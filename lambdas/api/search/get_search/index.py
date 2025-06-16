@@ -79,15 +79,16 @@ class SearchParams(BaseModelWithConfig):
     filters: Optional[List[Dict]] = None
     search_fields: Optional[List[str]] = None
     semantic: bool = Field(default=False)
-    asset_size_lte: int = None
-    asset_size_gte: int = None
-    ingested_date_lte: datetime = None
-    ingested_date_gte: datetime = None
-    extension: str = None
-    content_type: str = None
-    format: str = None
-    type: str = None
-
+    
+    # New facet parameters
+    type: Optional[str] = None
+    extension: Optional[str] = None
+    LargerThan: Optional[int] = None
+    asset_size_lte: Optional[int] = None
+    asset_size_gte: Optional[int] = None
+    ingested_date_lte: Optional[str] = None
+    ingested_date_gte: Optional[str] = None
+    filename: Optional[str] = None
 
     @property
     def from_(self) -> int:
@@ -239,7 +240,7 @@ def build_semantic_query(params: SearchParams) -> Dict:
                     {"term": {"embedding_scope": "clip"}}
                 ]
 
-            print(json.dumps(query))
+            # print(json.dumps(query))
             logger.info(f"Semantic query size: {query['size']}, k: {query['query']['bool']['must'][0]['knn']['embedding']['k']}")
             return query
         else:
@@ -253,18 +254,17 @@ def build_search_query(params: SearchParams) -> Dict:
     """Build OpenSearch query from search parameters"""
     print("this is printing extension",params.extension)
     print("this is printing type",params.type)
+    print("this is printing size lte",params.asset_size_lte)
     print("this is printing size gte",params.asset_size_gte)
     print("this is printing date gte",params.ingested_date_gte)
-    print("this is printing format",params.format)
     logger.info("Building search query with params:", extra={"params": params.model_dump()})
 
     if params.semantic:
         return build_semantic_query(params)
 
     clean_query, parsed_filters = parse_search_query(params.q)
-    print(clean_query,parsed_filters)
+    print("the value of clean query is",clean_query)
     logger.info("Parsed search query:", extra={"clean_query": clean_query, "filters": parsed_filters})
-    logger.info(f"➔ raw q='{params.q}' → clean_query={clean_query!r}, parsed_filters={parsed_filters!r}")
 
 
     name_fields = [
@@ -395,31 +395,30 @@ def build_search_query(params: SearchParams) -> Dict:
          ]
             }
         }
-
-
+    # Process Facet filters
     if params.type is not None:
+        var_type = params.type.split(",")
         query["bool"]["filter"].append(
-                           {
-                                "term": {"DigitalSourceAsset.Type.keyword": 
-                                        {"value":params.type,
-                                        "case_insensitive": True
-                                        }
-                                        }
-                            }
+                                {
+                                "terms": {
+                                    "DigitalSourceAsset.Type": var_type
+                                }
+                                }
     
         )
   
     if params.extension is not None:
+        var_ext = params.extension.split(",")
+        print("this is printing var_ext", var_ext)
         query["bool"]["filter"].append(
-                           {
-                                "term": {"DigitalSourceAsset.MainRepresentation.Format.keyword": 
-                                        {"value":params.extension,
-                                        "case_insensitive": True
-                                        }
-                                        }
-                            }
+                                {
+                                "terms": {
+                                    "DigitalSourceAsset.MainRepresentation.Format": var_ext
+                                }
+                                }
     
         )
+
 
     if params.asset_size_lte is not None and params.asset_size_gte is not None:
         try:
@@ -434,7 +433,33 @@ def build_search_query(params: SearchParams) -> Dict:
         except ValueError:
             logger.warning(f"Invalid values for asset size: {params.asset_size_gte,params.asset_size_lte}")
 
-    
+    if params.ingested_date_lte is not None and params.ingested_date_gte is not None:
+        try:
+            query["bool"]["filter"].append({
+                "range": {
+                    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate": {
+                        "gte": params.ingested_date_gte,
+                        "lte": params.ingested_date_lte
+                    }
+                }
+            })
+        except ValueError:
+            logger.warning(f"Invalid values for asset size: {params.asset_size_gte,params.asset_size_lte}")
+
+
+    # Process generic filters
+    if params.filters:
+        for filter_item in params.filters:
+            if filter_item.get("operator") == "term":
+                query["bool"]["filter"].append(
+                    {"term": {filter_item["field"]: filter_item["value"]}}
+                )
+            elif filter_item.get("operator") == "range":
+                query["bool"]["filter"].append(
+                    {"range": {filter_item["field"]: filter_item["value"]}}
+                )
+
+    # Build the complete OpenSearch query with aggregations for facets
     return {
         "query": query,
         "min_score": params.min_score,
@@ -444,13 +469,38 @@ def build_search_query(params: SearchParams) -> Dict:
             "file_types": {
                 "terms": {
                     "field": "DigitalSourceAsset.MainRepresentation.Format.keyword",
-                    "size": 20
+                    "size": 50
                 }
             },
             "asset_types": {
                 "terms": {
                     "field": "DigitalSourceAsset.Type.keyword",
                     "size": 20
+                }
+            },
+            "file_extensions": {
+                "terms": {
+                    "field": "DigitalSourceAsset.MainRepresentation.Format.keyword",
+                    "size": 50
+                }
+            },
+            "file_size_ranges": {
+                "range": {
+                    "field": "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize",
+                    "ranges": [
+                        { "to": 1024 * 100 },                  # < 100KB
+                        { "from": 1024 * 100, "to": 1024 * 1024 },      # 100KB - 1MB
+                        { "from": 1024 * 1024, "to": 10 * 1024 * 1024 },  # 1MB - 10MB
+                        { "from": 10 * 1024 * 1024, "to": 100 * 1024 * 1024 },  # 10MB - 100MB
+                        { "from": 100 * 1024 * 1024 }          # > 100MB
+                    ]
+                }
+            },
+            "ingestion_date": {
+                "date_histogram": {
+                    "field": "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate",
+                    "calendar_interval": "month",
+                    "format": "yyyy-MM-dd"
                 }
             }
         },
@@ -461,6 +511,8 @@ def build_search_query(params: SearchParams) -> Dict:
                 "DigitalSourceAsset.MainRepresentation.Format",
                 "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey",
                 "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo",
+                "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize",
+                "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate",
                 "DigitalSourceAsset.CreateDate",
                 "DerivedRepresentations.Purpose",
                 "DerivedRepresentations.StorageInfo.PrimaryLocation",
@@ -471,7 +523,7 @@ def build_search_query(params: SearchParams) -> Dict:
     }
 
 
-def process_search_hit(hit: Dict) -> AssetSearchResult:
+def process_search_hit(hit: Dict) -> Dict:
     """Process a single search hit and add presigned URL if thumbnail representation exists"""
     source = hit["_source"]
     digital_source_asset = source.get("DigitalSourceAsset", {})
@@ -504,7 +556,11 @@ def process_search_hit(hit: Dict) -> AssetSearchResult:
         if thumbnail_url and proxy_url:
             break
 
-    return AssetSearchResult(
+    # Extract fields to include at root level
+    object_key = storage_info.get("ObjectKey", {})
+    
+    # Create base result object
+    result = AssetSearchResult(
         InventoryID=source.get("InventoryID", ""),
         DigitalSourceAsset=digital_source_asset,
         DerivedRepresentations=derived_representations,
@@ -514,6 +570,11 @@ def process_search_hit(hit: Dict) -> AssetSearchResult:
         thumbnailUrl=thumbnail_url,
         proxyUrl=proxy_url,
     )
+    
+    # Convert to dictionary for adding additional fields
+    result_dict = result.model_dump(by_alias=True)
+    
+    return result_dict
 
 
 def process_clip(clip_hit: Dict) -> Dict:
@@ -521,14 +582,44 @@ def process_clip(clip_hit: Dict) -> Dict:
     Process a clip hit to preserve all clip-specific fields.
     """
     source = clip_hit["_source"]
-    asset_id = source.get("DigitalSourceAsset", {}).get("ID", "unknown")
+    digital_source_asset = source.get("DigitalSourceAsset", {})
+    main_rep = digital_source_asset.get("MainRepresentation", {})
+    storage_info = main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
+    object_key = storage_info.get("ObjectKey", {})
+    
+    asset_id = digital_source_asset.get("ID", "unknown")
     original_score = clip_hit.get("_score", 0)
     logger.info(f"Original OpenSearch score for clip of asset {asset_id}: {original_score}")
 
     result = {
-        "DigitalSourceAsset": source.get("DigitalSourceAsset", {}),
+        "DigitalSourceAsset": digital_source_asset,
         "score": clip_hit["_score"],
     }
+
+    # Add the same root-level fields as in process_search_hit for consistency
+    result["assetType"] = digital_source_asset.get("Type", "")
+    result["format"] = main_rep.get("Format", "")
+    result["objectName"] = object_key.get("Name", "")
+    result["fullPath"] = object_key.get("FullPath", "")
+    result["bucket"] = storage_info.get("Bucket", "")
+    
+    # Handle different possible locations of file size
+    file_size = storage_info.get("FileSize", 0)
+    if not file_size and "FileInfo" in storage_info:
+        file_size = storage_info.get("FileInfo", {}).get("Size", 0)
+    result["fileSize"] = file_size
+    
+    # Handle different possible locations of creation date
+    created_date = storage_info.get("CreateDate", "")
+    if not created_date and "FileInfo" in storage_info:
+        created_date = storage_info.get("FileInfo", {}).get("CreateDate", "")
+    if not created_date:
+        created_date = digital_source_asset.get("CreateDate", "")
+    result["createdAt"] = created_date
+    
+    # Include any consolidated metadata if available
+    if "Metadata" in source and "Consolidated" in source.get("Metadata", {}):
+        result["metadata"] = source["Metadata"].get("Consolidated", {})
 
     if "embedding_scope" in source:
         result["embedding_scope"] = source["embedding_scope"]
@@ -541,8 +632,9 @@ def process_clip(clip_hit: Dict) -> Dict:
     if "timestamp" in source:
         result["timestamp"] = source["timestamp"]
 
+    # Include any other fields from the source that might be clip-specific
     for key, value in source.items():
-        if key not in result and key not in ["DigitalSourceAsset"]:
+        if key not in result and key not in ["DigitalSourceAsset", "Metadata"]:
             result[key] = value
 
     return result
@@ -559,7 +651,7 @@ def get_parent_asset(client, index_name, asset_id):
                     "must": [
                         {
                             "term": {
-                                "DigitalSourceAsset.ID": asset_id
+                                "DigitalSourceAsset.ID.keyword": asset_id
                             }
                         }
                     ],
@@ -637,93 +729,94 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
     client = get_opensearch_client()
     index_name = os.environ["OPENSEARCH_INDEX"]
 
-    # 1) collect all orphan IDs into a list
-    orphan_ids = list(orphaned_clip_assets - parent_assets.keys())
-    print(orphan_ids)
-    if orphan_ids:
-        # 2) batch-fetch all parents in one terms query
-        batch_query = {
-            "query": {
-                "bool": {
-                    "must": [
-                        {"terms": {"DigitalSourceAsset.ID": orphan_ids}}
-                    ],
-                    "must_not": [
-                        {"term": {"embedding_scope": "clip"}}
-                    ]
-                }
-            },
-            "size": len(orphan_ids)
-        }
-        resp = client.search(body=batch_query, index=index_name)
-        print(resp)
-        for hit in resp["hits"]["hits"]:
-            src = hit["_source"]
-            pid = src["DigitalSourceAsset"]["ID"]
-            original_score = hit["_score"]  
-            highest_clip_score = max(
-                (c["score"] for c in clips_by_asset.get(pid, [])),
-                default=0
-            )
-            parent_assets[pid] = {
-                "source": src,
-                "score": highest_clip_score,
-                "hit": hit
-            }
+    for asset_id in orphaned_clip_assets:
+        if asset_id not in parent_assets:
+            parent_hit = get_parent_asset(client, index_name, asset_id)
+            if parent_hit:
+                highest_clip_score = max(
+                    (clip["score"] for clip in clips_by_asset.get(asset_id, [])),
+                    default=0
+                )
+                parent_score = parent_hit["_score"]
 
-            logger.info(
-                f"Fetched parent asset for orphaned clips: {pid} "
-                f"with score {parent_assets[pid]['score']} "
-                f"(original score: {original_score}, "
-                f"highest clip score: {highest_clip_score})"
-            )
+                # logging before compute
+                logger.info(
+                    f"[orphan-refetch] asset={asset_id}  "
+                    f"parent_score={parent_score:.4f}  "
+                    f"highest_clip_score={highest_clip_score:.4f}"
+                )
+ 
+                # simple inheritance
+                final_score = highest_clip_score
+
+
+                # logging after compute
+                logger.info(
+                    f"[orphan-refetch] asset={asset_id}  "
+                    f"final_score={final_score:.4f}"
+                )
+
+                parent_assets[asset_id] = {
+                    "source": parent_hit["_source"],
+                    "score": final_score,
+                    "hit": parent_hit
+                }
+
+                logger.info(f"Fetched parent asset for orphaned clips: {asset_id} with score {parent_assets[asset_id]['score']} (original score: {parent_hit['_score']}, highest clip score: {highest_clip_score})")
 
     def process_asset_with_clips(asset_id):
         if asset_id in parent_assets:
             try:
-                result = process_search_hit(parent_assets[asset_id]["hit"])
-                result_dict = result.model_dump(by_alias=True)
-                parent_score = result_dict.get("score", 0)
-                digital_source = result_dict.get("DigitalSourceAsset", {})
-                asset_type = digital_source.get("Type", "").lower()
+                parent_hit = parent_assets[asset_id]["hit"]
+                result = process_search_hit(parent_hit)
+                parent_score = parent_hit["_score"]
+                asset_type = result.get("DigitalSourceAsset", {}).get("Type", "unknown").lower()
+
+                # logging parent info
+                logger.info(
+                    f"[compute] asset={asset_id} "
+                    f"type={asset_type} "
+                    f"parent_score={parent_score:.4f}"
+                )
 
                 if asset_id in clips_by_asset:
-                    asset_clips = sorted(clips_by_asset[asset_id], key=lambda x: x["score"], reverse=True)
-                    highest_clip_score = asset_clips[0]["score"]
+                    asset_clips = clips_by_asset[asset_id]
+                    highest_clip_score = max(c["score"] for c in asset_clips)
 
-                    # Branch the logic based on asset type.
-                    if asset_type == "audio":
-                        # For audio, use the highest clip score directly as the asset score.
-                        combined_score = highest_clip_score
-                        logger.info(f"Audio asset {asset_id}: using highest clip score {highest_clip_score} as combined score.")
-                    else:
-                        # For video (or other types with their own embeddings), use a weighted average.
-                        relevance_ratio = (highest_clip_score / parent_score) if parent_score > 0 else 2.0
-                        if relevance_ratio > 1.2:
-                            combined_score = (0.5 * parent_score) + (0.5 * highest_clip_score)
-                            logger.info(f"Asset {asset_id}: Combining scores parent {parent_score} and clip {highest_clip_score} into {combined_score} (relevance ratio: {relevance_ratio:.2f}).")
-                        else:
-                            combined_score = parent_score
-                            logger.info(f"Asset {asset_id}: Keeping parent's score {parent_score} (relevance ratio: {relevance_ratio:.2f}).")
-                    
-                    # Ensure the score does not exceed 1.0.
-                    combined_score = min(combined_score, 1.0)
-                    result_dict["score"] = combined_score
+                    # logging clip info
+                    logger.info(
+                        f"[compute] asset={asset_id} "
+                        f"highest_clip_score={highest_clip_score:.4f}"
+                    )
 
-                    # Process and attach clips for transparency/debugging.
-                    result_dict["clips"] = [process_clip(clip_hit["hit"]) for clip_hit in asset_clips]
-                # Ensure the 'clips' key is always a list.
-                result_dict["clips"] = result_dict.get("clips") or []
-                return result_dict
+                    # inherit the higher score
+                    combined_score = highest_clip_score
+                    # combined_score = max(parent_score, highest_clip_score)
+                    # combined_score = min(combined_score, 1.0)
+                    result["score"] = combined_score
+
+                    # logging final result
+                    logger.info(
+                        f"[compute] asset={asset_id} "
+                        f"final_score={combined_score:.4f}"
+                    )
+
+                    sorted_clips = sorted(asset_clips, key=lambda x: x["score"], reverse=True)
+                    result["clips"] = [process_clip(c["hit"]) for c in sorted_clips]
+                else:
+                    result["clips"] = []
+
+                return result
             except Exception as e:
                 logger.warning(f"Error processing parent asset {asset_id}: {str(e)}")
                 return None
         return None
 
+
     def process_standalone_hit(hit):
         try:
             result = process_search_hit(hit)
-            return result.model_dump(by_alias=True)
+            return result
         except Exception as e:
             logger.warning(f"Error processing standalone hit: {str(e)}")
             return None
@@ -801,11 +894,67 @@ def perform_search(params: SearchParams) -> Dict:
         if hits is None:
             hits = []
 
+        # Define a helper function to add common fields to any result object
+        def add_common_fields(result, prefix=""):
+            """Add commonly needed fields to the root level of the result object"""
+            # Access the nested structure
+            digital_source_asset = result.get(f"{prefix}DigitalSourceAsset", {})
+            main_rep = digital_source_asset.get("MainRepresentation", {})
+            storage_info = main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
+            object_key = storage_info.get("ObjectKey", {})
+            inventory_id = result.get("InventoryID", "")
+            
+            # Add ID fields
+            if inventory_id:
+                # Extract the UUID part from the inventory ID
+                if ":" in inventory_id:
+                    uuid_part = inventory_id.split(":")[-1]
+                    result["id"] = uuid_part
+                else:
+                    result["id"] = inventory_id
+
+            # Add asset metadata fields
+            result["assetType"] = digital_source_asset.get("Type", "")
+            result["format"] = main_rep.get("Format", "")
+            result["objectName"] = object_key.get("Name", "")
+            result["fullPath"] = object_key.get("FullPath", "")
+            result["bucket"] = storage_info.get("Bucket", "")
+            
+            # Handle file size - check different locations
+            file_size = storage_info.get("FileSize", 0)
+            if not file_size and "FileInfo" in storage_info:
+                file_size = storage_info.get("FileInfo", {}).get("Size", 0)
+            result["fileSize"] = file_size
+            
+            # Handle creation date - check different locations
+            created_date = storage_info.get("CreateDate", "")
+            if not created_date and "FileInfo" in storage_info:
+                created_date = storage_info.get("FileInfo", {}).get("CreateDate", "")
+            if not created_date:
+                created_date = digital_source_asset.get("CreateDate", "")
+            result["createdAt"] = created_date
+            
+            # Include consolidated metadata directly
+            if "Metadata" in result and "Consolidated" in result.get("Metadata", {}):
+                result["metadata"] = result["Metadata"].get("Consolidated", {})
+            
+            return result
+
         if params.semantic:
             if CLIP_LOGIC_ENABLED:
                 processed_results = process_semantic_results_parallel(hits)
                 if processed_results is None:  # Safety check.
                     processed_results = []
+                
+                # Add common fields to each result
+                processed_results = [add_common_fields(result) for result in processed_results]
+                
+                # Also add fields to clips if present
+                for result in processed_results:
+                    if "clips" in result and result["clips"]:
+                        for clip in result["clips"]:
+                            clip = add_common_fields(clip)
+                
                 total_results = len(processed_results)
                 start_idx = (params.page - 1) * params.pageSize
                 end_idx = start_idx + params.pageSize
@@ -813,6 +962,7 @@ def perform_search(params: SearchParams) -> Dict:
                     start_idx = 0
                     end_idx = min(params.pageSize, total_results)
                 paged_results = processed_results[start_idx:end_idx]
+                
                 logger.info(f"Successfully processed semantic search results: {total_results} total, {len(paged_results)} returned")
                 if params.page > 1 and len(paged_results) < params.pageSize:
                     total_count = (params.page - 1) * params.pageSize + len(paged_results)
@@ -840,11 +990,14 @@ def perform_search(params: SearchParams) -> Dict:
                 for hit in hits:
                     try:
                         result = process_search_hit(hit)
-                        results.append(result.model_dump(by_alias=True))
+                        results.append(result)
                     except Exception as e:
                         logger.warning(f"Error processing hit: {str(e)}", extra={"hit": hit})
                         continue
 
+                # Add common fields to each result
+                results = [add_common_fields(result) for result in results]
+                
                 logger.info(f"Successfully processed semantic hits without clip logic: {len(results)}")
                 total_results = len(results)
                 start_idx = (params.page - 1) * params.pageSize
@@ -853,6 +1006,7 @@ def perform_search(params: SearchParams) -> Dict:
                     start_idx = 0
                     end_idx = min(params.pageSize, total_results)
                 paged_results = results[start_idx:end_idx]
+                
                 search_metadata = SearchMetadata(
                     totalResults=total_results,
                     page=params.page,
@@ -879,6 +1033,9 @@ def perform_search(params: SearchParams) -> Dict:
                     logger.warning(f"Error processing hit: {str(e)}", extra={"hit": hit})
                     continue
 
+            # Add common fields to each result
+            hits_list = [add_common_fields(result) for result in hits_list]
+            
             logger.info(f"Successfully processed hits: {len(hits_list)}")
             search_metadata = SearchMetadata(
                 totalResults=response["hits"]["total"]["value"],
@@ -893,7 +1050,7 @@ def perform_search(params: SearchParams) -> Dict:
                 "message": "ok",
                 "data": {
                     "searchMetadata": search_metadata.model_dump(by_alias=True),
-                    "results": [hit.model_dump(by_alias=True) for hit in hits_list],
+                    "results": hits_list,
                 },
             }
 
@@ -937,8 +1094,85 @@ def handle_search():
     """Handle search requests with validated parameters."""
     try:
         params = SearchParams(**app.current_event.get("queryStringParameters", {}))
-        print(params)
-        return perform_search(params)
+        result = perform_search(params)
+        
+        # Final transform to ensure root-level fields are added
+        if result.get("status") == "200" and "data" in result and "results" in result["data"]:
+            for item in result["data"]["results"]:
+                # Add ID from InventoryID
+                if "InventoryID" in item:
+                    inventory_id = item["InventoryID"]
+                    if ":" in inventory_id:
+                        item["id"] = inventory_id.split(":")[-1]
+                    else:
+                        item["id"] = inventory_id
+                
+                # Add standard fields from nested structure
+                if "DigitalSourceAsset" in item:
+                    digital_source_asset = item["DigitalSourceAsset"]
+                    item["assetType"] = digital_source_asset.get("Type", "")
+                    
+                    # Handle creation date
+                    item["createdAt"] = digital_source_asset.get("CreateDate", "")
+                    
+                    # Extract from MainRepresentation
+                    if "MainRepresentation" in digital_source_asset:
+                        main_rep = digital_source_asset["MainRepresentation"]
+                        item["format"] = main_rep.get("Format", "")
+                        
+                        # Extract from StorageInfo.PrimaryLocation
+                        if "StorageInfo" in main_rep and "PrimaryLocation" in main_rep["StorageInfo"]:
+                            location = main_rep["StorageInfo"]["PrimaryLocation"]
+                            
+                            # Extract file info
+                            if "FileInfo" in location:
+                                file_info = location["FileInfo"]
+                                item["fileSize"] = file_info.get("Size", 0)
+                                if not item["createdAt"] and "CreateDate" in file_info:
+                                    item["createdAt"] = file_info["CreateDate"]
+                            
+                            # Extract object key info
+                            if "ObjectKey" in location:
+                                object_key = location["ObjectKey"]
+                                item["objectName"] = object_key.get("Name", "")
+                                item["fullPath"] = object_key.get("FullPath", "")
+                            
+                            item["bucket"] = location.get("Bucket", "")
+                
+                # Add metadata 
+                if "Metadata" in item and "Consolidated" in item["Metadata"]:
+                    item["metadata"] = item["Metadata"]["Consolidated"]
+                
+                # Process clips if present
+                if "clips" in item and item["clips"]:
+                    for clip in item["clips"]:
+                        if "DigitalSourceAsset" in clip:
+                            clip_asset = clip["DigitalSourceAsset"]
+                            clip["assetType"] = clip_asset.get("Type", "")
+                            
+                            clip["createdAt"] = clip_asset.get("CreateDate", "")
+                            
+                            if "MainRepresentation" in clip_asset:
+                                clip_main_rep = clip_asset["MainRepresentation"]
+                                clip["format"] = clip_main_rep.get("Format", "")
+                                
+                                if "StorageInfo" in clip_main_rep and "PrimaryLocation" in clip_main_rep["StorageInfo"]:
+                                    clip_location = clip_main_rep["StorageInfo"]["PrimaryLocation"]
+                                    
+                                    if "FileInfo" in clip_location:
+                                        clip_file_info = clip_location["FileInfo"]
+                                        clip["fileSize"] = clip_file_info.get("Size", 0)
+                                        if not clip["createdAt"] and "CreateDate" in clip_file_info:
+                                            clip["createdAt"] = clip_file_info["CreateDate"]
+                                    
+                                    if "ObjectKey" in clip_location:
+                                        clip_object_key = clip_location["ObjectKey"]
+                                        clip["objectName"] = clip_object_key.get("Name", "")
+                                        clip["fullPath"] = clip_object_key.get("FullPath", "")
+                                    
+                                    clip["bucket"] = clip_location.get("Bucket", "")
+        
+        return result
     except ValueError as e:
         logger.warning(f"Invalid input parameters: {str(e)}")
         return {"status": "400", "message": str(e), "data": None}
@@ -949,9 +1183,6 @@ def handle_search():
 
 @metrics.log_metrics
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_HTTP)
-
 def lambda_handler(event: dict, context: LambdaContext) -> dict:
-    print(event)
-    print(context)
     """Lambda handler function"""
     return app.resolve(event, context)
