@@ -10,12 +10,12 @@ import boto3
 import os
 from botocore.exceptions import ClientError
 import json
-from boto3.dynamodb.conditions import Key
+from boto3.dynamodb.conditions import Key, Attr
 
 # Initialize AWS PowerTools
 logger = Logger(service="authorization-service", level=os.getenv("LOG_LEVEL", "WARNING"))
 tracer = Tracer(service="authorization-service")
-metrics = Metrics(namespace="medialake", service="groups-delete")
+metrics = Metrics(namespace="medialake", service="groups-list")
 
 # Initialize DynamoDB client
 dynamodb = boto3.resource("dynamodb")
@@ -27,10 +27,10 @@ class ErrorResponse(BaseModel):
     data: Dict = Field(default={}, description="Empty data object for errors")
 
 
-class SuccessResponse(BaseModel):
+class GroupsResponse(BaseModel):
     status: str = Field(..., description="Success status code")
     message: str = Field(..., description="Success message")
-    data: Dict[str, Any] = Field(default={}, description="Empty data object for success")
+    data: Dict[str, Any] = Field(..., description="Groups data")
 
 
 @tracer.capture_lambda_handler
@@ -40,7 +40,7 @@ def lambda_handler(
     event: Dict[str, Any], context: LambdaContext
 ) -> Dict[str, Any]:
     """
-    Lambda handler to delete a group from DynamoDB
+    Lambda handler to list all groups from DynamoDB
     """
     try:
         # Log the entire event structure for debugging
@@ -82,50 +82,22 @@ def lambda_handler(
             )
             return _create_error_response(500, "Internal configuration error")
 
-        # Get the group ID from path parameters
-        path_parameters = event.get("pathParameters", {})
-        if not path_parameters:
-            logger.error("Missing path parameters")
-            metrics.add_metric(
-                name="MissingPathParamsError", unit=MetricUnit.Count, value=1
-            )
-            return _create_error_response(400, "Missing group ID")
-            
-        group_id = path_parameters.get("groupId")
-        if not group_id:
-            logger.error("Missing groupId in path parameters")
-            metrics.add_metric(
-                name="MissingGroupIdError", unit=MetricUnit.Count, value=1
-            )
-            return _create_error_response(400, "Missing group ID")
-
-        # Check if the group exists
-        table = dynamodb.Table(auth_table_name)
-        response = table.get_item(
-            Key={
-                "PK": f"GROUP#{group_id}",
-                "SK": "METADATA"
-            }
-        )
+        # Get query parameters
+        query_string_parameters = event.get("queryStringParameters", {}) or {}
         
-        if "Item" not in response:
-            logger.error(f"Group not found", extra={"group_id": group_id})
-            metrics.add_metric(name="GroupNotFoundError", unit=MetricUnit.Count, value=1)
-            return _create_error_response(404, f"Group with ID {group_id} not found")
-
-        # Delete the group and all its memberships
-        _delete_group(auth_table_name, group_id)
+        # Fetch groups from DynamoDB
+        groups = _list_groups(auth_table_name, query_string_parameters)
 
         # Create success response
-        response = SuccessResponse(
+        response = GroupsResponse(
             status="200",
-            message="Group deleted successfully",
-            data={}
+            message="Groups retrieved successfully",
+            data={"groups": groups},
         )
 
-        logger.info("Successfully deleted group", 
-                   extra={"group_id": group_id})
-        metrics.add_metric(name="SuccessfulGroupDeletion", unit=MetricUnit.Count, value=1)
+        logger.info("Successfully retrieved groups", 
+                   extra={"count": len(groups)})
+        metrics.add_metric(name="SuccessfulGroupsLookup", unit=MetricUnit.Count, value=1)
 
         return {
             "statusCode": 200,
@@ -140,63 +112,54 @@ def lambda_handler(
 
 
 @tracer.capture_method
-def _delete_group(
+def _list_groups(
     table_name: str, 
-    group_id: str
-) -> None:
+    query_params: Dict[str, str]
+) -> List[Dict[str, Any]]:
     """
-    Delete a group and all its memberships from DynamoDB
+    List all groups from DynamoDB using a scan operation with a filter expression
+    to find all items where PK begins with "GROUP#" and SK equals "METADATA"
     """
     try:
         table = dynamodb.Table(table_name)
         
-        # First, get all items related to this group (memberships)
-        response = table.query(
-            KeyConditionExpression=Key("PK").eq(f"GROUP#{group_id}")
+        # Use scan with filter expression to find all group items
+        # This is more efficient than using a GSI when we have a known prefix pattern
+        response = table.scan(
+            FilterExpression=Attr("PK").begins_with("GROUP#") & Attr("SK").eq("METADATA")
         )
         
         items = response.get("Items", [])
         
         # Process pagination if there are more results
         while "LastEvaluatedKey" in response:
-            response = table.query(
-                KeyConditionExpression=Key("PK").eq(f"GROUP#{group_id}"),
+            response = table.scan(
+                FilterExpression=Attr("PK").begins_with("GROUP#") & Attr("SK").eq("METADATA"),
                 ExclusiveStartKey=response["LastEvaluatedKey"]
             )
             items.extend(response.get("Items", []))
         
-        # Delete all items in batches of 25 (DynamoDB batch write limit)
-        batch_size = 25
-        for i in range(0, len(items), batch_size):
-            batch_items = items[i:i+batch_size]
-            
-            # Prepare batch delete request
-            delete_requests = []
-            for item in batch_items:
-                delete_requests.append({
-                    "DeleteRequest": {
-                        "Key": {
-                            "PK": item["PK"],
-                            "SK": item["SK"]
-                        }
-                    }
-                })
-            
-            # Execute batch delete
-            if delete_requests:
-                dynamodb.batch_write_item(
-                    RequestItems={
-                        table_name: delete_requests
-                    }
-                )
+        # Log the number of items found
+        logger.info(f"Found {len(items)} group items in DynamoDB")
         
-        # Also delete any reverse lookup items (USER#{userId}#MEMBERSHIP#GROUP#{groupId})
-        # This would require additional queries and batch deletes
-        # For simplicity, we're not implementing this here, but in a production system
-        # you would want to clean up these references as well
-
-        logger.info(f"Deleted group and {len(items)} related items", 
-                   extra={"group_id": group_id})
+        # Transform the items to remove DynamoDB-specific attributes
+        groups = []
+        for item in items:
+            group = {
+                "id": item.get("id"),
+                "name": item.get("name"),
+                "description": item.get("description"),
+                "createdBy": item.get("createdBy"),
+                "createdAt": item.get("createdAt"),
+                "updatedAt": item.get("updatedAt"),
+                # Include any additional fields that might be useful
+                "department": item.get("department")
+            }
+            # Remove None values
+            group = {k: v for k, v in group.items() if v is not None}
+            groups.append(group)
+        
+        return groups
 
     except ClientError as e:
         logger.error(f"DynamoDB error", extra={"error": str(e)})
@@ -214,4 +177,4 @@ def _create_error_response(status_code: int, message: str) -> Dict[str, Any]:
         "statusCode": status_code,
         "headers": {"Content-Type": "application/json"},
         "body": error_response.model_dump_json(),
-    }
+    } 

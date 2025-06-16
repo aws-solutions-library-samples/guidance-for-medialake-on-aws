@@ -52,13 +52,14 @@ interface ManageGroupsModalProps {
 interface EditGroupFormData {
   name: string;
   description: string;
+  department: string;
 }
 
 const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({ open, onClose }) => {
   const { t } = useTranslation();
   const [selectedTab, setSelectedTab] = useState(0);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
-  const [editFormData, setEditFormData] = useState<EditGroupFormData>({ name: '', description: '' });
+  const [editFormData, setEditFormData] = useState<EditGroupFormData>({ name: '', description: '', department: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmDeleteGroup, setConfirmDeleteGroup] = useState<Group | null>(null);
   const [permissionSetMenuAnchor, setPermissionSetMenuAnchor] = useState<null | HTMLElement>(null);
@@ -98,7 +99,7 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({ open, onClose }) 
   useEffect(() => {
     if (!open) {
       setEditingGroup(null);
-      setEditFormData({ name: '', description: '' });
+      setEditFormData({ name: '', description: '', department: '' });
       setErrors({});
       setConfirmDeleteGroup(null);
       setPermissionSetMenuAnchor(null);
@@ -111,7 +112,8 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({ open, onClose }) 
     if (editingGroup) {
       setEditFormData({
         name: editingGroup.name,
-        description: editingGroup.description
+        description: editingGroup.description,
+        department: editingGroup.department || ''
       });
     }
   }, [editingGroup]);
@@ -161,6 +163,9 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({ open, onClose }) 
     }
     if (editFormData.description !== editingGroup.description) {
       updates.description = editFormData.description;
+    }
+    if (editFormData.department !== (editingGroup.department || '')) {
+      updates.department = editFormData.department;
     }
     
     try {
@@ -393,6 +398,14 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({ open, onClose }) 
                               multiline
                               rows={3}
                             />
+                            <TextField
+                              name="department"
+                              label={t('groups.fields.department')}
+                              value={editFormData.department}
+                              onChange={handleEditFormChange}
+                              fullWidth
+                              margin="normal"
+                            />
                           </CardContent>
                           <CardActions>
                             <Button 
@@ -422,6 +435,11 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({ open, onClose }) 
                                 <Typography variant="body2" color="text.secondary">
                                   {group.description || t('groups.noDescription')}
                                 </Typography>
+                                {group.department && (
+                                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                    <strong>{t('groups.fields.department')}:</strong> {group.department}
+                                  </Typography>
+                                )}
                               </Box>
                               <Box>
                                 <Tooltip title={t('common.actions.edit')}>

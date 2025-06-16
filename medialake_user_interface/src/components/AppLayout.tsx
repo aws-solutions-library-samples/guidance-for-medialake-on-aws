@@ -8,6 +8,7 @@ import { ChatProvider } from '../contexts/ChatContext';
 import TopBar from '../TopBar';
 import Sidebar from '../Sidebar';
 import { ChatSidebar } from '../features/chat';
+import { DebugPermissions } from './DebugPermissions';
 
 const AppLayout: React.FC = () => {
     const [isCollapsed, setIsCollapsed] = useState(false);
@@ -71,6 +72,8 @@ const AppLayout: React.FC = () => {
                 </Box>
                 {/* Chat Sidebar - Positioned outside the main layout flow */}
                 <ChatSidebar />
+                {/* Debug component - remove in production */}
+                <DebugPermissions />
             </ChatProvider>
         </SidebarContext.Provider>
     );

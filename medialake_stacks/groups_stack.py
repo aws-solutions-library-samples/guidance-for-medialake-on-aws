@@ -11,6 +11,7 @@ from aws_cdk import (
     aws_apigateway as api_gateway,
     aws_dynamodb as dynamodb,
     aws_cognito as cognito,
+    aws_iam as iam,
     aws_secretsmanager as secrets_manager,
     aws_apigateway as apigateway,
     Duration,
@@ -87,11 +88,25 @@ class GroupsStack(cdk.NestedStack):
             "post-groups",
             config=LambdaConfig(
                 name="post-groups",
-                entry="lambdas/api/groups/create_group",
+                entry="lambdas/api/groups/post_groups",
                 environment_variables=common_env_vars,
             ),
         )
         props.auth_table.grant_read_write_data(post_groups_lambda.function)
+        
+        # Grant permissions for Cognito group management
+        post_groups_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "cognito-idp:CreateGroup",
+                    "cognito-idp:DeleteGroup",
+                    "cognito-idp:GetGroup",
+                    "cognito-idp:ListGroups",
+                ],
+                resources=[props.cognito_user_pool.user_pool_arn],
+            )
+        )
         
         groups_resource.add_method(
             "POST",
@@ -106,7 +121,7 @@ class GroupsStack(cdk.NestedStack):
             "authorization-groups-get",
             config=LambdaConfig(
                 name="authorization-groups-get",
-                entry="lambdas/api/groups/list_groups",
+                entry="lambdas/api/groups/get_groups",
                 environment_variables=common_env_vars,
             ),
         )
@@ -176,11 +191,25 @@ class GroupsStack(cdk.NestedStack):
             "authorization-groups-group-id-delete",
             config=LambdaConfig(
                 name="authorization-groups-group-id-delete",
-                entry="lambdas/api/groups/delete_group",
+                entry="lambdas/api/groups/rp_groupId/del_groupId",
                 environment_variables=common_env_vars,
             ),
         )
         props.auth_table.grant_read_write_data(authorization_groups_group_id_delete.function)
+        
+        # Grant permissions for Cognito group management
+        authorization_groups_group_id_delete.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "cognito-idp:CreateGroup",
+                    "cognito-idp:DeleteGroup",
+                    "cognito-idp:GetGroup",
+                    "cognito-idp:ListGroups",
+                ],
+                resources=[props.cognito_user_pool.user_pool_arn],
+            )
+        )
         
         group_id_resource.add_method(
             "DELETE",

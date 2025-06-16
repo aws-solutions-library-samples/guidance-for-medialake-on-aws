@@ -24,7 +24,7 @@ const PermissionContext = createContext<PermissionContextType>({
  * throughout the app
  */
 export function PermissionProvider({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, isInitialized } = useAuth();
   const [user, setUser] = useState<User | null>(null);
   const [ability, setAbility] = useState<AppAbility>(() => createAppAbility());
   
@@ -41,7 +41,9 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
 
   // Extract user information from JWT token
   useEffect(() => {
-    if (isAuthenticated) {
+    console.log('PermissionProvider: Auth state changed', { isAuthenticated, isInitialized, authLoading });
+    
+    if (isAuthenticated && isInitialized) {
       try {
         const token = StorageHelper.getToken();
         if (token) {
@@ -102,7 +104,7 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
       setUser(null);
       PermissionTokenCache.clear(); // Clear cache on logout
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isInitialized]);
 
   // Listen for storage changes (token updates) to refresh permissions
   useEffect(() => {
@@ -166,7 +168,7 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
     console.log('user.customPermissions:', (user as any)?.customPermissions);
     console.log('permissionSets:', permissionSets);
     
-    if (isAuthenticated && user) {
+    if (isAuthenticated && isInitialized && user) {
       try {
         // Check if we have custom permissions from JWT
         if ((user as any).customPermissions) {
@@ -208,7 +210,7 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
       console.log('Resetting ability - not authenticated or no user');
       setAbility(createAppAbility());
     }
-  }, [isAuthenticated, user, permissionSets]);
+  }, [isAuthenticated, isInitialized, user, permissionSets]);
 
   // Function to refresh permissions
   const refreshPermissions = useCallback(async () => {
@@ -223,7 +225,7 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
   // Context value
   const value = {
     ability,
-    loading: isLoading,
+    loading: isLoading || authLoading || !isInitialized,
     error,
     refreshPermissions,
   };

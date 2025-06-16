@@ -25,7 +25,10 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ open, onClose }) =>
   const { t } = useTranslation();
   const [formData, setFormData] = useState<CreateGroupRequest>({
     name: '',
-    description: ''
+    id: '',
+    description: '',
+    department: '',
+    assignedPermissionSets: []
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [snackbar, setSnackbar] = useState<{
@@ -57,6 +60,10 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ open, onClose }) =>
       newErrors.name = t('validation.required');
     }
     
+    if (!formData.id.trim()) {
+      newErrors.id = t('validation.required');
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -73,7 +80,7 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ open, onClose }) =>
       });
       
       // Reset form and close modal after successful creation
-      setFormData({ name: '', description: '' });
+      setFormData({ name: '', id: '', description: '', department: '', assignedPermissionSets: [] });
       setTimeout(() => {
         onClose();
       }, 1000);
@@ -113,6 +120,17 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ open, onClose }) =>
               required
             />
             <TextField
+              name="id"
+              label={t('groups.fields.id')}
+              value={formData.id}
+              onChange={handleChange}
+              fullWidth
+              margin="normal"
+              error={!!errors.id}
+              helperText={errors.id || t('groups.fields.idHelp')}
+              required
+            />
+            <TextField
               name="description"
               label={t('groups.fields.description')}
               value={formData.description}
@@ -121,6 +139,14 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ open, onClose }) =>
               margin="normal"
               multiline
               rows={3}
+            />
+            <TextField
+              name="department"
+              label={t('groups.fields.department')}
+              value={formData.department}
+              onChange={handleChange}
+              fullWidth
+              margin="normal"
             />
           </Box>
         </DialogContent>

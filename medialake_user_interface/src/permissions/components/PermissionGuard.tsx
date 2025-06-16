@@ -2,9 +2,11 @@
 import React, { useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { usePermission } from '../hooks/usePermission';
+import { useAuth } from '../../common/hooks/auth-context';
 import { Actions, Subjects } from '../types/ability.types';
 import { PermissionGuardProps } from '../types/permission.types';
 import { permissionCache } from '../utils/permission-cache';
+import { Box, CircularProgress, Typography } from '@mui/material';
 
 /**
  * Higher-order component for protecting routes based on permissions
@@ -20,6 +22,7 @@ export function PermissionGuard({
   children 
 }: PermissionGuardProps) {
   const { can, loading } = usePermission();
+  const { isAuthenticated, isLoading: authLoading, isInitialized } = useAuth();
   const location = useLocation();
   
   // Clear the permission cache when the component mounts
@@ -29,9 +32,36 @@ export function PermissionGuard({
     permissionCache.clear();
   }, []);
   
-  // Show loading state if permissions are still loading
-  if (loading) {
-    return <div>Loading permissions...</div>;
+  // Show loading state if authentication or permissions are still loading/initializing
+  if (authLoading || !isInitialized || loading) {
+    console.log('PermissionGuard: Showing loading state', { 
+      authLoading, 
+      isInitialized, 
+      permissionLoading: loading 
+    });
+    return (
+      <Box 
+        sx={{ 
+          display: 'flex', 
+          flexDirection: 'column',
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          height: '100vh',
+          gap: 2
+        }}
+      >
+        <CircularProgress />
+        <Typography variant="body2" color="text.secondary">
+          Loading permissions...
+        </Typography>
+      </Box>
+    );
+  }
+
+  // If not authenticated after initialization, redirect to sign-in
+  if (isInitialized && !isAuthenticated) {
+    console.log('PermissionGuard: User not authenticated, redirecting to sign-in');
+    return <Navigate to="/sign-in" state={{ from: location }} replace />;
   }
   
   // Check if the user has permission
@@ -50,6 +80,7 @@ export function PermissionGuard({
   }
   
   // Otherwise, redirect to the login page or access denied page
+  console.log('PermissionGuard: Access denied, redirecting to /access-denied');
   return <Navigate to="/access-denied" state={{ from: location }} replace />;
 }
 
