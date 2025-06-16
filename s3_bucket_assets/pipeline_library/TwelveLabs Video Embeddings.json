@@ -1,6 +1,6 @@
 {
   "name": "TwelveLabs Video Embeddings",
-  "description": "",
+  "description": "Generate TwelveLabs Video Embeddings",
   "active": true,
   "configuration": {
     "nodes": [
