@@ -251,6 +251,10 @@ import { Currency } from 'lucide-react';
           // When the timeline container's size changes, settle the layout.
           if (playerRef.current?.timeline) {
             playerRef.current.timeline.settleLayout();
+            // Check if zoom is not 100% and adjust it
+            if (playerRef.current.timeline.getZoomPercent() !== 100) {
+              playerRef.current.timeline.zoomTo(100);
+            }
             console.log('Timeline layout settled via ResizeObserver');
           }
         });

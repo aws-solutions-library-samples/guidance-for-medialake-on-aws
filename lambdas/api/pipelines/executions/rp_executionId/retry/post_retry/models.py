@@ -1,5 +1,5 @@
 from pynamodb.models import Model
-from pynamodb.attributes import UnicodeAttribute, NumberAttribute, MapAttribute
+from pynamodb.attributes import UnicodeAttribute, NumberAttribute
 
 class PipelineExecution(Model):
     class Meta:
@@ -17,14 +17,3 @@ class PipelineExecution(Model):
     ttl = NumberAttribute()
     end_time = NumberAttribute(null=True)
     end_time_iso = UnicodeAttribute(null=True)
-    
-    # Additional fields found in the data
-    dsa_type = UnicodeAttribute(null=True)
-    inventory_id = UnicodeAttribute(null=True)
-    object_key_name = UnicodeAttribute(null=True)
-    duration_seconds = NumberAttribute(null=True)
-    pipeline_trace_id = UnicodeAttribute(null=True)
-    stepname = UnicodeAttribute(null=True)
-    stepresult = UnicodeAttribute(null=True)
-    stepstatus = UnicodeAttribute(null=True)
-    metadata = MapAttribute(null=True)

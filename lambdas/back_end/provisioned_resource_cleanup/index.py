@@ -112,6 +112,7 @@ def clean_up_connector(item, table):
 
     if "queueUrl" in item:
         try:
+            logger.info(f"Attempting to delete SQS queue from connector with queueUrl: {item['queueUrl']}")
             delete_sqs_queue(item["queueUrl"])
         except Exception as e:
             errors.append(f"Error deleting SQS queue: {str(e)}")
@@ -194,6 +195,7 @@ def clean_up_pipeline(item, table):
                 logger.info(f"Cleaning up resource of type {resource_type}: {resource_identifier}")
                 
                 if resource_type == "sqs" or resource_type == "sqs_queue":
+                    logger.info(f"Attempting to delete SQS queue with identifier: {resource_identifier}")
                     delete_sqs_queue(resource_identifier)
                 elif resource_type == "eventbridge_rule":
                     # Handle the new format where resource_identifier is an ARN string
@@ -256,14 +258,49 @@ def clean_up_pipeline(item, table):
         logger.info(f"Successfully cleaned up pipeline {item['id']}")
 
 
-def delete_sqs_queue(queue_url):
+def delete_sqs_queue(queue_identifier):
+    """
+    Delete an SQS queue.
+    
+    Args:
+        queue_identifier: Either a queue URL or queue ARN
+    """
     try:
+        # Check if the identifier is an ARN or URL
+        if queue_identifier.startswith("arn:aws:sqs:"):
+            # Extract queue URL from ARN
+            # ARN format: arn:aws:sqs:region:account-id:queue-name
+            parts = queue_identifier.split(":")
+            if len(parts) >= 6:
+                region = parts[3]
+                account_id = parts[4]
+                queue_name = parts[5]
+                
+                # Construct the queue URL
+                queue_url = f"https://sqs.{region}.amazonaws.com/{account_id}/{queue_name}"
+                logger.info(f"Converting SQS ARN to URL: {queue_identifier} -> {queue_url}")
+            else:
+                logger.error(f"Invalid SQS ARN format: {queue_identifier}")
+                raise ValueError(f"Invalid SQS ARN format: {queue_identifier}")
+        elif queue_identifier.startswith("https://sqs.") or queue_identifier.startswith("http://sqs."):
+            # It's already a queue URL
+            queue_url = queue_identifier
+            logger.info(f"Using provided SQS queue URL: {queue_url}")
+        else:
+            # Backward compatibility: assume it might be a queue URL in a different format
+            # or try to use it as-is
+            queue_url = queue_identifier
+            logger.info(f"Using queue identifier as-is (backward compatibility): {queue_url}")
+        
         sqs.delete_queue(QueueUrl=queue_url)
-        logger.info(f"Deleted SQS queue {queue_url}")
+        logger.info(f"Successfully deleted SQS queue: {queue_url}")
     except ClientError as e:
         if e.response["Error"]["Code"] != "AWS.SimpleQueueService.NonExistentQueue":
             raise
-        logger.warning(f"SQS queue {queue_url} already deleted")
+        logger.warning(f"SQS queue {queue_identifier} already deleted or not found")
+    except Exception as e:
+        logger.error(f"Error deleting SQS queue {queue_identifier}: {str(e)}")
+        raise
 
 
 def delete_eventbridge_rule(rule_name, event_bus_name):

@@ -141,6 +141,30 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
     // console.log('[CustomNode] Input types:', data.inputTypes);
     // console.log('[CustomNode] Output types:', data.outputTypes);
     
+    // Helper function to check if node has configurable parameters
+    const hasConfigurableParameters = () => {
+        const parameters = data.configuration?.parameters;
+        const isIntegrationNode = data.type === 'INTEGRATION';
+        
+        // Integration nodes always need configuration (for integration selection)
+        if (isIntegrationNode) return true;
+        
+        // If no parameters object, no configuration needed
+        if (!parameters) return false;
+        
+        // If parameters is an array (from API response), check if it has items
+        if (Array.isArray(parameters)) {
+            return parameters.length > 0;
+        }
+        
+        // If parameters is an object, check if it has keys
+        if (typeof parameters === 'object') {
+            return Object.keys(parameters).length > 0;
+        }
+        
+        return false;
+    };
+    
     const handleDelete = (event: React.MouseEvent) => {
         event.stopPropagation();
         data.onDelete?.(id);
@@ -303,13 +327,15 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
                         transition: 'all 0.2s ease-in-out' // Smooth transition for all properties
                     }}
                 >
-                    <IconButton
-                        size="small"
-                        onClick={handleConfigure}
-                        sx={{ p: 0.5 }}
-                    >
-                        <FaCog size={14} />
-                    </IconButton>
+                    {hasConfigurableParameters() && (
+                        <IconButton
+                            size="small"
+                            onClick={handleConfigure}
+                            sx={{ p: 0.5 }}
+                        >
+                            <FaCog size={14} />
+                        </IconButton>
+                    )}
                     <IconButton
                         size="small"
                         onClick={handleDelete}
