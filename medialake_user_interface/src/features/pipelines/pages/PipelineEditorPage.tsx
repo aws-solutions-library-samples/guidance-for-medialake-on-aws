@@ -85,6 +85,21 @@ const updateIdCounter = (existingNodes) => {
         }
     });
     
+    // Also check for any numeric IDs that might conflict with future dndnode IDs
+    // This handles imported nodes that might have numeric IDs
+    existingNodes.forEach(node => {
+        if (node.id) {
+            // Extract any trailing numbers from the ID
+            const match = node.id.match(/(\d+)$/);
+            if (match) {
+                const nodeIdNum = parseInt(match[1], 10);
+                if (!isNaN(nodeIdNum) && nodeIdNum >= id) {
+                    id = nodeIdNum + 1;
+                }
+            }
+        }
+    });
+    
     console.log(`[PipelineEditorPage] Updated ID counter to ${id}`);
 };
 
@@ -1173,6 +1188,9 @@ const PipelineEditorContent = () => {
                 x: event.clientX - reactFlowBounds.left,
                 y: event.clientY - reactFlowBounds.top,
             });
+
+            // Ensure ID counter is up to date with current nodes to prevent conflicts
+            updateIdCounter(nodes);
 
             // Check if this is our special job status node
 

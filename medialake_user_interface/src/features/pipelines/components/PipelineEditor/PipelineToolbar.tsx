@@ -1105,6 +1105,16 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
         <Box sx={{ typography: 'body1', fontWeight: 500 }}>Importing Pipeline…</Box>
       </Backdrop>
 
+      {/* Hidden file input - available for both compact and full modes */}
+      <input
+        type="file"
+        accept="application/json"
+        ref={fileInputRef}
+        style={{ display: 'none' }}
+        onChange={handleLoadFlow}
+        onClick={(e) => ((e.target as HTMLInputElement).value = '')}
+      />
+
       {/* Main bar */}
       <Box
         sx={{
@@ -1382,16 +1392,6 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                   offColor="#757575"
                 />}
                 label={active ? 'Active' : 'Inactive'}
-              />
-
-              {/* Hidden file input */}
-              <input
-                type="file"
-                accept="application/json"
-                ref={fileInputRef}
-                style={{ display: 'none' }}
-                onChange={handleLoadFlow}
-                onClick={(e) => ((e.target as HTMLInputElement).value = '')}
               />
 
               {/* Import/Export */}
