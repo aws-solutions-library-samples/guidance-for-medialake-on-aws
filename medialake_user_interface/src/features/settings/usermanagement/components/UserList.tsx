@@ -249,7 +249,7 @@ const UserList: React.FC<UserListProps> = ({
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
     
     // Fetch groups and permission sets at the parent level
-    const { data: groups } = useGetGroups();
+    const { data: groups } = useGetGroups(true);
     const { data: permissionSets } = useGetPermissionSets(true); // Enable API call when this component is loaded
 
     // Sync external state with internal state

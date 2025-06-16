@@ -20,6 +20,7 @@ interface UserFormProps {
     onSave: (user: CreateUserRequest) => Promise<any>;
     user?: User;
     availableGroups?: { id: string; name: string }[];
+    isLoadingGroups?: boolean;
 }
 
 export const UserForm: React.FC<UserFormProps> = ({
@@ -28,6 +29,7 @@ export const UserForm: React.FC<UserFormProps> = ({
     onSave,
     user,
     availableGroups = [],
+    isLoadingGroups = false,
 }) => {
     const { t } = useTranslation();
     
@@ -42,7 +44,11 @@ export const UserForm: React.FC<UserFormProps> = ({
                 email: user.email || '',
                 email_verified: user.email_verified === 'true',
                 permissions: [], // Initialize as empty array for now
-                groups: user.groups || [],
+                groups: user.groups ? user.groups.map(groupName => {
+                    // Convert group names to group IDs for the form
+                    const group = availableGroups.find(g => g.name === groupName);
+                    return group ? group.id : groupName;
+                }) : [],
                 enabled: user.enabled ?? true,
             }
             : createUserFormDefaults,
@@ -60,7 +66,11 @@ export const UserForm: React.FC<UserFormProps> = ({
                     email: user.email || '',
                     email_verified: user.email_verified === 'true',
                     permissions: [], // Initialize as empty array for now
-                    groups: user.groups || [],
+                    groups: user.groups ? user.groups.map(groupName => {
+                        // Convert group names to group IDs for the form
+                        const group = availableGroups.find(g => g.name === groupName);
+                        return group ? group.id : groupName;
+                    }) : [],
                     enabled: user.enabled ?? true,
                   }
                 : createUserFormDefaults;
@@ -69,7 +79,7 @@ export const UserForm: React.FC<UserFormProps> = ({
             // Optionally reset to blank defaults when closed, if desired
             // form.reset(createUserFormDefaults);
         }
-    }, [user, open, form.reset]);
+    }, [user, open, form.reset, availableGroups]);
 
     const handleSubmit = async (data: UserFormData) => {
         try {
@@ -79,10 +89,11 @@ export const UserForm: React.FC<UserFormProps> = ({
                 given_name: data.given_name,
                 family_name: data.family_name,
                 permissions: data.permissions,
-                groups: data.groups,
+                groups: data.groups, // These are group IDs from the form
                 enabled: data.enabled,
             };
 
+            console.log('Submitting user creation request:', requestData);
             await onSave(requestData);
             onClose();
             form.reset();
@@ -146,7 +157,7 @@ export const UserForm: React.FC<UserFormProps> = ({
                             name="groups"
                             control={form.control}
                             label={t('users.form.fields.groups.label', 'Groups')}
-                            tooltip={t('users.form.fields.groups.tooltip', 'Select groups for this user')}
+                            tooltip={isLoadingGroups ? 'Loading groups...' : t('users.form.fields.groups.tooltip', 'Select groups for this user')}
                             options={availableGroups.map(group => {
                                 console.log('Mapping group in FormSelect:', group);
                                 return {
@@ -155,6 +166,7 @@ export const UserForm: React.FC<UserFormProps> = ({
                                 };
                             })}
                             multiple
+                            disabled={isLoadingGroups || (!availableGroups || availableGroups.length === 0)}
                             translationPrefix="users.form"
                         />
                         <FormSwitch

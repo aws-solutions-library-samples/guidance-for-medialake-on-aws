@@ -115,10 +115,46 @@ def create_user():
             }
         )
 
+        # Add user to groups if specified
+        groups_added = []
+        if "groups" in request_data and request_data["groups"]:
+            for group_id in request_data["groups"]:
+                try:
+                    cognito.admin_add_user_to_group(
+                        UserPoolId=USER_POOL_ID,
+                        Username=request_data["email"],
+                        GroupName=group_id
+                    )
+                    groups_added.append(group_id)
+                    logger.info(
+                        {
+                            "message": "User added to group successfully",
+                            "username": request_data["email"],
+                            "group_id": group_id,
+                            "operation": "add_user_to_group",
+                        }
+                    )
+                except ClientError as group_error:
+                    logger.warning(
+                        {
+                            "message": "Failed to add user to group",
+                            "username": request_data["email"],
+                            "group_id": group_id,
+                            "error_code": group_error.response["Error"]["Code"],
+                            "error_message": group_error.response["Error"]["Message"],
+                            "operation": "add_user_to_group",
+                        }
+                    )
+                    # Continue with other groups even if one fails
+
         # Log success metrics
         metrics.add_metric(
             name="SuccessfulUserCreations", unit=MetricUnit.Count, value=1
         )
+        if groups_added:
+            metrics.add_metric(
+                name="UserGroupAssignments", unit=MetricUnit.Count, value=len(groups_added)
+            )
 
         return {
             "statusCode": 201,
@@ -129,6 +165,7 @@ def create_user():
                     "data": {
                         "username": request_data["email"],
                         "userStatus": response["User"]["UserStatus"],
+                        "groupsAdded": groups_added,
                     },
                 }
             ),

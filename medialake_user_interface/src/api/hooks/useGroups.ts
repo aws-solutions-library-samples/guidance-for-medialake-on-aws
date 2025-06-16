@@ -13,13 +13,14 @@ import {
   GroupMembersResponse
 } from '../types/group.types';
 
-export const useGetGroups = () => {
+export const useGetGroups = (enabled: boolean = true) => {
   // Add a unique identifier to track each hook instance
   const hookId = React.useId ? React.useId() : Math.random().toString(36).substring(7);
   console.log(`useGetGroups hook instance created: ${hookId}`);
   
   return useQuery<Group[], Error>({
     queryKey: QUERY_KEYS.GROUPS.all,
+    enabled: enabled,
     queryFn: async () => {
       try {
         console.log(`Fetching groups... [${new Date().toISOString()}] from hook instance: ${hookId}`);

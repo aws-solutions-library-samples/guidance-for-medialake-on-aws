@@ -28,7 +28,7 @@ const UserManagement: React.FC = () => {
     const { apiStatus, handleMutation, closeApiStatus } = useApiMutationHandler();
 
     const { data: users, isLoading: isLoadingUsers, error: usersError } = useGetUsers();
-    const { data: groups } = useGetGroups();
+    const { data: groups, isLoading: isLoadingGroups } = useGetGroups(true); // Always fetch groups when this component loads
     const { data: permissionSets } = useGetPermissionSets(true); // Enable API call when this page is loaded
     
     // Debug logs
@@ -51,9 +51,12 @@ const UserManagement: React.FC = () => {
 
     const handleSaveUser = async (userData: CreateUserRequest) => {
         const isNewUser = !editingUser;
+        console.log('handleSaveUser called with:', userData);
+        console.log('isNewUser:', isNewUser);
         setOpenUserForm(false);
 
         if (isNewUser) {
+            console.log('Creating new user with groups:', userData.groups);
             await handleMutation(
                 {
                     mutation: createUserMutation,
@@ -232,6 +235,7 @@ const UserManagement: React.FC = () => {
                     console.log('Mapping group for UserForm:', group);
                     return { id: group.id, name: group.name };
                 }) || []}
+                isLoadingGroups={isLoadingGroups}
             />
 
             <CreateGroupModal
