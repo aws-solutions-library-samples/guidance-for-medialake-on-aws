@@ -76,13 +76,13 @@ class UserInterfaceStack(Stack):
                     "parameters": {
                         "Name": props.cloudfront_waf_acl_arn
                     },
-                    "region": "us-east-1",
+                    "region": "us-east-1",  # Important: specify us-east-1 region
                     "physical_resource_id": cr.PhysicalResourceId.of("waf-acl-arn-param-" + props.cloudfront_waf_acl_arn),
                 },
                 policy=cr.AwsCustomResourcePolicy.from_statements([
                     iam.PolicyStatement(
                         actions=["ssm:GetParameter"],
-                        resources=[f"arn:aws:ssm:us-east-1:{cdk.Aws.ACCOUNT_ID}:parameter/medialake/cloudfront-waf-acl-arn"],
+                        resources=["*"],  # You can restrict this further if needed
                     )
                 ])
             )
