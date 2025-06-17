@@ -736,7 +736,7 @@ def get_parent_asset(client, index_name, asset_id):
                     "must": [
                         {
                             "term": {
-                                "DigitalSourceAsset.ID": asset_id
+                                "DigitalSourceAsset.ID.keyword": asset_id
                             }
                         }
                     ],
@@ -814,46 +814,40 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
     client = get_opensearch_client()
     index_name = os.environ["OPENSEARCH_INDEX"]
 
-    # 1) collect all orphan IDs into a list
-    orphan_ids = list(orphaned_clip_assets - parent_assets.keys())
-    print(orphan_ids)
-    if orphan_ids:
-        # 2) batch-fetch all parents in one terms query
-        batch_query = {
-            "query": {
-                "bool": {
-                    "must": [
-                        {"terms": {"DigitalSourceAsset.ID": orphan_ids}}
-                    ],
-                    "must_not": [
-                        {"term": {"embedding_scope": "clip"}}
-                    ]
-                }
-            },
-            "size": len(orphan_ids)
-        }
-        resp = client.search(body=batch_query, index=index_name)
-        print(resp)
-        for hit in resp["hits"]["hits"]:
-            src = hit["_source"]
-            pid = src["DigitalSourceAsset"]["ID"]
-            original_score = hit["_score"]  
-            highest_clip_score = max(
-                (c["score"] for c in clips_by_asset.get(pid, [])),
-                default=0
-            )
-            parent_assets[pid] = {
-                "source": src,
-                "score": highest_clip_score,
-                "hit": hit
-            }
+    for asset_id in orphaned_clip_assets:
+        if asset_id not in parent_assets:
+            parent_hit = get_parent_asset(client, index_name, asset_id)
+            if parent_hit:
+                highest_clip_score = max(
+                    (clip["score"] for clip in clips_by_asset.get(asset_id, [])),
+                    default=0
+                )
+                parent_score = parent_hit["_score"]
 
-            logger.info(
-                f"Fetched parent asset for orphaned clips: {pid} "
-                f"with score {parent_assets[pid]['score']} "
-                f"(original score: {original_score}, "
-                f"highest clip score: {highest_clip_score})"
-            )
+                # logging before compute
+                logger.info(
+                    f"[orphan-refetch] asset={asset_id}  "
+                    f"parent_score={parent_score:.4f}  "
+                    f"highest_clip_score={highest_clip_score:.4f}"
+                )
+ 
+                # simple inheritance
+                final_score = highest_clip_score
+
+
+                # logging after compute
+                logger.info(
+                    f"[orphan-refetch] asset={asset_id}  "
+                    f"final_score={final_score:.4f}"
+                )
+
+                parent_assets[asset_id] = {
+                    "source": parent_hit["_source"],
+                    "score": final_score,
+                    "hit": parent_hit
+                }
+
+                logger.info(f"Fetched parent asset for orphaned clips: {asset_id} with score {parent_assets[asset_id]['score']} (original score: {parent_hit['_score']}, highest clip score: {highest_clip_score})")
 
     def process_asset_with_clips(asset_id):
         if asset_id in parent_assets:
