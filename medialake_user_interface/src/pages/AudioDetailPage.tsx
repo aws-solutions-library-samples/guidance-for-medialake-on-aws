@@ -44,6 +44,7 @@ import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import CodeOutlinedIcon from '@mui/icons-material/CodeOutlined';
 import LinkOutlinedIcon from '@mui/icons-material/LinkOutlined';
 import SubtitlesOutlinedIcon from '@mui/icons-material/SubtitlesOutlined';
+import MarkdownRenderer from '../components/common/MarkdownRenderer';
 
 const outputFilters = {
     'ID3v2': ['Title', 'Artist', 'Album', 'Year', 'Genre', 'Track'],
@@ -649,11 +650,12 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
     );
 };
 
-const TranscriptionTab: React.FC<{ 
+const TranscriptionTab: React.FC<{
     assetId: string;
     transcriptionData: TranscriptionResponse | undefined;
     isLoading: boolean;
-}> = ({ assetId, transcriptionData, isLoading }) => {
+    assetData: any;
+}> = ({ assetId, transcriptionData, isLoading, assetData }) => {
     const theme = useTheme();
     
     // Handle loading state
@@ -695,15 +697,34 @@ const TranscriptionTab: React.FC<{
     const hasItems = transcriptionData.data.results.items && 
                     transcriptionData.data.results.items.length > 0;
 
+    // Extract summary from asset data
+    const summary = assetData?.data?.asset?.Summary100Result;
+
     return (
         <Box sx={{ p: 2 }}>
             <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
                 Audio Transcription
             </Typography>
             
-            <Paper elevation={0} sx={{ 
-                mb: 3, 
-                p: 2, 
+            {/* Summary Section */}
+            {summary && (
+                <Paper elevation={0} sx={{
+                    mb: 3,
+                    p: 2,
+                    backgroundColor: alpha(theme.palette.background.paper, 0.7),
+                    borderRadius: 1,
+                    border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
+                }}>
+                    <Typography variant="body2" sx={{ mb: 2, fontStyle: 'italic', color: theme.palette.text.secondary }}>
+                        Summary:
+                    </Typography>
+                    <MarkdownRenderer content={summary} />
+                </Paper>
+            )}
+            
+            <Paper elevation={0} sx={{
+                mb: 3,
+                p: 2,
                 backgroundColor: alpha(theme.palette.background.paper, 0.7),
                 borderRadius: 1,
                 border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
@@ -712,7 +733,7 @@ const TranscriptionTab: React.FC<{
                     Full Transcript:
                 </Typography>
                 <Typography variant="body1" paragraph>
-                    {hasTranscripts 
+                    {hasTranscripts
                         ? transcriptionData.data.results.transcripts[0].transcript
                         : "Full transcript not available"}
                 </Typography>
@@ -1249,6 +1270,7 @@ const AudioDetailContent: React.FC = () => {
                                     assetId={id || ''}
                                     transcriptionData={transcriptionData}
                                     isLoading={isLoadingTranscription}
+                                    assetData={assetData}
                                 />
                             )}
                             {activeTab === 'related' && (
