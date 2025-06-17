@@ -17,9 +17,22 @@ export function Can({
   passThrough = false,
   children
 }: CanProps) {
-  const { can } = usePermission();
+  const { can, loading } = usePermission();
   
   console.log('Can component rendering with:', { action, subject, field });
+  console.log('Can component loading state:', loading);
+  
+  // While permissions are loading, keep the current state (don't hide)
+  // This prevents flickering when permissions are refreshed
+  if (loading) {
+    console.log('Can component: Permissions loading, keeping content visible');
+    // During loading, we keep the content visible to prevent flickering
+    // If children is a function, call it with true during loading
+    if (typeof children === 'function') {
+      return <>{children(true)}</>;
+    }
+    return <>{children}</>;
+  }
   
   const allowed = can(action as Actions, subject as Subjects, field);
   

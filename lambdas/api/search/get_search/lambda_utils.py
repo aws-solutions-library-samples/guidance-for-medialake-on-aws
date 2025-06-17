@@ -88,6 +88,24 @@ def validate_input(schema: Dict[str, Any]) -> Callable:
 
     return decorator
 
+def _truncate_floats(obj, max_items=15):
+    """
+    Recursively walk obj (which can be a dict, list, or primitive),
+    and whenever you see a list of floats longer than max_items,
+    replace it with the first max_items floats plus an indicator.
+    """
+    if isinstance(obj, dict):
+        return {k: _truncate_floats(v, max_items) for k, v in obj.items()}
+    if isinstance(obj, list):
+        # if this is a flat list of floats, truncate it
+        if obj and all(isinstance(x, float) for x in obj):
+            if len(obj) > max_items:
+                return obj[:max_items] + [f"... (+{len(obj)-max_items} more)"]
+            return obj
+        # otherwise recurse into each element
+        return [_truncate_floats(x, max_items) for x in obj]
+    return obj  # primitives unchanged
+
 
 def lambda_handler_decorator(cors: bool = True) -> Callable:
     """

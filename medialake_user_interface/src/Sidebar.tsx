@@ -4,6 +4,7 @@ import { signOut, fetchUserAttributes } from 'aws-amplify/auth';
 import { useAuth } from './common/hooks/auth-context';
 import { useDirection } from './contexts/DirectionContext';
 import { Can, usePermission } from './permissions';
+import { useFeatureFlag } from './contexts/FeatureFlagsContext';
 import {
     Drawer,
     List,
@@ -107,30 +108,48 @@ function Sidebar() {
         return customTheme === 'dark' ? 'white' : theme.palette.text.secondary;
     };
 
-    const { ability } = usePermission();
+    const { ability, loading: permissionsLoading } = usePermission();
+    
+    // Feature flags
+    const advancedPermissionsEnabled = useFeatureFlag('advanced-permissions-enabled', false);
     
     const canViewPipeline = useMemo(() => {
         try {
+            // During permission loading, return true to prevent menu flickering
+            if (permissionsLoading) {
+                return true;
+            }
             return ability?.can('view', 'pipeline') ?? false;
         } catch (error) {
             console.error('Error checking pipeline permission:', error);
-            return false;
+            // During errors, default to true to keep menu visible
+            return true;
         }
-    }, [ability]);
+    }, [ability, permissionsLoading]);
     
     // Helper function to safely check permissions
     const safePermissionCheck = useCallback((action: string, resource: string) => {
         try {
+            // During permission loading, return true to prevent menu flickering
+            if (permissionsLoading) {
+                return true;
+            }
             return ability?.can(action as any, resource as any) ?? false;
         } catch (error) {
             console.error(`Error checking ${action} permission on ${resource}:`, error);
-            return false;
+            // During errors, default to true to keep menu visible
+            return true;
         }
-    }, [ability]);
+    }, [ability, permissionsLoading]);
 
     // Memoize permission checks with error handling
     const canViewSettings = useMemo(() => {
         try {
+            // During permission loading, return true to prevent menu flickering
+            if (permissionsLoading) {
+                return true;
+            }
+            
             // Check if user has any settings-related permissions
             return (ability?.can('view', 'settings') ||
                    ability?.can('view', 'user') ||
@@ -145,9 +164,10 @@ function Sidebar() {
                    safePermissionCheck('view', 'settings.permissions')) ?? false;
         } catch (error) {
             console.error('Error checking settings permission:', error);
-            return false;
+            // During errors, default to true to keep menu visible
+            return true;
         }
-    }, [ability, safePermissionCheck]);
+    }, [ability, safePermissionCheck, permissionsLoading]);
     
     // Build menu items based on permissions
     const mainMenuItems = [
@@ -202,7 +222,7 @@ function Sidebar() {
                     text: t('sidebar.submenu.permissionSets', 'Permissions'),
                     icon: <SecurityIcon />,
                     path: '/settings/permission-sets',
-                    visible: safePermissionCheck('view', 'permission-set')
+                    visible: advancedPermissionsEnabled && safePermissionCheck('view', 'permission-set')
                 },
                 {
                     text: t('sidebar.submenu.integrations'),

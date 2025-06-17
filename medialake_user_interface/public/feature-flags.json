@@ -18,5 +18,9 @@
   "notification-enabled": {
     "value": true,
     "variant": "off"
+  },
+  "advanced-permissions-enabled": {
+    "value": false,
+    "variant": "off"
   }
 }

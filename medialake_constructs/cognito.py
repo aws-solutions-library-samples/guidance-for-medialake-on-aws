@@ -117,14 +117,6 @@ class CognitoConstruct(Construct):
         
         self._auth_table.table.grant_read_data(self._pre_token_generation_lambda.function)
         
-        # Grant Cognito permission to invoke the pre_token_generation Lambda
-        self._pre_token_generation_lambda.function.add_permission(
-            "CognitoInvokePreTokenGeneration",
-            principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
-            action="lambda:InvokeFunction",
-            source_arn=f"arn:aws:cognito-idp:{Aws.REGION}:{Aws.ACCOUNT_ID}:userpool/*"
-        )
-
         # Create User Pool using L1 construct, needed for configuration parameters
         user_pool_props = {
             "admin_create_user_config": cognito.CfnUserPool.AdminCreateUserConfigProperty(
@@ -187,7 +179,6 @@ class CognitoConstruct(Construct):
             ),
             "lambda_config": cognito.CfnUserPool.LambdaConfigProperty(
                 post_confirmation=self._cognito_trigger_lambda.function.function_arn,
-                # pre_token_generation=self._pre_token_generation_lambda.function.function_arn,
                 pre_token_generation_config=cognito.CfnUserPool.PreTokenGenerationConfigProperty(
                     lambda_arn=self._pre_token_generation_lambda.function.function_arn,
                     lambda_version="V2_0"
@@ -256,6 +247,23 @@ class CognitoConstruct(Construct):
         # Create L2 construct from L1
         self._user_pool = cognito.UserPool.from_user_pool_id(
             self, "MediaLakeUserPoolL2", cfn_user_pool.ref
+        )
+
+        # Grant permissions AFTER the user pool is created
+        # Grant permission for pre-token generation lambda
+        self._pre_token_generation_lambda.function.add_permission(
+            "CognitoInvokePreTokenGeneration",
+            principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
+            action="lambda:InvokeFunction",
+            source_arn=cfn_user_pool.attr_arn
+        )
+        
+        # Grant permission for post confirmation lambda
+        self._cognito_trigger_lambda.function.add_permission(
+            "CognitoInvokePostConfirmation",
+            principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
+            action="lambda:InvokeFunction",
+            source_arn=cfn_user_pool.attr_arn
         )
 
         # Using stack name, region, account, and environment ensures uniqueness across different deployments

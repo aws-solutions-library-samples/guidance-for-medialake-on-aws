@@ -4,6 +4,7 @@ import AddIcon from '@mui/icons-material/Add';
 import GroupIcon from '@mui/icons-material/Group';
 import GroupsIcon from '@mui/icons-material/Groups';
 import { useTranslation } from 'react-i18next';
+import { useFeatureFlag } from '@/contexts/FeatureFlagsContext';
 import { PageHeader, PageContent } from '@/components/common/layout';
 import UserList from '@/features/settings/usermanagement/components/UserList';
 import UserForm from '@/features/settings/usermanagement/components/UserForm';
@@ -24,6 +25,9 @@ const UserManagement: React.FC = () => {
     const [editingUser, setEditingUser] = useState<User | undefined>();
     const [activeFilters, setActiveFilters] = useState<{ columnId: string; value: string }[]>([]);
     const [activeSorting, setActiveSorting] = useState<{ columnId: string; desc: boolean }[]>([]);
+    
+    // Feature flags
+    const advancedPermissionsEnabled = useFeatureFlag('advanced-permissions-enabled', false);
     
     const { apiStatus, handleMutation, closeApiStatus } = useApiMutationHandler();
 
@@ -168,32 +172,36 @@ const UserManagement: React.FC = () => {
                 description={t('users.description')}
                 action={
                     <Stack direction="row" spacing={2}>
-                        <Button
-                            variant="outlined"
-                            startIcon={<GroupsIcon />}
-                            onClick={() => setOpenManageGroupsModal(true)}
-                            sx={{
-                                borderRadius: '8px',
-                                textTransform: 'none',
-                                px: 3,
-                                height: 40
-                            }}
-                        >
-                            {t('groups.actions.manageGroups')}
-                        </Button>
-                        <Button
-                            variant="outlined"
-                            startIcon={<GroupIcon />}
-                            onClick={() => setOpenCreateGroupModal(true)}
-                            sx={{
-                                borderRadius: '8px',
-                                textTransform: 'none',
-                                px: 3,
-                                height: 40
-                            }}
-                        >
-                            {t('groups.actions.createGroup')}
-                        </Button>
+                        {advancedPermissionsEnabled && (
+                            <>
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<GroupsIcon />}
+                                    onClick={() => setOpenManageGroupsModal(true)}
+                                    sx={{
+                                        borderRadius: '8px',
+                                        textTransform: 'none',
+                                        px: 3,
+                                        height: 40
+                                    }}
+                                >
+                                    {t('groups.actions.manageGroups')}
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<GroupIcon />}
+                                    onClick={() => setOpenCreateGroupModal(true)}
+                                    sx={{
+                                        borderRadius: '8px',
+                                        textTransform: 'none',
+                                        px: 3,
+                                        height: 40
+                                    }}
+                                >
+                                    {t('groups.actions.createGroup')}
+                                </Button>
+                            </>
+                        )}
                         <Button
                             variant="contained"
                             startIcon={<AddIcon />}
@@ -261,15 +269,19 @@ const UserManagement: React.FC = () => {
                 isLoadingGroups={isLoadingGroups}
             />
 
-            <CreateGroupModal
-                open={openCreateGroupModal}
-                onClose={() => setOpenCreateGroupModal(false)}
-            />
+            {advancedPermissionsEnabled && (
+                <>
+                    <CreateGroupModal
+                        open={openCreateGroupModal}
+                        onClose={() => setOpenCreateGroupModal(false)}
+                    />
 
-            <ManageGroupsModal
-                open={openManageGroupsModal}
-                onClose={() => setOpenManageGroupsModal(false)}
-            />
+                    <ManageGroupsModal
+                        open={openManageGroupsModal}
+                        onClose={() => setOpenManageGroupsModal(false)}
+                    />
+                </>
+            )}
 
             <ApiStatusModal
                 open={apiStatus.show}
