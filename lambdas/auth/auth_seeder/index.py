@@ -46,7 +46,7 @@ DEFAULT_GROUPS = [
         "assignedPermissionSets": ["editor"]
     },
     {
-        "id": "readonly",
+        "id": "read-only",
         "name": "Read Only",
         "description": "Users with read-only access to view media assets and reports",
         "department": "General",
