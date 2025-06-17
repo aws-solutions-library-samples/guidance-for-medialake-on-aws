@@ -400,7 +400,7 @@ class NodesStack(cdk.NestedStack):
                     "kms:GenerateDataKey*",
                     "kms:DescribeKey",
                 ],
-                resources=[f"arn:aws:kms:{self.region}:{self.account}:key/*"],
+                resources=["*"],
             )
         )
 
