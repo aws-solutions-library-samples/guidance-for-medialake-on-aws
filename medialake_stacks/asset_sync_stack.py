@@ -8,11 +8,16 @@ from aws_cdk import (
     CfnOutput,
     aws_dynamodb as dynamodb,
     aws_lambda as lambda_,
+    aws_lambda_event_sources as lambda_events,
     aws_lambda_event_sources as lambda_event_sources,
+    aws_logs as logs,
     aws_events as events,
     aws_events_targets as events_targets,
     aws_sqs as sqs,
+    aws_sns as sns,
+    aws_sns_subscriptions as sns_subs,
     aws_s3 as s3,
+    aws_stepfunctions as sfn,
     aws_iam as iam,
     RemovalPolicy,
 )
@@ -47,6 +52,18 @@ class AssetSyncStack(cdk.NestedStack):
             ),
         )
 
+        # self._asset_sync_chunk_table = DynamoDBConstruct(
+        #     self,
+        #     "AssetSyncChunkTable",
+        #     props=DynamoDBProps(
+        #         name=DynamoDBConstants.asset_sync_chunk_table_name(),
+        #         partition_key_name="jobId",
+        #         partition_key_type=dynamodb.AttributeType.STRING,
+        #         sort_key_name="chunkId",
+        #         sort_key_type=dynamodb.AttributeType.STRING,
+        #     ),
+        # )
+
         self._asset_sync_error_table = DynamoDBConstruct(
             self,
             "AssetSyncErrorTable",
@@ -60,6 +77,14 @@ class AssetSyncStack(cdk.NestedStack):
         # Create S3 bucket for manifests and results
         self.results_bucket = self._create_results_bucket()
 
+        # SQS Queues
+        # queues = self._create_queues()
+        # self.processor_queue = queues["processor_queue"]
+        # self.dlq = queues["dlq"]
+        
+        # SNS topic for status notifications
+        # self.status_topic = self._create_status_topic()
+
         # Create IAM role for S3 batch operations
         self.batch_operations_role = iam.Role(
             self,
@@ -67,23 +92,49 @@ class AssetSyncStack(cdk.NestedStack):
             assumed_by=iam.ServicePrincipal("batchoperations.s3.amazonaws.com"),
         )
         
-        # Grant only necessary S3 read permissions to the results bucket
+        # Add S3 Full Access managed policy
+        self.batch_operations_role.add_managed_policy(
+            iam.ManagedPolicy.from_aws_managed_policy_name("AmazonS3FullAccess")
+        )
+        
+        # Grant necessary permissions to the batch operations role
         self.batch_operations_role.add_to_policy(
             iam.PolicyStatement(
                 actions=[
                     "s3:GetObject",
                     "s3:GetObjectTagging",
-                    "s3:GetObjectVersion",
+                    "s3:PutObjectTagging",
+                    "s3:GetBucketLocation",
+                    "s3:PutObject",
+                    "s3:PutInventoryConfiguration",
+                    "s3:GetInventory",
+                    "s3:GetInventoryConfiguration",
+                    "s3:GetBucketInventory",
+                    "s3:PutJobTagging",
+                    "s3:GetJobTagging",
+                    "s3:GetJob",
+                    "s3:GetJobStatus",
+                    "s3:GetJobOutput",
+                    "s3:GetJobOutputLocation",                    
                 ],
-                resources=[f"{self.results_bucket.bucket_arn}/*"],
+                resources=["*"],
             )
         )
         
+        # Lambda invocation permissions for batch operations
+        self.batch_operations_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=["lambda:InvokeFunction"],
+                resources=["*"],
+            )
+        )
+
         # Common environment variables
         common_env = {
             "POWERTOOLS_SERVICE_NAME": "asset-sync",
             "POWERTOOLS_METRICS_NAMESPACE": "MediaLake/AssetSync",
             "LOG_LEVEL": "INFO",
+            # "STATUS_TOPIC_ARN": self.status_topic.topic_arn,
         }
 
         # Engine-specific environment variables
@@ -91,6 +142,7 @@ class AssetSyncStack(cdk.NestedStack):
             **common_env,
             EnvVars.JOB_TABLE_NAME: self._asset_sync_job_table.table.table_name,
             EnvVars.ERROR_TABLE_NAME: self._asset_sync_error_table.table.table_name,
+            # EnvVars.PROCESSOR_QUEUE_URL: self.processor_queue.queue_url,
             EnvVars.RESULTS_BUCKET_NAME: self.results_bucket.bucket_name,
             EnvVars.BATCH_OPERATIONS_ROLE_ARN: self.batch_operations_role.role_arn,
             EnvVars.CONNECTOR_TABLE_NAME: DynamoDBConstants.connector_table_name(),
@@ -148,19 +200,21 @@ class AssetSyncStack(cdk.NestedStack):
             ),
         )
 
-        # Lambda invocation permissions for batch operations
-        self.batch_operations_role.add_to_policy(
-            iam.PolicyStatement(
-                actions=["lambda:InvokeFunction"],
-                resources=[self._asset_sync_processor_lambda.function.function_arn],
-            )
-        )
-        
         # Update the engine with the processor ARN
         self._asset_sync_engine_lambda.function.add_environment(
             EnvVars.PROCESSOR_FUNCTION_ARN, 
             self._asset_sync_processor_lambda.function.function_arn
         )
+
+        # Add SQS event source to processor lambda
+        # self._asset_sync_processor_lambda.function.add_event_source(
+        #     lambda_event_sources.SqsEventSource(
+        #         self.processor_queue,
+        #         batch_size=10,
+        #         max_batching_window=Duration.seconds(30),
+        #         report_batch_item_failures=True,
+        #     )
+        # )
         
         # Add permission for S3 batch operations to invoke processor
         self._asset_sync_processor_lambda.function.add_permission(
