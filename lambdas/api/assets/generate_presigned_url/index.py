@@ -14,14 +14,46 @@ tracer = Tracer(service="asset-service")
 metrics = Metrics(namespace="presigned_url-service")
 logger = Logger(service="asset-api", level=os.getenv("LOG_LEVEL", "WARNING"))
 
-# Initialize DynamoDB and S3
+# Initialize DynamoDB
 dynamodb = boto3.resource("dynamodb")
-# Configure S3 client with Signature Version 4 for KMS compatibility
-s3_config = Config(signature_version='s3v4')
-s3_client = boto3.client("s3", config=s3_config)
 table = dynamodb.Table(os.getenv("MEDIALAKE_ASSET_TABLE"))
 
+# Regional S3 client configuration for better cross-region support
+_SIGV4_CFG = Config(
+    signature_version="s3v4",
+    s3={"addressing_style": "virtual"},
+)
+
+_ENDPOINT_TMPL = "https://s3.{region}.amazonaws.com"
+_S3_CLIENT_CACHE: Dict[str, boto3.client] = {}  # {region → client}
+
 DEFAULT_EXPIRATION = 3600  # 1 hour in seconds
+
+
+def _get_s3_client_for_bucket(bucket: str) -> boto3.client:
+    """
+    Return an S3 client **pinned to the bucket's actual region**.
+    Clients are cached to reuse TCP connections across warm invocations.
+    """
+    generic = _S3_CLIENT_CACHE.setdefault(
+        "us-east-1",
+        boto3.client("s3", region_name="us-east-1", config=_SIGV4_CFG),
+    )
+
+    try:
+        region = (generic.get_bucket_location(Bucket=bucket)
+                        .get("LocationConstraint") or "us-east-1")
+    except generic.exceptions.NoSuchBucket:
+        raise ValueError(f"S3 bucket {bucket!r} does not exist")
+
+    if region not in _S3_CLIENT_CACHE:
+        _S3_CLIENT_CACHE[region] = boto3.client(
+            "s3",
+            region_name=region,
+            endpoint_url=_ENDPOINT_TMPL.format(region=region),
+            config=_SIGV4_CFG,
+        )
+    return _S3_CLIENT_CACHE[region]
 
 
 class RequestBody(BaseModel):
@@ -54,8 +86,11 @@ def get_asset_details(inventory_id: str) -> Dict[str, Any]:
 
 @tracer.capture_method
 def generate_presigned_url(bucket: str, key: str, expiration: int) -> str:
-    """Generate a presigned URL for the S3 object."""
+    """Generate a presigned URL for the S3 object using region-aware S3 client."""
     try:
+        # Get region-specific S3 client
+        s3_client = _get_s3_client_for_bucket(bucket)
+        
         url = s3_client.generate_presigned_url(
             "get_object",
             Params={
@@ -65,6 +100,11 @@ def generate_presigned_url(bucket: str, key: str, expiration: int) -> str:
             },
             ExpiresIn=expiration,
         )
+        
+        logger.info(
+            f"Generated presigned URL for s3://{bucket}/{key} (region {s3_client.meta.region_name}) valid {expiration}s"
+        )
+        
         return url
     except Exception as e:
         logger.error(f"Error generating presigned URL: {str(e)}")
