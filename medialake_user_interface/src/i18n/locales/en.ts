@@ -294,6 +294,11 @@ export default {
             endTime: 'End Time',
             duration: 'Duration',
             actions: 'Actions'
+        },
+        actions: {
+            retryFromCurrent: 'Retry from current position',
+            retryFromStart: 'Retry from start',
+            viewDetails: 'View Details'
         }
     },
     users: {

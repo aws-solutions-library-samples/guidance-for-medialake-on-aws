@@ -212,6 +212,11 @@ export default {
       endTime: 'समाप्ति समय',
       duration: 'अवधि',
       actions: 'क्रियाएँ'
+    },
+    actions: {
+      retryFromCurrent: 'वर्तमान स्थिति से पुनः प्रयास करें',
+      retryFromStart: 'शुरू से पुनः प्रयास करें',
+      viewDetails: 'विवरण देखें'
     }
   },
   users: {

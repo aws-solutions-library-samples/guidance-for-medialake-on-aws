@@ -212,6 +212,11 @@ export default {
         endTime: 'Heure de fin',
         duration: 'Durée',
         actions: 'Actions'
+      },
+      actions: {
+        retryFromCurrent: 'Réessayer à partir de la position actuelle',
+        retryFromStart: 'Réessayer depuis le début',
+        viewDetails: 'Voir les détails'
       }
     },
     users: {

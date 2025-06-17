@@ -1,23 +1,24 @@
+"""
+Store embedding vectors in OpenSearch.
+
+* Clip/audio segments are indexed as new documents with SMPTE time-codes.
+* Master video documents are updated in-place when a whole-file embedding arrives.
+"""
+
+from __future__ import annotations
+
 import json
 import os
 import time
 import sys
 from datetime import datetime
-from urllib.parse import urlparse
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 import boto3
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from opensearchpy import (
-    OpenSearch,
-    RequestsHttpConnection,
-    AWSV4SignerAuth,
-    exceptions,
-)
+from opensearchpy import AWSV4SignerAuth, OpenSearch, RequestsHttpConnection, exceptions
 
-# Add common_libraries to path for importing shared modules
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'common_libraries'))
 from lambda_middleware import lambda_middleware
 from lambda_error_handler import (
     check_response_status,
@@ -25,31 +26,34 @@ from lambda_error_handler import (
     with_error_handling
 )
 from nodes_utils import seconds_to_smpte
+from lambda_utils import _truncate_floats
 
-# ── Powertools ───────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Powertools
 logger = Logger()
-tracer = Tracer()
+tracer = Tracer(disabled=False)
 
-# ── Environment ──────────────────────────────────────────────────────────────
+# Environment
 OPENSEARCH_ENDPOINT = os.getenv("OPENSEARCH_ENDPOINT", "")
 INDEX_NAME          = os.getenv("INDEX_NAME", "media")
-CONTENT_TYPE        = os.getenv("CONTENT_TYPE", "video").lower()
+CONTENT_TYPE        = os.getenv("CONTENT_TYPE", "video").lower()  # "video" | "audio"
 AWS_REGION          = os.getenv("AWS_REGION", "us-east-1")
+EVENT_BUS_NAME      = os.getenv("EVENT_BUS_NAME", "default-event-bus")
 
-# ── OpenSearch client ────────────────────────────────────────────────────────
+IS_AUDIO_CONTENT    = CONTENT_TYPE == "audio"
+
+# OpenSearch client
 _session     = boto3.Session()
 _credentials = _session.get_credentials()
 _auth        = AWSV4SignerAuth(_credentials, AWS_REGION, "es")
 
 
-def get_opensearch_client():
+def get_opensearch_client() -> Optional[OpenSearch]:
     if not OPENSEARCH_ENDPOINT:
         logger.warning("OPENSEARCH_ENDPOINT not set – skipping OpenSearch calls.")
         return None
 
-    parsed = urlparse(OPENSEARCH_ENDPOINT)
-    host   = parsed.netloc if parsed.scheme else OPENSEARCH_ENDPOINT
-
+    host = OPENSEARCH_ENDPOINT.split("://")[-1]
     return OpenSearch(
         hosts=[{"host": host, "port": 443}],
         http_auth=_auth,
@@ -62,8 +66,8 @@ def get_opensearch_client():
         max_retries=3,
     )
 
-
-# ── Helper extraction functions ────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Extraction helpers (unchanged except for type annotations)
 def _item(container: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     if isinstance(container.get("data"), dict):
         itm = container["data"].get("item")
@@ -80,6 +84,12 @@ def _map_item(container: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 
 def extract_asset_id(container: Dict[str, Any]) -> Optional[str]:
+    # Check if data is an array (batch processing) - get from first item
+    if isinstance(container.get("data"), list) and container["data"]:
+        first_item = container["data"][0]
+        if isinstance(first_item, dict) and first_item.get("asset_id"):
+            return first_item["asset_id"]
+
     itm = _item(container)
     if itm and itm.get("asset_id"):
         return itm["asset_id"]
@@ -164,7 +174,49 @@ def extract_embedding_vector(container: Dict[str, Any]) -> Optional[List[float]]
     return None
 
 
-# ── Small helpers ────────────────────────────────────────────────────────────
+def _get_segment_bounds(payload: Dict[str, Any]) -> Tuple[int, int]:
+    candidates: List[Dict[str, Any]] = []
+
+    # Check payload.data directly (this is the main location based on logs)
+    if isinstance(payload.get("data"), dict):
+        candidates.append(payload["data"])
+
+    # Check if item is directly in payload
+    if isinstance(payload.get("item"), dict):
+        candidates.append(payload["item"])
+
+    # Check map.item (also contains the data based on logs)
+    if isinstance(payload.get("map"), dict) and isinstance(payload["map"].get("item"), dict):
+        candidates.append(payload["map"]["item"])
+
+    itm = _item(payload)
+    if itm:
+        candidates.append(itm)
+
+    m_itm = _map_item(payload)
+    if m_itm:
+        candidates.append(m_itm)
+
+    # Also check the payload itself as a candidate
+    candidates.append(payload)
+
+    for c in candidates:
+        if not isinstance(c, dict):
+            continue
+        start = c.get("start_offset_sec")
+        if start is None:
+            start = c.get("start_time")
+        end = c.get("end_offset_sec")
+        if end is None:
+            end = c.get("end_time")
+        if start is not None and end is not None:
+            return int(start), int(end)
+
+    logger.warning("Segment bounds not found – defaulting to 0-0")
+    return 0, 0
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Early-exit helpers
 def _bad_request(msg: str):
     logger.warning(msg)
     return {"statusCode": 400, "body": json.dumps({"error": msg})}
@@ -193,293 +245,368 @@ def check_opensearch_response(response: Dict[str, Any], operation: str) -> None:
     check_response_status(response, "OpenSearch", operation, [200, 201])
 =======
 
-def check_opensearch_response(response: Dict[str, Any], operation: str) -> None:
-    status = response.get("status", 200)
+def check_opensearch_response(resp: Dict[str, Any], op: str) -> None:
+    status = resp.get("status", 200)
     if status not in (200, 201):
-        error_msg = response.get("error", {}).get("reason", "Unknown error")
-        logger.error(f"OpenSearch {operation} failed", extra={
-            "status":   status,
-            "error":    error_msg,
-            "response": response
-        })
-        raise RuntimeError(f"OpenSearch {operation} failed: {error_msg} (status: {status})")
->>>>>>> e7926b1d25c1ad23611b0d1074062a03a94cfa9b
+        err = resp.get("error", {}).get("reason", "Unknown error")
+        logger.error(f"OpenSearch {op} failed", extra={"status": status, "error": err})
+        raise RuntimeError(f"OpenSearch {op} failed: {err} (status {status})")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# One-shot master-document cache + FPS extraction
+_master_doc_cache: Dict[str, Dict[str, Any]] = {}   # asset_id → _source
 
 
-# ── Lambda entrypoint ────────────────────────────────────────────────────────
-@lambda_middleware(event_bus_name=os.getenv("EVENT_BUS_NAME", "default-event-bus"))
+def _get_master_doc(client: OpenSearch, asset_id: str, is_video: bool) -> Dict[str, Any]:
+    if asset_id in _master_doc_cache:
+        return _master_doc_cache[asset_id]
+
+    filters = [
+        {"term": {"DigitalSourceAsset.ID": asset_id}},
+        {"exists": {"field": "InventoryID"}},
+        {
+            "nested": {
+                "path": "DerivedRepresentations",
+                "query": {
+                    "exists": {"field": "DerivedRepresentations.ID"}
+                }
+            }
+        }
+    ]
+
+    resp = client.search(
+        index=INDEX_NAME,
+        body={"query": {"bool": {"filter": filters}}},
+        size=1,
+    )
+    if resp["hits"]["total"]["value"] == 0:
+        raise RuntimeError(f"No master document found for asset {asset_id}")
+
+    _master_doc_cache[asset_id] = resp["hits"]["hits"][0]["_source"]
+    return _master_doc_cache[asset_id]
+
+
+def _extract_fps(master_src: Dict[str, Any], asset_id: str) -> int:
+    try:
+        fr = master_src["Metadata"]["EmbeddedMetadata"]["general"]["FrameRate"]
+        fps_int = int(round(float(fr)))
+        if fps_int <= 0:
+            raise ValueError
+        return fps_int
+    except Exception as exc:
+        raise RuntimeError(
+            f"Master document for asset {asset_id} is missing a valid FrameRate"
+        ) from exc
+
+# ─────────────────────────────────────────────────────────────────────────────
+def process_single_embedding(payload: Dict[str, Any], embedding_data: Dict[str, Any], client, asset_id: str) -> Dict[str, Any]:
+    """Process a single embedding object."""
+    embedding_vector = embedding_data.get("float")
+    if not embedding_vector:
+        return _bad_request("No embedding vector found in embedding data")
+
+    # Create a temporary payload for this embedding
+    temp_payload = {
+        "data": embedding_data,
+        **{k: v for k, v in payload.items() if k != "data"}
+    }
+
+    scope = embedding_data.get("embedding_scope") or extract_scope(temp_payload)
+    embedding_option = embedding_data.get("embedding_option") or extract_embedding_option(temp_payload)
+
+    start_sec, end_sec = _get_segment_bounds(temp_payload)
+
+    if CONTENT_TYPE == "video":
+        master_src = _get_master_doc(client, asset_id, is_video=True)
+        fps = _extract_fps(master_src, asset_id)
+    else:
+        fps = 30
+
+    start_tc = seconds_to_smpte(start_sec, fps)
+    end_tc = seconds_to_smpte(end_sec, fps)
+
+    document: Dict[str, Any] = {
+        "type": CONTENT_TYPE,
+        "embedding": embedding_vector,
+        "embedding_scope": "clip" if IS_AUDIO_CONTENT else scope,
+        "timestamp": datetime.utcnow().isoformat(),
+        "DigitalSourceAsset": {"ID": asset_id},
+        "start_timecode": start_tc,
+        "end_timecode": end_tc,
+    }
+    if embedding_option is not None:
+        document["embedding_option"] = embedding_option
+
+    res = client.index(index=INDEX_NAME, body=document)
+    check_opensearch_response(res, "index")
+    
+    return {
+        "document_id": res.get("_id", "unknown"),
+        "start_sec": start_sec,
+        "end_sec": end_sec,
+    }
+
+
+@lambda_middleware(event_bus_name=EVENT_BUS_NAME)
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
 @with_error_handling
 def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
     try:
-        # Unwrap any Powertools wrapper
-        logger.info("Received raw event", extra={"event": event})
-        inner = event.get("event", event)
-        raw_payload = inner.get("payload")
-        if raw_payload is None:
+        truncated = _truncate_floats(event, max_items=10)
+        logger.info("Received event", extra={"event": truncated})
+
+        payload: Dict[str, Any] = event.get("payload") or {}
+        if not payload:
             return _bad_request("Event missing 'payload'")
 
-        # Detect batch list in either form
-        batch: Optional[List[Dict[str, Any]]] = None
-        if isinstance(raw_payload, list):
-            batch = raw_payload
-        elif isinstance(raw_payload, dict) and isinstance(raw_payload.get("data"), list):
-            batch = raw_payload["data"]
-
-        # ────────────────────────────────────────────────────────────────────
-        # 1️⃣ Batch payload handling
-        # ────────────────────────────────────────────────────────────────────
-        if batch is not None:
-            if not batch:
-                return _bad_request("Payload list is empty")
-
-            shared_asset_id = batch[0].get("asset_id")
-            if not shared_asset_id:
-                return _bad_request("Unable to determine asset_id in batch")
-
-            logger.info("Processing batch embeddings", extra={
-                "count":    len(batch),
-                "asset_id": shared_asset_id,
-            })
-
-            # Split into clip/audio vs. other scopes
-            to_index = []
-            to_update = []
-            for rec in batch:
-                opt   = rec.get("embedding_option")
-                scope = rec.get("embedding_scope")
-
-                # skip audio+video
-                if opt == "audio" and scope == "video":
-                    logger.info("Skipping record (audio+video)", extra={"record": rec})
-                    continue
-
-                if scope in {"clip", "audio"}:
-                    to_index.append(rec)
-                else:
-                    to_update.append(rec)
-
-            client = get_opensearch_client()
-            if not client:
-                total_len = sum(len(r.get("float", [])) for r in batch)
-                return _ok_no_op(total_len, shared_asset_id)
-
-            # Index each clip/audio record
-            for rec in to_index:
-                vec = rec["float"]
-                if rec["embedding_scope"] == "clip":
-                    start, end = rec.get("start_offset_sec", 0), rec.get("end_offset_sec", 0)
-                else:
-                    start, end = rec.get("start_time", 0), rec.get("end_time", 0)
-
-                doc = {
-                    "type":               CONTENT_TYPE,
-                    "embedding":          vec,
-                    "embedding_scope":    rec["embedding_scope"],
-                    "embedding_option":   rec.get("embedding_option"),
-                    "DigitalSourceAsset": {"ID": shared_asset_id},
-                    "start_timecode":     seconds_to_smpte(start),
-                    "end_timecode":       seconds_to_smpte(end),
-                    "timestamp":          datetime.utcnow().isoformat(),
-                }
-                logger.info("Indexing clip/audio doc", extra={"asset_id": shared_asset_id})
-                res = client.index(index=INDEX_NAME, body=doc)
-                check_opensearch_response(res, "index")
-
-            # Update parent for other-scope records
-            if to_update:
-                search_q = {
-                    "query": {
-                        "bool": {
-                            "filter": [
-                                {"term": {"DigitalSourceAsset.ID": shared_asset_id}},
-                                {"exists": {"field": "InventoryID"}},
-                                {
-                                    "nested": {
-                                        "path": "DerivedRepresentations",
-                                        "query": {
-                                            "exists": {
-                                                "field": "DerivedRepresentations.ID"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-                logger.info("Searching parent doc for batch update", extra={"asset_id": shared_asset_id})
-                start = time.time()
-                sr = client.search(index=INDEX_NAME, body=search_q, size=1)
-                check_opensearch_response(sr, "search")
-                while sr["hits"]["total"]["value"] == 0 and time.time() - start < 120:
-                    client.indices.refresh(index=INDEX_NAME)
-                    time.sleep(5)
-                    sr = client.search(index=INDEX_NAME, body=search_q, size=1)
-                    check_opensearch_response(sr, "search")
-
-                if sr["hits"]["total"]["value"] == 0:
-                    return _bad_request(f"No parent document for asset_id={shared_asset_id}")
-
-                doc_id = sr["hits"]["hits"][0]["_id"]
-                meta   = client.get(index=INDEX_NAME, id=doc_id)
-                check_opensearch_response(meta, "get")
-                seq_no = meta["_seq_no"]
-                pt     = meta["_primary_term"]
-
-                for rec in to_update:
-                    vec = rec["float"]
-                    doc = {
-                        "type":               CONTENT_TYPE,
-                        "embedding":          vec,
-                        "embedding_scope":    rec.get("embedding_scope"),
-                        "embedding_option":   rec.get("embedding_option"),
-                        "DigitalSourceAsset": {"ID": shared_asset_id},
-                        "timestamp":          datetime.utcnow().isoformat(),
-                    }
-                    logger.info("Updating parent doc from batch", extra={"doc_id": doc_id})
-                    for _ in range(50):
-                        try:
-                            upd = client.update(
-                                index=INDEX_NAME,
-                                id=doc_id,
-                                body={"doc": doc},
-                                if_seq_no=seq_no,
-                                if_primary_term=pt,
-                            )
-                            check_opensearch_response(upd, "update")
-                            seq_no, pt = upd["_seq_no"], upd["_primary_term"]
-                            break
-                        except exceptions.ConflictError:
-                            meta   = client.get(index=INDEX_NAME, id=doc_id)
-                            seq_no = meta["_seq_no"]
-                            pt     = meta["_primary_term"]
-                            time.sleep(0.5)
-
-                return {
-                    "statusCode": 200,
-                    "body": json.dumps({
-                        "message":     f"Indexed {len(to_index)} docs, updated {len(to_update)} docs",
-                        "asset_id":    shared_asset_id,
-                        "document_id": doc_id,
-                    }),
-                }
-
-            # only clip/audio were present
-            return {
-                "statusCode": 200,
-                "body": json.dumps({
-                    "message":  f"Indexed {len(to_index)} clip/audio docs",
-                    "asset_id": shared_asset_id,
-                }),
-            }
-
-        # ────────────────────────────────────────────────────────────────────
-        # 2️⃣ Single-object payload – original logic follows unchanged
-        # ────────────────────────────────────────────────────────────────────
-        payload_dict: Dict[str, Any] = raw_payload or {}
-        if not payload_dict:
-            return _bad_request("Event missing 'payload'")
-
-        logger.info("Processing payload", extra={
-            "payload_structure": {
-                "has_data": "data" in payload_dict,
-                "has_assets": "assets" in payload_dict,
-                "data_type": type(payload_dict.get("data")).__name__ if payload_dict.get("data") else None,
-                "assets_length": len(payload_dict.get("assets", [])),
-            }
-        })
-
-        if isinstance(payload_dict.get("data"), dict):
-            response_data = payload_dict["data"]
-            if response_data.get("statusCode") == 400:
-                err_body = json.loads(response_data.get("body", "{}"))
-                err_msg  = err_body.get("error", "Unknown 400 error")
-                logger.error(f"Received 400 in payload.data: {err_msg}")
-                logger.info("Continuing despite error in payload.data")
-
-        asset_id = extract_asset_id(payload_dict) or next(
-            (
-                a.get("DigitalSourceAsset", {}).get("ID")
-                for a in payload_dict.get("assets", [])
-                if a.get("DigitalSourceAsset", {}).get("ID")
-            ),
-            None,
-        )
+        asset_id = extract_asset_id(payload)
         if not asset_id:
             return _bad_request("Unable to determine asset_id – aborting")
 
-        embedding_vector = extract_embedding_vector(payload_dict)
-        if not embedding_vector and payload_dict.get("assets"):
-            logger.info("Trying asset metadata for vector")
-            for asset in payload_dict["assets"]:
-                md = asset.get("Metadata", {}).get("CustomMetadata", {})
-                if md.get("embedding"):
-                    embedding_vector = md["embedding"]
-                    logger.info("Found embedding in asset metadata")
-                    break
+        # OpenSearch client (may be None in local dev)
+        client = get_opensearch_client()
+        if not client:
+            return _ok_no_op(None, asset_id)
 
-        if not embedding_vector:
-            err = "No embedding vector found in event or assets data"
-            logger.error(err, extra={"payload_structure": payload_dict})
-            return _bad_request(err)
-
-        scope            = extract_scope(payload_dict)
-        embedding_option = extract_embedding_option(payload_dict)
-        logger.info(f"Scope: {scope}, Embedding option: {embedding_option}")
-
-        if embedding_option == "audio" and scope == "video":
-            logger.info("Skipping: audio scope=video", extra={
-                "embedding_option": embedding_option,
-                "embedding_scope": scope,
-                "asset_id": asset_id
-            })
+        # Check if this is batch processing (array of embeddings)
+        if isinstance(payload.get("data"), list):
+            logger.info(f"Processing batch of {len(payload['data'])} embeddings")
+            results = []
+            video_scope_embeddings = []
+            
+            # Separate video scope embeddings from clip embeddings
+            for i, embedding_data in enumerate(payload["data"]):
+                if not isinstance(embedding_data, dict):
+                    continue
+                
+                # Create temp payload to extract scope
+                temp_payload = {
+                    "data": embedding_data,
+                    **{k: v for k, v in payload.items() if k != "data"}
+                }
+                scope = embedding_data.get("embedding_scope") or extract_scope(temp_payload)
+                
+                if scope == "video" and not IS_AUDIO_CONTENT:
+                    video_scope_embeddings.append((i, embedding_data, scope))
+                else:
+                    # Process clip/audio embeddings
+                    try:
+                        result = process_single_embedding(payload, embedding_data, client, asset_id)
+                        results.append(result)
+                        logger.info(f"Processed clip embedding {i+1}/{len(payload['data'])}", extra={
+                            "document_id": result["document_id"],
+                            "start_sec": result["start_sec"],
+                            "end_sec": result["end_sec"]
+                        })
+                    except Exception as e:
+                        logger.error(f"Failed to process clip embedding {i+1}", extra={"error": str(e)})
+                        continue
+            
+            # Process video scope embeddings (update master documents)
+            for i, embedding_data, scope in video_scope_embeddings:
+                try:
+                    embedding_vector = embedding_data.get("float")
+                    if not embedding_vector:
+                        logger.error(f"No embedding vector found in video embedding {i+1}")
+                        continue
+                    
+                    temp_payload = {
+                        "data": embedding_data,
+                        **{k: v for k, v in payload.items() if k != "data"}
+                    }
+                    embedding_option = embedding_data.get("embedding_option") or extract_embedding_option(temp_payload)
+                    
+                    # Update master document (similar to non-batch logic)
+                    search_query = {
+                        "query": {
+                            "bool": {
+                                "filter": [
+                                    {"term": {"DigitalSourceAsset.ID": asset_id}},
+                                    {"exists": {"field": "InventoryID"}},
+                                    {
+                                        "nested": {
+                                            "path": "DerivedRepresentations",
+                                            "query": {
+                                                "exists": {"field": "DerivedRepresentations.ID"}
+                                            },
+                                        }
+                                    },
+                                ]
+                            }
+                        }
+                    }
+                    
+                    logger.info(f"Searching for master document for video embedding {i+1}", extra={
+                        "index": INDEX_NAME, "asset_id": asset_id
+                    })
+                    start_time = time.time()
+                    search_resp = client.search(index=INDEX_NAME, body=search_query, size=1)
+                    check_opensearch_response(search_resp, "search")
+                    
+                    while (
+                        search_resp["hits"]["total"]["value"] == 0
+                        and time.time() - start_time < 120
+                    ):
+                        logger.info("Master doc not found – refreshing index & retrying …")
+                        client.indices.refresh(index=INDEX_NAME)
+                        time.sleep(5)
+                        search_resp = client.search(index=INDEX_NAME, body=search_query, size=1)
+                        check_opensearch_response(search_resp, "search")
+                    
+                    if search_resp["hits"]["total"]["value"] == 0:
+                        raise RuntimeError(
+                            f"No master doc with DigitalSourceAsset.ID={asset_id} in '{INDEX_NAME}'"
+                        )
+                    
+                    existing_id = search_resp["hits"]["hits"][0]["_id"]
+                    meta = client.get(index=INDEX_NAME, id=existing_id)
+                    check_opensearch_response(meta, "get")
+                    seq_no = meta["_seq_no"]
+                    p_term = meta["_primary_term"]
+                    
+                    update_body = {
+                        "doc": {
+                            "type": CONTENT_TYPE,
+                            "embedding": embedding_vector,
+                            "embedding_scope": scope,
+                            "timestamp": datetime.utcnow().isoformat(),
+                        }
+                    }
+                    if embedding_option is not None:
+                        update_body["doc"]["embedding_option"] = embedding_option
+                    
+                    for attempt in range(50):
+                        try:
+                            res = client.update(
+                                index=INDEX_NAME,
+                                id=existing_id,
+                                body=update_body,
+                                if_seq_no=seq_no,
+                                if_primary_term=p_term,
+                            )
+                            check_opensearch_response(res, "update")
+                            break
+                        except exceptions.ConflictError:
+                            meta = client.get(index=INDEX_NAME, id=existing_id)
+                            seq_no = meta["_seq_no"]
+                            p_term = meta["_primary_term"]
+                            time.sleep(1)
+                    else:
+                        raise RuntimeError("Failed to update master document after 50 retries")
+                    
+                    results.append({
+                        "document_id": existing_id,
+                        "type": "master_update",
+                        "scope": scope
+                    })
+                    logger.info(f"Updated master document for video embedding {i+1}/{len(payload['data'])}", extra={
+                        "document_id": existing_id,
+                        "scope": scope
+                    })
+                    
+                except Exception as e:
+                    logger.error(f"Failed to process video embedding {i+1}", extra={"error": str(e)})
+                    continue
+            
             return {
                 "statusCode": 200,
                 "body": json.dumps({
-                    "message": "Skipped processing: audio+video",
+                    "message": f"Batch processed: {len(results)} embeddings stored successfully",
+                    "index": INDEX_NAME,
                     "asset_id": asset_id,
-                })
+                    "processed_count": len(results),
+                    "total_count": len(payload["data"]),
+                }),
             }
 
-        client = get_opensearch_client()
-        if not client:
-            return _ok_no_op(len(embedding_vector), asset_id)
+        # Single embedding processing (original logic)
+        embedding_vector = extract_embedding_vector(payload)
+        if not embedding_vector and payload.get("assets"):
+            for asset in payload["assets"]:
+                meta = asset.get("Metadata", {}).get("CustomMetadata", {})
+                if isinstance(meta.get("embedding"), list):
+                    embedding_vector = meta["embedding"]
+                    break
 
-        document: Dict[str, Any] = {
-            "type":            CONTENT_TYPE,
-            "embedding":       embedding_vector,
-            "embedding_scope": scope,
-            "timestamp":       datetime.utcnow().isoformat(),
-        }
+        if not embedding_vector:
+            return _bad_request("No embedding vector found in event or assets")
 
+        scope            = extract_scope(payload)
+        embedding_option = extract_embedding_option(payload)
+
+        # ── CLIP / AUDIO SCOPE  → NEW DOC ────────────────────────────────────
         if scope in {"clip", "audio"}:
-            itm = _item(payload_dict) or {} if scope == "clip" else _map_item(payload_dict) or _item(payload_dict) or {}
-            start_sec = itm.get("start_offset_sec", 0) if scope == "clip" else itm.get("start_time", 0)
-            end_sec   = itm.get("end_offset_sec",   0) if scope == "clip" else itm.get("end_time",   0)
+            start_sec, end_sec = _get_segment_bounds(payload)
 
-            document |= {
+            if CONTENT_TYPE == "video":
+                master_src = _get_master_doc(client, asset_id, is_video=True)
+                fps = _extract_fps(master_src, asset_id)  # may raise
+            else:  # audio clip
+                fps = 30  # arbitrary; frame-rate irrelevant for audio
+
+            logger.info("Segment SMPTE conversion", extra={
+                "asset_id":      asset_id,
+                "fps":           fps,
+                "start_seconds": start_sec,
+                "end_seconds":   end_sec,
+            })
+
+            start_tc = seconds_to_smpte(start_sec, fps)
+            end_tc   = seconds_to_smpte(end_sec,   fps)
+
+            # ── log the SMPTE strings *after* conversion ────────────────────────
+            logger.info("Segment SMPTE values", extra={
+                "asset_id":      asset_id,
+                "start_timecode": start_tc,
+                "end_timecode":   end_tc,
+            })
+
+            document: Dict[str, Any] = {
+                "type":            CONTENT_TYPE,
+                "embedding":       embedding_vector,
+                "embedding_scope": "clip" if IS_AUDIO_CONTENT else scope,
+                "timestamp":       datetime.utcnow().isoformat(),
                 "DigitalSourceAsset": {"ID": asset_id},
-                "start_timecode":     seconds_to_smpte(start_sec),
-                "end_timecode":       seconds_to_smpte(end_sec),
+                "start_timecode":  start_tc,
+                "end_timecode":    end_tc,
             }
             if embedding_option is not None:
                 document["embedding_option"] = embedding_option
 
-            logger.info("Indexing new clip/audio doc", extra={"overview": {"vector_len": len(embedding_vector)}})
-            idx_res = client.index(index=INDEX_NAME, body=document)
-            check_opensearch_response(idx_res, "index")
+            logger.info("Indexing new clip/audio document", extra={
+                "index": INDEX_NAME,
+                "doc_preview": {**document, "embedding": f"<len {len(embedding_vector)}>"}
+            })
+            res = client.index(index=INDEX_NAME, body=document)
+            check_opensearch_response(res, "index")
+
             return {
                 "statusCode": 200,
-                "body": json.dumps({
-                    "message":     "Embedding stored successfully",
-                    "index":       INDEX_NAME,
-                    "document_id": idx_res.get("_id", "unknown"),
-                    "asset_id":    asset_id,
-                })
+                "body": json.dumps(
+                    {
+                        "message":     "Embedding stored successfully",
+                        "index":       INDEX_NAME,
+                        "document_id": res.get("_id", "unknown"),
+                        "asset_id":    asset_id,
+                    }
+                ),
             }
 
+        # ── AUDIO MASTER DOCS ARE *NOT* UPDATED ───────────────────────────────
+        if IS_AUDIO_CONTENT:
+            logger.info("Skipping master-doc update for audio content", extra={"asset_id": asset_id})
+            return {
+                "statusCode": 200,
+                "body": json.dumps(
+                    {
+                        "message":  "Embedding stored (audio clip only – master unchanged)",
+                        "asset_id": asset_id,
+                    }
+                ),
+            }
+
+        # ── MASTER-DOC UPDATE for VIDEO (existing query) ──────────────────────
         search_query = {
             "query": {
                 "bool": {
@@ -489,48 +616,63 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                         {
                             "nested": {
                                 "path": "DerivedRepresentations",
-                                "query": {"exists": {"field": "DerivedRepresentations.ID"}}
+                                "query": {
+                                    "exists": {"field": "DerivedRepresentations.ID"}
+                                },
                             }
-                        }
+                        },
                     ]
                 }
             }
         }
-        logger.info("Searching for existing document", extra={"asset_id": asset_id})
-        start_time      = time.time()
-        search_response = client.search(index=INDEX_NAME, body=search_query, size=1)
-        check_opensearch_response(search_response, "search")
+
+        logger.info("Searching for existing master document", extra={
+            "index": INDEX_NAME, "asset_id": asset_id, "query": search_query
+        })
+        start_time = time.time()
+        search_resp = client.search(index=INDEX_NAME, body=search_query, size=1)
+        check_opensearch_response(search_resp, "search")
+
         while (
-            search_response["hits"]["total"]["value"] == 0
+            search_resp["hits"]["total"]["value"] == 0
             and time.time() - start_time < 120
         ):
+            logger.info("Master doc not found – refreshing index & retrying …")
             client.indices.refresh(index=INDEX_NAME)
             time.sleep(5)
-            search_response = client.search(index=INDEX_NAME, body=search_query, size=1)
-            check_opensearch_response(search_response, "search")
+            search_resp = client.search(index=INDEX_NAME, body=search_query, size=1)
+            check_opensearch_response(search_resp, "search")
 
-        if search_response["hits"]["total"]["value"] == 0:
-            msg = f"No document found with DigitalSourceAsset.ID={asset_id}"
-            logger.error(msg)
-            raise RuntimeError(msg)
+        if search_resp["hits"]["total"]["value"] == 0:
+            raise RuntimeError(
+                f"No master doc with DigitalSourceAsset.ID={asset_id} in '{INDEX_NAME}'"
+            )
 
-        existing_id = search_response["hits"]["hits"][0]["_id"]
-        meta        = client.get(index=INDEX_NAME, id=existing_id)
+        existing_id  = search_resp["hits"]["hits"][0]["_id"]
+        meta         = client.get(index=INDEX_NAME, id=existing_id)
         check_opensearch_response(meta, "get")
-        seq_no, p_term = meta["_seq_no"], meta["_primary_term"]
-        document["DigitalSourceAsset"] = {"ID": asset_id}
+        seq_no       = meta["_seq_no"]
+        p_term       = meta["_primary_term"]
 
-        logger.info("Updating document", extra={"doc_id": existing_id})
+        update_body  = {
+            "doc": {
+                "type":            CONTENT_TYPE,
+                "embedding":       embedding_vector,
+                "embedding_scope": scope,
+                "timestamp":       datetime.utcnow().isoformat(),
+            }
+        }
+
         for attempt in range(50):
             try:
-                upd = client.update(
+                res = client.update(
                     index=INDEX_NAME,
                     id=existing_id,
                     body={"doc": document},
                     if_seq_no=seq_no,
                     if_primary_term=p_term,
                 )
-                check_opensearch_response(upd, "update")
+                check_opensearch_response(res, "update")
                 break
             except exceptions.ConflictError:
                 meta   = client.get(index=INDEX_NAME, id=existing_id)
@@ -538,9 +680,7 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                 p_term = meta["_primary_term"]
                 time.sleep(1)
         else:
-            err = "Failed to update document after 50 retries"
-            logger.error(err)
-            return _bad_request(err)
+            raise RuntimeError("Failed to update master document after 50 retries")
 
         return {
             "statusCode": 200,
@@ -552,9 +692,6 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
             }),
         }
 
-    except ResponseError:
-        # ResponseError is already logged and formatted by the with_error_handling decorator
-        raise
-    except Exception as exc:
+    except Exception:
         logger.exception("Error storing embedding")
-        raise RuntimeError("Error storing embedding") from exc
+        raise

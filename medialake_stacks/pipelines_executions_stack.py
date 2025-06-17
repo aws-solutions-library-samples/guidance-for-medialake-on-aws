@@ -6,6 +6,7 @@ from aws_cdk import (
     aws_lambda as lambda_,
     aws_events_targets as targets,
     aws_secretsmanager as secretsmanager,
+    aws_iam as iam,
 )
 from aws_cdk import aws_lambda_event_sources as eventsources
 from constructs import Construct
@@ -164,13 +165,26 @@ class PipelinesExecutionsStack(Stack):
                 entry="lambdas/api/pipelines/executions/rp_executionId/retry/post_retry",
                 environment_variables={
                     # "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
-                    "PIPELINES_EXECUTIONS_TABLE_NAME": self._pipelnes_executions_table.table_arn,
+                    "PIPELINES_EXECUTIONS_TABLE_NAME": self._pipelnes_executions_table.table_name,
                 },
             ),
         )
 
         self._pipelnes_executions_table.grant_read_data(
             self._post_retry_pipelines_executions_lambda.function
+        )
+
+        # Grant Step Functions permissions for retry operations
+        self._post_retry_pipelines_executions_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "states:DescribeExecution",
+                    "states:RedriveExecution",
+                    "states:StartExecution"
+                ],
+                resources=["*"]  # Allow access to all state machines and executions
+            )
         )
 
     @property

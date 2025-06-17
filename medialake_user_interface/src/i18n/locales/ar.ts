@@ -212,6 +212,11 @@ export default {
       endTime: 'وقت الانتهاء',
       duration: 'المدة',
       actions: 'الإجراءات'
+    },
+    actions: {
+      retryFromCurrent: 'أعد المحاولة من النقطة الحالية',
+      retryFromStart: 'أعد المحاولة من البداية',
+      viewDetails: 'عرض التفاصيل'
     }
   },
   users: {

@@ -18,6 +18,8 @@ from aws_lambda_powertools import Logger, Tracer, Metrics
 # Import the lambda_middleware from the local module
 from lambda_middleware import lambda_middleware
 
+from lambda_utils import _truncate_floats
+
 # Initialize clients and Powertools utilities
 s3_client = boto3.client("s3")
 secretsmanager_client = boto3.client("secretsmanager")
@@ -87,7 +89,9 @@ def make_api_call(
 
         if 200 <= response.status_code < 300:
             response_data = response.json()
-            logger.info(f"API call successful: {response_data}")
+            truncated = _truncate_floats(response_data, max_items=10)
+       
+            logger.info(f"Raw API call response: {truncated}")
             return {"statusCode": response.status_code, "body": json.dumps(response_data)}
         else:
             logger.error(f"API call failed with status code: {response.status_code}")
@@ -355,8 +359,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         else:
             response_output = create_response_output(s3_templates, api_template_bucket, response_body, event)
 
-        logger.info(f"Response output is {response_body} {response_output}")
-
+        truncated = _truncate_floats(response_output, max_items=10)
+        logger.info(f"Formatted response output (truncated) is {response_body} {truncated}")
        
         return response_output
 
