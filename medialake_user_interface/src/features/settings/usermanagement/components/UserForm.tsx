@@ -9,7 +9,6 @@ import { User, CreateUserRequest } from '@/api/types/api.types';
 import { Form } from '@/forms/components/Form';
 import { FormField } from '@/forms/components/FormField';
 import { FormSelect } from '@/forms/components/FormSelect';
-import { FormSwitch } from '@/forms/components/FormSwitch';
 import { useFormWithValidation } from '@/forms/hooks/useFormWithValidation';
 import { UserFormData, userFormSchema, createUserFormDefaults } from '../schemas/userFormSchema';
 import { useTranslation } from 'react-i18next';
@@ -42,14 +41,11 @@ export const UserForm: React.FC<UserFormProps> = ({
                 given_name: user.given_name || user.name || '',
                 family_name: user.family_name || '',
                 email: user.email || '',
-                email_verified: user.email_verified === 'true',
-                permissions: [], // Initialize as empty array for now
-                groups: user.groups ? user.groups.map(groupName => {
-                    // Convert group names to group IDs for the form
-                    const group = availableGroups.find(g => g.name === groupName);
-                    return group ? group.id : groupName;
-                }) : [],
-                enabled: user.enabled ?? true,
+                groups: user.groups && user.groups.length > 0 ? (() => {
+                    // Convert first group name to group ID for the form
+                    const group = availableGroups.find(g => g.name === user.groups[0]);
+                    return group ? group.id : 'editor';
+                })() : 'editor',
             }
             : createUserFormDefaults,
         validationSchema: userFormSchema,
@@ -64,14 +60,11 @@ export const UserForm: React.FC<UserFormProps> = ({
                     given_name: user.given_name || user.name || '',
                     family_name: user.family_name || '',
                     email: user.email || '',
-                    email_verified: user.email_verified === 'true',
-                    permissions: [], // Initialize as empty array for now
-                    groups: user.groups ? user.groups.map(groupName => {
-                        // Convert group names to group IDs for the form
-                        const group = availableGroups.find(g => g.name === groupName);
-                        return group ? group.id : groupName;
-                    }) : [],
-                    enabled: user.enabled ?? true,
+                    groups: user.groups && user.groups.length > 0 ? (() => {
+                        // Convert first group name to group ID for the form
+                        const group = availableGroups.find(g => g.name === user.groups[0]);
+                        return group ? group.id : 'editor';
+                    })() : 'editor',
                   }
                 : createUserFormDefaults;
             form.reset(defaultVals);
@@ -88,9 +81,9 @@ export const UserForm: React.FC<UserFormProps> = ({
                 email: data.email,
                 given_name: data.given_name,
                 family_name: data.family_name,
-                permissions: data.permissions,
-                groups: data.groups, // These are group IDs from the form
-                enabled: data.enabled,
+                permissions: [], // Set empty array for permissions
+                groups: [data.groups], // Convert single group ID back to array
+                enabled: true, // Default to enabled
             };
 
             console.log('Submitting user creation request:', requestData);
@@ -145,19 +138,10 @@ export const UserForm: React.FC<UserFormProps> = ({
                             translationPrefix="users.form"
                         />
                         <FormSelect
-                            name="permissions"
-                            control={form.control}
-                            label={t('users.form.fields.permissions.label')}
-                            tooltip={t('users.form.fields.permissions.tooltip')}
-                            options={[]}
-                            multiple
-                            translationPrefix="users.form"
-                        />
-                        <FormSelect
                             name="groups"
                             control={form.control}
-                            label={t('users.form.fields.groups.label', 'Groups')}
-                            tooltip={isLoadingGroups ? 'Loading groups...' : t('users.form.fields.groups.tooltip', 'Select groups for this user')}
+                            label={t('users.form.fields.groups.label', 'Group')}
+                            tooltip={isLoadingGroups ? 'Loading groups...' : t('users.form.fields.groups.tooltip', 'Select a group for this user')}
                             options={availableGroups.map(group => {
                                 console.log('Mapping group in FormSelect:', group);
                                 return {
@@ -165,23 +149,7 @@ export const UserForm: React.FC<UserFormProps> = ({
                                     value: group.id,
                                 };
                             })}
-                            multiple
                             disabled={isLoadingGroups || (!availableGroups || availableGroups.length === 0)}
-                            translationPrefix="users.form"
-                        />
-                        <FormSwitch
-                            name="email_verified"
-                            control={form.control}
-                            label={t('users.form.fields.email_verified.label')}
-                            tooltip={t('users.form.fields.email_verified.tooltip')}
-                            disabled={!user}
-                            translationPrefix="users.form"
-                        />
-                        <FormSwitch
-                            name="enabled"
-                            control={form.control}
-                            label={t('users.form.fields.enabled.label')}
-                            tooltip={t('users.form.fields.enabled.tooltip')}
                             translationPrefix="users.form"
                         />
                     </Form>
