@@ -1,6 +1,7 @@
 // src/permissions/components/Can.tsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePermission } from '../hooks/usePermission';
+import { useAuth } from '../../common/hooks/auth-context';
 import { CanProps } from '../types/permission.types';
 import { Actions, Subjects } from '../types/ability.types';
 
@@ -18,25 +19,44 @@ export function Can({
   children
 }: CanProps) {
   const { can, loading } = usePermission();
+  const { isAuthenticated, isInitialized } = useAuth();
+  const [lastKnownResult, setLastKnownResult] = useState<boolean | null>(null);
   
   console.log('Can component rendering with:', { action, subject, field });
   console.log('Can component loading state:', loading);
   
-  // While permissions are loading, keep the current state (don't hide)
-  // This prevents flickering when permissions are refreshed
+  // Don't do permission checks until we're authenticated and initialized
+  if (!isAuthenticated || !isInitialized) {
+    console.log('Can component: Not authenticated or not initialized, hiding content');
+    return null;
+  }
+  
+  // If loading and we have a previous result, use it to prevent flickering
+  // If loading and no previous result, hide content
   if (loading) {
-    console.log('Can component: Permissions loading, keeping content visible');
-    // During loading, we keep the content visible to prevent flickering
-    // If children is a function, call it with true during loading
-    if (typeof children === 'function') {
-      return <>{children(true)}</>;
+    console.log('Can component: Permissions loading');
+    if (lastKnownResult !== null) {
+      console.log('Can component: Using last known result during loading:', lastKnownResult);
+      if (typeof children === 'function') {
+        return <>{children(lastKnownResult)}</>;
+      }
+      return lastKnownResult ? <>{children}</> : null;
+    } else {
+      console.log('Can component: No previous result, hiding during loading');
+      return null;
     }
-    return <>{children}</>;
   }
   
   const allowed = can(action as Actions, subject as Subjects, field);
   
   console.log('Can component permission check result:', allowed);
+  
+  // Update last known result
+  useEffect(() => {
+    if (!loading) {
+      setLastKnownResult(allowed);
+    }
+  }, [allowed, loading]);
   
   // If children is a function, call it with the allowed status
   if (typeof children === 'function') {

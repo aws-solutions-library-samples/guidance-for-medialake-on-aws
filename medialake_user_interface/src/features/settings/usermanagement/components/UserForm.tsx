@@ -44,8 +44,8 @@ export const UserForm: React.FC<UserFormProps> = ({
                 groups: user.groups && user.groups.length > 0 ? (() => {
                     // Convert first group name to group ID for the form
                     const group = availableGroups.find(g => g.name === user.groups[0]);
-                    return group ? group.id : 'editor';
-                })() : 'editor',
+                    return group ? group.id : 'editors';
+                })() : 'editors',
             }
             : createUserFormDefaults,
         validationSchema: userFormSchema,
@@ -63,8 +63,8 @@ export const UserForm: React.FC<UserFormProps> = ({
                     groups: user.groups && user.groups.length > 0 ? (() => {
                         // Convert first group name to group ID for the form
                         const group = availableGroups.find(g => g.name === user.groups[0]);
-                        return group ? group.id : 'editor';
-                    })() : 'editor',
+                        return group ? group.id : 'editors';
+                    })() : 'editors',
                   }
                 : createUserFormDefaults;
             form.reset(defaultVals);

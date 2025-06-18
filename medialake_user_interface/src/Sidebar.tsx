@@ -115,41 +115,27 @@ function Sidebar() {
     
     const canViewPipeline = useMemo(() => {
         try {
-            // During permission loading, return true to prevent menu flickering
-            if (permissionsLoading) {
-                return true;
-            }
             return ability?.can('view', 'pipeline') ?? false;
         } catch (error) {
             console.error('Error checking pipeline permission:', error);
-            // During errors, default to true to keep menu visible
-            return true;
+            return false;
         }
-    }, [ability, permissionsLoading]);
+    }, [ability]);
     
     // Helper function to safely check permissions
     const safePermissionCheck = useCallback((action: string, resource: string) => {
         try {
-            // During permission loading, return true to prevent menu flickering
-            if (permissionsLoading) {
-                return true;
-            }
             return ability?.can(action as any, resource as any) ?? false;
         } catch (error) {
             console.error(`Error checking ${action} permission on ${resource}:`, error);
-            // During errors, default to true to keep menu visible
-            return true;
+            // During errors, default to false but log the error
+            return false;
         }
-    }, [ability, permissionsLoading]);
+    }, [ability]);
 
     // Memoize permission checks with error handling
     const canViewSettings = useMemo(() => {
         try {
-            // During permission loading, return true to prevent menu flickering
-            if (permissionsLoading) {
-                return true;
-            }
-            
             // Check if user has any settings-related permissions
             return (ability?.can('view', 'settings') ||
                    ability?.can('view', 'user') ||
@@ -164,10 +150,9 @@ function Sidebar() {
                    safePermissionCheck('view', 'settings.permissions')) ?? false;
         } catch (error) {
             console.error('Error checking settings permission:', error);
-            // During errors, default to true to keep menu visible
-            return true;
+            return false;
         }
-    }, [ability, safePermissionCheck, permissionsLoading]);
+    }, [ability, safePermissionCheck]);
     
     // Build menu items based on permissions
     const mainMenuItems = [

@@ -27,7 +27,6 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
   const { isAuthenticated, isLoading: authLoading, isInitialized } = useAuth();
   const [user, setUser] = useState<User | null>(null);
   const [ability, setAbility] = useState<AppAbility>(() => createAppAbility());
-  const [isAbilityReady, setIsAbilityReady] = useState(false);
   
   // State to control when to fetch permission sets from API
   const [shouldFetchPermissions, setShouldFetchPermissions] = useState(false);
@@ -43,9 +42,6 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
   // Extract user information from JWT token
   useEffect(() => {
     console.log('PermissionProvider: Auth state changed', { isAuthenticated, isInitialized, authLoading });
-    
-    // Reset ability ready state when auth state changes
-    setIsAbilityReady(false);
     
     if (isAuthenticated && isInitialized) {
       try {
@@ -208,25 +204,13 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
         console.error('Error creating ability:', error);
         // On error, ensure we have a fallback ability
         setAbility(createAppAbility());
-        setIsAbilityReady(false);
       }
     } else {
       // Reset ability when not authenticated
       console.log('Resetting ability - not authenticated or no user');
       setAbility(createAppAbility());
-      setIsAbilityReady(false);
     }
   }, [isAuthenticated, isInitialized, user, permissionSets]);
-
-  // Separate effect to track when ability is ready
-  useEffect(() => {
-    if (isAuthenticated && isInitialized && ability && ability.rules.length > 0) {
-      console.log('Ability is now ready for permission checks - rules count:', ability.rules.length);
-      setIsAbilityReady(true);
-    } else if (!isAuthenticated || !isInitialized) {
-      setIsAbilityReady(false);
-    }
-  }, [ability, isAuthenticated, isInitialized]);
 
   // Function to refresh permissions
   const refreshPermissions = useCallback(async () => {
@@ -241,7 +225,7 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
   // Context value
   const value = {
     ability,
-    loading: isLoading || authLoading || !isInitialized || !isAbilityReady,
+    loading: isLoading || authLoading || !isInitialized,
     error,
     refreshPermissions,
   };
