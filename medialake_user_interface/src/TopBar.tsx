@@ -282,18 +282,22 @@ function TopBar() {
   };
 
   // Updated to handle both switch and icon button clicks
-  const handleSemanticSearchToggle = (
-    event: React.MouseEvent | React.ChangeEvent<HTMLInputElement>
-  ) => {
-    if ('checked' in (event.target as HTMLInputElement)) {
-      // Switch toggle
-      setIsSemanticSearch(
-        (event.target as HTMLInputElement).checked
-      );
+  const handleSemanticSearchToggle = () => {
+    // Compute the new value
+    const newSemantic = !isSemanticSearch;
+    // Build the new search params
+    const params = new URLSearchParams(location.search);
+    params.set('semantic', newSemantic.toString());
+    if (newSemantic) {
+      params.set('clipType', clipType);
     } else {
-      // Icon/Button click
-      setIsSemanticSearch(prev => !prev);
+      params.delete('clipType');
     }
+    navigate({
+      pathname: location.pathname,
+      search: params.toString()
+    });
+    // Do NOT call setIsSemanticSearch here; let the useEffect handle it
   };
 
   const handleUploadComplete = (files: any[]) => {

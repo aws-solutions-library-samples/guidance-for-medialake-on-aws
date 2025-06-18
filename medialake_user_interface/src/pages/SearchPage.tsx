@@ -108,7 +108,9 @@ const SearchPage: React.FC = () => {
     const currentPage = parseInt(searchParams.get('page') || '1', 10);
     const currentQuery = searchParams.get('q') || query || '';
     const currentSemantic = searchParams.get('semantic') === 'true' || isSemantic || false;
-    const currentClipType = (searchParams.get('clipType') as 'clip' | 'full') || clipType || 'clip';
+    const currentClipType = currentSemantic
+        ? (searchParams.get('clipType') as 'clip' | 'full') || clipType || 'clip'
+        : 'full';
     const navigate = useNavigate();
 
     const [pageSize, setPageSize] = useState<number>(
@@ -157,7 +159,7 @@ const SearchPage: React.FC = () => {
         isSemantic: currentSemantic,
         fields: selectedFields,
         ...facetFilters, // Include facet filters in the search
-        clipType: currentClipType
+        ...(currentSemantic ? { clipType: currentClipType } : {})
     });
     
     // Access the nested data structure correctly
@@ -165,6 +167,9 @@ const SearchPage: React.FC = () => {
     const searchResults = searchData?.results || [];
     const searchMetadata = searchData?.searchMetadata;
     
+    // Log searchResults before processing
+    console.log('searchResults:', searchResults);
+
     // Process search results based on clipType
     const processedResults = useMemo(() => {
         console.log('Processing results with clipType:', currentClipType, 'searchResults length:', searchResults.length);
@@ -432,6 +437,10 @@ const SearchPage: React.FC = () => {
         ));
     };
 
+    // Debug logging for troubleshooting why results are not showing
+    console.log('processedResults:', processedResults);
+    console.log('filters:', filters);
+
     const filteredResults = processedResults?.filter(item => {
         const isImage = item.DigitalSourceAsset.Type === 'Image' && filters.mediaTypes.images;
         const isVideo = item.DigitalSourceAsset.Type === 'Video' && filters.mediaTypes.videos;
@@ -451,6 +460,7 @@ const SearchPage: React.FC = () => {
 
         return (isImage || isVideo || isAudio) && passesTimeFilter;
     }) || [];
+    console.log('filteredResults:', filteredResults);
 
     const imageResults = filteredResults.filter(item => item.DigitalSourceAsset.Type === 'Image');
     const videoResults = filteredResults.filter(item => item.DigitalSourceAsset.Type === 'Video');
@@ -535,6 +545,18 @@ const SearchPage: React.FC = () => {
             return prev;
         });
     };
+
+    // Force all media type filters to true for testing
+    useEffect(() => {
+        setFilters(prev => ({
+            ...prev,
+            mediaTypes: {
+                videos: true,
+                images: true,
+                audio: true,
+            }
+        }));
+    }, []);
 
     return (
         <RightSidebarProvider>
