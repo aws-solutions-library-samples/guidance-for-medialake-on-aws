@@ -23,7 +23,6 @@ import {
 } from '@mui/icons-material';
 import { useChat } from './contexts/ChatContext';
 import { useNavigate, useLocation } from 'react-router-dom'; // <-- import useLocation
-import debounce from 'lodash/debounce';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from './hooks/useTheme';
 import { useSidebar } from './contexts/SidebarContext';
@@ -106,20 +105,6 @@ function TopBar() {
       .join(' ');
     return `${tagPart}${tagPart && searchInput ? ' ' : ''}${searchInput}`.trim();
   }, [searchTags, searchInput]);
-
-  const debouncedSearch = useCallback(
-    debounce((query: string) => {
-      if (query.trim()) {
-        let search = `?q=${encodeURIComponent(query)}&semantic=${isSemanticSearch}`;
-        if (isSemanticSearch) search += `&clipType=${clipType}`;
-        navigate({
-          pathname: '/search',
-          search
-        });
-      }
-    }, 500),
-    [navigate, isSemanticSearch, clipType]
-  );
 
   const handleApplyFilters = (newFilters: any) => {
     setFilters(newFilters);
@@ -240,14 +225,15 @@ function TopBar() {
       }
     }
 
-    if (!value.includes(':')) {
-      const currentQuery = value.trim()
-        ? `${searchTags
-            .map(tag => `${tag.key}: ${tag.value}`)
-            .join(' ')}${searchTags.length > 0 ? ' ' : ''}${value}`
-        : searchTags.map(tag => `${tag.key}: ${tag.value}`).join(' ');
-      debouncedSearch(currentQuery);
-    }
+    // Remove automatic search - only search when button is clicked or Enter is pressed
+    // if (!value.includes(':')) {
+    //   const currentQuery = value.trim()
+    //     ? `${searchTags
+    //         .map(tag => `${tag.key}: ${tag.value}`)
+    //         .join(' ')}${searchTags.length > 0 ? ' ' : ''}${value}`
+    //     : searchTags.map(tag => `${tag.key}: ${tag.value}`).join(' ');
+    //   // debouncedSearch(currentQuery);
+    // }
   };
 
   const handleSearchKeyPress = (
