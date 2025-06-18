@@ -124,6 +124,7 @@ function AssetGridView<T>({
               selectedSearchFields={selectedSearchFields}
               clips={(asset as any).clips} // Pass clips data from asset
               clipType={clipType}
+              clipMetadata={(asset as any).clipMetadata} // Pass clip metadata
             />
           </Grid>
         ))}
@@ -176,6 +177,7 @@ function AssetGridView<T>({
                   selectedSearchFields={selectedSearchFields}
                   clips={(asset as any).clips} // Pass clips data from asset
                   clipType={clipType}
+                  clipMetadata={(asset as any).clipMetadata} // Pass clip metadata
                 />
               </Grid>
             ))}

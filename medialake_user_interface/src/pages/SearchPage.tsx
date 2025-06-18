@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useFeatureFlag } from '@/utils/featureFlags';
 import { formatDate } from '@/utils/dateFormat';
 import {
@@ -36,14 +36,14 @@ import ApiStatusModal from '../components/ApiStatusModal';
 import { useViewPreferences } from '@/hooks/useViewPreferences';
 import { useAssetSelection } from '@/hooks/useAssetSelection';
 import { useAssetFavorites } from '@/hooks/useAssetFavorites';
+import { useFacetSearch } from '../hooks/useFacetSearch';
+import { FacetFilters } from '../types/facetSearch';
 
 type AssetItem = (ImageItem | VideoItem | AudioItem) & {
     DigitalSourceAsset: {
         Type: string;
     };
 };
-import { useFacetSearch } from '../hooks/useFacetSearch';
-import { FacetFilters } from '../types/facetSearch';
 
 interface LocationState {
     query?: string;
@@ -165,18 +165,64 @@ const SearchPage: React.FC = () => {
     const searchResults = searchData?.results || [];
     const searchMetadata = searchData?.searchMetadata;
     
+    // Process search results based on clipType
+    const processedResults = useMemo(() => {
+        console.log('Processing results with clipType:', currentClipType, 'searchResults length:', searchResults.length);
+        
+        if (!searchResults || searchResults.length === 0) return [];
+        
+        if (currentClipType === 'clip') {
+            // When clipType is "clip", flatten the clips array and create individual items
+            const flattenedClips: any[] = [];
+            
+            searchResults.forEach((asset: any) => {
+                if (asset.clips && Array.isArray(asset.clips)) {
+                    asset.clips.forEach((clip: any) => {
+                        // Create a new asset item for each clip
+                        const clipAsset = {
+                            ...asset,
+                            // Override with clip-specific data
+                            score: clip.score,
+                            start_timecode: clip.start_timecode,
+                            end_timecode: clip.end_timecode,
+                            embedding_option: clip.embedding_option,
+                            // Add clip metadata
+                            clipMetadata: {
+                                originalAssetId: asset.id,
+                                originalAssetName: asset.objectName,
+                                clipStart: clip.start_timecode,
+                                clipEnd: clip.end_timecode,
+                                clipScore: clip.score,
+                                embeddingOption: clip.embedding_option
+                            }
+                        };
+                        flattenedClips.push(clipAsset);
+                    });
+                }
+            });
+            
+            console.log('Flattened clips count:', flattenedClips.length);
+            // Sort by score (highest first)
+            return flattenedClips.sort((a, b) => b.score - a.score);
+        } else {
+            // When clipType is "full", return original results
+            console.log('Returning original results count:', searchResults.length);
+            return searchResults;
+        }
+    }, [searchResults, currentClipType]);
+    
     // Store search results in sessionStorage for access by other components
     useEffect(() => {
-        if (searchResults) {
+        if (processedResults) {
             try {
-                sessionStorage.setItem('searchResults', JSON.stringify(searchResults));
+                sessionStorage.setItem('searchResults', JSON.stringify(processedResults));
                 // Trigger storage event for other components to detect the change
                 window.dispatchEvent(new Event('storage'));
             } catch (e) {
                 console.error('Error storing search results in session storage', e);
             }
         }
-    }, [searchResults]);
+    }, [processedResults]);
     
     // Fetch search fields
     const {
@@ -386,7 +432,7 @@ const SearchPage: React.FC = () => {
         ));
     };
 
-    const filteredResults = searchResults?.filter(item => {
+    const filteredResults = processedResults?.filter(item => {
         const isImage = item.DigitalSourceAsset.Type === 'Image' && filters.mediaTypes.images;
         const isVideo = item.DigitalSourceAsset.Type === 'Video' && filters.mediaTypes.videos;
         const isAudio = item.DigitalSourceAsset.Type === 'Audio' && filters.mediaTypes.audio;
@@ -490,8 +536,6 @@ const SearchPage: React.FC = () => {
         });
     };
 
-    // No need for this handler as it's now handled in the useAssetSelection hook
-
     return (
         <RightSidebarProvider>
             <>
@@ -572,6 +616,7 @@ const SearchPage: React.FC = () => {
 
                         {(filteredResults.length > 0 && searchMetadata && !error) || error ? (
                             <MasterResultsView
+                                key={`${currentClipType}-${currentQuery}-${currentPage}`}
                                 results={error ? [] : filteredResults}
                                 searchMetadata={{
                                     totalResults: error ? 0 : (searchMetadata?.totalResults || 0),

@@ -48,6 +48,12 @@ export interface AssetCardProps {
     selectedSearchFields?: string[]; // Selected search fields
     clips?: any[]; // Array of clips from search results
     clipType?: 'clip' | 'full'; // Current clip type setting
+    clipMetadata?: {
+        clipScore: number;
+        clipStart: string;
+        clipEnd: string;
+        embeddingOption: string;
+    };
 }
 
 const AssetCard: React.FC<AssetCardProps> = ({
@@ -81,6 +87,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
     selectedSearchFields,
     clips,
     clipType,
+    clipMetadata,
 }) => {
     const [selectionRange, setSelectionRange] = useState<[number, number] | null>(null);
     const [isHovering, setIsHovering] = useState(false);
@@ -495,6 +502,32 @@ const AssetCard: React.FC<AssetCardProps> = ({
                         <DownloadIcon fontSize="small" />
                     </IconButton>
                 </Box>
+
+                {/* Score indicator - when clipType is "clip" */}
+                {clipType === 'clip' && clipMetadata && (
+                    <Box
+                        sx={{
+                            position: 'absolute',
+                            top: 8,
+                            right: 8,
+                            backgroundColor: 'primary.main',
+                            color: 'primary.contrastText',
+                            borderRadius: '50%',
+                            width: 24,
+                            height: 24,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold',
+                            zIndex: 2,
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                        }}
+                        title={`Score: ${clipMetadata.clipScore.toFixed(3)}`}
+                    >
+                        {clipMetadata.clipScore.toFixed(3)}
+                    </Box>
+                )}
 
                 {/* Metadata section */}
                 {showMetadata && (

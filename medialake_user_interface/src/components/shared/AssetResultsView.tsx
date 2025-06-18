@@ -76,6 +76,7 @@ export interface AssetResultsViewProps<T> {
   onSelectAllToggle?: () => void;
   error?: { status: string; message: string } | null;
   isLoading?: boolean;
+  clipType?: 'clip' | 'full';
   // Functions to extract data from asset objects
   getAssetId: (asset: T) => string;
   getAssetName: (asset: T) => string;
@@ -83,7 +84,6 @@ export interface AssetResultsViewProps<T> {
   getAssetThumbnail: (asset: T) => string;
   getAssetProxy?: (asset: T) => string;
   renderCardField: (fieldId: string, asset: T) => React.ReactNode;
-  clipType?: 'clip' | 'full';
 }
 
 function AssetResultsView<T>({
@@ -376,6 +376,8 @@ function AssetResultsView<T>({
             onFavoriteToggle={onFavoriteToggle}
             isAssetSelected={isAssetSelected}
             onSelectToggle={onSelectToggle}
+            onSelectAllToggle={onSelectAllToggle}
+            clipType={clipType}
             getAssetId={getAssetId}
             getAssetName={getAssetName}
             getAssetType={getAssetType}
@@ -383,7 +385,6 @@ function AssetResultsView<T>({
             getAssetProxy={getAssetProxy}
             renderCardField={renderCardField}
             selectedSearchFields={selectedFields}
-            clipType={clipType}
           />
         ) : (
           <AssetTableView
