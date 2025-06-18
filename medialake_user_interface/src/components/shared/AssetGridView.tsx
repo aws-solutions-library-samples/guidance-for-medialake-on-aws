@@ -24,6 +24,8 @@ interface AssetGridViewProps<T> {
   // Selection functionality
   isAssetSelected?: (assetId: string) => boolean;
   onSelectToggle?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
+  // Select all functionality
+  onSelectAllToggle?: () => void;
   // Functions to extract data from asset objects
   getAssetId: (asset: T) => string;
   getAssetName: (asset: T) => string;
@@ -56,6 +58,7 @@ function AssetGridView<T>({
   onFavoriteToggle,
   isAssetSelected,
   onSelectToggle,
+  onSelectAllToggle,
   getAssetId,
   getAssetName,
   getAssetType,

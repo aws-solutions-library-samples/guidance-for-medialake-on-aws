@@ -110,10 +110,11 @@ function TopBar() {
   const debouncedSearch = useCallback(
     debounce((query: string) => {
       if (query.trim()) {
-        const params: any = { query, isSemantic: isSemanticSearch };
-        if (isSemanticSearch) params.clipType = clipType;
-        navigate('/search', {
-          state: params
+        let search = `?q=${encodeURIComponent(query)}&semantic=${isSemanticSearch}`;
+        if (isSemanticSearch) search += `&clipType=${clipType}`;
+        navigate({
+          pathname: '/search',
+          search
         });
       }
     }, 500),
@@ -123,26 +124,19 @@ function TopBar() {
   const handleApplyFilters = (newFilters: any) => {
     setFilters(newFilters);
     const searchQuery = getSearchQuery();
-    const queryParams = new URLSearchParams();
-    queryParams.append('q', searchQuery);
-    queryParams.append('semantic', isSemanticSearch.toString());
-    if (isSemanticSearch) queryParams.append('clipType', clipType);
-    if (newFilters.type) queryParams.append('type', newFilters.type);
-    if (newFilters.extension) queryParams.append('extension', newFilters.extension);
-    if (newFilters.LargerThan)
-      queryParams.append('LargerThan', newFilters.LargerThan.toString());
-    if (newFilters.asset_size_lte)
-      queryParams.append('asset_size_lte', newFilters.asset_size_lte.toString());
-    if (newFilters.asset_size_gte)
-      queryParams.append('asset_size_gte', newFilters.asset_size_gte.toString());
-    if (newFilters.ingested_date_lte)
-      queryParams.append('ingested_date_lte', newFilters.ingested_date_lte);
-    if (newFilters.ingested_date_gte)
-      queryParams.append('ingested_date_gte', newFilters.ingested_date_gte);
-    if (newFilters.filename) queryParams.append('filename', newFilters.filename);
+    let search = `?q=${encodeURIComponent(searchQuery)}&semantic=${isSemanticSearch}`;
+    if (isSemanticSearch) search += `&clipType=${clipType}`;
+    if (newFilters.type) search += `&type=${encodeURIComponent(newFilters.type)}`;
+    if (newFilters.extension) search += `&extension=${encodeURIComponent(newFilters.extension)}`;
+    if (newFilters.LargerThan) search += `&LargerThan=${newFilters.LargerThan}`;
+    if (newFilters.asset_size_lte) search += `&asset_size_lte=${newFilters.asset_size_lte}`;
+    if (newFilters.asset_size_gte) search += `&asset_size_gte=${newFilters.asset_size_gte}`;
+    if (newFilters.ingested_date_lte) search += `&ingested_date_lte=${encodeURIComponent(newFilters.ingested_date_lte)}`;
+    if (newFilters.ingested_date_gte) search += `&ingested_date_gte=${encodeURIComponent(newFilters.ingested_date_gte)}`;
+    if (newFilters.filename) search += `&filename=${encodeURIComponent(newFilters.filename)}`;
     navigate({
       pathname: '/search',
-      search: queryParams.toString()
+      search
     });
   };
 
@@ -221,10 +215,11 @@ function TopBar() {
         setSearchTags(prev => [...prev, newTag]);
         setSearchInput('');
         const searchQuery = getSearchQuery();
-        const params: any = { query: searchQuery, isSemantic: isSemanticSearch };
-        if (isSemanticSearch) params.clipType = clipType;
-        navigate('/search', {
-          state: params
+        let search = `?q=${encodeURIComponent(searchQuery)}&semantic=${isSemanticSearch}`;
+        if (isSemanticSearch) search += `&clipType=${clipType}`;
+        navigate({
+          pathname: '/search',
+          search
         });
         return true;
       }
@@ -269,10 +264,11 @@ function TopBar() {
       createTagFromInput(searchInput);
     } else if (searchInput.trim() || searchTags.length > 0) {
       const searchQuery = getSearchQuery();
-      const params: any = { query: searchQuery, isSemantic: isSemanticSearch };
-      if (isSemanticSearch) params.clipType = clipType;
-      navigate('/search', {
-        state: params
+      let search = `?q=${encodeURIComponent(searchQuery)}&semantic=${isSemanticSearch}`;
+      if (isSemanticSearch) search += `&clipType=${clipType}`;
+      navigate({
+        pathname: '/search',
+        search
       });
     }
   };
@@ -289,10 +285,11 @@ function TopBar() {
       const searchQuery = newTags
         .map(tag => `${tag.key}: ${tag.value}`)
         .join(' ');
-      const params: any = { query: searchQuery, isSemantic: isSemanticSearch };
-      if (isSemanticSearch) params.clipType = clipType;
-      navigate('/search', {
-        state: params
+      let search = `?q=${encodeURIComponent(searchQuery)}&semantic=${isSemanticSearch}`;
+      if (isSemanticSearch) search += `&clipType=${clipType}`;
+      navigate({
+        pathname: '/search',
+        search
       });
       return newTags;
     });
