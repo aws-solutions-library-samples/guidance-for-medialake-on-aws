@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Box,
     Typography,
@@ -14,6 +14,8 @@ import {
     Radio,
     ListItemIcon,
     ListItemText,
+    Slider,
+    Input,
 } from '@mui/material';
 
 import ViewModuleIcon from '@mui/icons-material/ViewModule';
@@ -60,6 +62,9 @@ interface AssetViewControlsProps extends BaseAssetViewControlsProps {
     hasSelectedAssets?: boolean;
     selectAllState?: 'none' | 'some' | 'all';
     onSelectAllToggle?: () => void;
+    scoreFilter: string;
+    onScoreFilterChange: (value: string) => void;
+    clipType?: 'clip' | 'full';
 }
 
 const AssetViewControls: React.FC<AssetViewControlsProps> = ({
@@ -89,6 +94,9 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
     hasSelectedAssets = false,
     selectAllState = 'none',
     onSelectAllToggle,
+    scoreFilter,
+    onScoreFilterChange,
+    clipType,
 }) => {
     const [sortAnchor, setSortAnchor] = React.useState<null | HTMLElement>(null);
     const [fieldsAnchor, setFieldsAnchor] = React.useState<null | HTMLElement>(null);
@@ -174,6 +182,39 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
         });
     }, [sortOptions, selectedFields, reverseFieldMapping]);
 
+    // Local state for the input string
+    const [inputValue, setInputValue] = useState(scoreFilter);
+    const [isInputFocused, setIsInputFocused] = useState(false);
+
+    useEffect(() => {
+      if (!isInputFocused) {
+        setInputValue(scoreFilter);
+      }
+    }, [scoreFilter, isInputFocused]);
+
+    const handleInputBlur = () => {
+      setIsInputFocused(false);
+      if (inputValue === '' || inputValue === '.') {
+        return;
+      }
+      let val = parseFloat(inputValue);
+      if (!isNaN(val) && val >= 0 && val <= 1) {
+        setInputValue(val.toString());
+        onScoreFilterChange(val.toString());
+      }
+    };
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      let valStr = e.target.value.replace(',', '.');
+      if (valStr === '' || valStr === '.' || /^\d*(\.\d{0,3})?$/.test(valStr)) {
+        setInputValue(valStr);
+        let val = parseFloat(valStr);
+        if (!isNaN(val) && val >= 0 && val <= 1) {
+          onScoreFilterChange(val.toString());
+        }
+      }
+    };
+
     return (
         <Box sx={{
             display: 'flex',
@@ -240,6 +281,38 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                         />
                     </Box>
                 )}
+                {/* Score Filter Slider - minimalist, no marks/labels */}
+                {clipType === 'clip' && (
+                  <Box sx={{ minWidth: 240, display: 'flex', alignItems: 'center', mr: 2 }}>
+                    <Slider
+                      value={parseFloat(scoreFilter) || 0}
+                      min={0}
+                      max={1}
+                      step={0.001}
+                      onChange={(_, value) => {
+                        onScoreFilterChange(value.toString());
+                        setInputValue(value.toString());
+                      }}
+                      valueLabelDisplay="off"
+                      color="primary"
+                      sx={{ width: 140, mx: 1, color: 'primary.main' }}
+                    />
+                    <Input
+                      value={inputValue}
+                      onChange={handleInputChange}
+                      onBlur={handleInputBlur}
+                      onFocus={() => setIsInputFocused(true)}
+                      inputProps={{
+                        inputMode: 'decimal',
+                        'aria-labelledby': 'score-slider',
+                        style: { width: 70, fontSize: 18, padding: 2, textAlign: 'center', color: '#1976d2' }
+                      }}
+                      type="text"
+                      sx={{ ml: 3, mr: 0, '& input': { textAlign: 'center', color: 'primary.main', fontWeight: 500 }, '&:before, &:after': { borderBottomColor: 'primary.main' } }}
+                      size="small"
+                    />
+                  </Box>
+                )}
                 {/* Sort Button */}
                 <Button
                     size="small"
@@ -249,6 +322,8 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                     sx={{
                         bgcolor: Boolean(sortAnchor) ? 'action.selected' : 'transparent',
                         textTransform: 'none',
+                        color: 'primary.main',
+                        fontWeight: 500
                     }}
                 >
                     Sort
@@ -560,4 +635,5 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
 };
 
 export default AssetViewControls;
+
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Box, Typography, LinearProgress } from '@mui/material';
 import { type SortingState } from '@tanstack/react-table';
 import { type AssetTableColumn } from '@/types/shared/assetComponents';
@@ -141,6 +141,20 @@ function AssetResultsView<T>({
   renderCardField,
   clipType,
 }: AssetResultsViewProps<T>) {
+  // Score filter state (string for input flexibility)
+  const [scoreFilter, setScoreFilter] = useState('0.000');
+
+  // Determine if we should show the score slider (if any result has a score property)
+  const showScoreSlider = results.some((r: any) => typeof r.score === 'number');
+
+  // Parse the filter value as a number
+  const scoreFilterValue = parseFloat(scoreFilter.replace(',', '.'));
+
+  // Filter results by score if slider is shown, using the raw input value if valid
+  const filteredResults = showScoreSlider && !isNaN(scoreFilterValue)
+    ? results.filter((r: any) => typeof r.score !== 'number' || r.score >= scoreFilterValue)
+    : results;
+
   // If there's an error, display the error component
   if (error) {
     return (
@@ -203,6 +217,9 @@ function AssetResultsView<T>({
           hasSelectedAssets={hasSelectedAssets}
           selectAllState={selectAllState}
           onSelectAllToggle={onSelectAllToggle}
+          scoreFilter={scoreFilter}
+          onScoreFilterChange={setScoreFilter}
+          clipType={clipType}
         />
         
         <ErrorDisplay 
@@ -301,12 +318,15 @@ function AssetResultsView<T>({
         hasSelectedAssets={hasSelectedAssets}
         selectAllState={selectAllState}
         onSelectAllToggle={onSelectAllToggle}
+        scoreFilter={scoreFilter}
+        onScoreFilterChange={setScoreFilter}
+        clipType={clipType}
       />
 
       {/* Sort the results based on the current sorting state */}
       {(() => {
         // Sort the results if sorting is specified
-        const sortedResults = [...results];
+        const sortedResults = [...filteredResults];
         if (sorting.length > 0) {
           const { id: sortField, desc } = sorting[0];
           sortedResults.sort((a, b) => {

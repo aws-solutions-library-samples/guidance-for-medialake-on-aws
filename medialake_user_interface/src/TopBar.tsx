@@ -381,23 +381,38 @@ function TopBar() {
                   borderRadius: '20px',
                   p: '2px',
                   mr: 1,
-                  minWidth: '100px',
-                  height: '32px',
+                  width: 140,
+                  height: '36px',
+                  position: 'relative',
                 }}
               >
                 <Box
+                  sx={{
+                    position: 'absolute',
+                    top: 2,
+                    left: clipType === 'clip' ? 2 : '50%',
+                    width: '50%',
+                    height: '32px',
+                    bgcolor: muiTheme.palette.primary.light,
+                    borderRadius: '16px',
+                    transition: 'left 0.2s',
+                    zIndex: 1,
+                  }}
+                />
+                <Box
                   onClick={() => setClipType('clip')}
                   sx={{
-                    px: 2,
-                    py: 0.5,
-                    borderRadius: '16px',
+                    flex: 1,
+                    zIndex: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     cursor: 'pointer',
-                    bgcolor: clipType === 'clip' ? muiTheme.palette.primary.light : 'transparent',
                     color: clipType === 'clip' ? muiTheme.palette.primary.main : muiTheme.palette.text.secondary,
                     fontWeight: 600,
                     fontSize: '1rem',
-                    transition: 'all 0.2s',
-                    boxShadow: clipType === 'clip' ? `0 0 8px ${alpha(muiTheme.palette.primary.main, 0.08)}` : 'none',
+                    userSelect: 'none',
+                    height: '32px',
                   }}
                 >
                   Clip
@@ -405,16 +420,17 @@ function TopBar() {
                 <Box
                   onClick={() => setClipType('full')}
                   sx={{
-                    px: 2,
-                    py: 0.5,
-                    borderRadius: '16px',
+                    flex: 1,
+                    zIndex: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     cursor: 'pointer',
-                    bgcolor: clipType === 'full' ? muiTheme.palette.primary.light : 'transparent',
                     color: clipType === 'full' ? muiTheme.palette.primary.main : muiTheme.palette.text.secondary,
                     fontWeight: 600,
                     fontSize: '1rem',
-                    transition: 'all 0.2s',
-                    boxShadow: clipType === 'full' ? `0 0 8px ${alpha(muiTheme.palette.primary.main, 0.08)}` : 'none',
+                    userSelect: 'none',
+                    height: '32px',
                   }}
                 >
                   Full
