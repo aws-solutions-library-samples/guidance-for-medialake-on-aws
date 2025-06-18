@@ -56,6 +56,21 @@ export interface AssetCardProps {
     };
 }
 
+// Utility to parse timecode (e.g., "00:00:30:00") to seconds
+function timecodeToSeconds(tc: string): number {
+    if (!tc) return 0;
+    const parts = tc.split(':').map(Number);
+    if (parts.length === 4) {
+        const [hh, mm, ss, ff] = parts;
+        // Assuming 25 fps
+        return hh * 3600 + mm * 60 + ss + (ff / 25);
+    } else if (parts.length === 3) {
+        const [hh, mm, ss] = parts;
+        return hh * 3600 + mm * 60 + ss;
+    }
+    return 0;
+}
+
 const AssetCard: React.FC<AssetCardProps> = ({
     id,
     name,
@@ -94,6 +109,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
     const [isMenuClicked, setIsMenuClicked] = useState(false);
     const inputRef = useRef<HTMLInputElement | null>(null);
     const cardRef = useRef<HTMLDivElement>(null);
+    const videoRef = useRef<HTMLVideoElement | null>(null);
 
     // Check if features are enabled
     const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', true);
@@ -270,6 +286,28 @@ const AssetCard: React.FC<AssetCardProps> = ({
         return apiFieldIds.some(apiFieldId => selectedSearchFields.includes(apiFieldId));
     });
 
+    useEffect(() => {
+        if (
+            clipType === 'clip' &&
+            clipMetadata &&
+            videoRef.current
+        ) {
+            const startSeconds = timecodeToSeconds(clipMetadata.clipStart);
+            const handleLoadedMetadata = () => {
+                videoRef.current!.currentTime = startSeconds;
+            };
+            const videoEl = videoRef.current;
+            videoEl.addEventListener('loadedmetadata', handleLoadedMetadata);
+            // If already loaded, set immediately
+            if (videoEl.readyState >= 1) {
+                videoEl.currentTime = startSeconds;
+            }
+            return () => {
+                videoEl.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            };
+        }
+    }, [clipType, clipMetadata]);
+
     return (
         <Box
             ref={cardRef}
@@ -342,6 +380,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
                 {/* Render appropriate content based on asset type */}
                 {assetType === 'Video' ? (
                     <video
+                        ref={videoRef}
                         onClick={(event) => {
                             event.preventDefault();
                             onAssetClick();
