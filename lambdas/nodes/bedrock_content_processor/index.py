@@ -29,16 +29,14 @@ ImagePayload = Dict[str, str]
 # Default prompts
 DEFAULT_PROMPTS = {
     "summary_100": (
-        "**You are a media-asset-management specialist.**\n"
-        "The following is a **content from a media file** "
-        "(podcast, feature film, corporate video, etc.). In **100 words "
-        "or less**, distill its **content**, emphasizing:\n"
-        "1. **Core Topic or Theme**\n"
-        "2. **Key Messages & Insights**\n"
-        "3. **Major Arguments or Plot Points**\n"
-        "4. **Tone & Style**\n"
-        "Use concise, industry-standard terminology so a MAM user can "
-        "immediately grasp the essence of the content."
+        "**You are a media‐asset‐management specialist.**\n"
+        "The following is content from a media file (podcast, feature film, corporate video, etc.).\n"
+        "In **100 words or less**, write a **single paragraph** that:\n"
+        "  • Distills the **core topic or theme**,\n"
+        "  • Highlights the **key messages & insights**,\n"
+        "  • Summarizes the **major arguments or plot points**, and\n"
+        "  • Conveys the **tone & style**.\n"
+        "Use concise, industry‐standard terminology so a MAM user can immediately grasp the essence of the content."
     ),
     "describe_image": (
         "**You are an image-description assistant.**\n"
