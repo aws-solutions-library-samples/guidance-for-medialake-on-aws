@@ -194,12 +194,14 @@ def perform_vector_search(asset_id: str, params: QueryParams) -> Dict:
         
         logger.info(f"Starting vector search", extra={
             "full_asset_id": asset_id,
-            "uuid": uuid,
+            "uuid_extracted": uuid,
+            "search_target": f"Looking for document with ID containing: {uuid}",
             "index_name": index_name,
             "params": params.dict()
         })
 
         # Search for the UUID portion in DigitalSourceAsset.ID using match query
+        # Also include DigitalAsset in the source to access nested embeddings
         initial_query = {        
             "query": {
                 "bool": {
@@ -218,6 +220,17 @@ def perform_vector_search(asset_id: str, params: QueryParams) -> Dict:
                     "minimum_should_match": 1
                 }
             },
+            "_source": {
+                "includes": [
+                    "InventoryID",
+                    "DigitalSourceAsset",
+                    "DigitalAsset.embedding",
+                    "DigitalAsset.asset_id",
+                    "DigitalAsset.embedding_scope",
+                    "embedding",  # Keep checking for top-level embedding too
+                    "embedding_scope"
+                ]
+            }
         }
 
         # Log the full initial query with all details
@@ -225,7 +238,8 @@ def perform_vector_search(asset_id: str, params: QueryParams) -> Dict:
             "query_type": "initial_lookup",
             "full_query": json.dumps(initial_query, indent=2),
             "index": index_name,
-            "uuid": uuid
+            "uuid": uuid,
+            "searching_for_asset_id": asset_id
         })
 
         asset_response = client.search(
@@ -233,12 +247,21 @@ def perform_vector_search(asset_id: str, params: QueryParams) -> Dict:
             body=initial_query
         )
         
+        # Extract document IDs from the response for logging
+        found_doc_ids = []
+        if asset_response.get("hits", {}).get("hits"):
+            for hit in asset_response["hits"]["hits"]:
+                found_doc_ids.append(hit.get("_id", "unknown"))
+        
         # Log the full response from the initial query
         logger.info("Initial asset lookup response details", extra={
             "query_type": "initial_lookup",
             "response": json.dumps(asset_response, indent=2),
             "total_hits": asset_response.get("hits", {}).get("total", {}).get("value", 0),
-            "asset_id": asset_id
+            "asset_id_searched_for": asset_id,
+            "uuid_searched_for": uuid,
+            "found_document_ids": found_doc_ids,
+            "first_doc_id": found_doc_ids[0] if found_doc_ids else "none"
         })
 
         # Check if we found any matches
@@ -246,62 +269,279 @@ def perform_vector_search(asset_id: str, params: QueryParams) -> Dict:
         if not hits:
             logger.warning("No hits found for asset lookup", extra={
                 "asset_id": asset_id,
+                "uuid_searched": uuid,
                 "query_used": json.dumps(initial_query, indent=2),
                 "response": json.dumps(asset_response, indent=2)
             })
             raise APIError("Asset not found", 404)
 
-        if "embedding" not in hits[0]["_source"]:
+        # Log details about the found document
+        found_doc = hits[0]
+        source = found_doc["_source"]
+        
+        logger.info("Found document details", extra={
+            "document_id": found_doc.get("_id", "unknown"),
+            "document_index": found_doc.get("_index", "unknown"),
+            "document_score": found_doc.get("_score", "unknown"),
+            "source_keys": list(source.keys()),
+            "digital_source_asset_id": source.get("DigitalSourceAsset", {}).get("ID", "not_found"),
+            "inventory_id": source.get("InventoryID", "not_found")
+        })
+
+        # Get the complete document without field filtering to see full structure
+        try:
+            complete_doc_query = {
+                "query": {
+                    "term": {
+                        "_id": found_doc["_id"]
+                    }
+                }
+            }
+            
+            complete_doc_response = client.search(
+                index=index_name,
+                body=complete_doc_query
+            )
+            
+            if complete_doc_response.get("hits", {}).get("hits"):
+                complete_doc = complete_doc_response["hits"]["hits"][0]
+                complete_source = complete_doc["_source"]
+                
+                # Log basic structure
+                logger.info("COMPLETE DOCUMENT STRUCTURE", extra={
+                    "document_id": complete_doc.get("_id", "unknown"),
+                    "all_fields": list(complete_source.keys()),
+                    "full_document": json.dumps(complete_source, indent=2)
+                })
+                
+                # Log detailed field inspection
+                field_details = {}
+                for field_name, field_value in complete_source.items():
+                    field_details[field_name] = {
+                        "type": type(field_value).__name__,
+                        "value": field_value if not isinstance(field_value, (dict, list)) or len(str(field_value)) < 200 else f"[{type(field_value).__name__} with {len(field_value) if hasattr(field_value, '__len__') else 'unknown'} items]"
+                    }
+                
+                logger.info("DETAILED FIELD INSPECTION", extra={
+                    "document_id": complete_doc.get("_id", "unknown"),
+                    "field_details": json.dumps(field_details, indent=2)
+                })
+                
+                # Specifically look for any field that might contain embeddings
+                embedding_candidates = {}
+                for field_name, field_value in complete_source.items():
+                    if "embed" in field_name.lower() or "vector" in field_name.lower():
+                        embedding_candidates[field_name] = {
+                            "type": type(field_value).__name__,
+                            "length": len(field_value) if hasattr(field_value, '__len__') else "no_length",
+                            "first_few_items": field_value[:5] if isinstance(field_value, list) else str(field_value)[:100]
+                        }
+                    elif isinstance(field_value, dict):
+                        # Check nested dict for embedding fields
+                        for nested_key, nested_value in field_value.items():
+                            if "embed" in nested_key.lower() or "vector" in nested_key.lower():
+                                embedding_candidates[f"{field_name}.{nested_key}"] = {
+                                    "type": type(nested_value).__name__,
+                                    "length": len(nested_value) if hasattr(nested_value, '__len__') else "no_length",
+                                    "first_few_items": nested_value[:5] if isinstance(nested_value, list) else str(nested_value)[:100]
+                                }
+                    elif isinstance(field_value, list):
+                        # Check list items for embedding fields
+                        for i, item in enumerate(field_value[:3]):  # Check first 3 items
+                            if isinstance(item, dict):
+                                for item_key, item_value in item.items():
+                                    if "embed" in item_key.lower() or "vector" in item_key.lower():
+                                        embedding_candidates[f"{field_name}[{i}].{item_key}"] = {
+                                            "type": type(item_value).__name__,
+                                            "length": len(item_value) if hasattr(item_value, '__len__') else "no_length",
+                                            "first_few_items": item_value[:5] if isinstance(item_value, list) else str(item_value)[:100]
+                                        }
+                
+                logger.info("EMBEDDING FIELD CANDIDATES", extra={
+                    "document_id": complete_doc.get("_id", "unknown"),
+                    "embedding_candidates": json.dumps(embedding_candidates, indent=2),
+                    "candidates_found": len(embedding_candidates)
+                })
+                
+            else:
+                logger.warning("Could not retrieve complete document")
+                
+        except Exception as complete_doc_error:
+            logger.warning(f"Failed to retrieve complete document: {str(complete_doc_error)}")
+
+        embedding = None
+        embedding_path = None
+
+        # First, check for top-level embedding (backward compatibility)
+        if "embedding" in source and source["embedding"]:
+            embedding = source["embedding"]
+            embedding_path = "embedding"
+            logger.info("Using top-level embedding", extra={
+                "embedding_length": len(embedding) if isinstance(embedding, list) else "not_a_list",
+                "document_id": found_doc.get("_id", "unknown")
+            })
+        
+        # If no top-level embedding, look in nested DigitalAsset array
+        elif "DigitalAsset" in source and isinstance(source["DigitalAsset"], list):
+            for digital_asset in source["DigitalAsset"]:
+                if isinstance(digital_asset, dict) and "embedding" in digital_asset and digital_asset["embedding"]:
+                    embedding = digital_asset["embedding"]
+                    embedding_path = "DigitalAsset.embedding"
+                    logger.info("Using nested DigitalAsset embedding", extra={
+                        "embedding_length": len(embedding) if isinstance(embedding, list) else "not_a_list",
+                        "digital_asset_id": digital_asset.get("asset_id", "unknown"),
+                        "embedding_scope": digital_asset.get("embedding_scope", "unknown"),
+                        "document_id": found_doc.get("_id", "unknown")
+                    })
+                    break
+
+        if not embedding:
+            # Let's do a diagnostic query to see what embedding structures exist in the index
+            diagnostic_query = {
+                "size": 5,
+                "query": {
+                    "bool": {
+                        "should": [
+                            {"exists": {"field": "embedding"}},
+                            {"exists": {"field": "DigitalAsset.embedding"}}
+                        ]
+                    }
+                },
+                "_source": {
+                    "includes": [
+                        "InventoryID",
+                        "DigitalSourceAsset.ID",
+                        "DigitalSourceAsset.Type",
+                        "embedding",
+                        "embedding_scope",
+                        "DigitalAsset.embedding",
+                        "DigitalAsset.asset_id",
+                        "DigitalAsset.embedding_scope"
+                    ]
+                }
+            }
+            
+            try:
+                diagnostic_response = client.search(index=index_name, body=diagnostic_query)
+                
+                # Extract document IDs from diagnostic response
+                diag_doc_ids = []
+                if diagnostic_response.get("hits", {}).get("hits"):
+                    for hit in diagnostic_response["hits"]["hits"]:
+                        diag_doc_ids.append(hit.get("_id", "unknown"))
+                
+                logger.info("Diagnostic query for embeddings in index", extra={
+                    "total_with_embeddings": diagnostic_response["hits"]["total"]["value"],
+                    "sample_doc_ids_with_embeddings": diag_doc_ids,
+                    "sample_docs": json.dumps(diagnostic_response["hits"]["hits"], indent=2),
+                    "current_doc_id_without_embedding": found_doc.get("_id", "unknown")
+                })
+            except Exception as diag_error:
+                logger.warning(f"Diagnostic query failed: {str(diag_error)}")
+
             logger.warning("No embedding found in asset document", extra={
                 "asset_id": asset_id,
-                "available_fields": list(hits[0]["_source"].keys()),
+                "document_id_found": found_doc.get("_id", "unknown"),
+                "available_fields": list(source.keys()),
+                "digital_asset_present": "DigitalAsset" in source,
+                "digital_asset_type": type(source.get("DigitalAsset")).__name__ if "DigitalAsset" in source else "not_present",
+                "digital_asset_count": len(source["DigitalAsset"]) if isinstance(source.get("DigitalAsset"), list) else "not_a_list",
                 "query_used": json.dumps(initial_query, indent=2)
             })
-            raise APIError("No embedding available for asset", 404)
-
-        embedding = hits[0]["_source"]["embedding"]
+            
+            # Return a more specific error for missing embeddings
+            raise APIError("This asset has not been processed for similarity search yet. Embeddings are not available.", 422)
         
         logger.info("Retrieved embedding details", extra={
             "embedding_exists": embedding is not None,
             "embedding_type": type(embedding).__name__,
-            "embedding_length": len(embedding) if isinstance(embedding, list) else "not_a_list"
+            "embedding_length": len(embedding) if isinstance(embedding, list) else "not_a_list",
+            "embedding_path": embedding_path
         })
 
-        # Build the vector search query
-        search_body = {
-            "size": params.size,
-            "from": params.from_,
-            "query": {
-                "knn": {
-                    "embedding": {
-                        "vector": embedding,
-                        "k": params.size
+        # Build the vector search query - use nested query if embedding is in DigitalAsset
+        if embedding_path == "DigitalAsset.embedding":
+            search_body = {
+                "size": params.size,
+                "from": params.from_,
+                "query": {
+                    "nested": {
+                        "path": "DigitalAsset",
+                        "query": {
+                            "knn": {
+                                "DigitalAsset.embedding": {
+                                    "vector": embedding,
+                                    "k": params.size * 2  # Get more results to account for filtering
+                                }
+                            }
+                        },
+                        "score_mode": "max"
                     }
-                }
-            },
-            "post_filter": {
-                "bool": {
-                    "must_not": [
-                        {"term": {"DigitalSourceAsset.ID.keyword": asset_id}},
-                        {"term": {"embedding_scope": "clip"}}
+                },
+                "post_filter": {
+                    "bool": {
+                        "must_not": [
+                            {"term": {"DigitalSourceAsset.ID.keyword": asset_id}},
+                            {"nested": {
+                                "path": "DigitalAsset",
+                                "query": {
+                                    "term": {"DigitalAsset.embedding_scope": "clip"}
+                                }
+                            }}
+                        ]
+                    }
+                },
+                "_source": {
+                    "includes": [
+                        "InventoryID",
+                        "DigitalSourceAsset.Type",
+                        "DigitalSourceAsset.MainRepresentation.Format",
+                        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey",
+                        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo",
+                        "DigitalSourceAsset.CreateDate",
+                        "DerivedRepresentations.Purpose",
+                        "DerivedRepresentations.StorageInfo.PrimaryLocation",
+                        "FileHash",
+                        "Metadata.Consolidated.type"
                     ]
                 }
-            },
-            "_source": {
-                "includes": [
-                    "InventoryID",
-                    "DigitalSourceAsset.Type",
-                    "DigitalSourceAsset.MainRepresentation.Format",
-                    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey",
-                    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo",
-                    "DigitalSourceAsset.CreateDate",
-                    "DerivedRepresentations.Purpose",
-                    "DerivedRepresentations.StorageInfo.PrimaryLocation",
-                    "FileHash",
-                    "Metadata.Consolidated.type"
-                ]
             }
-        }
+        else:
+            # Use traditional top-level embedding search
+            search_body = {
+                "size": params.size,
+                "from": params.from_,
+                "query": {
+                    "knn": {
+                        "embedding": {
+                            "vector": embedding,
+                            "k": params.size
+                        }
+                    }
+                },
+                "post_filter": {
+                    "bool": {
+                        "must_not": [
+                            {"term": {"DigitalSourceAsset.ID.keyword": asset_id}},
+                            {"term": {"embedding_scope": "clip"}}
+                        ]
+                    }
+                },
+                "_source": {
+                    "includes": [
+                        "InventoryID",
+                        "DigitalSourceAsset.Type",
+                        "DigitalSourceAsset.MainRepresentation.Format",
+                        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey",
+                        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo",
+                        "DigitalSourceAsset.CreateDate",
+                        "DerivedRepresentations.Purpose",
+                        "DerivedRepresentations.StorageInfo.PrimaryLocation",
+                        "FileHash",
+                        "Metadata.Consolidated.type"
+                    ]
+                }
+            }
 
         # Log the full KNN search query with all details
         logger.info("KNN search query details", extra={
@@ -309,7 +549,8 @@ def perform_vector_search(asset_id: str, params: QueryParams) -> Dict:
             "full_query": json.dumps(search_body, indent=2),
             "index": index_name,
             "asset_id": asset_id,
-            "params": params.dict()
+            "params": params.dict(),
+            "embedding_path": embedding_path
         })
 
         response = client.search(body=search_body, index=index_name)
@@ -395,6 +636,9 @@ def perform_vector_search(asset_id: str, params: QueryParams) -> Dict:
 
         return response_data
 
+    except APIError:
+        # Re-raise APIError as-is to preserve the specific error message and status code
+        raise
     except NotFoundError:
         logger.error("NotFoundError encountered")
         raise APIError("Asset not found", 404)
