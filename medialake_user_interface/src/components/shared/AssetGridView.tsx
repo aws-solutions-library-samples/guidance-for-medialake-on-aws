@@ -1,4 +1,4 @@
-import React from 'react';
+   import React from 'react';
 import { Box, Grid, Typography } from '@mui/material';
 import AssetCard, { AssetField } from './AssetCard';
 
@@ -120,6 +120,7 @@ function AssetGridView<T>({
               isSelected={isAssetSelected ? isAssetSelected(getAssetId(asset)) : false}
               onSelectToggle={onSelectToggle ? (id, e) => onSelectToggle(asset, e) : undefined}
               selectedSearchFields={selectedSearchFields}
+              clips={(asset as any).clips} // Pass clips data from asset
             />
           </Grid>
         ))}
@@ -170,6 +171,7 @@ function AssetGridView<T>({
                   isSelected={isAssetSelected ? isAssetSelected(getAssetId(asset)) : false}
                   onSelectToggle={onSelectToggle ? (id, e) => onSelectToggle(asset, e) : undefined}
                   selectedSearchFields={selectedSearchFields}
+                  clips={(asset as any).clips} // Pass clips data from asset
                 />
               </Grid>
             ))}
