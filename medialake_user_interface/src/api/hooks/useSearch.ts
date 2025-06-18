@@ -98,6 +98,7 @@ export const useSearch = (query: string, params?: SearchParams) => {
                     `${API_ENDPOINTS.SEARCH}?${queryParams.toString()}`,
                     { signal }
                 );
+                console.log("SEARCH RESPONSE: ",response)
 
                 // Check if the response status is not a success (2xx)
                 if (response.data?.status && !response.data.status.startsWith('2')) {
