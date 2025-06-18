@@ -241,7 +241,18 @@ def check_opensearch_response(resp: Dict[str, Any], op: str) -> None:
 _master_doc_cache: Dict[str, Dict[str, Any]] = {}   # asset_id → _source
 
 
-def _get_master_doc(client: OpenSearch, asset_id: str, is_video: bool) -> Dict[str, Any]:
+def _get_master_doc(
+    client: OpenSearch,
+    asset_id: str,
+    is_video: bool,
+    max_retries: int = 50,
+    delay_seconds: float = 1.0
+) -> Dict[str, Any]:
+    """
+    Fetches the master document for a given asset_id, retrying up to max_retries
+    times if no document is found.
+    """
+    # return cached if available
     if asset_id in _master_doc_cache:
         return _master_doc_cache[asset_id]
 
@@ -251,23 +262,31 @@ def _get_master_doc(client: OpenSearch, asset_id: str, is_video: bool) -> Dict[s
         {
             "nested": {
                 "path": "DerivedRepresentations",
-                "query": {
-                    "exists": {"field": "DerivedRepresentations.ID"}
-                }
+                "query": {"exists": {"field": "DerivedRepresentations.ID"}}
             }
         }
     ]
 
-    resp = client.search(
-        index=INDEX_NAME,
-        body={"query": {"bool": {"filter": filters}}},
-        size=1,
-    )
-    if resp["hits"]["total"]["value"] == 0:
-        raise RuntimeError(f"No master document found for asset {asset_id}")
+    for attempt in range(1, max_retries + 1):
+        resp = client.search(
+            index=INDEX_NAME,
+            body={"query": {"bool": {"filter": filters}}},
+            size=1,
+        )
+        total_hits = resp.get("hits", {}).get("total", {}).get("value", 0)
 
-    _master_doc_cache[asset_id] = resp["hits"]["hits"][0]["_source"]
-    return _master_doc_cache[asset_id]
+        if total_hits > 0:
+            doc = resp["hits"]["hits"][0]["_source"]
+            _master_doc_cache[asset_id] = doc
+            return doc
+
+        # not found, wait and retry
+        time.sleep(delay_seconds)
+
+    # after all retries
+    raise RuntimeError(
+        f"No master document found for asset {asset_id} after {max_retries} attempts"
+    )
 
 
 def _extract_fps(master_src: Dict[str, Any], asset_id: str) -> int:
