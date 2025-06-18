@@ -305,6 +305,28 @@ const AssetCard: React.FC<AssetCardProps> = ({
                     {clips.length} {clips.length === 1 ? 'clip' : 'clips'}
                 </Box>
             )}
+            {/* Score indicator - when clipType is "clip" */}
+            {clipType === 'clip' && clipMetadata && (
+                <Box
+                    sx={(theme) => ({
+                        position: 'absolute',
+                        top: -10,
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        backgroundColor: theme.palette.primary.main,
+                        color: theme.palette.primary.contrastText,
+                        padding: '2px 8px',
+                        borderRadius: '12px',
+                        fontSize: '0.7rem',
+                        fontWeight: 500,
+                        zIndex: 30,
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                        whiteSpace: 'nowrap',
+                    })}
+                >
+                    {`score: ${clipMetadata.clipScore.toFixed(3)}`}
+                </Box>
+            )}
             <Box
                 sx={{
                     borderRadius: 4, // Increased from 2 to 4 for more curved corners
@@ -502,32 +524,6 @@ const AssetCard: React.FC<AssetCardProps> = ({
                         <DownloadIcon fontSize="small" />
                     </IconButton>
                 </Box>
-
-                {/* Score indicator - when clipType is "clip" */}
-                {clipType === 'clip' && clipMetadata && (
-                    <Box
-                        sx={{
-                            position: 'absolute',
-                            top: 8,
-                            right: 8,
-                            backgroundColor: 'primary.main',
-                            color: 'primary.contrastText',
-                            borderRadius: '50%',
-                            width: 24,
-                            height: 24,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '0.75rem',
-                            fontWeight: 'bold',
-                            zIndex: 2,
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-                        }}
-                        title={`Score: ${clipMetadata.clipScore.toFixed(3)}`}
-                    >
-                        {clipMetadata.clipScore.toFixed(3)}
-                    </Box>
-                )}
 
                 {/* Metadata section */}
                 {showMetadata && (
