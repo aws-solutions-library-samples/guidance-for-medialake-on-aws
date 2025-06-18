@@ -81,6 +81,9 @@ interface MasterResultsViewProps {
   
   // Asset state accessors
   isAssetFavorited?: (assetId: string) => boolean;
+  
+  // Clip type for semantic search
+  clipType?: 'clip' | 'full';
 }
 
 const MasterResultsView: React.FC<MasterResultsViewProps> = ({
@@ -141,6 +144,9 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   
   // Asset state accessors
   isAssetFavorited,
+  
+  // Clip type for semantic search
+  clipType,
 }) => {
   // Function to render card fields
   const renderCardField = (fieldId: string, asset: AssetItem): React.ReactNode => {
@@ -225,6 +231,7 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       getAssetThumbnail={(asset) => asset.thumbnailUrl || ''}
       getAssetProxy={(asset) => asset.proxyUrl || ''}
       renderCardField={renderCardField}
+      clipType={clipType}
     />
   );
 };

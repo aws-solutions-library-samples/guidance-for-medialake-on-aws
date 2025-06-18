@@ -55,6 +55,7 @@ interface ModularUnifiedResultsViewProps {
   onPageSizeChange: (newPageSize: number) => void;
   error?: { status: string; message: string } | null;
   isLoading?: boolean;
+  clipType?: 'clip' | 'full';
 }
 
 const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
@@ -95,6 +96,7 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
   onPageSizeChange,
   error,
   isLoading,
+  clipType,
 }) => {
   // Check if multi-select feature is enabled
   const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
@@ -170,6 +172,7 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
       getAssetThumbnail={(asset) => asset.thumbnailUrl || ''}
       getAssetProxy={(asset) => asset.proxyUrl || ''}
       renderCardField={renderCardField}
+      clipType={clipType}
     />
   );
 };

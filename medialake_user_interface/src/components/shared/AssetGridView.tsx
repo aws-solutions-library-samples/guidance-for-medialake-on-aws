@@ -1,4 +1,4 @@
-   import React from 'react';
+import React from 'react';
 import { Box, Grid, Typography } from '@mui/material';
 import AssetCard, { AssetField } from './AssetCard';
 
@@ -33,6 +33,7 @@ interface AssetGridViewProps<T> {
   renderCardField: (fieldId: string, asset: T) => React.ReactNode;
   // Search fields
   selectedSearchFields?: string[];
+  clipType?: 'clip' | 'full';
 }
 
 function AssetGridView<T>({
@@ -62,6 +63,7 @@ function AssetGridView<T>({
   getAssetProxy,
   renderCardField,
   selectedSearchFields,
+  clipType,
 }: AssetGridViewProps<T>) {
   // Group results by type if needed
   const groupedResults = React.useMemo(() => {
@@ -121,6 +123,7 @@ function AssetGridView<T>({
               onSelectToggle={onSelectToggle ? (id, e) => onSelectToggle(asset, e) : undefined}
               selectedSearchFields={selectedSearchFields}
               clips={(asset as any).clips} // Pass clips data from asset
+              clipType={clipType}
             />
           </Grid>
         ))}
@@ -172,6 +175,7 @@ function AssetGridView<T>({
                   onSelectToggle={onSelectToggle ? (id, e) => onSelectToggle(asset, e) : undefined}
                   selectedSearchFields={selectedSearchFields}
                   clips={(asset as any).clips} // Pass clips data from asset
+                  clipType={clipType}
                 />
               </Grid>
             ))}

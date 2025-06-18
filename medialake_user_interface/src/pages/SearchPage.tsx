@@ -48,6 +48,7 @@ import { FacetFilters } from '../types/facetSearch';
 interface LocationState {
     query?: string;
     isSemantic?: boolean;
+    clipType?: 'clip' | 'full';
     preserveSearch?: boolean;
     viewMode?: 'card' | 'table';
     cardSize?: 'small' | 'medium' | 'large';
@@ -93,6 +94,7 @@ const SearchPage: React.FC = () => {
     const {
         query,
         isSemantic,
+        clipType,
         type,
         extension,
         LargerThan,
@@ -106,6 +108,7 @@ const SearchPage: React.FC = () => {
     const currentPage = parseInt(searchParams.get('page') || '1', 10);
     const currentQuery = searchParams.get('q') || query || '';
     const currentSemantic = searchParams.get('semantic') === 'true' || isSemantic || false;
+    const currentClipType = (searchParams.get('clipType') as 'clip' | 'full') || clipType || 'clip';
     const navigate = useNavigate();
 
     const [pageSize, setPageSize] = useState<number>(
@@ -153,7 +156,8 @@ const SearchPage: React.FC = () => {
         pageSize: pageSize,
         isSemantic: currentSemantic,
         fields: selectedFields,
-        ...facetFilters // Include facet filters in the search
+        ...facetFilters, // Include facet filters in the search
+        clipType: currentClipType
     });
     
     // Access the nested data structure correctly
@@ -608,7 +612,6 @@ const SearchPage: React.FC = () => {
                                 editedName={editedName}
                                 isAssetFavorited={assetFavorites.isAssetFavorited}
                                 onFavoriteToggle={assetFavorites.handleFavoriteToggle}
-                                // Only pass selection props if multi-select feature is enabled
                                 selectedAssets={multiSelectFeature.value ? assetSelection.selectedAssetIds : []}
                                 onSelectToggle={multiSelectFeature.value ? assetSelection.handleSelectToggle : undefined}
                                 hasSelectedAssets={multiSelectFeature.value ? assetSelection.selectedAssets.length > 0 : false}
@@ -621,6 +624,7 @@ const SearchPage: React.FC = () => {
                                     message: (error as SearchError).apiResponse?.message || error.message
                                 } : undefined}
                                 isLoading={isLoading || isFetching}
+                                clipType={currentClipType}
                             />
                         ) : null}
                     </Box>

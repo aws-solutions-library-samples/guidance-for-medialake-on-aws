@@ -10,6 +10,7 @@ interface SearchParams {
     page?: number;
     pageSize?: number;
     isSemantic?: boolean;
+    clipType?: 'clip' | 'full';
     // New facet parameters
     type?: string;
     extension?: string;
@@ -50,6 +51,7 @@ export const useSearch = (query: string, params?: SearchParams) => {
     const page = params?.page || 1;
     const pageSize = params?.pageSize || 20;
     const isSemantic = params?.isSemantic ?? false;
+    const clipType = params?.clipType;
     const fields = params?.fields || [];
     const { showError } = useErrorModal();
 
@@ -66,7 +68,7 @@ export const useSearch = (query: string, params?: SearchParams) => {
     } : undefined;
 
     return useQuery<SearchResponseType, SearchError>({
-        queryKey: QUERY_KEYS.SEARCH.list(query, page, pageSize, isSemantic, fields, facetParams),
+        queryKey: QUERY_KEYS.SEARCH.list(query, page, pageSize, isSemantic, fields, facetParams, clipType),
         queryFn: async ({ signal }) => {
             try {
                 // Build query parameters
@@ -75,6 +77,11 @@ export const useSearch = (query: string, params?: SearchParams) => {
                 queryParams.append('page', page.toString());
                 queryParams.append('pageSize', pageSize.toString());
                 queryParams.append('semantic', isSemantic.toString());
+                
+                // Add clipType parameter if it exists and semantic search is enabled
+                if (isSemantic && params?.clipType) {
+                    queryParams.append('clipType', params.clipType);
+                }
                 
                 // Add facet parameters if they exist
                 if (params?.type) queryParams.append('type', params.type);

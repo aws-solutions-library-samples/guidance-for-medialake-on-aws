@@ -47,6 +47,7 @@ export interface AssetCardProps {
     onSelectToggle?: (id: string, event: React.MouseEvent<HTMLElement>) => void; // Callback when selection is toggled
     selectedSearchFields?: string[]; // Selected search fields
     clips?: any[]; // Array of clips from search results
+    clipType?: 'clip' | 'full'; // Current clip type setting
 }
 
 const AssetCard: React.FC<AssetCardProps> = ({
@@ -79,6 +80,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
     onSelectToggle,
     selectedSearchFields,
     clips,
+    clipType,
 }) => {
     const [selectionRange, setSelectionRange] = useState<[number, number] | null>(null);
     const [isHovering, setIsHovering] = useState(false);
@@ -275,7 +277,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
             onMouseLeave={() => setIsHovering(false)}
         >
             {/* Clips indicator */}
-            {clips && clips.length > 0 && (
+            {clips && clips.length > 0 && clipType === 'full' && (
                 <Box
                     sx={(theme) => ({
                         position: 'absolute',

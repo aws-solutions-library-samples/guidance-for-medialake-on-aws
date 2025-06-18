@@ -83,6 +83,7 @@ export interface AssetResultsViewProps<T> {
   getAssetThumbnail: (asset: T) => string;
   getAssetProxy?: (asset: T) => string;
   renderCardField: (fieldId: string, asset: T) => React.ReactNode;
+  clipType?: 'clip' | 'full';
 }
 
 function AssetResultsView<T>({
@@ -138,6 +139,7 @@ function AssetResultsView<T>({
   getAssetThumbnail,
   getAssetProxy,
   renderCardField,
+  clipType,
 }: AssetResultsViewProps<T>) {
   // If there's an error, display the error component
   if (error) {
@@ -381,6 +383,7 @@ function AssetResultsView<T>({
             getAssetProxy={getAssetProxy}
             renderCardField={renderCardField}
             selectedSearchFields={selectedFields}
+            clipType={clipType}
           />
         ) : (
           <AssetTableView

@@ -71,6 +71,27 @@ function TopBar() {
   // Add state for clipType
   const [clipType, setClipType] = useState<'clip' | 'full'>('clip');
 
+  // Initialize clipType from URL parameters
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const clipTypeParam = params.get('clipType') as 'clip' | 'full';
+    if (clipTypeParam && (clipTypeParam === 'clip' || clipTypeParam === 'full')) {
+      setClipType(clipTypeParam);
+    }
+  }, [location.search]);
+
+  // Update URL when clipType changes
+  useEffect(() => {
+    if (isSemanticSearch) {
+      const params = new URLSearchParams(location.search);
+      params.set('clipType', clipType);
+      navigate({
+        pathname: location.pathname,
+        search: params.toString()
+      }, { replace: true });
+    }
+  }, [clipType, isSemanticSearch, location.pathname, location.search, navigate]);
+
   // Whenever the URL's `semantic` param changes (e.g. on browser refresh),
   // make sure `isSemanticSearch` reflects that:
   useEffect(() => {
@@ -200,8 +221,10 @@ function TopBar() {
         setSearchTags(prev => [...prev, newTag]);
         setSearchInput('');
         const searchQuery = getSearchQuery();
+        const params: any = { query: searchQuery, isSemantic: isSemanticSearch };
+        if (isSemanticSearch) params.clipType = clipType;
         navigate('/search', {
-          state: { query: searchQuery, isSemantic: isSemanticSearch }
+          state: params
         });
         return true;
       }
@@ -266,8 +289,10 @@ function TopBar() {
       const searchQuery = newTags
         .map(tag => `${tag.key}: ${tag.value}`)
         .join(' ');
+      const params: any = { query: searchQuery, isSemantic: isSemanticSearch };
+      if (isSemanticSearch) params.clipType = clipType;
       navigate('/search', {
-        state: { query: searchQuery, isSemantic: isSemanticSearch }
+        state: params
       });
       return newTags;
     });
