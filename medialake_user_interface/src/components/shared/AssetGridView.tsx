@@ -24,6 +24,8 @@ interface AssetGridViewProps<T> {
   // Selection functionality
   isAssetSelected?: (assetId: string) => boolean;
   onSelectToggle?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
+  // Select all functionality
+  onSelectAllToggle?: () => void;
   // Functions to extract data from asset objects
   getAssetId: (asset: T) => string;
   getAssetName: (asset: T) => string;
@@ -33,6 +35,8 @@ interface AssetGridViewProps<T> {
   renderCardField: (fieldId: string, asset: T) => React.ReactNode;
   // Search fields
   selectedSearchFields?: string[];
+  clipType?: 'clip' | 'full';
+  isSemanticSearch?: boolean;
 }
 
 function AssetGridView<T>({
@@ -55,6 +59,7 @@ function AssetGridView<T>({
   onFavoriteToggle,
   isAssetSelected,
   onSelectToggle,
+  onSelectAllToggle,
   getAssetId,
   getAssetName,
   getAssetType,
@@ -62,7 +67,9 @@ function AssetGridView<T>({
   getAssetProxy,
   renderCardField,
   selectedSearchFields,
-}: AssetGridViewProps<T>) {
+  clipType,
+  isSemanticSearch,
+}: AssetGridViewProps<T> & { isSemanticSearch?: boolean }) {
   // Group results by type if needed
   const groupedResults = React.useMemo(() => {
     if (!groupByType) return { all: results };
@@ -120,6 +127,11 @@ function AssetGridView<T>({
               isSelected={isAssetSelected ? isAssetSelected(getAssetId(asset)) : false}
               onSelectToggle={onSelectToggle ? (id, e) => onSelectToggle(asset, e) : undefined}
               selectedSearchFields={selectedSearchFields}
+              clips={(asset as any).clips} // Pass clips data from asset
+              clipType={clipType}
+              clipMetadata={(asset as any).clipMetadata} // Pass clip metadata
+              score={(asset as any).score} // Pass score to AssetCard
+              isSemanticSearch={isSemanticSearch}
             />
           </Grid>
         ))}
@@ -170,6 +182,11 @@ function AssetGridView<T>({
                   isSelected={isAssetSelected ? isAssetSelected(getAssetId(asset)) : false}
                   onSelectToggle={onSelectToggle ? (id, e) => onSelectToggle(asset, e) : undefined}
                   selectedSearchFields={selectedSearchFields}
+                  clips={(asset as any).clips} // Pass clips data from asset
+                  clipType={clipType}
+                  clipMetadata={(asset as any).clipMetadata} // Pass clip metadata
+                  score={(asset as any).score} // Pass score to AssetCard
+                  isSemanticSearch={isSemanticSearch}
                 />
               </Grid>
             ))}

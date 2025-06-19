@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { type ImageItem, type VideoItem, type AudioItem } from '@/types/search/searchResults';
 import { type SortingState } from '@tanstack/react-table';
 import { type AssetTableColumn } from '@/types/shared/assetComponents';
@@ -81,66 +81,70 @@ interface MasterResultsViewProps {
   
   // Asset state accessors
   isAssetFavorited?: (assetId: string) => boolean;
+  
+  // Clip type for semantic search
+  clipType?: 'clip' | 'full';
+  
+  // Score filter
+  scoreFilter?: number;
+  onScoreFilterChange?: (value: number) => void;
+  totalResults?: number;
+  filteredResults?: number;
+  
+  // Semantic search
+  isSemanticSearch?: boolean;
 }
 
 const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   results,
   searchMetadata,
+  onPageChange,
+  onPageSizeChange,
   searchTerm,
-  error,
-  isLoading,
-  
-  // Search fields
   selectedFields,
   availableFields,
   onFieldsChange,
-  
-  // View preferences
-  viewMode,
-  cardSize,
-  aspectRatio,
-  thumbnailScale,
-  showMetadata,
   groupByType,
-  sorting,
-  cardFields,
-  columns,
-  
-  // Event handlers for view preferences
-  onViewModeChange,
-  onCardSizeChange,
-  onAspectRatioChange,
-  onThumbnailScaleChange,
-  onShowMetadataChange,
   onGroupByTypeChange,
+  viewMode,
+  onViewModeChange,
+  cardSize,
+  onCardSizeChange,
+  aspectRatio,
+  onAspectRatioChange,
+  thumbnailScale,
+  onThumbnailScaleChange,
+  showMetadata,
+  onShowMetadataChange,
+  sorting,
   onSortChange,
+  cardFields,
   onCardFieldToggle,
+  columns,
   onColumnToggle,
-  onPageChange,
-  onPageSizeChange,
-  
-  // Asset state
-  selectedAssets,
-  editingAssetId,
-  editedName,
-  
-  // Asset action handlers
   onAssetClick,
   onDeleteClick,
   onMenuClick,
   onEditClick,
   onEditNameChange,
   onEditNameComplete,
-  onSelectToggle,
+  editingAssetId,
+  editedName,
+  isAssetFavorited,
   onFavoriteToggle,
-  
-  // Select all functionality
+  selectedAssets,
+  onSelectToggle,
   hasSelectedAssets,
   selectAllState,
   onSelectAllToggle,
-  
-  // Asset state accessors
-  isAssetFavorited,
+  error,
+  isLoading,
+  clipType,
+  scoreFilter,
+  onScoreFilterChange,
+  totalResults,
+  filteredResults,
+  isSemanticSearch,
 }) => {
   // Function to render card fields
   const renderCardField = (fieldId: string, asset: AssetItem): React.ReactNode => {
@@ -179,9 +183,6 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       searchMetadata={searchMetadata}
       onPageChange={onPageChange}
       onPageSizeChange={onPageSizeChange}
-      selectedFields={selectedFields}
-      availableFields={availableFields}
-      onFieldsChange={onFieldsChange}
       searchTerm={searchTerm}
       title="Results"
       groupByType={groupByType}
@@ -225,6 +226,12 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       getAssetThumbnail={(asset) => asset.thumbnailUrl || ''}
       getAssetProxy={(asset) => asset.proxyUrl || ''}
       renderCardField={renderCardField}
+      clipType={clipType}
+      scoreFilter={scoreFilter}
+      onScoreFilterChange={onScoreFilterChange}
+      totalResults={totalResults}
+      filteredResults={filteredResults}
+      isSemanticSearch={isSemanticSearch}
     />
   );
 };
