@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
     Box,
     Typography,
@@ -14,9 +14,6 @@ import {
     Radio,
     ListItemIcon,
     ListItemText,
-    Slider,
-    Input,
-    IconButton,
 } from '@mui/material';
 
 import ViewModuleIcon from '@mui/icons-material/ViewModule';
@@ -33,11 +30,9 @@ import PhotoSizeSelectLargeIcon from '@mui/icons-material/PhotoSizeSelectLarge';
 import FitScreenIcon from '@mui/icons-material/FitScreen';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import InfoIcon from '@mui/icons-material/Info';
-import ClearIcon from '@mui/icons-material/Clear';
 import { type SortingState } from '@tanstack/react-table';
 import { type AssetField, type SortOption, type CardSize, type AspectRatio, type AssetViewControlsProps as BaseAssetViewControlsProps } from '../../types/shared/assetComponents';
 import { useFeatureFlag } from '@/utils/featureFlags';
-import { useTheme } from '@mui/material/styles';
 
 interface AssetViewControlsProps extends BaseAssetViewControlsProps {
     // Search fields
@@ -65,12 +60,6 @@ interface AssetViewControlsProps extends BaseAssetViewControlsProps {
     hasSelectedAssets?: boolean;
     selectAllState?: 'none' | 'some' | 'all';
     onSelectAllToggle?: () => void;
-    // Score filter props
-    scoreFilter?: number;
-    onScoreFilterChange?: (value: number) => void;
-    totalResults?: number;
-    filteredResults?: number;
-    clipType?: 'clip' | 'full';
 }
 
 const AssetViewControls: React.FC<AssetViewControlsProps> = ({
@@ -100,18 +89,10 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
     hasSelectedAssets = false,
     selectAllState = 'none',
     onSelectAllToggle,
-    // Score filter props
-    scoreFilter,
-    onScoreFilterChange,
-    totalResults,
-    filteredResults,
-    clipType,
 }) => {
     const [sortAnchor, setSortAnchor] = React.useState<null | HTMLElement>(null);
     const [fieldsAnchor, setFieldsAnchor] = React.useState<null | HTMLElement>(null);
     const [appearanceAnchor, setAppearanceAnchor] = React.useState<null | HTMLElement>(null);
-    const [inputValue, setInputValue] = React.useState(scoreFilter?.toString() || '0');
-    const [sliderValue, setSliderValue] = React.useState(scoreFilter);
 
     const handleSortClose = () => setSortAnchor(null);
     const handleFieldsClose = () => setFieldsAnchor(null);
@@ -193,230 +174,113 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
         });
     }, [sortOptions, selectedFields, reverseFieldMapping]);
 
-    // Sync inputValue with scoreFilter only when scoreFilter changes externally
-    React.useEffect(() => {
-        setInputValue(scoreFilter?.toString() || '0');
-    }, [scoreFilter]);
-
-    // Sync sliderValue with scoreFilter only when scoreFilter changes externally
-    React.useEffect(() => {
-        setSliderValue(scoreFilter);
-    }, [scoreFilter]);
-
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const valStr = e.target.value.replace(',', '.');
-        setInputValue(valStr);
-    };
-
-    const commitInputValue = () => {
-        if (inputValue === '' || inputValue === '.' || !/^\d*(\.\d{0,3})?$/.test(inputValue)) {
-            setInputValue(scoreFilter.toString());
-            return;
-        }
-        const val = parseFloat(inputValue);
-        if (!isNaN(val) && val >= 0 && val <= 1) {
-            if (val !== scoreFilter) {
-                onScoreFilterChange(val);
-            }
-        } else {
-            setInputValue(scoreFilter.toString());
-        }
-    };
-
-    const handleSliderChange = (_: any, value: number | number[]) => {
-        const v = Array.isArray(value) ? value[0] : value;
-        setSliderValue(v);
-        setInputValue(v.toString());
-    };
-
-    const handleSliderChangeCommitted = (_: any, value: number | number[]) => {
-        const numValue = Array.isArray(value) ? value[0] : value;
-        if (numValue !== scoreFilter) {
-            onScoreFilterChange(numValue);
-        }
-    };
-
-    const theme = useTheme();
-
     return (
         <Box sx={{
             display: 'flex',
-            flexDirection: 'column',
+            justifyContent: 'space-between',
+            alignItems: 'center',
             mb: 3
         }}>
-            {/* Minimal Score Filter - top right above controls */}
-            {clipType === 'clip' && scoreFilter !== undefined && onScoreFilterChange && (
-                <Box sx={{
-                    display: 'flex',
-                    justifyContent: 'flex-end',
-                    alignItems: 'center',
-                    width: '100%',
-                    mb: 1,
-                }}>
-                    <Slider
-                        value={sliderValue}
-                        min={0}
-                        max={1}
-                        step={0.001}
-                        onChange={handleSliderChange}
-                        onChangeCommitted={handleSliderChangeCommitted}
-                        sx={{
-                            width: 180,
-                            mr: 2,
-                            zIndex: 1,
-                            '& .MuiSlider-thumb': {
-                                width: 18,
-                                height: 18,
-                            },
-                            '& .MuiSlider-track': {
-                                height: 4,
-                            },
-                            '& .MuiSlider-rail': {
-                                height: 4,
-                            }
-                        }}
-                    />
-                    <Input
-                        value={inputValue}
-                        onChange={handleInputChange}
-                        onBlur={commitInputValue}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                                commitInputValue();
-                            }
-                        }}
-                        inputProps={{
-                            inputMode: 'decimal',
-                            style: {
-                                width: 48,
-                                fontSize: '1rem',
-                                padding: '2px 4px',
-                                textAlign: 'center',
-                                borderRadius: '6px',
-                                border: 'none',
-                                background: 'transparent',
-                                color: theme.palette.primary.main,
-                                fontWeight: 600,
-                            }
-                        }}
-                        type="text"
-                        size="small"
-                        sx={{
-                            '& input': {
-                                textAlign: 'center',
-                                fontWeight: 600,
-                                fontSize: '1rem',
-                                color: 'primary.main',
-                                background: 'transparent',
-                                border: 'none',
-                            },
-                            '&:before, &:after': { borderBottom: 'none' }
-                        }}
-                    />
-                </Box>
-            )}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <ToggleButtonGroup
+                    value={viewMode}
+                    exclusive
+                    onChange={onViewModeChange}
+                    size="small"
+                >
+                    <ToggleButton value="card">
+                        <ViewModuleIcon />
+                    </ToggleButton>
+                    <ToggleButton value="table">
+                        <ViewListIcon />
+                    </ToggleButton>
+                </ToggleButtonGroup>
+            </Box>
 
-            {/* Main Controls Row */}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <ToggleButtonGroup
-                        value={viewMode}
-                        exclusive
-                        onChange={onViewModeChange}
-                        size="small"
+            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                {multiSelectFeature.value && (
+
+                    <Box
+                        sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1,
+                        }}
                     >
-                        <ToggleButton value="card">
-                            <ViewModuleIcon />
-                        </ToggleButton>
-                        <ToggleButton value="table">
-                            <ViewListIcon />
-                        </ToggleButton>
-                    </ToggleButtonGroup>
-                </Box>
-                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                    {multiSelectFeature.value && (
-                        <Box
-                            sx={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 1,
-                            }}
-                        >
-                            <FormControlLabel
-                                control={
-                                    <Checkbox
-                                        checked={selectAllState === 'all'}
-                                        indeterminate={selectAllState === 'some'}
-                                        onChange={onSelectAllToggle}
-                                        size="small"
-                                        sx={{
-                                            color: 'primary.main',
-                                            '&.Mui-checked': {
-                                                color: 'primary.main',
-                                            },
-                                            '&.MuiCheckbox-indeterminate': {
-                                                color: 'primary.main',
-                                            },
-                                            '& .MuiSvgIcon-root': {
-                                                fontSize: '1.2rem',
-                                            }
-                                        }}
-                                    />
-                                }
-                                label={selectAllState === 'all' ? 'Deselect Page' : 'Select Page'}
-                                sx={{
-                                    margin: 0,
-                                    '& .MuiFormControlLabel-label': {
-                                        fontSize: '0.875rem',
-                                        fontWeight: 500,
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={selectAllState === 'all'}
+                                    indeterminate={selectAllState === 'some'}
+                                    onChange={onSelectAllToggle}
+                                    size="small"
+                                    sx={{
                                         color: 'primary.main',
-                                    }
-                                }}
-                            />
-                        </Box>
-                    )}
-                    {/* Sort Button */}
-                    <Button
-                        size="small"
-                        startIcon={<SortIcon />}
-                        endIcon={<KeyboardArrowDownIcon />}
-                        onClick={(e) => setSortAnchor(e.currentTarget)}
-                        sx={{
-                            bgcolor: Boolean(sortAnchor) ? 'action.selected' : 'transparent',
-                            textTransform: 'none',
-                            color: 'primary.main',
-                            fontWeight: 500
-                        }}
-                    >
-                        Sort
-                    </Button>
-                    {/* Show Fields Button */}
-                    <Button
-                        size="small"
-                        startIcon={<ViewColumnIcon />}
-                        endIcon={<KeyboardArrowDownIcon />}
-                        onClick={(e) => setFieldsAnchor(e.currentTarget)}
-                        sx={{
-                            bgcolor: Boolean(fieldsAnchor) ? 'action.selected' : 'transparent',
-                            textTransform: 'none',
-                        }}
-                    >
-                        Fields
-                    </Button>
-                    {/* Appearance Button */}
-                    <Button
-                        size="small"
-                        startIcon={<TuneIcon />}
-                        endIcon={<KeyboardArrowDownIcon />}
-                        onClick={(e) => setAppearanceAnchor(e.currentTarget)}
-                        sx={{
-                            bgcolor: Boolean(appearanceAnchor) ? 'action.selected' : 'transparent',
-                            textTransform: 'none',
-                        }}
-                    >
-                        Appearance
-                    </Button>
-                </Box>
+                                        '&.Mui-checked': {
+                                            color: 'primary.main',
+                                        },
+                                        '&.MuiCheckbox-indeterminate': {
+                                            color: 'primary.main',
+                                        },
+                                        '& .MuiSvgIcon-root': {
+                                            fontSize: '1.2rem',
+                                        }
+                                    }}
+                                />
+                            }
+                            label={selectAllState === 'all' ? 'Deselect Page' : 'Select Page'}
+                            sx={{
+                                margin: 0,
+                                '& .MuiFormControlLabel-label': {
+                                    fontSize: '0.875rem',
+                                    fontWeight: 500,
+                                    color: 'primary.main',
+                                }
+                            }}
+                        />
+                    </Box>
+                )}
+                {/* Sort Button */}
+                <Button
+                    size="small"
+                    startIcon={<SortIcon />}
+                    endIcon={<KeyboardArrowDownIcon />}
+                    onClick={(e) => setSortAnchor(e.currentTarget)}
+                    sx={{
+                        bgcolor: Boolean(sortAnchor) ? 'action.selected' : 'transparent',
+                        textTransform: 'none',
+                    }}
+                >
+                    Sort
+                </Button>
+
+                {/* Show Fields Button */}
+                <Button
+                    size="small"
+                    startIcon={<ViewColumnIcon />}
+                    endIcon={<KeyboardArrowDownIcon />}
+                    onClick={(e) => setFieldsAnchor(e.currentTarget)}
+                    sx={{
+                        bgcolor: Boolean(fieldsAnchor) ? 'action.selected' : 'transparent',
+                        textTransform: 'none',
+                    }}
+                >
+                    Fields
+                </Button>
+
+                {/* Appearance Button */}
+                <Button
+                    size="small"
+                    startIcon={<TuneIcon />}
+                    endIcon={<KeyboardArrowDownIcon />}
+                    onClick={(e) => setAppearanceAnchor(e.currentTarget)}
+                    sx={{
+                        bgcolor: Boolean(appearanceAnchor) ? 'action.selected' : 'transparent',
+                        textTransform: 'none',
+                    }}
+                >
+                    Appearance
+                </Button>
             </Box>
 
             {/* Sort Menu */}
@@ -696,5 +560,4 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
 };
 
 export default AssetViewControls;
-
 
