@@ -16,6 +16,7 @@ import {
     ListItemText,
     Slider,
     Input,
+    IconButton,
 } from '@mui/material';
 
 import ViewModuleIcon from '@mui/icons-material/ViewModule';
@@ -32,9 +33,11 @@ import PhotoSizeSelectLargeIcon from '@mui/icons-material/PhotoSizeSelectLarge';
 import FitScreenIcon from '@mui/icons-material/FitScreen';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import InfoIcon from '@mui/icons-material/Info';
+import ClearIcon from '@mui/icons-material/Clear';
 import { type SortingState } from '@tanstack/react-table';
 import { type AssetField, type SortOption, type CardSize, type AspectRatio, type AssetViewControlsProps as BaseAssetViewControlsProps } from '../../types/shared/assetComponents';
 import { useFeatureFlag } from '@/utils/featureFlags';
+import { useTheme } from '@mui/material/styles';
 
 interface AssetViewControlsProps extends BaseAssetViewControlsProps {
     // Search fields
@@ -62,8 +65,11 @@ interface AssetViewControlsProps extends BaseAssetViewControlsProps {
     hasSelectedAssets?: boolean;
     selectAllState?: 'none' | 'some' | 'all';
     onSelectAllToggle?: () => void;
-    scoreFilter?: string;
-    onScoreFilterChange?: (value: string) => void;
+    // Score filter props
+    scoreFilter?: number;
+    onScoreFilterChange?: (value: number) => void;
+    totalResults?: number;
+    filteredResults?: number;
     clipType?: 'clip' | 'full';
 }
 
@@ -94,13 +100,18 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
     hasSelectedAssets = false,
     selectAllState = 'none',
     onSelectAllToggle,
+    // Score filter props
     scoreFilter,
     onScoreFilterChange,
+    totalResults,
+    filteredResults,
     clipType,
 }) => {
     const [sortAnchor, setSortAnchor] = React.useState<null | HTMLElement>(null);
     const [fieldsAnchor, setFieldsAnchor] = React.useState<null | HTMLElement>(null);
     const [appearanceAnchor, setAppearanceAnchor] = React.useState<null | HTMLElement>(null);
+    const [inputValue, setInputValue] = React.useState(scoreFilter?.toString() || '0');
+    const [sliderValue, setSliderValue] = React.useState(scoreFilter);
 
     const handleSortClose = () => setSortAnchor(null);
     const handleFieldsClose = () => setFieldsAnchor(null);
@@ -182,38 +193,50 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
         });
     }, [sortOptions, selectedFields, reverseFieldMapping]);
 
-    // Local state for the input string
-    const [inputValue, setInputValue] = useState(scoreFilter || '0.000');
-    const [isInputFocused, setIsInputFocused] = useState(false);
+    // Sync inputValue with scoreFilter only when scoreFilter changes externally
+    React.useEffect(() => {
+        setInputValue(scoreFilter?.toString() || '0');
+    }, [scoreFilter]);
 
-    useEffect(() => {
-      if (!isInputFocused && scoreFilter !== undefined) {
-        setInputValue(scoreFilter);
-      }
-    }, [scoreFilter, isInputFocused]);
-
-    const handleInputBlur = () => {
-      setIsInputFocused(false);
-      if (inputValue === '' || inputValue === '.') {
-        return;
-      }
-      let val = parseFloat(inputValue);
-      if (!isNaN(val) && val >= 0 && val <= 1 && onScoreFilterChange) {
-        setInputValue(val.toString());
-        onScoreFilterChange(val.toString());
-      }
-    };
+    // Sync sliderValue with scoreFilter only when scoreFilter changes externally
+    React.useEffect(() => {
+        setSliderValue(scoreFilter);
+    }, [scoreFilter]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      let valStr = e.target.value.replace(',', '.');
-      if (valStr === '' || valStr === '.' || /^\d*(\.\d{0,3})?$/.test(valStr)) {
+        const valStr = e.target.value.replace(',', '.');
         setInputValue(valStr);
-        let val = parseFloat(valStr);
-        if (!isNaN(val) && val >= 0 && val <= 1 && onScoreFilterChange) {
-          onScoreFilterChange(val.toString());
-        }
-      }
     };
+
+    const commitInputValue = () => {
+        if (inputValue === '' || inputValue === '.' || !/^\d*(\.\d{0,3})?$/.test(inputValue)) {
+            setInputValue(scoreFilter.toString());
+            return;
+        }
+        const val = parseFloat(inputValue);
+        if (!isNaN(val) && val >= 0 && val <= 1) {
+            if (val !== scoreFilter) {
+                onScoreFilterChange(val);
+            }
+        } else {
+            setInputValue(scoreFilter.toString());
+        }
+    };
+
+    const handleSliderChange = (_: any, value: number | number[]) => {
+        const v = Array.isArray(value) ? value[0] : value;
+        setSliderValue(v);
+        setInputValue(v.toString());
+    };
+
+    const handleSliderChangeCommitted = (_: any, value: number | number[]) => {
+        const numValue = Array.isArray(value) ? value[0] : value;
+        if (numValue !== scoreFilter) {
+            onScoreFilterChange(numValue);
+        }
+    };
+
+    const theme = useTheme();
 
     return (
         <Box sx={{
@@ -221,38 +244,79 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
             flexDirection: 'column',
             mb: 3
         }}>
-            {/* Score Filter Slider - move to top right */}
+            {/* Minimal Score Filter - top right above controls */}
             {clipType === 'clip' && scoreFilter !== undefined && onScoreFilterChange && (
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mb: 1 }}>
+                <Box sx={{
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    alignItems: 'center',
+                    width: '100%',
+                    mb: 1,
+                }}>
                     <Slider
-                        value={parseFloat(scoreFilter) || 0}
+                        value={sliderValue}
                         min={0}
                         max={1}
                         step={0.001}
-                        onChange={(_, value) => {
-                            onScoreFilterChange(value.toString());
-                            setInputValue(value.toString());
+                        onChange={handleSliderChange}
+                        onChangeCommitted={handleSliderChangeCommitted}
+                        sx={{
+                            width: 180,
+                            mr: 2,
+                            zIndex: 1,
+                            '& .MuiSlider-thumb': {
+                                width: 18,
+                                height: 18,
+                            },
+                            '& .MuiSlider-track': {
+                                height: 4,
+                            },
+                            '& .MuiSlider-rail': {
+                                height: 4,
+                            }
                         }}
-                        valueLabelDisplay="off"
-                        color="primary"
-                        sx={{ width: 140, mx: 1, color: 'primary.main' }}
                     />
                     <Input
                         value={inputValue}
                         onChange={handleInputChange}
-                        onBlur={handleInputBlur}
-                        onFocus={() => setIsInputFocused(true)}
+                        onBlur={commitInputValue}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                commitInputValue();
+                            }
+                        }}
                         inputProps={{
                             inputMode: 'decimal',
-                            'aria-labelledby': 'score-slider',
-                            style: { width: 70, fontSize: '1rem', padding: 2, textAlign: 'center', color: '#1976d2' }
+                            style: {
+                                width: 48,
+                                fontSize: '1rem',
+                                padding: '2px 4px',
+                                textAlign: 'center',
+                                borderRadius: '6px',
+                                border: 'none',
+                                background: 'transparent',
+                                color: theme.palette.primary.main,
+                                fontWeight: 600,
+                            }
                         }}
                         type="text"
-                        sx={{ ml: 3, mr: 0, '& input': { textAlign: 'center', color: 'primary.main', fontWeight: 500, fontSize: '1rem' }, '&:before, &:after': { borderBottomColor: 'primary.main' } }}
                         size="small"
+                        sx={{
+                            '& input': {
+                                textAlign: 'center',
+                                fontWeight: 600,
+                                fontSize: '1rem',
+                                color: 'primary.main',
+                                background: 'transparent',
+                                border: 'none',
+                            },
+                            '&:before, &:after': { borderBottom: 'none' }
+                        }}
                     />
                 </Box>
             )}
+
+            {/* Main Controls Row */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                     <ToggleButtonGroup

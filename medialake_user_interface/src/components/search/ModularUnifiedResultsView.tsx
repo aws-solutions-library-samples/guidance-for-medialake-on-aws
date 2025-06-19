@@ -99,25 +99,6 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
   clipType,
 }) => {
   const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
-  const [scoreFilter, setScoreFilter] = useState('0.000');
-
-  // Reset scoreFilter when switching to non-clip mode
-  useEffect(() => {
-    if (clipType !== 'clip' && scoreFilter !== '0.000') {
-      setScoreFilter('0.000');
-    }
-  }, [clipType]);
-
-  // Filter results by score in parent
-  const filteredResults = useMemo(() => {
-    if (clipType === 'clip' && !isNaN(parseFloat(scoreFilter))) {
-      const threshold = parseFloat(scoreFilter);
-      return results.filter(
-        (r: any) => typeof r.score === 'number' && r.score >= threshold
-      );
-    }
-    return results;
-  }, [results, clipType, scoreFilter]);
 
   const renderCardField = (fieldId: string, asset: AssetItem): React.ReactNode => {
     switch (fieldId) {
@@ -146,7 +127,7 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
 
   return (
     <AssetResultsView
-      results={filteredResults}
+      results={results}
       searchMetadata={searchMetadata}
       onPageChange={onPageChange}
       onPageSizeChange={onPageSizeChange}
@@ -191,8 +172,6 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
       getAssetProxy={(asset) => asset.proxyUrl || ''}
       renderCardField={renderCardField}
       clipType={clipType}
-      scoreFilter={clipType === 'clip' ? scoreFilter : undefined}
-      onScoreFilterChange={clipType === 'clip' ? setScoreFilter : undefined}
     />
   );
 };

@@ -320,6 +320,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
             }}
             onMouseEnter={() => setIsHovering(true)}
             onMouseLeave={() => setIsHovering(false)}
+            data-testid="asset-card"
         >
             {/* Clips indicator */}
             {clips && clips.length > 0 && clipType === 'full' && (

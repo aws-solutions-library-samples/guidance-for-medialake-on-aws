@@ -39,6 +39,7 @@ import { useAssetSelection } from '@/hooks/useAssetSelection';
 import { useAssetFavorites } from '@/hooks/useAssetFavorites';
 import { useFacetSearch } from '../hooks/useFacetSearch';
 import { FacetFilters } from '../types/facetSearch';
+import ScoreFilter from '../components/search/ScoreFilter';
 
 type AssetItem = (ImageItem | VideoItem | AudioItem) & {
     DigitalSourceAsset: {
@@ -133,6 +134,9 @@ const SearchPage: React.FC = () => {
     // State for selected fields
     const [selectedFields, setSelectedFields] = useState<string[]>([]);
 
+    // Score filter state - only used for clip mode
+    const [scoreFilter, setScoreFilter] = useState<number>(0);
+
     const {
         data,
         isLoading,
@@ -203,21 +207,41 @@ const SearchPage: React.FC = () => {
         }
     }, [searchResults, currentClipType]);
     
-    // Debug: Always log processedResults
+    // Apply score filter to processed results
+    const scoreFilteredResults = useMemo(() => {
+        if (currentClipType === 'clip' && scoreFilter > 0) {
+            return processedResults.filter((item: any) => {
+                // Check if the item has a score property and it meets the threshold
+                return typeof item.score === 'number' && item.score >= scoreFilter;
+            });
+        }
+        return processedResults;
+    }, [processedResults, currentClipType, scoreFilter]);
+    
+    // Debug: Always log processedResults and scoreFilteredResults
     console.log('processedResults:', processedResults);
+    console.log('scoreFilteredResults:', scoreFilteredResults);
+    console.log('scoreFilter:', scoreFilter);
     
     // Store search results in sessionStorage for access by other components
     useEffect(() => {
-        if (processedResults) {
+        if (scoreFilteredResults) {
             try {
-                sessionStorage.setItem('searchResults', JSON.stringify(processedResults));
+                sessionStorage.setItem('searchResults', JSON.stringify(scoreFilteredResults));
                 // Trigger storage event for other components to detect the change
                 window.dispatchEvent(new Event('storage'));
             } catch (e) {
                 console.error('Error storing search results in session storage', e);
             }
         }
-    }, [processedResults]);
+    }, [scoreFilteredResults]);
+    
+    // Reset score filter when switching from clip to full mode
+    useEffect(() => {
+        if (currentClipType !== 'clip' && scoreFilter > 0) {
+            setScoreFilter(0);
+        }
+    }, [currentClipType, scoreFilter]);
     
     // Fetch search fields
     const {
@@ -430,7 +454,7 @@ const SearchPage: React.FC = () => {
     // Debug logging for troubleshooting why results are not showing
     console.log('filters:', filters);
 
-    const filteredResults = processedResults?.filter(item => {
+    const filteredResults = scoreFilteredResults?.filter(item => {
         const isImage = item.DigitalSourceAsset.Type === 'Image' && filters.mediaTypes.images;
         const isVideo = item.DigitalSourceAsset.Type === 'Video' && filters.mediaTypes.videos;
         const isAudio = item.DigitalSourceAsset.Type === 'Audio' && filters.mediaTypes.audio;
@@ -569,128 +593,68 @@ const SearchPage: React.FC = () => {
                         />
                     )}
 
-                    {/* Main Content */}
-                    <Box sx={{
-                        flexGrow: 1,
-                        px: 4,
-                        pt: 1,
-                        pb: 2,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 6,
-                        minHeight: 0,
-                        marginBottom: 4
-                    }}>
-                        {(isLoading || isFetching) ? (
-                            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '40vh' }}>
-                                <CircularProgress size={40} />
-                            </Box>
-                        ) : (
-                            <>
-                                {searchMetadata?.totalResults === 0 && currentQuery && (
-                                    <Box
-                                        sx={{
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            minHeight: '50vh',
-                                            textAlign: 'center',
-                                            gap: 2
-                                        }}
-                                    >
-                                        <Paper
-                                            elevation={0}
-                                            sx={{
-                                                p: 4,
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                alignItems: 'center',
-                                                gap: 2,
-                                                bgcolor: 'background.paper',
-                                                borderRadius: 2
-                                            }}
-                                        >
-                                            <SearchOffIcon
-                                                sx={{
-                                                    fontSize: 64,
-                                                    color: 'text.secondary',
-                                                    mb: 2
-                                                }}
-                                            />
-                                            <Typography variant="h5" color="text.primary" gutterBottom>
-                                                No results found
-                                            </Typography>
-                                            <Typography variant="body1" color="text.secondary">
-                                                We couldn't find any matches for "{currentQuery}"
-                                            </Typography>
-                                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                                Try adjusting your search or filters to find what you're looking for
-                                            </Typography>
-                                        </Paper>
-                                    </Box>
-                                )}
-
-                                {(filteredResults.length > 0 && searchMetadata && !error) || error ? (
-                                    <MasterResultsView
-                                        key={`${currentClipType}-${currentQuery}-${currentPage}`}
-                                        results={error ? [] : filteredResults}
-                                        searchMetadata={{
-                                            totalResults: error ? 0 : (searchMetadata?.totalResults || 0),
-                                            page: currentPage,
-                                            pageSize: pageSize,
-                                        }}
-                                        onPageChange={(newPage) => handleSearch({ page: newPage })}
-                                        onPageSizeChange={handlePageSizeChange}
-                                        searchTerm={currentQuery}
-                                        selectedFields={selectedFields}
-                                        availableFields={availableFields}
-                                        onFieldsChange={handleFieldsChange}
-                                        groupByType={viewPreferences.groupByType}
-                                        onGroupByTypeChange={viewPreferences.handleGroupByTypeChange}
-                                        viewMode={viewPreferences.viewMode}
-                                        onViewModeChange={viewPreferences.handleViewModeChange}
-                                        cardSize={viewPreferences.cardSize}
-                                        onCardSizeChange={viewPreferences.handleCardSizeChange}
-                                        aspectRatio={viewPreferences.aspectRatio}
-                                        onAspectRatioChange={viewPreferences.handleAspectRatioChange}
-                                        thumbnailScale={viewPreferences.thumbnailScale}
-                                        onThumbnailScaleChange={viewPreferences.handleThumbnailScaleChange}
-                                        showMetadata={viewPreferences.showMetadata}
-                                        onShowMetadataChange={viewPreferences.handleShowMetadataChange}
-                                        sorting={viewPreferences.sorting}
-                                        onSortChange={viewPreferences.handleSortChange}
-                                        cardFields={viewPreferences.cardFields}
-                                        onCardFieldToggle={viewPreferences.handleCardFieldToggle}
-                                        columns={columns}
-                                        onColumnToggle={handleColumnToggle}
-                                        onAssetClick={handleAssetClick}
-                                        onDeleteClick={handleDeleteClick}
-                                        onMenuClick={handleDownloadClick}
-                                        onEditClick={handleStartEditing}
-                                        onEditNameChange={handleNameChange}
-                                        onEditNameComplete={handleNameEditComplete}
-                                        editingAssetId={editingAssetId}
-                                        editedName={editedName}
-                                        isAssetFavorited={assetFavorites.isAssetFavorited}
-                                        onFavoriteToggle={assetFavorites.handleFavoriteToggle}
-                                        selectedAssets={multiSelectFeature.value ? assetSelection.selectedAssetIds : []}
-                                        onSelectToggle={multiSelectFeature.value ? assetSelection.handleSelectToggle : undefined}
-                                        hasSelectedAssets={multiSelectFeature.value ? assetSelection.selectedAssets.length > 0 : false}
-                                        selectAllState={multiSelectFeature.value ? assetSelection.getSelectAllState(filteredResults) : 'none'}
-                                        onSelectAllToggle={multiSelectFeature.value ? () => {
-                                            assetSelection.handleSelectAll(filteredResults);
-                                        } : undefined}
-                                        error={error ? {
-                                            status: (error as SearchError).apiResponse?.status || error.name,
-                                            message: (error as SearchError).apiResponse?.message || error.message
-                                        } : undefined}
-                                        isLoading={isLoading || isFetching}
-                                        clipType={currentClipType}
-                                    />
-                                ) : null}
-                            </>
-                        )}
+                    {/* Controls and Score Filter - always visible */}
+                    <Box sx={{ width: '100%' }}>
+                        <MasterResultsView
+                            key={`${currentClipType}-${currentQuery}-${currentPage}-${scoreFilter}`}
+                            results={filteredResults}
+                            searchMetadata={{
+                                totalResults: searchMetadata?.totalResults || 0,
+                                page: currentPage,
+                                pageSize: pageSize,
+                            }}
+                            onPageChange={(newPage) => handleSearch({ page: newPage })}
+                            onPageSizeChange={handlePageSizeChange}
+                            searchTerm={currentQuery}
+                            selectedFields={selectedFields}
+                            availableFields={availableFields}
+                            onFieldsChange={handleFieldsChange}
+                            groupByType={viewPreferences.groupByType}
+                            onGroupByTypeChange={viewPreferences.handleGroupByTypeChange}
+                            viewMode={viewPreferences.viewMode}
+                            onViewModeChange={viewPreferences.handleViewModeChange}
+                            cardSize={viewPreferences.cardSize}
+                            onCardSizeChange={viewPreferences.handleCardSizeChange}
+                            aspectRatio={viewPreferences.aspectRatio}
+                            onAspectRatioChange={viewPreferences.handleAspectRatioChange}
+                            thumbnailScale={viewPreferences.thumbnailScale}
+                            onThumbnailScaleChange={viewPreferences.handleThumbnailScaleChange}
+                            showMetadata={viewPreferences.showMetadata}
+                            onShowMetadataChange={viewPreferences.handleShowMetadataChange}
+                            sorting={viewPreferences.sorting}
+                            onSortChange={viewPreferences.handleSortChange}
+                            cardFields={viewPreferences.cardFields}
+                            onCardFieldToggle={viewPreferences.handleCardFieldToggle}
+                            columns={columns}
+                            onColumnToggle={handleColumnToggle}
+                            onAssetClick={handleAssetClick}
+                            onDeleteClick={handleDeleteClick}
+                            onMenuClick={handleDownloadClick}
+                            onEditClick={handleStartEditing}
+                            onEditNameChange={handleNameChange}
+                            onEditNameComplete={handleNameEditComplete}
+                            editingAssetId={editingAssetId}
+                            editedName={editedName}
+                            isAssetFavorited={assetFavorites.isAssetFavorited}
+                            onFavoriteToggle={assetFavorites.handleFavoriteToggle}
+                            selectedAssets={multiSelectFeature.value ? assetSelection.selectedAssetIds : []}
+                            onSelectToggle={multiSelectFeature.value ? assetSelection.handleSelectToggle : undefined}
+                            hasSelectedAssets={multiSelectFeature.value ? assetSelection.selectedAssets.length > 0 : false}
+                            selectAllState={multiSelectFeature.value ? assetSelection.getSelectAllState(filteredResults) : 'none'}
+                            onSelectAllToggle={multiSelectFeature.value ? () => {
+                                assetSelection.handleSelectAll(filteredResults);
+                            } : undefined}
+                            error={error ? {
+                                status: (error as SearchError).apiResponse?.status || error.name,
+                                message: (error as SearchError).apiResponse?.message || error.message
+                            } : undefined}
+                            isLoading={isLoading || isFetching}
+                            clipType={currentClipType}
+                            scoreFilter={currentClipType === 'clip' ? scoreFilter : undefined}
+                            onScoreFilterChange={currentClipType === 'clip' ? setScoreFilter : undefined}
+                            totalResults={processedResults.length}
+                            filteredResults={scoreFilteredResults.length}
+                        />
                     </Box>
 
                     <RightSidebar>

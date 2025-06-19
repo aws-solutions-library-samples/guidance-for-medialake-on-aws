@@ -84,8 +84,11 @@ export interface AssetResultsViewProps<T> {
   getAssetThumbnail: (asset: T) => string;
   getAssetProxy?: (asset: T) => string;
   renderCardField: (fieldId: string, asset: T) => React.ReactNode;
-  scoreFilter?: string;
-  onScoreFilterChange?: (value: string) => void;
+  // Score filter props
+  scoreFilter?: number;
+  onScoreFilterChange?: (value: number) => void;
+  totalResults?: number;
+  filteredResults?: number;
 }
 
 function AssetResultsView<T>({
@@ -144,13 +147,9 @@ function AssetResultsView<T>({
   clipType,
   scoreFilter,
   onScoreFilterChange,
+  totalResults,
+  filteredResults,
 }: AssetResultsViewProps<T>) {
-  // Determine if we should show the score slider (if any result has a score property)
-  const showScoreSlider = results.some((r: any) => typeof r.score === 'number');
-
-  // Parse the filter value as a number, guard against undefined
-  const scoreFilterValue = scoreFilter !== undefined ? parseFloat(scoreFilter.replace(',', '.')) : 0;
-
   // If there's an error, display the error component
   if (error) {
     return (
@@ -215,6 +214,8 @@ function AssetResultsView<T>({
           onSelectAllToggle={onSelectAllToggle}
           scoreFilter={scoreFilter}
           onScoreFilterChange={onScoreFilterChange}
+          totalResults={totalResults}
+          filteredResults={filteredResults}
           clipType={clipType}
         />
         
@@ -316,6 +317,8 @@ function AssetResultsView<T>({
         onSelectAllToggle={onSelectAllToggle}
         scoreFilter={scoreFilter}
         onScoreFilterChange={onScoreFilterChange}
+        totalResults={totalResults}
+        filteredResults={filteredResults}
         clipType={clipType}
       />
 
@@ -393,7 +396,6 @@ function AssetResultsView<T>({
             isAssetSelected={isAssetSelected}
             onSelectToggle={onSelectToggle}
             onSelectAllToggle={onSelectAllToggle}
-            clipType={clipType}
             getAssetId={getAssetId}
             getAssetName={getAssetName}
             getAssetType={getAssetType}
@@ -401,6 +403,7 @@ function AssetResultsView<T>({
             getAssetProxy={getAssetProxy}
             renderCardField={renderCardField}
             selectedSearchFields={selectedFields}
+            clipType={clipType}
           />
         ) : (
           <AssetTableView

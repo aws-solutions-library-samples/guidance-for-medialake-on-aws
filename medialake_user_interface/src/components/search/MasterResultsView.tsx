@@ -84,90 +84,64 @@ interface MasterResultsViewProps {
   
   // Clip type for semantic search
   clipType?: 'clip' | 'full';
+  
+  // Score filter
+  scoreFilter?: number;
+  onScoreFilterChange?: (value: number) => void;
+  totalResults?: number;
+  filteredResults?: number;
 }
 
 const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   results,
   searchMetadata,
+  onPageChange,
+  onPageSizeChange,
   searchTerm,
-  error,
-  isLoading,
-  
-  // Search fields
   selectedFields,
   availableFields,
   onFieldsChange,
-  
-  // View preferences
-  viewMode,
-  cardSize,
-  aspectRatio,
-  thumbnailScale,
-  showMetadata,
   groupByType,
-  sorting,
-  cardFields,
-  columns,
-  
-  // Event handlers for view preferences
-  onViewModeChange,
-  onCardSizeChange,
-  onAspectRatioChange,
-  onThumbnailScaleChange,
-  onShowMetadataChange,
   onGroupByTypeChange,
+  viewMode,
+  onViewModeChange,
+  cardSize,
+  onCardSizeChange,
+  aspectRatio,
+  onAspectRatioChange,
+  thumbnailScale,
+  onThumbnailScaleChange,
+  showMetadata,
+  onShowMetadataChange,
+  sorting,
   onSortChange,
+  cardFields,
   onCardFieldToggle,
+  columns,
   onColumnToggle,
-  onPageChange,
-  onPageSizeChange,
-  
-  // Asset state
-  selectedAssets,
-  editingAssetId,
-  editedName,
-  
-  // Asset action handlers
   onAssetClick,
   onDeleteClick,
   onMenuClick,
   onEditClick,
   onEditNameChange,
   onEditNameComplete,
-  onSelectToggle,
+  editingAssetId,
+  editedName,
+  isAssetFavorited,
   onFavoriteToggle,
-  
-  // Select all functionality
+  selectedAssets,
+  onSelectToggle,
   hasSelectedAssets,
   selectAllState,
   onSelectAllToggle,
-  
-  // Asset state accessors
-  isAssetFavorited,
-  
-  // Clip type for semantic search
+  error,
+  isLoading,
   clipType,
+  scoreFilter,
+  onScoreFilterChange,
+  totalResults,
+  filteredResults,
 }) => {
-  const [scoreFilter, setScoreFilter] = useState('0.000');
-
-  // Reset scoreFilter when switching to non-clip mode
-  React.useEffect(() => {
-    if (clipType !== 'clip' && scoreFilter !== '0.000') {
-      setScoreFilter('0.000');
-    }
-  }, [clipType]);
-
-  // Filter results by score in parent
-  const filteredResults = useMemo(() => {
-    if (clipType === 'clip' && !isNaN(parseFloat(scoreFilter))) {
-      const threshold = parseFloat(scoreFilter);
-      return results.filter(
-        (r: any) => typeof r.score === 'number' && r.score >= threshold
-      );
-    }
-    return results;
-  }, [results, clipType, scoreFilter]);
-
   // Function to render card fields
   const renderCardField = (fieldId: string, asset: AssetItem): React.ReactNode => {
     console.log('Rendering field:', fieldId, 'for asset:', asset.InventoryID);
@@ -201,13 +175,10 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
 
   return (
     <AssetResultsView
-      results={filteredResults}
+      results={results}
       searchMetadata={searchMetadata}
       onPageChange={onPageChange}
       onPageSizeChange={onPageSizeChange}
-      selectedFields={selectedFields}
-      availableFields={availableFields}
-      onFieldsChange={onFieldsChange}
       searchTerm={searchTerm}
       title="Results"
       groupByType={groupByType}
@@ -252,8 +223,10 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       getAssetProxy={(asset) => asset.proxyUrl || ''}
       renderCardField={renderCardField}
       clipType={clipType}
-      scoreFilter={clipType === 'clip' ? scoreFilter : undefined}
-      onScoreFilterChange={clipType === 'clip' ? setScoreFilter : undefined}
+      scoreFilter={scoreFilter}
+      onScoreFilterChange={onScoreFilterChange}
+      totalResults={totalResults}
+      filteredResults={filteredResults}
     />
   );
 };
