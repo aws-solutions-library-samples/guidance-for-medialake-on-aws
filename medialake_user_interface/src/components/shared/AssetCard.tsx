@@ -54,6 +54,7 @@ export interface AssetCardProps {
         clipEnd: string;
         embeddingOption: string;
     };
+    score?: number; // Add score prop
 }
 
 // Utility to parse timecode (e.g., "00:00:30:00") to seconds
@@ -103,6 +104,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
     clips,
     clipType,
     clipMetadata,
+    score, // Add score to destructure
 }) => {
     const [selectionRange, setSelectionRange] = useState<[number, number] | null>(null);
     const [isHovering, setIsHovering] = useState(false);
@@ -364,6 +366,28 @@ const AssetCard: React.FC<AssetCardProps> = ({
                     })}
                 >
                     {`score: ${clipMetadata.clipScore.toFixed(3)}`}
+                </Box>
+            )}
+            {/* Score indicator for images and other non-clip assets */}
+            {assetType === 'Image' && typeof score === 'number' && (
+                <Box
+                    sx={(theme) => ({
+                        position: 'absolute',
+                        top: -10,
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        backgroundColor: theme.palette.primary.main,
+                        color: theme.palette.primary.contrastText,
+                        padding: '2px 8px',
+                        borderRadius: '12px',
+                        fontSize: '0.7rem',
+                        fontWeight: 500,
+                        zIndex: 30,
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                        whiteSpace: 'nowrap',
+                    })}
+                >
+                    {`score: ${score.toFixed(3)}`}
                 </Box>
             )}
             <Box

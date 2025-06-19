@@ -128,6 +128,7 @@ function AssetGridView<T>({
               clips={(asset as any).clips} // Pass clips data from asset
               clipType={clipType}
               clipMetadata={(asset as any).clipMetadata} // Pass clip metadata
+              score={(asset as any).score} // Pass score to AssetCard
             />
           </Grid>
         ))}
@@ -181,6 +182,7 @@ function AssetGridView<T>({
                   clips={(asset as any).clips} // Pass clips data from asset
                   clipType={clipType}
                   clipMetadata={(asset as any).clipMetadata} // Pass clip metadata
+                  score={(asset as any).score} // Pass score to AssetCard
                 />
               </Grid>
             ))}
