@@ -40,6 +40,7 @@ import { useAssetFavorites } from '@/hooks/useAssetFavorites';
 import { useFacetSearch } from '../hooks/useFacetSearch';
 import { FacetFilters } from '../types/facetSearch';
 import ScoreFilter from '../components/search/ScoreFilter';
+import LoadingSpinner from '../components/common/LoadingSpinner';
 
 type AssetItem = (ImageItem | VideoItem | AudioItem) & {
     DigitalSourceAsset: {
@@ -593,11 +594,29 @@ const SearchPage: React.FC = () => {
                         />
                     )}
 
+                    {/* Central loading spinner overlay */}
+                    {(isLoading || isFetching) && (
+                        <Box sx={{
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            width: '100vw',
+                            height: '100vh',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 1300,
+                            backgroundColor: 'rgba(255,255,255,0.5)'
+                        }}>
+                            <LoadingSpinner />
+                        </Box>
+                    )}
+
                     {/* Controls and Score Filter - always visible */}
                     <Box sx={{ width: '100%' }}>
                         <MasterResultsView
                             key={`${currentClipType}-${currentQuery}-${currentPage}-${scoreFilter}`}
-                            results={filteredResults}
+                            results={(isLoading || isFetching) ? [] : filteredResults}
                             searchMetadata={{
                                 totalResults: searchMetadata?.totalResults || 0,
                                 page: currentPage,
