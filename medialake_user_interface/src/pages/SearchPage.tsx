@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useFeatureFlag } from '@/utils/featureFlags';
 import { formatDate } from '@/utils/dateFormat';
 import {
@@ -17,7 +17,8 @@ import {
     Select,
     Chip,
     OutlinedInput,
-    SelectChangeEvent
+    SelectChangeEvent,
+    CircularProgress
 } from '@mui/material';
 import SearchOffIcon from '@mui/icons-material/SearchOff';
 import { RightSidebar, RightSidebarProvider } from '../components/common/RightSidebar';
@@ -36,18 +37,21 @@ import ApiStatusModal from '../components/ApiStatusModal';
 import { useViewPreferences } from '@/hooks/useViewPreferences';
 import { useAssetSelection } from '@/hooks/useAssetSelection';
 import { useAssetFavorites } from '@/hooks/useAssetFavorites';
+import { useFacetSearch } from '../hooks/useFacetSearch';
+import { FacetFilters } from '../types/facetSearch';
+import ScoreFilter from '../components/search/ScoreFilter';
+import LoadingSpinner from '../components/common/LoadingSpinner';
 
 type AssetItem = (ImageItem | VideoItem | AudioItem) & {
     DigitalSourceAsset: {
         Type: string;
     };
 };
-import { useFacetSearch } from '../hooks/useFacetSearch';
-import { FacetFilters } from '../types/facetSearch';
 
 interface LocationState {
     query?: string;
     isSemantic?: boolean;
+    clipType?: 'clip' | 'full';
     preserveSearch?: boolean;
     viewMode?: 'card' | 'table';
     cardSize?: 'small' | 'medium' | 'large';
@@ -90,58 +94,49 @@ interface SelectedAsset {
 
 const SearchPage: React.FC = () => {
     const location = useLocation();
-    const {
-        query,
-        isSemantic,
-        type,
-        extension,
-        LargerThan,
-        asset_size_lte,
-        asset_size_gte,
-        ingested_date_lte,
-        ingested_date_gte,
-        filename
-    } = (location.state as LocationState) || {};
     const [searchParams, setSearchParams] = useSearchParams();
     const currentPage = parseInt(searchParams.get('page') || '1', 10);
-    const currentQuery = searchParams.get('q') || query || '';
-    const currentSemantic = searchParams.get('semantic') === 'true' || isSemantic || false;
+    const currentQuery = searchParams.get('q') || '';
+    const currentSemantic = searchParams.get('semantic') === 'true';
+    const currentClipType = currentSemantic
+        ? (searchParams.get('clipType') as 'clip' | 'full') || 'clip'
+        : 'full';
     const navigate = useNavigate();
 
     const [pageSize, setPageSize] = useState<number>(
         parseInt(searchParams.get('pageSize') || DEFAULT_PAGE_SIZE.toString(), 10)
     );
 
-    // Initialize facet filters from URL params first, then fall back to location state
+    // Initialize facet filters from URL params first, then fall back to location state for non-search params
     const initialFacetFilters: FacetFilters = {
-        // Get values from URL params first, then fall back to location state
-        type: searchParams.get('type') || type,
-        extension: searchParams.get('extension') || extension,
+        type: searchParams.get('type'),
+        extension: searchParams.get('extension'),
         LargerThan: searchParams.has('LargerThan')
             ? parseInt(searchParams.get('LargerThan') || '0', 10)
-            : LargerThan,
+            : undefined,
         asset_size_lte: searchParams.has('asset_size_lte')
             ? parseInt(searchParams.get('asset_size_lte') || '0', 10)
-            : asset_size_lte,
+            : undefined,
         asset_size_gte: searchParams.has('asset_size_gte')
             ? parseInt(searchParams.get('asset_size_gte') || '0', 10)
-            : asset_size_gte,
-        ingested_date_lte: searchParams.get('ingested_date_lte') || ingested_date_lte,
-        ingested_date_gte: searchParams.get('ingested_date_gte') || ingested_date_gte,
-        filename: searchParams.get('filename') || filename
+            : undefined,
+        ingested_date_lte: searchParams.get('ingested_date_lte'),
+        ingested_date_gte: searchParams.get('ingested_date_gte'),
+        filename: searchParams.get('filename')
     };
-    
     // Remove undefined values
     Object.keys(initialFacetFilters).forEach(key => {
         if (initialFacetFilters[key as keyof FacetFilters] === undefined) {
             delete initialFacetFilters[key as keyof FacetFilters];
         }
     });
-    
     const { filters: facetFilters } = useFacetSearch({ initialFilters: initialFacetFilters });
         
     // State for selected fields
     const [selectedFields, setSelectedFields] = useState<string[]>([]);
+
+    // Score filter state - only used for clip mode
+    const [scoreFilter, setScoreFilter] = useState<number>(0);
 
     const {
         data,
@@ -153,26 +148,101 @@ const SearchPage: React.FC = () => {
         pageSize: pageSize,
         isSemantic: currentSemantic,
         fields: selectedFields,
-        ...facetFilters // Include facet filters in the search
+        ...facetFilters, // Include facet filters in the search
+        ...(currentSemantic ? { clipType: currentClipType } : {})
     });
+    
+    // Debug logging to verify query and results
+    console.log('DEBUG: currentQuery:', currentQuery);
+    console.log('DEBUG: currentSemantic:', currentSemantic);
+    console.log('DEBUG: currentClipType:', currentClipType);
+    console.log('DEBUG: searchParams:', searchParams.toString());
+    console.log('DEBUG: useSearch data:', data);
     
     // Access the nested data structure correctly
     const searchData = data?.data;
     const searchResults = searchData?.results || [];
     const searchMetadata = searchData?.searchMetadata;
     
+    // Log searchResults before processing
+    console.log('searchResults:', searchResults);
+
+    // Process search results based on clipType
+    const processedResults = useMemo(() => {
+        if (!searchResults || searchResults.length === 0) return [];
+
+        if (currentClipType === 'clip') {
+            const flattenedClips: any[] = [];
+            searchResults.forEach((asset: any) => {
+                const type = asset.DigitalSourceAsset.Type;
+                if (asset.clips && Array.isArray(asset.clips) && asset.clips.length > 0) {
+                    // For video, audio, or image with clips, flatten
+                    asset.clips.forEach((clip: any) => {
+                        flattenedClips.push({
+                            ...asset,
+                            // Override with clip-specific data
+                            score: clip.score,
+                            start_timecode: clip.start_timecode,
+                            end_timecode: clip.end_timecode,
+                            embedding_option: clip.embedding_option,
+                            // Add clip metadata
+                            clipMetadata: {
+                                originalAssetId: asset.id,
+                                originalAssetName: asset.objectName,
+                                clipStart: clip.start_timecode,
+                                clipEnd: clip.end_timecode,
+                                clipScore: clip.score,
+                                embeddingOption: clip.embedding_option
+                            }
+                        });
+                    });
+                } else {
+                    // No clips: show as full asset (for all types)
+                    flattenedClips.push(asset);
+                }
+            });
+            return flattenedClips;
+        } else {
+            // 'full' mode: just return all assets
+            return searchResults;
+        }
+    }, [searchResults, currentClipType]);
+    
+    // Apply score filter to processed results
+    const scoreFilteredResults = useMemo(() => {
+        if (currentClipType === 'clip' && scoreFilter > 0) {
+            return processedResults.filter((item: any) => {
+                // Check if the item has a score property and it meets the threshold
+                return typeof item.score === 'number' && item.score >= scoreFilter;
+            });
+        }
+        return processedResults;
+    }, [processedResults, currentClipType, scoreFilter]);
+    
+    // Debug: Always log processedResults and scoreFilteredResults
+    console.log('processedResults:', processedResults);
+    console.log('scoreFilteredResults:', scoreFilteredResults);
+    console.log('scoreFilter:', scoreFilter);
+    
     // Store search results in sessionStorage for access by other components
     useEffect(() => {
-        if (searchResults) {
+        if (scoreFilteredResults) {
             try {
-                sessionStorage.setItem('searchResults', JSON.stringify(searchResults));
+                sessionStorage.setItem('searchResults', JSON.stringify(scoreFilteredResults));
                 // Trigger storage event for other components to detect the change
                 window.dispatchEvent(new Event('storage'));
             } catch (e) {
                 console.error('Error storing search results in session storage', e);
             }
         }
-    }, [searchResults]);
+    }, [scoreFilteredResults]);
+    
+    // Reset score filter when switching from clip to full mode
+    useEffect(() => {
+        if (currentClipType !== 'clip' && scoreFilter > 0) {
+            setScoreFilter(0);
+        }
+    }, [currentClipType, scoreFilter]);
     
     // Fetch search fields
     const {
@@ -382,7 +452,10 @@ const SearchPage: React.FC = () => {
         ));
     };
 
-    const filteredResults = searchResults?.filter(item => {
+    // Debug logging for troubleshooting why results are not showing
+    console.log('filters:', filters);
+
+    const filteredResults = scoreFilteredResults?.filter(item => {
         const isImage = item.DigitalSourceAsset.Type === 'Image' && filters.mediaTypes.images;
         const isVideo = item.DigitalSourceAsset.Type === 'Video' && filters.mediaTypes.videos;
         const isAudio = item.DigitalSourceAsset.Type === 'Audio' && filters.mediaTypes.audio;
@@ -401,6 +474,7 @@ const SearchPage: React.FC = () => {
 
         return (isImage || isVideo || isAudio) && passesTimeFilter;
     }) || [];
+    console.log('filteredResults:', filteredResults);
 
     const imageResults = filteredResults.filter(item => item.DigitalSourceAsset.Type === 'Image');
     const videoResults = filteredResults.filter(item => item.DigitalSourceAsset.Type === 'Video');
@@ -413,14 +487,14 @@ const SearchPage: React.FC = () => {
     });
 
     useEffect(() => {
-        if ((query && !searchParams.has('q')) || (isSemantic !== undefined && !searchParams.has('semantic'))) {
+        if ((currentQuery && !searchParams.has('q')) || (currentSemantic !== undefined && !searchParams.has('semantic'))) {
             setSearchParams(prev => {
                 const newParams = new URLSearchParams(prev);
-                if (query && !prev.has('q')) {
-                    newParams.set('q', query);
+                if (currentQuery && !prev.has('q')) {
+                    newParams.set('q', currentQuery);
                 }
-                if (isSemantic !== undefined && !prev.has('semantic')) {
-                    newParams.set('semantic', isSemantic.toString());
+                if (currentSemantic !== undefined && !prev.has('semantic')) {
+                    newParams.set('semantic', currentSemantic.toString());
                 }
                 if (!prev.has('page')) {
                     newParams.set('page', '1');
@@ -428,7 +502,7 @@ const SearchPage: React.FC = () => {
                 return newParams;
             });
         }
-    }, [query, isSemantic, searchParams, setSearchParams]);
+    }, [currentQuery, currentSemantic, searchParams, setSearchParams]);
 
     // No need for these effects as they're now handled in the useAssetSelection hook
 
@@ -486,7 +560,17 @@ const SearchPage: React.FC = () => {
         });
     };
 
-    // No need for this handler as it's now handled in the useAssetSelection hook
+    // Force all media type filters to true for testing
+    useEffect(() => {
+        setFilters(prev => ({
+            ...prev,
+            mediaTypes: {
+                videos: true,
+                images: true,
+                audio: true,
+            }
+        }));
+    }, []);
 
     return (
         <RightSidebarProvider>
@@ -510,119 +594,86 @@ const SearchPage: React.FC = () => {
                         />
                     )}
 
-                    {/* Main Content */}
-                    <Box sx={{
-                        flexGrow: 1,
-                        px: 4,
-                        pt: 1,
-                        pb: 2,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 6,
-                        minHeight: 0,
-                        marginBottom: 4
-                    }}>
-                        {searchMetadata?.totalResults === 0 && currentQuery && (
-                            <Box
-                                sx={{
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    minHeight: '50vh',
-                                    textAlign: 'center',
-                                    gap: 2
-                                }}
-                            >
-                                <Paper
-                                    elevation={0}
-                                    sx={{
-                                        p: 4,
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        alignItems: 'center',
-                                        gap: 2,
-                                        bgcolor: 'background.paper',
-                                        borderRadius: 2
-                                    }}
-                                >
-                                    <SearchOffIcon
-                                        sx={{
-                                            fontSize: 64,
-                                            color: 'text.secondary',
-                                            mb: 2
-                                        }}
-                                    />
-                                    <Typography variant="h5" color="text.primary" gutterBottom>
-                                        No results found
-                                    </Typography>
-                                    <Typography variant="body1" color="text.secondary">
-                                        We couldn't find any matches for "{currentQuery}"
-                                    </Typography>
-                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                        Try adjusting your search or filters to find what you're looking for
-                                    </Typography>
-                                </Paper>
-                            </Box>
-                        )}
+                    {/* Central loading spinner overlay */}
+                    {(isLoading || isFetching) && (
+                        <Box sx={{
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            width: '100vw',
+                            height: '100vh',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 1300
+                        }}>
+                            <LoadingSpinner />
+                        </Box>
+                    )}
 
-                        {(filteredResults.length > 0 && searchMetadata && !error) || error ? (
-                            <MasterResultsView
-                                results={error ? [] : filteredResults}
-                                searchMetadata={{
-                                    totalResults: error ? 0 : (searchMetadata?.totalResults || 0),
-                                    page: currentPage,
-                                    pageSize: pageSize,
-                                }}
-                                onPageChange={(newPage) => handleSearch({ page: newPage })}
-                                onPageSizeChange={handlePageSizeChange}
-                                searchTerm={currentQuery}
-                                selectedFields={selectedFields}
-                                availableFields={availableFields}
-                                onFieldsChange={handleFieldsChange}
-                                groupByType={viewPreferences.groupByType}
-                                onGroupByTypeChange={viewPreferences.handleGroupByTypeChange}
-                                viewMode={viewPreferences.viewMode}
-                                onViewModeChange={viewPreferences.handleViewModeChange}
-                                cardSize={viewPreferences.cardSize}
-                                onCardSizeChange={viewPreferences.handleCardSizeChange}
-                                aspectRatio={viewPreferences.aspectRatio}
-                                onAspectRatioChange={viewPreferences.handleAspectRatioChange}
-                                thumbnailScale={viewPreferences.thumbnailScale}
-                                onThumbnailScaleChange={viewPreferences.handleThumbnailScaleChange}
-                                showMetadata={viewPreferences.showMetadata}
-                                onShowMetadataChange={viewPreferences.handleShowMetadataChange}
-                                sorting={viewPreferences.sorting}
-                                onSortChange={viewPreferences.handleSortChange}
-                                cardFields={viewPreferences.cardFields}
-                                onCardFieldToggle={viewPreferences.handleCardFieldToggle}
-                                columns={columns}
-                                onColumnToggle={handleColumnToggle}
-                                onAssetClick={handleAssetClick}
-                                onDeleteClick={handleDeleteClick}
-                                onMenuClick={handleDownloadClick}
-                                onEditClick={handleStartEditing}
-                                onEditNameChange={handleNameChange}
-                                onEditNameComplete={handleNameEditComplete}
-                                editingAssetId={editingAssetId}
-                                editedName={editedName}
-                                isAssetFavorited={assetFavorites.isAssetFavorited}
-                                onFavoriteToggle={assetFavorites.handleFavoriteToggle}
-                                // Only pass selection props if multi-select feature is enabled
-                                selectedAssets={multiSelectFeature.value ? assetSelection.selectedAssetIds : []}
-                                onSelectToggle={multiSelectFeature.value ? assetSelection.handleSelectToggle : undefined}
-                                hasSelectedAssets={multiSelectFeature.value ? assetSelection.selectedAssets.length > 0 : false}
-                                selectAllState={multiSelectFeature.value ? assetSelection.getSelectAllState(filteredResults) : 'none'}
-                                onSelectAllToggle={multiSelectFeature.value ? () => {
-                                    assetSelection.handleSelectAll(filteredResults);
-                                } : undefined}
-                                error={error ? {
-                                    status: (error as SearchError).apiResponse?.status || error.name,
-                                    message: (error as SearchError).apiResponse?.message || error.message
-                                } : undefined}
-                                isLoading={isLoading || isFetching}
-                            />
-                        ) : null}
+                    {/* Controls and Score Filter - always visible */}
+                    <Box sx={{ width: '100%' }}>
+                        <MasterResultsView
+                            key={`${currentClipType}-${currentQuery}-${currentPage}-${scoreFilter}`}
+                            results={(isLoading || isFetching) ? [] : filteredResults}
+                            searchMetadata={{
+                                totalResults: searchMetadata?.totalResults || 0,
+                                page: currentPage,
+                                pageSize: pageSize,
+                            }}
+                            onPageChange={(newPage) => handleSearch({ page: newPage })}
+                            onPageSizeChange={handlePageSizeChange}
+                            searchTerm={currentQuery}
+                            selectedFields={selectedFields}
+                            availableFields={availableFields}
+                            onFieldsChange={handleFieldsChange}
+                            groupByType={viewPreferences.groupByType}
+                            onGroupByTypeChange={viewPreferences.handleGroupByTypeChange}
+                            viewMode={viewPreferences.viewMode}
+                            onViewModeChange={viewPreferences.handleViewModeChange}
+                            cardSize={viewPreferences.cardSize}
+                            onCardSizeChange={viewPreferences.handleCardSizeChange}
+                            aspectRatio={viewPreferences.aspectRatio}
+                            onAspectRatioChange={viewPreferences.handleAspectRatioChange}
+                            thumbnailScale={viewPreferences.thumbnailScale}
+                            onThumbnailScaleChange={viewPreferences.handleThumbnailScaleChange}
+                            showMetadata={viewPreferences.showMetadata}
+                            onShowMetadataChange={viewPreferences.handleShowMetadataChange}
+                            sorting={viewPreferences.sorting}
+                            onSortChange={viewPreferences.handleSortChange}
+                            cardFields={viewPreferences.cardFields}
+                            onCardFieldToggle={viewPreferences.handleCardFieldToggle}
+                            columns={columns}
+                            onColumnToggle={handleColumnToggle}
+                            onAssetClick={handleAssetClick}
+                            onDeleteClick={handleDeleteClick}
+                            onMenuClick={handleDownloadClick}
+                            onEditClick={handleStartEditing}
+                            onEditNameChange={handleNameChange}
+                            onEditNameComplete={handleNameEditComplete}
+                            editingAssetId={editingAssetId}
+                            editedName={editedName}
+                            isAssetFavorited={assetFavorites.isAssetFavorited}
+                            onFavoriteToggle={assetFavorites.handleFavoriteToggle}
+                            selectedAssets={multiSelectFeature.value ? assetSelection.selectedAssetIds : []}
+                            onSelectToggle={multiSelectFeature.value ? assetSelection.handleSelectToggle : undefined}
+                            hasSelectedAssets={multiSelectFeature.value ? assetSelection.selectedAssets.length > 0 : false}
+                            selectAllState={multiSelectFeature.value ? assetSelection.getSelectAllState(filteredResults) : 'none'}
+                            onSelectAllToggle={multiSelectFeature.value ? () => {
+                                assetSelection.handleSelectAll(filteredResults);
+                            } : undefined}
+                            error={error ? {
+                                status: (error as SearchError).apiResponse?.status || error.name,
+                                message: (error as SearchError).apiResponse?.message || error.message
+                            } : undefined}
+                            isLoading={isLoading || isFetching}
+                            clipType={currentClipType}
+                            scoreFilter={currentClipType === 'clip' ? scoreFilter : undefined}
+                            onScoreFilterChange={currentClipType === 'clip' ? setScoreFilter : undefined}
+                            totalResults={processedResults.length}
+                            filteredResults={scoreFilteredResults.length}
+                            isSemanticSearch={currentSemantic}
+                        />
                     </Box>
 
                     <RightSidebar>

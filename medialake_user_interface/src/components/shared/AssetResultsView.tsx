@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Box, Typography, LinearProgress } from '@mui/material';
 import { type SortingState } from '@tanstack/react-table';
 import { type AssetTableColumn } from '@/types/shared/assetComponents';
@@ -76,6 +76,7 @@ export interface AssetResultsViewProps<T> {
   onSelectAllToggle?: () => void;
   error?: { status: string; message: string } | null;
   isLoading?: boolean;
+  clipType?: 'clip' | 'full';
   // Functions to extract data from asset objects
   getAssetId: (asset: T) => string;
   getAssetName: (asset: T) => string;
@@ -83,6 +84,12 @@ export interface AssetResultsViewProps<T> {
   getAssetThumbnail: (asset: T) => string;
   getAssetProxy?: (asset: T) => string;
   renderCardField: (fieldId: string, asset: T) => React.ReactNode;
+  // Score filter props
+  scoreFilter?: number;
+  onScoreFilterChange?: (value: number) => void;
+  totalResults?: number;
+  filteredResults?: number;
+  isSemanticSearch?: boolean;
 }
 
 function AssetResultsView<T>({
@@ -138,6 +145,12 @@ function AssetResultsView<T>({
   getAssetThumbnail,
   getAssetProxy,
   renderCardField,
+  clipType,
+  scoreFilter,
+  onScoreFilterChange,
+  totalResults,
+  filteredResults,
+  isSemanticSearch,
 }: AssetResultsViewProps<T>) {
   // If there's an error, display the error component
   if (error) {
@@ -201,6 +214,11 @@ function AssetResultsView<T>({
           hasSelectedAssets={hasSelectedAssets}
           selectAllState={selectAllState}
           onSelectAllToggle={onSelectAllToggle}
+          scoreFilter={scoreFilter}
+          onScoreFilterChange={onScoreFilterChange}
+          totalResults={totalResults}
+          filteredResults={filteredResults}
+          clipType={clipType}
         />
         
         <ErrorDisplay 
@@ -227,35 +245,42 @@ function AssetResultsView<T>({
       )}
 
       <Box sx={{ mb: 2 }}>
-        <Typography
-          variant="h4"
-          component="h1"
-          sx={{
-            fontWeight: 700,
-            background: theme => `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-            backgroundClip: 'text',
-            WebkitBackgroundClip: 'text',
-            color: 'transparent',
-            display: 'block',
-            visibility: 'visible',
-            position: 'relative',
-            zIndex: 1,
-          }}
-        >
-          {title} {searchMetadata?.totalResults > 0 && searchTerm && (
-            <Typography 
-              component="span" 
-              sx={{ 
-                fontWeight: 300, 
-                fontSize: '0.5em',
-                color: 'text.secondary',
-                opacity: 0.75
+        {(() => {
+          const isClipMode = clipType === 'clip';
+          const count = isClipMode ? results.length : (searchMetadata?.totalResults || 0);
+          const label = isClipMode ? 'clips' : 'results';
+          return (
+            <Typography
+              variant="h4"
+              component="h1"
+              sx={{
+                fontWeight: 700,
+                background: theme => `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                color: 'transparent',
+                display: 'block',
+                visibility: 'visible',
+                position: 'relative',
+                zIndex: 1,
               }}
             >
-              (Found {searchMetadata.totalResults} results for "{searchTerm}")
+              {title} {count > 0 && searchTerm && (
+                <Typography
+                  component="span"
+                  sx={{
+                    fontWeight: 300,
+                    fontSize: '0.5em',
+                    color: 'text.secondary',
+                    opacity: 0.75
+                  }}
+                >
+                  (Found {count} {label} for "{searchTerm}")
+                </Typography>
+              )}
             </Typography>
-          )}
-        </Typography>
+          );
+        })()}
       </Box>
       
       <AssetViewControls
@@ -299,6 +324,11 @@ function AssetResultsView<T>({
         hasSelectedAssets={hasSelectedAssets}
         selectAllState={selectAllState}
         onSelectAllToggle={onSelectAllToggle}
+        scoreFilter={scoreFilter}
+        onScoreFilterChange={onScoreFilterChange}
+        totalResults={totalResults}
+        filteredResults={filteredResults}
+        clipType={clipType}
       />
 
       {/* Sort the results based on the current sorting state */}
@@ -374,6 +404,7 @@ function AssetResultsView<T>({
             onFavoriteToggle={onFavoriteToggle}
             isAssetSelected={isAssetSelected}
             onSelectToggle={onSelectToggle}
+            onSelectAllToggle={onSelectAllToggle}
             getAssetId={getAssetId}
             getAssetName={getAssetName}
             getAssetType={getAssetType}
@@ -381,6 +412,8 @@ function AssetResultsView<T>({
             getAssetProxy={getAssetProxy}
             renderCardField={renderCardField}
             selectedSearchFields={selectedFields}
+            clipType={clipType}
+            isSemanticSearch={isSemanticSearch}
           />
         ) : (
           <AssetTableView
