@@ -17,7 +17,16 @@ const parseDate = (input: string | number): Date => {
     const n = Number(input);
     return new Date(String(input).length === 10 ? n * 1000 : n);
   }
-  return parseISO(String(input));
+
+  const inputStr = String(input);
+
+  //  If the string doesn't have timezone info, force it to be UTC
+  if (inputStr.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$/) && !inputStr.includes('Z') && !inputStr.includes('+') && !inputStr.includes('-', 10)) {
+    // This is a datetime string without timezone info - treat as local time
+    return new Date(inputStr + 'Z');
+  }
+
+  return parseISO(inputStr);
 };
 
 /**
@@ -52,8 +61,20 @@ export const formatLocalDateTime = (
   }
 
   const { showSeconds = false } = options;
-  const pattern = `PP, ${showSeconds ? 'pp' : 'p'}`;
-  return format(date, pattern, { locale: enUS }) + ' ' + getTimezoneAbbreviation();
+
+  // Use Intl.DateTimeFormat for consistent local time formatting
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    ...(showSeconds && { second: '2-digit' }),
+    hour12: true,
+    timeZoneName: 'short'
+  });
+
+  return formatter.format(date);
 };
 
 /**
@@ -91,9 +112,18 @@ export const isValidISOString = (
 };
 
 /** E.g. “PDT” or fallback “America/Los_Angeles” */
-export const getTimezoneAbbreviation = (): string => {
-  const parts = new Date()
-    .toLocaleTimeString('en-US', { timeZoneName: 'short' })
-    .split(' ');
-  return parts[2] || Intl.DateTimeFormat().resolvedOptions().timeZone;
+export const getTimezoneAbbreviation = (timezone?: string): string => {
+  const targetTimezone = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  try {
+    const parts = new Date()
+      .toLocaleTimeString('en-US', {
+        timeZone: targetTimezone,
+        timeZoneName: 'short'
+      })
+      .split(' ');
+    return parts[2] || targetTimezone;
+  } catch (error) {
+    console.error('Error getting timezone abbreviation:', error);
+    return targetTimezone;
+  }
 };
