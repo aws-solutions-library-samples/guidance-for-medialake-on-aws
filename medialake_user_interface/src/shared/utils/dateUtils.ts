@@ -1,66 +1,99 @@
-import { format, formatDistanceToNow, parseISO } from 'date-fns';
+// src/shared/utils/dateUtils.ts
+
+import { format, formatDistanceToNow, parseISO, isValid as isValidDate } from 'date-fns';
 import { enUS } from 'date-fns/locale';
 
 interface DateTimeFormatOptions {
   showSeconds?: boolean;
-  allowSecondsToggle?: boolean;
+  allowSecondsToggle?: boolean; // unused for now
 }
 
-const convertToDate = (input: string | number): Date => {
-  try {
-    // If it's a number or string number, treat as epoch timestamp
-    if (!isNaN(Number(input))) {
-      const ms = String(input).length === 10 ? Number(input) * 1000 : Number(input);
-      return new Date(ms);
-    }
-    // Otherwise try to parse as ISO string
-    return parseISO(String(input));
-  } catch (error) {
-    console.error('Error converting to date:', error);
-    throw new Error('Invalid date input');
+/**
+ * Parse a numeric string/number as epoch (auto-multiplies 10-digit by 1000),
+ * otherwise parseISO.
+ */
+const parseDate = (input: string | number): Date => {
+  if (typeof input === 'number' || /^\d+$/.test(String(input))) {
+    const n = Number(input);
+    return new Date(String(input).length === 10 ? n * 1000 : n);
   }
+  return parseISO(String(input));
 };
 
-export const formatLocalDateTime = (input: string | number, options: DateTimeFormatOptions = {}): string => {
-  try {
-    const { showSeconds = false } = options;
-    const date = convertToDate(input);
-    
-    // Format the date in local time with timezone indicator
-    const formatString = `PP, ${showSeconds ? 'pp' : 'p'}`;
-    return format(date, formatString, { locale: enUS }) + ' ' + getTimezoneAbbreviation();
-  } catch (error) {
-    console.error('Error formatting date:', error);
+/**
+ * Returns true if this string is a pure text label (no digits),
+ * e.g. "In Progress", "Running".
+ */
+const isStatusLabel = (input: string | number): input is string =>
+  typeof input === 'string' && !/\d/.test(input);
+
+/**
+ * Format a timestamp/ISO string into something like:
+ *   "Jun 18, 2025, 3:45 PM PDT"
+ * If you pass a no-digits string, it returns it verbatim.
+ * If input is nullish, returns an empty string.
+ * Only really bad numbers/ISOs yield "Invalid date".
+ */
+export const formatLocalDateTime = (
+  input?: string | number | null,
+  options: DateTimeFormatOptions = {}
+): string => {
+  if (input == null) {
+    return '';
+  }
+
+  if (isStatusLabel(input)) {
+    return input;
+  }
+
+  const date = parseDate(input);
+  if (!isValidDate(date)) {
     return 'Invalid date';
   }
+
+  const { showSeconds = false } = options;
+  const pattern = `PP, ${showSeconds ? 'pp' : 'p'}`;
+  return format(date, pattern, { locale: enUS }) + ' ' + getTimezoneAbbreviation();
 };
 
-export const formatRelativeTime = (input: string | number): string => {
-  try {
-    const date = convertToDate(input);
-    return formatDistanceToNow(date, { 
-      addSuffix: true,
-      locale: enUS
-    });
-  } catch (error) {
-    console.error('Error formatting relative time:', error);
+/**
+ * "x minutes ago" style. Same passthrough for no-digits labels.
+ * Nullish input → empty string.
+ */
+export const formatRelativeTime = (
+  input?: string | number | null
+): string => {
+  if (input == null) {
+    return '';
+  }
+
+  if (isStatusLabel(input)) {
+    return input;
+  }
+
+  const date = parseDate(input);
+  if (!isValidDate(date)) {
     return 'Invalid date';
   }
+
+  return formatDistanceToNow(date, { addSuffix: true, locale: enUS });
 };
 
-export const isValidISOString = (input: string | number): boolean => {
-  try {
-    convertToDate(input);
-    return true;
-  } catch {
+/** Quick ISO-validity check */
+export const isValidISOString = (
+  input?: string | number | null
+): boolean => {
+  if (input == null || isStatusLabel(input)) {
     return false;
   }
+  const date = parseDate(input);
+  return isValidDate(date);
 };
 
-// Helper function to get timezone abbreviation
+/** E.g. “PDT” or fallback “America/Los_Angeles” */
 export const getTimezoneAbbreviation = (): string => {
-  return new Date()
+  const parts = new Date()
     .toLocaleTimeString('en-US', { timeZoneName: 'short' })
-    .split(' ')[2] || 
-    Intl.DateTimeFormat().resolvedOptions().timeZone;
-}; 
+    .split(' ');
+  return parts[2] || Intl.DateTimeFormat().resolvedOptions().timeZone;
+};
