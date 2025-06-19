@@ -63,7 +63,7 @@ export const useConnectorAssets = ({
 
     return useQuery<ConnectorAssetsResponse, ConnectorAssetsError>({
         // Use the existing search list query key with our bucket filter
-        queryKey: QUERY_KEYS.SEARCH.list(query, page, pageSize, false, undefined, undefined, undefined),
+        queryKey: QUERY_KEYS.SEARCH.list(query, page, pageSize, false),
         queryFn: async ({ signal }) => {
             try {
                 // Build the query parameters

@@ -10,7 +10,6 @@ interface SearchParams {
     page?: number;
     pageSize?: number;
     isSemantic?: boolean;
-    clipType?: 'clip' | 'full';
     // New facet parameters
     type?: string;
     extension?: string;
@@ -51,12 +50,8 @@ export const useSearch = (query: string, params?: SearchParams) => {
     const page = params?.page || 1;
     const pageSize = params?.pageSize || 20;
     const isSemantic = params?.isSemantic ?? false;
-    const clipType = params?.clipType;
     const fields = params?.fields || [];
     const { showError } = useErrorModal();
-
-    // Debug logging
-    console.log('useSearch called with:', { query, params, page, pageSize, isSemantic, clipType, fields });
 
     // Extract facet parameters from params
     const facetParams = params ? {
@@ -71,7 +66,7 @@ export const useSearch = (query: string, params?: SearchParams) => {
     } : undefined;
 
     return useQuery<SearchResponseType, SearchError>({
-        queryKey: QUERY_KEYS.SEARCH.list(query, page, pageSize, isSemantic, fields, facetParams, clipType),
+        queryKey: QUERY_KEYS.SEARCH.list(query, page, pageSize, isSemantic, fields, facetParams),
         queryFn: async ({ signal }) => {
             try {
                 // Build query parameters
@@ -80,11 +75,6 @@ export const useSearch = (query: string, params?: SearchParams) => {
                 queryParams.append('page', page.toString());
                 queryParams.append('pageSize', pageSize.toString());
                 queryParams.append('semantic', isSemantic.toString());
-                
-                // Add clipType parameter if it exists and semantic search is enabled
-                if (isSemantic && params?.clipType) {
-                    queryParams.append('clipType', params.clipType);
-                }
                 
                 // Add facet parameters if they exist
                 if (params?.type) queryParams.append('type', params.type);
@@ -108,7 +98,6 @@ export const useSearch = (query: string, params?: SearchParams) => {
                     `${API_ENDPOINTS.SEARCH}?${queryParams.toString()}`,
                     { signal }
                 );
-                console.log("SEARCH RESPONSE: ",response)
 
                 // Check if the response status is not a success (2xx)
                 if (response.data?.status && !response.data.status.startsWith('2')) {
@@ -139,7 +128,7 @@ export const useSearch = (query: string, params?: SearchParams) => {
             }
         },
         placeholderData: keepPreviousData,
-        enabled: true, // Temporarily enable all searches for debugging
+        enabled: !!query, // Only enable and refetch if there is a query
         staleTime: 1000 * 60, // Cache for 1 minute
         gcTime: 1000 * 60 * 5 // Keep unused data for 5 minutes
     });

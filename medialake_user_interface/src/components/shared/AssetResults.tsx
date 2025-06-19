@@ -216,7 +216,6 @@ function AssetResults<T extends AssetBase>({
                 onEditNameComplete={(save) => handleNameEditComplete(asset, save)}
                 isFavorite={false} // Default to false since we don't have favorite info here
                 onFavoriteToggle={(e) => console.log('Favorite toggle not implemented in AssetResults')}
-                clips={(asset as any).clips} // Pass clips data if available
             />
         </Grid>
     );
