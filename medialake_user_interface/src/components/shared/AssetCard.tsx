@@ -55,6 +55,7 @@ export interface AssetCardProps {
         embeddingOption: string;
     };
     score?: number; // Add score prop
+    isSemanticSearch?: boolean; // Add isSemanticSearch prop
 }
 
 // Utility to parse timecode (e.g., "00:00:30:00") to seconds
@@ -105,6 +106,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
     clipType,
     clipMetadata,
     score, // Add score to destructure
+    isSemanticSearch, // Add isSemanticSearch to destructure
 }) => {
     const [selectionRange, setSelectionRange] = useState<[number, number] | null>(null);
     const [isHovering, setIsHovering] = useState(false);
@@ -368,8 +370,8 @@ const AssetCard: React.FC<AssetCardProps> = ({
                     {`score: ${clipMetadata.clipScore.toFixed(3)}`}
                 </Box>
             )}
-            {/* Score indicator for images and other non-clip assets */}
-            {assetType === 'Image' && typeof score === 'number' && (
+            {/* Score indicator for images only in semantic search with clipType=clip */}
+            {assetType === 'Image' && typeof score === 'number' && clipType === 'clip' && isSemanticSearch && (
                 <Box
                     sx={(theme) => ({
                         position: 'absolute',

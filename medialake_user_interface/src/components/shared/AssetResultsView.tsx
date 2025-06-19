@@ -89,6 +89,7 @@ export interface AssetResultsViewProps<T> {
   onScoreFilterChange?: (value: number) => void;
   totalResults?: number;
   filteredResults?: number;
+  isSemanticSearch?: boolean;
 }
 
 function AssetResultsView<T>({
@@ -149,6 +150,7 @@ function AssetResultsView<T>({
   onScoreFilterChange,
   totalResults,
   filteredResults,
+  isSemanticSearch,
 }: AssetResultsViewProps<T>) {
   // If there's an error, display the error component
   if (error) {
@@ -243,35 +245,42 @@ function AssetResultsView<T>({
       )}
 
       <Box sx={{ mb: 2 }}>
-        <Typography
-          variant="h4"
-          component="h1"
-          sx={{
-            fontWeight: 700,
-            background: theme => `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-            backgroundClip: 'text',
-            WebkitBackgroundClip: 'text',
-            color: 'transparent',
-            display: 'block',
-            visibility: 'visible',
-            position: 'relative',
-            zIndex: 1,
-          }}
-        >
-          {title} {searchMetadata?.totalResults > 0 && searchTerm && (
-            <Typography 
-              component="span" 
-              sx={{ 
-                fontWeight: 300, 
-                fontSize: '0.5em',
-                color: 'text.secondary',
-                opacity: 0.75
+        {(() => {
+          const isClipMode = clipType === 'clip';
+          const count = isClipMode ? results.length : (searchMetadata?.totalResults || 0);
+          const label = isClipMode ? 'clips' : 'results';
+          return (
+            <Typography
+              variant="h4"
+              component="h1"
+              sx={{
+                fontWeight: 700,
+                background: theme => `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                color: 'transparent',
+                display: 'block',
+                visibility: 'visible',
+                position: 'relative',
+                zIndex: 1,
               }}
             >
-              (Found {searchMetadata.totalResults} results for "{searchTerm}")
+              {title} {count > 0 && searchTerm && (
+                <Typography
+                  component="span"
+                  sx={{
+                    fontWeight: 300,
+                    fontSize: '0.5em',
+                    color: 'text.secondary',
+                    opacity: 0.75
+                  }}
+                >
+                  (Found {count} {label} for "{searchTerm}")
+                </Typography>
+              )}
             </Typography>
-          )}
-        </Typography>
+          );
+        })()}
       </Box>
       
       <AssetViewControls
@@ -404,6 +413,7 @@ function AssetResultsView<T>({
             renderCardField={renderCardField}
             selectedSearchFields={selectedFields}
             clipType={clipType}
+            isSemanticSearch={isSemanticSearch}
           />
         ) : (
           <AssetTableView

@@ -36,6 +36,7 @@ interface AssetGridViewProps<T> {
   // Search fields
   selectedSearchFields?: string[];
   clipType?: 'clip' | 'full';
+  isSemanticSearch?: boolean;
 }
 
 function AssetGridView<T>({
@@ -67,7 +68,8 @@ function AssetGridView<T>({
   renderCardField,
   selectedSearchFields,
   clipType,
-}: AssetGridViewProps<T>) {
+  isSemanticSearch,
+}: AssetGridViewProps<T> & { isSemanticSearch?: boolean }) {
   // Group results by type if needed
   const groupedResults = React.useMemo(() => {
     if (!groupByType) return { all: results };
@@ -129,6 +131,7 @@ function AssetGridView<T>({
               clipType={clipType}
               clipMetadata={(asset as any).clipMetadata} // Pass clip metadata
               score={(asset as any).score} // Pass score to AssetCard
+              isSemanticSearch={isSemanticSearch}
             />
           </Grid>
         ))}
@@ -183,6 +186,7 @@ function AssetGridView<T>({
                   clipType={clipType}
                   clipMetadata={(asset as any).clipMetadata} // Pass clip metadata
                   score={(asset as any).score} // Pass score to AssetCard
+                  isSemanticSearch={isSemanticSearch}
                 />
               </Grid>
             ))}

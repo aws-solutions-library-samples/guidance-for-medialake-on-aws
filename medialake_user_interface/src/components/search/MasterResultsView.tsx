@@ -90,6 +90,9 @@ interface MasterResultsViewProps {
   onScoreFilterChange?: (value: number) => void;
   totalResults?: number;
   filteredResults?: number;
+  
+  // Semantic search
+  isSemanticSearch?: boolean;
 }
 
 const MasterResultsView: React.FC<MasterResultsViewProps> = ({
@@ -141,6 +144,7 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   onScoreFilterChange,
   totalResults,
   filteredResults,
+  isSemanticSearch,
 }) => {
   // Function to render card fields
   const renderCardField = (fieldId: string, asset: AssetItem): React.ReactNode => {
@@ -227,6 +231,7 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       onScoreFilterChange={onScoreFilterChange}
       totalResults={totalResults}
       filteredResults={filteredResults}
+      isSemanticSearch={isSemanticSearch}
     />
   );
 };

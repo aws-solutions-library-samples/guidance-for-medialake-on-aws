@@ -605,8 +605,7 @@ const SearchPage: React.FC = () => {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            zIndex: 1300,
-                            backgroundColor: 'rgba(255,255,255,0.5)'
+                            zIndex: 1300
                         }}>
                             <LoadingSpinner />
                         </Box>
@@ -673,6 +672,7 @@ const SearchPage: React.FC = () => {
                             onScoreFilterChange={currentClipType === 'clip' ? setScoreFilter : undefined}
                             totalResults={processedResults.length}
                             filteredResults={scoreFilteredResults.length}
+                            isSemanticSearch={currentSemantic}
                         />
                     </Box>
 
