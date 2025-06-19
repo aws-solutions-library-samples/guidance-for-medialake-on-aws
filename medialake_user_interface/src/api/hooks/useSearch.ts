@@ -55,6 +55,9 @@ export const useSearch = (query: string, params?: SearchParams) => {
     const fields = params?.fields || [];
     const { showError } = useErrorModal();
 
+    // Debug logging
+    console.log('useSearch called with:', { query, params, page, pageSize, isSemantic, clipType, fields });
+
     // Extract facet parameters from params
     const facetParams = params ? {
         type: params.type,
@@ -136,7 +139,7 @@ export const useSearch = (query: string, params?: SearchParams) => {
             }
         },
         placeholderData: keepPreviousData,
-        enabled: !!query, // Only enable and refetch if there is a query
+        enabled: true, // Temporarily enable all searches for debugging
         staleTime: 1000 * 60, // Cache for 1 minute
         gcTime: 1000 * 60 * 5 // Keep unused data for 5 minutes
     });

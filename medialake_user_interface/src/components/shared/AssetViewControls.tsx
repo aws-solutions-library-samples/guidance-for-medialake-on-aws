@@ -62,8 +62,8 @@ interface AssetViewControlsProps extends BaseAssetViewControlsProps {
     hasSelectedAssets?: boolean;
     selectAllState?: 'none' | 'some' | 'all';
     onSelectAllToggle?: () => void;
-    scoreFilter: string;
-    onScoreFilterChange: (value: string) => void;
+    scoreFilter?: string;
+    onScoreFilterChange?: (value: string) => void;
     clipType?: 'clip' | 'full';
 }
 
@@ -183,11 +183,11 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
     }, [sortOptions, selectedFields, reverseFieldMapping]);
 
     // Local state for the input string
-    const [inputValue, setInputValue] = useState(scoreFilter);
+    const [inputValue, setInputValue] = useState(scoreFilter || '0.000');
     const [isInputFocused, setIsInputFocused] = useState(false);
 
     useEffect(() => {
-      if (!isInputFocused) {
+      if (!isInputFocused && scoreFilter !== undefined) {
         setInputValue(scoreFilter);
       }
     }, [scoreFilter, isInputFocused]);
@@ -198,7 +198,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
         return;
       }
       let val = parseFloat(inputValue);
-      if (!isNaN(val) && val >= 0 && val <= 1) {
+      if (!isNaN(val) && val >= 0 && val <= 1 && onScoreFilterChange) {
         setInputValue(val.toString());
         onScoreFilterChange(val.toString());
       }
@@ -209,7 +209,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
       if (valStr === '' || valStr === '.' || /^\d*(\.\d{0,3})?$/.test(valStr)) {
         setInputValue(valStr);
         let val = parseFloat(valStr);
-        if (!isNaN(val) && val >= 0 && val <= 1) {
+        if (!isNaN(val) && val >= 0 && val <= 1 && onScoreFilterChange) {
           onScoreFilterChange(val.toString());
         }
       }
@@ -218,144 +218,141 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
     return (
         <Box sx={{
             display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
+            flexDirection: 'column',
             mb: 3
         }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <ToggleButtonGroup
-                    value={viewMode}
-                    exclusive
-                    onChange={onViewModeChange}
-                    size="small"
-                >
-                    <ToggleButton value="card">
-                        <ViewModuleIcon />
-                    </ToggleButton>
-                    <ToggleButton value="table">
-                        <ViewListIcon />
-                    </ToggleButton>
-                </ToggleButtonGroup>
-            </Box>
-
-            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                {multiSelectFeature.value && (
-
-                    <Box
-                        sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 1,
-                        }}
-                    >
-                        <FormControlLabel
-                            control={
-                                <Checkbox
-                                    checked={selectAllState === 'all'}
-                                    indeterminate={selectAllState === 'some'}
-                                    onChange={onSelectAllToggle}
-                                    size="small"
-                                    sx={{
-                                        color: 'primary.main',
-                                        '&.Mui-checked': {
-                                            color: 'primary.main',
-                                        },
-                                        '&.MuiCheckbox-indeterminate': {
-                                            color: 'primary.main',
-                                        },
-                                        '& .MuiSvgIcon-root': {
-                                            fontSize: '1.2rem',
-                                        }
-                                    }}
-                                />
-                            }
-                            label={selectAllState === 'all' ? 'Deselect Page' : 'Select Page'}
-                            sx={{
-                                margin: 0,
-                                '& .MuiFormControlLabel-label': {
-                                    fontSize: '0.875rem',
-                                    fontWeight: 500,
-                                    color: 'primary.main',
-                                }
-                            }}
-                        />
-                    </Box>
-                )}
-                {/* Score Filter Slider - minimalist, no marks/labels */}
-                {clipType === 'clip' && (
-                  <Box sx={{ minWidth: 240, display: 'flex', alignItems: 'center', mr: 2 }}>
+            {/* Score Filter Slider - move to top right */}
+            {clipType === 'clip' && scoreFilter !== undefined && onScoreFilterChange && (
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mb: 1 }}>
                     <Slider
-                      value={parseFloat(scoreFilter) || 0}
-                      min={0}
-                      max={1}
-                      step={0.001}
-                      onChange={(_, value) => {
-                        onScoreFilterChange(value.toString());
-                        setInputValue(value.toString());
-                      }}
-                      valueLabelDisplay="off"
-                      color="primary"
-                      sx={{ width: 140, mx: 1, color: 'primary.main' }}
+                        value={parseFloat(scoreFilter) || 0}
+                        min={0}
+                        max={1}
+                        step={0.001}
+                        onChange={(_, value) => {
+                            onScoreFilterChange(value.toString());
+                            setInputValue(value.toString());
+                        }}
+                        valueLabelDisplay="off"
+                        color="primary"
+                        sx={{ width: 140, mx: 1, color: 'primary.main' }}
                     />
                     <Input
-                      value={inputValue}
-                      onChange={handleInputChange}
-                      onBlur={handleInputBlur}
-                      onFocus={() => setIsInputFocused(true)}
-                      inputProps={{
-                        inputMode: 'decimal',
-                        'aria-labelledby': 'score-slider',
-                        style: { width: 70, fontSize: 18, padding: 2, textAlign: 'center', color: '#1976d2' }
-                      }}
-                      type="text"
-                      sx={{ ml: 3, mr: 0, '& input': { textAlign: 'center', color: 'primary.main', fontWeight: 500 }, '&:before, &:after': { borderBottomColor: 'primary.main' } }}
-                      size="small"
+                        value={inputValue}
+                        onChange={handleInputChange}
+                        onBlur={handleInputBlur}
+                        onFocus={() => setIsInputFocused(true)}
+                        inputProps={{
+                            inputMode: 'decimal',
+                            'aria-labelledby': 'score-slider',
+                            style: { width: 70, fontSize: '1rem', padding: 2, textAlign: 'center', color: '#1976d2' }
+                        }}
+                        type="text"
+                        sx={{ ml: 3, mr: 0, '& input': { textAlign: 'center', color: 'primary.main', fontWeight: 500, fontSize: '1rem' }, '&:before, &:after': { borderBottomColor: 'primary.main' } }}
+                        size="small"
                     />
-                  </Box>
-                )}
-                {/* Sort Button */}
-                <Button
-                    size="small"
-                    startIcon={<SortIcon />}
-                    endIcon={<KeyboardArrowDownIcon />}
-                    onClick={(e) => setSortAnchor(e.currentTarget)}
-                    sx={{
-                        bgcolor: Boolean(sortAnchor) ? 'action.selected' : 'transparent',
-                        textTransform: 'none',
-                        color: 'primary.main',
-                        fontWeight: 500
-                    }}
-                >
-                    Sort
-                </Button>
-
-                {/* Show Fields Button */}
-                <Button
-                    size="small"
-                    startIcon={<ViewColumnIcon />}
-                    endIcon={<KeyboardArrowDownIcon />}
-                    onClick={(e) => setFieldsAnchor(e.currentTarget)}
-                    sx={{
-                        bgcolor: Boolean(fieldsAnchor) ? 'action.selected' : 'transparent',
-                        textTransform: 'none',
-                    }}
-                >
-                    Fields
-                </Button>
-
-                {/* Appearance Button */}
-                <Button
-                    size="small"
-                    startIcon={<TuneIcon />}
-                    endIcon={<KeyboardArrowDownIcon />}
-                    onClick={(e) => setAppearanceAnchor(e.currentTarget)}
-                    sx={{
-                        bgcolor: Boolean(appearanceAnchor) ? 'action.selected' : 'transparent',
-                        textTransform: 'none',
-                    }}
-                >
-                    Appearance
-                </Button>
+                </Box>
+            )}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <ToggleButtonGroup
+                        value={viewMode}
+                        exclusive
+                        onChange={onViewModeChange}
+                        size="small"
+                    >
+                        <ToggleButton value="card">
+                            <ViewModuleIcon />
+                        </ToggleButton>
+                        <ToggleButton value="table">
+                            <ViewListIcon />
+                        </ToggleButton>
+                    </ToggleButtonGroup>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                    {multiSelectFeature.value && (
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1,
+                            }}
+                        >
+                            <FormControlLabel
+                                control={
+                                    <Checkbox
+                                        checked={selectAllState === 'all'}
+                                        indeterminate={selectAllState === 'some'}
+                                        onChange={onSelectAllToggle}
+                                        size="small"
+                                        sx={{
+                                            color: 'primary.main',
+                                            '&.Mui-checked': {
+                                                color: 'primary.main',
+                                            },
+                                            '&.MuiCheckbox-indeterminate': {
+                                                color: 'primary.main',
+                                            },
+                                            '& .MuiSvgIcon-root': {
+                                                fontSize: '1.2rem',
+                                            }
+                                        }}
+                                    />
+                                }
+                                label={selectAllState === 'all' ? 'Deselect Page' : 'Select Page'}
+                                sx={{
+                                    margin: 0,
+                                    '& .MuiFormControlLabel-label': {
+                                        fontSize: '0.875rem',
+                                        fontWeight: 500,
+                                        color: 'primary.main',
+                                    }
+                                }}
+                            />
+                        </Box>
+                    )}
+                    {/* Sort Button */}
+                    <Button
+                        size="small"
+                        startIcon={<SortIcon />}
+                        endIcon={<KeyboardArrowDownIcon />}
+                        onClick={(e) => setSortAnchor(e.currentTarget)}
+                        sx={{
+                            bgcolor: Boolean(sortAnchor) ? 'action.selected' : 'transparent',
+                            textTransform: 'none',
+                            color: 'primary.main',
+                            fontWeight: 500
+                        }}
+                    >
+                        Sort
+                    </Button>
+                    {/* Show Fields Button */}
+                    <Button
+                        size="small"
+                        startIcon={<ViewColumnIcon />}
+                        endIcon={<KeyboardArrowDownIcon />}
+                        onClick={(e) => setFieldsAnchor(e.currentTarget)}
+                        sx={{
+                            bgcolor: Boolean(fieldsAnchor) ? 'action.selected' : 'transparent',
+                            textTransform: 'none',
+                        }}
+                    >
+                        Fields
+                    </Button>
+                    {/* Appearance Button */}
+                    <Button
+                        size="small"
+                        startIcon={<TuneIcon />}
+                        endIcon={<KeyboardArrowDownIcon />}
+                        onClick={(e) => setAppearanceAnchor(e.currentTarget)}
+                        sx={{
+                            bgcolor: Boolean(appearanceAnchor) ? 'action.selected' : 'transparent',
+                            textTransform: 'none',
+                        }}
+                    >
+                        Appearance
+                    </Button>
+                </Box>
             </Box>
 
             {/* Sort Menu */}

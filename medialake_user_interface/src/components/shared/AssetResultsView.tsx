@@ -84,6 +84,8 @@ export interface AssetResultsViewProps<T> {
   getAssetThumbnail: (asset: T) => string;
   getAssetProxy?: (asset: T) => string;
   renderCardField: (fieldId: string, asset: T) => React.ReactNode;
+  scoreFilter?: string;
+  onScoreFilterChange?: (value: string) => void;
 }
 
 function AssetResultsView<T>({
@@ -140,20 +142,14 @@ function AssetResultsView<T>({
   getAssetProxy,
   renderCardField,
   clipType,
+  scoreFilter,
+  onScoreFilterChange,
 }: AssetResultsViewProps<T>) {
-  // Score filter state (string for input flexibility)
-  const [scoreFilter, setScoreFilter] = useState('0.000');
-
   // Determine if we should show the score slider (if any result has a score property)
   const showScoreSlider = results.some((r: any) => typeof r.score === 'number');
 
-  // Parse the filter value as a number
-  const scoreFilterValue = parseFloat(scoreFilter.replace(',', '.'));
-
-  // Filter results by score if slider is shown, using the raw input value if valid
-  const filteredResults = showScoreSlider && !isNaN(scoreFilterValue)
-    ? results.filter((r: any) => typeof r.score !== 'number' || r.score >= scoreFilterValue)
-    : results;
+  // Parse the filter value as a number, guard against undefined
+  const scoreFilterValue = scoreFilter !== undefined ? parseFloat(scoreFilter.replace(',', '.')) : 0;
 
   // If there's an error, display the error component
   if (error) {
@@ -218,7 +214,7 @@ function AssetResultsView<T>({
           selectAllState={selectAllState}
           onSelectAllToggle={onSelectAllToggle}
           scoreFilter={scoreFilter}
-          onScoreFilterChange={setScoreFilter}
+          onScoreFilterChange={onScoreFilterChange}
           clipType={clipType}
         />
         
@@ -319,14 +315,14 @@ function AssetResultsView<T>({
         selectAllState={selectAllState}
         onSelectAllToggle={onSelectAllToggle}
         scoreFilter={scoreFilter}
-        onScoreFilterChange={setScoreFilter}
+        onScoreFilterChange={onScoreFilterChange}
         clipType={clipType}
       />
 
       {/* Sort the results based on the current sorting state */}
       {(() => {
         // Sort the results if sorting is specified
-        const sortedResults = [...filteredResults];
+        const sortedResults = [...results];
         if (sorting.length > 0) {
           const { id: sortField, desc } = sorting[0];
           sortedResults.sort((a, b) => {

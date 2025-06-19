@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { type ImageItem, type VideoItem, type AudioItem } from '@/types/search/searchResults';
 import { type SortingState } from '@tanstack/react-table';
 import { type AssetTableColumn } from '@/types/shared/assetComponents';
@@ -148,6 +148,26 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   // Clip type for semantic search
   clipType,
 }) => {
+  const [scoreFilter, setScoreFilter] = useState('0.000');
+
+  // Reset scoreFilter when switching to non-clip mode
+  React.useEffect(() => {
+    if (clipType !== 'clip' && scoreFilter !== '0.000') {
+      setScoreFilter('0.000');
+    }
+  }, [clipType]);
+
+  // Filter results by score in parent
+  const filteredResults = useMemo(() => {
+    if (clipType === 'clip' && !isNaN(parseFloat(scoreFilter))) {
+      const threshold = parseFloat(scoreFilter);
+      return results.filter(
+        (r: any) => typeof r.score === 'number' && r.score >= threshold
+      );
+    }
+    return results;
+  }, [results, clipType, scoreFilter]);
+
   // Function to render card fields
   const renderCardField = (fieldId: string, asset: AssetItem): React.ReactNode => {
     console.log('Rendering field:', fieldId, 'for asset:', asset.InventoryID);
@@ -181,7 +201,7 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
 
   return (
     <AssetResultsView
-      results={results}
+      results={filteredResults}
       searchMetadata={searchMetadata}
       onPageChange={onPageChange}
       onPageSizeChange={onPageSizeChange}
@@ -232,6 +252,8 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       getAssetProxy={(asset) => asset.proxyUrl || ''}
       renderCardField={renderCardField}
       clipType={clipType}
+      scoreFilter={clipType === 'clip' ? scoreFilter : undefined}
+      onScoreFilterChange={clipType === 'clip' ? setScoreFilter : undefined}
     />
   );
 };

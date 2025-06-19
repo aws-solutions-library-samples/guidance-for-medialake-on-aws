@@ -22,7 +22,7 @@ import {
   Psychology as PsychologyIcon
 } from '@mui/icons-material';
 import { useChat } from './contexts/ChatContext';
-import { useNavigate, useLocation } from 'react-router-dom'; // <-- import useLocation
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'; // <-- import useLocation and useSearchParams
 import { useTranslation } from 'react-i18next';
 import { useTheme } from './hooks/useTheme';
 import { useSidebar } from './contexts/SidebarContext';
@@ -34,12 +34,11 @@ import FilterModal from './components/search/FilterModal';
 import { useFacetSearch } from './hooks/useFacetSearch';
 import { NotificationCenter } from './components/NotificationCenter';
 
-interface SearchTag {
-  key: string;
-  value: string;
+interface TopBarProps {
+  isSearchLoading?: boolean;
 }
 
-function TopBar() {
+function TopBar({ isSearchLoading = false }: TopBarProps) {
   const muiTheme = useMuiTheme();
   const { theme } = useTheme();
   const { isCollapsed } = useSidebar();
@@ -49,12 +48,9 @@ function TopBar() {
   const { direction } = useDirection();
   const isRTL = direction === 'rtl';
 
-  const [searchInput, setSearchInput] = useState('');
-  const [searchTags, setSearchTags] = useState<SearchTag[]>([]);
-  // Parse `semantic` from URL on initial render:
-  const initialSemantic =
-    new URLSearchParams(location.search).get('semantic') === 'true';
-  const [isSemanticSearch, setIsSemanticSearch] = useState<boolean>(initialSemantic);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchInput, setSearchInput] = useState(searchParams.get('q') || '');
+  const isSemanticSearch = searchParams.get('semantic') === 'true';
 
   const { filters, setFilters } = useFacetSearch();
   const [searchResults, setSearchResults] = useState<any>(null);
@@ -91,25 +87,15 @@ function TopBar() {
     }
   }, [clipType, isSemanticSearch, location.pathname, location.search, navigate]);
 
-  // Whenever the URL's `semantic` param changes (e.g. on browser refresh),
-  // make sure `isSemanticSearch` reflects that:
+  // On mount, sync input from URL if present
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const semanticParam = params.get('semantic') === 'true';
-    setIsSemanticSearch(semanticParam);
-  }, [location.search]);
-
-  const getSearchQuery = useCallback(() => {
-    const tagPart = searchTags
-      .map(tag => `${tag.key}: ${tag.value}`)
-      .join(' ');
-    return `${tagPart}${tagPart && searchInput ? ' ' : ''}${searchInput}`.trim();
-  }, [searchTags, searchInput]);
+    setSearchInput(searchParams.get('q') || '');
+    // eslint-disable-next-line
+  }, []);
 
   const handleApplyFilters = (newFilters: any) => {
     setFilters(newFilters);
-    const searchQuery = getSearchQuery();
-    let search = `?q=${encodeURIComponent(searchQuery)}&semantic=${isSemanticSearch}`;
+    let search = `?q=${encodeURIComponent(searchInput)}&semantic=${isSemanticSearch}`;
     if (isSemanticSearch) search += `&clipType=${clipType}`;
     if (newFilters.type) search += `&type=${encodeURIComponent(newFilters.type)}`;
     if (newFilters.extension) search += `&extension=${encodeURIComponent(newFilters.extension)}`;
@@ -189,51 +175,11 @@ function TopBar() {
   };
 
   const createTagFromInput = (input: string): boolean => {
-    if (input.includes(':')) {
-      const [key, ...valueParts] = input.split(':');
-      const value = valueParts.join(':').trim();
-      if (key && value) {
-        const newTag: SearchTag = {
-          key: key.trim(),
-          value: value
-        };
-        setSearchTags(prev => [...prev, newTag]);
-        setSearchInput('');
-        const searchQuery = getSearchQuery();
-        let search = `?q=${encodeURIComponent(searchQuery)}&semantic=${isSemanticSearch}`;
-        if (isSemanticSearch) search += `&clipType=${clipType}`;
-        navigate({
-          pathname: '/search',
-          search
-        });
-        return true;
-      }
-    }
     return false;
   };
 
-  const handleSearchInputChange = (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const value = event.target.value;
-    setSearchInput(value);
-
-    if (value.endsWith(' ') && value.includes(':')) {
-      const potentialTag = value.trim();
-      if (createTagFromInput(potentialTag)) {
-        return;
-      }
-    }
-
-    // Remove automatic search - only search when button is clicked or Enter is pressed
-    // if (!value.includes(':')) {
-    //   const currentQuery = value.trim()
-    //     ? `${searchTags
-    //         .map(tag => `${tag.key}: ${tag.value}`)
-    //         .join(' ')}${searchTags.length > 0 ? ' ' : ''}${value}`
-    //     : searchTags.map(tag => `${tag.key}: ${tag.value}`).join(' ');
-    //   // debouncedSearch(currentQuery);
-    // }
+  const handleSearchInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchInput(event.target.value);
   };
 
   const handleSearchKeyPress = (
@@ -246,38 +192,20 @@ function TopBar() {
   };
 
   const handleSearchSubmit = () => {
-    if (searchInput.includes(':')) {
-      createTagFromInput(searchInput);
-    } else if (searchInput.trim() || searchTags.length > 0) {
-      const searchQuery = getSearchQuery();
-      let search = `?q=${encodeURIComponent(searchQuery)}&semantic=${isSemanticSearch}`;
-      if (isSemanticSearch) search += `&clipType=${clipType}`;
-      navigate({
-        pathname: '/search',
-        search
-      });
+    // Navigate to search page with the query
+    const searchParams = new URLSearchParams();
+    searchParams.set('q', searchInput);
+    searchParams.set('page', '1');
+    
+    // Preserve semantic search settings if they exist
+    if (isSemanticSearch) {
+      searchParams.set('semantic', 'true');
+      searchParams.set('clipType', clipType);
     }
-  };
-
-  const handleDeleteTag = (tagToDelete: SearchTag) => {
-    setSearchTags(prev => {
-      const newTags = prev.filter(
-        tag =>
-          !(
-            tag.key === tagToDelete.key &&
-            tag.value === tagToDelete.value
-          )
-      );
-      const searchQuery = newTags
-        .map(tag => `${tag.key}: ${tag.value}`)
-        .join(' ');
-      let search = `?q=${encodeURIComponent(searchQuery)}&semantic=${isSemanticSearch}`;
-      if (isSemanticSearch) search += `&clipType=${clipType}`;
-      navigate({
-        pathname: '/search',
-        search
-      });
-      return newTags;
+    
+    navigate({
+      pathname: '/search',
+      search: searchParams.toString()
     });
   };
 
@@ -293,17 +221,53 @@ function TopBar() {
     } else {
       params.delete('clipType');
     }
+    
+    // Navigate to update URL and trigger search
     navigate({
       pathname: location.pathname,
       search: params.toString()
     });
-    // Do NOT call setIsSemanticSearch here; let the useEffect handle it
+    
+    // If there's a current search query, trigger a new search
+    if (searchInput.trim()) {
+      const searchParams = new URLSearchParams();
+      searchParams.set('q', searchInput);
+      searchParams.set('semantic', newSemantic.toString());
+      if (newSemantic) {
+        searchParams.set('clipType', clipType);
+      }
+      searchParams.set('page', '1');
+      
+      navigate({
+        pathname: '/search',
+        search: searchParams.toString()
+      });
+    }
   };
 
   const handleUploadComplete = (files: any[]) => {
     console.log('Upload completed:', files);
     handleCloseUploadModal();
     // Add any feedback if needed
+  };
+
+  // Handle clip type changes and trigger search
+  const handleClipTypeChange = (newClipType: 'clip' | 'full') => {
+    setClipType(newClipType);
+    
+    // If there's a current search query, trigger a new search
+    if (searchInput.trim() && isSemanticSearch) {
+      const searchParams = new URLSearchParams();
+      searchParams.set('q', searchInput);
+      searchParams.set('semantic', 'true');
+      searchParams.set('clipType', newClipType);
+      searchParams.set('page', '1');
+      
+      navigate({
+        pathname: '/search',
+        search: searchParams.toString()
+      });
+    }
   };
 
   return (
@@ -329,7 +293,7 @@ function TopBar() {
         }}
       >
         {/* Tags */}
-        {searchTags.map((tag, index) => (
+        {/* searchTags.map((tag, index) => (
           <Chip
             key={index}
             label={`${tag.key}: ${tag.value}`}
@@ -343,7 +307,7 @@ function TopBar() {
               }
             }}
           />
-        ))}
+        )) */}
 
         <Box
           sx={{
@@ -404,7 +368,7 @@ function TopBar() {
                   }}
                 />
                 <Box
-                  onClick={() => setClipType('clip')}
+                  onClick={() => handleClipTypeChange('clip')}
                   sx={{
                     flex: 1,
                     zIndex: 2,
@@ -422,7 +386,7 @@ function TopBar() {
                   Clip
                 </Box>
                 <Box
-                  onClick={() => setClipType('full')}
+                  onClick={() => handleClipTypeChange('full')}
                   sx={{
                     flex: 1,
                     zIndex: 2,
@@ -536,6 +500,7 @@ function TopBar() {
           <Button
             variant="contained"
             onClick={handleSearchSubmit}
+            disabled={isSearchLoading}
             sx={{
               minWidth: '80px',
               [isRTL ? 'mr' : 'ml']: 2,
