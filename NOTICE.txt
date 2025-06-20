@@ -24,3 +24,4 @@ Amazon Cognito Identity SDK for JavaScript under the Apache License Version 2.0
 MediaInfo under the BSD-2-Clause License
 ReactFlow under the Massachusetts Institute of Technology (MIT) license
 Tanstack Query under the Massachusetts Institute of Technology (MIT) license
+Omakase Player under the Apache License Version 2.0

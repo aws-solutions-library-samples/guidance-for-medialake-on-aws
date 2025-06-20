@@ -132,56 +132,34 @@ const Home: React.FC = () => {
                     easing: theme.transitions.easing.sharp,
                     duration: theme.transitions.duration.leavingScreen,
                 }),
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
             }}
         >
-            <Box sx={{ p: { xs: 2, sm: 3 } }}>
-                <Box sx={{
-                    mb: 6,
-                    maxWidth: 800,
-                    mx: 'auto',
-                    // Remove textAlign property to let children control their own alignment
-                }}>
-                    <Typography
-                        variant="h3"
-                        component="h1"
-                        sx={{
-                            fontWeight: 700,
-                            color: 'primary.main',
-                            mb: 2,
-                            textAlign: 'center' // Force center alignment regardless of parent
-                        }}
-                    >
-                        {t('app.branding.name')}
-                    </Typography>
-                    <Typography
-                        variant="h5"
-                        color="text.secondary"
-                        sx={{ mb: 4, textAlign: 'center' }} // Force center alignment
-                    >
-                        {t('home.description')}
-                    </Typography>
-                </Box>
-
-                <Grid container spacing={4} sx={{ maxWidth: 1200, mx: 'auto' }}>
-                    <Grid item xs={12} md={4}>
-                        <FeatureCard
-                            title={t('home.favorites')}
-                            icon={<FavoriteIcon />}
-                        />
-                    </Grid>
-                    <Grid item xs={12} md={4}>
-                        <FeatureCard
-                            title={t('home.collections')}
-                            icon={<CollectionsIcon />}
-                        />
-                    </Grid>
-                    <Grid item xs={12} md={4}>
-                        <FeatureCard
-                            title={t('home.sharing')}
-                            icon={<ShareIcon />}
-                        />
-                    </Grid>
-                </Grid>
+            <Box sx={{ 
+                p: { xs: 2, sm: 3 },
+                textAlign: 'center',
+                maxWidth: 800,
+            }}>
+                <Typography
+                    variant="h3"
+                    component="h1"
+                    sx={{
+                        fontWeight: 700,
+                        color: 'primary.main',
+                        mb: 2,
+                    }}
+                >
+                    {t('app.branding.name')}
+                </Typography>
+                <Typography
+                    variant="h5"
+                    color="text.secondary"
+                    sx={{ mb: 4 }}
+                >
+                    {t('home.description')}
+                </Typography>
                 
                 {/* User Favorites Section - Feature Flagged */}
                 {isFavoritesEnabled && (
@@ -271,7 +249,6 @@ const Home: React.FC = () => {
                         )}
                     </Box>
                 )}
-
             </Box>
         </Box>
     );

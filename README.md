@@ -490,6 +490,8 @@ The API includes the following main endpoints:
 - AWS CDK team for the excellent infrastructure as code framework
 - AWS Lambda Powertools for Python
 - The open-source community for various tools and libraries used in this project
+- The konOmakase Player
+
 
 LICENSE
 
