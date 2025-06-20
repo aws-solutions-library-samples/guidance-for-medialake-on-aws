@@ -46,31 +46,6 @@ export interface AssetCardProps {
     isSelected?: boolean; // Whether the asset is selected for bulk operations
     onSelectToggle?: (id: string, event: React.MouseEvent<HTMLElement>) => void; // Callback when selection is toggled
     selectedSearchFields?: string[]; // Selected search fields
-    clips?: any[]; // Array of clips from search results
-    clipType?: 'clip' | 'full'; // Current clip type setting
-    clipMetadata?: {
-        clipScore: number;
-        clipStart: string;
-        clipEnd: string;
-        embeddingOption: string;
-    };
-    score?: number; // Add score prop
-    isSemanticSearch?: boolean; // Add isSemanticSearch prop
-}
-
-// Utility to parse timecode (e.g., "00:00:30:00") to seconds
-function timecodeToSeconds(tc: string): number {
-    if (!tc) return 0;
-    const parts = tc.split(':').map(Number);
-    if (parts.length === 4) {
-        const [hh, mm, ss, ff] = parts;
-        // Assuming 25 fps
-        return hh * 3600 + mm * 60 + ss + (ff / 25);
-    } else if (parts.length === 3) {
-        const [hh, mm, ss] = parts;
-        return hh * 3600 + mm * 60 + ss;
-    }
-    return 0;
 }
 
 const AssetCard: React.FC<AssetCardProps> = ({
@@ -102,18 +77,12 @@ const AssetCard: React.FC<AssetCardProps> = ({
     isSelected = false,
     onSelectToggle,
     selectedSearchFields,
-    clips,
-    clipType,
-    clipMetadata,
-    score, // Add score to destructure
-    isSemanticSearch, // Add isSemanticSearch to destructure
 }) => {
     const [selectionRange, setSelectionRange] = useState<[number, number] | null>(null);
     const [isHovering, setIsHovering] = useState(false);
     const [isMenuClicked, setIsMenuClicked] = useState(false);
     const inputRef = useRef<HTMLInputElement | null>(null);
     const cardRef = useRef<HTMLDivElement>(null);
-    const videoRef = useRef<HTMLVideoElement | null>(null);
 
     // Check if features are enabled
     const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', true);
@@ -290,28 +259,6 @@ const AssetCard: React.FC<AssetCardProps> = ({
         return apiFieldIds.some(apiFieldId => selectedSearchFields.includes(apiFieldId));
     });
 
-    useEffect(() => {
-        if (
-            clipType === 'clip' &&
-            clipMetadata &&
-            videoRef.current
-        ) {
-            const startSeconds = timecodeToSeconds(clipMetadata.clipStart);
-            const handleLoadedMetadata = () => {
-                videoRef.current!.currentTime = startSeconds;
-            };
-            const videoEl = videoRef.current;
-            videoEl.addEventListener('loadedmetadata', handleLoadedMetadata);
-            // If already loaded, set immediately
-            if (videoEl.readyState >= 1) {
-                videoEl.currentTime = startSeconds;
-            }
-            return () => {
-                videoEl.removeEventListener('loadedmetadata', handleLoadedMetadata);
-            };
-        }
-    }, [clipType, clipMetadata]);
-
     return (
         <Box
             ref={cardRef}
@@ -324,74 +271,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
             }}
             onMouseEnter={() => setIsHovering(true)}
             onMouseLeave={() => setIsHovering(false)}
-            data-testid="asset-card"
         >
-            {/* Clips indicator */}
-            {clips && clips.length > 0 && clipType === 'full' && (
-                <Box
-                    sx={(theme) => ({
-                        position: 'absolute',
-                        top: -10,
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        backgroundColor: theme.palette.primary.main,
-                        color: theme.palette.primary.contrastText,
-                        padding: '2px 8px',
-                        borderRadius: '12px',
-                        fontSize: '0.7rem',
-                        fontWeight: 500,
-                        zIndex: 20,
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                        whiteSpace: 'nowrap',
-                    })}
-                >
-                    {clips.length} {clips.length === 1 ? 'clip' : 'clips'}
-                </Box>
-            )}
-            {/* Score indicator - when clipType is "clip" */}
-            {clipType === 'clip' && clipMetadata && (
-                <Box
-                    sx={(theme) => ({
-                        position: 'absolute',
-                        top: -10,
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        backgroundColor: theme.palette.primary.main,
-                        color: theme.palette.primary.contrastText,
-                        padding: '2px 8px',
-                        borderRadius: '12px',
-                        fontSize: '0.7rem',
-                        fontWeight: 500,
-                        zIndex: 30,
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                        whiteSpace: 'nowrap',
-                    })}
-                >
-                    {`score: ${clipMetadata.clipScore.toFixed(3)}`}
-                </Box>
-            )}
-            {/* Score indicator for images only in semantic search with clipType=clip */}
-            {assetType === 'Image' && typeof score === 'number' && clipType === 'clip' && isSemanticSearch && (
-                <Box
-                    sx={(theme) => ({
-                        position: 'absolute',
-                        top: -10,
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        backgroundColor: theme.palette.primary.main,
-                        color: theme.palette.primary.contrastText,
-                        padding: '2px 8px',
-                        borderRadius: '12px',
-                        fontSize: '0.7rem',
-                        fontWeight: 500,
-                        zIndex: 30,
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                        whiteSpace: 'nowrap',
-                    })}
-                >
-                    {`score: ${score.toFixed(3)}`}
-                </Box>
-            )}
             <Box
                 sx={{
                     borderRadius: 4, // Increased from 2 to 4 for more curved corners
@@ -407,7 +287,6 @@ const AssetCard: React.FC<AssetCardProps> = ({
                 {/* Render appropriate content based on asset type */}
                 {assetType === 'Video' ? (
                     <video
-                        ref={videoRef}
                         onClick={(event) => {
                             event.preventDefault();
                             onAssetClick();

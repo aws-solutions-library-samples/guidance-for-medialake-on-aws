@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React from 'react';
 import { useFeatureFlag } from '@/utils/featureFlags';
 import { type ImageItem, type VideoItem, type AudioItem } from '@/types/search/searchResults';
 import { type SortingState } from '@tanstack/react-table';
@@ -55,7 +55,6 @@ interface ModularUnifiedResultsViewProps {
   onPageSizeChange: (newPageSize: number) => void;
   error?: { status: string; message: string } | null;
   isLoading?: boolean;
-  clipType?: 'clip' | 'full';
 }
 
 const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
@@ -96,10 +95,10 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
   onPageSizeChange,
   error,
   isLoading,
-  clipType,
 }) => {
+  // Check if multi-select feature is enabled
   const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
-
+  
   const renderCardField = (fieldId: string, asset: AssetItem): React.ReactNode => {
     switch (fieldId) {
       case 'name':
@@ -171,7 +170,6 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
       getAssetThumbnail={(asset) => asset.thumbnailUrl || ''}
       getAssetProxy={(asset) => asset.proxyUrl || ''}
       renderCardField={renderCardField}
-      clipType={clipType}
     />
   );
 };
