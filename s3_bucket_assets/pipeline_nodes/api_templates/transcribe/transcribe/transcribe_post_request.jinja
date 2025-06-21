@@ -6,7 +6,7 @@
   "MediaFormat": "{{ variables.media_format }}",
   "IdentifyLanguage": true,
   "OutputBucketName": "{{ variables.output_bucket }}",
-  "OutputKey": "{{ variables.s3_bucket }}/{{ variables.s3_path }}/transcription",
+  "OutputKey": "{{ variables.s3_bucket }}/{{ variables.s3_path }}/{{ variables.base_name }}_transcription.json",
   "Subtitles": {
     "Formats": ["vtt"]
   },
