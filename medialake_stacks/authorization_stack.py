@@ -27,6 +27,7 @@ import datetime
 
 from constructs import Construct
 from dataclasses import dataclass
+from typing import Any
 
 # DynamoDB table is now created in the Cognito construct
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
@@ -44,7 +45,7 @@ class AuthorizationStackProps:
     """Configuration for Authorization Stack."""
     cognito_user_pool: cognito.UserPool
     cognito_user_pool_client: cognito.UserPoolClient
-    cognito_construct: any
+    cognito_construct: Any
 
 class AuthorizationStack(Stack):
     """
@@ -358,6 +359,94 @@ def handler(event, context):
             "CognitoInvokePermissionPreSignup",
             principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
             source_arn=props.cognito_user_pool.user_pool_arn,
+        )
+        
+        # Create a Lambda function for the Pre-Token Generation trigger
+        pre_token_generation_lambda = lambda_.Function(
+            self,
+            "PreTokenGenerationTriggerProvider",
+            runtime=lambda_.Runtime.PYTHON_3_12,
+            handler="index.handler",
+            code=lambda_.Code.from_inline("""
+import boto3
+import cfnresponse
+import logging
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+cognito = boto3.client('cognito-idp')
+
+def handler(event, context):
+    logger.info(f"Event: {event}")
+    
+    request_type = event['RequestType']
+    physical_id = event.get('PhysicalResourceId', 'PreTokenGenerationTrigger')
+    
+    try:
+        user_pool_id = event['ResourceProperties']['UserPoolId']
+        lambda_arn = event['ResourceProperties']['LambdaArn']
+        
+        if request_type in ['Create', 'Update']:
+            logger.info(f"Adding Pre-Token Generation trigger to user pool {user_pool_id}")
+            
+            # Get current Lambda config
+            response = cognito.describe_user_pool(UserPoolId=user_pool_id)
+            lambda_config = response.get('UserPool', {}).get('LambdaConfig', {})
+            
+            # Update with our trigger - use PreTokenGeneration key for the Lambda config
+            lambda_config['PreTokenGeneration'] = lambda_arn
+            
+            # Update the user pool
+            cognito.update_user_pool(
+                UserPoolId=user_pool_id,
+                LambdaConfig=lambda_config
+            )
+            
+            logger.info("Successfully added Pre-Token Generation trigger")
+            cfnresponse.send(event, context, cfnresponse.SUCCESS, {}, physical_id)
+        elif request_type == 'Delete':
+            # Optionally remove the trigger on delete
+            logger.info(f"Delete request for Pre-Token Generation trigger on user pool {user_pool_id}")
+            cfnresponse.send(event, context, cfnresponse.SUCCESS, {}, physical_id)
+        else:
+            logger.error(f"Unexpected request type: {request_type}")
+            cfnresponse.send(event, context, cfnresponse.FAILED, {}, physical_id)
+    except Exception as e:
+        logger.error(f"Error: {str(e)}")
+        cfnresponse.send(event, context, cfnresponse.FAILED, {"Error": str(e)}, physical_id)
+"""),
+            timeout=cdk.Duration.minutes(5),
+        )
+        
+        # Grant permission for the custom resource Lambda to update Cognito
+        pre_token_generation_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "cognito-idp:DescribeUserPool",
+                    "cognito-idp:UpdateUserPool",
+                ],
+                resources=[props.cognito_user_pool.user_pool_arn],
+            )
+        )
+        
+        # Create a provider for the Pre-Token Generation trigger
+        pre_token_generation_provider = cdk.custom_resources.Provider(
+            self,
+            "PreTokenGenerationProvider",
+            on_event_handler=pre_token_generation_lambda,
+        )
+        
+        # Create a custom resource to add the Pre-Token Generation trigger
+        pre_token_generation_trigger = cdk.CustomResource(
+            self,
+            "PreTokenGenerationTrigger",
+            service_token=pre_token_generation_provider.service_token,
+            properties={
+                "UserPoolId": props.cognito_user_pool.user_pool_id,
+                "LambdaArn": props.cognito_construct._pre_token_generation_lambda.function.function_arn,
+                "Timestamp": str(datetime.datetime.now().timestamp()),  # Force update on each deployment
+            },
         )
         
         # 9. Create a Custom Resource to seed the default permission sets

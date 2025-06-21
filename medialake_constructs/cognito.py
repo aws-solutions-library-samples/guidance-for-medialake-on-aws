@@ -178,6 +178,7 @@ class CognitoConstruct(Construct):
                 )
             ),
             "lambda_config": cognito.CfnUserPool.LambdaConfigProperty(
+                pre_sign_up=self._cognito_trigger_lambda.function.function_arn,
                 post_confirmation=self._cognito_trigger_lambda.function.function_arn,
                 pre_token_generation_config=cognito.CfnUserPool.PreTokenGenerationConfigProperty(
                     lambda_arn=self._pre_token_generation_lambda.function.function_arn,
@@ -250,11 +251,10 @@ class CognitoConstruct(Construct):
         )
 
         # Grant permissions AFTER the user pool is created
-        # Grant permission for pre-token generation lambda
-        self._pre_token_generation_lambda.function.add_permission(
-            "CognitoInvokePreTokenGeneration",
+        # Grant permission for pre-signup lambda (same as post confirmation)
+        self._cognito_trigger_lambda.function.add_permission(
+            "CognitoInvokePreSignUp",
             principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
-            action="lambda:InvokeFunction",
             source_arn=cfn_user_pool.attr_arn
         )
         
@@ -262,7 +262,13 @@ class CognitoConstruct(Construct):
         self._cognito_trigger_lambda.function.add_permission(
             "CognitoInvokePostConfirmation",
             principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
-            action="lambda:InvokeFunction",
+            source_arn=cfn_user_pool.attr_arn
+        )
+        
+        # Grant permission for pre-token generation lambda
+        self._pre_token_generation_lambda.function.add_permission(
+            "CognitoInvokePreTokenGeneration",
+            principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
             source_arn=cfn_user_pool.attr_arn
         )
 
@@ -270,14 +276,6 @@ class CognitoConstruct(Construct):
         unique_id = hashlib.md5(f"{config.resource_prefix}-{config.primary_region}-{config.account_id}-{config.environment}".encode()).hexdigest()[:16]
         domain_prefix = f"{config.resource_prefix}-{config.environment.lower()}-{unique_id}"
         self._domain_prefix = domain_prefix
-
-        # Grant the Cognito service permission to invoke the Lambda
-        self._pre_token_generation_lambda.function.add_permission(
-            "CognitoInvokePermission",
-            principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
-            action="lambda:InvokeFunction",
-            source_arn=self._user_pool.user_pool_arn
-        )
         
         
         self._domain = self._user_pool.add_domain(
