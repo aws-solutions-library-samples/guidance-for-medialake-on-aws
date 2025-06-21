@@ -618,7 +618,7 @@ class ApiGatewayPipelinesConstruct(Construct):
         self._put_pipeline_id_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["events:DisableRule","events:EnableRule"],
-                resources=[f"arn:aws:events:us-east-1:{self.account_id}:rule/*"],
+                resources=[f"arn:aws:events:{self.region}:{self.account_id}:rule/*"],
             )
         )
 
