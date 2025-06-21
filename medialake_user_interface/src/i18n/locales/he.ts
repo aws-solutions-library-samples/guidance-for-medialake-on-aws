@@ -209,6 +209,11 @@ export default {
       endTime: 'זמן סיום',
       duration: 'משך',
       actions: 'פעולות'
+    },
+    actions: {
+      retryFromCurrent: 'נסה שוב מהמצב הנוכחי',
+      retryFromStart: 'נסה שוב מההתחלה',
+      viewDetails: 'צפה בפרטים'
     }
   },
   users: {

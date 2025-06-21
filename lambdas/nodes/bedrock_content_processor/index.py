@@ -29,16 +29,14 @@ ImagePayload = Dict[str, str]
 # Default prompts
 DEFAULT_PROMPTS = {
     "summary_100": (
-        "**You are a media-asset-management specialist.**\n"
-        "The following is a **content from a media file** "
-        "(podcast, feature film, corporate video, etc.). In **100 words "
-        "or less**, distill its **content**, emphasizing:\n"
-        "1. **Core Topic or Theme**\n"
-        "2. **Key Messages & Insights**\n"
-        "3. **Major Arguments or Plot Points**\n"
-        "4. **Tone & Style**\n"
-        "Use concise, industry-standard terminology so a MAM user can "
-        "immediately grasp the essence of the content."
+        "**You are a media‐asset‐management specialist.**\n"
+        "The following is content from a media file (podcast, feature film, corporate video, etc.).\n"
+        "In **100 words or less**, write a **single paragraph** that:\n"
+        "  • Distills the **core topic or theme**,\n"
+        "  • Highlights the **key messages & insights**,\n"
+        "  • Summarizes the **major arguments or plot points**, and\n"
+        "  • Conveys the **tone & style**.\n"
+        "Use concise, industry‐standard terminology so a MAM user can immediately grasp the essence of the content."
     ),
     "describe_image": (
         "**You are an image-description assistant.**\n"
@@ -210,6 +208,18 @@ def build_bedrock_body(
 # ────────────────────────────────────────────────────────────
 # Utility helpers
 # ────────────────────────────────────────────────────────────
+def _format_prompt_name_for_dynamo(prompt_name: str) -> str:
+    """
+    Format prompt name for DynamoDB field name.
+    Converts 'summary_100' to 'Summary100' by capitalizing first letter and removing underscores.
+    """
+    if not prompt_name:
+        return prompt_name
+    
+    # Remove underscores and capitalize first letter
+    formatted = prompt_name.replace("_", "").capitalize()
+    return formatted
+
 def _strip_decimals(obj):
     if isinstance(obj, list):
         return [_strip_decimals(v) for v in obj]
@@ -351,18 +361,28 @@ def lambda_handler(event, context):
             raise                                              # ← propagate
 
         data = json.loads(resp["body"].read())
+        logger.info(f"Bedrock response structure: {list(data.keys())}")
+        
         if "anthropic" in model_id.lower():
             result = data["content"][0]["text"]
+        elif "nova" in model_id.lower():
+            # Nova models return response in 'output' -> 'message' -> 'content' -> [0] -> 'text'
+            result = data.get("output", {}).get("message", {}).get("content", [{}])[0].get("text", "")
+            logger.info(f"Nova result extraction: {result[:100]}..." if result else "Nova result is empty")
         elif "images" in data:
             result = data["images"][0]
         else:
             result = data.get("completion", data.get("generated_text", ""))
+        
+        logger.info(f"Final extracted result length: {len(result) if result else 0}")
 
         # ── Persist back to DynamoDB ──────────────────────────────────────
+        formatted_prompt_name = _format_prompt_name_for_dynamo(prompt_name) if prompt_name else None
         dynamo_key = (
             mapping.get("dynamo_key") or
-            (f"{prompt_name}Result" if prompt_name else "customPromptResult")
+            (f"{formatted_prompt_name}Result" if formatted_prompt_name else "customPromptResult")
         )
+        logger.info(f"DynamoDB key formatting: prompt_name='{prompt_name}' -> formatted='{formatted_prompt_name}' -> dynamo_key='{dynamo_key}'")
         table.update_item(
             Key={"InventoryID": asset_id},
             UpdateExpression="SET #k = :v",

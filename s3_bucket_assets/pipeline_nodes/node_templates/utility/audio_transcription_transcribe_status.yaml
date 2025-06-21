@@ -16,7 +16,7 @@ node:
               actions:
                 - transcribe:GetTranscriptionJob
               resources:
-                - arn:aws:transcribe:*:*:transcription-job/*
+                - arn:aws:transcribe:${AWS::Region}:${AWS::AccountId}:transcription-job/*
             - effect: Allow
               actions:
                 - s3:GetObject
@@ -41,7 +41,7 @@ node:
                     - s3:GetObject
                     - s3:DeleteObject
                   resources:
-                    - "*"  # This could be more specific in production
+                    - ${MEDIA_ASSETS_BUCKET_ARN_KMS_KEY}
 actions:
   transcribe_status:
     summary: Transcription Job Status

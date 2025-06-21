@@ -73,6 +73,7 @@ class QueryParams(BaseModel):
     min_score: float = Field(default=0.01)
 
     @validator("pageSize")
+    @classmethod
     def validate_page_size(cls, v):
         if v > 500:
             raise ValueError("pageSize must be less than or equal to 500")
@@ -113,16 +114,47 @@ class APIError(Exception):
         self.status_code = status_code
         super().__init__(self.message)
 
-def generate_presigned_url(bucket: str, key: str, expiration: int = 3600) -> Optional[str]:
-    """Generate a presigned URL for an S3 object with SSE-KMS support"""
+# Regional S3 client configuration for better cross-region support
+_SIGV4_CFG = Config(
+    signature_version="s3v4",
+    s3={"addressing_style": "virtual"},
+)
+
+_ENDPOINT_TMPL = "https://s3.{region}.amazonaws.com"
+_S3_CLIENT_CACHE: Dict[str, boto3.client] = {}  # {region → client}
+
+
+def _get_s3_client_for_bucket(bucket: str) -> boto3.client:
+    """
+    Return an S3 client **pinned to the bucket's actual region**.
+    Clients are cached to reuse TCP connections across warm invocations.
+    """
+    generic = _S3_CLIENT_CACHE.setdefault(
+        "us-east-1",
+        boto3.client("s3", region_name="us-east-1", config=_SIGV4_CFG),
+    )
+
     try:
-        s3_client = boto3.client(
+        region = (generic.get_bucket_location(Bucket=bucket)
+                        .get("LocationConstraint") or "us-east-1")
+    except generic.exceptions.NoSuchBucket:
+        raise ValueError(f"S3 bucket {bucket!r} does not exist")
+
+    if region not in _S3_CLIENT_CACHE:
+        _S3_CLIENT_CACHE[region] = boto3.client(
             "s3",
-            config=Config(
-                signature_version="s3v4",
-                region_name=os.environ["AWS_REGION"]
-            )
+            region_name=region,
+            endpoint_url=_ENDPOINT_TMPL.format(region=region),
+            config=_SIGV4_CFG,
         )
+    return _S3_CLIENT_CACHE[region]
+
+
+def generate_presigned_url(bucket: str, key: str, expiration: int = 3600) -> Optional[str]:
+    """Generate a presigned URL for an S3 object with region-aware client"""
+    try:
+        # Get region-specific S3 client
+        s3_client = _get_s3_client_for_bucket(bucket)
         
         url = s3_client.generate_presigned_url(
             "get_object",
@@ -133,6 +165,11 @@ def generate_presigned_url(bucket: str, key: str, expiration: int = 3600) -> Opt
             },
             ExpiresIn=expiration
         )
+        
+        logger.info(
+            f"Generated presigned URL for s3://{bucket}/{key} (region {s3_client.meta.region_name}) valid {expiration}s"
+        )
+        
         return url
     except Exception as e:
         logger.error(f"Error generating presigned URL: {str(e)}", extra={
@@ -251,27 +288,20 @@ def perform_vector_search(asset_id: str, params: QueryParams) -> Dict:
             })
             raise APIError("Asset not found", 404)
 
-        src = hits[0]["_source"]
-
-        # Prefer audio_embedding if present, otherwise fall back to embedding
-        if "audio_embedding" in src:
-            vector_field = "audio_embedding"
-            embedding     = src["audio_embedding"]
-        elif "embedding" in src:
-            vector_field = "embedding"
-            embedding     = src["embedding"]
-        else:
-            logger.warning("No embedding field found in asset document", extra={
+        if "embedding" not in hits[0]["_source"]:
+            logger.warning("No embedding found in asset document", extra={
                 "asset_id": asset_id,
-                "available_fields": list(src.keys()),
+                "available_fields": list(hits[0]["_source"].keys()),
                 "query_used": json.dumps(initial_query, indent=2)
             })
             raise APIError("No embedding available for asset", 404)
 
-        logger.info(f"Retrieved {vector_field} details", extra={
-            "vector_field":   vector_field,
+        embedding = hits[0]["_source"]["embedding"]
+        
+        logger.info("Retrieved embedding details", extra={
+            "embedding_exists": embedding is not None,
             "embedding_type": type(embedding).__name__,
-            "embedding_len":  len(embedding) if isinstance(embedding, list) else "not_a_list"
+            "embedding_length": len(embedding) if isinstance(embedding, list) else "not_a_list"
         })
 
         # Build the vector search query
@@ -280,9 +310,9 @@ def perform_vector_search(asset_id: str, params: QueryParams) -> Dict:
             "from": params.from_,
             "query": {
                 "knn": {
-                    vector_field: {
-                       "vector": embedding,
-                        "k":      params.size
+                    "embedding": {
+                        "vector": embedding,
+                        "k": params.size
                     }
                 }
             },

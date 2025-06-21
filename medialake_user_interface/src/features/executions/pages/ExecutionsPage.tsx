@@ -27,6 +27,7 @@ import { ExecutionsTable } from '../components/ExecutionsTable';
 import { TableCellContent } from '@/components/common/table';
 import { BaseFilterPopover } from '@/components/common/table/BaseFilterPopover';
 import { usePipelineExecutions } from '../api/hooks/usePipelineExecutions';
+import { useRetryFromCurrent, useRetryFromStart } from '../api/hooks/useRetryExecution';
 import type { PipelineExecution, PipelineExecutionFilters } from '../types/pipelineExecutions.types';
 import ExecutionSideBar from '../components/ExecutionSideBar';
 
@@ -48,6 +49,9 @@ const ExecutionsPage: React.FC = () => {
     const [isSidePanelOpen, setIsSidePanelOpen] = useState(false);
     const [selectedExecution, setSelectedExecution] = useState<PipelineExecution | null>(null);
 
+    // Retry mutations
+    const retryFromCurrentMutation = useRetryFromCurrent();
+    const retryFromStartMutation = useRetryFromStart();
  
     const filters = useMemo<PipelineExecutionFilters>(() => ({
         sortBy: sorting[0]?.id || 'start_time',
@@ -124,14 +128,12 @@ const ExecutionsPage: React.FC = () => {
     }, []);
 
     const handleRetryFromCurrent = useCallback((executionId: string) => {
-        // TODO: Implement retry from current position
-        console.log('Retry from current position:', executionId);
-    }, []);
+        retryFromCurrentMutation.mutate(executionId);
+    }, [retryFromCurrentMutation]);
 
     const handleRetryFromStart = useCallback((executionId: string) => {
-        // TODO: Implement retry from start
-        console.log('Retry from start:', executionId);
-    }, []);
+        retryFromStartMutation.mutate(executionId);
+    }, [retryFromStartMutation]);
 
     // const handleViewDetails = useCallback((executionId: string) => {
     //     navigate(`/executions/${executionId}`);
@@ -272,43 +274,53 @@ const ExecutionsPage: React.FC = () => {
                                 <VisibilityIcon fontSize="small" />
                             </IconButton>
 			                {row.original.status === 'FAILED' && (
-                            <>
-                            <IconButton
-                                size="small"
-                                color="primary"
-                                title= {t('executions.actions.retryFromCurrent')}
-                                onClick={() => handleRetryFromCurrent(row.original.execution_id)}
-                                sx={{
-                                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                                    '&:hover': {
-                                        backgroundColor: alpha(theme.palette.primary.main, 0.2),
-                                    },
-                                }}
-                            >
-                                <ReplayIcon fontSize="small"  />
-                            </IconButton>
-                            <IconButton
-                                size="small"
-                                color="primary"
-                                title= {t('executions.actions.retryFromStart')}
-                                onClick={() => handleRetryFromStart(row.original.execution_id)}
-                                sx={{
-                                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                                    '&:hover': {
-                                        backgroundColor: alpha(theme.palette.primary.main, 0.2),
-                                    },
-                                }}
-                            >
-                                <RestartIcon fontSize="small"  />
-                            </IconButton>
-                            </>
-                        )}
+			                         <>
+			                         <IconButton
+			                             size="small"
+			                             color="primary"
+			                             title= {t('executions.actions.retryFromCurrent')}
+			                             onClick={() => handleRetryFromCurrent(row.original.execution_id)}
+			                             disabled={retryFromCurrentMutation.isPending || retryFromStartMutation.isPending}
+			                             sx={{
+			                                 backgroundColor: alpha(theme.palette.primary.main, 0.1),
+			                                 '&:hover': {
+			                                     backgroundColor: alpha(theme.palette.primary.main, 0.2),
+			                                 },
+			                                 '&:disabled': {
+			                                     backgroundColor: alpha(theme.palette.grey[500], 0.1),
+			                                     color: theme.palette.grey[500],
+			                                 },
+			                             }}
+			                         >
+			                             <ReplayIcon fontSize="small"  />
+			                         </IconButton>
+			                         <IconButton
+			                             size="small"
+			                             color="primary"
+			                             title= {t('executions.actions.retryFromStart')}
+			                             onClick={() => handleRetryFromStart(row.original.execution_id)}
+			                             disabled={retryFromCurrentMutation.isPending || retryFromStartMutation.isPending}
+			                             sx={{
+			                                 backgroundColor: alpha(theme.palette.primary.main, 0.1),
+			                                 '&:hover': {
+			                                     backgroundColor: alpha(theme.palette.primary.main, 0.2),
+			                                 },
+			                                 '&:disabled': {
+			                                     backgroundColor: alpha(theme.palette.grey[500], 0.1),
+			                                     color: theme.palette.grey[500],
+			                                 },
+			                             }}
+			                         >
+			                             <RestartIcon fontSize="small"  />
+			                         </IconButton>
+			                         </>
+			                     )}
                     </Box>
                     </TableCellContent> 
                 ),
             },
         ],
-        [theme, t, getStatusColor, formatDate, formatDuration, handleRetryFromCurrent, handleRetryFromStart]
+        [theme, t, getStatusColor, formatDate, formatDuration, handleRetryFromCurrent, handleRetryFromStart, retryFromCurrentMutation.isPending, retryFromStartMutation.isPending]
     );
 
 
