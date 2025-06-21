@@ -1,22 +1,22 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
-  Box,
-  CircularProgress,
-  Typography,
-  Paper,
-  List,
-  ListItem,
-  Divider,
-  Button,
-  Tabs,
-  Tab,
-  Grid,
-  Card,
-  CardContent,
-  Chip,
-  useTheme,
-  alpha
+    Box,
+    CircularProgress,
+    Typography,
+    Paper,
+    List,
+    ListItem,
+    Divider,
+    Button,
+    Tabs,
+    Tab,
+    Grid,
+    Card,
+    CardContent,
+    Chip,
+    useTheme,
+    alpha
 } from '@mui/material';
 import { useAsset, useRelatedVersions, useTranscription } from '../api/hooks/useAssets';
 import { RightSidebarProvider, useRightSidebar } from '../components/common/RightSidebar';
@@ -134,7 +134,7 @@ const MetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, show
 // New component for audio metadata content with a grid layout like the screenshot
 const AudioMetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, showAll, category }) => {
     const theme = useTheme();
-    
+
     const sortEntries = (entries: [string, any][]): [string, any][] => {
         if (category && outputFilters[category]) {
             const preferredOrder = outputFilters[category];
@@ -149,14 +149,14 @@ const AudioMetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0,
     // Function to flatten nested objects like Tags/Encoder
     const flattenNestedMetadata = (entries: [string, any][]): [string, any][] => {
         const result: [string, any][] = [];
-        
+
         entries.forEach(([key, value]) => {
             if (typeof value === 'object' && value !== null && !Array.isArray(value) && Object.keys(value).length > 0) {
                 // Special case for Tags with Encoder
                 if (key === 'Tags' && 'Encoder' in value) {
                     // Mark this as a parent with _PARENT_ prefix (for internal use)
                     result.push([`_PARENT_${key}`, '']);
-                    
+
                     // Then add the Encoder with its value - using a more visible indent prefix
                     Object.entries(value).forEach(([subKey, subValue]) => {
                         result.push([`      ↳ ${subKey}`, subValue]);
@@ -164,7 +164,7 @@ const AudioMetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0,
                 } else {
                     // Mark this as a parent with _PARENT_ prefix (for internal use)
                     result.push([`_PARENT_${key}`, '']);
-                    
+
                     // Then add the subkeys with more pronounced indentation
                     Object.entries(value).forEach(([subKey, subValue]) => {
                         result.push([`      ↳ ${subKey}`, subValue]);
@@ -174,7 +174,7 @@ const AudioMetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0,
                 result.push([key, value]);
             }
         });
-        
+
         return result;
     };
 
@@ -212,35 +212,35 @@ const AudioMetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0,
         // Flatten nested metadata like Tags/Encoder
         const flattenedEntries = flattenNestedMetadata(sortedEntries);
         const displayEntries = showAll ? flattenedEntries : flattenedEntries.slice(0, 5);
-        
+
         // Create rows efficiently while preserving parent-child relationships
         const rows: [string, any][][] = [];
-        
+
         let currentIndex = 0;
         while (currentIndex < displayEntries.length) {
             const row: [string, any][] = [];
-            
+
             // Process the left column
             if (currentIndex < displayEntries.length) {
                 const leftEntry = displayEntries[currentIndex];
                 const [leftKey] = leftEntry;
-                
+
                 // Parent entries must always be on the left side
                 if (isParentEntry(leftKey)) {
                     row.push([cleanDisplayKey(leftKey), leftEntry[1]]);
                     currentIndex++;
-                    
+
                     // In this case, we don't add a right column entry
                     // because we want to ensure the child appears in the next row
                 } else {
                     row.push(leftEntry);
                     currentIndex++;
-                    
+
                     // Process the right column if available and not a parent
                     if (currentIndex < displayEntries.length) {
                         const rightEntry = displayEntries[currentIndex];
                         const [rightKey] = rightEntry;
-                        
+
                         if (!isParentEntry(rightKey)) {
                             row.push(rightEntry);
                             currentIndex++;
@@ -248,7 +248,7 @@ const AudioMetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0,
                     }
                 }
             }
-            
+
             if (row.length > 0) {
                 rows.push(row);
             }
@@ -263,24 +263,24 @@ const AudioMetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0,
                 p: 2
             }}>
                 {rows.map((row, rowIndex) => (
-                    <Box 
-                        key={rowIndex} 
+                    <Box
+                        key={rowIndex}
                         sx={{
                             display: 'grid',
                             gridTemplateColumns: 'minmax(180px, 25%) minmax(180px, 25%) minmax(180px, 25%) minmax(180px, 25%)',
                             py: 1,
-                            borderBottom: rowIndex < rows.length - 1 ? 
+                            borderBottom: rowIndex < rows.length - 1 ?
                                 `1px solid ${alpha(theme.palette.divider, 0.1)}` : 'none',
                         }}
                     >
                         {row.map(([key, value], colIndex) => (
                             <React.Fragment key={`${rowIndex}-${colIndex}`}>
-                                <Typography 
-                                    variant="body2" 
-                                    sx={{ 
+                                <Typography
+                                    variant="body2"
+                                    sx={{
                                         fontWeight: 'bold',
-                                        color: key.trim().startsWith('↳') ? 
-                                            theme.palette.primary.main : 
+                                        color: key.trim().startsWith('↳') ?
+                                            theme.palette.primary.main :
                                             theme.palette.text.secondary,
                                         textAlign: 'left',
                                         pr: 1
@@ -297,9 +297,9 @@ const AudioMetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0,
                                             category={category}
                                         />
                                     ) : (
-                                        <Typography 
-                                            variant="body2" 
-                                            sx={{ 
+                                        <Typography
+                                            variant="body2"
+                                            sx={{
                                                 wordBreak: 'break-word',
                                                 whiteSpace: 'nowrap',
                                                 overflow: 'hidden',
@@ -327,7 +327,7 @@ const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetD
     const fileInfoColor = '#4299E1';      // Blue
     const techDetailsColor = '#68D391';   // Green/teal
     const descKeywordsColor = '#F6AD55';  // Orange
-    
+
     const s3Bucket = assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.Bucket;
     const objectName = assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.Name;
     const fullPath = assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.FullPath;
@@ -335,18 +335,37 @@ const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetD
 
     // Extract metadata from API response
     const metadata = assetData?.data?.asset?.Metadata?.EmbeddedMetadata || {};
-    const generalMetadata = metadata?.General || {};
-    const audioMetadata = metadata?.Audio?.[0] || {};
+    const general = metadata.general || {};
+    const audio = Array.isArray(metadata.audio) ? metadata.audio[0] : {};
+
     const fileSize = assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.FileInfo?.Size || 0;
     const format = assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.Format || 'Unknown';
-    
+
     // Audio-specific metadata fields
-    const duration = generalMetadata?.Duration || audioMetadata?.Duration || 'Unknown';
-    const sampleRate = audioMetadata?.SampleRate || audioMetadata?.Samplerate || '44.1';
-    const bitDepth = audioMetadata?.BitDepth || audioMetadata?.BitsPerSample || '16';
-    const channels = audioMetadata?.Channels || audioMetadata?.AudioChannels || '2';
-    const bitRate = audioMetadata?.Bitrate ? `${Math.round(audioMetadata.Bitrate / 1000)} kbps` : 'Unknown';
-    const codec = audioMetadata?.CodecName || audioMetadata?.Format || 'Unknown';
+    const duration = general.Duration
+        ? `${parseFloat(general.Duration).toFixed(2)} s`
+        : 'Unknown';
+    const sampleRate = audio.sample_rate
+        ? `${(audio.sample_rate / 1000).toFixed(1)} kHz`
+        : 'Unknown';
+
+    const bitDepth = audio.BitsPerSample
+        || audio.bit_depth
+        || 'Unknown';
+
+    const channels = audio.channels
+        || audio.Channels
+        || 'Unknown';
+
+    const bitRate = audio.bit_rate
+        ? `${Math.round(audio.bit_rate / 1000)} kbps`
+        : 'Unknown';
+
+    const codec = audio.codec_name
+        || general.Format
+        || 'Unknown';
+
+
     const createdDate = assetData?.data?.asset?.DigitalSourceAsset?.CreateDate
         ? new Date(assetData.data.asset.DigitalSourceAsset.CreateDate).toLocaleDateString()
         : 'Unknown';
@@ -355,8 +374,8 @@ const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetD
         <Box>
             {/* File Information Section */}
             <Box sx={{ mb: 3 }}>
-                <Typography 
-                    sx={{ 
+                <Typography
+                    sx={{
                         color: fileInfoColor,
                         fontSize: '0.875rem',
                         fontWeight: 600,
@@ -365,25 +384,25 @@ const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetD
                 >
                     File Information
                 </Typography>
-                <Box sx={{ 
-                    width: '100%', 
-                    height: '1px', 
+                <Box sx={{
+                    width: '100%',
+                    height: '1px',
                     bgcolor: fileInfoColor,
                     mb: 2
                 }} />
-                
+
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Type:</Typography>
                     <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{assetData?.data?.asset?.DigitalSourceAsset?.Type || 'Audio'}</Typography>
                 </Box>
-                
+
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Size:</Typography>
                     <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>
                         {formatFileSize(fileSize)}
                     </Typography>
                 </Box>
-                
+
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Format:</Typography>
                     <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{format}</Typography>
@@ -410,11 +429,11 @@ const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetD
                     </Typography>
                 </Box>
             </Box>
-            
+
             {/* Technical Details Section */}
             <Box sx={{ mb: 3 }}>
-                <Typography 
-                    sx={{ 
+                <Typography
+                    sx={{
                         color: techDetailsColor,
                         fontSize: '0.875rem',
                         fontWeight: 600,
@@ -423,43 +442,43 @@ const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetD
                 >
                     Technical Details
                 </Typography>
-                <Box sx={{ 
-                    width: '100%', 
-                    height: '1px', 
+                <Box sx={{
+                    width: '100%',
+                    height: '1px',
                     bgcolor: techDetailsColor,
                     mb: 2
                 }} />
-                
+
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Duration:</Typography>
                     <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{duration} seconds</Typography>
                 </Box>
-                
+
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Sample Rate:</Typography>
                     <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{sampleRate} kHz</Typography>
                 </Box>
-                
+
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Bit Depth:</Typography>
                     <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{bitDepth} bit</Typography>
                 </Box>
-                
+
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Channels:</Typography>
                     <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{channels}</Typography>
                 </Box>
-                
+
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Bit Rate:</Typography>
                     <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{bitRate}</Typography>
                 </Box>
-                
+
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Codec:</Typography>
                     <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>{codec}</Typography>
                 </Box>
-                
+
                 <Box sx={{ display: 'flex', mb: 1 }}>
                     <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>Created Date:</Typography>
                     <Typography sx={{ flex: 1, fontSize: '0.875rem' }}>
@@ -467,11 +486,11 @@ const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetD
                     </Typography>
                 </Box>
             </Box>
-            
+
             {/* Description & Keywords Section */}
             <Box sx={{ mb: 3 }}>
-                <Typography 
-                    sx={{ 
+                <Typography
+                    sx={{
                         color: descKeywordsColor,
                         fontSize: '0.875rem',
                         fontWeight: 600,
@@ -480,20 +499,20 @@ const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetD
                 >
                     Description & Keywords
                 </Typography>
-                <Box sx={{ 
-                    width: '100%', 
-                    height: '1px', 
+                <Box sx={{
+                    width: '100%',
+                    height: '1px',
                     bgcolor: descKeywordsColor,
                     mb: 2
                 }} />
-                
+
                 <Typography sx={{ fontSize: '0.875rem', mb: 2 }}>
                     {metadataFields.descriptive.find((item: any) => item.label === 'Description')?.value || 'No description available'}
                 </Typography>
-                
-                <Box sx={{ 
-                    display: 'flex', 
-                    flexWrap: 'wrap', 
+
+                <Box sx={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
                     gap: 0.75
                 }}>
                     {(metadataFields.descriptive.find((item: any) => item.label === 'Keywords')?.value || 'audio,sound')
@@ -519,22 +538,22 @@ const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetD
 
 const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadataAccordions }) => {
     const theme = useTheme();
-    
+
     // Create array of all item IDs to pre-expand them
     const [expandedItems] = useState<string[]>(() => {
         // Initialize with all items expanded
         const allItems: string[] = [];
-        
+
         metadataAccordions.forEach((parent, parentIndex) => {
             // Add parent item
             allItems.push(`parent-${parentIndex}`);
-            
+
             // Add all child items
             parent.subCategories.forEach((_, subIndex) => {
                 allItems.push(`${parentIndex}-${subIndex}`);
             });
         });
-        
+
         return allItems;
     });
 
@@ -549,7 +568,7 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
             />
         );
     };
-    
+
     return (
         <Box sx={{
             borderRadius: 1,
@@ -592,8 +611,8 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
                             <Box sx={{ display: 'flex', alignItems: 'center' }}>
                                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
                                     {/* Replace "EmbeddedMetadata" with "Embedded Metadata" */}
-                                    {parentAccordion.category === "EmbeddedMetadata" 
-                                        ? "Embedded Metadata" 
+                                    {parentAccordion.category === "EmbeddedMetadata"
+                                        ? "Embedded Metadata"
                                         : parentAccordion.category}
                                 </Typography>
                                 <Chip
@@ -657,7 +676,7 @@ const TranscriptionTab: React.FC<{
     assetData: any;
 }> = ({ assetId, transcriptionData, isLoading, assetData }) => {
     const theme = useTheme();
-    
+
     // Handle loading state
     if (isLoading) {
         return (
@@ -666,7 +685,7 @@ const TranscriptionTab: React.FC<{
             </Box>
         );
     }
-    
+
     // Handle missing or invalid data
     if (!transcriptionData || !transcriptionData.data || !transcriptionData.data.results) {
         return (
@@ -674,9 +693,9 @@ const TranscriptionTab: React.FC<{
                 <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
                     Audio Transcription
                 </Typography>
-                <Paper elevation={0} sx={{ 
-                    mb: 3, 
-                    p: 4, 
+                <Paper elevation={0} sx={{
+                    mb: 3,
+                    p: 4,
                     backgroundColor: alpha(theme.palette.background.paper, 0.7),
                     borderRadius: 1,
                     border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
@@ -688,14 +707,14 @@ const TranscriptionTab: React.FC<{
             </Box>
         );
     }
-    
+
     // Check if transcripts array exists and has items
-    const hasTranscripts = transcriptionData.data.results.transcripts && 
-                          transcriptionData.data.results.transcripts.length > 0;
-    
+    const hasTranscripts = transcriptionData.data.results.transcripts &&
+        transcriptionData.data.results.transcripts.length > 0;
+
     // Check if items array exists
-    const hasItems = transcriptionData.data.results.items && 
-                    transcriptionData.data.results.items.length > 0;
+    const hasItems = transcriptionData.data.results.items &&
+        transcriptionData.data.results.items.length > 0;
 
     // Extract summary from asset data
     const summary = assetData?.data?.asset?.Summary100Result;
@@ -705,7 +724,7 @@ const TranscriptionTab: React.FC<{
             <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
                 Audio Transcription
             </Typography>
-            
+
             {/* Summary Section */}
             {summary && (
                 <Paper elevation={0} sx={{
@@ -721,7 +740,7 @@ const TranscriptionTab: React.FC<{
                     <MarkdownRenderer content={summary} />
                 </Paper>
             )}
-            
+
             <Paper elevation={0} sx={{
                 mb: 3,
                 p: 2,
@@ -738,33 +757,33 @@ const TranscriptionTab: React.FC<{
                         : "Full transcript not available"}
                 </Typography>
             </Paper>
-            
+
             {hasItems && (
                 <>
                     <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
                         Time-Aligned Segments
                     </Typography>
-                    
-                    <Paper elevation={0} sx={{ 
+
+                    <Paper elevation={0} sx={{
                         backgroundColor: alpha(theme.palette.background.paper, 0.5),
                         borderRadius: 1
                     }}>
                         {transcriptionData.data.results.items.map((item, index) => (
-                            <Box 
-                                key={index} 
-                                sx={{ 
-                                    display: 'flex', 
-                                    p: 1.5, 
-                                    borderBottom: index < transcriptionData.data.results.items.length - 1 ? 
+                            <Box
+                                key={index}
+                                sx={{
+                                    display: 'flex',
+                                    p: 1.5,
+                                    borderBottom: index < transcriptionData.data.results.items.length - 1 ?
                                         `1px solid ${alpha(theme.palette.divider, 0.1)}` : 'none',
                                     '&:hover': {
                                         backgroundColor: alpha(theme.palette.primary.main, 0.03)
                                     }
                                 }}
                             >
-                                <Box sx={{ 
-                                    minWidth: '100px', 
-                                    pr: 2, 
+                                <Box sx={{
+                                    minWidth: '100px',
+                                    pr: 2,
                                     borderRight: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
                                     display: 'flex',
                                     flexDirection: 'column'
@@ -773,11 +792,11 @@ const TranscriptionTab: React.FC<{
                                         {`${item.start_time}s - ${item.end_time}s`}
                                     </Typography>
                                     {item.alternatives && item.alternatives.length > 0 && item.alternatives[0].confidence && (
-                                        <Chip 
-                                            size="small" 
-                                            label={`${Math.round(parseFloat(item.alternatives[0].confidence) * 100)}%`} 
-                                            sx={{ 
-                                                height: '18px', 
+                                        <Chip
+                                            size="small"
+                                            label={`${Math.round(parseFloat(item.alternatives[0].confidence) * 100)}%`}
+                                            sx={{
+                                                height: '18px',
                                                 mt: 0.5,
                                                 fontSize: '0.65rem',
                                                 backgroundColor: (() => {
@@ -810,7 +829,7 @@ const TranscriptionTab: React.FC<{
                                                     {item.alternatives.slice(1).map((alt, altIndex) => {
                                                         const confidenceValue = alt.confidence ? Math.round(parseFloat(alt.confidence) * 100) : 'N/A';
                                                         return (
-                                                            <Typography key={altIndex} variant="caption" sx={{ 
+                                                            <Typography key={altIndex} variant="caption" sx={{
                                                                 display: 'block',
                                                                 color: theme.palette.text.secondary,
                                                                 fontStyle: 'italic',
@@ -834,18 +853,18 @@ const TranscriptionTab: React.FC<{
                     </Paper>
                 </>
             )}
-            
+
             <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
-                <Button 
-                    variant="outlined" 
+                <Button
+                    variant="outlined"
                     startIcon={<SubtitlesOutlinedIcon />}
                     sx={{ mr: 2 }}
                     disabled={!hasTranscripts}
                 >
                     Export Transcript
                 </Button>
-                <Button 
-                    variant="outlined" 
+                <Button
+                    variant="outlined"
                     startIcon={<CodeOutlinedIcon />}
                 >
                     Show Raw JSON
@@ -855,14 +874,14 @@ const TranscriptionTab: React.FC<{
     );
 };
 
-const RelatedItemsTab: React.FC<{ 
+const RelatedItemsTab: React.FC<{
     assetId: string;
     relatedVersionsData: RelatedVersionsResponse | undefined;
     isLoading: boolean;
     onLoadMore: () => void;
 }> = ({ assetId, relatedVersionsData, isLoading, onLoadMore }) => {
     console.log('RelatedItemsTab - relatedVersionsData:', relatedVersionsData);
-    
+
     const items = useMemo(() => {
         if (!relatedVersionsData?.data?.results) {
             console.log('No results found in relatedVersionsData');
@@ -941,11 +960,11 @@ const AudioDetailContent: React.FC = () => {
     // Track scroll position to hide/show header
     useEffect(() => {
         let lastScrollTop = 0;
-        
+
         const handleScroll = () => {
             // Get scrollTop from the parent scrollable container instead
             const currentScrollTop = document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]')?.scrollTop || 0;
-            
+
             if (currentScrollTop <= 10) {
                 setShowHeader(true);
             } else if (currentScrollTop > lastScrollTop) {
@@ -953,16 +972,16 @@ const AudioDetailContent: React.FC = () => {
             } else if (currentScrollTop < lastScrollTop) {
                 setShowHeader(true);
             }
-            
+
             lastScrollTop = currentScrollTop;
         };
-        
+
         // Listen to scroll on the parent container
         const container = document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]');
         if (container) {
             container.addEventListener('scroll', handleScroll, { passive: true });
         }
-        
+
         return () => {
             if (container) {
                 container.removeEventListener('scroll', handleScroll);
@@ -1083,7 +1102,7 @@ const AudioDetailContent: React.FC = () => {
     const handleTabKeyDown = useCallback((event: React.KeyboardEvent) => {
         const tabs = ['summary', 'technical', 'transcription', 'related'];
         const currentIndex = tabs.indexOf(activeTab);
-        
+
         if (event.key === 'ArrowRight') {
             const nextIndex = (currentIndex + 1) % tabs.length;
             setActiveTab(tabs[nextIndex]);
@@ -1142,10 +1161,10 @@ const AudioDetailContent: React.FC = () => {
             }),
             bgcolor: 'transparent',
         }}>
-            <Box sx={{ 
-                position: 'sticky', 
-                top: 0, 
-                zIndex: 1200, 
+            <Box sx={{
+                position: 'sticky',
+                top: 0,
+                zIndex: 1200,
                 background: theme => alpha(theme.palette.background.default, 0.8),
                 backdropFilter: 'blur(8px)',
                 transform: showHeader ? 'translateY(0)' : 'translateY(-100%)',
@@ -1274,8 +1293,8 @@ const AudioDetailContent: React.FC = () => {
                                 />
                             )}
                             {activeTab === 'related' && (
-                                <RelatedItemsTab 
-                                    assetId={id || ''} 
+                                <RelatedItemsTab
+                                    assetId={id || ''}
                                     relatedVersionsData={relatedVersionsData}
                                     isLoading={isLoadingRelated}
                                     onLoadMore={() => setRelatedPage(prev => prev + 1)}
