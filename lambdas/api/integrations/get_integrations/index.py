@@ -11,13 +11,14 @@ pipelines_nodes_table = dynamodb.Table(os.environ["PIPELINES_NODES_TABLE"])
 
 def format_integration(item: Dict) -> Dict:
     # Extract node name from the Node field (e.g., "node-aws-s3-vector" -> "AWS S3 Vector")
-    node_name = item.get("Node", "").replace("node-", "").replace("-", " ").title()
+    node_name = item.get("Node", "").replace("node-", "").replace("-", " ").replace("_", " ").title()
 
     return {
         "id": item.get("ID", ""),
         "name": node_name,
         "type": item.get("Type", ""),
         "status": item.get("Status", ""),
+        "description": item.get("Description", ""),
         "configuration": item.get("Configuration", {}),
         "createdAt": item.get("CreatedDate", datetime.utcnow().isoformat()),
         "updatedAt": item.get("ModifiedDate", datetime.utcnow().isoformat()),
