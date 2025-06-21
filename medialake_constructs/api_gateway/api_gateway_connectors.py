@@ -483,7 +483,15 @@ class ConnectorsConstruct(Construct):
             )
         )
         
-        # Add EC2 describe permissions (these require * resource)
+        # These EC2 actions are used by Lambda when deploying it into a VPC.
+        # They allow the Lambda service to look up network configuration like VPCs, subnets, and security groups.
+        #
+        # These are **read-only** (describe) actions and do not allow modifying or deleting anything.
+        # Because of how AWS permissions work, "describe" actions **cannot** be restricted to specific ARNs.
+        # AWS requires that the `resources` field be set to `"*"` for these actions, since they operate across the account.
+        #
+        # It's safe to include these permissions because they only allow the Lambda to retrieve network info,
+        # which is necessary for it to be deployed into a VPC.
         connector_s3_post_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
