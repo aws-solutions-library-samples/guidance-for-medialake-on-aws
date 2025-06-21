@@ -7,7 +7,6 @@ from typing import Dict, Any
 import boto3
 import json
 import os
-import uuid
 from botocore.exceptions import ClientError
 
 # Initialize PowerTools with configurable log level
@@ -43,12 +42,6 @@ cognito = boto3.client("cognito-idp")
 
 # Get environment variables
 USER_POOL_ID = os.environ["COGNITO_USER_POOL_ID"]
-
-
-@tracer.capture_method
-def generate_temporary_password() -> str:
-    """Generate a secure temporary password"""
-    return f"Welcome1!{uuid.uuid4().hex[:8]}"
 
 
 @tracer.capture_method
@@ -128,15 +121,6 @@ def create_user():
             }
         )
 
-        # Generate temporary password
-        temp_password = generate_temporary_password()
-        logger.debug(
-            {
-                "message": "Generated temporary password",
-                "operation": "password_generation",
-            }
-        )
-
         # Prepare user attributes with only required fields
         user_attributes = [
             {"Name": "email", "Value": request_data["email"]},
@@ -161,12 +145,13 @@ def create_user():
             }
         )
 
-        # Create user in Cognito
+        # Create user in Cognito using the configured invitation template
         response = cognito.admin_create_user(
             UserPoolId=USER_POOL_ID,
             Username=request_data["email"],
             UserAttributes=user_attributes,
-            TemporaryPassword=temp_password,
+            # Remove TemporaryPassword to use the configured invite template
+            # MessageAction defaults to "SEND" which will use the invite_message_template
         )
         logger.info(
             {

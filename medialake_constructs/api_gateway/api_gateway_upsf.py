@@ -78,7 +78,7 @@ class UPSFApi(Construct):
         profile_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(get_profile_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
 
@@ -97,7 +97,7 @@ class UPSFApi(Construct):
         profile_resource.add_method(
             "PUT",
             api_gateway.LambdaIntegration(put_profile_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
 
@@ -119,7 +119,7 @@ class UPSFApi(Construct):
         settings_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(get_settings_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
 
@@ -147,7 +147,7 @@ class UPSFApi(Construct):
                     "application/json": '{ "namespace": "$input.params(\'namespace\')", "key": "$input.params(\'key\')" }'
                 },
             ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
 
@@ -170,7 +170,7 @@ class UPSFApi(Construct):
         favorites_resource.add_method(
             "POST",
             api_gateway.LambdaIntegration(post_favorite_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
 
@@ -189,7 +189,7 @@ class UPSFApi(Construct):
         favorites_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(get_favorites_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
 
@@ -217,7 +217,7 @@ class UPSFApi(Construct):
                     "application/json": '{ "itemType": "$input.params(\'itemType\')", "itemId": "$input.params(\'itemId\')" }'
                 },
             ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
 

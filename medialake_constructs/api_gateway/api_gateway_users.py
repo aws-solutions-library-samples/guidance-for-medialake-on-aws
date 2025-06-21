@@ -130,7 +130,7 @@ class UsersApi(Construct):
         users_user_id_resources.add_method(
             "GET",
             api_gateway_get_user_id_integration,
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
 
@@ -191,7 +191,7 @@ class UsersApi(Construct):
         users_user_id_resources.add_method(
             "PUT",
             api_gateway_put_users_user_id_integration,
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
 
@@ -211,10 +211,19 @@ class UsersApi(Construct):
             ),
         )
 
+        # Add CORS preflight for POST method
+        users_user_resource.add_cors_preflight(
+            allow_origins=["http://localhost:5173"],
+            allow_methods=["GET", "PUT", "OPTIONS", "DELETE", "POST"],
+            allow_headers=["Content-Type", "Authorization", "X-Amz-Date", "X-Api-Key", "X-Amz-Security-Token"],
+            allow_credentials=True,
+            max_age=Duration.seconds(300),
+        )
+
         users_user_resource.add_method(
             "POST",
             api_gateway.LambdaIntegration(users_user_post_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
 
@@ -295,7 +304,7 @@ class UsersApi(Construct):
         users_user_id_disableuser_resource.add_method(
             "POST",
             api_post_users_user_id_disableuser_integration,
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
 
@@ -353,7 +362,7 @@ class UsersApi(Construct):
         users_user_id_enableuser_resource.add_method(
             "POST",
             api_post_users_user_id_enableuser_integration,
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
 

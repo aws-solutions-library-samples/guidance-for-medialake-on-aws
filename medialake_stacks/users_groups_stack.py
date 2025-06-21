@@ -58,18 +58,11 @@ class UsersGroupsStack(cdk.NestedStack):
             root_resource_id=root_resource_id
         )
         
-        # Use the shared custom authorizer
-        self._api_authorizer = create_shared_custom_authorizer(
+        # Create Cognito User Pool authorizer for standard authentication
+        self._cognito_user_pool_authorizer = apigateway.CognitoUserPoolsAuthorizer(
             self,
-            "UsersGroupsRolesCustomApiAuthorizer",
-            api_gateway_id=api_id
-        )
-        
-        # Ensure the shared authorizer has permissions for this API Gateway
-        ensure_shared_authorizer_permissions(
-            self,
-            "UsersGroupsRoles",
-            api
+            "UsersGroupsRolesCognitoAuthorizer",
+            cognito_user_pools=[props.cognito_user_pool]
         )
         
         # 1. User Table
@@ -211,7 +204,7 @@ class UsersGroupsStack(cdk.NestedStack):
             "UsersApiGateway",
             props=UsersApiProps(
                 api_resource=api.root,
-                cognito_authorizer=self._api_authorizer,
+                cognito_authorizer=self._cognito_user_pool_authorizer,
                 cognito_user_pool=props.cognito_user_pool,
                 x_origin_verify_secret=props.x_origin_verify_secret,
             ),
@@ -223,7 +216,7 @@ class UsersGroupsStack(cdk.NestedStack):
             "UPSFApi",
             props=UPSFApiProps(
                 api_resource=api.root,
-                cognito_authorizer=self._api_authorizer,
+                cognito_authorizer=self._cognito_user_pool_authorizer,
                 cognito_user_pool=props.cognito_user_pool,
                 x_origin_verify_secret=props.x_origin_verify_secret,
                 user_table=self._user_table.table,

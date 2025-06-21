@@ -111,7 +111,7 @@ class AuthorizationApi(Construct):
         permission_sets_resource.add_method(
             "POST",
             api_gateway.LambdaIntegration(create_permission_set_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=self._api_authorizer,
         )
 
@@ -130,7 +130,7 @@ class AuthorizationApi(Construct):
         permission_sets_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(list_permission_sets_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=self._api_authorizer,
         )
 
@@ -157,7 +157,7 @@ class AuthorizationApi(Construct):
                     "application/json": '{ "permissionSetId": "$input.params(\'permissionSetId\')" }'
                 },
             ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=self._api_authorizer,
         )
 
@@ -181,7 +181,7 @@ class AuthorizationApi(Construct):
                     "application/json": '{ "permissionSetId": "$input.params(\'permissionSetId\')" }'
                 },
             ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=self._api_authorizer,
         )
 
@@ -205,7 +205,7 @@ class AuthorizationApi(Construct):
                     "application/json": '{ "permissionSetId": "$input.params(\'permissionSetId\')" }'
                 },
             ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=self._api_authorizer,
         )
 
@@ -236,7 +236,7 @@ class AuthorizationApi(Construct):
                     "application/json": '{ "userId": "$input.params(\'userId\')" }'
                 },
             ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=self._api_authorizer,
         )
         
@@ -260,7 +260,7 @@ class AuthorizationApi(Construct):
                     "application/json": '{ "userId": "$input.params(\'userId\')" }'
                 },
             ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=self._api_authorizer,
         )
         
@@ -288,7 +288,7 @@ class AuthorizationApi(Construct):
                     "application/json": '{ "userId": "$input.params(\'userId\')", "permissionSetId": "$input.params(\'permissionSetId\')" }'
                 },
             ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=self._api_authorizer,
         )
         
@@ -316,7 +316,7 @@ class AuthorizationApi(Construct):
                     "application/json": '{ "groupId": "$input.params(\'groupId\')" }'
                 },
             ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=self._api_authorizer,
         )
         
@@ -340,7 +340,7 @@ class AuthorizationApi(Construct):
                     "application/json": '{ "groupId": "$input.params(\'groupId\')" }'
                 },
             ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=self._api_authorizer,
         )
         
@@ -368,7 +368,7 @@ class AuthorizationApi(Construct):
                     "application/json": '{ "groupId": "$input.params(\'groupId\')", "permissionSetId": "$input.params(\'permissionSetId\')" }'
                 },
             ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=self._api_authorizer,
         )
         
