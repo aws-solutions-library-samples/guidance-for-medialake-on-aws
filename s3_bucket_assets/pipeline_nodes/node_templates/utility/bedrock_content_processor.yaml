@@ -16,6 +16,8 @@ node:
               actions:
                 - bedrock:InvokeModel
                 - bedrock:InvokeModelWithResponseStream
+                - bedrock:ListInferenceProfiles
+                - bedrock:GetInferenceProfile
               resources:
                 - "*"
             - effect: Allow

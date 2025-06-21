@@ -342,13 +342,15 @@ const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetD
     const format = assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.Format || 'Unknown';
 
     // Audio-specific metadata fields
-    const duration = general.Duration
-        ? `${parseFloat(general.Duration).toFixed(2)} s`
-        : 'Unknown';
+    const duration = audio.duration != null
+        ? audio.duration.toFixed(2)
+        : (general.Duration
+            ? parseFloat(general.Duration).toFixed(2)
+            : 'Unknown'
+        );
     const sampleRate = audio.sample_rate
-        ? `${(audio.sample_rate / 1000).toFixed(1)} kHz`
+        ? (parseInt(audio.sample_rate, 10) / 1000).toFixed(1)
         : 'Unknown';
-
     const bitDepth = audio.BitsPerSample
         || audio.bit_depth
         || 'Unknown';
@@ -488,7 +490,7 @@ const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetD
             </Box>
 
             {/* Description & Keywords Section */}
-            <Box sx={{ mb: 3 }}>
+            {/* <Box sx={{ mb: 3 }}>
                 <Typography
                     sx={{
                         color: descKeywordsColor,
@@ -531,7 +533,7 @@ const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetD
                             />
                         ))}
                 </Box>
-            </Box>
+            </Box> */}
         </Box>
     );
 };

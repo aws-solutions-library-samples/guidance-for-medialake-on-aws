@@ -460,7 +460,7 @@ const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetD
             </Box>
             
             {/* Description & Keywords Section */}
-            <Box sx={{ mb: 3 }}>
+            {/* <Box sx={{ mb: 3 }}>
                 <Typography 
                     sx={{ 
                         color: descKeywordsColor,
@@ -503,7 +503,7 @@ const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetD
                             />
                         ))}
                 </Box>
-            </Box>
+            </Box> */}
         </Box>
     );
 };
