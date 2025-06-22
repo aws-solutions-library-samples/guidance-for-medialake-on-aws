@@ -16,6 +16,7 @@ from aws_cdk import (
     aws_cognito as cognito,
     CustomResource,
     Duration,
+    RemovalPolicy,
 )
 import aws_cdk as cdk
 
@@ -112,6 +113,9 @@ class CognitoUpdateStack(Stack):
                 memory_size=256,
                 timeout_minutes=5,
                 environment_variables={},
+                log_removal_policy=RemovalPolicy.RETAIN,
+                
+                
             ),
         )
         
