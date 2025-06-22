@@ -31,6 +31,10 @@ from medialake_stacks.authorization_stack import (
     AuthorizationStack,
     AuthorizationStackProps,
 )
+from medialake_stacks.cognito_update_stack import (
+    CognitoUpdateStack,
+    CognitoUpdateStackProps,
+)
 from medialake_stacks.permissions_stack import (
     PermissionsStack,
     PermissionsStackProps,
@@ -332,8 +336,20 @@ user_interface_stack = UserInterfaceStack(
 )
 user_interface_stack.add_dependency(medialake_stack)
 
-if config.resource_application_tag:
-    cdk.Tags.of(app).add("Application", config.resource_application_tag)
+# Create the Cognito Update Stack (between user_interface_stack and cleanup_stack)
+cognito_update_stack = CognitoUpdateStack(
+    app,
+    "MediaLakeCognitoUpdate",
+    props=CognitoUpdateStackProps(
+        cognito_user_pool=cognito_stack.user_pool,
+        cognito_user_pool_id=cognito_stack.user_pool_id,
+        cognito_user_pool_arn=cognito_stack.user_pool_arn,
+        auth_table_name=authorization_stack._auth_table.table_name,
+    ),
+    env=env,
+)
+cognito_update_stack.add_dependency(user_interface_stack)
+cognito_update_stack.add_dependency(authorization_stack)
 
 cleanup_stack = CleanupStack(
     app,
@@ -345,11 +361,14 @@ cleanup_stack = CleanupStack(
     ),
     env=env,
 )
-
 cleanup_stack.add_dependency(medialake_stack)
 cleanup_stack.add_dependency(user_interface_stack)
+cleanup_stack.add_dependency(cognito_update_stack)
 cleanup_stack.add_dependency(api_gateway_deployment_stack)
 cleanup_stack.add_dependency(api_gateway_core_stack)
+
+if config.resource_application_tag:
+    cdk.Tags.of(app).add("Application", config.resource_application_tag)
 
 app.synth()
 

@@ -212,18 +212,8 @@ class AuthorizationStack(Stack):
             )
         )
 
-        # 6. Create the Cognito Pre-Signup Lambda
-        self._pre_signup_lambda = Lambda(
-            self,
-            "PreSignupLambda",
-            config=LambdaConfig(
-                name="cognito_pre_signup",
-                entry="lambdas/auth/cognito_pre_signup",
-                memory_size=256,
-                timeout_minutes=1,
-                environment_variables=common_env_vars,
-            ),
-        )
+        # 6. Cognito Pre-Signup Lambda is now handled in CognitoUpdateStack
+        # This avoids circular dependencies and timing issues
 
         # Add the Cognito Identity Source to the AVP Policy Store
         # Get the client ID directly from the cognito construct
@@ -260,109 +250,11 @@ class AuthorizationStack(Stack):
         # Cognito Pre-Token Generation Lambda permissions and environment variables
         # are now configured in the Cognito stack to avoid circular dependencies
 
-        # Cognito Pre-Signup Lambda: Write access to the auth table
-        self._auth_table.grant_read_write_data(self._pre_signup_lambda.function)
+        # Pre-Signup Lambda and trigger configuration is now handled in CognitoUpdateStack
+        # This avoids circular dependencies and timing issues
         
         # Auth Table Seeder Lambda: Write access to the auth table
         self._auth_table.grant_read_write_data(self._auth_seeder_lambda.function)
-
-        # Create a Lambda function for the Pre-Signup trigger
-        pre_signup_lambda = lambda_.Function(
-            self,
-            "PreSignupTriggerProvider",
-            runtime=lambda_.Runtime.PYTHON_3_12,
-            handler="index.handler",
-            code=lambda_.Code.from_inline("""
-import boto3
-import cfnresponse
-import logging
-
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
-cognito = boto3.client('cognito-idp')
-
-def handler(event, context):
-    logger.info(f"Event: {event}")
-    
-    request_type = event['RequestType']
-    physical_id = event.get('PhysicalResourceId', 'PreSignupTrigger')
-    
-    try:
-        user_pool_id = event['ResourceProperties']['UserPoolId']
-        lambda_arn = event['ResourceProperties']['LambdaArn']
-        
-        if request_type in ['Create', 'Update']:
-            logger.info(f"Adding Pre-Signup trigger to user pool {user_pool_id}")
-            
-            # Get current Lambda config
-            response = cognito.describe_user_pool(UserPoolId=user_pool_id)
-            lambda_config = response.get('UserPool', {}).get('LambdaConfig', {})
-            
-            # Update with our trigger
-            lambda_config['PreSignUp'] = lambda_arn
-            
-            # Update the user pool
-            cognito.update_user_pool(
-                UserPoolId=user_pool_id,
-                LambdaConfig=lambda_config
-            )
-            
-            logger.info("Successfully added Pre-Signup trigger")
-            cfnresponse.send(event, context, cfnresponse.SUCCESS, {}, physical_id)
-        elif request_type == 'Delete':
-            # Optionally remove the trigger on delete
-            logger.info(f"Delete request for Pre-Signup trigger on user pool {user_pool_id}")
-            cfnresponse.send(event, context, cfnresponse.SUCCESS, {}, physical_id)
-        else:
-            logger.error(f"Unexpected request type: {request_type}")
-            cfnresponse.send(event, context, cfnresponse.FAILED, {}, physical_id)
-    except Exception as e:
-        logger.error(f"Error: {str(e)}")
-        cfnresponse.send(event, context, cfnresponse.FAILED, {"Error": str(e)}, physical_id)
-"""),
-            timeout=cdk.Duration.minutes(5),
-        )
-        
-        # Grant permission for the custom resource Lambda to update Cognito
-        pre_signup_lambda.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "cognito-idp:DescribeUserPool",
-                    "cognito-idp:UpdateUserPool",
-                ],
-                resources=[props.cognito_user_pool.user_pool_arn],
-            )
-        )
-        
-        # Create a provider for the Pre-Signup trigger
-        pre_signup_provider = cdk.custom_resources.Provider(
-            self,
-            "PreSignupProvider",
-            on_event_handler=pre_signup_lambda,
-        )
-        
-        # Create a custom resource to add the Pre-Signup trigger
-        pre_signup_trigger = cdk.CustomResource(
-            self,
-            "PreSignupTrigger",
-            service_token=pre_signup_provider.service_token,
-            properties={
-                "UserPoolId": props.cognito_user_pool.user_pool_id,
-                "LambdaArn": self._pre_signup_lambda.function.function_arn,
-                "Timestamp": str(datetime.datetime.now().timestamp()),  # Force update on each deployment
-            },
-        )
-        
-        # Grant permission for Cognito to invoke the Pre-Signup Lambda
-        self._pre_signup_lambda.function.add_permission(
-            "CognitoInvokePermissionPreSignup",
-            principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
-            source_arn=props.cognito_user_pool.user_pool_arn,
-        )
-        
-        # NOTE: PreTokenGeneration trigger is now configured directly in cognito.py
-        # Removed redundant custom resource to prevent ConcurrentModificationException
         
         # 9. Create a Custom Resource to seed the default permission sets
         self._auth_seeder_custom_resource = CustomResource(
@@ -382,8 +274,14 @@ def handler(event, context):
             "PreTokenGenerationWarmerRule",
             schedule=events.Schedule.rate(Duration.minutes(LambdaConstants.WARMER_INTERVAL_MINUTES)),
             targets=[
-                targets.LambdaFunction(props.cognito_construct._pre_token_generation_lambda.function, event=events.RuleTargetInput.from_object({"lambda_warmer": True})),
-                targets.LambdaFunction(self._custom_authorizer_lambda.function, event=events.RuleTargetInput.from_object({"lambda_warmer": True})),
+                targets.LambdaFunction(
+                    props.cognito_construct._pre_token_generation_lambda.function,
+                    event=events.RuleTargetInput.from_object({"lambda_warmer": True})
+                ),
+                targets.LambdaFunction(
+                    self._custom_authorizer_lambda.function,
+                    event=events.RuleTargetInput.from_object({"lambda_warmer": True})
+                ),
             ],
             description="Keeps pre_token_generation and custom_authorizer Lambdas warm via scheduled EventBridge rule."
         )
@@ -403,10 +301,7 @@ def handler(event, context):
         """Return the policy sync Lambda function"""
         return self._policy_sync_lambda.function
 
-    @property
-    def pre_signup_lambda(self):
-        """Return the pre-signup Lambda function"""
-        return self._pre_signup_lambda.function
+    # pre_signup_lambda is now handled in CognitoUpdateStack
         
     @property
     def auth_seeder_lambda(self):
