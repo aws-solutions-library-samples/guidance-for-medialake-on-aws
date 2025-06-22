@@ -53,18 +53,19 @@ class CognitoUpdateStack(Stack):
             "COGNITO_USER_POOL_ID": props.cognito_user_pool_id,
         }
 
-        # Create the Cognito Pre-Signup Lambda for additional signup validation
-        self._pre_signup_lambda = Lambda(
-            self,
-            "PreSignupLambda",
-            config=LambdaConfig(
-                name="cognito_pre_signup",
-                entry="lambdas/auth/cognito_pre_signup",
-                memory_size=256,
-                timeout_minutes=1,
-                environment_variables=common_env_vars,
-            ),
-        )
+        # TODO: Create the Cognito Pre-Signup Lambda for additional signup validation
+        # Commented out for now as requested
+        # self._pre_signup_lambda = Lambda(
+        #     self,
+        #     "PreSignupLambda",
+        #     config=LambdaConfig(
+        #         name="cognito_pre_signup",
+        #         entry="lambdas/auth/cognito_pre_signup",
+        #         memory_size=256,
+        #         timeout_minutes=1,
+        #         environment_variables=common_env_vars,
+        #     ),
+        # )
 
         # Create the Pre-Token Generation Lambda
         pre_token_env_vars = {
@@ -85,128 +86,37 @@ class CognitoUpdateStack(Stack):
             ),
         )
 
-        # Grant permissions for both lambdas to interact with the auth table
+        # Grant permissions for the pre-token generation lambda to interact with the auth table
         auth_table_arn = f"arn:aws:dynamodb:{self.region}:{self.account}:table/{props.auth_table_name}"
         
-        for lambda_function in [self._pre_signup_lambda.function, self._pre_token_generation_lambda.function]:
-            lambda_function.add_to_role_policy(
-                iam.PolicyStatement(
-                    actions=[
-                        "dynamodb:GetItem",
-                        "dynamodb:PutItem",
-                        "dynamodb:UpdateItem",
-                        "dynamodb:Query",
-                        "dynamodb:Scan",
-                    ],
-                    resources=[auth_table_arn],
-                )
+        self._pre_token_generation_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:Query",
+                    "dynamodb:Scan",
+                ],
+                resources=[auth_table_arn],
             )
+        )
 
         # Create a Lambda function for updating Cognito User Pool triggers
-        cognito_trigger_update_lambda = lambda_.Function(
+        self._cognito_trigger_update_lambda = Lambda(
             self,
             "CognitoTriggerUpdateProvider",
-            runtime=lambda_.Runtime.PYTHON_3_12,
-            handler="index.handler",
-            code=lambda_.Code.from_inline("""
-import boto3
-import cfnresponse
-import logging
-
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
-cognito = boto3.client('cognito-idp')
-
-def handler(event, context):
-    logger.info(f"Event: {event}")
-    
-    request_type = event['RequestType']
-    physical_id = event.get('PhysicalResourceId', 'CognitoTriggerUpdate')
-    
-         try:
-         user_pool_id = event['ResourceProperties']['UserPoolId']
-         pre_signup_lambda_arn = event['ResourceProperties']['PreSignupLambdaArn']
-         pre_token_generation_lambda_arn = event['ResourceProperties']['PreTokenGenerationLambdaArn']
-         
-         if request_type in ['Create', 'Update']:
-             logger.info(f"Updating triggers for user pool {user_pool_id}")
-             
-             # Get current user pool configuration
-             response = cognito.describe_user_pool(UserPoolId=user_pool_id)
-             current_config = response['UserPool']
-             lambda_config = current_config.get('LambdaConfig', {})
-             
-             # Add or update the triggers
-             lambda_config['PreSignUp'] = pre_signup_lambda_arn
-             lambda_config['PreTokenGenerationConfig'] = {
-                 'LambdaArn': pre_token_generation_lambda_arn,
-                 'LambdaVersion': 'V2_0'
-             }
-            
-                         # Update the user pool with the new Lambda configuration
-             # Only include parameters that are valid for update_user_pool API
-             update_params = {
-                 'UserPoolId': user_pool_id,
-                 'LambdaConfig': lambda_config
-             }
-             
-             # Preserve existing configuration - only include updateable parameters
-             if 'Policies' in current_config:
-                 update_params['Policies'] = current_config['Policies']
-             if 'AutoVerifiedAttributes' in current_config:
-                 update_params['AutoVerifiedAttributes'] = current_config['AutoVerifiedAttributes']
-             if 'AdminCreateUserConfig' in current_config:
-                 update_params['AdminCreateUserConfig'] = current_config['AdminCreateUserConfig']
-             if 'VerificationMessageTemplate' in current_config:
-                 update_params['VerificationMessageTemplate'] = current_config['VerificationMessageTemplate']
-             if 'UserPoolAddOns' in current_config:
-                 update_params['UserPoolAddOns'] = current_config['UserPoolAddOns']
-             # Note: UsernameAttributes cannot be updated after user pool creation
-            
-            cognito.update_user_pool(**update_params)
-            
-            logger.info("Successfully updated Cognito triggers")
-            cfnresponse.send(event, context, cfnresponse.SUCCESS, {}, physical_id)
-            
-        elif request_type == 'Delete':
-            logger.info(f"Delete request for Cognito triggers on user pool {user_pool_id}")
-            # On delete, we can optionally remove our triggers
-                         try:
-                 response = cognito.describe_user_pool(UserPoolId=user_pool_id)
-                 lambda_config = response['UserPool'].get('LambdaConfig', {})
-                 
-                 # Remove our triggers if they match
-                 if lambda_config.get('PreSignUp') == pre_signup_lambda_arn:
-                     lambda_config.pop('PreSignUp', None)
-                 
-                 pre_token_config = lambda_config.get('PreTokenGenerationConfig', {})
-                 if pre_token_config.get('LambdaArn') == pre_token_generation_lambda_arn:
-                     lambda_config.pop('PreTokenGenerationConfig', None)
-                     
-                     cognito.update_user_pool(
-                         UserPoolId=user_pool_id,
-                         LambdaConfig=lambda_config
-                     )
-                     logger.info("Removed Cognito triggers during cleanup")
-            except Exception as cleanup_error:
-                logger.warning(f"Error during trigger cleanup: {str(cleanup_error)}")
-                # Don't fail the stack deletion for cleanup errors
-                
-            cfnresponse.send(event, context, cfnresponse.SUCCESS, {}, physical_id)
-        else:
-            logger.error(f"Unexpected request type: {request_type}")
-            cfnresponse.send(event, context, cfnresponse.FAILED, {}, physical_id)
-            
-    except Exception as e:
-        logger.error(f"Error: {str(e)}")
-        cfnresponse.send(event, context, cfnresponse.FAILED, {"Error": str(e)}, physical_id)
-"""),
-            timeout=cdk.Duration.minutes(5),
+            config=LambdaConfig(
+                name="cognito_trigger_update",
+                entry="lambdas/custom_resources/auth/cognito_trigger_update",
+                memory_size=256,
+                timeout_minutes=5,
+                environment_variables={},
+            ),
         )
         
         # Grant permission for the custom resource Lambda to update Cognito
-        cognito_trigger_update_lambda.add_to_role_policy(
+        self._cognito_trigger_update_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "cognito-idp:DescribeUserPool",
@@ -220,7 +130,7 @@ def handler(event, context):
         cognito_update_provider = cdk.custom_resources.Provider(
             self,
             "CognitoUpdateProvider",
-            on_event_handler=cognito_trigger_update_lambda,
+            on_event_handler=self._cognito_trigger_update_lambda.function,
         )
         
         # Create a custom resource to update the Cognito triggers
@@ -230,29 +140,31 @@ def handler(event, context):
             service_token=cognito_update_provider.service_token,
             properties={
                 "UserPoolId": props.cognito_user_pool_id,
-                "PreSignupLambdaArn": self._pre_signup_lambda.function.function_arn,
+                # "PreSignupLambdaArn": self._pre_signup_lambda.function.function_arn,  # Commented out for now
                 "PreTokenGenerationLambdaArn": self._pre_token_generation_lambda.function.function_arn,
                 "Timestamp": str(datetime.datetime.now().timestamp()),  # Force update on each deployment
             },
         )
         
-        # Grant permissions for Cognito to invoke both Lambda functions
-        self._pre_signup_lambda.function.add_permission(
-            "CognitoInvokePermissionPreSignup",
-            principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
-            source_arn=props.cognito_user_pool_arn,
-        )
+        # TODO: Grant permissions for Cognito to invoke pre-signup Lambda (commented out for now)
+        # self._pre_signup_lambda.function.add_permission(
+        #     "CognitoInvokePermissionPreSignup",
+        #     principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
+        #     source_arn=props.cognito_user_pool_arn,
+        # )
         
+        # Grant permissions for Cognito to invoke the pre-token generation Lambda
         self._pre_token_generation_lambda.function.add_permission(
             "CognitoInvokePermissionPreTokenGeneration",
             principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
             source_arn=props.cognito_user_pool_arn,
         )
 
-    @property
-    def pre_signup_lambda(self):
-        """Return the pre-signup Lambda function"""
-        return self._pre_signup_lambda.function
+    # TODO: Re-enable when pre-signup lambda is uncommented
+    # @property
+    # def pre_signup_lambda(self):
+    #     """Return the pre-signup Lambda function"""
+    #     return self._pre_signup_lambda.function
         
     @property
     def pre_token_generation_lambda(self):
