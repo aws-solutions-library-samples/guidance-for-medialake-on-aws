@@ -267,23 +267,19 @@ class AuthorizationStack(Stack):
             },
         )
         
-        # Lambda warming for pre_token_generation and custom_authorizer
-        # Add EventBridge rule to keep both Lambdas warm
+        # Lambda warming for custom_authorizer
+        # Note: pre_token_generation lambda warming is now handled in CognitoUpdateStack
         events.Rule(
             self,
-            "PreTokenGenerationWarmerRule",
+            "CustomAuthorizerWarmerRule",
             schedule=events.Schedule.rate(Duration.minutes(LambdaConstants.WARMER_INTERVAL_MINUTES)),
             targets=[
-                targets.LambdaFunction(
-                    props.cognito_construct._pre_token_generation_lambda.function,
-                    event=events.RuleTargetInput.from_object({"lambda_warmer": True})
-                ),
                 targets.LambdaFunction(
                     self._custom_authorizer_lambda.function,
                     event=events.RuleTargetInput.from_object({"lambda_warmer": True})
                 ),
             ],
-            description="Keeps pre_token_generation and custom_authorizer Lambdas warm via scheduled EventBridge rule."
+            description="Keeps custom_authorizer Lambda warm via scheduled EventBridge rule."
         )
 
     @property

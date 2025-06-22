@@ -98,24 +98,8 @@ class CognitoConstruct(Construct):
             ),
         )
         
-        # Create Pre-Token Generation Lambda
-        self._pre_token_generation_lambda = Lambda(
-            self,
-            "CognitoPreTokenGeneration",
-            LambdaConfig(
-                name="pre_token_generation",
-                entry="lambdas/auth/pre_token_generation",
-                timeout_minutes=1,
-                lambda_handler="handler",
-                snap_start=False,
-                environment_variables={
-                    "AUTH_TABLE_NAME": self._auth_table.table_name,
-                    "DEBUG_MODE": "true",
-                },
-            ),
-        )
-        
-        self._auth_table.table.grant_read_data(self._pre_token_generation_lambda.function)
+        # Pre-Token Generation Lambda is now created in CognitoUpdateStack
+        # This avoids circular dependencies and timing issues
         
         # Create User Pool using L1 construct, needed for configuration parameters
         user_pool_props = {
@@ -180,10 +164,7 @@ class CognitoConstruct(Construct):
             "lambda_config": cognito.CfnUserPool.LambdaConfigProperty(
                 pre_sign_up=self._cognito_trigger_lambda.function.function_arn,
                 post_confirmation=self._cognito_trigger_lambda.function.function_arn,
-                pre_token_generation_config=cognito.CfnUserPool.PreTokenGenerationConfigProperty(
-                    lambda_arn=self._pre_token_generation_lambda.function.function_arn,
-                    lambda_version="V2_0"
-                )
+                # Pre-token generation config is now set via CognitoUpdateStack
             ),
             "user_pool_add_ons": cognito.CfnUserPool.UserPoolAddOnsProperty(
                 advanced_security_mode="ENFORCED"
@@ -265,12 +246,7 @@ class CognitoConstruct(Construct):
             source_arn=cfn_user_pool.attr_arn
         )
         
-        # Grant permission for pre-token generation lambda
-        self._pre_token_generation_lambda.function.add_permission(
-            "CognitoInvokePreTokenGeneration",
-            principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
-            source_arn=cfn_user_pool.attr_arn
-        )
+        # Pre-token generation lambda permissions are now granted in CognitoUpdateStack
 
         # Using stack name, region, account, and environment ensures uniqueness across different deployments
         unique_id = hashlib.md5(f"{config.resource_prefix}-{config.primary_region}-{config.account_id}-{config.environment}".encode()).hexdigest()[:16]
