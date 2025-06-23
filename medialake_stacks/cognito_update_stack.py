@@ -17,6 +17,7 @@ from aws_cdk import (
     CustomResource,
     Duration,
     RemovalPolicy,
+    custom_resources as cr,
 )
 import aws_cdk as cdk
 
@@ -131,10 +132,10 @@ class CognitoUpdateStack(Stack):
         )
         
         # Create a provider for the Cognito trigger updates
-        cognito_update_provider = cdk.custom_resources.Provider(
+        cognito_update_provider = cr.Provider(
             self,
             "CognitoUpdateProvider",
-            on_event_handler=self._cognito_trigger_update_lambda.function,
+            on_event_handler=self._cognito_trigger_update_lambda.function,  # type: ignore
         )
         
         # Create a custom resource to update the Cognito triggers

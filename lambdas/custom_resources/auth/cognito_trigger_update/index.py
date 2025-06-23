@@ -1,13 +1,49 @@
 import boto3
-import cfnresponse
+import json
 import logging
+import urllib3
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 cognito = boto3.client('cognito-idp')
 
-def handler(event, context):
+# CloudFormation response constants and helper function
+SUCCESS = "SUCCESS"
+FAILED = "FAILED"
+
+def send_response(event, context, response_status, response_data, physical_resource_id=None, no_echo=False):
+    """
+    Send response to CloudFormation custom resource.
+    """
+    response_url = event['ResponseURL']
+    
+    response_body = {
+        'Status': response_status,
+        'Reason': f'See the details in CloudWatch Log Stream: {context.log_stream_name}',
+        'PhysicalResourceId': physical_resource_id or context.log_stream_name,
+        'StackId': event['StackId'],
+        'RequestId': event['RequestId'],
+        'LogicalResourceId': event['LogicalResourceId'],
+        'NoEcho': no_echo,
+        'Data': response_data
+    }
+    
+    json_response_body = json.dumps(response_body)
+    
+    headers = {
+        'content-type': '',
+        'content-length': str(len(json_response_body))
+    }
+    
+    try:
+        http = urllib3.PoolManager()
+        response = http.request('PUT', response_url, body=json_response_body, headers=headers)
+        logger.info(f"Status code: {response.status}")
+    except Exception as e:
+        logger.error(f"Failed to send response to CloudFormation: {str(e)}")
+
+def lambda_handler(event, context):
     logger.info(f"Event: {event}")
     
     request_type = event['RequestType']
@@ -54,7 +90,7 @@ def handler(event, context):
             cognito.update_user_pool(**update_params)
             
             logger.info("Successfully updated Cognito triggers")
-            cfnresponse.send(event, context, cfnresponse.SUCCESS, {}, physical_id)
+            send_response(event, context, SUCCESS, {}, physical_id)
             
         elif request_type == 'Delete':
             logger.info(f"Delete request for Cognito triggers on user pool {user_pool_id}")
@@ -77,11 +113,11 @@ def handler(event, context):
                 logger.warning(f"Error during trigger cleanup: {str(cleanup_error)}")
                 # Don't fail the stack deletion for cleanup errors
                 
-            cfnresponse.send(event, context, cfnresponse.SUCCESS, {}, physical_id)
+            send_response(event, context, SUCCESS, {}, physical_id)
         else:
             logger.error(f"Unexpected request type: {request_type}")
-            cfnresponse.send(event, context, cfnresponse.FAILED, {}, physical_id)
+            send_response(event, context, FAILED, {}, physical_id)
             
     except Exception as e:
         logger.error(f"Error: {str(e)}")
-        cfnresponse.send(event, context, cfnresponse.FAILED, {"Error": str(e)}, physical_id) 
+        send_response(event, context, FAILED, {"Error": str(e)}, physical_id) 
