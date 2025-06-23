@@ -1067,7 +1067,17 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
         </Box>
       </Backdrop>
 
-      {/* Container to calculate available space */}
+      {/* Hidden file input - available for both compact and full modes */}
+      <input
+        type="file"
+        accept="application/json"
+        ref={fileInputRef}
+        style={{ display: 'none' }}
+        onChange={handleLoadFlow}
+        onClick={(e) => ((e.target as HTMLInputElement).value = '')}
+      />
+
+      {/* Main bar */}
       <Box
         sx={{
           position: 'fixed',
@@ -1141,97 +1151,71 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
           </Button>
         </Box>
 
-      {/* Center - Status */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          {/* Show status chip if status is provided */}
-          {status && (
-            <Box
-              sx={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                px: 1.5,
-                py: 0.5,
-                borderRadius: '16px',
-                fontSize: '0.75rem',
-                fontWeight: 'medium',
-                lineHeight: '1',
-                backgroundColor: status === 'FAILED' ? 'error.light' :
-                  status === 'CREATING' ? 'info.light' :
-                    status === 'PENDING' ? 'warning.light' : 'grey.300',
-                color: status === 'FAILED' ? 'error.dark' :
-                  status === 'CREATING' ? 'info.dark' :
-                    status === 'PENDING' ? 'warning.dark' : 'grey.800',
-              }}
-            >
-              {status}
-            </Box>
-          )}
-        </Box>
+            {/* Center: Status badge */}
+            {status && (
+              <Box
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  px: 1.5,
+                  py: 0.5,
+                  borderRadius: 16,
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  lineHeight: 1,
+                  bgcolor:
+                    status === 'FAILED'
+                      ? 'error.light'
+                      : status === 'CREATING'
+                        ? 'info.light'
+                        : status === 'PENDING'
+                          ? 'warning.light'
+                          : 'grey.300',
+                  color:
+                    status === 'FAILED'
+                      ? 'error.dark'
+                      : status === 'CREATING'
+                        ? 'info.dark'
+                        : status === 'PENDING'
+                          ? 'warning.dark'
+                          : 'grey.800',
+                }}
+              >
+                {status}
+              </Box>
+            )}
 
-        {/* Right side - Active/Inactive Toggle, Import and Delete */}
-        <Stack
-          direction="row"
-          spacing={2}
-          sx={{
-            '& .MuiButton-root': commonStyles,
-          }}
-        >
-          {/* Active/Inactive Toggle */}
-          <FormControlLabel
-            control={
-              <IconSwitch
-                checked={active}
-                onChange={(e) => onActiveChange(e.target.checked)}
-                color="primary"
-                onIcon={<ToggleOnIcon fontSize="large" />}
-                offIcon={<ToggleOffIcon fontSize="large" />}
-                onColor="#2b6cb0"
-                offColor="#757575"
-                trackOnColor="#b2ebf2"
-                trackOffColor="#cfd8dc"
+            {/* Right group */}
+            <Stack direction="row" spacing={2}>
+              {/* Active toggle */}
+              <FormControlLabel
+                control={<IconSwitch
+                  checked={active}
+                  onChange={(e) => onActiveChange(e.target.checked)}
+                  color="primary"
+                  onIcon={<ToggleOnIcon fontSize="large" />}
+                  offIcon={<ToggleOffIcon fontSize="large" />}
+                  onColor="#2b6cb0"
+                  offColor="#757575"
+                />}
+                label={active ? 'Active' : 'Inactive'}
               />
-            }
-            label={active ? "Active" : "Inactive"}
-          />
-          {/* Hidden file input for import */}
-          <input
-            type="file"
-            accept="application/json"
-            ref={fileInputRef}
-            style={{ display: 'none' }}
-            onChange={handleLoadFlow}
-            onClick={(e) => {
-              console.log('[PipelineToolbar] File input clicked');
-              // Reset the value to allow selecting the same file again
-              (e.target as HTMLInputElement).value = '';
-            }}
-          />
 
-          {/* Import/Export ButtonGroup */}
-          <ButtonGroup
-            variant="outlined"
-            ref={importExportRef}
-            aria-label="Pipeline file operations"
-          >
-            <Button
-              color="inherit"
-              onClick={handleImport}
-              startIcon={<FileUploadIcon />}
-            >
-              Import
-            </Button>
-            <Button
-              size="small"
-              color="inherit"
-              aria-controls={importExportOpen ? 'import-export-menu' : undefined}
-              aria-expanded={importExportOpen ? 'true' : undefined}
-              aria-label="select import/export action"
-              aria-haspopup="menu"
-              onClick={handleImportExportToggle}
-            >
-              <ArrowDropDownIcon />
-            </Button>
-          </ButtonGroup>
+              {/* Import/Export */}
+              <ButtonGroup ref={importExportRef} variant="outlined" aria-label="Pipeline file operations">
+                <Button color="inherit" onClick={handleImport} startIcon={<FileUploadIcon />}>
+                  Import
+                </Button>
+                <Button
+                  size="small"
+                  color="inherit"
+                  aria-controls="import-export-menu"
+                  aria-haspopup="menu"
+                  onClick={handleImportExportToggle}
+                >
+                  <ArrowDropDownIcon />
+                </Button>
+              </ButtonGroup>
 
           {/* Import/Export Dropdown */}
           <Popper

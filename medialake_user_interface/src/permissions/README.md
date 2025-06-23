@@ -1,190 +1,214 @@
-# CASL v5 Authorization System
+# Permission System Caching Optimization
 
-This directory contains the implementation of the CASL v5 authorization system for the MediaLake React frontend. The system provides fine-grained authorization controls throughout the application, with a mix of hiding and disabling UI elements based on permissions, while ensuring good performance through caching.
+## Overview
 
-## Architecture
+This document describes the comprehensive caching system implemented to optimize authentication and permission checking performance in the MediaLake application.
 
-The authorization system follows this architecture:
+## Problem Statement
 
-```
-JWT Token --> Extract User & Group Info --> Ability Factory --> Permission Provider
-                                              ^
-Permission Sets API --> Transform Permissions -|
-                                              |
-Permission Provider --> usePermission Hook & Can Component --> UI Components
-                    |
-                    v
-             Permission Cache
-```
+The original permission system had several performance issues:
 
-## Core Components
+1. **Frequent Cache Clearing**: [`PermissionGuard.tsx`](components/PermissionGuard.tsx) cleared the permission cache on every component mount (lines 28-33)
+2. **Token Refresh Cache Clearing**: [`permission-context.tsx`](context/permission-context.tsx) cleared both caches on token refresh (lines 151-152)
+3. **Excessive Logging**: Permission checks included extensive console logging that impacted performance
+4. **Redundant API Calls**: Multiple components made redundant permission checks and API calls
+5. **No Global Cache**: Each component maintained its own cache state
 
-### Types
+## Solution: Global Permission Cache System
 
-- `ability.types.ts`: Defines TypeScript types for CASL, including actions, subjects, and conditions.
-- `permission.types.ts`: Defines permission-related types, including Permission, PermissionSet, and User.
+### Architecture
 
-### Utils
+The new system implements a three-tier caching strategy:
 
-- `ability-factory.ts`: Creates CASL ability instances from JWT claims and permission sets.
-- `permission-cache.ts`: Provides a caching mechanism for permission checks to improve performance.
+1. **Global Cache**: Stores all authentication and permission data globally
+2. **Permission Check Cache**: Caches individual permission check results
+3. **Persistent Storage**: Uses localStorage for cache persistence across page reloads
 
-### Transformers
+### Key Components
 
-- `permission-transformer.ts`: Transforms API permissions to the format expected by CASL.
+#### 1. Global Permission Cache ([`global-permission-cache.ts`](utils/global-permission-cache.ts))
 
-### Context
-
-- `permission-context.tsx`: Provides a React context provider for the ability instance.
-
-### Hooks
-
-- `usePermission.ts`: Provides hooks for checking permissions in components.
-  - `usePermission()`: General permission checking hook.
-  - `useSubjectPermission(subject)`: Hook for checking permissions on a specific subject.
-
-### Components
-
-- `Can.tsx`: Component for conditional rendering based on permissions.
-- `PermissionGuard.tsx`: Components for protecting routes based on permissions.
-  - `PermissionGuard`: Basic component for protecting content.
-  - `withPermission`: Higher-order component for creating a route guard.
-  - `RoutePermissionGuard`: Component for protecting routes in a router configuration.
-
-## Usage
-
-### Setting Up
-
-1. Wrap your application with the `PermissionProvider`:
-
-```tsx
-import { PermissionProvider } from './permissions';
-
-function App() {
-  return (
-    <PermissionProvider>
-      <YourApp />
-    </PermissionProvider>
-  );
+```typescript
+class GlobalPermissionCache {
+  // Stores complete user, permissions, and ability data
+  setGlobalCache(user, customPermissions, ability, permissionSets, token, expiresIn)
+  
+  // Retrieves cached data if valid
+  getGlobalCache(currentToken)
+  
+  // Caches individual permission check results
+  setPermissionCheck(cacheKey, result)
+  getPermissionCheck(cacheKey)
 }
+```
+
+**Features:**
+- Singleton pattern ensures single source of truth
+- Automatic cache expiration based on JWT token expiry
+- Memory + localStorage persistence
+- Efficient permission check caching with TTL
+
+#### 2. Updated Permission Context ([`permission-context.tsx`](context/permission-context.tsx))
+
+**Key Changes:**
+- Uses global cache instead of clearing caches frequently
+- Only updates cache when tokens are refreshed, not on every mount
+- Loads from global cache on initialization
+- Preserves cache during token refresh operations
+
+#### 3. Optimized Permission Guard ([`PermissionGuard.tsx`](components/PermissionGuard.tsx))
+
+**Key Changes:**
+- **Removed cache clearing on mount** - This was the primary performance bottleneck
+- Relies on global cache for consistent permission state
+- Reduced logging overhead
+
+#### 4. Enhanced Permission Hook ([`usePermission.ts`](hooks/usePermission.ts))
+
+**Key Changes:**
+- Uses global permission check cache
+- Eliminated extensive debug logging
+- Faster permission check resolution
+- Automatic error result caching
+
+#### 5. Streamlined Can Component ([`Can.tsx`](components/Can.tsx))
+
+**Key Changes:**
+- Removed excessive console logging
+- Optimized rendering logic
+- Better performance for conditional rendering
+
+## Performance Improvements
+
+### Before Optimization
+- Cache cleared on every `PermissionGuard` mount
+- Cache cleared on every token refresh
+- Extensive logging on every permission check
+- Redundant API calls across components
+- No persistence across page reloads
+
+### After Optimization
+- **Global cache loaded once** on app initialization
+- **Cache preserved** during navigation and token refresh
+- **Minimal logging** for production performance
+- **Cached permission checks** with 5-minute TTL
+- **Persistent cache** across page reloads
+- **Token-based cache invalidation** only when necessary
+
+## Cache Lifecycle
+
+```mermaid
+graph TD
+    A[App Start] --> B[Check Global Cache]
+    B --> C{Cache Valid?}
+    C -->|Yes| D[Load from Cache]
+    C -->|No| E[Parse JWT Token]
+    E --> F[Create Ability]
+    F --> G[Store in Global Cache]
+    G --> H[App Ready]
+    D --> H
+    
+    I[Permission Check] --> J{Check Cache}
+    J -->|Hit| K[Return Cached Result]
+    J -->|Miss| L[Perform Check]
+    L --> M[Cache Result]
+    M --> N[Return Result]
+    
+    O[Token Refresh] --> P[Update Token in Cache]
+    P --> Q[Preserve Permissions]
+```
+
+## Usage Examples
+
+### Checking Permissions
+```typescript
+// In any component
+const { can } = usePermission();
+const allowed = can('read', 'assets'); // Uses global cache
 ```
 
 ### Conditional Rendering
-
-Use the `Can` component to conditionally render UI elements based on permissions:
-
-```tsx
-import { Can } from './permissions';
-
-function AssetActions({ asset }) {
-  return (
-    <div>
-      <Can I="view" a="asset" subject={asset}>
-        <button>View Details</button>
-      </Can>
-      
-      <Can I="edit" a="asset" subject={asset}>
-        <button>Edit</button>
-      </Can>
-      
-      <Can I="delete" a="asset" subject={asset} passThrough>
-        {(allowed) => (
-          <button 
-            disabled={!allowed}
-            title={!allowed ? "You don't have permission to delete this asset" : ""}
-          >
-            Delete
-          </button>
-        )}
-      </Can>
-    </div>
-  );
-}
+```typescript
+// Optimized Can component
+<Can I="edit" a="users">
+  <EditButton />
+</Can>
 ```
 
-### Using Hooks
-
-Use the `usePermission` hook to check permissions in your components:
-
-```tsx
-import { usePermission } from './permissions';
-
-function AssetHeader({ asset }) {
-  const { can } = usePermission();
-  
-  const canShare = can('share', 'asset', asset);
-  
-  return (
-    <div>
-      <h1>{asset.name}</h1>
-      
-      {canShare && (
-        <button>Share</button>
-      )}
-    </div>
-  );
-}
+### Route Protection
+```typescript
+// PermissionGuard no longer clears cache
+<PermissionGuard action="view" subject="dashboard">
+  <Dashboard />
+</PermissionGuard>
 ```
 
-### Protecting Routes
+## Cache Statistics
 
-Use the `PermissionGuard` component to protect routes:
+The global cache provides debugging information:
 
-```tsx
-import { PermissionGuard } from './permissions';
-
-function SettingsPage() {
-  return (
-    <div>
-      <h1>Settings</h1>
-      
-      <PermissionGuard action="manage" subject="user">
-        <div>
-          <h2>User Management</h2>
-          <p>Manage users and permissions</p>
-        </div>
-      </PermissionGuard>
-    </div>
-  );
-}
+```typescript
+const stats = globalPermissionCache.getCacheStats();
+console.log({
+  hasGlobalCache: stats.hasGlobalCache,
+  cacheAge: stats.cacheAge,
+  expiresIn: stats.expiresIn,
+  permissionChecksCount: stats.permissionChecksCount
+});
 ```
 
-Or use the `RoutePermissionGuard` component in your router configuration:
+## Migration Notes
 
-```tsx
-import { RoutePermissionGuard } from './permissions';
+### Breaking Changes
+- Old `permissionCache` and `PermissionTokenCache` are replaced by `globalPermissionCache`
+- Cache clearing behavior has changed - caches are now preserved during normal operations
 
-function AppRoutes() {
-  return (
-    <Routes>
-      <Route path="/" element={<div>Home Page</div>} />
-      
-      <Route 
-        path="/assets" 
-        element={
-          <RoutePermissionGuard 
-            permission={{ action: 'view', subject: 'asset' }}
-            element={<div>Assets Page</div>}
-          />
-        } 
-      />
-    </Routes>
-  );
-}
+### Backward Compatibility
+- All existing permission checking APIs remain the same
+- Component interfaces unchanged
+- No changes required in consuming components
+
+## Configuration
+
+### Cache TTL Settings
+```typescript
+// Permission check cache TTL (default: 5 minutes)
+private readonly TTL = 5 * 60 * 1000;
+
+// Global cache TTL (based on JWT expiry)
+// Automatically calculated from token expiration
 ```
 
-## Best Practices
+### Storage Keys
+```typescript
+// Global cache storage
+private static CACHE_KEY = 'medialake_global_permission_cache';
 
-1. **Use the Can component for conditional rendering**: This provides a clear and declarative way to show or hide UI elements based on permissions.
+// Permission checks storage  
+private static CHECK_CACHE_KEY = 'medialake_permission_checks';
+```
 
-2. **Use the passThrough prop for disabled states**: When you want to show a UI element but disable it based on permissions, use the `passThrough` prop with a render function.
+## Testing
 
-3. **Use the usePermission hook for complex logic**: When you need to check permissions in more complex scenarios, use the `usePermission` hook.
+To verify the caching system is working:
 
-4. **Use the PermissionGuard component for protecting routes**: This ensures that users can only access routes they have permission to view.
+1. **Check Console Logs**: Look for "Global permission cache updated" messages
+2. **Monitor Network**: Verify reduced API calls for permission checks
+3. **Page Reload Test**: Permissions should load instantly from cache
+4. **Token Refresh Test**: Cache should be updated, not cleared
 
-5. **Keep permission checks close to the UI**: Place permission checks as close as possible to the UI elements they protect to make the code more maintainable.
+## Performance Metrics
 
-## Examples
+Expected improvements:
+- **50-80% reduction** in permission-related API calls
+- **Faster page load times** due to cached permissions
+- **Reduced "checking permissions" delays**
+- **Improved user experience** with instant permission resolution
 
-See the `examples/integration-example.tsx` file for a complete example of how to integrate the CASL v5 authorization system into your application.
+## Future Enhancements
+
+1. **Cache Warming**: Pre-load permissions for anticipated routes
+2. **Background Refresh**: Update cache before expiration
+3. **Selective Invalidation**: Invalidate specific permission types
+4. **Metrics Collection**: Track cache hit rates and performance
+5. **Cache Compression**: Optimize storage size for large permission sets

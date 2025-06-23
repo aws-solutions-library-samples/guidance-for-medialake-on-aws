@@ -516,3 +516,4 @@ class LambdaMiddleware:
 def lambda_middleware(**kw):
     mw = LambdaMiddleware(**kw)
     return lambda handler: mw(handler)
+

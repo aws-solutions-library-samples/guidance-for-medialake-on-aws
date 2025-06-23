@@ -63,7 +63,16 @@ def translate_event_to_request(event):
         
         # Extract the base name from the source key (without extension)
         import os
+        import re
         base_name = os.path.splitext(os.path.basename(s3_key))[0]
+        
+        # Sanitize base_name to comply with AWS Transcribe OutputKey constraints
+        # Replace spaces and other problematic characters with underscores
+        base_name = re.sub(r'[^a-zA-Z0-9\-_.\!\*\'\(\)\/\&\$@=;:+,?]', '_', base_name)
+        # Remove multiple consecutive underscores
+        base_name = re.sub(r'_+', '_', base_name)
+        # Remove leading/trailing underscores
+        base_name = base_name.strip('_')
         
         # Get the media format from the file extension or from the Format field
         media_format = ""
@@ -98,6 +107,7 @@ def translate_event_to_request(event):
             "s3_bucket": s3_bucket,
             "s3_key": s3_key,
             "s3_path": s3_path,
+            "base_name": base_name,
             "inventory_id": inventory_id,
             "job_name": job_name,
             "media_format": media_format,

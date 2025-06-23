@@ -1,11 +1,10 @@
 // src/permissions/components/PermissionGuard.tsx
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { usePermission } from '../hooks/usePermission';
 import { useAuth } from '../../common/hooks/auth-context';
 import { Actions, Subjects } from '../types/ability.types';
 import { PermissionGuardProps } from '../types/permission.types';
-import { permissionCache } from '../utils/permission-cache';
 import { Box, CircularProgress, Typography } from '@mui/material';
 
 /**
@@ -24,13 +23,6 @@ export function PermissionGuard({
   const { can, loading } = usePermission();
   const { isAuthenticated, isLoading: authLoading, isInitialized } = useAuth();
   const location = useLocation();
-  
-  // Clear the permission cache when the component mounts
-  // This ensures that we always get a fresh permission check
-  useEffect(() => {
-    console.log('PermissionGuard: Clearing permission cache');
-    permissionCache.clear();
-  }, []);
   
   // Show loading state if authentication or permissions are still loading/initializing
   if (authLoading || !isInitialized || loading) {

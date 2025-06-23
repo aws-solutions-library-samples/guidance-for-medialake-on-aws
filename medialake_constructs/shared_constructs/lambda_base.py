@@ -218,6 +218,12 @@ class Lambda(Construct):
     - VPC configuration (optional)
     - Environment variables
     - Resource naming and validation
+    - Common libraries integration via Docker bundling (Python) or local copying (Node.js)
+
+    Common Libraries Handling:
+    - Python functions: Common libraries are automatically copied during Docker bundling,
+      eliminating the need for local file duplication in Lambda directories.
+    - Node.js functions: Common libraries are still copied locally due to different bundling process.
 
     Example:
         ```python
@@ -443,18 +449,21 @@ class Lambda(Construct):
         logger.info(
             f"Creating {config.runtime.family} Lambda function with properties"
         )
-        # Collect common libraries
         entry_path = Path(common_lambda_props["entry"])
-        common_libs = self._collect_common_libraries(entry_path)
-        logger.debug(f"Found common libraries: {common_libs}")
+        logger.debug(f"Lambda entry path: {entry_path}")
 
         try:
             if config.runtime.family == lambda_.RuntimeFamily.NODEJS:
+                # For Node.js, we still collect common libraries for local copying since 
+                # the Node.js bundling process is different
+                common_libs = self._collect_common_libraries(entry_path)
+                logger.debug(f"Found common libraries for Node.js: {common_libs}")
                 self._create_nodejs_function(common_lambda_props, common_libs)
             else:
-                # Python specific bundling with hash-based asset tracking
+                # Python bundling now handles common libraries via Docker - no local copying needed
+                logger.debug("Using enhanced Docker bundling for Python - common libraries handled automatically")
                 self._create_python_function(
-                    common_lambda_props, config, entry_path, common_libs
+                    common_lambda_props, config, entry_path, {}
                 )
 
             # --- SnapStart: Ensure versioning if enabled ---
@@ -473,6 +482,9 @@ class Lambda(Construct):
         Collect common libraries from parent directories.
         Returns a dictionary mapping file names to their full paths,
         with more specific (closer to lambda) libraries taking precedence.
+        
+        Note: This method is now only used for Node.js functions. Python functions
+        handle common libraries through enhanced Docker bundling during the build process.
         """
         common_libs = {}
         current_path = entry_path
@@ -498,6 +510,9 @@ class Lambda(Construct):
     ) -> None:
         """
         Copy common libraries to the target directory, flattening the structure.
+        
+        Note: This method is now only used for Node.js functions. Python functions
+        handle common libraries through enhanced Docker bundling to avoid local file copying.
         """
         import shutil
         logger = Logger()
@@ -542,7 +557,7 @@ class Lambda(Construct):
 
             # Add a default index document if not defined
             if not "." in props["handler"]:
-                props["handler"] = f"index.{props["handler"]}"
+                props["handler"] = f"index.{props['handler']}"
 
             self._function = lambda_.Function(
                 self,
@@ -568,27 +583,88 @@ class Lambda(Construct):
     def _create_python_function(
         self, props: dict, config: LambdaConfig, entry_path: Path, common_libs: dict
     ):
-        """Handle Python specific function creation with asset hashing"""
+        """Handle Python specific function creation with enhanced bundling"""
         logger = Logger()
 
-        # Generate hash of source files for deterministic builds
-        # source_hash = self._generate_source_hash(entry_path, common_libs)
-
+        # Enhanced bundling options that copy common libraries during Docker build
         bundling_options = BundlingOptions(
-            # Override the default command to install dependencies without caching and then copy assets.
             command=[
                 "bash",
                 "-c",
-                "if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt -t /asset-output; fi && cp -au . /asset-output",
+                """
+                set -e
+                echo "Starting Lambda bundling process..."
+                
+                # Install requirements if they exist
+                if [ -f requirements.txt ]; then 
+                    echo "Installing Python requirements..."
+                    pip install --no-cache-dir -r requirements.txt -t /asset-output
+                fi
+                
+                # Copy lambda source files
+                echo "Copying Lambda source files..."
+                cp -au . /asset-output
+                
+                # Copy common libraries from various possible locations
+                COMMON_LIBS_COPIED=false
+                
+                # Try different possible paths for common_libraries based on Lambda location depth
+                # For lambdas at root level: ../common_libraries
+                # For lambdas in api/: ../../common_libraries  
+                # For lambdas in api/category/: ../../../common_libraries
+                # For lambdas in api/category/function/: ../../../../common_libraries
+                for path in "/asset-input/../common_libraries" "/asset-input/../../common_libraries" "/asset-input/../../../common_libraries" "/asset-input/../../../../common_libraries" "/asset-input/../../../../../common_libraries"; do
+                    if [ -d "$path" ]; then
+                        echo "Found common libraries at: $path"
+                        echo "Copying common libraries to Lambda bundle..."
+                        
+                        # List files being copied for debugging
+                        echo "Files in common_libraries:"
+                        ls -la "$path"
+                        
+                        # Copy files individually to avoid issues with globbing
+                        for file in "$path"/*; do
+                            if [ -f "$file" ]; then
+                                filename=$(basename "$file")
+                                echo "Copying: $filename"
+                                cp -u "$file" /asset-output/ || echo "Warning: Could not copy $filename"
+                            fi
+                        done
+                        COMMON_LIBS_COPIED=true
+                        break
+                    else
+                        echo "Path not found: $path"
+                    fi
+                done
+                
+                if [ "$COMMON_LIBS_COPIED" = false ]; then
+                    echo "Warning: No common_libraries directory found. Searched paths:"
+                    echo "  - /asset-input/../common_libraries"
+                    echo "  - /asset-input/../../common_libraries" 
+                    echo "  - /asset-input/../../../common_libraries"
+                    echo "  - /asset-input/../../../../common_libraries"
+                    echo "  - /asset-input/../../../../../common_libraries"
+                    echo "Current working directory during build:"
+                    pwd
+                    echo "Directory structure:"
+                    find /asset-input -name "common_libraries" -type d 2>/dev/null || echo "No common_libraries found in asset-input tree"
+                else
+                    echo "Successfully copied common libraries"
+                fi
+                
+                echo "Bundling process completed successfully"
+                """,
             ],
-            # We can adjust the working directory if needed (default is /asset-input)
             working_directory="/asset-input",
         )
 
-        # Copy common libraries
+        # Use custom bundling if provided, otherwise use enhanced bundling
+        if config.python_bundling:
+            logger.debug("Using custom Python bundling options from config")
+            bundling_options = config.python_bundling
 
-        if common_libs:
-            self._copy_common_libraries(common_libs, entry_path)
+        # No need to copy common libraries locally since Docker bundling handles it
+        logger.debug("Skipping local common libraries copying - handled by Docker bundling")
 
         # If the deployment is part of a CI/CD pipeline, avoid using PythonFunction as it's relying on DnD
         # CI env var is exposed by Gitlab. TODO: add Github specific env var
@@ -600,7 +676,7 @@ class Lambda(Construct):
 
             # Add a default index document if not defined
             if not "." in props["handler"]:
-                props["handler"] = f"index.{props["handler"]}"
+                props["handler"] = f"index.{props['handler']}"
 
             self._function = lambda_.Function(
                 self,

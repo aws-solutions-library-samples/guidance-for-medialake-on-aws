@@ -8,8 +8,7 @@ import { transformPermissions } from '../transformers/permission-transformer';
 import { useGetPermissionSets } from '../../api/hooks/usePermissionSets';
 import { useAuth } from '../../common/hooks/auth-context';
 import { StorageHelper } from '../../common/helpers/storage-helper';
-import { permissionCache } from '../utils/permission-cache';
-import PermissionTokenCache from '../utils/permission-token-cache';
+import { globalPermissionCache } from '../utils/global-permission-cache';
 
 // Create the permission context with default values
 const PermissionContext = createContext<PermissionContextType>({
@@ -40,7 +39,7 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
     refetch
   } = useGetPermissionSets(shouldFetchPermissions);
 
-  // Extract user information from JWT token
+  // Extract user information from JWT token and check global cache
   useEffect(() => {
     console.log('PermissionProvider: Auth state changed', { isAuthenticated, isInitialized, authLoading });
     
@@ -48,12 +47,14 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
       try {
         const token = StorageHelper.getToken();
         if (token) {
-          // Check cache first
-          const cached = PermissionTokenCache.get(token);
-          if (cached) {
-            console.log('Using cached user and permissions');
-            const cachedUser = { ...cached.user, customPermissions: cached.customPermissions };
+          // Check global cache first
+          const globalCache = globalPermissionCache.getGlobalCache(token);
+          if (globalCache) {
+            console.log('Using global cached user and permissions');
+            const cachedUser = { ...globalCache.user, customPermissions: globalCache.customPermissions };
             setUser(cachedUser);
+            setAbility(globalCache.ability);
+            setPermissionsInitialized(true);
             return;
           }
           
@@ -85,15 +86,6 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
               }
             }
             
-            // Cache the permissions with token expiry
-            const exp = payload.exp;
-            if (exp) {
-              const expiresIn = exp - Math.floor(Date.now() / 1000); // Time until expiry in seconds
-              if (expiresIn > 0) {
-                PermissionTokenCache.set(extractedUser, customPermissions, token, expiresIn);
-              }
-            }
-            
             console.log('Extracted user from claims:', extractedUser);
             setUser(extractedUser);
           } else {
@@ -111,7 +103,7 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
     } else {
       setUser(null);
       setPermissionsInitialized(false);
-      PermissionTokenCache.clear(); // Clear cache on logout
+      globalPermissionCache.clear(); // Clear cache on logout
     }
   }, [isAuthenticated, isInitialized]);
 
@@ -147,9 +139,15 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
               
               console.log('Extracted user from new token:', extractedUser);
               setUser(extractedUser);
-              // Clear cache to force fresh evaluation
-              permissionCache.clear();
-              PermissionTokenCache.clear();
+              
+              // Update token in global cache instead of clearing everything
+              const exp = payload.exp;
+              if (exp) {
+                const expiresIn = exp - Math.floor(Date.now() / 1000);
+                if (expiresIn > 0) {
+                  globalPermissionCache.updateToken(newToken, expiresIn);
+                }
+              }
             }
           } catch (error) {
             console.error('Error extracting user from refreshed token:', error);
@@ -159,8 +157,7 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
           console.log('Token was cleared, resetting permissions');
           setUser(null);
           setAbility(createAppAbility());
-          permissionCache.clear();
-          PermissionTokenCache.clear();
+          globalPermissionCache.clear();
         }
       }
     };
@@ -179,32 +176,66 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
     
     if (isAuthenticated && isInitialized && user) {
       try {
+        const token = StorageHelper.getToken();
+        if (!token) return;
+
+        // Check if we already have this in global cache
+        const globalCache = globalPermissionCache.getGlobalCache(token);
+        if (globalCache && globalCache.user.id === user.id) {
+          console.log('Using existing global cache for ability');
+          setAbility(globalCache.ability);
+          setPermissionsInitialized(true);
+          return;
+        }
+
         // Check if we have custom permissions from JWT
         if ((user as any).customPermissions) {
           console.log('Using custom permissions from JWT, skipping permission sets API');
-          // Clear the permission cache before creating a new ability
-          permissionCache.clear();
           
           // Create ability using custom permissions (empty permission sets)
           const newAbility = defineAbilityFor(user, []);
           console.log('New ability created with custom permissions:', newAbility);
           setAbility(newAbility);
           setPermissionsInitialized(true);
+
+          // Store in global cache
+          const exp = JSON.parse(atob(token.split('.')[1])).exp;
+          const expiresIn = exp - Math.floor(Date.now() / 1000);
+          if (expiresIn > 0) {
+            globalPermissionCache.setGlobalCache(
+              user,
+              (user as any).customPermissions,
+              newAbility,
+              [],
+              token,
+              expiresIn
+            );
+          }
         } else if (permissionSets) {
           // If no custom permissions but we have permission sets from API
           // Transform permission sets to the format expected by CASL
           const transformedPermissions = transformPermissions(permissionSets || []);
           console.log('Transformed permissions:', transformedPermissions);
           
-          // Clear the permission cache before creating a new ability
-          console.log('Clearing permission cache before creating new ability');
-          permissionCache.clear();
-          
           // Create the ability instance
           const newAbility = defineAbilityFor(user, transformedPermissions);
           console.log('New ability created:', newAbility);
           setAbility(newAbility);
           setPermissionsInitialized(true);
+
+          // Store in global cache
+          const exp = JSON.parse(atob(token.split('.')[1])).exp;
+          const expiresIn = exp - Math.floor(Date.now() / 1000);
+          if (expiresIn > 0) {
+            globalPermissionCache.setGlobalCache(
+              user,
+              [],
+              newAbility,
+              permissionSets,
+              token,
+              expiresIn
+            );
+          }
         } else if (!shouldFetchPermissions) {
           // If no custom permissions and no permission sets yet, enable fetching
           // but only if we haven't already enabled it

@@ -515,3 +515,4 @@ def is_lambda_warmer_event(event: dict) -> bool:
             if event.get("resources") and any("lambda-warmer" in r for r in event["resources"]):
                 return True
     return False
+
