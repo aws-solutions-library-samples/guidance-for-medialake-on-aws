@@ -28,6 +28,7 @@ from config import config
 class AssetSyncStackProps:
     asset_table: dynamodb.TableV2
     ingest_event_bus: events.EventBus
+    media_assets_bucket: s3.IBucket
 
 
 class AssetSyncStack(cdk.NestedStack):
@@ -174,6 +175,15 @@ class AssetSyncStack(cdk.NestedStack):
             iam.PolicyStatement(
                 actions=["lambda:InvokeFunction"],
                 resources=[self._asset_sync_processor_lambda.function.function_arn],
+            )
+        )
+        
+        # Add S3 inventory configuration permission to batch operations role
+        self.batch_operations_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=["s3:PutInventoryConfiguration"],
+                resources=[props.media_assets_bucket.bucket_arn],
+                effect=iam.Effect.ALLOW,
             )
         )
 
