@@ -22,6 +22,16 @@ export function Can({
   const { isAuthenticated, isInitialized } = useAuth();
   const [lastKnownResult, setLastKnownResult] = useState<boolean | null>(null);
   
+  // Calculate allowed value (always call hooks first)
+  const allowed = can(action as Actions, subject as Subjects, field);
+  
+  // Update last known result (always call useEffect)
+  useEffect(() => {
+    if (!loading) {
+      setLastKnownResult(allowed);
+    }
+  }, [allowed, loading]);
+  
   console.log('Can component rendering with:', { action, subject, field });
   console.log('Can component loading state:', loading);
   
@@ -47,16 +57,7 @@ export function Can({
     }
   }
   
-  const allowed = can(action as Actions, subject as Subjects, field);
-  
   console.log('Can component permission check result:', allowed);
-  
-  // Update last known result
-  useEffect(() => {
-    if (!loading) {
-      setLastKnownResult(allowed);
-    }
-  }, [allowed, loading]);
   
   // If children is a function, call it with the allowed status
   if (typeof children === 'function') {

@@ -1,4 +1,3 @@
-import React from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../apiClient';
 import { API_ENDPOINTS } from '../endpoints';
@@ -14,18 +13,14 @@ import {
 } from '../types/group.types';
 
 export const useGetGroups = (enabled: boolean = true) => {
-  // Add a unique identifier to track each hook instance
-  const hookId = React.useId ? React.useId() : Math.random().toString(36).substring(7);
-  console.log(`useGetGroups hook instance created: ${hookId}`);
-  
   return useQuery<Group[], Error>({
     queryKey: QUERY_KEYS.GROUPS.all,
     enabled: enabled,
     queryFn: async () => {
       try {
-        console.log(`Fetching groups... [${new Date().toISOString()}] from hook instance: ${hookId}`);
+        console.log(`Fetching groups... [${new Date().toISOString()}]`);
         const { data } = await apiClient.get<any>(API_ENDPOINTS.GROUPS.BASE);
-        console.log(`Groups API response [${new Date().toISOString()}] for hook instance: ${hookId}`);
+        console.log(`Groups API response [${new Date().toISOString()}]`);
       
         // Handle string body format (older API format)
         if (typeof data.body === 'string') {
@@ -51,7 +46,7 @@ export const useGetGroups = (enabled: boolean = true) => {
       } catch (error: any) {
         // Handle 403 errors gracefully
         if (error?.response?.status === 403) {
-          console.log(`Groups API returned 403 Forbidden for hook instance: ${hookId}`);
+          console.log('Groups API returned 403 Forbidden');
           console.log('User likely does not have permission to access groups');
           // Return empty array instead of throwing an error
           return [];

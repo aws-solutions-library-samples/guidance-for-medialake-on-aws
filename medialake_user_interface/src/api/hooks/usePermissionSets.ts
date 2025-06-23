@@ -13,7 +13,7 @@ import {
 
 export const useGetPermissionSets = (enabled = false) => {
   // Add a unique identifier to track each hook instance
-  const hookId = React.useId ? React.useId() : Math.random().toString(36).substring(7);
+  const hookId = React.useId();
   console.log(`useGetPermissionSets hook instance created: ${hookId}`);
   
   return useQuery<PermissionSet[], Error>({

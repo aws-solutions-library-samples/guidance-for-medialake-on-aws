@@ -53,6 +53,24 @@ interface UserListProps {
     onSortChange?: (columnId: string, desc: boolean) => void;
 }
 
+// Helper component for managing permission set chips
+const PermissionSetCell: React.FC<{
+    user: User,
+    theme: any,
+    permissionSets: any[] | undefined
+}> = ({ user, theme, permissionSets }) => {
+    const { data: userAssignments } = useListUserAssignments(user.username);
+    
+    return (
+        <PermissionSetChips
+            user={user}
+            theme={theme}
+            permissionSets={permissionSets}
+            userAssignments={userAssignments}
+        />
+    );
+};
+
 // Helper component for managing group chips
 const GroupChips: React.FC<{
     user: User,
@@ -435,13 +453,10 @@ const UserList: React.FC<UserListProps> = ({
                 enableSorting: false,
                 enableFiltering: false,
                 cell: ({ row }) => {
-                    // Get user assignments for this specific user
-                    const { data: userAssignments } = useListUserAssignments(row.original.username);
-                    return <PermissionSetChips
+                    return <PermissionSetCell
                         user={row.original}
                         theme={theme}
                         permissionSets={permissionSets}
-                        userAssignments={userAssignments}
                     />;
                 },
             },
@@ -559,7 +574,7 @@ const UserList: React.FC<UserListProps> = ({
                 ),
             },
         ];
-    }, [theme, t, onEditUser, onDeleteUser, onToggleUserStatus]);
+    }, [theme, t, onEditUser, onDeleteUser, onToggleUserStatus, groups, permissionSets]);
 
     const table = useReactTable({
         data: users,
