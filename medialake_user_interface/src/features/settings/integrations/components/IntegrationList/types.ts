@@ -6,6 +6,7 @@ export interface Integration extends BaseIntegration {
     name: string;
     type: string;
     status: string;
+    description: string;
     createdAt: string;
     updatedAt: string;
 }

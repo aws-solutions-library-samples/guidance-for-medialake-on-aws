@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from constructs import Construct
 import aws_cdk as cdk
+import json
+import os
 
 from aws_cdk import (
     Stack,
@@ -27,6 +29,12 @@ class CleanupStack(Stack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
+        # Load config to get resource prefix
+        config_path = os.path.join(os.path.dirname(__file__), "..", "config.json")
+        with open(config_path, "r") as f:
+            config = json.load(f)
+        resource_prefix = config.get("resource_prefix", "medialake")
+
         self._clean_up_lambda = Lambda(
             self,
             "MediaLakeCleanUp",
@@ -34,10 +42,10 @@ class CleanupStack(Stack):
                 name="MediaLakeCleanUp",
                 timeout_minutes=15,
                 entry="lambdas/back_end/provisioned_resource_cleanup",
-                # log_removal_policy=RemovalPolicy.RETAIN,  # Enable to debug
                 environment_variables={
                     "CONNECTOR_TABLE": props.connector_table.table_name,
                     "PIPELINE_TABLE": props.pipeline_table.table_name,
+                    "RESOURCE_PREFIX": resource_prefix,
                 },
             ),
         )
@@ -46,7 +54,7 @@ class CleanupStack(Stack):
         props.pipeline_table.grant_read_write_data(self._clean_up_lambda.function)
 
 
-        # Add EventBridge Pipes permissions
+        # Add EventBridge Pipes permissions - restricted to resource prefix
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 actions=[
@@ -57,11 +65,11 @@ class CleanupStack(Stack):
                     "pipes:UntagResource",
                     "pipes:ListTagsForResource"
                 ],
-                resources=[f"arn:aws:pipes:{Stack.of(self).region}:{Stack.of(self).account}:pipe/*"],
+                resources=[f"arn:aws:pipes:{Stack.of(self).region}:{Stack.of(self).account}:pipe/{resource_prefix}*"],
             )
         )
 
-        # Ensure IAM permissions for role deletion are complete
+        # Ensure IAM permissions for role deletion are complete - restricted to resource prefix
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
@@ -74,7 +82,7 @@ class CleanupStack(Stack):
                     "iam:DetachRolePolicy",
                     "iam:DeleteRolePolicy",
                 ],
-                resources=[f"arn:aws:iam::{Stack.of(self).account}:role/*"],
+                resources=[f"arn:aws:iam::{Stack.of(self).account}:role/{resource_prefix}*"],
             )
         )
 
@@ -100,26 +108,29 @@ class CleanupStack(Stack):
             )
         )
 
+        # Lambda function deletion - restricted to resource prefix
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=["lambda:DeleteFunction"],
                 resources=[
-                    f"arn:aws:lambda:{Stack.of(self).region}:{Stack.of(self).account}:function:*"
-                ],  # TODO add resource prefix i.e. medialake
+                    f"arn:aws:lambda:{Stack.of(self).region}:{Stack.of(self).account}:function:{resource_prefix}*"
+                ],
             )
         )
 
+        # Step Functions deletion - restricted to resource prefix
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=["states:DeleteStateMachine"],
                 resources=[
-                    f"arn:aws:states:{Stack.of(self).region}:{Stack.of(self).account}:stateMachine:*"
-                ],  # TODO add resource prefix i.e. medialake
+                    f"arn:aws:states:{Stack.of(self).region}:{Stack.of(self).account}:stateMachine:{resource_prefix}*"
+                ],
             )
         )
 
+        # EventBridge rules and targets - restricted to resource prefix
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
@@ -130,10 +141,14 @@ class CleanupStack(Stack):
                     "events:RemoveTargets",
                     "events:DeleteRule",
                 ],
-                resources=["*"],
+                resources=[
+                    f"arn:aws:events:{Stack.of(self).region}:{Stack.of(self).account}:rule/{resource_prefix}*",
+                    f"arn:aws:events:{Stack.of(self).region}:{Stack.of(self).account}:event-bus/{resource_prefix}*",
+                ],
             )
         )
 
+        # SQS queue deletion - restricted to resource prefix
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
@@ -143,10 +158,11 @@ class CleanupStack(Stack):
                     "sqs:ListQueues",
                     "sqs:ListQueueTags",
                 ],
-                resources=[f"arn:aws:sqs:*:{Stack.of(self).account}:*"],
+                resources=[f"arn:aws:sqs:*:{Stack.of(self).account}:{resource_prefix}*"],
             )
         )
 
+        # S3 bucket notification permissions - keep broad for operational needs
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
@@ -158,6 +174,7 @@ class CleanupStack(Stack):
             )
         )
 
+        # CloudWatch Log Groups - restricted to resource prefix patterns
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
@@ -171,7 +188,8 @@ class CleanupStack(Stack):
                     "logs:UntagLogGroup",
                 ],
                 resources=[
-                    f"arn:aws:logs:{Stack.of(self).region}:{Stack.of(self).account}:log-group:*"
+                    f"arn:aws:logs:{Stack.of(self).region}:{Stack.of(self).account}:log-group:/aws/lambda/{resource_prefix}*",
+                    f"arn:aws:logs:{Stack.of(self).region}:{Stack.of(self).account}:log-group:{resource_prefix}*",
                 ],
             )
         )

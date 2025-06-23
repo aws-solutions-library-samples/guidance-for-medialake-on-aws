@@ -19,8 +19,15 @@ logger = Logger(service="upload-api", level=os.getenv("LOG_LEVEL", "WARNING"))
 
 # Initialize DynamoDB and S3
 dynamodb = boto3.resource("dynamodb")
-# Configure S3 client with Signature Version 4 for KMS compatibility
-s3_config = Config(signature_version='s3v4')
+
+# Regional S3 client configuration for better cross-region support
+_SIGV4_CFG = Config(
+    signature_version="s3v4",
+    s3={"addressing_style": "virtual"},
+)
+
+_ENDPOINT_TMPL = "https://s3.{region}.amazonaws.com"
+_S3_CLIENT_CACHE: Dict[str, boto3.client] = {}  # {region → client}
 
 # Define constants
 DEFAULT_EXPIRATION = 3600  # 1 hour in seconds
@@ -54,12 +61,14 @@ class RequestBody(BaseModel):
     path: str = ""
     
     @validator('filename')
+    @classmethod
     def validate_filename(cls, v):
         if not re.match(FILENAME_REGEX, v):
             raise ValueError(f"Filename must match pattern: {FILENAME_REGEX}")
         return v
     
     @validator('content_type')
+    @classmethod
     def validate_content_type(cls, v):
         # Check if content type matches any of the allowed patterns
         for allowed_type in ALLOWED_CONTENT_TYPES:
@@ -72,6 +81,7 @@ class RequestBody(BaseModel):
         raise ValueError(f"Content type not allowed. Must be one of: {', '.join(ALLOWED_CONTENT_TYPES)}")
     
     @validator('path')
+    @classmethod
     def validate_path(cls, v):
         # Normalize path to prevent path traversal attacks
         normalized_path = os.path.normpath(v)
@@ -88,6 +98,32 @@ class APIError(Exception):
         self.message = message
         self.status_code = status_code
         super().__init__(self.message)
+
+
+def _get_s3_client_for_bucket(bucket: str) -> boto3.client:
+    """
+    Return an S3 client **pinned to the bucket's actual region**.
+    Clients are cached to reuse TCP connections across warm invocations.
+    """
+    generic = _S3_CLIENT_CACHE.setdefault(
+        "us-east-1",
+        boto3.client("s3", region_name="us-east-1", config=_SIGV4_CFG),
+    )
+
+    try:
+        region = (generic.get_bucket_location(Bucket=bucket)
+                        .get("LocationConstraint") or "us-east-1")
+    except generic.exceptions.NoSuchBucket:
+        raise ValueError(f"S3 bucket {bucket!r} does not exist")
+
+    if region not in _S3_CLIENT_CACHE:
+        _S3_CLIENT_CACHE[region] = boto3.client(
+            "s3",
+            region_name=region,
+            endpoint_url=_ENDPOINT_TMPL.format(region=region),
+            config=_SIGV4_CFG,
+        )
+    return _S3_CLIENT_CACHE[region]
 
 
 @tracer.capture_method
@@ -120,9 +156,11 @@ def is_multipart_upload_required(file_size: int) -> bool:
 @tracer.capture_method
 def generate_presigned_post_url(bucket: str, key: str, content_type: str, 
                               expiration: int = DEFAULT_EXPIRATION) -> Dict[str, Any]:
-    """Generate a presigned POST URL for the S3 object."""
+    """Generate a presigned POST URL for the S3 object using region-aware S3 client."""
     try:
-        s3_client = boto3.client("s3", config=s3_config)
+        # Get region-specific S3 client
+        s3_client = _get_s3_client_for_bucket(bucket)
+        
         conditions = [
             {"bucket": bucket},
             {"key": key},
@@ -140,6 +178,10 @@ def generate_presigned_post_url(bucket: str, key: str, content_type: str,
             ExpiresIn=expiration,
         )
         
+        logger.info(
+            f"Generated presigned POST URL for s3://{bucket}/{key} (region {s3_client.meta.region_name}) valid {expiration}s"
+        )
+        
         return presigned_post
     except Exception as e:
         logger.error(f"Error generating presigned POST URL: {str(e)}")
@@ -148,9 +190,11 @@ def generate_presigned_post_url(bucket: str, key: str, content_type: str,
 
 @tracer.capture_method
 def create_multipart_upload(bucket: str, key: str, content_type: str) -> Dict[str, Any]:
-    """Initiate a multipart upload and return the upload ID."""
+    """Initiate a multipart upload and return the upload ID using region-aware S3 client."""
     try:
-        s3_client = boto3.client("s3", config=s3_config)
+        # Get region-specific S3 client
+        s3_client = _get_s3_client_for_bucket(bucket)
+        
         response = s3_client.create_multipart_upload(
             Bucket=bucket,
             Key=key,
@@ -165,9 +209,11 @@ def create_multipart_upload(bucket: str, key: str, content_type: str) -> Dict[st
 @tracer.capture_method
 def get_presigned_urls_for_parts(bucket: str, key: str, upload_id: str, 
                                 parts: int, expiration: int = DEFAULT_EXPIRATION) -> List[Dict[str, Any]]:
-    """Generate presigned URLs for each part of a multipart upload."""
+    """Generate presigned URLs for each part of a multipart upload using region-aware S3 client."""
     try:
-        s3_client = boto3.client("s3", config=s3_config)
+        # Get region-specific S3 client
+        s3_client = _get_s3_client_for_bucket(bucket)
+        
         presigned_urls = []
         
         for part_number in range(1, parts + 1):

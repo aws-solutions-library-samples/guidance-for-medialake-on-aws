@@ -20,6 +20,7 @@ export interface Integration {
     name: string;
     type: string;
     status: string;
+    description: string;
     configuration: Record<string, any>;
     createdAt: string;
     updatedAt: string;

@@ -9,7 +9,41 @@ from botocore.config import Config
 from aws_lambda_powertools import Logger
 
 logger = Logger()
-s3_client = boto3.client("s3", config=Config(signature_version="s3v4"))
+
+# Signature style & virtual-host addressing are required for every region
+_SIGV4_CFG = Config(
+    signature_version="s3v4",
+    s3={"addressing_style": "virtual"},
+)
+
+_ENDPOINT_TMPL = "https://s3.{region}.amazonaws.com"
+_S3_CLIENT_CACHE: dict[str, boto3.client] = {}       # {region → client}
+
+# ─────────────────────────────────────────────────────────────────────────────
+def _get_s3_client_for_bucket(bucket: str) -> boto3.client:
+    """
+    Return an S3 client **pinned to the bucket's actual region**.
+    Clients are cached to reuse TCP connections across warm invocations.
+    """
+    generic = _S3_CLIENT_CACHE.setdefault(
+        "us-east-1",
+        boto3.client("s3", region_name="us-east-1", config=_SIGV4_CFG),
+    )
+
+    try:
+        region = (generic.get_bucket_location(Bucket=bucket)
+                        .get("LocationConstraint") or "us-east-1")
+    except generic.exceptions.NoSuchBucket:
+        raise ValueError(f"S3 bucket {bucket!r} does not exist")
+
+    if region not in _S3_CLIENT_CACHE:
+        _S3_CLIENT_CACHE[region] = boto3.client(
+            "s3",
+            region_name=region,
+            endpoint_url=_ENDPOINT_TMPL.format(region=region),
+            config=_SIGV4_CFG,
+        )
+    return _S3_CLIENT_CACHE[region]
 
 # Supported special keywords for search
 KEYWORDS = {
@@ -179,8 +213,14 @@ class CustomEncoder(json.JSONEncoder):
 def generate_presigned_url(
     bucket: str, key: str, expiration: int = 3600
 ) -> Optional[str]:
-    """Generate a presigned URL for an S3 object"""
+    """
+    Generate a presigned URL for an S3 object with region-aware client.
+    The URL is signed in the bucket's own region, preventing
+    SignatureDoesNotMatch errors outside us-east-1.
+    """
     try:
+        # Use region-aware S3 client
+        s3_client = _get_s3_client_for_bucket(bucket)
         url = s3_client.generate_presigned_url(
             "get_object",
             Params={
@@ -190,6 +230,12 @@ def generate_presigned_url(
             },
             ExpiresIn=expiration,
         )
+        
+        logger.info(
+            "Generated presigned URL for s3://%s/%s (region %s)",
+            bucket, key, s3_client.meta.region_name,
+        )
+        
         return url
     except Exception as e:
         logger.error(f"Error generating presigned URL: {str(e)}")

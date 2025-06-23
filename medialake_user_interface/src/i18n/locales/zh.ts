@@ -209,6 +209,11 @@ export default {
       endTime: '结束时间',
       duration: '时长',
       actions: '操作'
+    },
+    actions: {
+      retryFromCurrent: '从当前位置重试',
+      retryFromStart: '从头重试',
+      viewDetails: '查看详情'
     }
   },
   users: {

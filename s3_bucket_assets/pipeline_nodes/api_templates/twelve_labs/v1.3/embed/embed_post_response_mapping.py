@@ -17,4 +17,7 @@ def translate_event_to_request(response_body_and_event):
     if not embedding:
         raise ValueError("No float vector on returned segment")
 
-    return {"embedding": embedding}
+    return {
+        "embedding": embedding,
+        "embedding_scope": scope
+    }

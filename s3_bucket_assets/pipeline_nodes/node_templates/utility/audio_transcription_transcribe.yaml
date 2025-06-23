@@ -16,12 +16,12 @@ node:
               actions:
                 - transcribe:StartTranscriptionJob
               resources:
-                - "*"
+                - arn:aws:transcribe:${AWS::Region}:${AWS::AccountId}:transcription-job/*
             - effect: Allow
               actions:
                 - iam:PassRole
               resources:
-                - "*"
+                - arn:aws:iam::${AWS::AccountId}:role/*_audio_transcription_transcribe_*
             
       service_roles:
         - name: transcribe_service_role
@@ -32,14 +32,18 @@ node:
                 - effect: Allow
                   actions:
                     - s3:PutObject
-                    - s3:ListBucket
                     - s3:GetObject
-                    - s3:DeleteObject
                   resources:
-                    - "*"  # This could be more specific in production
+                    - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}/*
+                - effect: Allow
+                  actions:
+                    - s3:ListBucket
+                  resources:
+                    - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}
                 - effect: Allow
                   actions:
                     - kms:Decrypt
+                    - kms:GenerateDataKey
                   resources:
                     - ${MEDIA_ASSETS_BUCKET_ARN_KMS_KEY}
             

@@ -70,6 +70,10 @@ export interface AssetResultsViewProps<T> {
   // Selection functionality
   isAssetSelected?: (assetId: string) => boolean;
   onSelectToggle?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
+  // Select all functionality
+  hasSelectedAssets?: boolean;
+  selectAllState?: 'none' | 'some' | 'all';
+  onSelectAllToggle?: () => void;
   error?: { status: string; message: string } | null;
   isLoading?: boolean;
   // Functions to extract data from asset objects
@@ -122,6 +126,10 @@ function AssetResultsView<T>({
   onFavoriteToggle,
   isAssetSelected,
   onSelectToggle,
+  // Select all functionality
+  hasSelectedAssets,
+  selectAllState,
+  onSelectAllToggle,
   error,
   isLoading,
   getAssetId,
@@ -190,6 +198,9 @@ function AssetResultsView<T>({
           onThumbnailScaleChange={onThumbnailScaleChange}
           showMetadata={showMetadata}
           onShowMetadataChange={onShowMetadataChange}
+          hasSelectedAssets={hasSelectedAssets}
+          selectAllState={selectAllState}
+          onSelectAllToggle={onSelectAllToggle}
         />
         
         <ErrorDisplay 
@@ -285,6 +296,9 @@ function AssetResultsView<T>({
         onThumbnailScaleChange={onThumbnailScaleChange}
         showMetadata={showMetadata}
         onShowMetadataChange={onShowMetadataChange}
+        hasSelectedAssets={hasSelectedAssets}
+        selectAllState={selectAllState}
+        onSelectAllToggle={onSelectAllToggle}
       />
 
       {/* Sort the results based on the current sorting state */}

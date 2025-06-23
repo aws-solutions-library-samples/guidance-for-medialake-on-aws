@@ -74,6 +74,11 @@ interface MasterResultsViewProps {
   onSelectToggle?: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onFavoriteToggle?: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   
+  // Select all functionality
+  hasSelectedAssets?: boolean;
+  selectAllState?: 'none' | 'some' | 'all';
+  onSelectAllToggle?: () => void;
+  
   // Asset state accessors
   isAssetFavorited?: (assetId: string) => boolean;
 }
@@ -128,6 +133,11 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   onEditNameComplete,
   onSelectToggle,
   onFavoriteToggle,
+  
+  // Select all functionality
+  hasSelectedAssets,
+  selectAllState,
+  onSelectAllToggle,
   
   // Asset state accessors
   isAssetFavorited,
@@ -204,6 +214,9 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       onFavoriteToggle={onFavoriteToggle}
       isAssetSelected={isAssetSelected}
       onSelectToggle={onSelectToggle}
+      hasSelectedAssets={hasSelectedAssets}
+      selectAllState={selectAllState}
+      onSelectAllToggle={onSelectAllToggle}
       error={error}
       isLoading={isLoading}
       getAssetId={(asset) => asset.InventoryID}

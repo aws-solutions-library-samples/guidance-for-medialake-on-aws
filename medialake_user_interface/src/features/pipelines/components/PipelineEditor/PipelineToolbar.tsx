@@ -1,25 +1,41 @@
+/* PipelineToolbar.tsx */
+/* eslint-disable @typescript-eslint/no-shadow */
 import React, { useRef, ChangeEvent, useState } from 'react';
-import { ensureCorrectTypes } from '../../types';
-import { Stack, Button, Tooltip, FormControlLabel, Box, CircularProgress, Backdrop } from '@mui/material';
-import { IconSwitch } from '@/components/common';
+import {
+  Stack,
+  Button,
+  Tooltip,
+  FormControlLabel,
+  Box,
+  CircularProgress,
+  Backdrop,
+  IconButton,
+  ButtonGroup,
+  ClickAwayListener,
+  Grow,
+  Paper,
+  Popper,
+  MenuItem,
+  MenuList,
+  useTheme,
+  useMediaQuery,
+} from '@mui/material';
+import SaveIcon from '@mui/icons-material/Save';
+import CloseIcon from '@mui/icons-material/Close';
+import FileUploadIcon from '@mui/icons-material/FileUpload';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import DeleteIcon from '@mui/icons-material/Delete';
 import ToggleOnIcon from '@mui/icons-material/ToggleOn';
 import ToggleOffIcon from '@mui/icons-material/ToggleOff';
-import DeleteIcon from '@mui/icons-material/Delete';
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import { FaFileVideo } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
+import { ensureCorrectTypes } from '../../types';
+import { IconSwitch } from '@/components/common';
 import { PipelineNameInput } from './';
 import { useSidebar } from '@/contexts/SidebarContext';
 import { useRightSidebar, COLLAPSED_WIDTH } from '@/components/common/RightSidebar/SidebarContext';
-import FileUploadIcon from '@mui/icons-material/FileUpload';
-import FileDownloadIcon from '@mui/icons-material/FileDownload';
-import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
-import ButtonGroup from '@mui/material/ButtonGroup';
-import ClickAwayListener from '@mui/material/ClickAwayListener';
-import Grow from '@mui/material/Grow';
-import Paper from '@mui/material/Paper';
-import Popper from '@mui/material/Popper';
-import MenuItem from '@mui/material/MenuItem';
-import MenuList from '@mui/material/MenuList';
-import { FaFileVideo } from 'react-icons/fa';
 import type { Node, Edge, ReactFlowInstance } from 'reactflow';
 import { IntegrationValidationService } from '../../services/integrationValidation.service';
 import IntegrationValidationDialog from '../../components/IntegrationValidationDialog';
@@ -27,48 +43,54 @@ import type { InvalidNodeInfo, IntegrationMapping } from '../../services/integra
 import type { Integration } from '@/features/settings/integrations/types/integrations.types';
 import { drawerWidth, collapsedDrawerWidth } from '@/constants';
 
+/* —— props unchanged —— */
 export interface PipelineToolbarProps {
   onSave: () => Promise<void>;
   isLoading: boolean;
   pipelineName: string;
   onPipelineNameChange: (value: string) => void;
   reactFlowInstance: ReactFlowInstance | null;
-  // New props to update the flow state
   setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
   setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
-  active: boolean; // New prop for pipeline active state
-  onActiveChange: (active: boolean) => void; // New prop for handling active state changes
-  // Add prop for updating formData with imported pipeline
+  active: boolean;
+  onActiveChange: (active: boolean) => void;
   updateFormData?: (nodes: Node[], edges: Edge[]) => void;
-  // Add prop for deleting pipeline
   onDelete?: () => void;
-  // Add prop for pipeline status
   status?: string;
-  // Add prop to determine if we're editing an existing pipeline
   isEditMode?: boolean;
 }
 
-const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
-  onSave,
-  isLoading,
-  pipelineName,
-  onPipelineNameChange,
-  reactFlowInstance,
-  setNodes,
-  setEdges,
-  active,
-  onActiveChange,
-  updateFormData,
-  onDelete,
-  status,
-  isEditMode = false,
-}) => {
+const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
+  /* —— destructuring unchanged props for brevity —— */
+  const {
+    onSave, isLoading, pipelineName, onPipelineNameChange,
+    reactFlowInstance, setNodes, setEdges,
+    active, onActiveChange,
+    updateFormData, onDelete, status, isEditMode = false,
+  } = props;
+
+  /* —— routing & sidebar width logic —— */
   const navigate = useNavigate();
   const { isCollapsed: isLeftSidebarCollapsed } = useSidebar();
-  const { isExpanded: isRightSidebarExpanded, width } = useRightSidebar();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { isExpanded: isRightSidebarExpanded, width } = useRightSidebar(); // width includes manual resizing
 
-  // State for integration validation
+  /* —— NEW: Two-mode responsive approach —— */
+  const theme = useTheme();
+  
+  // Calculate available width for toolbar
+  const leftSidebarWidth = isLeftSidebarCollapsed ? collapsedDrawerWidth : drawerWidth;
+  const rightSidebarWidth = isRightSidebarExpanded ? width : COLLAPSED_WIDTH;
+  
+  // Determine if we should use compact mode based on available space
+  // This accounts for window width, sidebars, and dev tools
+  const availableWidth = typeof window !== 'undefined' ?
+    window.innerWidth - leftSidebarWidth - rightSidebarWidth - 64 : // 64px for margins
+    1200; // fallback for SSR
+  
+  const isCompactMode = availableWidth < 800; // Switch to compact mode when less than 800px available
+
+  /* —— refs & state (all original) —— */
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [validationDialogOpen, setValidationDialogOpen] = useState(false);
   const [invalidNodes, setInvalidNodes] = useState<InvalidNodeInfo[]>([]);
   const [availableIntegrations, setAvailableIntegrations] = useState<Integration[]>([]);
@@ -79,13 +101,6 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
     navigate('/pipelines');
   };
 
-  const commonStyles = {
-    backdropFilter: 'blur(8px)',
-    bgcolor: (theme: any) => `${theme.palette.background.paper}CC`,
-    '&:hover': {
-      bgcolor: (theme: any) => `${theme.palette.background.paper}EE`,
-    },
-  };
 
   // Load a flow from a JSON file.
   const handleLoadFlow = (event: ChangeEvent<HTMLInputElement>) => {
@@ -93,7 +108,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
     const fileReader = new FileReader();
     const files = event.target.files;
     console.log('[PipelineToolbar] Files selected:', files);
-    
+
     if (files && files.length > 0) {
       console.log('[PipelineToolbar] Starting import process for file:', files[0].name);
       setIsImporting(true);
@@ -122,7 +137,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
               processedFlow.nodes = processedFlow.configuration.nodes;
               processedFlow.edges = processedFlow.configuration.edges;
             }
-            
+
             // Store the processed imported flow temporarily
             setImportedFlow(processedFlow);
 
@@ -1017,7 +1032,25 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
     return exportPayload;
   };
 
-  // Import/Export dropdown functionality
+  // Compact mode dropdown functionality
+  const [compactMenuOpen, setCompactMenuOpen] = React.useState(false);
+  const compactMenuRef = React.useRef<HTMLDivElement>(null);
+
+  const handleCompactMenuToggle = () => {
+    setCompactMenuOpen((prevOpen) => !prevOpen);
+  };
+
+  const handleCompactMenuClose = (event: Event) => {
+    if (
+      compactMenuRef.current &&
+      compactMenuRef.current.contains(event.target as HTMLElement)
+    ) {
+      return;
+    }
+    setCompactMenuOpen(false);
+  };
+
+  // Import/Export dropdown functionality (for full mode)
   const [importExportOpen, setImportExportOpen] = React.useState(false);
   const importExportRef = React.useRef<HTMLDivElement>(null);
 
@@ -1049,252 +1082,383 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
     setImportExportOpen(false);
   };
 
+  // Add window resize listener to update compact mode
+  React.useEffect(() => {
+    const handleResize = () => {
+      // Force re-render to recalculate availableWidth
+      // This is handled automatically by the component re-rendering
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  /* ——————————————————————————————————————— render —————————————————————————————————————— */
   return (
     <>
-      {/* Loading Backdrop */}
+      {/* Loading Backdrop (unchanged) */}
       <Backdrop
-        sx={{
-          color: '#fff',
-          zIndex: (theme) => theme.zIndex.drawer + 1,
-          flexDirection: 'column',
-          gap: 2
-        }}
+        sx={{ color: '#fff', zIndex: (t) => t.zIndex.drawer + 1, flexDirection: 'column', gap: 2 }}
         open={isImporting}
       >
         <CircularProgress color="inherit" />
-        <Box sx={{ typography: 'body1', fontWeight: 'medium' }}>
-          Importing Pipeline...
-        </Box>
+        <Box sx={{ typography: 'body1', fontWeight: 500 }}>Importing Pipeline…</Box>
       </Backdrop>
 
-      {/* Container to calculate available space */}
+      {/* Hidden file input - available for both compact and full modes */}
+      <input
+        type="file"
+        accept="application/json"
+        ref={fileInputRef}
+        style={{ display: 'none' }}
+        onChange={handleLoadFlow}
+        onClick={(e) => ((e.target as HTMLInputElement).value = '')}
+      />
+
+      {/* Main bar */}
       <Box
         sx={{
           position: 'fixed',
           zIndex: 1100,
-          left: (isLeftSidebarCollapsed ? collapsedDrawerWidth : drawerWidth) + 16,
-          right: (isRightSidebarExpanded ? width : COLLAPSED_WIDTH) + 16,
-          top: '72px',
+          left: leftSidebarWidth + 16,
+          right: rightSidebarWidth + 16,
+          top: 72,
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          minWidth: 0,
+          gap: 2,
+          py: 1,
+          px: 2,
+          minHeight: 56,
         }}
       >
-        {/* Left side - Pipeline Name, Save and Cancel */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Box
-            sx={{
-              '& .MuiInputBase-root': {
-                bgcolor: 'transparent',
-                '& input': {
-                  ...commonStyles,
-                  px: 2,
-                  py: 1,
-                  borderRadius: '4px',
-                },
-              },
-              maxWidth: {
-                // Responsive width based on available space
-                xs: '200px',
-                sm: '250px',
-                md: '300px',
-              },
-            }}
-          >
-            <PipelineNameInput
-              value={pipelineName}
-              onChange={onPipelineNameChange}
-            />
-          </Box>
-
-          {/* Save Button */}
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={onSave}
-            disabled={isLoading || !pipelineName.trim()}
-            sx={{
-              '&.Mui-disabled': {
-                opacity: 1,
-                color: 'text.disabled',
-                backgroundColor: 'action.disabledBackground',
-              }
-            }}
-          >
-            {isLoading ? 'Saving...' : isEditMode ? 'Update' : 'Save'}
-          </Button>
-
-          {/* Cancel Button */}
-          <Button
-            variant="outlined"
-            color="inherit"
-            onClick={handleCancel}
-            sx={{
-              '&.Mui-disabled': {
-                opacity: 1,
-                borderColor: 'action.disabledBackground',
-                color: 'text.disabled',
-              }
-            }}
-          >
-            Cancel
-          </Button>
-        </Box>
-
-      {/* Center - Status */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          {/* Show status chip if status is provided */}
-          {status && (
-            <Box
-              sx={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                px: 1.5,
-                py: 0.5,
-                borderRadius: '16px',
-                fontSize: '0.75rem',
-                fontWeight: 'medium',
-                lineHeight: '1',
-                backgroundColor: status === 'FAILED' ? 'error.light' :
-                  status === 'CREATING' ? 'info.light' :
-                    status === 'PENDING' ? 'warning.light' : 'grey.300',
-                color: status === 'FAILED' ? 'error.dark' :
-                  status === 'CREATING' ? 'info.dark' :
-                    status === 'PENDING' ? 'warning.dark' : 'grey.800',
-              }}
-            >
-              {status}
-            </Box>
-          )}
-        </Box>
-
-        {/* Right side - Active/Inactive Toggle, Import and Delete */}
-        <Stack
-          direction="row"
-          spacing={2}
-          sx={{
-            '& .MuiButton-root': commonStyles,
-          }}
-        >
-          {/* Active/Inactive Toggle */}
-          <FormControlLabel
-            control={
-              <IconSwitch
-                checked={active}
-                onChange={(e) => onActiveChange(e.target.checked)}
-                color="primary"
-                onIcon={<ToggleOnIcon fontSize="large" />}
-                offIcon={<ToggleOffIcon fontSize="large" />}
-                onColor="#2b6cb0"
-                offColor="#757575"
-                trackOnColor="#b2ebf2"
-                trackOffColor="#cfd8dc"
-              />
-            }
-            label={active ? "Active" : "Inactive"}
-          />
-          {/* Hidden file input for import */}
-          <input
-            type="file"
-            accept="application/json"
-            ref={fileInputRef}
-            style={{ display: 'none' }}
-            onChange={handleLoadFlow}
-            onClick={(e) => {
-              console.log('[PipelineToolbar] File input clicked');
-              // Reset the value to allow selecting the same file again
-              (e.target as HTMLInputElement).value = '';
-            }}
-          />
-
-          {/* Import/Export ButtonGroup */}
-          <ButtonGroup
-            variant="outlined"
-            ref={importExportRef}
-            aria-label="Pipeline file operations"
-          >
-            <Button
-              color="inherit"
-              onClick={handleImport}
-              startIcon={<FileUploadIcon />}
-            >
-              Import
-            </Button>
-            <Button
-              size="small"
-              color="inherit"
-              aria-controls={importExportOpen ? 'import-export-menu' : undefined}
-              aria-expanded={importExportOpen ? 'true' : undefined}
-              aria-label="select import/export action"
-              aria-haspopup="menu"
-              onClick={handleImportExportToggle}
-            >
-              <ArrowDropDownIcon />
-            </Button>
-          </ButtonGroup>
-
-          {/* Import/Export Dropdown */}
-          <Popper
-            sx={{ zIndex: 1200 }}
-            open={importExportOpen}
-            anchorEl={importExportRef.current}
-            role={undefined}
-            transition
-            disablePortal
-          >
-            {({ TransitionProps, placement }) => (
-              <Grow
-                {...TransitionProps}
-                style={{
-                  transformOrigin:
-                    placement === 'bottom' ? 'center top' : 'center bottom',
+        {isCompactMode ? (
+          /* ——— COMPACT MODE ——— */
+          <>
+            {/* Left: Pipeline name + Save/Cancel icons */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, minWidth: 0 }}>
+              <Box
+                sx={{
+                  '& .MuiInputBase-root': {
+                    bgcolor: 'transparent',
+                    '& input': {
+                      backdropFilter: 'blur(8px)',
+                      bgcolor: (t) => `${t.palette.background.paper}CC`,
+                      px: 1,
+                      py: 0.5,
+                      borderRadius: 1,
+                      fontSize: '0.875rem',
+                      '&:hover': { bgcolor: (t) => `${t.palette.background.paper}EE` },
+                    },
+                  },
+                  flex: 1,
+                  minWidth: 120,
+                  maxWidth: 250,
                 }}
               >
-                <Paper>
-                  <ClickAwayListener onClickAway={handleImportExportClose}>
-                    <MenuList id="import-export-menu" autoFocusItem>
-                      <Tooltip title={getExportTooltipMessage()} placement="left">
-                        <span>
+                <PipelineNameInput value={pipelineName} onChange={onPipelineNameChange} />
+              </Box>
+
+              {/* Save button - always icon in compact mode */}
+              <Tooltip title={isEditMode ? 'Update Pipeline' : 'Save Pipeline'}>
+                <span>
+                  <IconButton
+                    color="primary"
+                    onClick={onSave}
+                    disabled={isLoading || !pipelineName.trim()}
+                    size="medium"
+                  >
+                    {isLoading ? (
+                      <CircularProgress size={24} />
+                    ) : (
+                      <SaveIcon />
+                    )}
+                  </IconButton>
+                </span>
+              </Tooltip>
+
+              {/* Cancel button - always icon in compact mode */}
+              <Tooltip title="Cancel">
+                <IconButton color="inherit" onClick={handleCancel} size="medium">
+                  <CloseIcon />
+                </IconButton>
+              </Tooltip>
+            </Box>
+
+            {/* Right: Dropdown menu with everything else */}
+            <Box ref={compactMenuRef}>
+              <Tooltip title="More options">
+                <IconButton
+                  color="inherit"
+                  onClick={handleCompactMenuToggle}
+                  size="medium"
+                >
+                  <MoreVertIcon />
+                </IconButton>
+              </Tooltip>
+
+              <Popper
+                sx={{ zIndex: 1200 }}
+                open={compactMenuOpen}
+                anchorEl={compactMenuRef.current}
+                role={undefined}
+                transition
+                disablePortal
+              >
+                {({ TransitionProps, placement }) => (
+                  <Grow
+                    {...TransitionProps}
+                    style={{ transformOrigin: placement === 'bottom' ? 'center top' : 'center bottom' }}
+                  >
+                    <Paper>
+                      <ClickAwayListener onClickAway={handleCompactMenuClose}>
+                        <MenuList autoFocusItem>
+                          {/* Status */}
+                          {status && (
+                            <MenuItem disabled>
+                              <Box
+                                sx={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  px: 1,
+                                  py: 0.25,
+                                  borderRadius: 12,
+                                  fontSize: '0.75rem',
+                                  fontWeight: 500,
+                                  bgcolor:
+                                    status === 'FAILED'
+                                      ? 'error.light'
+                                      : status === 'CREATING'
+                                        ? 'info.light'
+                                        : status === 'PENDING'
+                                          ? 'warning.light'
+                                          : 'grey.300',
+                                  color:
+                                    status === 'FAILED'
+                                      ? 'error.dark'
+                                      : status === 'CREATING'
+                                        ? 'info.dark'
+                                        : status === 'PENDING'
+                                          ? 'warning.dark'
+                                          : 'grey.800',
+                                }}
+                              >
+                                Status: {status}
+                              </Box>
+                            </MenuItem>
+                          )}
+
+                          {/* Active/Inactive toggle */}
+                          <MenuItem>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                              <IconSwitch
+                                checked={active}
+                                onChange={(e) => onActiveChange(e.target.checked)}
+                                color="primary"
+                                onIcon={<ToggleOnIcon fontSize="medium" />}
+                                offIcon={<ToggleOffIcon fontSize="medium" />}
+                                onColor="#2b6cb0"
+                                offColor="#757575"
+                              />
+                              <span>{active ? 'Active' : 'Inactive'}</span>
+                            </Box>
+                          </MenuItem>
+
+                          {/* Import */}
+                          <MenuItem onClick={() => { handleImport(); setCompactMenuOpen(false); }}>
+                            <FileUploadIcon sx={{ mr: 1 }} />
+                            Import Pipeline
+                          </MenuItem>
+
+                          {/* Export */}
                           <MenuItem
-                            onClick={handleExport}
+                            onClick={() => { handleExport(); setCompactMenuOpen(false); }}
                             disabled={isExportDisabled()}
                           >
-                            <FileDownloadIcon sx={{ mr: 1 }} /> Export Pipeline
+                            <FileDownloadIcon sx={{ mr: 1 }} />
+                            Export Pipeline
                           </MenuItem>
-                        </span>
-                      </Tooltip>
-                    </MenuList>
-                  </ClickAwayListener>
-                </Paper>
-              </Grow>
+
+                          {/* Delete */}
+                          {onDelete && (
+                            <MenuItem
+                              onClick={() => { onDelete(); setCompactMenuOpen(false); }}
+                              sx={{ color: 'error.main' }}
+                            >
+                              <DeleteIcon sx={{ mr: 1 }} />
+                              Delete Pipeline
+                            </MenuItem>
+                          )}
+                        </MenuList>
+                      </ClickAwayListener>
+                    </Paper>
+                  </Grow>
+                )}
+              </Popper>
+            </Box>
+          </>
+        ) : (
+          /* ——— FULL MODE ——— */
+          <>
+            {/* Left group */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box
+                sx={{
+                  '& .MuiInputBase-root': {
+                    bgcolor: 'transparent',
+                    '& input': {
+                      backdropFilter: 'blur(8px)',
+                      bgcolor: (t) => `${t.palette.background.paper}CC`,
+                      px: 2,
+                      py: 1,
+                      borderRadius: 1,
+                      '&:hover': { bgcolor: (t) => `${t.palette.background.paper}EE` },
+                    },
+                  },
+                  minWidth: 200,
+                  maxWidth: 300,
+                }}
+              >
+                <PipelineNameInput value={pipelineName} onChange={onPipelineNameChange} />
+              </Box>
+
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={onSave}
+                disabled={isLoading || !pipelineName.trim()}
+                sx={{
+                  '&.Mui-disabled': {
+                    opacity: 1,
+                    color: 'text.disabled',
+                    backgroundColor: 'action.disabledBackground',
+                  },
+                }}
+              >
+                {isLoading ? 'Saving…' : isEditMode ? 'Update' : 'Save'}
+              </Button>
+
+              <Button variant="outlined" color="inherit" onClick={handleCancel}>
+                Cancel
+              </Button>
+            </Box>
+
+            {/* Center: Status badge */}
+            {status && (
+              <Box
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  px: 1.5,
+                  py: 0.5,
+                  borderRadius: 16,
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  lineHeight: 1,
+                  bgcolor:
+                    status === 'FAILED'
+                      ? 'error.light'
+                      : status === 'CREATING'
+                        ? 'info.light'
+                        : status === 'PENDING'
+                          ? 'warning.light'
+                          : 'grey.300',
+                  color:
+                    status === 'FAILED'
+                      ? 'error.dark'
+                      : status === 'CREATING'
+                        ? 'info.dark'
+                        : status === 'PENDING'
+                          ? 'warning.dark'
+                          : 'grey.800',
+                }}
+              >
+                {status}
+              </Box>
             )}
-          </Popper>
 
+            {/* Right group */}
+            <Stack direction="row" spacing={2}>
+              {/* Active toggle */}
+              <FormControlLabel
+                control={<IconSwitch
+                  checked={active}
+                  onChange={(e) => onActiveChange(e.target.checked)}
+                  color="primary"
+                  onIcon={<ToggleOnIcon fontSize="large" />}
+                  offIcon={<ToggleOffIcon fontSize="large" />}
+                  onColor="#2b6cb0"
+                  offColor="#757575"
+                />}
+                label={active ? 'Active' : 'Inactive'}
+              />
 
-          {/* Delete Button - Only show if onDelete is provided */}
-          {onDelete && (
-            <Button
-              variant="contained"
-              onClick={onDelete}
-              startIcon={<DeleteIcon />}
-              sx={{
-                backgroundColor: 'error.main',
-                color: 'white',
-                '&:hover': {
-                  backgroundColor: 'error.dark',
-                },
-                '&.MuiButton-root': {
-                  bgcolor: 'error.main',
-                }
-              }}
-            >
-              Delete
-            </Button>
-          )}
-        </Stack>
+              {/* Import/Export */}
+              <ButtonGroup ref={importExportRef} variant="outlined" aria-label="Pipeline file operations">
+                <Button color="inherit" onClick={handleImport} startIcon={<FileUploadIcon />}>
+                  Import
+                </Button>
+                <Button
+                  size="small"
+                  color="inherit"
+                  aria-controls="import-export-menu"
+                  aria-haspopup="menu"
+                  onClick={handleImportExportToggle}
+                >
+                  <ArrowDropDownIcon />
+                </Button>
+              </ButtonGroup>
+
+              {/* Export menu */}
+              <Popper
+                sx={{ zIndex: 1200 }}
+                open={importExportOpen}
+                anchorEl={importExportRef.current as HTMLElement | null}
+                role={undefined}
+                transition
+                disablePortal
+              >
+                {({ TransitionProps, placement }) => (
+                  <Grow
+                    {...TransitionProps}
+                    style={{ transformOrigin: placement === 'bottom' ? 'center top' : 'center bottom' }}
+                  >
+                    <Paper>
+                      <ClickAwayListener onClickAway={handleImportExportClose}>
+                        <MenuList id="import-export-menu" autoFocusItem>
+                          <MenuItem onClick={handleExport} disabled={isExportDisabled()}>
+                            <FileDownloadIcon sx={{ mr: 1 }} />
+                            Export Pipeline
+                          </MenuItem>
+                        </MenuList>
+                      </ClickAwayListener>
+                    </Paper>
+                  </Grow>
+                )}
+              </Popper>
+
+              {/* Delete */}
+              {onDelete && (
+                <Button
+                  variant="contained"
+                  onClick={onDelete}
+                  startIcon={<DeleteIcon />}
+                  sx={{
+                    backgroundColor: 'error.main',
+                    color: 'white',
+                    '&:hover': { backgroundColor: 'error.dark' },
+                  }}
+                >
+                  Delete
+                </Button>
+              )}
+            </Stack>
+          </>
+        )}
       </Box>
 
-      {/* Integration Validation Dialog */}
+      {/* Integration validation dialog (unchanged) */}
       <IntegrationValidationDialog
         open={validationDialogOpen}
         invalidNodes={invalidNodes}
