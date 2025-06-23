@@ -249,14 +249,20 @@ def build_semantic_query(params: SearchParams) -> Dict:
 
 def build_search_query(params: SearchParams) -> Dict:
     """Build OpenSearch query from search parameters"""
+    print("this is printing extension",params.extension)
+    print("this is printing type",params.type)
+    print("this is printing size lte",params.asset_size_lte)
+    print("this is printing size gte",params.asset_size_gte)
+    print("this is printing date gte",params.ingested_date_gte)
     logger.info("Building search query with params:", extra={"params": params.model_dump()})
 
     if params.semantic:
         return build_semantic_query(params)
 
     clean_query, parsed_filters = parse_search_query(params.q)
+    print("the value of clean query is",clean_query)
     logger.info("Parsed search query:", extra={"clean_query": clean_query, "filters": parsed_filters})
-    logger.info(f"➔ raw q='{params.q}' → clean_query={clean_query!r}, parsed_filters={parsed_filters!r}")
+
 
     name_fields = [
         "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name^3",
@@ -315,9 +321,9 @@ def build_search_query(params: SearchParams) -> Dict:
                             "fields": name_fields,
                             "type": "best_fields",
                             "fuzziness": "AUTO",
-                            "prefix_length": 12,
+                            "prefix_length": 10,
                             "minimum_should_match": "80%",
-                            "boost": 4
+                            "boost": 2
                         }
                     },
                     {
@@ -347,7 +353,8 @@ def build_search_query(params: SearchParams) -> Dict:
                         }
                     }
                 ],
-                "filter": []
+                "filter": [
+                ]
             }
         }
         
@@ -390,147 +397,62 @@ def build_search_query(params: SearchParams) -> Dict:
                         }
                     }
                 ],
-                "filter": []
+                "filter": [
+
+         ]
             }
         }
+    # Process Facet filters
+    if params.type is not None:
+        var_type = params.type.split(",")
+        query["bool"]["filter"].append(
+                                {
+                                "terms": {
+                                    "DigitalSourceAsset.Type": var_type
+                                }
+                                }
+    
+        )
+  
+    if params.extension is not None:
+        var_ext = params.extension.split(",")
+        print("this is printing var_ext", var_ext)
+        query["bool"]["filter"].append(
+                                {
+                                "terms": {
+                                    "DigitalSourceAsset.MainRepresentation.Format": var_ext
+                                }
+                                }
+    
+        )
 
-    # Process parsed filters from the query string
-    if parsed_filters:
-        if 'type' in parsed_filters:
-            query["bool"]["filter"].append({
-                "term": {"DigitalSourceAsset.Type.keyword": parsed_filters['type'][0]}
-            })
-        if 'format' in parsed_filters:
-            query["bool"]["filter"].append({
-                "term": {"DigitalSourceAsset.MainRepresentation.Format.keyword": parsed_filters['format'][0]}
-            })
-        if 'storageIdentifier' in parsed_filters:
-            bucket_name = parsed_filters['storageIdentifier'][0]
-            # bucket_name == "image-repo-cmk"
 
-            # Use match_phrase on the text field, so ES will analyze "image-repo-cmk"
-            # → tokens ["image","repo","cmk"], and then require those three in order.
-            query["bool"]["filter"].append({
-                "match_phrase": {
-                    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket": bucket_name
-                }
-            })
-        if 'size' in parsed_filters:
-            for size_filter in parsed_filters['size']:
-                range_operator = '>=' if size_filter['operator'].startswith('>=') else '<=' if size_filter['operator'].startswith('<=') else '>' if size_filter['operator'].startswith('>') else '<'
-                query["bool"]["filter"].append({
-                    "range": {
-                        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize": {
-                            range_operator: size_filter['value']
-                        }
-                    }
-                })
-        if 'date' in parsed_filters:
-            for date_filter in parsed_filters['date']:
-                range_operator = '>=' if date_filter['operator'].startswith('>=') else '<=' if date_filter['operator'].startswith('<=') else '>' if date_filter['operator'].startswith('>') else '<'
-                query["bool"]["filter"].append({
-                    "range": {
-                        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate": {
-                            range_operator: date_filter['value']
-                        }
-                    }
-                })
-        if 'metadata' in parsed_filters:
-            for metadata_filter in parsed_filters['metadata']:
-                query["bool"]["filter"].append({
-                    "term": {
-                        f"Metadata.Consolidated.{metadata_filter['key']}.keyword": metadata_filter['value']
-                    }
-                })
-        if 'extension' in parsed_filters:
-            for extension in parsed_filters['extension']:
-                query["bool"]["filter"].append({
-                    "term": {
-                        "DigitalSourceAsset.MainRepresentation.Format.keyword": extension
-                    }
-                })
-        if 'filename' in parsed_filters:
-            for filename in parsed_filters['filename']:
-                query["bool"]["filter"].append({
-                    "wildcard": {
-                        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name.keyword": {
-                            "value": f"*{filename}*"
-                        }
-                    }
-                })
-
-    # Process explicit facet parameters from the API request
-    if params.type:
-        query["bool"]["filter"].append({
-            "term": {"DigitalSourceAsset.Type.keyword": params.type}
-        })
-    
-    if params.extension:
-        query["bool"]["filter"].append({
-            "term": {"DigitalSourceAsset.MainRepresentation.Format.keyword": params.extension}
-        })
-    
-    if params.LargerThan:
-        query["bool"]["filter"].append({
-            "range": {
-                "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize": {
-                    "gt": params.LargerThan
-                }
-            }
-        })
-    
-    if params.asset_size_lte:
-        query["bool"]["filter"].append({
-            "range": {
-                "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize": {
-                    "lte": params.asset_size_lte
-                }
-            }
-        })
-    
-    if params.asset_size_gte:
-        query["bool"]["filter"].append({
-            "range": {
-                "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize": {
-                    "gte": params.asset_size_gte
-                }
-            }
-        })
-    
-    if params.ingested_date_lte:
+    if params.asset_size_lte is not None and params.asset_size_gte is not None:
         try:
-            date_value = datetime.strptime(params.ingested_date_lte, '%Y-%m-%d').isoformat()
             query["bool"]["filter"].append({
                 "range": {
-                    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate": {
-                        "lte": date_value
+                    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size": {
+                        "gte": params.asset_size_gte,
+                        "lte": params.asset_size_lte
                     }
                 }
             })
         except ValueError:
-            logger.warning(f"Invalid date format for ingested_date_lte: {params.ingested_date_lte}")
-    
-    if params.ingested_date_gte:
+            logger.warning(f"Invalid values for asset size: {params.asset_size_gte,params.asset_size_lte}")
+
+    if params.ingested_date_lte is not None and params.ingested_date_gte is not None:
         try:
-            date_value = datetime.strptime(params.ingested_date_gte, '%Y-%m-%d').isoformat()
             query["bool"]["filter"].append({
                 "range": {
-                    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate": {
-                        "gte": date_value
+                    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate": {
+                        "gte": params.ingested_date_gte,
+                        "lte": params.ingested_date_lte
                     }
                 }
             })
         except ValueError:
-            logger.warning(f"Invalid date format for ingested_date_gte: {params.ingested_date_gte}")
-    
-    if params.filename:
-        query["bool"]["filter"].append({
-            "wildcard": {
-                "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name.keyword": {
-                    "value": f"*{params.filename}*"
-                }
-            }
-        })
+            logger.warning(f"Invalid values for asset size: {params.asset_size_gte,params.asset_size_lte}")
+
 
     # Process generic filters
     if params.filters:
@@ -968,7 +890,7 @@ def perform_search(params: SearchParams) -> Dict:
 
     try:
         search_body = build_search_query(params)
-        # logger.info("OpenSearch query body:", extra={"query": search_body})
+        logger.info("OpenSearch query body:", extra={"query": search_body})
 
         response = client.search(body=search_body, index=index_name)
 

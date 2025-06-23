@@ -11,6 +11,8 @@ from collections.abc import Mapping
 from boto3.dynamodb.conditions import Key
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.middleware_factory import lambda_handler_decorator
+from botocore.exceptions import ClientError   # already imported? keep just once
+
 
 R = TypeVar("R")
 
@@ -127,92 +129,69 @@ class LambdaMiddleware:
     # Input standardisation
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def _standardize_input(self, ev: Dict[str, Any]) -> Dict[str, Any]:
-        # ── Handle external payload offload ─────────────────────────────────
+        """
+        Normalise any incoming event into the {metadata, payload:{data,assets}} shape
+        and, when stepExternalPayload=True, download the *entire* off-loaded JSON
+        so downstream code can simply read event["payload"]["data"].
+        """
+
+        # ── 0. Was the entire payload off-loaded to S3? ─────────────────────
         meta = ev.get("metadata", {})
         if meta.get("stepExternalPayload") == "True":
-            print("external")
-            loc = meta.get("stepExternalPayloadLocation", {})
+            loc    = meta.get("stepExternalPayloadLocation", {})
             bucket = loc.get("bucket")
-            key = loc.get("key")
-            data = {}
+            key    = loc.get("key")
 
+            data: Any = {}
             if bucket and key:
-                # pull the actual payload from S3
-                obj = self.s3.get_object(Bucket=bucket, Key=key)
+                obj  = self.s3.get_object(Bucket=bucket, Key=key)
                 body = obj["Body"].read().decode("utf-8")
-                parsed = json.loads(body)
-
-                if isinstance(parsed, list):
-                    # prepare for Map: one entry per list item
-                    data = [
-                        {"s3_bucket": bucket, "s3_key": key, "index": idx}
-                        for idx in range(len(parsed))
-                    ]
-                else:
-                    # single object, pass straight through
-                    data = parsed
+                data = json.loads(body)          # dict OR list – keep as-is
 
             return {
                 "metadata": meta,
                 "payload": {
-                    "data": data,
+                    "data":   data,
                     "assets": ev.get("payload", {}).get("assets", []),
                 },
             }
+
         self.logger.info("Original input event", extra={"event": ev})
 
-        # ── 0) Step‑Functions top‑level wrapper (payload present) ─────────────
+        # ── 1. Step-Functions top-level wrapper (payload present) ───────────
         if (
             isinstance(ev.get("executionName"), str)
             and isinstance(ev.get("stateMachineArn"), str)
             and isinstance(ev.get("payload"), dict)
         ):
             exec_id, pipe_id = _pick_pipeline_ids(ev)
-
             inner_event = copy.deepcopy(ev["payload"])
-            std_inner = self._standardize_input(inner_event)
-
+            std_inner   = self._standardize_input(inner_event)
             std_inner.setdefault("metadata", {})
             std_inner["metadata"]["pipelineExecutionId"] = exec_id
-            std_inner["metadata"]["pipelineId"] = pipe_id
+            std_inner["metadata"]["pipelineId"]          = pipe_id
             return std_inner
-        # ───────────────────────────────────────────────────────────────────────
+        # ────────────────────────────────────────────────────────────────────
 
-        # ── 1) Map/Task wrapper containing inventory_id ───────────────────────────
+        # ── 2. Map/Task wrapper containing inventory_id ─────────────────────
         if isinstance(ev.get("item"), dict) and ev["item"].get("inventory_id"):
-            # mutable copy of the incoming item
-            item_obj = copy.deepcopy(ev["item"])
-            inventory_id = item_obj["inventory_id"]
+            item_obj      = copy.deepcopy(ev["item"])
+            inventory_id  = item_obj["inventory_id"]
 
-            # extract any offload flags and the map index
-            step_ext     = item_obj.pop("stepExternalPayload", False)
-            step_ext_loc = item_obj.pop("stepExternalPayloadLocation", {})
-            item_index   = item_obj.get("index", 0)
+            # did the Map placeholder indicate off-load?
+            step_ext      = item_obj.pop("stepExternalPayload", False)
+            step_ext_loc  = item_obj.pop("stepExternalPayloadLocation", {})
 
-            # ---- external-payload placeholder path ----
             if step_ext:
                 bucket = step_ext_loc.get("bucket")
                 key    = step_ext_loc.get("key")
-                data   = None
+                data   = {}
 
                 if bucket and key:
-                    # pull the actual payload from S3
-                    obj    = self.s3.get_object(Bucket=bucket, Key=key)
-                    body   = obj["Body"].read().decode("utf-8")
-                    parsed = json.loads(body)
+                    obj  = self.s3.get_object(Bucket=bucket, Key=key)
+                    body = obj["Body"].read().decode("utf-8")
+                    data = json.loads(body)
 
-                    if isinstance(parsed, list):
-                        # select just the one entry at item_index
-                        try:
-                            data = parsed[item_index]
-                        except (IndexError, TypeError):
-                            # fallback to empty dict if index is bad
-                            data = {}
-                    else:
-                        # single object, pass straight through
-                        data = parsed
-
-                # rebuild metadata exactly as your top‐level offload branch
                 meta = {
                     "service":          self.service,
                     "stepName":         self.step_name,
@@ -224,7 +203,7 @@ class LambdaMiddleware:
                 return {
                     "metadata": meta,
                     "payload": {
-                        "data":   {"item":data},
+                        "data":   data,        # full JSON (dict OR list)
                         "assets": ev.get("payload", {}).get("assets", []),
                     },
                 }
@@ -329,13 +308,13 @@ class LambdaMiddleware:
         return {"metadata": meta, "payload": payload}
 
     # ---------------------------------------------------------------- make_out
+    # ---------------------------------------------------------------- make_out
+    # ---------------------------------------------------------------- make_out
     def _make_output(
         self, result: Any, orig: Dict[str, Any], step_start: float
     ) -> Dict[str, Any]:
-        """
-        Construct and publish the standardized output event, handling large payloads by offloading
-        to S3 and embedding or listing external payload references for downstream Map states.
-        """
+
+        # ───────────────────────── 0. Metadata build (unchanged) ─────────────────────────
         now = time.time()
         data = result
 
@@ -355,43 +334,36 @@ class LambdaMiddleware:
             ext_st == "" or ext_st.lower() == "completed"
         )
 
-        # Build metadata
         meta = {
             "service": self.service,
             "stepName": self.step_name,
             "stepStatus": "Completed",
             "stepResult": "Success",
             "pipelineTraceId": prev_meta.get("pipelineTraceId", str(uuid.uuid4())),
-            "stepExecutionStartTime": prev_meta.get(
-                "stepExecutionStartTime", step_start
-            ),
-            "stepExecutionEndTime": now,
-            "stepExecutionDuration": round(now - step_start, 3),
+            "stepExecutionStartTime": prev_meta.get("stepExecutionStartTime", step_start),
+            "stepExecutionEndTime":   now,
+            "stepExecutionDuration":  round(now - step_start, 3),
             "pipelineExecutionStartTime": orig.get("pipelineExecutionStartTime", ""),
-            "pipelineExecutionEndTime": now if self.is_last else "",
-            "pipelineName": self.pipe_name,
-            "pipelineStatus": (
-                "Started"
-                if self.is_first
-                else "Completed" if status_is_complete else "InProgress"
-            ),
-            "pipelineId": prev_meta.get("pipelineId", ""),
+            "pipelineExecutionEndTime":   now if self.is_last else "",
+            "pipelineName":   self.pipe_name,
+            "pipelineStatus": ("Started" if self.is_first
+                               else "Completed" if status_is_complete
+                               else "InProgress"),
+            "pipelineId":        prev_meta.get("pipelineId", ""),
             "pipelineExecutionId": prev_meta.get("pipelineExecutionId", ""),
-            "externalJobResult": ext_rs,
-            "externalJobId": ext_id,
-            "externalJobStatus": ext_st,
+            "externalJobResult":  ext_rs,
+            "externalJobId":      ext_id,
+            "externalJobStatus":  ext_st,
             "stepExternalPayload": "False",
             "stepExternalPayloadLocation": {},
         }
 
-        # Gather previous assets
+        # ───────────────────────── 1. Assets gather (unchanged) ─────────────────────────
         def _inner_assets(obj: Any) -> list:
-            if (
-                isinstance(obj, dict)
-                and isinstance(obj.get("metadata"), dict)
-                and isinstance(obj.get("payload"), dict)
-                and isinstance(obj["payload"].get("assets"), list)
-            ):
+            if (isinstance(obj, dict) and
+                isinstance(obj.get("metadata"), dict) and
+                isinstance(obj.get("payload"), dict) and
+                isinstance(obj["payload"].get("assets"), list)):
                 return copy.deepcopy(obj["payload"]["assets"])
             return [copy.deepcopy(obj)]
 
@@ -401,7 +373,8 @@ class LambdaMiddleware:
             asset_from_detail = (
                 orig.get("input", {}).get("detail")
                 if isinstance(orig, dict) and "input" in orig
-                else orig.get("detail") if isinstance(orig, dict) else orig
+                else orig.get("detail") if isinstance(orig, dict)
+                else orig
             )
             prev_assets = []
             if isinstance(orig, dict):
@@ -411,61 +384,70 @@ class LambdaMiddleware:
                     prev_assets = copy.deepcopy(orig["payload"]["assets"])
                 elif isinstance(orig.get("assets"), list):
                     prev_assets = copy.deepcopy(orig["assets"])
-            assets = prev_assets + (
-                _inner_assets(asset_from_detail) if asset_from_detail else []
-            )
+            assets = prev_assets + (_inner_assets(asset_from_detail) if asset_from_detail else [])
 
-        # Preserve map block if present
+        # map-block passthrough
         map_block = None
-        if isinstance(orig.get("payload"), dict) and isinstance(
-            orig["payload"].get("map"), dict
-        ):
+        if (isinstance(orig.get("payload"), dict) and
+            isinstance(orig["payload"].get("map"), dict)):
             map_block = copy.deepcopy(orig["payload"]["map"])
 
-        # Prepare payload
+        # initial payload
         payload: Dict[str, Any] = {"data": data, "assets": assets}
         if map_block:
             payload["map"] = map_block
 
-        # Serialize and offload if too large
-        raw = json.dumps(payload["data"], default=_json_default).encode()
-        if len(raw) > self.max_response_size:
-            key = f"{meta['pipelineExecutionId']}"
-            self.s3.put_object(Bucket=self.external_payload_bucket, Key=key, Body=raw)
+        # ───────────────────────── 2. Off-load logic ─────────────────────────
+        candidate_raw  = json.dumps({"metadata": meta, "payload": payload},
+                                    default=_json_default).encode()
+        if len(candidate_raw) > self.max_response_size:
+
+            # a) off-load only DATA blob
+            key = meta["pipelineExecutionId"]
+            self.s3.put_object(
+                Bucket=self.external_payload_bucket,
+                Key=key,
+                Body=json.dumps(payload["data"], default=_json_default).encode(),
+                ContentType="application/json",
+            )
+            self.logger.info("[middleware] Off-loaded data to S3", extra={
+                "bucket": self.external_payload_bucket, "key": key
+            })
+
+            # b) create lightweight placeholders
+            assets_from_orig = orig.get("payload", {}).get("assets", [])
+            inv_id = (assets_from_orig[0].get("InventoryID")
+                      if isinstance(assets_from_orig, list) and assets_from_orig else None)
+
+            placeholder_list = [
+                {
+                    "inventory_id": inv_id,
+                    "stepExternalPayload": True,
+                    "stepExternalPayloadLocation": {
+                        "bucket": self.external_payload_bucket,
+                        "key": key,
+                    },
+                }
+            ]
+
+            # c) shrink inline payload
+            payload["data"]   = placeholder_list
+            payload["assets"] = []      # drop heavy assets
+            payload.pop("map", None)    # drop map block entirely
+
             meta["stepExternalPayload"] = "True"
             meta["stepExternalPayloadLocation"] = {
                 "bucket": self.external_payload_bucket,
                 "key": key,
             }
-            payload["data"] = {}
 
-            # pull inventory_id from the first asset, if present
-            assets = orig.get("payload", {}).get("assets", [])
-            inventory_id = None
-            if isinstance(assets, list) and assets:
-                inventory_id = assets[0].get("InventoryID")
-
-            # Fetch external list file references
-            loc = meta["stepExternalPayloadLocation"]
-            try:
-                resp = self.s3.get_object(Bucket=loc["bucket"], Key=loc["key"])
-                body_text = resp["Body"].read().decode("utf-8")
-                external_json = json.loads(body_text)
-
-                payload["data"] = [
-                    {
-                        "inventory_id": inventory_id,
-                        "stepExternalPayload": True,
-                        "stepExternalPayloadLocation" : loc,
-                        "index": idx,
-
-                    }
-                    for idx in range(len(external_json))
-                ]
-            except Exception as exc:
-                self.logger.error(f"Failed to fetch external payload: {exc}")
-
-        return {"metadata": meta, "payload": payload}
+        # ───────────────────────── 3. Return ─────────────────────────
+        final_out = {"metadata": meta, "payload": payload}
+        final_size = len(json.dumps(final_out, default=_json_default).encode())
+        self.logger.info("[middleware] Final output size (bytes)",
+                         extra={"bytes": final_size})
+        print (final_out)
+        return final_out
 
     # ---------------------------------------------------------------- publish
     def _publish(self, out: Dict[str, Any]):
