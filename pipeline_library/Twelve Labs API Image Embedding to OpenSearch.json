@@ -1,6 +1,6 @@
 {
-  "name": "TwelveLabs Image Embeddings",
-  "description": "",
+  "name": "Twelve Labs API Image Embedding to OpenSearch",
+  "description": "Generate Twelve Labs API Image Embeddings to OpenSearch",
   "active": true,
   "configuration": {
     "nodes": [
