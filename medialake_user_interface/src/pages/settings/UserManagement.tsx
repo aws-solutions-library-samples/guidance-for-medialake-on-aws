@@ -1,27 +1,42 @@
 import React, { useState } from 'react';
-import { Box, Button } from '@mui/material';
+import { Box, Button, Stack } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import GroupIcon from '@mui/icons-material/Group';
+import GroupsIcon from '@mui/icons-material/Groups';
 import { useTranslation } from 'react-i18next';
+import { useFeatureFlag } from '@/contexts/FeatureFlagsContext';
 import { PageHeader, PageContent } from '@/components/common/layout';
 import UserList from '@/features/settings/usermanagement/components/UserList';
 import UserForm from '@/features/settings/usermanagement/components/UserForm';
+import CreateGroupModal from '@/features/settings/usermanagement/components/CreateGroupModal';
+import ManageGroupsModal from '@/features/settings/usermanagement/components/ManageGroupsModal';
 import ApiStatusModal from '@/components/ApiStatusModal';
 import { useGetUsers, useCreateUser, useUpdateUser, useDeleteUser, useDisableUser, useEnableUser } from '@/api/hooks/useUsers';
+import { useGetPermissionSets } from '@/api/hooks/usePermissionSets';
+import { useGetGroups } from '@/api/hooks/useGroups';
 import { useApiMutationHandler } from '@/shared/hooks/useApiMutationHandler';
 import { User, CreateUserRequest, UpdateUserRequest } from '@/api/types/api.types';
-
-const availableRoles = ['Admin', 'Editor', 'Viewer'];
 
 const UserManagement: React.FC = () => {
     const { t } = useTranslation();
     const [openUserForm, setOpenUserForm] = useState(false);
+    const [openCreateGroupModal, setOpenCreateGroupModal] = useState(false);
+    const [openManageGroupsModal, setOpenManageGroupsModal] = useState(false);
     const [editingUser, setEditingUser] = useState<User | undefined>();
     const [activeFilters, setActiveFilters] = useState<{ columnId: string; value: string }[]>([]);
     const [activeSorting, setActiveSorting] = useState<{ columnId: string; desc: boolean }[]>([]);
     
+    // Feature flags
+    const advancedPermissionsEnabled = useFeatureFlag('advanced-permissions-enabled', false);
+    
     const { apiStatus, handleMutation, closeApiStatus } = useApiMutationHandler();
 
     const { data: users, isLoading: isLoadingUsers, error: usersError } = useGetUsers();
+    const { data: groups, isLoading: isLoadingGroups } = useGetGroups(true); // Always fetch groups when this component loads
+    const { data: permissionSets } = useGetPermissionSets(true); // Enable API call when this page is loaded
+    
+    // Debug logs
+    console.log('Groups data in UserManagement:', groups);
     const createUserMutation = useCreateUser();
     const updateUserMutation = useUpdateUser();
     const deleteUserMutation = useDeleteUser();
@@ -40,10 +55,13 @@ const UserManagement: React.FC = () => {
 
     const handleSaveUser = async (userData: CreateUserRequest) => {
         const isNewUser = !editingUser;
+        console.log('handleSaveUser called with:', userData);
+        console.log('isNewUser:', isNewUser);
         setOpenUserForm(false);
 
         if (isNewUser) {
-            await handleMutation(
+            console.log('Creating new user with groups:', userData.groups);
+            const result = await handleMutation(
                 {
                     mutation: createUserMutation,
                     actionMessages: {
@@ -52,7 +70,30 @@ const UserManagement: React.FC = () => {
                         successMessage: t('users.apiMessages.creating.successMessage'),
                         error: t('users.apiMessages.creating.error'),
                     },
-                    onSuccess: () => { /* Optional: Trigger refetch or other actions */ },
+                    onSuccess: (data) => {
+                        // Check for group assignment issues and show additional notifications
+                        if (data?.data) {
+                            const { groupsAdded = [], groupsFailed = [], invalidGroups = [] } = data.data;
+                            
+                            // Log the results for debugging
+                            console.log('User creation completed with group results:', {
+                                groupsAdded,
+                                groupsFailed,
+                                invalidGroups
+                            });
+                            
+                            // Show warnings for failed group assignments
+                            if (groupsFailed.length > 0) {
+                                console.warn(`Failed to assign user to ${groupsFailed.length} groups:`, groupsFailed);
+                                // You could show a toast notification here about partial group assignment
+                            }
+                            
+                            if (invalidGroups.length > 0) {
+                                console.warn(`${invalidGroups.length} groups were invalid:`, invalidGroups);
+                                // You could show a toast notification here about invalid groups
+                            }
+                        }
+                    },
                 },
                 userData
             );
@@ -62,7 +103,7 @@ const UserManagement: React.FC = () => {
                 email: userData.email,
                 enabled: userData.enabled,
                 groups: userData.groups,
-                roles: userData.roles,
+                permissions: userData.permissions,
                 given_name: userData.given_name,
                 family_name: userData.family_name,
             };
@@ -130,19 +171,51 @@ const UserManagement: React.FC = () => {
                 title={t('users.title')}
                 description={t('users.description')}
                 action={
-                    <Button
-                        variant="contained"
-                        startIcon={<AddIcon />}
-                        onClick={handleAddUser}
-                        sx={{
-                            borderRadius: '8px',
-                            textTransform: 'none',
-                            px: 3,
-                            height: 40
-                        }}
-                    >
-                        {t('users.actions.addUser')}
-                    </Button>
+                    <Stack direction="row" spacing={2}>
+                        {advancedPermissionsEnabled && (
+                            <>
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<GroupsIcon />}
+                                    onClick={() => setOpenManageGroupsModal(true)}
+                                    sx={{
+                                        borderRadius: '8px',
+                                        textTransform: 'none',
+                                        px: 3,
+                                        height: 40
+                                    }}
+                                >
+                                    {t('groups.actions.manageGroups')}
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<GroupIcon />}
+                                    onClick={() => setOpenCreateGroupModal(true)}
+                                    sx={{
+                                        borderRadius: '8px',
+                                        textTransform: 'none',
+                                        px: 3,
+                                        height: 40
+                                    }}
+                                >
+                                    {t('groups.actions.createGroup')}
+                                </Button>
+                            </>
+                        )}
+                        <Button
+                            variant="contained"
+                            startIcon={<AddIcon />}
+                            onClick={handleAddUser}
+                            sx={{
+                                borderRadius: '8px',
+                                textTransform: 'none',
+                                px: 3,
+                                height: 40
+                            }}
+                        >
+                            {t('users.actions.addUser')}
+                        </Button>
+                    </Stack>
                 }
             />
 
@@ -189,8 +262,26 @@ const UserManagement: React.FC = () => {
                 onClose={() => setOpenUserForm(false)}
                 onSave={handleSaveUser}
                 user={editingUser}
-                availableRoles={availableRoles}
+                availableGroups={groups?.map(group => {
+                    console.log('Mapping group for UserForm:', group);
+                    return { id: group.id, name: group.name };
+                }) || []}
+                isLoadingGroups={isLoadingGroups}
             />
+
+            {advancedPermissionsEnabled && (
+                <>
+                    <CreateGroupModal
+                        open={openCreateGroupModal}
+                        onClose={() => setOpenCreateGroupModal(false)}
+                    />
+
+                    <ManageGroupsModal
+                        open={openManageGroupsModal}
+                        onClose={() => setOpenManageGroupsModal(false)}
+                    />
+                </>
+            )}
 
             <ApiStatusModal
                 open={apiStatus.show}

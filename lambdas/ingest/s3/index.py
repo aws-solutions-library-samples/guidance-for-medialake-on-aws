@@ -48,6 +48,7 @@ configure_logging()
 
 # Log configuration at startup
 logger.info(f"Lambda configuration - DO_NOT_INGEST_DUPLICATES: {DO_NOT_INGEST_DUPLICATES}")
+logger.info("Note: Files with same hash AND same object key will always be skipped regardless of DO_NOT_INGEST_DUPLICATES setting")
 
 # Configure S3 client with retries
 s3_config = Config(
@@ -553,84 +554,21 @@ class AssetProcessor:
             # Calculate MD5 hash for duplicate checking
             md5_hash = self._calculate_md5(bucket, key)
             
-            # Check if file with same hash exists in DynamoDB (if duplicate checking is enabled)
-            existing_file = None
-            if DO_NOT_INGEST_DUPLICATES:
-                existing_file = self._check_existing_file(md5_hash)
-                logger.info(f"Duplicate checking enabled - checked for existing file with hash {md5_hash}")
+            # Always check if file with same hash exists in DynamoDB
+            # We need this check even when DO_NOT_INGEST_DUPLICATES is False to handle same hash + same key scenario
+            existing_file = self._check_existing_file(md5_hash)
+            if existing_file:
+                logger.info(f"Found existing file with hash {md5_hash}")
                 metrics.add_metric(name="DuplicateCheckPerformed", unit=MetricUnit.Count, value=1)
             else:
-                logger.info(f"Duplicate checking disabled - skipping duplicate check for hash {md5_hash}")
-                metrics.add_metric(name="DuplicateCheckSkipped", unit=MetricUnit.Count, value=1)
+                logger.info(f"No existing file found with hash {md5_hash}")
+                metrics.add_metric(name="DuplicateCheckPerformed", unit=MetricUnit.Count, value=1)
             
-            if existing_file and DO_NOT_INGEST_DUPLICATES:
+            # Handle duplicate logic based on DO_NOT_INGEST_DUPLICATES setting
+            if existing_file:
                 logger.info(f"Duplicate file found with hash {md5_hash}")
                 
-                # If we have InventoryID tag but no AssetID tag, generate new AssetID under existing inventory
-                if "InventoryID" in tags and "AssetID" not in tags:
-                    logger.info(f"Object has InventoryID but no AssetID. Generating new AssetID under existing inventory.")
-                    
-                    # Extract asset type from content type
-                    content_type = response.get("ContentType", "")
-                    file_ext = key.split(".")[-1] if "." in key else ""
-                    asset_type = determine_asset_type(content_type, file_ext)
-                    type_abbrev = get_type_abbreviation(asset_type)  # Use cached function
-                    
-                    # Generate new AssetID
-                    new_asset_id = f"asset:{type_abbrev}:{str(uuid.uuid4())}"
-                    
-                    # Tag with existing InventoryID and new AssetID
-                    self.s3.put_object_tagging(
-                        Bucket=bucket,
-                        Key=key,
-                        Tagging={
-                            "TagSet": [
-                                {"Key": "InventoryID", "Value": tags["InventoryID"]},
-                                {"Key": "AssetID", "Value": new_asset_id},
-                                {"Key": "FileHash", "Value": md5_hash},
-                            ]
-                        },
-                    )
-                    
-                    # Create new asset entry with existing inventory ID
-                    metadata = self._create_asset_metadata(response, bucket, key, md5_hash)
-                    dynamo_entry = self.create_dynamo_entry(metadata, inventory_id=tags["InventoryID"], s3_last_modified=s3_last_modified_str)
-                    
-                    self.publish_event(
-                        dynamo_entry["InventoryID"],
-                        dynamo_entry["DigitalSourceAsset"]["ID"],
-                        metadata,
-                    )
-                    
-                    return dynamo_entry
-                
-                # If hash exists in DB but object has no tags, tag with existing IDs and stop processing
-                if "InventoryID" not in tags and "AssetID" not in tags:
-                    logger.info(f"Hash exists in DB but object has no tags. Tagging with existing IDs.")
-                    self.s3.put_object_tagging(
-                        Bucket=bucket,
-                        Key=key,
-                        Tagging={
-                            "TagSet": [
-                                {"Key": "InventoryID", "Value": existing_file["InventoryID"]},
-                                {"Key": "AssetID", "Value": existing_file["DigitalSourceAsset"]["ID"]},
-                                {"Key": "FileHash", "Value": md5_hash},
-                                {"Key": "DuplicateHash", "Value": "true"},
-                            ]
-                        },
-                    )
-                    
-                    # Update lastModifiedDate for the existing file in DynamoDB
-                    self.dynamodb.update_item(
-                        Key={"InventoryID": existing_file["InventoryID"]},
-                        UpdateExpression="SET DigitalSourceAsset.lastModifiedDate = :lastModDate",
-                        ExpressionAttributeValues={":lastModDate": s3_last_modified_str}
-                    )
-                    logger.info(f"Updated lastModifiedDate to {s3_last_modified_str} for existing asset: {existing_file['DigitalSourceAsset']['ID']}")
-                    
-                    return None
-                
-                # Handle other cases from existing code
+                # Get the existing object key to check if it's the same file
                 existing_object_key = (
                     existing_file.get("DigitalSourceAsset", {})
                     .get("MainRepresentation", {})
@@ -640,24 +578,17 @@ class AssetProcessor:
                     .get("FullPath")
                 )
 
+                # Check if it's the same object key (same hash + same key = exact same file)
                 if existing_object_key == key:
-                    logger.info(
-                        "Duplicate file with same object key. Tagging with existing IDs"
-                    )
-                    # Tag with the same IDs as the existing file
+                    logger.info("Duplicate file with same hash AND same object key - skipping processing regardless of DO_NOT_INGEST_DUPLICATES setting")
+                    # Always skip processing if it's the exact same file (same hash + same key)
                     self.s3.put_object_tagging(
                         Bucket=bucket,
                         Key=key,
                         Tagging={
                             "TagSet": [
-                                {
-                                    "Key": "InventoryID",
-                                    "Value": existing_file["InventoryID"],
-                                },
-                                {
-                                    "Key": "AssetID",
-                                    "Value": existing_file["DigitalSourceAsset"]["ID"],
-                                },
+                                {"Key": "InventoryID", "Value": existing_file["InventoryID"]},
+                                {"Key": "AssetID", "Value": existing_file["DigitalSourceAsset"]["ID"]},
                                 {"Key": "FileHash", "Value": md5_hash},
                             ]
                         },
@@ -672,11 +603,77 @@ class AssetProcessor:
                     logger.info(f"Updated lastModifiedDate to {s3_last_modified_str} for existing asset: {existing_file['DigitalSourceAsset']['ID']}")
                     
                     return None
-                else:
+                
+                # Different object key but same hash - behavior depends on DO_NOT_INGEST_DUPLICATES
+                if DO_NOT_INGEST_DUPLICATES:
+                    logger.info("Same hash but different key with DO_NOT_INGEST_DUPLICATES=True - applying duplicate prevention logic")
+                    
+                    # If we have InventoryID tag but no AssetID tag, generate new AssetID under existing inventory
+                    if "InventoryID" in tags and "AssetID" not in tags:
+                        logger.info(f"Object has InventoryID but no AssetID. Generating new AssetID under existing inventory.")
+                        
+                        # Extract asset type from content type
+                        content_type = response.get("ContentType", "")
+                        file_ext = key.split(".")[-1] if "." in key else ""
+                        asset_type = determine_asset_type(content_type, file_ext)
+                        type_abbrev = get_type_abbreviation(asset_type)  # Use cached function
+                        
+                        # Generate new AssetID
+                        new_asset_id = f"asset:{type_abbrev}:{str(uuid.uuid4())}"
+                        
+                        # Tag with existing InventoryID and new AssetID
+                        self.s3.put_object_tagging(
+                            Bucket=bucket,
+                            Key=key,
+                            Tagging={
+                                "TagSet": [
+                                    {"Key": "InventoryID", "Value": tags["InventoryID"]},
+                                    {"Key": "AssetID", "Value": new_asset_id},
+                                    {"Key": "FileHash", "Value": md5_hash},
+                                ]
+                            },
+                        )
+                        
+                        # Create new asset entry with existing inventory ID
+                        metadata = self._create_asset_metadata(response, bucket, key, md5_hash)
+                        dynamo_entry = self.create_dynamo_entry(metadata, inventory_id=tags["InventoryID"], s3_last_modified=s3_last_modified_str)
+                        
+                        self.publish_event(
+                            dynamo_entry["InventoryID"],
+                            dynamo_entry["DigitalSourceAsset"]["ID"],
+                            metadata,
+                        )
+                        
+                        return dynamo_entry
+                    
+                    # If hash exists in DB but object has no tags, tag with existing IDs and stop processing
+                    if "InventoryID" not in tags and "AssetID" not in tags:
+                        logger.info(f"Hash exists in DB but object has no tags. Tagging with existing IDs.")
+                        self.s3.put_object_tagging(
+                            Bucket=bucket,
+                            Key=key,
+                            Tagging={
+                                "TagSet": [
+                                    {"Key": "InventoryID", "Value": existing_file["InventoryID"]},
+                                    {"Key": "AssetID", "Value": existing_file["DigitalSourceAsset"]["ID"]},
+                                    {"Key": "FileHash", "Value": md5_hash},
+                                    {"Key": "DuplicateHash", "Value": "true"},
+                                ]
+                            },
+                        )
+                        
+                        # Update lastModifiedDate for the existing file in DynamoDB
+                        self.dynamodb.update_item(
+                            Key={"InventoryID": existing_file["InventoryID"]},
+                            UpdateExpression="SET DigitalSourceAsset.lastModifiedDate = :lastModDate",
+                            ExpressionAttributeValues={":lastModDate": s3_last_modified_str}
+                        )
+                        logger.info(f"Updated lastModifiedDate to {s3_last_modified_str} for existing asset: {existing_file['DigitalSourceAsset']['ID']}")
+                        
+                        return None
+                    
                     # Same hash but different key - tag with same InventoryID but new AssetID
-                    logger.info(
-                        "Same hash but different key. Tagging with same InventoryID but new AssetID"
-                    )
+                    logger.info("Same hash but different key. Tagging with same InventoryID but new AssetID")
                     # Extract asset type from content type
                     content_type = response.get("ContentType", "")
                     file_ext = key.split(".")[-1] if "." in key else ""
@@ -689,23 +686,17 @@ class AssetProcessor:
                         Key=key,
                         Tagging={
                             "TagSet": [
-                                {
-                                    "Key": "InventoryID",
-                                    "Value": existing_file["InventoryID"],
-                                },
-                                {
-                                    "Key": "AssetID",
-                                    "Value": new_asset_id,
-                                },
+                                {"Key": "InventoryID", "Value": existing_file["InventoryID"]},
+                                {"Key": "AssetID", "Value": new_asset_id},
                                 {"Key": "FileHash", "Value": md5_hash},
-                                {
-                                    "Key": "DuplicateHash",
-                                    "Value": "true",
-                                },
+                                {"Key": "DuplicateHash", "Value": "true"},
                             ]
                         },
                     )
                     return None
+                else:
+                    logger.info("Same hash but different key with DO_NOT_INGEST_DUPLICATES=False - proceeding to create new asset")
+                    # Fall through to process as new asset since DO_NOT_INGEST_DUPLICATES is False
 
             # Process new unique file...
             metadata = self._create_asset_metadata(response, bucket, key, md5_hash)

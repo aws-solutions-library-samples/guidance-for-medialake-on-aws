@@ -37,6 +37,7 @@ class StorageConnectorsStack(cdk.NestedStack):
                 retention_period=Duration.days(14),
                 encryption=True,
                 enforce_ssl=True,
+                # No DLQ for this queue as it's already a DLQ
                 max_receive_count=0,
                 removal_policy=RemovalPolicy.DESTROY,
             ),

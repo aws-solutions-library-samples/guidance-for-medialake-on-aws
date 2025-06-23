@@ -4,6 +4,9 @@ import AuthPage from '@/components/AuthPage';
 import AppLayout from '@/components/AppLayout';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { RouteErrorBoundary } from '@/shared/ui/errors';
+import { RoutePermissionGuard } from '@/permissions';
+import AccessDeniedPage from '@/pages/AccessDeniedPage';
+import GroupBasedAccess from '@/components/examples/GroupBasedAccess';
 import Home from '@/pages/Home';
 import SearchPage from '@/pages/SearchPage';
 import AssetsPage from '@/pages/AssetsPage';
@@ -21,6 +24,7 @@ import RoleManagement from '@/pages/settings/RoleManagement';
 import IntegrationsPage from '@/pages/settings/IntegrationsPage';
 import EnvironmentsPage from '@/pages/settings/EnvironmentsPage';
 import SystemSettingsPage from '@/pages/settings/SystemSettingsPage';
+import PermissionSetsPage from '@/pages/settings/PermissionSetsPage';
 
 const S3ExplorerWrapper = () => {
     const { connectorId } = useParams<{ connectorId: string }>();
@@ -31,6 +35,11 @@ export const router = createBrowserRouter([
     {
         path: '/sign-in',
         element: <AuthPage />,
+        errorElement: <RouteErrorBoundary />
+    },
+    {
+        path: '/access-denied',
+        element: <AccessDeniedPage />,
         errorElement: <RouteErrorBoundary />
     },
     {
@@ -48,43 +57,73 @@ export const router = createBrowserRouter([
             },
             {
                 path: 'search',
-                element: <SearchPage />
+                element: <RoutePermissionGuard
+                    permission={{ action: 'view', subject: 'asset' }}
+                    element={<SearchPage />}
+                />
             },
             {
                 path: 's3/explorer/:connectorId',
-                element: <S3ExplorerWrapper />
+                element: <RoutePermissionGuard
+                    permission={{ action: 'view', subject: 'connector' }}
+                    element={<S3ExplorerWrapper />}
+                />
             },
             {
                 path: 'assets',
-                element: <AssetsPage />
+                element: <RoutePermissionGuard
+                    permission={{ action: 'view', subject: 'asset' }}
+                    element={<AssetsPage />}
+                />
             },
             {
                 path: 'assets/upload',
-                element: <UploadDemo />
+                element: <RoutePermissionGuard
+                    permission={{ action: 'upload', subject: 'asset' }}
+                    element={<UploadDemo />}
+                />
             },
             {
                 path: 'executions',
-                element: <ExecutionsPage />
+                element: <RoutePermissionGuard
+                    permission={{ action: 'view', subject: 'pipeline' }}
+                    element={<ExecutionsPage />}
+                />
             },
             {
                 path: 'pipelines',
-                element: <PipelinesPage />
+                element: <RoutePermissionGuard
+                    permission={{ action: 'view', subject: 'pipeline' }}
+                    element={<PipelinesPage />}
+                />
             },
             {
                 path: 'pipelines/new',
-                element: <PipelineEditorPage />
+                element: <RoutePermissionGuard
+                    permission={{ action: 'create', subject: 'pipeline' }}
+                    element={<PipelineEditorPage />}
+                />
             },
             {
                 path: 'images/:id',
-                element: <ImageDetailPage />
+                element: <RoutePermissionGuard
+                    permission={{ action: 'view', subject: 'asset' }}
+                    element={<ImageDetailPage />}
+                />
             },
             {
                 path: 'videos/:id',
-                element: <VideoDetailPage />
+                element: <RoutePermissionGuard
+                    permission={{ action: 'view', subject: 'asset' }}
+                    element={<VideoDetailPage />}
+                />
             },
             {
                 path: 'audio/:id',
-                element: <AudioDetailPage />
+                element: <RoutePermissionGuard
+                    permission={{ action: 'view', subject: 'asset' }}
+                    element={<AudioDetailPage />}
+                />
             },
             {
                 path: 'settings/profile',
@@ -92,39 +131,84 @@ export const router = createBrowserRouter([
             },
             {
                 path: 'settings/connectors',
-                element: <ConnectorsPage />
+                element: <RoutePermissionGuard
+                    permission={{ action: 'manage', subject: 'connector' }}
+                    element={<ConnectorsPage />}
+                />
             },
             {
                 path: 'settings/users',
-                element: <UserManagement />
+                element: <RoutePermissionGuard
+                    permission={{ action: 'manage', subject: 'user' }}
+                    element={<UserManagement />}
+                />
+            },
+            {
+                path: 'settings/users-groups',
+                element: <RoutePermissionGuard
+                    permission={{ action: 'manage', subject: 'group' }}
+                    element={<UserManagement />}
+                />
             },
             {
                 path: 'settings/roles',
-                element: <RoleManagement />
+                element: <RoutePermissionGuard
+                    permission={{ action: 'manage', subject: 'permission-set' }}
+                    element={<RoleManagement />}
+                />
+            },
+            {
+                path: 'settings/permission-sets',
+                element: <RoutePermissionGuard
+                    permission={{ action: 'manage', subject: 'permission-set' }}
+                    element={<PermissionSetsPage />}
+                />
             },
             {
                 path: 'settings/integrations',
-                element: <IntegrationsPage />
+                element: <RoutePermissionGuard
+                    permission={{ action: 'manage', subject: 'integration' }}
+                    element={<IntegrationsPage />}
+                />
             },
             {
                 path: 'settings/environments',
-                element: <EnvironmentsPage />
+                element: <RoutePermissionGuard
+                    permission={{ action: 'manage', subject: 'settings' }}
+                    element={<EnvironmentsPage />}
+                />
             },
             {
                 path: 'settings/pipelines',
-                element: <PipelinesPage />
+                element: <RoutePermissionGuard
+                    permission={{ action: 'manage', subject: 'pipeline' }}
+                    element={<PipelinesPage />}
+                />
             },
             {
                 path: 'settings/pipelines/new',
-                element: <PipelineEditorPage />
+                element: <RoutePermissionGuard
+                    permission={{ action: 'create', subject: 'pipeline' }}
+                    element={<PipelineEditorPage />}
+                />
             },
             {
                 path: 'settings/pipelines/edit/:id',
-                element: <PipelineEditorPage />
+                element: <RoutePermissionGuard
+                    permission={{ action: 'edit', subject: 'pipeline' }}
+                    element={<PipelineEditorPage />}
+                />
             },
             {
                 path: 'settings/system',
-                element: <SystemSettingsPage />
+                element: <RoutePermissionGuard
+                    permission={{ action: 'manage', subject: 'settings' }}
+                    element={<SystemSettingsPage />}
+                />
+            },
+            {
+                path: 'examples/group-based-access',
+                element: <GroupBasedAccess />
             },
             {
                 path: 'settings',

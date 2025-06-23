@@ -7,7 +7,10 @@ export default {
       chinese: 'Chinês',
       hindi: 'Hindi',
       arabic: 'Árabe',
-      hebrew: 'Hebraico'
+      hebrew: 'Hebraico',
+      japanese: 'Japonês',
+      korean: 'Coreano',
+      spanish: 'Espanhol'
     },
     assetsPage: {
       title: 'Ativos',
@@ -769,8 +772,25 @@ export default {
                 }
               }
             }
+          }
         }
-        }
+      }
+    },
+    groups: {
+      actions: {
+        addGroup: 'Adicionar Grupo',
+        editGroup: 'Editar Grupo',
+        deleteGroup: 'Excluir Grupo',
+        createGroup: 'Criar Grupo',
+        manageGroups: 'Gerenciar Grupos'
+      }
+    },
+    permissionSets: {
+      noAssignments: 'Nenhum conjunto de permissões',
+      actions: {
+        addPermissionSet: 'Adicionar Conjunto de Permissões',
+        editPermissionSet: 'Editar Conjunto de Permissões',
+        deletePermissionSet: 'Excluir Conjunto de Permissões'
       }
     }
 }

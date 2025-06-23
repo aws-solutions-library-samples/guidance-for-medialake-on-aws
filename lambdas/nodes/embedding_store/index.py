@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import time
+import sys
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -19,6 +20,11 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from opensearchpy import AWSV4SignerAuth, OpenSearch, RequestsHttpConnection, exceptions
 
 from lambda_middleware import lambda_middleware
+from lambda_error_handler import (
+    check_response_status,
+    ResponseError,
+    with_error_handling
+)
 from nodes_utils import seconds_to_smpte
 from lambda_utils import _truncate_floats
 
@@ -216,18 +222,28 @@ def _bad_request(msg: str):
     return {"statusCode": 400, "body": json.dumps({"error": msg})}
 
 
-def _ok_no_op(vector: Optional[List], asset_id: Optional[str]):
+def _ok_no_op(vector_len: int, asset_id: Optional[str]):
     return {
         "statusCode": 200,
         "body": json.dumps(
             {
-                "message": "Embedding processed (OpenSearch not available)",
-                "asset_id": asset_id,
-                "vector_length": len(vector or []),
+                "message":       "Embedding processed (OpenSearch not available)",
+                "asset_id":      asset_id,
+                "vector_length": vector_len,
             }
         ),
     }
 
+<<<<<<< HEAD
+# Using the new error handler module instead of the local function
+def check_opensearch_response(response: Dict[str, Any], operation: str) -> None:
+    """
+    Check OpenSearch response for errors and raise if status is not 200/201
+    
+    This is a wrapper around check_response_status for backward compatibility
+    """
+    check_response_status(response, "OpenSearch", operation, [200, 201])
+=======
 
 def check_opensearch_response(resp: Dict[str, Any], op: str) -> None:
     status = resp.get("status", 200)
@@ -353,6 +369,7 @@ def process_single_embedding(payload: Dict[str, Any], embedding_data: Dict[str, 
 @lambda_middleware(event_bus_name=EVENT_BUS_NAME)
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
+@with_error_handling
 def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
     try:
         truncated = _truncate_floats(event, max_items=10)
@@ -670,7 +687,7 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                 res = client.update(
                     index=INDEX_NAME,
                     id=existing_id,
-                    body=update_body,
+                    body={"doc": document},
                     if_seq_no=seq_no,
                     if_primary_term=p_term,
                 )
@@ -686,14 +703,12 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
 
         return {
             "statusCode": 200,
-            "body": json.dumps(
-                {
-                    "message":     "Embedding stored successfully",
-                    "index":       INDEX_NAME,
-                    "document_id": existing_id,
-                    "asset_id":    asset_id,
-                }
-            ),
+            "body": json.dumps({
+                "message":     "Embedding stored successfully",
+                "index":       INDEX_NAME,
+                "document_id": existing_id,
+                "asset_id":    asset_id,
+            }),
         }
 
     except Exception:

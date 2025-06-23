@@ -9,6 +9,8 @@
     "@aws-sdk/credential-providers": "^3.797.0",
     "@aws-sdk/s3-request-presigner": "^3.750.0",
     "@byomakase/omakase-player": "^0.15.1-SNAPSHOT.1741774199",
+    "@casl/ability": "^6.7.3",
+    "@casl/react": "^5.0.0",
     "@emotion/react": "^11.13.3",
     "@emotion/styled": "^11.13.0",
     "@hookform/resolvers": "^3.10.0",
@@ -77,6 +79,7 @@
     "test:e2e:login": "playwright test playwright/tests/login.spec.ts",
     "test:e2e:api": "playwright test playwright/tests/api.spec.ts",
     "test:e2e:ui-tests": "playwright test playwright/tests/ui.spec.ts",
+    "test:e2e:cognito": "playwright test tests/auth/cognito-e2e.spec.ts --headed",
     "test:report": "playwright show-report"
   },
   "browserslist": {
