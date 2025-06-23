@@ -113,9 +113,7 @@ class CognitoUpdateStack(Stack):
                 entry="lambdas/custom_resources/auth/cognito_trigger_update",
                 memory_size=256,
                 timeout_minutes=5,
-                environment_variables={},
-                log_removal_policy=RemovalPolicy.RETAIN,
-                
+                environment_variables={},                
                 
             ),
         )
