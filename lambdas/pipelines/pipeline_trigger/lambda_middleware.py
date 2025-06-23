@@ -318,18 +318,20 @@ class LambdaMiddleware:
         now = time.time()
         data = result
 
-        if isinstance(data, dict):
-            ext_id = data.get("externalJobId")    or orig.get("metadata", {}).get("externalJobId", "")
-            ext_st = data.get("externalJobStatus")or orig.get("metadata", {}).get("externalJobStatus", "")
-            ext_rs = data.get("externalJobResult")or orig.get("metadata", {}).get("externalJobResult", "")
-        else:
-            ext_id = orig.get("metadata", {}).get("externalJobId", "")
-            ext_st = orig.get("metadata", {}).get("externalJobStatus", "")
-            ext_rs = orig.get("metadata", {}).get("externalJobResult", "")
+        # Extract external job fields
+        ext_id = safe_pop(data, "externalJobId") or orig.get("metadata", {}).get(
+            "externalJobId", ""
+        )
+        ext_st = safe_pop(data, "externalJobStatus") or orig.get("metadata", {}).get(
+            "externalJobStatus", ""
+        )
+        ext_rs = safe_pop(data, "externalJobResult") or orig.get("metadata", {}).get(
+            "externalJobResult", ""
+        )
 
         prev_meta = orig.get("metadata", {})
         status_is_complete = self.is_last and (
-            ext_st == "" or (ext_st and ext_st.lower() == "completed")
+            ext_st == "" or ext_st.lower() == "completed"
         )
 
         meta = {
@@ -455,7 +457,7 @@ class LambdaMiddleware:
                     {
                         "Source": self.service,
                         "DetailType": f"{self.step_name}Output",
-                        "Detail": json.dumps(out, default=_json_default),
+                        "Detail": json.dumps(out),
                         "EventBusName": self.event_bus_name,
                     }
                 ]
@@ -496,3 +498,4 @@ class LambdaMiddleware:
 def lambda_middleware(**kw):
     mw = LambdaMiddleware(**kw)
     return lambda handler: mw(handler)
+

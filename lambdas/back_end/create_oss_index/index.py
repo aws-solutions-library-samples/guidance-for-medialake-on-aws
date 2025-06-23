@@ -131,12 +131,25 @@ def handler(event, context):
     """
     logger.info("Received event", extra={"event": event})
 
-    if event["RequestType"] == "Create":
-        host = os.environ["COLLECTION_ENDPOINT"]
-        logger.info("Retrieved collection endpoint", extra={"host": host})
+    req_type = event.get("RequestType")
+    if req_type != "Create":
+        logger.info("Skipping non-Create request",
+                    extra={"RequestType": req_type})
+        return {"statusCode": 200,
+                "body": f"Skipped {req_type} request"}
 
-        index_names = os.environ["INDEX_NAMES"]
-        logger.info("Retrieved index names", extra={"index_names": index_names})
+    # -- env
+    host         = os.environ["COLLECTION_ENDPOINT"]
+    index_names  = os.environ["INDEX_NAMES"]
+    region       = os.environ["REGION"]
+    service      = os.environ["SCOPE"]
+    credentials  = boto3.Session().get_credentials()
+
+    logger.info("Environment",
+                extra={"host": host,
+                       "indexes": index_names,
+                       "region": region,
+                       "service": service})
 
         headers = {
             "content-type": "application/json",

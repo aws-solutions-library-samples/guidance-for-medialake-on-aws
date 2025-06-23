@@ -5,6 +5,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import queryClient from '../api/queryClient';
 import { AwsConfigProvider } from '../common/hooks/aws-config-context';
 import { AuthProvider } from '../common/hooks/auth-context';
+import { PermissionProvider } from '../permissions';
 import '@aws-amplify/ui-react/styles.css';
 import { ModalProvider } from './common/ModalConnector';
 import { ThemeProvider } from '../hooks/useTheme';
@@ -16,6 +17,7 @@ import { router } from '../routes/router';
 import { Box, CircularProgress } from '@mui/material';
 import { NotificationProvider } from './NotificationCenter';
 import { JobNotificationSync } from './JobNotificationSync';
+import { TokenRefreshManager } from './TokenRefreshManager';
 
 const LoadingFallback = () => (
     <Box sx={{
@@ -49,7 +51,9 @@ const AppConfigured = () => {
                 <QueryClientProvider client={queryClient}>
                     <AwsConfigProvider>
                         <AuthProvider>
-                            <TimezoneProvider>
+                            <TokenRefreshManager>
+                                <PermissionProvider>
+                                <TimezoneProvider>
                                 <ThemeProvider>
                                     <DirectionProvider>
                                         <TableDensityProvider>
@@ -65,6 +69,8 @@ const AppConfigured = () => {
                                         </DirectionProvider>
                                     </ThemeProvider>
                                 </TimezoneProvider>
+                            </PermissionProvider>
+                        </TokenRefreshManager>
                         </AuthProvider>
                     </AwsConfigProvider>
                 </QueryClientProvider>

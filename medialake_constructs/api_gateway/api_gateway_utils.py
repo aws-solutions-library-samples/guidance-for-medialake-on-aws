@@ -8,7 +8,7 @@ def add_cors_headers_to_response(response, allow_origins="*"):
         response.response_parameters = {}
         
     response.response_parameters["method.response.header.Access-Control-Allow-Origin"] = f"'{allow_origins}'"
-    response.response_parameters["method.response.header.Access-Control-Allow-Headers"] = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Origin-Verify'"
+    response.response_parameters["method.response.header.Access-Control-Allow-Headers"] = "'Content-Type,X-Amz-Date,Authorization,authorization,X-Api-Key,X-Amz-Security-Token,X-Origin-Verify'"
     response.response_parameters["method.response.header.Access-Control-Allow-Methods"] = "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
     
     return response
@@ -29,7 +29,7 @@ def add_cors_options_method(resource):
                 integration_responses=[{
                     'statusCode': '200',
                     'responseParameters': {
-                        'method.response.header.Access-Control-Allow-Headers': "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Origin-Verify'",
+                        'method.response.header.Access-Control-Allow-Headers': "'Content-Type,X-Amz-Date,Authorization,authorization,X-Api-Key,X-Amz-Security-Token,X-Origin-Verify'",
                         'method.response.header.Access-Control-Allow-Origin': "'*'",
                         'method.response.header.Access-Control-Allow-Methods': "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
                     }

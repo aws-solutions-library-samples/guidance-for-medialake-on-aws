@@ -5,6 +5,7 @@ export const INTEGRATIONS_API = {
         GET_INTEGRATION: (id: string) => `/integrations/${id}`,
         CREATE_INTEGRATION: '/integrations',
         UPDATE_INTEGRATION: (id: string) => `/integrations/${id}`,
-        UPDATE_STATUS: (id: string) => `/integrations/${id}/status`
+        UPDATE_STATUS: (id: string) => `/integrations/${id}/status`,
+        DELETE_INTEGRATION: (id: string) => `/integrations/${id}`
     }
 } as const;

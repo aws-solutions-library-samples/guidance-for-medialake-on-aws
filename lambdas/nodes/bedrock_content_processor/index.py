@@ -4,6 +4,7 @@ from decimal import Decimal
 from typing import Any, Callable, Dict, Union
 
 import boto3
+
 from botocore.exceptions import ClientError
 from jinja2 import Environment, FileSystemLoader
 from aws_lambda_powertools import Logger, Tracer
@@ -29,16 +30,14 @@ ImagePayload = Dict[str, str]
 # Default prompts
 DEFAULT_PROMPTS = {
     "summary_100": (
-        "**You are a media-asset-management specialist.**\n"
-        "The following is a **content from a media file** "
-        "(podcast, feature film, corporate video, etc.). In **100 words "
-        "or less**, distill its **content**, emphasizing:\n"
-        "1. **Core Topic or Theme**\n"
-        "2. **Key Messages & Insights**\n"
-        "3. **Major Arguments or Plot Points**\n"
-        "4. **Tone & Style**\n"
-        "Use concise, industry-standard terminology so a MAM user can "
-        "immediately grasp the essence of the content."
+        "**You are a media‐asset‐management specialist.**\n"
+        "The following is content from a media file (podcast, feature film, corporate video, etc.).\n"
+        "In **100 words or less**, write a **single paragraph** that:\n"
+        "  • Distills the **core topic or theme**,\n"
+        "  • Highlights the **key messages & insights**,\n"
+        "  • Summarizes the **major arguments or plot points**, and\n"
+        "  • Conveys the **tone & style**.\n"
+        "Use concise, industry‐standard terminology so a MAM user can immediately grasp the essence of the content."
     ),
     "describe_image": (
         "**You are an image-description assistant.**\n"
@@ -210,6 +209,78 @@ def build_bedrock_body(
 # ────────────────────────────────────────────────────────────
 # Utility helpers
 # ────────────────────────────────────────────────────────────
+
+def get_inference_profile_for_model(
+    model_id: str,
+    region_name: str = None
+) -> str:
+    """
+    Find an inference profile that wraps the given model_id.
+    Returns the inferenceProfileId (or ARN) you should pass to invoke_model().
+    Raises:
+      - PermissionError if you can’t list or describe profiles
+      - ValueError if no accessible profile contains model_id
+    """
+    # 1) Build the Bedrock control-plane client
+    kwargs = {}
+    if region_name:
+        kwargs["region_name"] = region_name
+    bedrock = boto3.client("bedrock", **kwargs)
+
+    # 2) Page through list_inference_profiles
+    profiles = []
+    next_token = None
+    try:
+        while True:
+            resp = bedrock.list_inference_profiles(
+                maxResults=50,
+                **({"nextToken": next_token} if next_token else {})
+            )
+            profiles.extend(resp.get("inferenceProfileSummaries", []))
+            next_token = resp.get("nextToken")
+            if not next_token:
+                break
+    except ClientError as e:
+        logger.error("Failed to list inference profiles", exc_info=e)
+        raise PermissionError("Cannot list Bedrock inference profiles") from e
+
+    # 3) For each profile, call get_inference_profile and look for your model
+    for summary in profiles:
+        profile_id = summary["inferenceProfileId"]
+        try:
+            detail = bedrock.get_inference_profile(
+                inferenceProfileIdentifier=profile_id
+            )
+        except ClientError as e:
+            code = e.response.get("Error", {}).get("Code", "")
+            if code in ("AccessDeniedException", "AccessDenied"):
+                logger.error(f"No permission to get profile {profile_id}", exc_info=e)
+                raise PermissionError(f"No access to inference profile {profile_id}") from e
+            logger.warning(f"Skipping profile {profile_id} due to error", exc_info=e)
+            continue
+
+        # detail["models"] is a list of { "modelArn": "...foundation-model/<model-id>" }
+        for m in detail.get("models", []):
+            arn = m.get("modelArn", "")
+            if model_id in arn or arn.endswith(f"/{model_id}"):
+                # Found a profile that contains your model!
+                return profile_id
+
+    # 4) Nothing found
+    raise ValueError(f"Model '{model_id}' not found in any accessible inference profile")
+
+def _format_prompt_name_for_dynamo(prompt_name: str) -> str:
+    """
+    Format prompt name for DynamoDB field name.
+    Converts 'summary_100' to 'Summary100' by capitalizing first letter and removing underscores.
+    """
+    if not prompt_name:
+        return prompt_name
+    
+    # Remove underscores and capitalize first letter
+    formatted = prompt_name.replace("_", "").capitalize()
+    return formatted
+
 def _strip_decimals(obj):
     if isinstance(obj, list):
         return [_strip_decimals(v) for v in obj]
@@ -338,11 +409,21 @@ def lambda_handler(event, context):
         else:
             raise ValueError(f"Unsupported content source '{content_src}'")
 
+
+        try:
+            profile_id = get_inference_profile_for_model(
+                model_id,
+                region_name=os.getenv("AWS_REGION")
+            )
+        except (PermissionError, ValueError) as e:
+            logger.error("Bedrock setup error", exc_info=e)
+            raise
+
         # ── Invoke Bedrock ────────────────────────────────────────────────
         logger.info(f"Invoking {model_id} with payload from {fetched_uri}")
         try:
             resp = bedrock_rt.invoke_model(
-                modelId=model_id,
+                modelId=profile_id,
                 body=body_json,
                 contentType="application/json"
             )
@@ -351,18 +432,28 @@ def lambda_handler(event, context):
             raise                                              # ← propagate
 
         data = json.loads(resp["body"].read())
+        logger.info(f"Bedrock response structure: {list(data.keys())}")
+        
         if "anthropic" in model_id.lower():
             result = data["content"][0]["text"]
+        elif "nova" in model_id.lower():
+            # Nova models return response in 'output' -> 'message' -> 'content' -> [0] -> 'text'
+            result = data.get("output", {}).get("message", {}).get("content", [{}])[0].get("text", "")
+            logger.info(f"Nova result extraction: {result[:100]}..." if result else "Nova result is empty")
         elif "images" in data:
             result = data["images"][0]
         else:
             result = data.get("completion", data.get("generated_text", ""))
+        
+        logger.info(f"Final extracted result length: {len(result) if result else 0}")
 
         # ── Persist back to DynamoDB ──────────────────────────────────────
+        formatted_prompt_name = _format_prompt_name_for_dynamo(prompt_name) if prompt_name else None
         dynamo_key = (
             mapping.get("dynamo_key") or
-            (f"{prompt_name}Result" if prompt_name else "customPromptResult")
+            (f"{formatted_prompt_name}Result" if formatted_prompt_name else "customPromptResult")
         )
+        logger.info(f"DynamoDB key formatting: prompt_name='{prompt_name}' -> formatted='{formatted_prompt_name}' -> dynamo_key='{dynamo_key}'")
         table.update_item(
             Key={"InventoryID": asset_id},
             UpdateExpression="SET #k = :v",

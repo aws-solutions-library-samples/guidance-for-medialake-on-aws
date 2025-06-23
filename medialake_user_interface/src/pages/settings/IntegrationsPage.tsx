@@ -13,10 +13,11 @@ import {
     IntegrationsResponse,
     Integration
 } from '@/features/settings/integrations/types/integrations.types';
-import { IntegrationFormResult } from '@/features/settings/integrations/components/IntegrationForm/types';
+import { IntegrationFormResult, IntegrationFormData } from '@/features/settings/integrations/components/IntegrationForm/types';
 import {
     useGetIntegrations,
     useCreateIntegration,
+    useUpdateIntegration,
     integrationsController
 } from '@/features/settings/integrations/api/integrations.controller';
 import { IntegrationsNodesService } from '@/features/settings/integrations/services/integrations-nodes.service';
@@ -64,6 +65,10 @@ const IntegrationsPage: React.FC = () => {
     // Fetch integrations using React Query
     const { data: integrationsData, isLoading: isLoadingIntegrations, error: integrationsError } = useGetIntegrations();
     
+    // React Query mutations for create/update
+    const createIntegrationMutation = useCreateIntegration();
+    const updateIntegrationMutation = useUpdateIntegration();
+    
     // Combine loading and error states
     const isLoading = isLoadingNodes || isLoadingIntegrations;
     const error = nodesError || integrationsError;
@@ -83,56 +88,54 @@ const IntegrationsPage: React.FC = () => {
         setApiStatus(prev => ({ ...prev, show: false }));
     };
     
-    // Handle successful integration creation
-    const handleIntegrationCreated = (result: IntegrationFormResult) => {
-        console.log('Integration created callback received with result:', result);
-        
-        // Show the success status immediately with loading first
+    // Handle form submission with immediate loading state
+    const handleSave = async (values: IntegrationFormData) => {
+        // 1) Show loading immediately
         setApiStatus({
             show: true,
             status: 'loading',
-            action: 'Creating integration...',
+            action: editingIntegration ? 'Updating integration…' : 'Creating integration…'
         });
-        
-        // Then show success after a brief moment
-        setTimeout(() => {
-            console.log('Setting API status to success');
-            setApiStatus({
-                show: true,
-                status: 'success',
-                action: 'Integration Created',
-                message: `New integration "${result.nodeId}" has been successfully created`,
-            });
-            
-            // Refresh the integrations data
-            refreshIntegrations();
-        }, 500);
-    };
 
-    // Handle successful integration update
-    const handleIntegrationUpdated = (result: IntegrationFormResult) => {
-        console.log('Integration updated callback received with result:', result);
-        
-        // Show the success status immediately with loading first
-        setApiStatus({
-            show: true,
-            status: 'loading',
-            action: 'Updating integration...',
-        });
-        
-        // Then show success after a brief moment
-        setTimeout(() => {
-            console.log('Setting API status to success for update');
+        try {
+            let result;
+            
+            // 2) Do the create/update API call
+            if (editingIntegration) {
+                console.log('Starting integration update with data:', values);
+                result = await updateIntegrationMutation.mutateAsync({
+                    id: editingIntegration.id,
+                    data: values
+                });
+                console.log('Integration updated successfully:', result);
+            } else {
+                console.log('Starting integration creation with data:', values);
+                result = await createIntegrationMutation.mutateAsync(values);
+                console.log('Integration created successfully:', result);
+            }
+
+            // 3) Show success
             setApiStatus({
                 show: true,
                 status: 'success',
-                action: 'Integration Updated',
-                message: `Integration "${result.nodeId}" has been successfully updated`,
+                action: editingIntegration ? 'Integration Updated' : 'Integration Created',
+                message: `Integration "${values.nodeId}" saved.`,
             });
             
-            // Refresh the integrations data
+            // Close the form and refresh data
+            setOpenIntegrationForm(false);
+            setEditingIntegration(null);
             refreshIntegrations();
-        }, 500);
+            
+        } catch (err) {
+            console.error(`Failed to ${editingIntegration ? 'update' : 'create'} integration:`, err);
+            setApiStatus({
+                show: true,
+                status: 'error',
+                action: 'Save Failed',
+                message: err instanceof Error ? err.message : String(err),
+            });
+        }
     };
 
     const handleCloseIntegrationForm = () => {
@@ -146,35 +149,6 @@ const IntegrationsPage: React.FC = () => {
         setOpenIntegrationForm(true);
     };
 
-    const handleUpdateIntegration = async (id: string, data: any) => {
-        setApiStatus({
-            show: true,
-            status: 'loading',
-            action: 'Updating integration...',
-        });
-        
-        try {
-            await integrationsController.updateIntegration(id, data);
-            setApiStatus({
-                show: true,
-                status: 'success',
-                action: 'Integration Updated',
-                message: 'Integration has been successfully updated',
-            });
-            
-            // Refresh the integrations data
-            refreshIntegrations();
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Failed to update integration';
-            setApiStatus({
-                show: true,
-                status: 'error',
-                action: 'Integration Update Failed',
-                message: errorMessage,
-            });
-            console.error('Failed to update integration:', error);
-        }
-    };
 
     const handleDeleteIntegration = async (id: string) => {
         // Open the confirmation dialog and set the integration ID to delete
@@ -297,7 +271,7 @@ const IntegrationsPage: React.FC = () => {
                 open={openIntegrationForm}
                 onClose={handleCloseIntegrationForm}
                 filteredNodes={integrationNodes}
-                onSubmitSuccess={editingIntegration ? handleIntegrationUpdated : handleIntegrationCreated}
+                onSubmit={handleSave}
                 editingIntegration={editingIntegration}
             />
 

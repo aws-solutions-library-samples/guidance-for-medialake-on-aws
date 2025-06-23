@@ -60,24 +60,8 @@ class UPSFApi(Construct):
             "COGNITO_USER_POOL_ID": props.cognito_user_pool.user_pool_id,
         }
 
-        # Set up common CORS configuration
-        cors_config = api_gateway.CorsOptions(
-            allow_origins=["http://localhost:5173"],
-            allow_methods=["GET", "PUT", "OPTIONS", "DELETE", "POST"],
-            allow_headers=["Content-Type", "Authorization", "X-Amz-Date", "X-Api-Key", "X-Amz-Security-Token"],
-            allow_credentials=True,
-            max_age=Duration.seconds(300),
-        )
-
         # 1. User Profile Endpoints
         profile_resource = users_resource.add_resource("profile")
-        profile_resource.add_cors_preflight(
-            allow_origins=cors_config.allow_origins,
-            allow_methods=cors_config.allow_methods,
-            allow_headers=cors_config.allow_headers,
-            allow_credentials=cors_config.allow_credentials,
-            max_age=cors_config.max_age,
-        )
 
         # GET /users/profile - Get user profile
         get_profile_lambda = Lambda(
@@ -101,9 +85,9 @@ class UPSFApi(Construct):
         # PUT /users/profile - Update user profile
         put_profile_lambda = Lambda(
             self,
-            "PutProfileLambda",
+            "UserProfilePutLambda",
             config=LambdaConfig(
-                name="update_user_profile",
+                name="user-profile-put",
                 entry="lambdas/api/users/profile/put_profile",
                 environment_variables=common_env_vars,
             ),
@@ -119,20 +103,13 @@ class UPSFApi(Construct):
 
         # 2. User Settings Endpoints
         settings_resource = users_resource.add_resource("settings")
-        settings_resource.add_cors_preflight(
-            allow_origins=cors_config.allow_origins,
-            allow_methods=cors_config.allow_methods,
-            allow_headers=cors_config.allow_headers,
-            allow_credentials=cors_config.allow_credentials,
-            max_age=cors_config.max_age,
-        )
 
         # GET /users/settings - Get user settings
         get_settings_lambda = Lambda(
             self,
-            "GetSettingsLambda",
+            "UserSettingsGetLambda",
             config=LambdaConfig(
-                name="get_user_settings",
+                name="user-settings-get",
                 entry="lambdas/api/users/settings/get_settings",
                 environment_variables=common_env_vars,
             ),
@@ -149,19 +126,13 @@ class UPSFApi(Construct):
         # PUT /users/settings/{namespace}/{key} - Update user setting
         settings_namespace_resource = settings_resource.add_resource("{namespace}")
         settings_namespace_key_resource = settings_namespace_resource.add_resource("{key}")
-        settings_namespace_key_resource.add_cors_preflight(
-            allow_origins=cors_config.allow_origins,
-            allow_methods=cors_config.allow_methods,
-            allow_headers=cors_config.allow_headers,
-            allow_credentials=cors_config.allow_credentials,
-            max_age=cors_config.max_age,
-        )
+
 
         put_setting_lambda = Lambda(
             self,
-            "PutSettingLambda",
+            "UserSettingsPutLambda",
             config=LambdaConfig(
-                name="update_user_setting",
+                name="user-settings-put",
                 entry="lambdas/api/users/settings/put_setting",
                 environment_variables=common_env_vars,
             ),
@@ -182,13 +153,7 @@ class UPSFApi(Construct):
 
         # 3. User Favorites Endpoints
         favorites_resource = users_resource.add_resource("favorites")
-        favorites_resource.add_cors_preflight(
-            allow_origins=cors_config.allow_origins,
-            allow_methods=cors_config.allow_methods,
-            allow_headers=cors_config.allow_headers,
-            allow_credentials=cors_config.allow_credentials,
-            max_age=cors_config.max_age,
-        )
+
 
         # POST /users/favorites - Add favorite
         post_favorite_lambda = Lambda(
@@ -231,19 +196,13 @@ class UPSFApi(Construct):
         # DELETE /users/favorites/{itemType}/{itemId} - Remove favorite
         favorites_item_type_resource = favorites_resource.add_resource("{itemType}")
         favorites_item_type_item_id_resource = favorites_item_type_resource.add_resource("{itemId}")
-        favorites_item_type_item_id_resource.add_cors_preflight(
-            allow_origins=cors_config.allow_origins,
-            allow_methods=cors_config.allow_methods,
-            allow_headers=cors_config.allow_headers,
-            allow_credentials=cors_config.allow_credentials,
-            max_age=cors_config.max_age,
-        )
+
 
         delete_favorite_lambda = Lambda(
             self,
-            "DeleteFavoriteLambda",
+            "UsersFavoritesDeleteLambda",
             config=LambdaConfig(
-                name="remove_favorite",
+                name="users-favorites-delete",
                 entry="lambdas/api/users/favorites/delete_favorite",
                 environment_variables=common_env_vars,
             ),
@@ -263,6 +222,12 @@ class UPSFApi(Construct):
         )
 
         # Add CORS support to all resources
-        add_cors_options_method(users_resource)
+        # Don't add OPTIONS to users_resource if it was reused from UsersApi
+        # Only add OPTIONS to the sub-resources that UPSFApi creates
         add_cors_options_method(settings_namespace_resource)
         add_cors_options_method(favorites_item_type_resource)
+        add_cors_options_method(profile_resource)
+        add_cors_options_method(settings_resource)
+        add_cors_options_method(favorites_resource)
+        add_cors_options_method(settings_namespace_key_resource)
+        add_cors_options_method(favorites_item_type_item_id_resource)
