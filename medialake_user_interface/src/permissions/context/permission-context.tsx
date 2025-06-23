@@ -27,6 +27,7 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
   const { isAuthenticated, isLoading: authLoading, isInitialized } = useAuth();
   const [user, setUser] = useState<User | null>(null);
   const [ability, setAbility] = useState<AppAbility>(() => createAppAbility());
+  const [permissionsInitialized, setPermissionsInitialized] = useState(false);
   
   // State to control when to fetch permission sets from API
   const [shouldFetchPermissions, setShouldFetchPermissions] = useState(false);
@@ -95,13 +96,21 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
             
             console.log('Extracted user from claims:', extractedUser);
             setUser(extractedUser);
+          } else {
+            console.error('Invalid JWT token format');
+            setUser(null);
           }
+        } else {
+          console.log('No token found');
+          setUser(null);
         }
       } catch (error) {
         console.error('Error extracting user from token:', error);
+        setUser(null);
       }
     } else {
       setUser(null);
+      setPermissionsInitialized(false);
       PermissionTokenCache.clear(); // Clear cache on logout
     }
   }, [isAuthenticated, isInitialized]);
@@ -180,6 +189,7 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
           const newAbility = defineAbilityFor(user, []);
           console.log('New ability created with custom permissions:', newAbility);
           setAbility(newAbility);
+          setPermissionsInitialized(true);
         } else if (permissionSets) {
           // If no custom permissions but we have permission sets from API
           // Transform permission sets to the format expected by CASL
@@ -194,21 +204,25 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
           const newAbility = defineAbilityFor(user, transformedPermissions);
           console.log('New ability created:', newAbility);
           setAbility(newAbility);
+          setPermissionsInitialized(true);
         } else if (!shouldFetchPermissions) {
           // If no custom permissions and no permission sets yet, enable fetching
           // but only if we haven't already enabled it
           console.log('No custom permissions in JWT, enabling permission sets API fetch');
           setShouldFetchPermissions(true);
+          setPermissionsInitialized(false);
         }
       } catch (error) {
         console.error('Error creating ability:', error);
         // On error, ensure we have a fallback ability
         setAbility(createAppAbility());
+        setPermissionsInitialized(true); // Set to true to prevent infinite loading
       }
-    } else {
+    } else if (!isAuthenticated) {
       // Reset ability when not authenticated
       console.log('Resetting ability - not authenticated or no user');
       setAbility(createAppAbility());
+      setPermissionsInitialized(false);
     }
   }, [isAuthenticated, isInitialized, user, permissionSets]);
 
@@ -222,10 +236,10 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
     }
   }, [isAuthenticated, refetch, setShouldFetchPermissions]);
 
-  // Context value
+  // Context value - ensure we stay in loading state until permissions are fully initialized
   const value = {
     ability,
-    loading: isLoading || authLoading || !isInitialized,
+    loading: isLoading || authLoading || !isInitialized || (isAuthenticated && !permissionsInitialized),
     error,
     refreshPermissions,
   };
