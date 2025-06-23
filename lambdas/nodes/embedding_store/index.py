@@ -234,17 +234,6 @@ def _ok_no_op(vector_len: int, asset_id: Optional[str]):
         ),
     }
 
-<<<<<<< HEAD
-# Using the new error handler module instead of the local function
-def check_opensearch_response(response: Dict[str, Any], operation: str) -> None:
-    """
-    Check OpenSearch response for errors and raise if status is not 200/201
-    
-    This is a wrapper around check_response_status for backward compatibility
-    """
-    check_response_status(response, "OpenSearch", operation, [200, 201])
-=======
-
 def check_opensearch_response(resp: Dict[str, Any], op: str) -> None:
     status = resp.get("status", 200)
     if status not in (200, 201):
