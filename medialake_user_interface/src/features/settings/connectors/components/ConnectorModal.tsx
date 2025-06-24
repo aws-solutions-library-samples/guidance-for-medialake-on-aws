@@ -475,7 +475,8 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                                 error={!!bucketNameError}
                                 helperText={bucketNameError || 'Bucket name must be globally unique, follow S3 naming rules.'}
                             />
-                            <FormControl fullWidth required>
+                            {/* AWS Region FormControl hidden as requested */}
+                            {/* <FormControl fullWidth required>
                                 <InputLabel>AWS Region</InputLabel>
                                 <Select
                                     value={awsRegion}
@@ -488,7 +489,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                                         </MenuItem>
                                     ))}
                                 </Select>
-                            </FormControl>
+                            </FormControl> */}
                         </>
                     )}
                 </>
