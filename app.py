@@ -107,8 +107,7 @@ class MediaLakeStack(cdk.Stack):
 
         asset_sync_stack = AssetSyncStack(self, "MediaLakeAssetSyncStack", props=AssetSyncStackProps(
             asset_table=props.base_infrastructure.asset_table,
-            ingest_event_bus=props.base_infrastructure.ingest_event_bus,
-            media_assets_bucket=props.base_infrastructure.media_assets_s3_bucket.bucket
+            ingest_event_bus=props.base_infrastructure.ingest_event_bus
             ),
         )
         
