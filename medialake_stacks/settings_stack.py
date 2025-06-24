@@ -57,12 +57,9 @@ class SettingsStack(cdk.NestedStack):
             self,
             "PopulateSystemSettingsLambda",
             config=LambdaConfig(
-                function_name=f"{config.resource_prefix}-populate-system-settings-{config.environment}",
-                runtime=lambda_.Runtime.PYTHON_3_11,
-                handler="index.lambda_handler",
-                code_path="lambdas/back_end/populate_system_settings",
-                timeout=Duration.minutes(5),
-                environment={
+                name=f"{config.resource_prefix}-populate-system-settings-{config.environment}",
+                entry="lambdas/back_end/populate_system_settings",
+                environment_variables={
                     "SYSTEM_SETTINGS_TABLE_NAME": self.system_settings_table.table_name,
                     "ACCESS_LOGS_BUCKET_NAME": props.access_logs_bucket_name or "",
                     "MEDIA_ASSETS_BUCKET_NAME": props.media_assets_bucket_name or "",
