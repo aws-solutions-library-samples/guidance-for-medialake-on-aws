@@ -246,8 +246,8 @@ MediaLake now supports three predefined OpenSearch deployment configurations tha
 **Use Case**: Development and testing environments
 **Cost**: Minimal
 **Configuration**:
-- 1 master node (t3.small.search)
-- 1 data node (t3.small.search)
+- 3 master nodes (t3.small.search)
+- 2 data nodes (t3.small.search)
 - 10GB storage with 3000 IOPS
 - Multi-AZ deployment (2 AZs)
 - Off-peak window enabled

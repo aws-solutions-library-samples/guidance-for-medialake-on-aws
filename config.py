@@ -31,9 +31,9 @@ class OpenSearchPresets:
         presets = {
             DeploymentSize.SMALL: {
                 "use_dedicated_master_nodes": True,
-                "master_node_count": 1,
+                "master_node_count": 3,
                 "master_node_instance_type": "t3.small.search",
-                "data_node_count": 1,
+                "data_node_count": 2,
                 "data_node_instance_type": "t3.small.search",
                 "data_node_volume_size": 10,
                 "data_node_volume_type": "gp3",
