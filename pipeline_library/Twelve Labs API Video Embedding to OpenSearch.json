@@ -1,6 +1,6 @@
 {
-  "name": "TwelveLabs Video Embeddings",
-  "description": "Generate TwelveLabs Video Embeddings",
+  "name": "Twelve Labs API Video Embedding to OpenSearch",
+  "description": "Generate Twelve Labs API Video Embeddings to OpenSearch",
   "active": true,
   "configuration": {
     "nodes": [

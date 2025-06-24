@@ -1,6 +1,6 @@
 {
-  "name": "TwelveLabs Audio Embeddings",
-  "description": "",
+  "name": "Twelve Labs API Audio Embedding to OpenSearch",
+  "description": "Generate Twelve Labs API Audio Embeddings to OpenSearch",
   "active": true,
   "configuration": {
     "nodes": [
