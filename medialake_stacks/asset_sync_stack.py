@@ -72,6 +72,7 @@ class AssetSyncStack(cdk.NestedStack):
             iam.PolicyStatement(
                 actions=[
                     "s3:GetObject",
+                    "s3:PutObject",
                     "s3:GetObjectTagging",
                     "s3:GetObjectVersion",
                 ],
