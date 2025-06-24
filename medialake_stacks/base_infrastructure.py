@@ -193,7 +193,7 @@ class BaseInfrastructureStack(Stack):
 
         # Create OpenSearch managed cluster
         # Calculate the effective availability zone count based on data node count
-        opensearch_settings = config.opensearch_cluster_settings
+        opensearch_settings = config.resolved_opensearch_cluster_settings
         effective_az_count = min(
             opensearch_settings.availability_zone_count,
             opensearch_settings.data_node_count
