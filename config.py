@@ -13,6 +13,76 @@ from pydantic import (
 )
 import warnings
 import os
+from enum import Enum
+
+
+class DeploymentSize(str, Enum):
+    SMALL = "small"
+    MEDIUM = "medium"
+    LARGE = "large"
+
+
+class OpenSearchPresets:
+    """Predefined OpenSearch cluster configurations for different deployment sizes."""
+    
+    @staticmethod
+    def get_preset(deployment_size: DeploymentSize) -> Dict:
+        """Get OpenSearch configuration preset based on deployment size."""
+        presets = {
+            DeploymentSize.SMALL: {
+                "use_dedicated_master_nodes": True,
+                "master_node_count": 1,
+                "master_node_instance_type": "t3.small.search",
+                "data_node_count": 1,
+                "data_node_instance_type": "t3.small.search",
+                "data_node_volume_size": 10,
+                "data_node_volume_type": "gp3",
+                "data_node_volume_iops": 1000,
+                "availability_zone_count": 1,
+                "multi_az_with_standby_enabled": False,
+                "automated_snapshot_start_hour": 20,
+                "off_peak_window_enabled": False,
+                "off_peak_window_start": "20:00",
+                "domain_endpoint": None
+            },
+            DeploymentSize.MEDIUM: {
+                "use_dedicated_master_nodes": True,
+                "master_node_count": 3,
+                "master_node_instance_type": "t3.medium.search",
+                "data_node_count": 2,
+                "data_node_instance_type": "t3.medium.search",
+                "data_node_volume_size": 50,
+                "data_node_volume_type": "gp3",
+                "data_node_volume_iops": 1500,
+                "availability_zone_count": 2,
+                "multi_az_with_standby_enabled": False,
+                "automated_snapshot_start_hour": 20,
+                "off_peak_window_enabled": False,
+                "off_peak_window_start": "20:00",
+                "domain_endpoint": None
+            },
+            DeploymentSize.LARGE: {
+                "use_dedicated_master_nodes": True,
+                "master_node_count": 3,
+                "master_node_instance_type": "r7g.medium.search",
+                "data_node_count": 2,
+                "data_node_instance_type": "r7g.medium.search",
+                "data_node_volume_size": 10,
+                "data_node_volume_type": "gp3",
+                "data_node_volume_iops": 3000,
+                "availability_zone_count": 2,
+                "multi_az_with_standby_enabled": False,
+                "automated_snapshot_start_hour": 20,
+                "off_peak_window_enabled": True,
+                "off_peak_window_start": "20:00",
+                "domain_endpoint": None
+            }
+        }
+        
+        if deployment_size not in presets:
+            raise ValueError(f"Unknown deployment size: {deployment_size}")
+            
+        return presets[deployment_size]
 
 
 def validate_opensearch_instance_type(instance_type: str) -> str:
@@ -349,7 +419,8 @@ class CDKConfig(BaseModel):
     """Configuration for CDK Application"""
 
     lambda_tail_warming: bool = False
-    environment: str  # Used for retain decisions 
+    environment: str  # Used for retain decisions
+    deployment_size: DeploymentSize = DeploymentSize.MEDIUM  # NEW: Dynamic deployment sizing
     resource_prefix: str
     resource_application_tag: str
     account_id: str
@@ -358,11 +429,22 @@ class CDKConfig(BaseModel):
     initial_user: UserConfig
     logging: LoggingConfig = LoggingConfig()
     secondary_region: Optional[str] = None
-    opensearch_cluster_settings: Optional[OpenSearchClusterSettings] = None
+    opensearch_cluster_settings: Optional[OpenSearchClusterSettings] = None  # Can override presets
     authZ: AuthConfig = AuthConfig()
     vpc: VpcConfig = Field(default_factory=VpcConfig)
     db: DatabaseConfig = Field(default_factory=DatabaseConfig)
     s3: S3Config = Field(default_factory=S3Config)
+    
+    @property
+    def resolved_opensearch_cluster_settings(self) -> OpenSearchClusterSettings:
+        """Get OpenSearch cluster settings, using preset if not explicitly configured."""
+        if self.opensearch_cluster_settings is not None:
+            # Use explicitly provided settings
+            return self.opensearch_cluster_settings
+        
+        # Use preset based on deployment_size
+        preset_config = OpenSearchPresets.get_preset(self.deployment_size)
+        return OpenSearchClusterSettings(**preset_config)
 
     @property
     def should_retain_tables(self) -> bool:
@@ -370,11 +452,10 @@ class CDKConfig(BaseModel):
 
     @model_validator(mode="after")
     def check_az_count_vpc(self):
-        if self.vpc and self.opensearch_cluster_settings:
+        if self.vpc:
+            opensearch_settings = self.resolved_opensearch_cluster_settings
             if self.vpc.use_existing_vpc:
-                required_subnet_count = (
-                    self.opensearch_cluster_settings.availability_zone_count
-                )
+                required_subnet_count = opensearch_settings.availability_zone_count
                 if (
                     len(self.vpc.existing_vpc.subnet_ids["private"])
                     < required_subnet_count
@@ -384,9 +465,7 @@ class CDKConfig(BaseModel):
                     )
             elif self.vpc.new_vpc:
                 vpc_max_azs = self.vpc.new_vpc.max_azs
-                opensearch_az_count = (
-                    self.opensearch_cluster_settings.availability_zone_count
-                )
+                opensearch_az_count = opensearch_settings.availability_zone_count
 
                 if opensearch_az_count > vpc_max_azs:
                     warnings.warn(
