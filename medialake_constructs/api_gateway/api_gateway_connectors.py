@@ -411,6 +411,7 @@ class ConnectorsConstruct(Construct):
                     "MEDIALAKE_ASSET_TABLE_S3_PATH_INDEX": props.asset_table_s3_path_index_arn,
                     "RESOURCE_PREFIX": config.resource_prefix,
                     "RESOURCE_APPLICATION_TAG": config.resource_application_tag,
+                    "REGION": config.primary_region,
                 },
             ),
         )
