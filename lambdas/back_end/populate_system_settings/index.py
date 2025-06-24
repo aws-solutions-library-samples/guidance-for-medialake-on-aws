@@ -49,7 +49,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 table.put_item(
                     Item={
                         'PK': 'SYSTEM_SETTINGS',
-                        'SK': 'medialake_buckets',
+                        'SK': 'MEDIALAKE_BUCKETS',
                         'setting_value': bucket_names,
                         'description': 'List of S3 buckets created by MediaLake infrastructure',
                         'created_by': 'system',
@@ -76,7 +76,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     table.delete_item(
                         Key={
                             'PK': 'SYSTEM_SETTINGS',
-                            'SK': 'medialake_buckets'
+                            'SK': 'MEDIALAKE_BUCKETS'
                         }
                     )
                     print("Cleaned up MediaLake buckets setting from system table")

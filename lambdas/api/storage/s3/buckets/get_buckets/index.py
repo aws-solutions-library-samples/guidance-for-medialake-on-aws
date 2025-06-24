@@ -21,18 +21,23 @@ def get_medialake_buckets_from_ddb():
         response = table.get_item(
             Key={
                 'PK': 'SYSTEM_SETTINGS',
-                'SK': 'medialake_buckets'
+                'SK': 'MEDIALAKE_BUCKETS'
             }
         )
         
         if 'Item' in response and 'setting_value' in response['Item']:
             buckets_data = response['Item']['setting_value']
+            print(f"Retrieved buckets_data: {buckets_data}")
+            
+            # Handle DynamoDB List format - when using boto3 resource, it should auto-convert
             if isinstance(buckets_data, list):
                 return buckets_data
             elif isinstance(buckets_data, str):
                 # If stored as JSON string, parse it
                 import json
                 return json.loads(buckets_data)
+        else:
+            print(f"No item found or no setting_value. Response: {response}")
         
         return []
         
@@ -54,12 +59,15 @@ def lambda_handler(event, context):
         
         # Get MediaLake buckets from DynamoDB
         medialake_buckets = get_medialake_buckets_from_ddb()
+        print(f"MediaLake buckets to filter: {medialake_buckets}")
+        print(f"All S3 buckets: {all_buckets}")
         
         # Filter out MediaLake buckets
         filtered_buckets = [
             bucket for bucket in all_buckets
             if bucket not in medialake_buckets
         ]
+        print(f"Filtered buckets: {filtered_buckets}")
 
         return {
             "statusCode": 200,

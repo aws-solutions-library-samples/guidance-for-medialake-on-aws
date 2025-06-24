@@ -595,6 +595,7 @@ class ConnectorsConstruct(Construct):
                     "X_ORIGIN_VERIFY_SECRET_ARN": (
                         props.x_origin_verify_secret.secret_arn
                     ),
+                    "SYSTEM_SETTINGS_TABLE_NAME": props.system_settings_table_name or "",
                 },
             ),
         )
@@ -605,6 +606,18 @@ class ConnectorsConstruct(Construct):
                 resources=["*"],
             )
         )
+        
+        # Grant DynamoDB read permissions for system settings table
+        if props.system_settings_table_arn:
+            connector_s3_get_lambda.function.role.add_to_policy(
+                iam.PolicyStatement(
+                    actions=[
+                        "dynamodb:GetItem",
+                        "dynamodb:Query",
+                    ],
+                    resources=[props.system_settings_table_arn],
+                )
+            )
 
         connector_s3_resource.add_method(
             "GET",
