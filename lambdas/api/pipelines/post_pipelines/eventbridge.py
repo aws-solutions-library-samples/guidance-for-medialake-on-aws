@@ -669,7 +669,10 @@ def create_eventbridge_rule(
             
             # Create a role for the trigger lambda
             iam_client = boto3.client("iam")
-            role_name = f"{resource_prefix}_{sanitized_pipeline_name}_trigger_role"
+            # Import sanitize_role_name to ensure proper role name formatting
+            from iam_operations import sanitize_role_name
+            base_role_name = f"{resource_prefix}_{sanitized_pipeline_name}_trigger_role"
+            role_name = sanitize_role_name(base_role_name)
             
             # Check if role already exists
             try:
