@@ -102,6 +102,7 @@ class AssetSyncStack(cdk.NestedStack):
             iam.PolicyStatement(
                 actions=[
                     "s3:GetObject",
+                    "s3:PutObject",
                     "s3:GetObjectTagging",
                     "s3:PutObjectTagging",
                     "s3:GetBucketLocation",
@@ -228,6 +229,17 @@ class AssetSyncStack(cdk.NestedStack):
             iam.PolicyStatement(
                 actions=["lambda:InvokeFunction"],
                 resources=[self._asset_sync_processor_lambda.function.function_arn],
+            )
+        )
+        
+        # Add S3 inventory configuration permission to batch operations role
+        # Using "*" for resources because asset sync needs permission to set inventory configuration
+        # on the source bucket, which can be any S3 bucket that users want to sync from
+        self.batch_operations_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=["s3:PutInventoryConfiguration"],
+                resources=["*"],
+                effect=iam.Effect.ALLOW,
             )
         )
 
