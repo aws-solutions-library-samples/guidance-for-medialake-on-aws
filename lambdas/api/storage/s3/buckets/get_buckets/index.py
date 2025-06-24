@@ -1,48 +1,44 @@
 import boto3
 import json
 import os
-import re
 
 
-def is_medialake_bucket(bucket_name):
+def get_medialake_buckets_from_ddb():
     """
-    Check if a bucket is deployed by MediaLake based on naming patterns.
-    
-    MediaLake buckets typically follow these patterns:
-    - {resource_prefix}-*-{account}-{region}-{environment}
-    - {resource_prefix}-nodes-templates-{account}-{region}--{environment}
-    - Contains 'medialake' in the name (case insensitive)
+    Retrieve the list of MediaLake buckets from DynamoDB system settings table.
     """
-    resource_prefix = os.environ.get("RESOURCE_PREFIX", "").lower()
-    
-    # Convert bucket name to lowercase for comparison
-    bucket_lower = bucket_name.lower()
-    
-    # Check if bucket contains 'medialake' in the name
-    if "medialake" in bucket_lower:
-        return True
-    
-    # If resource prefix is available, check for MediaLake bucket patterns
-    if resource_prefix:
-        # Pattern 1: {resource_prefix}-*-{account}-{region}-{environment}
-        # Pattern 2: {resource_prefix}-nodes-templates-{account}-{region}--{environment}
-        if bucket_lower.startswith(resource_prefix + "-"):
-            # Check for common MediaLake bucket suffixes
-            medialake_patterns = [
-                r"-access-logs?-",
-                r"-asset-bucket-",
-                r"-iac-assets?-",
-                r"-external-payload-",
-                r"-dynamodb-export-",
-                r"-nodes-templates-",
-                r"-media-assets?-"
-            ]
-            
-            for pattern in medialake_patterns:
-                if re.search(pattern, bucket_lower):
-                    return True
-    
-    return False
+    try:
+        dynamodb = boto3.resource('dynamodb')
+        table_name = os.environ.get('SYSTEM_SETTINGS_TABLE_NAME')
+        
+        if not table_name:
+            print("SYSTEM_SETTINGS_TABLE_NAME environment variable not set")
+            return []
+        
+        table = dynamodb.Table(table_name)
+        
+        # Query for MediaLake buckets setting using composite key (PK, SK)
+        response = table.get_item(
+            Key={
+                'PK': 'SYSTEM_SETTINGS',
+                'SK': 'medialake_buckets'
+            }
+        )
+        
+        if 'Item' in response and 'setting_value' in response['Item']:
+            buckets_data = response['Item']['setting_value']
+            if isinstance(buckets_data, list):
+                return buckets_data
+            elif isinstance(buckets_data, str):
+                # If stored as JSON string, parse it
+                import json
+                return json.loads(buckets_data)
+        
+        return []
+        
+    except Exception as e:
+        print(f"Error retrieving MediaLake buckets from DDB: {str(e)}")
+        return []
 
 
 def lambda_handler(event, context):
@@ -53,11 +49,16 @@ def lambda_handler(event, context):
         # Get list of buckets
         response = s3_client.list_buckets()
 
-        # Extract bucket names from response and filter out MediaLake buckets
+        # Extract bucket names from response
         all_buckets = [bucket["Name"] for bucket in response["Buckets"]]
+        
+        # Get MediaLake buckets from DynamoDB
+        medialake_buckets = get_medialake_buckets_from_ddb()
+        
+        # Filter out MediaLake buckets
         filtered_buckets = [
             bucket for bucket in all_buckets
-            if not is_medialake_bucket(bucket)
+            if bucket not in medialake_buckets
         ]
 
         return {

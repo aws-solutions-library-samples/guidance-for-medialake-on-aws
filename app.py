@@ -176,9 +176,6 @@ class MediaLakeStack(cdk.Stack):
         )
         groups_stack.add_dependency(props.authorization_stack)
 
-        settings_stack = SettingsStack(
-            self, "MediaLakeSettings", props=SettingsStackProps()
-        )
         nodes_stack = NodesStack(
             self,
             "MediaLakeNodes",
@@ -186,6 +183,19 @@ class MediaLakeStack(cdk.Stack):
                 iac_bucket=props.base_infrastructure.iac_assets_bucket,
             ),
         )
+
+        settings_stack = SettingsStack(
+            self, "MediaLakeSettings", props=SettingsStackProps(
+                access_logs_bucket_name=props.base_infrastructure.access_logs_bucket.bucket_name,
+                media_assets_bucket_name=props.base_infrastructure.media_assets_s3_bucket.bucket_name,
+                iac_assets_bucket_name=props.base_infrastructure.iac_assets_bucket.bucket_name,
+                external_payload_bucket_name=props.base_infrastructure.external_payload_bucket.bucket_name,
+                ddb_export_bucket_name=props.base_infrastructure.ddb_export_bucket.bucket_name,
+                pipelines_nodes_templates_bucket_name=nodes_stack.pipelines_nodes_templates_bucket.bucket_name,
+            )
+        )
+        # Add dependency to ensure nodes_stack is created before settings_stack
+        settings_stack.add_dependency(nodes_stack)
 
         asset_sync_stack = AssetSyncStack(
             self,

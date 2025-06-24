@@ -55,6 +55,8 @@ class ConnectorsProps:
     api_resource: str | None = None
     cognito_authorizer: str | None = None
     x_origin_verify_secret: secretsmanager.Secret | None = None
+    system_settings_table_name: str | None = None
+    system_settings_table_arn: str | None = None
 
 
 
@@ -697,6 +699,56 @@ class ConnectorsConstruct(Construct):
 
         self.connectors_table.table.grant_read_data(s3_explorer_get_lambda.function)
         
+        # Create storage/s3/buckets resource for get_buckets endpoint
+        storage_resource = props.api_resource.root.add_resource("storage")
+        storage_s3_resource = storage_resource.add_resource("s3")
+        storage_buckets_resource = storage_s3_resource.add_resource("buckets")
+        
+        # Create get_buckets Lambda function
+        get_buckets_lambda = Lambda(
+            self,
+            "GetBucketsLambda",
+            config=LambdaConfig(
+                name="get_buckets",
+                entry="lambdas/api/storage/s3/buckets/get_buckets",
+                environment_variables={
+                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+                    "SYSTEM_SETTINGS_TABLE_NAME": props.system_settings_table_name or "",
+                },
+            ),
+        )
+        
+        # Grant S3 list buckets permission
+        get_buckets_lambda.function.role.add_to_policy(
+            iam.PolicyStatement(
+                actions=["s3:ListAllMyBuckets"],
+                resources=["*"],
+            )
+        )
+        
+        # Grant DynamoDB read permissions for system settings table
+        if props.system_settings_table_arn:
+            get_buckets_lambda.function.role.add_to_policy(
+                iam.PolicyStatement(
+                    actions=[
+                        "dynamodb:GetItem",
+                        "dynamodb:Query",
+                    ],
+                    resources=[props.system_settings_table_arn],
+                )
+            )
+        
+        # Add GET method to buckets resource
+        storage_buckets_resource.add_method(
+            "GET",
+            apigateway.LambdaIntegration(get_buckets_lambda.function),
+            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer,
+        )
+        
+        # Store reference to get_buckets lambda for external configuration
+        self._get_buckets_lambda = get_buckets_lambda
+        
         # Add CORS support to child API resources (not root)
         add_cors_options_method(connectors_resource)
         add_cors_options_method(connector_id_resource)
@@ -752,3 +804,7 @@ class ConnectorsConstruct(Construct):
     @property
     def connector_sync_lambda(self) -> lambda_.Function:
         return self._connector_sync_lambda.function
+    
+    @property
+    def get_buckets_lambda(self) -> lambda_.Function:
+        return self._get_buckets_lambda.function

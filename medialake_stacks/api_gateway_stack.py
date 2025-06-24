@@ -125,6 +125,8 @@ class ApiGatewayStack(cdk.NestedStack):
                 ingest_event_bus=props.ingest_event_bus,
                 asset_sync_job_table=props.asset_sync_job_table,
                 asset_sync_engine_lambda=props.asset_sync_engine_lambda,
+                system_settings_table_name=props.system_settings_table,
+                system_settings_table_arn=f"arn:aws:dynamodb:{self.region}:{self.account}:table/{props.system_settings_table}",
             ),
         )
 
