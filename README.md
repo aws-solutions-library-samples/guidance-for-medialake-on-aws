@@ -250,7 +250,7 @@ MediaLake now supports three predefined OpenSearch deployment configurations tha
 - 1 data node (t3.small.search)
 - 10GB storage with 3000 IOPS
 - Single AZ deployment
-- Off-peak window disabled
+- Off-peak window enabled
 
 ```json
 {
@@ -266,7 +266,7 @@ MediaLake now supports three predefined OpenSearch deployment configurations tha
 - 2 data nodes (t3.medium.search)
 - 50GB storage with 3000 IOPS
 - Multi-AZ deployment (2 AZs)
-- Off-peak window disabled
+- Off-peak window enabled
 
 ```json
 {

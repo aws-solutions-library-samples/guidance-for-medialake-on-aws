@@ -41,7 +41,7 @@ class OpenSearchPresets:
                 "availability_zone_count": 1,
                 "multi_az_with_standby_enabled": False,
                 "automated_snapshot_start_hour": 20,
-                "off_peak_window_enabled": False,
+                "off_peak_window_enabled": True,
                 "off_peak_window_start": "20:00",
                 "domain_endpoint": None
             },
@@ -57,7 +57,7 @@ class OpenSearchPresets:
                 "availability_zone_count": 2,
                 "multi_az_with_standby_enabled": False,
                 "automated_snapshot_start_hour": 20,
-                "off_peak_window_enabled": False,
+                "off_peak_window_enabled": True,
                 "off_peak_window_start": "20:00",
                 "domain_endpoint": None
             },
