@@ -38,7 +38,7 @@ class OpenSearchPresets:
                 "data_node_volume_size": 10,
                 "data_node_volume_type": "gp3",
                 "data_node_volume_iops": 3000,
-                "availability_zone_count": 1,
+                "availability_zone_count": 2,
                 "multi_az_with_standby_enabled": False,
                 "automated_snapshot_start_hour": 20,
                 "off_peak_window_enabled": True,
