@@ -176,6 +176,22 @@ class CleanupStack(Stack):
             )
         )
 
+        # Add Secrets Manager permissions
+        self._clean_up_lambda.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "secretsmanager:ListSecrets",
+                    "secretsmanager:DeleteSecret",
+                    "secretsmanager:DescribeSecret",
+                ],
+                resources=[
+                    f"arn:aws:secretsmanager:{Stack.of(self).region}:{Stack.of(self).account}:secret:integration/*",
+                    f"arn:aws:secretsmanager:{Stack.of(self).region}:{Stack.of(self).account}:secret:medialake/search/provider/*"
+                ],
+            )
+        )
+
         self.provider = cr.Provider(
             self, "CleanupProvider", on_event_handler=self._clean_up_lambda.function
         )
