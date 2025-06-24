@@ -138,7 +138,6 @@ def handler(event, context):
         return {"statusCode": 200,
                 "body": f"Skipped {req_type} request"}
 
-    # -- env
     host         = os.environ["COLLECTION_ENDPOINT"]
     index_names  = os.environ["INDEX_NAMES"]
     region       = os.environ["REGION"]
@@ -147,129 +146,128 @@ def handler(event, context):
 
     logger.info("Environment",
                 extra={"host": host,
-                       "indexes": index_names,
-                       "region": region,
-                       "service": service})
+                    "indexes": index_names,
+                    "region": region,
+                    "service": service})
 
-        headers = {
-            "content-type": "application/json",
-            "accept": "application/json",
-        }      
+    headers = {
+        "content-type": "application/json",
+        "accept": "application/json",
+    }      
 
-        payload = {
-            "settings": {
-                "index": {
-                    "knn": True,
-                    "mapping.total_fields.limit": 6000
+    payload = {
+        "settings": {
+            "index": {
+                "knn": True,
+                "mapping.total_fields.limit": 6000
+            }
+        },
+        "mappings": {
+            "properties": {
+            "type":             {"type": "text"},
+            "document_id":      {"type": "text"},
+            "InventoryID":      {"type": "text"},
+            "FileHash":         {"type": "text"},
+            "StoragePath":      {"type": "text"}, 
+            "start_timecode":   {"type": "keyword"},
+            "end_timecode":     {"type": "keyword"},
+            "embedding_scope":  {"type": "keyword"},
+            "embedding": {
+                "type":      "knn_vector",
+                "dimension": 1024,
+                "method": {
+                "name":       "hnsw",
+                "space_type": "cosinesimil",
+                "engine":     "nmslib"
                 }
-            },
-            "mappings": {
-                "properties": {
-                "type":             {"type": "text"},
-                "document_id":      {"type": "text"},
-                "InventoryID":      {"type": "text"},
-                "FileHash":         {"type": "text"},
-                "StoragePath":      {"type": "text"}, 
-                "start_timecode":   {"type": "keyword"},
-                "end_timecode":     {"type": "keyword"},
-                "embedding_scope":  {"type": "keyword"},
-                "embedding": {
-                    "type":      "knn_vector",
-                    "dimension": 1024,
-                    "method": {
-                    "name":       "hnsw",
-                    "space_type": "cosinesimil",
-                    "engine":     "nmslib"
-                    }
-                },   
-                "DerivedRepresentations": {
-                "type": "nested", 
-                "properties": {
-                    "Format":    { "type": "text"  },
-                    "ID":        { "type": "text"  },
-                    "Purpose":   { "type": "text"  },
-                    "Type":      { "type": "text"  },
-                    "ImageSpec": {
-                        "type": "object",
-                        "properties": {
-                            "Resolution": {
-                                "properties": {
-                                    "Height": { "type": "integer" },
-                                    "Width": { "type": "integer" }
-                                }
+            },   
+            "DerivedRepresentations": {
+            "type": "nested", 
+            "properties": {
+                "Format":    { "type": "text"  },
+                "ID":        { "type": "text"  },
+                "Purpose":   { "type": "text"  },
+                "Type":      { "type": "text"  },
+                "ImageSpec": {
+                    "type": "object",
+                    "properties": {
+                        "Resolution": {
+                            "properties": {
+                                "Height": { "type": "integer" },
+                                "Width": { "type": "integer" }
                             }
                         }
-                    },
-                    "StorageInfo": {
-                        "type": "object",
-                        "properties": {
-                            "PrimaryLocation": {
-                                "properties": {
-                                    "Bucket": { "type": "text" },
-                                    "Status": { "type": "text" },
-                                    "Provider": { "type": "text" },
-                                    "StorageType": { "type": "text" },
-                                    "FileInfo": {
-                                        "properties": {
-                                            "Size": { "type": "long" }
-                                        }
-                                    },
-                                    "ObjectKey": {
-                                        "properties": {
-                                            "FullPath": { "type": "text" },
-                                            "Name": { "type": "text" },
-                                            "Path": { "type": "text" }
-                                        }
+                    }
+                },
+                "StorageInfo": {
+                    "type": "object",
+                    "properties": {
+                        "PrimaryLocation": {
+                            "properties": {
+                                "Bucket": { "type": "text" },
+                                "Status": { "type": "text" },
+                                "Provider": { "type": "text" },
+                                "StorageType": { "type": "text" },
+                                "FileInfo": {
+                                    "properties": {
+                                        "Size": { "type": "long" }
+                                    }
+                                },
+                                "ObjectKey": {
+                                    "properties": {
+                                        "FullPath": { "type": "text" },
+                                        "Name": { "type": "text" },
+                                        "Path": { "type": "text" }
                                     }
                                 }
                             }
                         }
                     }
                 }
-                },
-                "DigitalSourceAsset": {
-                    "type": "object",
-                    "properties": {
-                        "CreateDate": { "type": "date" },
-                        "ID": { "type": "keyword" },
-                        "IngestedAt": { "type": "date" },
-                        "lastModifiedDate": { "type": "date" },
-                        "originalIngestDate": { "type": "date" },
-                        "Type": { "type": "keyword" },
-                        "MainRepresentation": {
-                            "type": "object",
-                            "properties": {
-                                "Format": { "type": "keyword" },
-                                "ID": { "type": "text" },
-                                "Purpose": { "type": "text" },
-                                "Type": { "type": "text" },
-                                "StorageInfo": {
-                                    "type": "object",
-                                    "properties": {
-                                        "PrimaryLocation": {
-                                            "properties": {
-                                                "Bucket": { "type": "text" },
-                                                "Status": { "type": "text" },
-                                                "StorageType": { "type": "text" },
-                                                "FileInfo": {
-                                                    "properties": {
-                                                        "CreateDate": { "type": "date" },
-                                                        "Size": { "type": "long" },
-                                                        "Hash": {
-                                                            "properties": {
-                                                                "Algorithm": { "type": "keyword" },
-                                                                "MD5Hash": { "type": "keyword" },
-                                                                "Value": { "type": "keyword" }
-                                                            }
+            }
+            },
+            "DigitalSourceAsset": {
+                "type": "object",
+                "properties": {
+                    "CreateDate": { "type": "date" },
+                    "ID": { "type": "keyword" },
+                    "IngestedAt": { "type": "date" },
+                    "lastModifiedDate": { "type": "date" },
+                    "originalIngestDate": { "type": "date" },
+                    "Type": { "type": "keyword" },
+                    "MainRepresentation": {
+                        "type": "object",
+                        "properties": {
+                            "Format": { "type": "keyword" },
+                            "ID": { "type": "text" },
+                            "Purpose": { "type": "text" },
+                            "Type": { "type": "text" },
+                            "StorageInfo": {
+                                "type": "object",
+                                "properties": {
+                                    "PrimaryLocation": {
+                                        "properties": {
+                                            "Bucket": { "type": "text" },
+                                            "Status": { "type": "text" },
+                                            "StorageType": { "type": "text" },
+                                            "FileInfo": {
+                                                "properties": {
+                                                    "CreateDate": { "type": "date" },
+                                                    "Size": { "type": "long" },
+                                                    "Hash": {
+                                                        "properties": {
+                                                            "Algorithm": { "type": "keyword" },
+                                                            "MD5Hash": { "type": "keyword" },
+                                                            "Value": { "type": "keyword" }
                                                         }
                                                     }
-                                                },
-                                                "ObjectKey": {
-                                                    "properties": {
-                                                        "FullPath": { "type": "text" },
-                                                        "Name": { "type": "text" },
-                                                        "Path": { "type": "text" }
-                                                    }
+                                                }
+                                            },
+                                            "ObjectKey": {
+                                                "properties": {
+                                                    "FullPath": { "type": "text" },
+                                                    "Name": { "type": "text" },
+                                                    "Path": { "type": "text" }
                                                 }
                                             }
                                         }
@@ -278,69 +276,67 @@ def handler(event, context):
                             }
                         }
                     }
-                },
-                "Metadata": {
-                    "type": "object",
-                    "dynamic": True,
-                    "properties": {
-                        "CustomMetadata": {
-                            "type": "object",
-                            "dynamic": True
-                        }
+                }
+            },
+            "Metadata": {
+                "type": "object",
+                "dynamic": True,
+                "properties": {
+                    "CustomMetadata": {
+                        "type": "object",
+                        "dynamic": True
                     }
-                },
-                "DigitalAsset": {
-                    "type": "nested",
-                    "properties": {
-                        "asset_id":         { "type": "keyword" },
-                        "start_timecode":   { "type": "keyword" },
-                        "end_timecode":     { "type": "keyword" },
-                        "embedding_scope":  { "type": "keyword" },
-                        "embedding": {
-                            "type":      "knn_vector",
-                            "dimension": 1024,
-                            "method": {
-                                "name":       "hnsw",
-                                "space_type": "cosinesimil",
-                                "engine":     "nmslib"
-                            }
-                        },
-                        "EmbeddedMetadata": { "type": "object", "dynamic": True }
+                }
+            },
+            "DigitalAsset": {
+                "type": "nested",
+                "properties": {
+                    "asset_id":         { "type": "keyword" },
+                    "start_timecode":   { "type": "keyword" },
+                    "end_timecode":     { "type": "keyword" },
+                    "embedding_scope":  { "type": "keyword" },
+                    "embedding": {
+                        "type":      "knn_vector",
+                        "dimension": 1024,
+                        "method": {
+                            "name":       "hnsw",
+                            "space_type": "cosinesimil",
+                            "engine":     "nmslib"
                         }
+                    },
+                    "EmbeddedMetadata": { "type": "object", "dynamic": True }
                     }
                 }
             }
         }
+    }
 
 
-        region = os.environ["REGION"]
-        service = os.environ["SCOPE"]
-        credentials = boto3.Session().get_credentials()
+    region = os.environ["REGION"]
+    service = os.environ["SCOPE"]
+    credentials = boto3.Session().get_credentials()
 
-        logger.info(
-            "Preparing to create indexes",
-            extra={
-                "region": region,
-                "service": service,
-                "vector_dimension": VECTOR_DIMENSION
-            }
+    logger.info(
+        "Preparing to create indexes",
+        extra={
+            "region": region,
+            "service": service,
+            "vector_dimension": VECTOR_DIMENSION
+        }
+    )
+
+    indexes = index_names.split(",")
+    logger.info(f"Creating {len(indexes)} indexes", extra={"indexes": indexes})
+    
+    for index_name in indexes:
+        logger.info(f"Processing index", extra={"index_name": index_name})
+        success = create_index_with_retry(
+            host, index_name, payload, headers, credentials, service, region
         )
-
-        indexes = index_names.split(",")
-        logger.info(f"Creating {len(indexes)} indexes", extra={"indexes": indexes})
+        if not success:
+            error_msg = f"Failed to create index {index_name} after multiple retries"
+            logger.error(error_msg)
+            raise Exception(error_msg)
         
-        for index_name in indexes:
-            logger.info(f"Processing index", extra={"index_name": index_name})
-            success = create_index_with_retry(
-                host, index_name, payload, headers, credentials, service, region
-            )
-            if not success:
-                error_msg = f"Failed to create index {index_name} after multiple retries"
-                logger.error(error_msg)
-                raise Exception(error_msg)
-            
-        logger.info("Successfully created all indexes")
-        return {"statusCode": 200, "body": "All indexes created successfully"}
-    else:
-        logger.info(f"Skipping non-Create request type", extra={"RequestType": event["RequestType"]})
-        return {"statusCode": 200, "body": f"Skipped {event['RequestType']} request"}
+    logger.info("Successfully created all indexes")
+    return {"statusCode": 200, "body": "All indexes created successfully"}
