@@ -496,3 +496,22 @@ class LambdaMiddleware:
 def lambda_middleware(**kw):
     mw = LambdaMiddleware(**kw)
     return lambda handler: mw(handler)
+
+
+def is_lambda_warmer_event(event: dict) -> bool:
+    """
+    Returns True if the event is a lambda warmer event (e.g., triggered by the EventBridge rule for warming).
+    Usage (at the top of your lambda):
+        if is_lambda_warmer_event(event):
+            return {"warmed": True}
+    """
+    # Check for a custom key or recognizable pattern
+    if isinstance(event, dict):
+        if event.get("lambda_warmer") is True:
+            return True
+        # Optionally, check for EventBridge scheduled event pattern
+        if event.get("source") == "aws.events" and event.get("detail-type") == "Scheduled Event":
+            # Optionally, check for a custom resource or id
+            if event.get("resources") and any("lambda-warmer" in r for r in event["resources"]):
+                return True
+    return False

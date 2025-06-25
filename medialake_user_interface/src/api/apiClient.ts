@@ -27,7 +27,16 @@ class ApiClient extends ApiClientBase {
 
     private getBaseURL() {
         const awsConfig = StorageHelper.getAwsConfig();
-        return awsConfig?.API?.REST?.RestApi?.endpoint || '';
+        const baseURL = awsConfig?.API?.REST?.RestApi?.endpoint || '';
+        console.log('🌐 Base URL Configuration:', {
+            hasConfig: !!awsConfig,
+            hasAPI: !!awsConfig?.API,
+            hasREST: !!awsConfig?.API?.REST,
+            hasRestApi: !!awsConfig?.API?.REST?.RestApi,
+            endpoint: baseURL,
+            fullConfig: awsConfig
+        });
+        return baseURL;
     }
 
     private processQueue(error: any = null) {
@@ -44,19 +53,48 @@ class ApiClient extends ApiClientBase {
     private setupInterceptors() {
         this.axiosInstance.interceptors.request.use(
             async (config: InternalAxiosRequestConfig) => {
+                console.log('🚀 API Request:', {
+                    method: config.method?.toUpperCase(),
+                    url: config.url,
+                    baseURL: config.baseURL,
+                    fullURL: `${config.baseURL}${config.url}`,
+                    hasAuthHeader: !!config.headers?.Authorization
+                });
+                
                 const headers = await this.getHeaders();
                 config.headers = {
                     ...config.headers,
                     ...headers,
                 } as AxiosRequestHeaders;
+                
+                console.log('🔑 Auth Header Added:', !!config.headers?.Authorization);
                 return config;
             },
-            (error) => Promise.reject(error)
+            (error) => {
+                console.error('❌ Request Interceptor Error:', error);
+                return Promise.reject(error);
+            }
         );
 
         this.axiosInstance.interceptors.response.use(
-            (response) => response,
+            (response) => {
+                console.log('✅ API Response Success:', {
+                    status: response.status,
+                    url: response.config.url,
+                    method: response.config.method?.toUpperCase()
+                });
+                return response;
+            },
             async (error) => {
+                console.error('❌ API Response Error:', {
+                    status: error.response?.status,
+                    statusText: error.response?.statusText,
+                    url: error.config?.url,
+                    method: error.config?.method?.toUpperCase(),
+                    message: error.response?.data?.message || error.message,
+                    headers: error.response?.headers
+                });
+
                 const originalRequest = error.config;
 
                 // Check if error is token expiration
@@ -64,7 +102,10 @@ class ApiClient extends ApiClientBase {
                     error.response?.data?.message === "The incoming token has expired" &&
                     !originalRequest._retry) {
 
+                    console.log('🔄 Token expired, attempting refresh...');
+
                     if (this.isRefreshing) {
+                        console.log('⏳ Token refresh already in progress, queuing request...');
                         return new Promise((resolve, reject) => {
                             this.failedQueue.push({ resolve, reject });
                         })
@@ -80,10 +121,12 @@ class ApiClient extends ApiClientBase {
                     try {
                         const newToken = await authService.refreshToken();
                         if (!newToken) {
+                            console.error('❌ Failed to refresh token');
                             this.processQueue(new Error('Failed to refresh token'));
                             return Promise.reject(error);
                         }
 
+                        console.log('✅ Token refreshed successfully');
                         // Update the failed request with new token
                         originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
 
@@ -93,6 +136,7 @@ class ApiClient extends ApiClientBase {
                         // Retry the original request
                         return this.axiosInstance(originalRequest);
                     } catch (refreshError) {
+                        console.error('❌ Token refresh failed:', refreshError);
                         this.processQueue(refreshError);
                         return Promise.reject(refreshError);
                     } finally {

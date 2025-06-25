@@ -39,6 +39,7 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
     onClose,
     filteredNodes,
     onSubmitSuccess,
+    onSubmit,
     editingIntegration,
 }) => {
     const { t } = useTranslation();
@@ -76,7 +77,7 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
             
             return {
                 nodeId: nodeId,
-                description: config.description || editingIntegration.name || '',
+                description: editingIntegration.description || config.description || '',
                 auth: {
                     type: authType,
                     credentials: {
@@ -132,10 +133,20 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
     ]);
 
     const handleSubmit = React.useCallback(async (data: IntegrationFormData) => {
-        // Close the form immediately when the user clicks the button
-        onClose();
-        
         try {
+            // If onSubmit prop is provided, use it (new approach)
+            if (onSubmit) {
+                console.log('Using new onSubmit approach with data:', data);
+                await onSubmit(data);
+                return;
+            }
+            
+            // Otherwise, fall back to old approach for backward compatibility
+            console.log('Using legacy onSubmitSuccess approach with data:', data);
+            
+            // Close the form immediately when the user clicks the button
+            onClose();
+            
             let result;
             
             if (isEditMode && editingIntegration) {
@@ -185,7 +196,7 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
             });
             throw error;
         }
-    }, [createIntegration, updateIntegration, onClose, onSubmitSuccess, selectedNodeId, form.formState, isEditMode, editingIntegration]);
+    }, [onSubmit, createIntegration, updateIntegration, onClose, onSubmitSuccess, selectedNodeId, form.formState, isEditMode, editingIntegration]);
 
     const handleBack = React.useCallback(() => {
         setActiveStep(0);
@@ -244,7 +255,7 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
             setSelectedNodeId(nodeId);
             form.reset({
                 nodeId: nodeId,
-                description: config.description || editingIntegration.name || '',
+                description: editingIntegration.description || config.description || '',
                 auth: {
                     type: authType,
                     credentials: {

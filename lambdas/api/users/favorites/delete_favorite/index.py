@@ -36,22 +36,21 @@ class DeleteResponse(BaseModel):
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
 @metrics.log_metrics(capture_cold_start_metric=True)
 def lambda_handler(
-    event: APIGatewayProxyEventModel, context: LambdaContext
+    event: Dict[str, Any], context: LambdaContext
 ) -> Dict[str, Any]:
     """
-    Lambda handler to remove a favorite item for a user from DynamoDB
+    Lambda handler to remove an item from user favorites
     """
     try:
         # Extract user ID from Cognito authorizer context
         request_context = event.get("requestContext", {})
         authorizer = request_context.get("authorizer", {})
-        claims = authorizer.get("claims", {})
         
-        # Get the user ID from the Cognito claims
-        user_id = claims.get("sub")
+        # Get the user ID directly from the authorizer context
+        user_id = authorizer.get("userId")
         
         if not user_id:
-            logger.error("Missing user_id in Cognito claims")
+            logger.error("Missing user_id in authorizer context")
             metrics.add_metric(
                 name="MissingUserIdError", unit=MetricUnit.Count, value=1
             )

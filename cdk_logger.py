@@ -12,10 +12,7 @@ LOG_LEVELS = {
 }
 
 class CDKLogger:
-    """
-    MediaLake CDK Logger utility class.
-    Provides consistent logging across CDK stacks and constructs.
-    """
+    """CDK logging utility with consistent configuration."""
     
     _loggers: Dict[str, logging.Logger] = {}
     _initialized = False
@@ -23,7 +20,7 @@ class CDKLogger:
     
     @classmethod
     def _initialize_from_config(cls):
-        """Initialize logger settings from configuration"""
+        """Initialize logger from configuration."""
         if cls._initialized:
             return
             
@@ -44,15 +41,7 @@ class CDKLogger:
     
     @classmethod
     def get_logger(cls, name: Optional[str] = None) -> logging.Logger:
-        """
-        Get or create a logger with the given name.
-        
-        Args:
-            name: The logger name (defaults to "MediaLake")
-            
-        Returns:
-            A configured logger instance
-        """
+        """Get or create a logger with the given name."""
         # Initialize from config the first time
         if not cls._initialized:
             cls._initialize_from_config()
@@ -84,12 +73,7 @@ class CDKLogger:
 
     @classmethod
     def set_level(cls, level: str) -> None:
-        """
-        Set the log level for all existing loggers.
-        
-        Args:
-            level: Log level as string (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-        """
+        """Set log level for all loggers."""
         log_level = LOG_LEVELS.get(level.upper(), logging.INFO)
         cls._global_level = log_level
         
@@ -99,5 +83,5 @@ class CDKLogger:
 
 # For backward compatibility
 def get_logger(name: Optional[str] = None) -> logging.Logger:
-    """Get a logger with the specified name"""
+    """Get a logger with the specified name."""
     return CDKLogger.get_logger(name)

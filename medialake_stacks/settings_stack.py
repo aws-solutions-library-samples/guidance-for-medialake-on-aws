@@ -7,6 +7,7 @@ import aws_cdk as cdk
 
 from constructs import Construct
 from dataclasses import dataclass
+from config import config
 
 from medialake_constructs.shared_constructs.dynamodb import (
     DynamoDB,
@@ -26,12 +27,11 @@ class SettingsStack(cdk.NestedStack):
     ):
         super().__init__(scope, id, **kwargs)
 
-        # Create DynamoDB table for system settings
         self.system_settings_table = DynamoDB(
             self,
             "SystemSettingsTable",
             props=DynamoDBProps(
-                name=f"medialake-system-settings",
+                name="system-settings",
                 partition_key_name="PK",
                 partition_key_type=dynamodb.AttributeType.STRING,
                 sort_key_name="SK",

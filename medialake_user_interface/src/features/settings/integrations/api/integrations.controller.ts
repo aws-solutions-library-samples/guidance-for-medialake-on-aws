@@ -1,5 +1,6 @@
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { IntegrationsService } from './integrations.service';
+import { INTEGRATIONS_API } from './integrations.endpoints';
 import type {
     IntegrationFormData,
     IntegrationsResponse,
@@ -107,31 +108,31 @@ export const useUpdateIntegrationStatus = () => {
 
 export const integrationsController = {
     getIntegrations: async (): Promise<IntegrationsResponse> => {
-        const response = await apiClient.get<IntegrationsResponse>('/integrations');
+        const response = await apiClient.get<IntegrationsResponse>(INTEGRATIONS_API.endpoints.GET_INTEGRATIONS);
         return response.data;
     },
 
     getIntegration: async (id: string): Promise<Integration> => {
-        const response = await apiClient.get<Integration>(`/integrations/${id}`);
+        const response = await apiClient.get<Integration>(INTEGRATIONS_API.endpoints.GET_INTEGRATION(id));
         return response.data;
     },
 
     createIntegration: async (data: IntegrationFormData): Promise<Integration> => {
-        const response = await apiClient.post<Integration>('/integrations', data);
+        const response = await apiClient.post<Integration>(INTEGRATIONS_API.endpoints.CREATE_INTEGRATION, data);
         return response.data;
     },
 
     updateIntegration: async (id: string, data: Partial<Integration>): Promise<Integration> => {
-        const response = await apiClient.put<Integration>(`/integrations/${id}`, data);
+        const response = await apiClient.put<Integration>(INTEGRATIONS_API.endpoints.UPDATE_INTEGRATION(id), data);
         return response.data;
     },
 
     updateStatus: async (id: string, status: { status: string }): Promise<Integration> => {
-        const response = await apiClient.patch<Integration>(`/integrations/${id}/status`, status);
+        const response = await apiClient.patch<Integration>(INTEGRATIONS_API.endpoints.UPDATE_STATUS(id), status);
         return response.data;
     },
 
     deleteIntegration: async (id: string): Promise<void> => {
-        await apiClient.delete(`/integrations/${id}`);
+        await apiClient.delete(INTEGRATIONS_API.endpoints.DELETE_INTEGRATION(id));
     }
 };

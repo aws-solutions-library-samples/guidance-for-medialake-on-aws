@@ -18,7 +18,7 @@ export interface User {
   family_name: string | null;
   name?: string;
   groups: string[];
-  roles?: string[];
+  permissions?: string[];
 }
 
 export interface CreateUserRequest {
@@ -26,7 +26,7 @@ export interface CreateUserRequest {
   email: string;
   enabled?: boolean;
   groups?: string[];
-  roles?: string[];
+  permissions?: string[];
   given_name?: string;
   family_name?: string;
 }
@@ -37,6 +37,15 @@ export interface CreateUserResponse {
   data: {
     username: string;
     userStatus: string;
+    groupsAdded: string[];
+    groupsFailed?: Array<{
+      group_id: string;
+      error_code: string;
+      error_message: string;
+    }>;
+    groupsFailedCount?: number;
+    invalidGroups?: string[];
+    invalidGroupsCount?: number;
   };
 }
 
@@ -45,7 +54,7 @@ export interface UpdateUserRequest {
   email?: string;
   enabled?: boolean;
   groups?: string[];
-  roles?: string[];
+  permissions?: string[];
   given_name?: string;
   family_name?: string;
 }

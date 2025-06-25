@@ -7,7 +7,10 @@ export default {
     chinese: '中文',
     hindi: '印地语',
     arabic: '阿拉伯语',
-    hebrew: '希伯来语'
+    hebrew: '希伯来语',
+    japanese: '日语',
+    korean: '韩语',
+    spanish: '西班牙语'
   },
   assetsPage: {
     title: '资产',
@@ -327,6 +330,23 @@ export default {
       performance: {
         title: '性能设置',
         comingSoon: '性能设置即将推出。'
+      }
+    },
+    groups: {
+      actions: {
+        addGroup: '添加组',
+        editGroup: '编辑组',
+        deleteGroup: '删除组',
+        createGroup: '创建组',
+        manageGroups: '管理组'
+      }
+    },
+    permissionSets: {
+      noAssignments: '无权限集',
+      actions: {
+        addPermissionSet: '添加权限集',
+        editPermissionSet: '编辑权限集',
+        deletePermissionSet: '删除权限集'
       }
     }
   },
@@ -765,6 +785,23 @@ export default {
         environments: {
           title: '环境'
         }
+      }
+    },
+    groups: {
+      actions: {
+        addGroup: '添加组',
+        editGroup: '编辑组',
+        deleteGroup: '删除组',
+        createGroup: '创建组',
+        manageGroups: '管理组'
+      }
+    },
+    permissionSets: {
+      noAssignments: '无权限集',
+      actions: {
+        addPermissionSet: '添加权限集',
+        editPermissionSet: '编辑权限集',
+        deletePermissionSet: '删除权限集'
       }
     }
   }
