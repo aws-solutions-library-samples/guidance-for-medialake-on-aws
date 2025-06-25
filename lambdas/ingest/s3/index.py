@@ -333,10 +333,16 @@ class AssetProcessor:
             logger.info(message, **context)
 
     def _decode_s3_event_key(self, encoded_key: str) -> str:
-        """Decode S3 event key by handling URL encoding"""
-        # Just decode URL encoding without replacing literal '+' characters
-        # urllib.parse.unquote properly handles %20, %2B etc.
-        return urllib.parse.unquote(encoded_key)
+        """Decode S3 event key by handling URL encoding properly"""
+        # First, decode all URL-encoded sequences (%20, %E2%80%AF, etc.)
+        decoded_key = urllib.parse.unquote(encoded_key)
+        
+        # In S3 event notifications, '+' characters typically represent spaces
+        # This is different from general URL encoding where '+' in paths should be literal
+        # But S3 notifications often use '+' to represent spaces in object keys
+        decoded_key = decoded_key.replace('+', ' ')
+        
+        return decoded_key
 
     def _extract_file_extension(self, key: str) -> str:
         """Extract file extension from key"""
@@ -384,7 +390,12 @@ class AssetProcessor:
     @tracer.capture_method
     def process_asset(self, bucket: str, key: str) -> Optional[Dict]:
         """Process new asset from S3 with optimized performance"""
+        original_key = key
         key = self._decode_s3_event_key(key)
+        
+        # Log key transformation for debugging
+        if original_key != key:
+            logger.info(f"Key decoded from '{original_key}' to '{key}'")
 
         try:
             # Get S3 object metadata and tags in parallel
@@ -1506,6 +1517,9 @@ def process_s3_event(processor: AssetProcessor, bucket: str, key: str, event_nam
             # Handle creation/modification/copy events - process all ObjectCreated events the same way
             logger.info(f"Processing ObjectCreated event for {bucket}/{key}")
             
+            # Store original key for fallback in error handling
+            original_event_key = key
+            
             # Verify object exists in S3 before processing
             try:
                 # Try to get tags to identify asset early for logging
@@ -1526,7 +1540,35 @@ def process_s3_event(processor: AssetProcessor, bucket: str, key: str, event_nam
                 logger.error(f"S3 object verification failed for {bucket}/{key}: {str(s3_error)}")
                 # Log exact key for debugging to see if there are encoding issues
                 logger.error(f"Failed key details - length: {len(key)}, contains '+': {'+' in key}, raw key: {repr(key)}")
-                raise
+                
+                # Try alternative key encodings to help diagnose the issue
+                alternative_found = False
+                try:
+                    # Try with '+' decoded as literal '+' (no space replacement)
+                    alt_key = urllib.parse.unquote(key)
+                    if alt_key != key:
+                        logger.info(f"Trying alternative key without space replacement: {repr(alt_key)}")
+                        processor.s3.head_object(Bucket=bucket, Key=alt_key)
+                        logger.warning(f"Object found with alternative key encoding. Using: {repr(alt_key)}")
+                        key = alt_key
+                        alternative_found = True
+                except Exception as alt_error:
+                    logger.debug(f"Alternative key without space replacement failed: {str(alt_error)}")
+                
+                if not alternative_found:
+                    try:
+                        # Try with original key from event (before any decoding)
+                        logger.info(f"Trying original undecoded key: {repr(original_event_key)}")
+                        processor.s3.head_object(Bucket=bucket, Key=original_event_key)
+                        logger.warning(f"Object found with original key. Using: {repr(original_event_key)}")
+                        key = original_event_key
+                        alternative_found = True
+                    except Exception as orig_error:
+                        logger.debug(f"Original key also failed: {str(orig_error)}")
+                
+                if not alternative_found:
+                    logger.error(f"All key variations failed. Object may not exist or there's a different encoding issue.")
+                    raise s3_error
             
             # Process all ObjectCreated events (including Copy) the same way
             result = processor.process_asset(bucket, key)
@@ -1575,12 +1617,15 @@ def extract_s3_details_from_event(event_record: Dict) -> Tuple[Optional[str], Op
     if "s3" in event_record:
         if "bucket" in event_record["s3"] and "object" in event_record["s3"]:
             bucket = event_record["s3"]["bucket"]["name"]
-            key = urllib.parse.unquote(event_record["s3"]["object"]["key"])
+            # Decode S3 key properly - handle both URL encoding and '+' as spaces
+            raw_key = event_record["s3"]["object"]["key"]
+            key = urllib.parse.unquote(raw_key).replace('+', ' ')
             event_name = event_record.get("eventName", "ObjectCreated:")
             version_id = event_record["s3"]["object"].get("versionId")
             # Log the source for debugging
             event_source = event_record.get("eventSource", "unknown")
             logger.info(f"Processing direct S3 record from {event_source}: {bucket}/{key}, version: {version_id}")
+            logger.info(f"Key transformation: '{raw_key}' -> '{key}'")
             return bucket, key, event_name, version_id
     
     # SQS message with EventBridge payload
@@ -1595,11 +1640,14 @@ def extract_s3_details_from_event(event_record: Dict) -> Tuple[Optional[str], Op
                     valid_sources = ["aws:s3", "medialake.AssetSyncProcessor"]
                     if record.get("eventSource") in valid_sources and "s3" in record:
                         bucket = record["s3"]["bucket"]["name"]
-                        key = urllib.parse.unquote(record["s3"]["object"]["key"])
+                        # Decode S3 key properly - handle both URL encoding and '+' as spaces
+                        raw_key = record["s3"]["object"]["key"]
+                        key = urllib.parse.unquote(raw_key).replace('+', ' ')
                         event_name = record.get("eventName", "ObjectCreated:")
                         version_id = record["s3"]["object"].get("versionId")
                         # Log the extracted details for debugging
                         logger.info(f"Extracted from SQS S3 record (source: {record.get('eventSource')}): bucket={bucket}, key={key}, event={event_name}, version={version_id}")
+                        logger.info(f"Key transformation: '{raw_key}' -> '{key}'")
                         return bucket, key, event_name, version_id
             
             # Check if this is an S3 event from EventBridge
@@ -1627,9 +1675,12 @@ def extract_s3_details_from_event(event_record: Dict) -> Tuple[Optional[str], Op
                 if "object" in detail and isinstance(detail["object"], dict):
                     version_id = detail["object"].get("version-id") or detail["object"].get("versionId")
                 
-                # Apply URL decoding to the key if it exists
+                # Apply URL decoding to the key if it exists - handle both URL encoding and '+' as spaces
                 if key:
-                    key = urllib.parse.unquote(key)
+                    raw_key = key
+                    key = urllib.parse.unquote(key).replace('+', ' ')
+                    if raw_key != key:
+                        logger.info(f"EventBridge key transformation: '{raw_key}' -> '{key}'")
                 
                 # Determine event type
                 event_name = "ObjectCreated:"
