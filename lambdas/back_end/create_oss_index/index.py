@@ -1,36 +1,99 @@
+import os
+import json
+import time
+
 import boto3
+from botocore.awsrequest import AWSRequest
+from botocore.auth import SigV4Auth
 from botocore.exceptions import ClientError
 from requests import request
-import json
-import os
-from botocore.auth import SigV4Auth
-from botocore.awsrequest import AWSRequest
-import time
+
 from lambda_utils import logger, lambda_handler_decorator
 
 VECTOR_DIMENSION = 1024  # Twelve Labs embeddings dimension
+
+def index_exists(host: str,
+                 index_name: str,
+                 credentials,
+                 service: str,
+                 region: str) -> bool:
+    """
+    HEAD /{index} – returns True if index already exists.
+    """
+    url = f"{host}/{index_name}"
+    req = AWSRequest(method="HEAD", url=url, headers={})
+    # required for SigV4
+    req.headers["X-Amz-Content-SHA256"] = SigV4Auth(credentials, service, region).payload(req)
+    SigV4Auth(credentials, service, region).add_auth(req)
+    prepared = req.prepare()
+
+    logger.info("Checking if index exists",
+                extra={"method": prepared.method, "url": prepared.url})
+    resp = request(method=prepared.method,
+                   url=prepared.url,
+                   headers=prepared.headers,
+                   data=prepared.body)
+    return resp.status_code == 200
+
+def delete_index(host: str,
+                 index_name: str,
+                 credentials,
+                 service: str,
+                 region: str) -> None:
+    """
+    DELETE /{index}.  Ignores 404s.
+    """
+    url = f"{host}/{index_name}"
+    req = AWSRequest(method="DELETE", url=url, headers={})
+    req.headers["X-Amz-Content-SHA256"] = SigV4Auth(credentials, service, region).payload(req)
+    SigV4Auth(credentials, service, region).add_auth(req)
+    prepared = req.prepare()
+
+    resp = request(method=prepared.method,
+                   url=prepared.url,
+                   headers=prepared.headers,
+                   data=prepared.body)
+    if resp.status_code not in (200, 404):
+        raise Exception(f"Unexpected status deleting index {index_name}: "
+                        f"{resp.status_code} – {resp.text}")
+    logger.info("Index deleted (or did not exist)",
+                extra={"index_name": index_name, "status_code": resp.status_code})
+
+def wait_for_deletion(host: str,
+                      index_name: str,
+                      credentials,
+                      service: str,
+                      region: str,
+                      timeout: int = 60,
+                      interval: int = 2) -> None:
+    """
+    Poll until HEAD /{index} returns 404, or timeout expires.
+    """
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if not index_exists(host, index_name, credentials, service, region):
+            logger.info("Index confirmed gone", extra={"index_name": index_name})
+            return
+        time.sleep(interval)
+    raise TimeoutError(f"Index {index_name} still exists after {timeout}s")
 
 def create_index_with_retry(
     host, index_name, payload, headers, credentials, service, region, max_retries=5
 ):
     """
-    Create an OpenSearch index with retry logic and exponential backoff
-    
-    Args:
-        host: OpenSearch host endpoint
-        index_name: Name of the index to create
-        payload: Index configuration payload
-        headers: HTTP headers for the request
-        credentials: AWS credentials for SigV4 signing
-        service: AWS service name for SigV4 signing
-        region: AWS region for SigV4 signing
-        max_retries: Maximum number of retry attempts
-        
-    Returns:
-        bool: True if index creation was successful, False otherwise
+    Create an OpenSearch index with retry logic and exponential backoff.
+    If the index already exists, delete it and wait for deletion before creating.
     """
+    # If it already exists, drop & recreate
+    if index_exists(host, index_name, credentials, service, region):
+        logger.info("Index exists – deleting before recreation",
+                    extra={"index_name": index_name})
+        delete_index(host, index_name, credentials, service, region)
+        wait_for_deletion(host, index_name, credentials, service, region)
+
     url = f"{host}/{index_name}"
-    logger.info(f"Creating OpenSearch index", extra={"url": url, "index_name": index_name})
+    logger.info("Creating OpenSearch index",
+                extra={"url": url, "index_name": index_name})
 
     for attempt in range(max_retries):
         try:
@@ -41,81 +104,71 @@ def create_index_with_retry(
                 credentials, service, region
             ).payload(req)
             SigV4Auth(credentials, service, region).add_auth(req)
-            req = req.prepare()
+            prepared = req.prepare()
 
-            logger.info("Sending request to OpenSearch", extra={
-                "method": req.method,
-                "url": req.url,
-                "attempt": attempt + 1,
-                "max_retries": max_retries
-            })
-            
+            logger.info("Sending request to OpenSearch",
+                        extra={
+                            "method": prepared.method,
+                            "url": prepared.url,
+                            "attempt": attempt + 1,
+                            "max_retries": max_retries
+                        })
+
             response = request(
-                method=req.method, url=req.url, headers=req.headers, data=req.body
+                method=prepared.method,
+                url=prepared.url,
+                headers=prepared.headers,
+                data=prepared.body
             )
 
             if response.status_code == 200:
-                logger.info(
-                    "Index creation successful",
-                    extra={
-                        "index_name": index_name,
-                        "status_code": response.status_code,
-                        "response": response.text
-                    }
-                )
+                logger.info("Index creation successful",
+                            extra={
+                                "index_name": index_name,
+                                "status_code": response.status_code,
+                                "response": response.text
+                            })
                 return True
             else:
-                if (
-                    response.json()["error"]["root_cause"][0]["type"]
-                    == "resource_already_exists_exception"
-                ):
-                    logger.info(
-                        "Index already exists",
-                        extra={
-                            "index_name": index_name,
-                            "status_code": response.status_code
-                        }
-                    )
+                # If it somehow reappeared in the meantime
+                error = response.json().get("error", {}).get("root_cause", [{}])[0].get("type")
+                if error == "resource_already_exists_exception":
+                    logger.info("Index already exists",
+                                extra={"index_name": index_name,
+                                       "status_code": response.status_code})
                     return True
-                
-                logger.error(
-                    "Failed to create OpenSearch index",
-                    extra={
-                        "index_name": index_name,
-                        "status_code": response.status_code,
-                        "response": response.text,
-                        "attempt": attempt + 1,
-                        "max_retries": max_retries
-                    }
-                )
+
+                logger.error("Failed to create OpenSearch index",
+                             extra={
+                                 "index_name": index_name,
+                                 "status_code": response.status_code,
+                                 "response": response.text,
+                                 "attempt": attempt + 1,
+                                 "max_retries": max_retries
+                             })
 
         except Exception as e:
-            logger.error(
-                "Error creating OpenSearch index",
-                extra={
-                    "index_name": index_name,
-                    "error": str(e),
-                    "attempt": attempt + 1,
-                    "max_retries": max_retries
-                },
-                exc_info=True
-            )
+            logger.error("Error creating OpenSearch index",
+                         extra={
+                             "index_name": index_name,
+                             "error": str(e),
+                             "attempt": attempt + 1,
+                             "max_retries": max_retries
+                         },
+                         exc_info=True)
 
         # Exponential backoff
-        backoff_time = 2**attempt
-        logger.info(
-            "Retrying index creation after backoff",
-            extra={
-                "index_name": index_name,
-                "attempt": attempt + 1,
-                "max_retries": max_retries,
-                "backoff_seconds": backoff_time
-            }
-        )
+        backoff_time = 2 ** attempt
+        logger.info("Retrying index creation after backoff",
+                    extra={
+                        "index_name": index_name,
+                        "attempt": attempt + 1,
+                        "max_retries": max_retries,
+                        "backoff_seconds": backoff_time
+                    })
         time.sleep(backoff_time)
 
     return False
-
 
 @lambda_handler_decorator(cors=True)
 def handler(event, context):
@@ -138,22 +191,24 @@ def handler(event, context):
         return {"statusCode": 200,
                 "body": f"Skipped {req_type} request"}
 
-    host         = os.environ["COLLECTION_ENDPOINT"]
-    index_names  = os.environ["INDEX_NAMES"]
-    region       = os.environ["REGION"]
-    service      = os.environ["SCOPE"]
-    credentials  = boto3.Session().get_credentials()
+    host        = os.environ["COLLECTION_ENDPOINT"]
+    index_names = os.environ["INDEX_NAMES"]
+    region      = os.environ["REGION"]
+    service     = os.environ["SCOPE"]
+    credentials = boto3.Session().get_credentials()
 
     logger.info("Environment",
-                extra={"host": host,
+                extra={
+                    "host": host,
                     "indexes": index_names,
                     "region": region,
-                    "service": service})
+                    "service": service
+                })
 
     headers = {
         "content-type": "application/json",
         "accept": "application/json",
-    }      
+    }
 
     payload = {
         "settings": {
@@ -311,11 +366,6 @@ def handler(event, context):
         }
     }
 
-
-    region = os.environ["REGION"]
-    service = os.environ["SCOPE"]
-    credentials = boto3.Session().get_credentials()
-
     logger.info(
         "Preparing to create indexes",
         extra={
@@ -329,14 +379,14 @@ def handler(event, context):
     logger.info(f"Creating {len(indexes)} indexes", extra={"indexes": indexes})
     
     for index_name in indexes:
-        logger.info(f"Processing index", extra={"index_name": index_name})
+        logger.info("Processing index", extra={"index_name": index_name})
         success = create_index_with_retry(
-            host, index_name, payload, headers, credentials, service, region
+            host, index_name.strip(), payload, headers, credentials, service, region
         )
         if not success:
-            error_msg = f"Failed to create index {index_name} after multiple retries"
-            logger.error(error_msg)
-            raise Exception(error_msg)
+            msg = f"Failed to create index {index_name} after multiple retries"
+            logger.error(msg)
+            raise Exception(msg)
         
     logger.info("Successfully created all indexes")
     return {"statusCode": 200, "body": "All indexes created successfully"}
