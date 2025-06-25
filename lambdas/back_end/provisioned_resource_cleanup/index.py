@@ -534,6 +534,7 @@ def delete_eventbridge_pipe(pipe_arn):
         if e.response["Error"]["Code"] != "ResourceNotFoundException":
             raise
         logger.warning(f"EventBridge Pipe {pipe_arn} already deleted")
+        
 def delete_secrets_manager_secrets():
     """Delete secrets from Secrets Manager that match specific patterns"""
     try:

@@ -83,6 +83,7 @@ class CleanupStack(Stack):
                 effect=iam.Effect.ALLOW,
                 actions=[
                     "lambda:DeleteEventSourceMapping",
+                    "lambda:GetEventSourceMapping",
                 ],
                 resources=[
                     f"arn:aws:lambda:{Stack.of(self).region}:{Stack.of(self).account}:event-source-mapping:*"
@@ -90,13 +91,14 @@ class CleanupStack(Stack):
             )
         )
 
+        # ListEventSourceMappings requires * resource - AWS API limitation
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=[
                     "lambda:ListEventSourceMappings",
                 ],
-                resources=["*"],
+                resources=["*"],  # Required by AWS API - cannot be scoped to specific resources
             )
         )
 
@@ -177,17 +179,42 @@ class CleanupStack(Stack):
         )
 
         # Add Secrets Manager permissions
+        # ListSecrets requires * resource - AWS API limitation for list operations
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=[
                     "secretsmanager:ListSecrets",
+                ],
+                resources=["*"],  # Required by AWS API - cannot be scoped to specific secrets
+            )
+        )
+        
+        self._clean_up_lambda.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
                     "secretsmanager:DeleteSecret",
                     "secretsmanager:DescribeSecret",
                 ],
                 resources=[
                     f"arn:aws:secretsmanager:{Stack.of(self).region}:{Stack.of(self).account}:secret:integration/*",
                     f"arn:aws:secretsmanager:{Stack.of(self).region}:{Stack.of(self).account}:secret:medialake/search/provider/*"
+                ],
+            )
+        )
+
+        # Add Step Functions permissions
+        self._clean_up_lambda.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "states:ListExecutions",
+                    "states:StopExecution",
+                ],
+                resources=[
+                    f"arn:aws:states:{Stack.of(self).region}:{Stack.of(self).account}:stateMachine:*",
+                    f"arn:aws:states:{Stack.of(self).region}:{Stack.of(self).account}:execution:*"
                 ],
             )
         )
