@@ -1,6 +1,6 @@
 {
   "user-favorites-enabled": {
-    "value": true,
+    "value": false,
     "variant": "off"
   },
   "file-upload-enabled": {
@@ -16,7 +16,7 @@
     "variant": "off"
   },
   "notification-enabled": {
-    "value": true,
+    "value": false,
     "variant": "off"
   },
   "advanced-permissions-enabled": {
