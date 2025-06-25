@@ -1,0 +1,179 @@
+import boto3
+from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth
+
+# Configuration - Update these values
+BUCKET_NAME = "wbd-title-poc"
+PREFIX = ""
+BATCH_SIZE = 5
+
+# OpenSearch configuration
+OPENSEARCH_CONFIG = {
+    'host': 'vpc-medialake-os-us-east-1-dev-iwwm4jr5al4krcae23k66tdwoy.us-east-1.es.amazonaws.com',
+    'port': 443,
+    'use_ssl': True,
+    'index_name': 'media'
+}
+
+# AWS region
+REGION_NAME = 'us-east-1'
+
+
+def setup_clients(region_name=REGION_NAME):
+    """Set up the necessary AWS clients using the notebook's IAM role"""
+    print("Setting up AWS clients...")
+    
+    # Create clients using the default session (SageMaker notebook's IAM role)
+    s3_client = boto3.client('s3', region_name=region_name)
+    bedrock_runtime = boto3.client('bedrock-runtime', region_name=region_name)
+    
+    return s3_client, bedrock_runtime
+
+def setup_opensearch_client(config, region_name=REGION_NAME):
+    """Set up OpenSearch client using the notebook's IAM role"""
+    print("Setting up OpenSearch client using notebook's IAM role...")
+    
+    # Use the default session credentials (SageMaker notebook's IAM role)
+    session = boto3.Session(region_name=region_name)
+    credentials = session.get_credentials()
+    
+    # Create AWSV4SignerAuth using the session credentials
+    auth = AWSV4SignerAuth(credentials, region_name, 'es')  # Use 'es' for OpenSearch VPC
+    
+    # Create the client
+    client = OpenSearch(
+        hosts=[{'host': config['host'], 'port': config['port']}],
+        http_auth=auth,
+        use_ssl=config['use_ssl'],
+        verify_certs=True,
+        connection_class=RequestsHttpConnection,
+        timeout=60,
+        http_compress=True,
+        retry_on_timeout=True,
+        max_retries=3
+    )
+    
+    return client
+
+
+# Initialize clients using the notebook's IAM role
+s3_client, bedrock_runtime = setup_clients()
+opensearch_client = setup_opensearch_client(OPENSEARCH_CONFIG)
+
+# Test connections
+print(f"S3 client: {s3_client}")
+print(f"Bedrock client: {bedrock_runtime}")
+
+# Test OpenSearch connection
+try:
+    # Test connection by checking if the index exists
+    index_name = OPENSEARCH_CONFIG['index_name']
+    
+    # Check if the specific index exists
+    if opensearch_client.indices.exists(index=index_name):
+        print(f"Successfully connected to OpenSearch. Index '{index_name}' exists.")
+        
+        # Get index information
+        index_info = opensearch_client.indices.get(index=index_name)
+        print(f"Index info retrieved for '{index_name}'")
+        
+        # Perform a simple query to get one document
+        query = {
+            "size": 1,
+            "query": {
+                "match_all": {}
+            }
+        }
+        
+        response = opensearch_client.search(
+            body=query,
+            index=index_name
+        )
+        
+        hits = response.get('hits', {}).get('hits', [])
+        total_docs = response.get('hits', {}).get('total', {})
+        if isinstance(total_docs, dict):
+            total_count = total_docs.get('value', 0)
+        else:
+            total_count = total_docs
+            
+        print(f"Total documents in index: {total_count}")
+        
+        if hits:
+            print(f"Successfully retrieved a document from index '{index_name}'")
+            print(f"Document ID: {hits[0]['_id']}")
+            # Print a sample of the document structure (without sensitive data)
+            doc_keys = list(hits[0]['_source'].keys()) if hits[0].get('_source') else []
+            print(f"Document keys: {doc_keys[:10]}...")  # Show first 10 keys
+        else:
+            print(f"Connection successful but no documents found in index '{index_name}'")
+    else:
+        print(f"Connected to OpenSearch but index '{index_name}' does not exist.")
+        
+        # Try to list all indices
+        try:
+            all_indices = opensearch_client.cat.indices(format='json')
+            index_names = [idx['index'] for idx in all_indices] if all_indices else []
+            print(f"Available indices: {index_names}")
+        except Exception as list_error:
+            print(f"Could not list indices: {list_error}")
+    
+    print("Connection to OpenSearch successful!")
+
+    # Search and display the first two documents in full
+    print("\n" + "="*80)
+    print("SEARCHING AND DISPLAYING FIRST TWO DOCUMENTS")
+    print("="*80)
+
+    try:
+        # Search for the first 2 documents
+        query = {
+            "size": 2,
+            "query": {
+                "match_all": {}
+            }
+        }
+        
+        response = opensearch_client.search(
+            body=query,
+            index=OPENSEARCH_CONFIG['index_name']
+        )
+        
+        hits = response.get('hits', {}).get('hits', [])
+        total_docs = response.get('hits', {}).get('total', {})
+        if isinstance(total_docs, dict):
+            total_count = total_docs.get('value', 0)
+        else:
+            total_count = total_docs
+        
+        print(f"Total documents in index: {total_count}")
+        print(f"Displaying first {len(hits)} documents:\n")
+        
+        import json
+        
+        for i, hit in enumerate(hits, 1):
+            print(f"{'='*60}")
+            print(f"DOCUMENT {i}")
+            print(f"{'='*60}")
+            print(f"Document ID: {hit['_id']}")
+            print(f"Index: {hit['_index']}")
+            print(f"Score: {hit.get('_score', 'N/A')}")
+            print(f"\nDocument Source:")
+            print("-" * 40)
+            
+            # Pretty print the full document
+            document_source = hit.get('_source', {})
+            print(json.dumps(document_source, indent=2, default=str))
+            print("\n")
+        
+        print(f"{'='*80}")
+        print("DOCUMENT LISTING COMPLETE")
+        print(f"{'='*80}")
+        
+    except Exception as e:
+        print(f"Error searching documents: {e}")
+        import traceback
+        traceback.print_exc()
+
+except Exception as e:
+    print(f"OpenSearch connection failed: {e}")
+    print("Please check your IAM permissions and OpenSearch domain configuration") 
