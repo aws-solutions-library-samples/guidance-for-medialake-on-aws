@@ -222,30 +222,23 @@ class ImageMagickLayer(Construct):
                         "public.ecr.aws/amazonlinux/amazonlinux:2023"
                     ),
                     command=[
-                        "/bin/bash",
-                        "-c",
-                        f"""
+                        "/bin/bash", "-c", f"""
                         set -euo pipefail
 
-                        # ------------------------------------------------------------------
-                        # 1. minimal deps, download the binary package
-                        # ------------------------------------------------------------------
-                        dnf -y install {pre_pkgs}
-                        TMP=$(mktemp -d)
-                        cd "$TMP"
-                        wget -q {download_url}
+                        # 1. minimal deps: wget to fetch, gzip+tar to unpack
+                        dnf -y install wget gzip tar
 
-                        # ------------------------------------------------------------------
-                        # 2. unpack / extract
-                        # ------------------------------------------------------------------
-                        {extract_cmd}
+                        TMP=$(mktemp -d); cd "$TMP"
+                        wget -q https://imagemagick.org/archive/binaries/ImageMagick-x86_64-pc-linux-gnu.tar.gz
 
-                        # ------------------------------------------------------------------
-                        # 3. copy into layer structure
-                        # ------------------------------------------------------------------
+                        # 2. unpack
+                        tar -xzf ImageMagick-x86_64-pc-linux-gnu.tar.gz
+
+                        # 3. copy into /asset-output
                         mkdir -p /asset-output/bin /asset-output/lib
-                        cp -r {bin_src}/* /asset-output/bin/
-                        cp -r {lib_src}/* /asset-output/lib/
+                        IMDIR=$(find . -maxdepth 1 -type d -name 'ImageMagick-*' | head -n1)
+                        cp -r "$IMDIR"/bin/*  /asset-output/bin/
+                        cp -r "$IMDIR"/lib/*  /asset-output/lib/
                         ln -s magick /asset-output/bin/convert
                         chmod -R 755 /asset-output
                         """
