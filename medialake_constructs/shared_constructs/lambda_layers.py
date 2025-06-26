@@ -202,37 +202,21 @@ class ImageMagickLayer(Construct):
                 path=".",                      # all work happens in Docker
                 bundling=BundlingOptions(
                     user="root",
-                    image=DockerImage.from_registry(
-                        "public.ecr.aws/amazonlinux/amazonlinux:2023"
-                    ),
+                    image=DockerImage.from_registry("public.ecr.aws/amazonlinux/amazonlinux:2023"),
                     command=[
                         "/bin/bash", "-c", f"""
                         set -euo pipefail
+                        dnf -y update && dnf -y install wget xz
 
-                        # ---------- enable EPEL & install tools ----------
-                        # 1) grab the signed EPEL release package for AL2023
-                        dnf -y install \
-                            'https://dl.fedoraproject.org/pub/epel/epel-release-latest-2023.noarch.rpm'
-                        # 2) install the utilities we need
-                        dnf -y --enablerepo=epel install wget xz squashfs-tools
-
-                        # ---------- build the layer ----------
                         TMP=$(mktemp -d); cd "$TMP"
-
                         wget -q https://download.imagemagick.org/ImageMagick/download/binaries/{appimage_name}
-                        chmod +x {appimage_name}
-
-                        # extract the AppImage
-                        ./{appimage_name} --appimage-extract >/dev/null
+                        chmod +x {appimage_name} && ./{appimage_name} --appimage-extract >/dev/null
 
                         mkdir -p /asset-output/bin /asset-output/lib
                         cp squashfs-root/usr/bin/magick /asset-output/bin/
                         ln -s magick /asset-output/bin/convert
-
                         cp -r squashfs-root/usr/lib/* /asset-output/lib/
-
                         chmod -R 755 /asset-output
-                        rm -rf "$TMP"
                         """
                     ],
                 ),
