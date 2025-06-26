@@ -160,13 +160,12 @@ class PyMediaInfo(Construct):
     @property
     def layer(self) -> lambda_.LayerVersion:
         return self.layer_version.layer
-
 class ImageMagickLayer(Construct):
     """
-    Lambda layer that drops a fully-featured ImageMagick CLI under /opt.
+    Bundles ImageMagick into a Lambda layer.
 
-    * x86_64 – uses the official portable tarball (already has all delegates)
-    * arm64  – uses the AppImage build and extracts its squashfs
+    * x86_64 – portable tarball
+    * arm64  – AppImage (self-extracts)
     """
 
     VERSION = "7.1.1-30"
@@ -184,69 +183,64 @@ class ImageMagickLayer(Construct):
         is_arm = architecture == lambda_.Architecture.ARM_64
 
         if is_arm:
-            # -------- AppImage path (arm64) ---------------------------------
-            archive_name = f"magick-{self.VERSION}.arm64.AppImage"
-            download_url = (
+            # ---------- arm64 via AppImage ---------------------------------
+            archive = f"magick-{self.VERSION}.arm64.AppImage"
+            url     = (
                 "https://download.imagemagick.org/ImageMagick/download/binaries/"
-                + archive_name
+                + archive
             )
-            pre_pkgs = "wget xz bsdtar"  # bsdtar can unpack the squashfs
-            extract_cmd = (
-                f"chmod +x {archive_name} && "
-                f"{archive_name} --appimage-extract >/dev/null"
-            )
-            bin_src = "squashfs-root/usr/bin"
-            lib_src = "squashfs-root/usr/lib"
+            pre_pkgs   = "wget xz bsdtar findutils"
+            extract    = f"chmod +x {archive} && {archive} --appimage-extract"
+            bin_src    = "squashfs-root/usr/bin"
+            lib_src    = "squashfs-root/usr/lib"
         else:
-            # -------- Portable tarball path (x86_64) ------------------------
-            archive_name = "ImageMagick-x86_64-pc-linux-gnu.tar.gz"
-            download_url = "https://imagemagick.org/archive/binaries/" + archive_name
-            pre_pkgs = "wget xz tar"
-            extract_cmd = f"tar -xzf {archive_name}"
-            # we’ll resolve the dir name at runtime
-            bin_src = '$(find . -maxdepth 1 -type d -name "ImageMagick-*" | head -n1)/bin'
-            lib_src = '$(find . -maxdepth 1 -type d -name "ImageMagick-*" | head -n1)/lib'
+            # ---------- x86_64 via portable tarball ------------------------
+            archive = "ImageMagick-x86_64-pc-linux-gnu.tar.gz"
+            url     = "https://imagemagick.org/archive/binaries/" + archive
+            pre_pkgs   = "wget gzip tar findutils"
+            extract    = f"tar -xzf {archive}"
+            bin_src    = '$(find . -maxdepth 1 -type d -name "ImageMagick-*" | head -n1)/bin'
+            lib_src    = '$(find . -maxdepth 1 -type d -name "ImageMagick-*" | head -n1)/lib'
 
         self.layer = lambda_.LayerVersion(
             self,
             "ImageMagickLayer",
             layer_version_name="imagemagick-layer",
             description=f"ImageMagick {self.VERSION} CLI & delegates",
-            compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
             compatible_architectures=[architecture],
+            compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
             code=lambda_.Code.from_asset(
-                path=".",  # all work happens in Docker
+                path=".",
                 bundling=BundlingOptions(
                     user="root",
                     image=DockerImage.from_registry(
                         "public.ecr.aws/amazonlinux/amazonlinux:2023"
                     ),
                     command=[
-                        "/bin/bash", "-c", f"""
+                        "/bin/bash",
+                        "-c",
+                        f"""
                         set -euo pipefail
 
-                        # 1. minimal deps: wget to fetch, gzip+tar to unpack
-                        dnf -y install wget gzip tar
+                        # 1. minimal deps
+                        dnf -y install {pre_pkgs}
 
+                        # 2. download & extract
                         TMP=$(mktemp -d); cd "$TMP"
-                        wget -q https://imagemagick.org/archive/binaries/ImageMagick-x86_64-pc-linux-gnu.tar.gz
+                        wget -q {url}
+                        {extract}
 
-                        # 2. unpack
-                        tar -xzf ImageMagick-x86_64-pc-linux-gnu.tar.gz
-
-                        # 3. copy into /asset-output
+                        # 3. copy into layer structure
                         mkdir -p /asset-output/bin /asset-output/lib
-                        IMDIR=$(find . -maxdepth 1 -type d -name 'ImageMagick-*' | head -n1)
-                        cp -r "$IMDIR"/bin/*  /asset-output/bin/
-                        cp -r "$IMDIR"/lib/*  /asset-output/lib/
+                        cp -r {bin_src}/* /asset-output/bin/
+                        cp -r {lib_src}/* /asset-output/lib/
                         ln -s magick /asset-output/bin/convert
                         chmod -R 755 /asset-output
                         """
                     ],
                 ),
             ),
-        )
-        
+        )     
 class CairoSvgLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
         super().__init__(scope, id, **kwargs)
