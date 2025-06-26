@@ -9,7 +9,6 @@ import { User, CreateUserRequest } from '@/api/types/api.types';
 import { Form } from '@/forms/components/Form';
 import { FormField } from '@/forms/components/FormField';
 import { FormSelect } from '@/forms/components/FormSelect';
-import { FormSwitch } from '@/forms/components/FormSwitch';
 import { useFormWithValidation } from '@/forms/hooks/useFormWithValidation';
 import { UserFormData, userFormSchema, createUserFormDefaults } from '../schemas/userFormSchema';
 import { useTranslation } from 'react-i18next';
@@ -19,7 +18,8 @@ interface UserFormProps {
     onClose: () => void;
     onSave: (user: CreateUserRequest) => Promise<any>;
     user?: User;
-    availableRoles: string[];
+    availableGroups?: { id: string; name: string }[];
+    isLoadingGroups?: boolean;
 }
 
 export const UserForm: React.FC<UserFormProps> = ({
@@ -27,9 +27,13 @@ export const UserForm: React.FC<UserFormProps> = ({
     onClose,
     onSave,
     user,
-    availableRoles,
+    availableGroups = [],
+    isLoadingGroups = false,
 }) => {
     const { t } = useTranslation();
+    
+    // Debug logs
+    console.log('UserForm props:', { user, availableGroups });
     
     const form = useFormWithValidation<UserFormData>({
         defaultValues: user
@@ -37,9 +41,11 @@ export const UserForm: React.FC<UserFormProps> = ({
                 given_name: user.given_name || user.name || '',
                 family_name: user.family_name || '',
                 email: user.email || '',
-                email_verified: user.email_verified === 'true',
-                roles: user.roles || [],
-                enabled: user.enabled ?? true,
+                groups: user.groups && user.groups.length > 0 ? (() => {
+                    // Convert first group name to group ID for the form
+                    const group = availableGroups.find(g => g.name === user.groups[0]);
+                    return group ? group.id : 'editors';
+                })() : 'editors',
             }
             : createUserFormDefaults,
         validationSchema: userFormSchema,
@@ -54,9 +60,11 @@ export const UserForm: React.FC<UserFormProps> = ({
                     given_name: user.given_name || user.name || '',
                     family_name: user.family_name || '',
                     email: user.email || '',
-                    email_verified: user.email_verified === 'true',
-                    roles: user.roles || [],
-                    enabled: user.enabled ?? true,
+                    groups: user.groups && user.groups.length > 0 ? (() => {
+                        // Convert first group name to group ID for the form
+                        const group = availableGroups.find(g => g.name === user.groups[0]);
+                        return group ? group.id : 'editors';
+                    })() : 'editors',
                   }
                 : createUserFormDefaults;
             form.reset(defaultVals);
@@ -64,7 +72,7 @@ export const UserForm: React.FC<UserFormProps> = ({
             // Optionally reset to blank defaults when closed, if desired
             // form.reset(createUserFormDefaults);
         }
-    }, [user, open, form.reset]);
+    }, [user, open, form.reset, availableGroups]);
 
     const handleSubmit = async (data: UserFormData) => {
         try {
@@ -73,10 +81,12 @@ export const UserForm: React.FC<UserFormProps> = ({
                 email: data.email,
                 given_name: data.given_name,
                 family_name: data.family_name,
-                roles: data.roles,
-                enabled: data.enabled,
+                permissions: [], // Set empty array for permissions
+                groups: [data.groups], // Convert single group ID back to array
+                enabled: true, // Default to enabled
             };
 
+            console.log('Submitting user creation request:', requestData);
             await onSave(requestData);
             onClose();
             form.reset();
@@ -128,31 +138,18 @@ export const UserForm: React.FC<UserFormProps> = ({
                             translationPrefix="users.form"
                         />
                         <FormSelect
-                            name="roles"
+                            name="groups"
                             control={form.control}
-                            label={t('users.form.fields.roles.label')}
-                            tooltip={t('users.form.fields.roles.tooltip')}
-                            options={availableRoles.map(role => ({
-                                label: t(`users.roles.${role.toLowerCase()}`),
-                                value: role,
-                            }))}
-                            multiple
-                            required
-                            translationPrefix="users.form"
-                        />
-                        <FormSwitch
-                            name="email_verified"
-                            control={form.control}
-                            label={t('users.form.fields.email_verified.label')}
-                            tooltip={t('users.form.fields.email_verified.tooltip')}
-                            disabled={!user}
-                            translationPrefix="users.form"
-                        />
-                        <FormSwitch
-                            name="enabled"
-                            control={form.control}
-                            label={t('users.form.fields.enabled.label')}
-                            tooltip={t('users.form.fields.enabled.tooltip')}
+                            label={t('users.form.fields.groups.label', 'Group')}
+                            tooltip={isLoadingGroups ? 'Loading groups...' : t('users.form.fields.groups.tooltip', 'Select a group for this user')}
+                            options={availableGroups.map(group => {
+                                console.log('Mapping group in FormSelect:', group);
+                                return {
+                                    label: group.name,
+                                    value: group.id,
+                                };
+                            })}
+                            disabled={isLoadingGroups || (!availableGroups || availableGroups.length === 0)}
                             translationPrefix="users.form"
                         />
                     </Form>

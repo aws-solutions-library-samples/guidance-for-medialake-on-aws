@@ -636,9 +636,10 @@ class AssetsConstruct(Construct):
                     "s3:DeleteObject",
                     "s3:ListBucket",
                     "s3:PutObjectTagging",
+                    "s3:GetBucketLocation",
                 ],
                 resources=[
-                    "arn:aws:s3:::*/*", 
+                    "arn:aws:s3:::*/*",
                     "arn:aws:s3:::*",
                 ],
             )

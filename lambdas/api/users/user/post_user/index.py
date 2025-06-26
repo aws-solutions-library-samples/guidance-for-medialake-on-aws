@@ -7,7 +7,6 @@ from typing import Dict, Any
 import boto3
 import json
 import os
-import uuid
 from botocore.exceptions import ClientError
 
 # Initialize PowerTools with configurable log level
@@ -46,9 +45,65 @@ USER_POOL_ID = os.environ["COGNITO_USER_POOL_ID"]
 
 
 @tracer.capture_method
-def generate_temporary_password() -> str:
-    """Generate a secure temporary password"""
-    return f"Welcome1!{uuid.uuid4().hex[:8]}"
+def validate_groups_exist(group_ids: list) -> tuple[list, list]:
+    """
+    Validate that the specified groups exist in Cognito
+    
+    Args:
+        group_ids: List of group IDs to validate
+    
+    Returns:
+        Tuple of (valid_groups, invalid_groups)
+    """
+    if not group_ids:
+        return [], []
+    
+    valid_groups = []
+    invalid_groups = []
+    
+    try:
+        # Get all groups in the user pool
+        response = cognito.list_groups(UserPoolId=USER_POOL_ID)
+        existing_group_names = {group['GroupName'] for group in response.get('Groups', [])}
+        
+        logger.debug(
+            {
+                "message": "Retrieved existing groups from Cognito",
+                "existing_groups": list(existing_group_names),
+                "requested_groups": group_ids,
+                "operation": "validate_groups_exist",
+            }
+        )
+        
+        for group_id in group_ids:
+            if group_id in existing_group_names:
+                valid_groups.append(group_id)
+            else:
+                invalid_groups.append(group_id)
+        
+        logger.info(
+            {
+                "message": "Group validation completed",
+                "valid_groups": valid_groups,
+                "invalid_groups": invalid_groups,
+                "operation": "validate_groups_exist",
+            }
+        )
+        
+    except ClientError as e:
+        logger.error(
+            {
+                "message": "Failed to validate groups",
+                "error_code": e.response["Error"]["Code"],
+                "error_message": e.response["Error"]["Message"],
+                "operation": "validate_groups_exist",
+            }
+        )
+        # If we can't validate, assume all groups are valid and let Cognito handle the errors
+        valid_groups = group_ids
+        invalid_groups = []
+    
+    return valid_groups, invalid_groups
 
 
 @app.post("/users/user")
@@ -63,15 +118,6 @@ def create_user():
                 "message": "Processing user creation request",
                 "request_data": request_data,
                 "operation": "create_user",
-            }
-        )
-
-        # Generate temporary password
-        temp_password = generate_temporary_password()
-        logger.debug(
-            {
-                "message": "Generated temporary password",
-                "operation": "password_generation",
             }
         )
 
@@ -99,12 +145,13 @@ def create_user():
             }
         )
 
-        # Create user in Cognito
+        # Create user in Cognito using the configured invitation template
         response = cognito.admin_create_user(
             UserPoolId=USER_POOL_ID,
             Username=request_data["email"],
             UserAttributes=user_attributes,
-            TemporaryPassword=temp_password,
+            # Remove TemporaryPassword to use the configured invite template
+            # MessageAction defaults to "SEND" which will use the invite_message_template
         )
         logger.info(
             {
@@ -115,10 +162,143 @@ def create_user():
             }
         )
 
+        # Add user to groups if specified
+        groups_added = []
+        groups_failed = []
+        invalid_groups = []
+        if "groups" in request_data and request_data["groups"]:
+            logger.info(
+                {
+                    "message": "Starting group assignment process",
+                    "username": request_data["email"],
+                    "total_groups": len(request_data["groups"]),
+                    "group_list": request_data["groups"],
+                    "operation": "group_assignment_start",
+                }
+            )
+            
+            valid_groups, invalid_groups = validate_groups_exist(request_data["groups"])
+            
+            # Log about invalid groups
+            if invalid_groups:
+                logger.warning(
+                    {
+                        "message": "Some groups do not exist in Cognito",
+                        "username": request_data["email"],
+                        "invalid_groups": invalid_groups,
+                        "operation": "invalid_groups_detected",
+                    }
+                )
+            
+            for group_id in valid_groups:
+                logger.info(
+                    {
+                        "message": "Attempting to add user to group",
+                        "username": request_data["email"],
+                        "group_id": group_id,
+                        "operation": "add_user_to_group_attempt",
+                    }
+                )
+                try:
+                    cognito.admin_add_user_to_group(
+                        UserPoolId=USER_POOL_ID,
+                        Username=request_data["email"],
+                        GroupName=group_id
+                    )
+                    groups_added.append(group_id)
+                    logger.info(
+                        {
+                            "message": "User added to group successfully",
+                            "username": request_data["email"],
+                            "group_id": group_id,
+                            "operation": "add_user_to_group_success",
+                        }
+                    )
+                except ClientError as group_error:
+                    error_code = group_error.response["Error"]["Code"]
+                    error_message = group_error.response["Error"]["Message"]
+                    groups_failed.append({
+                        "group_id": group_id,
+                        "error_code": error_code,
+                        "error_message": error_message
+                    })
+                    
+                    logger.error(
+                        {
+                            "message": "Failed to add user to group",
+                            "username": request_data["email"],
+                            "group_id": group_id,
+                            "error_code": error_code,
+                            "error_message": error_message,
+                            "operation": "add_user_to_group_failed",
+                        }
+                    )
+                except Exception as unexpected_error:
+                    groups_failed.append({
+                        "group_id": group_id,
+                        "error_code": "UnexpectedError",
+                        "error_message": str(unexpected_error)
+                    })
+                    
+                    logger.error(
+                        {
+                            "message": "Unexpected error adding user to group",
+                            "username": request_data["email"],
+                            "group_id": group_id,
+                            "error_type": type(unexpected_error).__name__,
+                            "error_message": str(unexpected_error),
+                            "operation": "add_user_to_group_unexpected_error",
+                        }
+                    )
+            
+            # Final summary of group assignment
+            logger.info(
+                {
+                    "message": "Group assignment process completed",
+                    "username": request_data["email"],
+                    "groups_added_count": len(groups_added),
+                    "groups_failed_count": len(groups_failed),
+                    "invalid_groups_count": len(invalid_groups),
+                    "groups_added": groups_added,
+                    "groups_failed": groups_failed,
+                    "invalid_groups": invalid_groups,
+                    "operation": "group_assignment_complete",
+                }
+            )
+
         # Log success metrics
         metrics.add_metric(
             name="SuccessfulUserCreations", unit=MetricUnit.Count, value=1
         )
+        if groups_added:
+            metrics.add_metric(
+                name="UserGroupAssignments", unit=MetricUnit.Count, value=len(groups_added)
+            )
+        if groups_failed:
+            metrics.add_metric(
+                name="FailedGroupAssignments", unit=MetricUnit.Count, value=len(groups_failed)
+            )
+        if invalid_groups:
+            metrics.add_metric(
+                name="InvalidGroupsRequested", unit=MetricUnit.Count, value=len(invalid_groups)
+            )
+
+        # Include group assignment details in response
+        response_data = {
+            "username": request_data["email"],
+            "userStatus": response["User"]["UserStatus"],
+            "groupsAdded": groups_added,
+        }
+        
+        # Include failed groups in response if any failed
+        if groups_failed:
+            response_data["groupsFailed"] = groups_failed
+            response_data["groupsFailedCount"] = len(groups_failed)
+        
+        # Include invalid groups in response if any were invalid
+        if invalid_groups:
+            response_data["invalidGroups"] = invalid_groups
+            response_data["invalidGroupsCount"] = len(invalid_groups)
 
         return {
             "statusCode": 201,
@@ -126,10 +306,7 @@ def create_user():
                 {
                     "status": 201,
                     "message": "User created successfully",
-                    "data": {
-                        "username": request_data["email"],
-                        "userStatus": response["User"]["UserStatus"],
-                    },
+                    "data": response_data,
                 }
             ),
         }

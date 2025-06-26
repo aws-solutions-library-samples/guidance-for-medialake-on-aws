@@ -20,6 +20,7 @@ from aws_cdk import (
     aws_dynamodb as dynamodb,
     aws_s3 as s3,
     aws_secretsmanager as secretsmanager,
+    aws_ssm as ssm,
     Stack,
     aws_stepfunctions as sfn,
 )
@@ -141,7 +142,8 @@ class ConnectorsConstruct(Construct):
                         "iam:PassRole",
                     ],
                     resources=[
-                        f"arn:aws:iam::{account_id}:role/{config.resource_prefix}*",
+                        # f"arn:aws:iam::{account_id}:role/{config.resource_prefix}-*",
+                        f"arn:aws:iam::{account_id}:role/*",
                     ],  # Restrict to roles with prefix
                     conditions={
                         "StringLike": {
@@ -213,6 +215,15 @@ class ConnectorsConstruct(Construct):
                 partition_key_name="id",
                 partition_key_type=dynamodb.AttributeType.STRING,
             ),
+        )
+
+        # Store connector table name in SSM for other stacks to reference
+        ssm.StringParameter(
+            self,
+            "ConnectorTableNameParameter",
+            parameter_name=f"/{config.resource_prefix}/connector-table-name",
+            string_value=self.connectors_table.table.table_name,
+            description="MediaLake Connector Table Name"
         )
 
         # Create connectors resource
@@ -300,7 +311,7 @@ class ConnectorsConstruct(Construct):
             )
         )
 
-        # Separate IAM policy with account-specific ARNs - restricted to resource prefix
+        # Separate IAM policy with account-specific ARNs
         connectors_del_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
@@ -310,12 +321,13 @@ class ConnectorsConstruct(Construct):
                     "iam:ListAttachedRolePolicies",
                     "iam:ListRolePolicies",
                     "iam:GetRolePolicy",
+                    "iam:ListInstanceProfilesForRole",
+                    "iam:GetRole"
                 ],
-                resources=[f"arn:aws:iam::{account_id}:role/{config.resource_prefix}*"],
+                resources=[f"arn:aws:iam::{account_id}:role/*"],
             )
         )
 
-        # EventBridge rules - restricted to resource prefix
         connectors_del_lambda.function.role.add_to_policy(
             iam.PolicyStatement(
                 actions=[
@@ -323,7 +335,7 @@ class ConnectorsConstruct(Construct):
                     "events:DeleteRule",
                 ],
                 resources=[
-                    f"arn:aws:events:{scope.region}:{account_id}:rule/{config.resource_prefix}*",
+                    f"arn:aws:events:{scope.region}:{account_id}:rule/*",
                 ],
             )
         )
@@ -341,7 +353,7 @@ class ConnectorsConstruct(Construct):
             )
         )
         
-        # Add EventBridge Pipes permissions - restricted to resource prefix
+        # Add EventBridge Pipes permissions
         connectors_del_lambda.function.role.add_to_policy(
             iam.PolicyStatement(
                 actions=[
@@ -353,7 +365,7 @@ class ConnectorsConstruct(Construct):
                     "pipes:UntagResource",
                     "pipes:ListTagsForResource"
                 ],
-                resources=[f"arn:aws:pipes:{scope.region}:{account_id}:pipe/{config.resource_prefix}*"],
+                resources=[f"arn:aws:pipes:{scope.region}:{account_id}:pipe/*"],
             )
         )
 
@@ -399,6 +411,7 @@ class ConnectorsConstruct(Construct):
                     "MEDIALAKE_ASSET_TABLE_S3_PATH_INDEX": props.asset_table_s3_path_index_arn,
                     "RESOURCE_PREFIX": config.resource_prefix,
                     "RESOURCE_APPLICATION_TAG": config.resource_application_tag,
+                    "REGION": config.primary_region,
                 },
             ),
         )
@@ -475,7 +488,7 @@ class ConnectorsConstruct(Construct):
             )
         )
 
-        # Separate IAM policy with account-specific ARNs - restricted to resource prefix
+        # Separate IAM policy with account-specific ARNs
         connector_s3_post_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
@@ -492,7 +505,7 @@ class ConnectorsConstruct(Construct):
                     "iam:DetachRolePolicy",
                     "iam:GetRole",
                 ],
-                resources=[f"arn:aws:iam::{account_id}:role/{config.resource_prefix}*"],
+                resources=[f"arn:aws:iam::{account_id}:role/*"],
             )
         )
 
@@ -530,7 +543,7 @@ class ConnectorsConstruct(Construct):
             )
         )
 
-        # Policy for EventBridge actions - restricted to resource prefix
+        # Policy for EventBridge actions
         connector_s3_post_lambda.function.role.add_to_policy(
             iam.PolicyStatement(
                 actions=[
@@ -540,12 +553,12 @@ class ConnectorsConstruct(Construct):
                     "events:RemoveTargets"
                 ],
                 resources=[
-                    f"arn:aws:events:{scope.region}:{account_id}:rule/{config.resource_prefix}*",
+                    f"arn:aws:events:{scope.region}:{account_id}:rule/*",
                 ],
             )
         )
 
-        # Add EventBridge Pipes permissions - restricted to resource prefix
+        # Add EventBridge Pipes permissions
         connector_s3_post_lambda.function.role.add_to_policy(
             iam.PolicyStatement(
                 actions=[
@@ -560,7 +573,7 @@ class ConnectorsConstruct(Construct):
                     "pipes:UntagResource",
                     "pipes:ListTagsForResource"
                 ],
-                resources=[f"arn:aws:pipes:{scope.region}:{account_id}:pipe/{config.resource_prefix}*"],
+                resources=[f"arn:aws:pipes:{scope.region}:{account_id}:pipe/*"],
             )
         )
 
@@ -693,7 +706,6 @@ class ConnectorsConstruct(Construct):
         add_cors_options_method(s3_explorer_resource)
         add_cors_options_method(s3_explorer_connector_resource)
 
-        # ---- AWS Resources Endpoint ----
         aws_resource = props.api_resource.root.add_resource("aws")
         regions_resource = aws_resource.add_resource("regions")
 
@@ -701,12 +713,12 @@ class ConnectorsConstruct(Construct):
             self,
             "GetAWSRegionsLambda",
             config=LambdaConfig(
-                name="aws_regions_get",
+                name="regions-get",
                 entry="lambdas/api/aws/get_regions",
                 environment_variables={
                      "X_ORIGIN_VERIFY_SECRET_ARN": (
                         props.x_origin_verify_secret.secret_arn
-                    ), # If needed for auth/verification
+                    ),
                 },
             ),
         )
@@ -715,14 +727,14 @@ class ConnectorsConstruct(Construct):
         get_regions_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["ec2:DescribeRegions"],
-                resources=["*"], # ec2:DescribeRegions requires "*"
+                resources=["*"],
             )
         )
         
         regions_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(get_regions_lambda.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO, # Or appropriate auth
+            authorization_type=apigateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
         

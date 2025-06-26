@@ -12,6 +12,7 @@ import re
 import os
 import glob
 from pathlib import Path
+import datetime
 
 from aws_cdk import (
     aws_lambda as lambda_,
@@ -180,6 +181,8 @@ class LambdaConfig:
         nodejs_bundling (Optional[NodeJSBundlingOptions]): Bundling options for Node.js functions
         filesystem_access_point (Optional[efs.IAccessPoint]): EFS access point for Lambda filesystem
         filesystem_mount_path (Optional[str]): Mount path for EFS filesystem
+        snap_start (Optional[bool]): Enable SnapStart for faster cold starts (default: False).
+        Note: SnapStart is supported for Java 11+, Python 3.12+, and .NET 8+ runtimes.
     """
 
     name: Optional[str] = None
@@ -201,6 +204,7 @@ class LambdaConfig:
     reserved_concurrent_executions: Optional[int] = None
     filesystem_access_point: Optional[efs.IAccessPoint] = None
     filesystem_mount_path: Optional[str] = None
+    snap_start: Optional[bool] = False
 
 
 class Lambda(Construct):
@@ -383,7 +387,6 @@ class Lambda(Construct):
             lambda_environment_variables["METRICS_NAMESPACE"] = (
                 env_config.resource_prefix
             )
-            common_lambda_props["environment"] = lambda_environment_variables
         else:
             lambda_environment_variables = {}
             lambda_environment_variables["RESOURCE_PREFIX"] = env_config.resource_prefix
@@ -391,6 +394,13 @@ class Lambda(Construct):
             lambda_environment_variables["METRICS_NAMESPACE"] = (
                 env_config.resource_prefix
             )
+
+        # --- SnapStart: Force new version on each deployment ---
+        if config.snap_start:
+            lambda_environment_variables["DEPLOYMENT_TIMESTAMP"] = datetime.datetime.utcnow().isoformat()
+        # --- End SnapStart versioning ---
+
+        common_lambda_props["environment"] = lambda_environment_variables
 
         # Add VPC if provided
         if config.vpc:
@@ -415,6 +425,26 @@ class Lambda(Construct):
                 config.filesystem_mount_path
             )
 
+        # Add SnapStart if enabled
+        if config.snap_start:
+            logger.debug("SnapStart enabled for Lambda function")
+            # SnapStart is supported for Java 11+, Python 3.12+, and .NET 8+ runtimes
+            # SnapStart requires SnapStartConf object, not a simple boolean
+            common_lambda_props["snap_start"] = lambda_.SnapStartConf.ON_PUBLISHED_VERSIONS
+            logger.info(f"SnapStart enabled for {config.runtime.family} function - using ON_PUBLISHED_VERSIONS")
+            
+            # Validate runtime support for SnapStart
+            supported_families = [lambda_.RuntimeFamily.JAVA, lambda_.RuntimeFamily.DOTNET_CORE, lambda_.RuntimeFamily.PYTHON]
+            if config.runtime.family not in supported_families:
+                logger.warning(f"SnapStart requested for runtime {config.runtime.family}. SnapStart is currently supported for Java 11+, Python 3.12+, and .NET 8+ runtimes.")
+            elif config.runtime.family == lambda_.RuntimeFamily.PYTHON:
+                # Additional validation for Python - must be 3.12 or later
+                python_version = config.runtime.name
+                if "python3.12" not in python_version.lower() and not any(ver in python_version.lower() for ver in ["python3.13", "python3.14", "python3.15"]):
+                    logger.warning(f"SnapStart requires Python 3.12 or later. Current runtime: {config.runtime.name}")
+                else:
+                    logger.info(f"SnapStart is supported for {config.runtime.name}")
+
         # Create the Lambda function based on runtime
         logger.info(
             f"Creating {config.runtime.family} Lambda function with properties"
@@ -435,6 +465,13 @@ class Lambda(Construct):
                 self._create_python_function(
                     common_lambda_props, config, entry_path, {}
                 )
+
+            # --- SnapStart: Ensure versioning if enabled ---
+            if config.snap_start:
+                self._function_version = self._function.current_version
+            else:
+                self._function_version = None
+            # --- End SnapStart versioning ---
 
         except Exception as e:
             logger.error(f"Failed to create Lambda function: {str(e)}", exc_info=True)
@@ -755,3 +792,13 @@ class Lambda(Construct):
             iam.Role: The IAM role attached to the Lambda function
         """
         return self._lambda_role
+
+    @property
+    def function_version(self) -> Optional[lambda_.Version]:
+        """
+        Get the versioned Lambda function (if SnapStart is enabled).
+
+        Returns:
+            lambda_.Version | None: The versioned Lambda function, or None if not versioned
+        """
+        return getattr(self, '_function_version', None)

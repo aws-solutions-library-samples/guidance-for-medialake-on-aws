@@ -230,8 +230,16 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
             setBucketNameError(bucketValidationError);
             return; // Stop submission if bucket name is invalid
         }
-        if (!name || !type || (type === 's3' && (!s3ConnectorType || !configuration.integrationMethod || (bucketType === 'existing' && !configuration.bucket) || (bucketType === 'new' && (!configuration.bucket || !awsRegion))))) {
-            alert('Please fill in all required fields, including Bucket Name and Region for new buckets.');
+        
+        // Original validation logic with region requirement (commented out for restoration later)
+        // if (!name || !type || (type === 's3' && (!s3ConnectorType || !configuration.integrationMethod || (bucketType === 'existing' && !configuration.bucket) || (bucketType === 'new' && (!configuration.bucket || !awsRegion))))) {
+        //     alert('Please fill in all required fields, including Bucket Name and Region for new buckets.');
+        //     return;
+        // }
+        
+        // Modified validation logic - removed region requirement for new buckets
+        if (!name || !type || (type === 's3' && (!s3ConnectorType || !configuration.integrationMethod || (bucketType === 'existing' && !configuration.bucket) || (bucketType === 'new' && !configuration.bucket)))) {
+            alert('Please fill in all required fields.');
             return;
         }
 
@@ -475,7 +483,8 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                                 error={!!bucketNameError}
                                 helperText={bucketNameError || 'Bucket name must be globally unique, follow S3 naming rules.'}
                             />
-                            <FormControl fullWidth required>
+                            {/* AWS Region FormControl hidden as requested */}
+                            {/* <FormControl fullWidth required>
                                 <InputLabel>AWS Region</InputLabel>
                                 <Select
                                     value={awsRegion}
@@ -488,7 +497,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                                         </MenuItem>
                                     ))}
                                 </Select>
-                            </FormControl>
+                            </FormControl> */}
                         </>
                     )}
                 </>
