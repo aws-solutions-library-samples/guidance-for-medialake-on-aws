@@ -162,70 +162,56 @@ class PyMediaInfo(Construct):
         return self.layer_version.layer
 
 class ImageMagickLayer(Construct):
-    """
-    Bundles a static ImageMagick distribution into a Lambda layer.
+    APPIMAGE_VERSION = "7.1.1-30"          # keep for reference
 
-    • Uses the official AppImage build – it already contains all delegate
-      libraries, so we only need to extract the squashfs and copy the bits we
-      need.  
-    • Works for both x86_64 and arm64 (AppImage ships separate binaries).  
-    • Resulting layer structure:
-        /opt/bin/magick   (↔ convert, identify, etc.)
-        /opt/lib/*        (<100 MB of delegate .so files)
-    """
+    PORTABLE_TAR = {
+        lambda_.Architecture.X86_64: "ImageMagick-x86_64-pc-linux-gnu.tar.gz",
+        lambda_.Architecture.ARM_64: "ImageMagick-aarch64-linux-gnu.tar.gz",
+    }
 
-    APPIMAGE_VERSION = "7.1.1-30"
+    def __init__(self, scope: Construct, id: str,
+                 *, architecture=lambda_.Architecture.X86_64, **kw):
+        super().__init__(scope, id, **kw)
 
-    def __init__(
-        self,
-        scope: Construct,
-        construct_id: str,
-        *,
-        architecture: lambda_.Architecture = lambda_.Architecture.X86_64,
-        **kwargs,
-    ):
-        super().__init__(scope, construct_id, **kwargs)
+        tarball = self.PORTABLE_TAR[architecture]
 
-        # Pick the correct pre-built AppImage
-        arch_tag = "arm64" if architecture == lambda_.Architecture.ARM_64 else "x86_64"
-        appimage_name = f"magick-{self.APPIMAGE_VERSION}.{arch_tag}.AppImage"
-
-        # layers/imagemagick_layer.py  – only the BundlingOptions block changed
         self.layer = lambda_.LayerVersion(
-            self,
-            "ImageMagickLayer",
+            self, "ImageMagickLayer",
             layer_version_name="imagemagick-layer",
-            description=f"ImageMagick {self.APPIMAGE_VERSION} CLI & delegates",
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
             compatible_architectures=[architecture],
+            description="ImageMagick CLI + delegates (portable tar build)",
             code=lambda_.Code.from_asset(
                 path=".",
                 bundling=BundlingOptions(
                     user="root",
-                    image=DockerImage.from_registry("public.ecr.aws/amazonlinux/amazonlinux:2023"),
+                    image=DockerImage.from_registry(
+                        "public.ecr.aws/amazonlinux/amazonlinux:2023"
+                    ),
                     command=[
                         "/bin/bash", "-c", f"""
                         set -euo pipefail
-                        dnf -y update
-                        dnf -y install wget xz bsdtar   # <-- add bsdtar (or squashfs-tools)
+                        dnf -y install wget xz tar
 
                         TMP=$(mktemp -d); cd "$TMP"
-                        wget -q https://download.imagemagick.org/ImageMagick/download/binaries/{appimage_name}
-                        chmod +x {appimage_name}
+                        wget -q https://imagemagick.org/archive/binaries/{tarball}
+                        tar -xzf {tarball}
 
-                        # extract – now works because bsdtar is present
-                        ./{appimage_name} --appimage-extract
+                        # The tarball expands to ImageMagick-{ver}
+                        IMDIR=$(find . -maxdepth 1 -type d -name 'ImageMagick-*' | head -n1)
 
                         mkdir -p /asset-output/bin /asset-output/lib
-                        cp squashfs-root/usr/bin/magick /asset-output/bin/
-                        ln -s magick /asset-output/bin/convert
-                        cp -r squashfs-root/usr/lib/* /asset-output/lib/
+                        cp -r "$IMDIR"/bin/* /asset-output/bin/
+                        cp -r "$IMDIR"/lib/* /asset-output/lib/
+                        ln -s magick /asset-output/bin/convert   # convenience alias
+
                         chmod -R 755 /asset-output
                         """
                     ],
                 ),
             ),
         )
+
 
         
 class CairoSvgLayer(Construct):
