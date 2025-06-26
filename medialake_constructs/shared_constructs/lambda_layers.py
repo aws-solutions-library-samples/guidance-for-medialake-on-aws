@@ -190,6 +190,7 @@ class ImageMagickLayer(Construct):
         arch_tag = "arm64" if architecture == lambda_.Architecture.ARM_64 else "x86_64"
         appimage_name = f"magick-{self.APPIMAGE_VERSION}.{arch_tag}.AppImage"
 
+        # layers/imagemagick_layer.py  – only the BundlingOptions block changed
         self.layer = lambda_.LayerVersion(
             self,
             "ImageMagickLayer",
@@ -198,38 +199,38 @@ class ImageMagickLayer(Construct):
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
             compatible_architectures=[architecture],
             code=lambda_.Code.from_asset(
-                path=".",      # dummy – everything happens in Docker
+                path=".",                      # all work happens in Docker
                 bundling=BundlingOptions(
                     user="root",
                     image=DockerImage.from_registry(
                         "public.ecr.aws/amazonlinux/amazonlinux:2023"
                     ),
                     command=[
-                        "/bin/bash",
-                        "-c",
-                        f"""
+                        "/bin/bash", "-c", f"""
                         set -euo pipefail
-                        yum -y update && yum -y install wget xz squashfs-tools
 
-                        TMP=$(mktemp -d)
-                        cd "$TMP"
+                        # ---------- enable EPEL & install tools ----------
+                        # 1) grab the signed EPEL release package for AL2023
+                        dnf -y install \
+                            'https://dl.fedoraproject.org/pub/epel/epel-release-latest-2023.noarch.rpm'
+                        # 2) install the utilities we need
+                        dnf -y --enablerepo=epel install wget xz squashfs-tools
 
-                        # 1. Download the AppImage (static + delegates)
+                        # ---------- build the layer ----------
+                        TMP=$(mktemp -d); cd "$TMP"
+
                         wget -q https://download.imagemagick.org/ImageMagick/download/binaries/{appimage_name}
                         chmod +x {appimage_name}
 
-                        # 2. Extract the squashfs from the AppImage
+                        # extract the AppImage
                         ./{appimage_name} --appimage-extract >/dev/null
 
-                        # 3. Copy CLI and libs into the layer structure
                         mkdir -p /asset-output/bin /asset-output/lib
                         cp squashfs-root/usr/bin/magick /asset-output/bin/
-                        # Provide the classic "convert" alias some scripts expect
                         ln -s magick /asset-output/bin/convert
 
                         cp -r squashfs-root/usr/lib/* /asset-output/lib/
 
-                        # 4. Cleanup
                         chmod -R 755 /asset-output
                         rm -rf "$TMP"
                         """
@@ -237,6 +238,7 @@ class ImageMagickLayer(Construct):
                 ),
             ),
         )
+
         
 class CairoSvgLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
