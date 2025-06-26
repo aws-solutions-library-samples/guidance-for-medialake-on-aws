@@ -199,18 +199,22 @@ class ImageMagickLayer(Construct):
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
             compatible_architectures=[architecture],
             code=lambda_.Code.from_asset(
-                path=".",                      # all work happens in Docker
+                path=".",
                 bundling=BundlingOptions(
                     user="root",
                     image=DockerImage.from_registry("public.ecr.aws/amazonlinux/amazonlinux:2023"),
                     command=[
                         "/bin/bash", "-c", f"""
                         set -euo pipefail
-                        dnf -y update && dnf -y install wget xz
+                        dnf -y update
+                        dnf -y install wget xz bsdtar   # <-- add bsdtar (or squashfs-tools)
 
                         TMP=$(mktemp -d); cd "$TMP"
                         wget -q https://download.imagemagick.org/ImageMagick/download/binaries/{appimage_name}
-                        chmod +x {appimage_name} && ./{appimage_name} --appimage-extract >/dev/null
+                        chmod +x {appimage_name}
+
+                        # extract – now works because bsdtar is present
+                        ./{appimage_name} --appimage-extract
 
                         mkdir -p /asset-output/bin /asset-output/lib
                         cp squashfs-root/usr/bin/magick /asset-output/bin/
