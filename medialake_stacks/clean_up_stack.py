@@ -47,12 +47,21 @@ class CleanupStack(Stack):
 
 
         # Add EventBridge Pipes permissions
+        # ListPipes requires * resource - AWS API limitation for list operations
+        self._clean_up_lambda.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "pipes:ListPipes",
+                ],
+                resources=["*"],  # Required by AWS API - cannot be scoped to specific pipes
+            )
+        )
+        
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 actions=[
                     "pipes:DeletePipe",
                     "pipes:DescribePipe",
-                    "pipes:ListPipes",
                     "pipes:StopPipe",
                     "pipes:UntagResource",
                     "pipes:ListTagsForResource"
