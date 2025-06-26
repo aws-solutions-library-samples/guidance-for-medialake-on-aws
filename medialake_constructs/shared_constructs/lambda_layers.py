@@ -162,34 +162,37 @@ class PyMediaInfo(Construct):
         return self.layer_version.layer
 
 class ImageMagickLayer(Construct):
-    APPIMAGE_VERSION = "7.1.1-30"          # keep for reference
+    PORTABLE_VERSION = "7.1.1-30"
 
-    PORTABLE_TAR = {
-        lambda_.Architecture.X86_64: "ImageMagick-x86_64-pc-linux-gnu.tar.gz",
-        lambda_.Architecture.ARM_64: "ImageMagick-aarch64-linux-gnu.tar.gz",
-    }
+    def __init__(
+        self,
+        scope: Construct,
+        construct_id: str,
+        *,
+        architecture: lambda_.Architecture = lambda_.Architecture.X86_64,
+        **kwargs,
+    ):
+        super().__init__(scope, construct_id, **kwargs)
 
-    def __init__(self, scope: Construct, id: str,
-                 *, architecture=lambda_.Architecture.X86_64, **kw):
-        super().__init__(scope, id, **kw)
-
-        tarball = self.PORTABLE_TAR[architecture]
+        arch_tag = "aarch64" if architecture == lambda_.Architecture.ARM_64 else "x86_64"
+        tarball  = f"ImageMagick-{arch_tag}-linux-gnu.tar.gz"
 
         self.layer = lambda_.LayerVersion(
-            self, "ImageMagickLayer",
+            self,
+            "ImageMagickLayer",
             layer_version_name="imagemagick-layer",
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
             compatible_architectures=[architecture],
-            description="ImageMagick CLI + delegates (portable tar build)",
+            description=f"ImageMagick {self.PORTABLE_VERSION} portable build",
             code=lambda_.Code.from_asset(
                 path=".",
                 bundling=BundlingOptions(
                     user="root",
-                    image=DockerImage.from_registry(
-                        "public.ecr.aws/amazonlinux/amazonlinux:2023"
-                    ),
+                    image=DockerImage.from_registry("public.ecr.aws/amazonlinux/amazonlinux:2023"),
                     command=[
-                        "/bin/bash", "-c", f"""
+                        "/bin/bash",
+                        "-c",
+                        f"""
                         set -euo pipefail
                         dnf -y install wget xz tar
 
@@ -197,21 +200,18 @@ class ImageMagickLayer(Construct):
                         wget -q https://imagemagick.org/archive/binaries/{tarball}
                         tar -xzf {tarball}
 
-                        # The tarball expands to ImageMagick-{ver}
                         IMDIR=$(find . -maxdepth 1 -type d -name 'ImageMagick-*' | head -n1)
 
                         mkdir -p /asset-output/bin /asset-output/lib
                         cp -r "$IMDIR"/bin/* /asset-output/bin/
                         cp -r "$IMDIR"/lib/* /asset-output/lib/
-                        ln -s magick /asset-output/bin/convert   # convenience alias
-
+                        ln -s magick /asset-output/bin/convert
                         chmod -R 755 /asset-output
                         """
                     ],
                 ),
             ),
         )
-
 
         
 class CairoSvgLayer(Construct):
