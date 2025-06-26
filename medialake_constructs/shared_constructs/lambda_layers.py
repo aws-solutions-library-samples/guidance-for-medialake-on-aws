@@ -161,7 +161,83 @@ class PyMediaInfo(Construct):
     def layer(self) -> lambda_.LayerVersion:
         return self.layer_version.layer
 
+class ImageMagickLayer(Construct):
+    """
+    Bundles a static ImageMagick distribution into a Lambda layer.
 
+    • Uses the official AppImage build – it already contains all delegate
+      libraries, so we only need to extract the squashfs and copy the bits we
+      need.  
+    • Works for both x86_64 and arm64 (AppImage ships separate binaries).  
+    • Resulting layer structure:
+        /opt/bin/magick   (↔ convert, identify, etc.)
+        /opt/lib/*        (<100 MB of delegate .so files)
+    """
+
+    APPIMAGE_VERSION = "7.1.1-30"
+
+    def __init__(
+        self,
+        scope: Construct,
+        construct_id: str,
+        *,
+        architecture: lambda_.Architecture = lambda_.Architecture.X86_64,
+        **kwargs,
+    ):
+        super().__init__(scope, construct_id, **kwargs)
+
+        # Pick the correct pre-built AppImage
+        arch_tag = "arm64" if architecture == lambda_.Architecture.ARM_64 else "x86_64"
+        appimage_name = f"magick-{self.APPIMAGE_VERSION}.{arch_tag}.AppImage"
+
+        self.layer = lambda_.LayerVersion(
+            self,
+            "ImageMagickLayer",
+            layer_version_name="imagemagick-layer",
+            description=f"ImageMagick {self.APPIMAGE_VERSION} CLI & delegates",
+            compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
+            compatible_architectures=[architecture],
+            code=lambda_.Code.from_asset(
+                path=".",      # dummy – everything happens in Docker
+                bundling=BundlingOptions(
+                    user="root",
+                    image=DockerImage.from_registry(
+                        "public.ecr.aws/amazonlinux/amazonlinux:2023"
+                    ),
+                    command=[
+                        "/bin/bash",
+                        "-c",
+                        f"""
+                        set -euo pipefail
+                        yum -y update && yum -y install wget xz squashfs-tools
+
+                        TMP=$(mktemp -d)
+                        cd "$TMP"
+
+                        # 1. Download the AppImage (static + delegates)
+                        wget -q https://download.imagemagick.org/ImageMagick/download/binaries/{appimage_name}
+                        chmod +x {appimage_name}
+
+                        # 2. Extract the squashfs from the AppImage
+                        ./{appimage_name} --appimage-extract >/dev/null
+
+                        # 3. Copy CLI and libs into the layer structure
+                        mkdir -p /asset-output/bin /asset-output/lib
+                        cp squashfs-root/usr/bin/magick /asset-output/bin/
+                        # Provide the classic "convert" alias some scripts expect
+                        ln -s magick /asset-output/bin/convert
+
+                        cp -r squashfs-root/usr/lib/* /asset-output/lib/
+
+                        # 4. Cleanup
+                        chmod -R 755 /asset-output
+                        rm -rf "$TMP"
+                        """
+                    ],
+                ),
+            ),
+        )
+        
 class CairoSvgLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
         super().__init__(scope, id, **kwargs)

@@ -12,6 +12,7 @@ node:
         runtime: python3.12
         layers:
           - CairoSvg
+          - ImageMagick
         iam_policy:
           statements:
             - effect: Allow

@@ -19,7 +19,7 @@ from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBPr
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 from medialake_constructs.shared_constructs.lambda_layers import (
     PowertoolsLayer, PowertoolsLayerConfig,
-    PyMediaInfo, CairoSvgLayer, FFProbeLayer, FFmpegLayer,
+    PyMediaInfo, CairoSvgLayer,ImageMagickLayer, FFProbeLayer, FFmpegLayer,
     PyamlLayer, ShortuuidLayer
 )
 from medialake_constructs.shared_constructs.mediaconvert import (
@@ -68,6 +68,8 @@ class NodesStack(cdk.NestedStack):
         self.pyaml_layer = PyamlLayer(self, "PyamlLayer")
         self.ffprobe_layer = FFProbeLayer(self, "FFProbeLayer")
         self.cairosvg_layer = CairoSvgLayer(self, "CairoSvgLayer")
+        self.cairosvg_layer = ImageMagickLayer(self, "ImageMagickLayer")
+        
         
         
         
