@@ -1,6 +1,6 @@
 {
     "environment": "<env>",
-    "deployment_size": "large",
+    "opensearch_deployment_size": "large",
     "account_id": "<aws_account_id>",
     "resource_prefix": "medialake",
     "global_prefix": "medialake",
