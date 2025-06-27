@@ -160,98 +160,73 @@ class PyMediaInfo(Construct):
     @property
     def layer(self) -> lambda_.LayerVersion:
         return self.layer_version.layer
+
 class ImageMagickLayer(Construct):
     """
-    Lambda layer that bundles ImageMagick (CLI + delegates):
-
-      • x86_64 – pulls the portable tarball and untars it  
-      • arm64  – pulls & self-extracts the AppImage  
+    Bundles a static ImageMagick distribution into a Lambda layer by
+    downloading the official x86_64 tarball and copying its bin/lib.
     """
 
-    VERSION = "7.1.1-30"
+    TAR_URL = "https://imagemagick.org/archive/binaries/ImageMagick-x86_64-pc-linux-gnu.tar.gz"
+    APPIMAGE_VERSION = "7.1.1-30"  # for reference only
 
     def __init__(
         self,
         scope: Construct,
-        id_: str,
+        construct_id: str,
         *,
         architecture: lambda_.Architecture = lambda_.Architecture.X86_64,
         **kwargs,
     ):
-        super().__init__(scope, id_, **kwargs)
+        super().__init__(scope, construct_id, **kwargs)
 
-        is_arm = architecture == lambda_.Architecture.ARM_64
-
-        if is_arm:
-            # AppImage for ARM
-            archive     = f"magick-{self.VERSION}.arm64.AppImage"
-            download_url= (
-                "https://download.imagemagick.org/ImageMagick/download/binaries/"
-                + archive
-            )
-            pre_pkgs    = "wget xz bsdtar"
-            extract_cmd = f"chmod +x {archive} && ./{archive} --appimage-extract"
-            bin_src     = "squashfs-root/usr/bin"
-            lib_src     = "squashfs-root/usr/lib"
-        else:
-            # Portable tarball for x86_64
-            archive      = "ImageMagick-x86_64-pc-linux-gnu.tar.gz"
-            download_url = "https://imagemagick.org/archive/binaries/" + archive
-            pre_pkgs     = "wget gzip tar"
-            extract_cmd  = f"tar -xzf {archive}"
-            # extraction always yields ImageMagick-<VERSION> directory
-            imdir        = f"ImageMagick-{self.VERSION}"
-            bin_src      = f"{imdir}/bin"
-            lib_src      = f"{imdir}/lib"
+        # Only x86_64 is supported by this tarball approach
+        if architecture != lambda_.Architecture.X86_64:
+            raise ValueError("ImageMagickLayer currently only supports x86_64")
 
         self.layer = lambda_.LayerVersion(
             self,
             "ImageMagickLayer",
             layer_version_name="imagemagick-layer",
-            description=f"ImageMagick {self.VERSION} CLI + delegates",
+            description=f"ImageMagick {self.APPIMAGE_VERSION} CLI & delegates",
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
             compatible_architectures=[architecture],
             code=lambda_.Code.from_asset(
-                path=".",  # our bundling script runs in Docker
+                path=".",  # all work happens in the Docker container
                 bundling=BundlingOptions(
-                    user="root",
                     image=DockerImage.from_registry(
                         "public.ecr.aws/amazonlinux/amazonlinux:2023"
                     ),
+                    user="root",
                     command=[
                         "/bin/bash",
                         "-c",
                         f"""
                         set -euo pipefail
 
-                        # 1. install the minimum tools
-                        dnf -y install {pre_pkgs}
+                        # 1. install minimal tools
+                        dnf -y install wget gzip tar
 
-                        # 2. download & extract into a temp dir
+                        # 2. download & extract the official tarball
                         TMP=$(mktemp -d)
                         cd "$TMP"
-                        wget -q {download_url}
-                        {extract_cmd}
+                        wget -q "{self.TAR_URL}"
+                        tar -xzf ImageMagick-x86_64-pc-linux-gnu.tar.gz
 
-                        # 3. copy CLI + libs into the layer
+                        # 3. copy the 'magick' binary and its libs
                         mkdir -p /asset-output/bin /asset-output/lib
-
-                        # copy the 'magick' binary
-                        cp {bin_src}/magick /asset-output/bin/
-
-                        # ensure 'convert' points to magick
+                        cp bin/magick /asset-output/bin/
                         ln -sf magick /asset-output/bin/convert
+                        cp -r lib/* /asset-output/lib/
 
-                        # copy all delegate .so files
-                        cp -r {lib_src}/* /asset-output/lib/
-
-                        # fix permissions
+                        # 4. tighten permissions
                         chmod -R 755 /asset-output
                         """
                     ],
                 ),
             ),
-        )     
+        )
+           
 class CairoSvgLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
         super().__init__(scope, id, **kwargs)
