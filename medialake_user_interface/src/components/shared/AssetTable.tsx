@@ -37,7 +37,7 @@ export interface AssetTableProps<T> {
     editingId?: string;
     editedName?: string;
     onEditNameChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
-    onEditNameComplete?: (item: T, save: boolean) => void;
+    onEditNameComplete?: (item: T, save: boolean, value?: string) => void;
     onFilterClick?: (event: React.MouseEvent<HTMLElement>, columnId: string) => void;
     activeFilters?: Array<{ columnId: string; value: string }>;
     onRemoveFilter?: (columnId: string) => void;
@@ -79,6 +79,7 @@ export function AssetTable<T>({
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
     const editInputRef = useRef<HTMLInputElement>(null);
     const hasInitialFocusRef = useRef<boolean>(false);
+    const preventCommitRef = useRef<boolean>(false);
 
     // Create a mapping between API field IDs and column IDs
     const fieldMapping: Record<string, string> = {
@@ -308,50 +309,40 @@ export function AssetTable<T>({
                     size: col.minWidth,
                     enableSorting: true,
                     cell: info => {
+                        // 1) If this is the “name” column and we’re in edit mode, show the inline editor:
                         if (col.id === 'name' && onEditClick) {
-                            const isEditing = editingId === getId(info.row.original);
+                            const rowId = getId(info.row.original);
+                            const isEditing = editingId === rowId;
+
                             return (
-                                <Box sx={{
-                                    display: 'flex',
-                                    alignItems: isEditing ? 'flex-start' : 'center',
-                                    gap: 1,
-                                    p: 1,
-                                    minWidth: 0,
-                                    width: '100%'
-                                }}>
+                                <Box
+                                    sx={{
+                                        display: 'flex',
+                                        alignItems: isEditing ? 'flex-start' : 'center',
+                                        gap: 1,
+                                        p: 1,
+                                        width: '100%',
+                                    }}
+                                >
                                     {isEditing ? (
-                                        <Box sx={{
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            gap: 1,
-                                            width: '100%'
-                                        }}>
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, width: '100%' }}>
                                             <InlineTextEditor
-                                                key={`edit-${getId(info.row.original)}`}
-                                                initialValue={editedName || ''}
-                                                onChange={onEditNameChange}
-                                                onComplete={(save) => onEditNameComplete?.(info.row.original, save)}
-                                                isEditing={true}
+                                                key={rowId}
+                                                initialValue={editedName ?? ''}
+                                                editingCellId={rowId}
+                                                preventCommitRef={preventCommitRef}
+                                                onChangeCommit={value =>
+                                                    onEditNameChange?.({ target: { value } } as React.ChangeEvent<HTMLInputElement>)
+                                                }
+                                                onComplete={(save, value) => onEditNameComplete?.(info.row.original, save, value)}
+                                                isEditing
                                                 autoFocus
                                                 size="small"
                                                 sx={{
                                                     flex: 1,
                                                     minWidth: '100%',
-                                                    '& .MuiInputBase-root': {
-                                                        width: '100%',
-                                                        minHeight: '2.5em',
-                                                        height: 'auto',
-                                                    },
-                                                    '& .MuiInputBase-input': {
-                                                        whiteSpace: 'normal',
-                                                        wordBreak: 'break-word',
-                                                        overflow: 'visible',
-                                                        textOverflow: 'clip',
-                                                        width: '100%',
-                                                        minHeight: '1.5em',
-                                                        height: 'auto',
-                                                        lineHeight: '1.5',
-                                                    }
+                                                    '& .MuiInputBase-root': { width: '100%', minHeight: '2.5em' },
+                                                    '& .MuiInputBase-input': { whiteSpace: 'normal', wordBreak: 'break-word' },
                                                 }}
                                                 multiline
                                                 fullWidth
@@ -359,34 +350,34 @@ export function AssetTable<T>({
                                             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', mt: 1 }}>
                                                 <Button
                                                     size="small"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        onEditNameComplete?.(info.row.original, true);
-                                                    }}
                                                     variant="contained"
-                                                >
-                                                    Save
-                                                </Button>
+                                                    onClick={e => {
+                                                        e.stopPropagation();
+                                                        // The InlineTextEditor will handle both onChangeCommit and onComplete when we trigger its commit
+                                                        const input = e.currentTarget.closest('.MuiBox-root')?.querySelector('input');
+                                                        if (input) {
+                                                            input.blur(); // This triggers the commit in InlineTextEditor
+                                                        }
+                                                    }}
+                                                >Save</Button>
                                                 <Button
                                                     size="small"
-                                                    onClick={(e) => {
+                                                    onClick={e => {
                                                         e.stopPropagation();
-                                                        onEditNameComplete?.(info.row.original, false);
+                                                        console.log('🚫 AssetTable Cancel clicked');
+                                                        // Set flag to prevent InlineTextEditor commit from being called
+                                                        preventCommitRef.current = true;
+                                                        onEditNameComplete?.(info.row.original, false, undefined);
                                                     }}
-                                                >
-                                                    Cancel
-                                                </Button>
+                                                >Cancel</Button>
                                             </Box>
                                         </Box>
                                     ) : (
                                         <>
-                                            <Typography>{info.getValue()}</Typography>
+                                            <Typography noWrap>{info.getValue()}</Typography>
                                             <IconButton
                                                 size="small"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onEditClick(info.row.original, e);
-                                                }}
+                                                onClick={e => { e.stopPropagation(); onEditClick(info.row.original, e); }}
                                             >
                                                 <EditIcon fontSize="small" />
                                             </IconButton>
@@ -395,12 +386,15 @@ export function AssetTable<T>({
                                 </Box>
                             );
                         }
+
+                        // 2) Default case for *every other* column:
                         return (
                             <Box sx={{ p: 1 }}>
-                                {col.cell ? col.cell(info) : info.getValue()}
+                                {info.getValue()}
                             </Box>
                         );
                     }
+
                 }
             )),
             columnHelper.display({
@@ -455,6 +449,7 @@ export function AssetTable<T>({
     const table = useReactTable({
         data,
         columns: tableColumns,
+        getRowId: row => getId(row),
         state: {
             sorting,
             columnFilters,
@@ -470,6 +465,8 @@ export function AssetTable<T>({
                 return value.includes(String(filterValue).toLowerCase());
             }
         },
+        autoResetPageIndex: false,
+        autoResetExpanded: false,
     });
 
     const { rows } = table.getRowModel();

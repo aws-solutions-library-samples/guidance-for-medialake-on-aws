@@ -36,7 +36,7 @@ export interface AssetCardProps {
     isEditing?: boolean;
     editedName?: string;
     onEditNameChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
-    onEditNameComplete?: (save: boolean) => void;
+    onEditNameComplete?: (save: boolean, value?: string) => void;
     cardSize?: 'small' | 'medium' | 'large';
     aspectRatio?: 'vertical' | 'square' | 'horizontal';
     thumbnailScale?: 'fit' | 'fill';
@@ -82,6 +82,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
     const [isHovering, setIsHovering] = useState(false);
     const [isMenuClicked, setIsMenuClicked] = useState(false);
     const cardRef = useRef<HTMLDivElement>(null);
+    const preventCommitRef = useRef<boolean>(false);
 
     // Check if features are enabled
     const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', true);
@@ -482,8 +483,19 @@ const AssetCard: React.FC<AssetCardProps> = ({
                                             }}>
                                                 <InlineTextEditor
                                                     initialValue={editedName || ''}
-                                                    onChange={onEditNameChange}
-                                                    onComplete={onEditNameComplete}
+                                                    editingCellId={id}                       // ← pass a stable ID (e.g. asset ID)
+                                                    preventCommitRef={preventCommitRef}      // ← pass the ref to prevent commit
+                                                    onChangeCommit={(value) => {
+                                                        // Update parent state
+                                                        onEditNameChange({
+                                                            target: { value }
+                                                        } as React.ChangeEvent<HTMLInputElement>);
+                                                    }}
+                                                    onComplete={(save, value) => {
+                                                        console.log('🎯 AssetCard onComplete - save:', save, 'value:', value);
+                                                        console.log('🎯 Calling onEditNameComplete with save:', save, 'value:', value);
+                                                        onEditNameComplete?.(save, value);
+                                                    }}
                                                     isEditing={true}
                                                     disabled={isRenaming}
                                                     autoFocus
@@ -512,7 +524,12 @@ const AssetCard: React.FC<AssetCardProps> = ({
                                                         size="small"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            onEditNameComplete?.(true);
+                                                            console.log('💾 AssetCard Save clicked');
+                                                            // Find the input element and get its current value
+                                                            const inputElement = e.currentTarget.closest('.MuiBox-root')?.querySelector('input') as HTMLInputElement;
+                                                            const currentValue = inputElement?.value || editedName;
+                                                            console.log('💾 Using current value from input:', currentValue);
+                                                            onEditNameComplete?.(true, currentValue);
                                                         }}
                                                         variant="contained"
                                                         disabled={isRenaming}
@@ -524,7 +541,10 @@ const AssetCard: React.FC<AssetCardProps> = ({
                                                         disabled={isRenaming}
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            onEditNameComplete?.(false);
+                                                            console.log('🚫 AssetCard Cancel clicked');
+                                                            // Set flag to prevent InlineTextEditor commit from being called
+                                                            preventCommitRef.current = true;
+                                                            onEditNameComplete?.(false, undefined);
                                                         }}
                                                     >
                                                         Cancel

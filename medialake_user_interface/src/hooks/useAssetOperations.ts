@@ -19,7 +19,7 @@ interface UseAssetOperationsReturn<T extends AssetBase> {
     handleDeleteConfirm: () => Promise<void>;
     handleStartEditing: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
     handleNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-    handleNameEditComplete: (asset: T, save: boolean) => void;
+    handleNameEditComplete: (asset: T, save: boolean, value?: string) => void;
     handleRenameConfirm: (newName: string) => Promise<void>;
     handleDeleteCancel: () => void;
     handleRenameCancel: () => void;
@@ -174,10 +174,21 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
         setEditedName(event.target.value);
     };
 
-    const handleNameEditComplete = (asset: T, save: boolean) => {
-        if (save && editedName !== asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name) {
-            handleRenameConfirm(editedName);
+    const handleNameEditComplete = (asset: T, save: boolean, value?: string) => {
+        console.log('🔍 handleNameEditComplete - save:', save, 'value:', value, 'editedName:', editedName);
+        console.log('🔍 Original name:', asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name);
+        
+        // Use the passed value if available, otherwise fall back to editedName
+        const nameToUse = value || editedName;
+        console.log('🔍 Name to use:', nameToUse);
+        
+        if (save && nameToUse !== asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name) {
+            console.log('🔍 Names different - calling API');
+            handleRenameConfirm(nameToUse);
+        } else if (save) {
+            console.log('🔍 Names same - NOT calling API');
         }
+        
         setEditingAssetId(null);
         if (!save) {
             setEditedName(asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name);

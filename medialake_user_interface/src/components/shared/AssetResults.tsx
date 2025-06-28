@@ -213,7 +213,11 @@ function AssetResults<T extends AssetBase>({
                 isRenaming={isLoading.rename && editingAssetId === asset.InventoryID}
                 editedName={editedName}
                 onEditNameChange={handleNameChange}
-                onEditNameComplete={(save) => handleNameEditComplete(asset, save)}
+                onEditNameComplete={(save, value) => {
+                    console.log('🎯 AssetResults onEditNameComplete - save:', save, 'value:', value);
+                    console.log('🎯 AssetResults calling handleNameEditComplete with asset:', asset.InventoryID, 'save:', save, 'value:', value);
+                    handleNameEditComplete(asset, save, value);
+                }}
                 isFavorite={false} // Default to false since we don't have favorite info here
                 onFavoriteToggle={(e) => console.log('Favorite toggle not implemented in AssetResults')}
             />
@@ -306,7 +310,7 @@ function AssetResults<T extends AssetBase>({
                         editingId={editingAssetId}
                         editedName={editedName}
                         onEditNameChange={handleNameChange}
-                        onEditNameComplete={(asset) => handleNameEditComplete(asset, true)}
+                        onEditNameComplete={(asset, save, value) => handleNameEditComplete(asset, save, value)}
                         onFilterClick={handleFilterClick}
                         activeFilters={columnFilters}
                         onRemoveFilter={handleRemoveFilter}

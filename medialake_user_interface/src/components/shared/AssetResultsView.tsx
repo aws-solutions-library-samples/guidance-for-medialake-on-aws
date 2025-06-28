@@ -61,7 +61,7 @@ export interface AssetResultsViewProps<T> {
   onDownloadClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onEditClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  onEditNameComplete: (asset: T, save: boolean) => void;
+  onEditNameComplete: (asset: T, save: boolean, value?: string) => void;
   editingAssetId?: string;
   editedName?: string;
   // Favorite functionality

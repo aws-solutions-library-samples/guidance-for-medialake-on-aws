@@ -15,7 +15,7 @@ interface AssetGridViewProps<T> {
   onDownloadClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onEditClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  onEditNameComplete: (asset: T, save: boolean) => void;
+  onEditNameComplete: (asset: T, save: boolean, value?: string) => void;
   editingAssetId?: string;
   editedName?: string;
   // Favorite functionality
@@ -110,7 +110,7 @@ function AssetGridView<T>({
               isEditing={editingAssetId === getAssetId(asset)}
               editedName={editedName}
               onEditNameChange={onEditNameChange}
-              onEditNameComplete={(save) => onEditNameComplete(asset, save)}
+              onEditNameComplete={(save, value) => onEditNameComplete(asset, save, value)}
               cardSize={cardSize}
               aspectRatio={aspectRatio}
               thumbnailScale={thumbnailScale}
@@ -160,7 +160,7 @@ function AssetGridView<T>({
                   isEditing={editingAssetId === getAssetId(asset)}
                   editedName={editedName}
                   onEditNameChange={onEditNameChange}
-                  onEditNameComplete={(save) => onEditNameComplete(asset, save)}
+                  onEditNameComplete={(save, value) => onEditNameComplete(asset, save, value)}
                   cardSize={cardSize}
                   aspectRatio={aspectRatio}
                   thumbnailScale={thumbnailScale}

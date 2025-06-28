@@ -42,7 +42,7 @@ interface ModularUnifiedResultsViewProps {
   onMenuClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onEditClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  onEditNameComplete: (asset: AssetItem, save: boolean) => void;
+  onEditNameComplete: (asset: AssetItem, save: boolean, value?: string) => void;
   editingAssetId?: string;
   editedName?: string;
   // Favorite functionality

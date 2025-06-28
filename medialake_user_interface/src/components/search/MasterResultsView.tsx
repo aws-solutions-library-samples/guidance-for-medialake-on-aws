@@ -70,7 +70,7 @@ interface MasterResultsViewProps {
   onMenuClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onEditClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  onEditNameComplete: (asset: AssetItem, save: boolean) => void;
+  onEditNameComplete: (asset: AssetItem, save: boolean, value?: string) => void;
   onSelectToggle?: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onFavoriteToggle?: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   
