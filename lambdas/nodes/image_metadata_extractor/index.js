@@ -240,7 +240,7 @@ exports.lambda_handler = async (event) => {
       removeBase64Fields(cleaned);
   
       const forced      = forceAllObjects(cleaned);
-      const newMeta     = { CustomMetadata: forced };
+      const newMeta     = { EmbeddedMetadata: forced };
       const converted   = convertFloatsToDecimals(newMeta);
       const marshalled  = AWS.DynamoDB.Converter.marshall(converted);
   
