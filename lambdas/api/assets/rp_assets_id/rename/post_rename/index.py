@@ -42,6 +42,7 @@ class RenameRequest(BaseModel):
     """Request model for rename operation"""
 
     newName: str = Field(..., description="New name for the asset")
+    updatePathsOnly: bool = Field(False, description="If true, only update DynamoDB paths without moving S3 objects")
 
 
 class AssetRenameError(Exception):
@@ -57,7 +58,12 @@ class AssetRenameError(Exception):
 @tracer.capture_method
 def validate_name(name: str) -> None:
     """
-    Validates the asset name format.
+    Validates the asset name format according to S3 object key requirements.
+    
+    S3 allows most Unicode characters except:
+    - Null bytes (\x00)
+    - Control characters (\x01-\x1F, \x7F-\x9F)
+    - Some problematic characters for URLs and file systems
 
     Args:
         name: The name to validate
@@ -68,11 +74,32 @@ def validate_name(name: str) -> None:
     if not name or not isinstance(name, str):
         raise AssetRenameError("Invalid name format", HTTPStatus.BAD_REQUEST)
 
-    # Add additional name validation rules as needed
-    if not re.match(r"^[a-zA-Z0-9_\-\.\/\!\*\'\(\) ]+$", name):
+    # Check for null bytes and control characters
+    if any(ord(c) < 32 or ord(c) == 127 for c in name):
         raise AssetRenameError(
-            "Name can only contain alphanumeric characters, underscores, hyphens, dots, "
-            "forward slashes, exclamation points, asterisks, single quotes, parentheses, and spaces",
+            "Name cannot contain control characters or null bytes",
+            HTTPStatus.BAD_REQUEST,
+        )
+    
+    # Check for problematic characters that could cause issues
+    problematic_chars = ['\x00', '\r', '\n', '\t']
+    if any(char in name for char in problematic_chars):
+        raise AssetRenameError(
+            "Name contains invalid characters",
+            HTTPStatus.BAD_REQUEST,
+        )
+    
+    # Prevent path traversal and other security issues
+    if ".." in name or name.startswith("/") or name.endswith("/"):
+        raise AssetRenameError(
+            "Name cannot contain '..' sequences or start/end with forward slashes",
+            HTTPStatus.BAD_REQUEST,
+        )
+    
+    # Check length (S3 limit is 1024 bytes for object keys)
+    if len(name.encode('utf-8')) > 1024:
+        raise AssetRenameError(
+            "Name is too long (maximum 1024 bytes)",
             HTTPStatus.BAD_REQUEST,
         )
 
@@ -92,9 +119,29 @@ def get_asset(inventory_id: str) -> Dict[str, Any]:
     Retrieves asset details with proper path information.
     """
     try:
-        response = table.get_item(Key={"InventoryID": inventory_id})
+        logger.info(
+            "Retrieving asset from DynamoDB",
+            extra={
+                "inventory_id": inventory_id,
+                "operation": "get_asset"
+            }
+        )
+        
+        # Use consistent read to avoid eventual consistency issues
+        response = table.get_item(
+            Key={"InventoryID": inventory_id},
+            ConsistentRead=True
+        )
 
         if "Item" not in response:
+            logger.error(
+                "Asset not found in DynamoDB",
+                extra={
+                    "inventory_id": inventory_id,
+                    "operation": "get_asset",
+                    "dynamodb_response_keys": list(response.keys())
+                }
+            )
             raise AssetRenameError(
                 f"Asset with ID {inventory_id} not found", HTTPStatus.NOT_FOUND
             )
@@ -118,22 +165,68 @@ def get_asset(inventory_id: str) -> Dict[str, Any]:
                 ].get("ObjectKey"),
             ]
         ):
+            logger.error(
+                "Asset has invalid structure",
+                extra={
+                    "inventory_id": inventory_id,
+                    "operation": "get_asset",
+                    "has_digital_source": bool(asset.get("DigitalSourceAsset")),
+                    "has_main_rep": bool(asset.get("DigitalSourceAsset", {}).get("MainRepresentation")),
+                }
+            )
             raise AssetRenameError("Invalid asset location", HTTPStatus.BAD_REQUEST)
+
+        logger.info(
+            "Successfully retrieved asset",
+            extra={
+                "inventory_id": inventory_id,
+                "operation": "get_asset",
+                "has_derived_reps": len(asset["DigitalSourceAsset"].get("DerivedRepresentations", []))
+            }
+        )
 
         return asset
 
     except ClientError as e:
-        logger.error(f"DynamoDB error: {str(e)}")
+        logger.error(
+            "DynamoDB error retrieving asset",
+            extra={
+                "inventory_id": inventory_id,
+                "error_code": e.response.get("Error", {}).get("Code", "Unknown"),
+                "error_message": str(e),
+                "operation": "get_asset"
+            }
+        )
         raise AssetRenameError(f"Failed to retrieve asset: {str(e)}")
 
 
 def get_object_name_from_path(full_path: str) -> str:
-    """Extracts the object name from the full path."""
-    return full_path.split("/")[-1]
+    """Extracts the object name from the full path with validation."""
+    if not full_path or not isinstance(full_path, str):
+        raise ValueError("Invalid path provided")
+    
+    # Remove trailing slashes and split
+    clean_path = full_path.rstrip('/')
+    if not clean_path:
+        raise ValueError("Empty path after cleaning")
+    
+    return clean_path.split("/")[-1]
 
 def get_object_path(full_path: str) -> str:
-    """Extracts the object path from the full path."""
-    return full_path.rsplit("/",1)[0]
+    """Extracts the directory path from the full path."""
+    if not full_path or not isinstance(full_path, str):
+        raise ValueError("Invalid path provided")
+    
+    # Remove trailing slashes
+    clean_path = full_path.rstrip('/')
+    if not clean_path:
+        return ""  # Root level
+    
+    # If no slash, it's at root level
+    if '/' not in clean_path:
+        return ""
+    
+    return clean_path.rsplit("/", 1)[0]
 
 
 @tracer.capture_method
@@ -191,7 +284,20 @@ def copy_s3_object_with_tags(
             )
 
         except ClientError as e:
-            logger.warning(f"Could not get tags for {source_key}: {str(e)}")
+            error_code = e.response.get("Error", {}).get("Code", "Unknown")
+            if error_code in ["AccessDenied", "NoSuchTagSet"]:
+                logger.info(
+                    f"Cannot access tags for {source_key} (error: {error_code}), using default tags",
+                    extra={
+                        "source_key": source_key,
+                        "error_code": error_code,
+                        "inventory_id": inventory_id,
+                        "operation": "get_object_tagging_fallback"
+                    }
+                )
+            else:
+                logger.warning(f"Could not get tags for {source_key}: {str(e)}")
+            
             # If we can't get existing tags, set required tags
             tags = [{"Key": "AssetID", "Value": inventory_id}]
             if is_master and master_id:
@@ -261,6 +367,46 @@ def copy_s3_objects(asset: Dict[str, Any], new_name: str) -> List[Dict[str, Any]
         source_bucket = main_storage["Bucket"]
         source_path = main_storage["ObjectKey"]["FullPath"]
 
+        # Validate that the source object actually exists before attempting copy
+        if not check_object_exists(source_bucket, source_path):
+            logger.error(
+                f"Source object does not exist in S3 at expected location",
+                extra={
+                    "source_bucket": source_bucket,
+                    "source_path": source_path,
+                    "inventory_id": inventory_id,
+                    "operation": "source_validation_failed"
+                }
+            )
+            
+            # Try to find the file at the target location (in case previous rename failed to update DynamoDB)
+            new_object_name = get_object_name_from_path(new_name)
+            base_directory = get_object_path(source_path)
+            potential_source_path = f"{base_directory}/{new_object_name}" if base_directory else new_object_name
+            
+            if check_object_exists(source_bucket, potential_source_path):
+                logger.info(
+                    f"Found source file at target location - DynamoDB may be out of sync",
+                    extra={
+                        "expected_path": source_path,
+                        "found_at_path": potential_source_path,
+                        "inventory_id": inventory_id,
+                        "operation": "source_found_at_target"
+                    }
+                )
+                # Update the source path to the actual location
+                source_path = potential_source_path
+                # Update the asset record to reflect reality
+                main_storage["ObjectKey"]["FullPath"] = source_path
+                main_storage["ObjectKey"]["Name"] = new_object_name
+                main_rep["Name"] = new_object_name
+            else:
+                raise AssetRenameError(
+                    f"Source file not found at expected location ({source_path}) or target location ({potential_source_path}). "
+                    f"This indicates a data inconsistency between DynamoDB and S3.",
+                    HTTPStatus.NOT_FOUND
+                )
+
         # Extract the object name from the new_name (in case it contains path elements)
         new_object_name = get_object_name_from_path(new_name)
         
@@ -271,13 +417,52 @@ def copy_s3_objects(asset: Dict[str, Any], new_name: str) -> List[Dict[str, Any]
         base_directory = get_object_path(source_path)
         
         # Create new path with just the parent directory and new filename
-        new_path = f"{base_directory}/{new_object_name}"
+        if base_directory:
+            new_path = f"{base_directory}/{new_object_name}"
+        else:
+            new_path = new_object_name
+            
+        logger.info(
+            "Constructed new path for main representation",
+            extra={
+                "source_path": source_path,
+                "base_directory": base_directory,
+                "new_object_name": new_object_name,
+                "new_path": new_path,
+                "operation": "path_construction"
+            }
+        )
 
-        # Check if main representation already exists
+        # Check if target already exists (but handle orphaned files from failed deletions)
         if check_object_exists(source_bucket, new_path):
-            raise AssetRenameError(
-                f"An object with the name {new_object_name} already exists",
-                HTTPStatus.CONFLICT,
+            # If target exists, check if it's an orphaned file from a previous failed deletion
+            logger.warning(
+                f"Target object {new_path} already exists - this may be from a previous failed deletion",
+                extra={
+                    "source_path": source_path,
+                    "new_path": new_path,
+                    "operation": "orphaned_file_detected"
+                }
+            )
+            
+            # For now, we'll allow the operation to proceed and overwrite
+            # The copy operation will replace the orphaned file
+            logger.info(
+                "Proceeding with rename - will overwrite existing target",
+                extra={
+                    "source_path": source_path,
+                    "new_path": new_path,
+                    "operation": "overwrite_orphaned_file"
+                }
+            )
+        else:
+            logger.info(
+                "Target path is clear, proceeding with rename",
+                extra={
+                    "source_path": source_path,
+                    "new_path": new_path,
+                    "operation": "rename_proceed"
+                }
             )
 
         logger.info(
@@ -317,25 +502,61 @@ def copy_s3_objects(asset: Dict[str, Any], new_name: str) -> List[Dict[str, Any]
             derived_bucket = storage["Bucket"]
             derived_path = storage["ObjectKey"]["FullPath"]
             
-            # Get derived name possibly with the same naming pattern as main object
-            derived_name = get_object_name_from_path(derived_path)
-            derived_name_parts = derived_name.split(".")
-            base_name_parts = get_object_name_from_path(source_path).split(".")
-            
-            # Create new derived name with the same extension and pattern
-            if len(derived_name_parts) > 1 and len(base_name_parts) > 1:
-                # If there are extensions, preserve them
-                new_derived_name = new_object_name
-                # If the derived name has a different extension, keep it
-                if derived_name_parts[-1] != base_name_parts[-1]:
-                    # Split by extensions
-                    derived_ext = ".".join(derived_name_parts[-(len(derived_name_parts)-len(base_name_parts)+1):])
-                    new_derived_base = ".".join(new_object_name.split(".")[:-1])
-                    new_derived_name = f"{new_derived_base}.{derived_ext}"
-            else:
-                new_derived_name = derived_name.replace(get_object_name_from_path(source_path), new_object_name)
+            # Simplified derived name generation to prevent path construction errors
+            try:
+                original_name = get_object_name_from_path(source_path)
+                derived_name = get_object_name_from_path(derived_path)
                 
-            new_derived_path = f"{get_object_path(derived_path)}/{new_derived_name}"
+                logger.info(
+                    "Processing derived representation naming",
+                    extra={
+                        "original_name": original_name,
+                        "derived_name": derived_name,
+                        "new_object_name": new_object_name,
+                        "derived_index": idx,
+                    }
+                )
+                
+                # Simple replacement approach - if original name is part of derived name, replace it
+                if original_name in derived_name:
+                    new_derived_name = derived_name.replace(original_name, new_object_name)
+                else:
+                    # Fallback: use new name with derived extension if different
+                    original_parts = original_name.split('.')
+                    derived_parts = derived_name.split('.')
+                    new_parts = new_object_name.split('.')
+                    
+                    if len(derived_parts) > 1 and len(original_parts) > 1:
+                        # If derived has different extension, preserve it
+                        if derived_parts[-1] != original_parts[-1]:
+                            new_base = '.'.join(new_parts[:-1]) if len(new_parts) > 1 else new_object_name
+                            new_derived_name = f"{new_base}.{derived_parts[-1]}"
+                        else:
+                            new_derived_name = new_object_name
+                    else:
+                        new_derived_name = new_object_name
+                
+                # Construct new path safely
+                derived_base_path = get_object_path(derived_path)
+                if derived_base_path:
+                    new_derived_path = f"{derived_base_path}/{new_derived_name}"
+                else:
+                    new_derived_path = new_derived_name
+                    
+            except Exception as e:
+                logger.error(
+                    f"Error constructing derived name for index {idx}",
+                    extra={
+                        "error": str(e),
+                        "derived_path": derived_path,
+                        "source_path": source_path,
+                        "new_object_name": new_object_name,
+                    }
+                )
+                # Fallback to simple naming
+                new_derived_name = f"{new_object_name}_derived_{idx}"
+                derived_base_path = get_object_path(derived_path)
+                new_derived_path = f"{derived_base_path}/{new_derived_name}" if derived_base_path else new_derived_name
 
             # Update object name in DynamoDB
             derived["Name"] = new_derived_name
@@ -389,45 +610,69 @@ def copy_s3_objects(asset: Dict[str, Any], new_name: str) -> List[Dict[str, Any]
 @tracer.capture_method
 def cleanup_copied_objects(copies: List[Dict[str, Any]]) -> None:
     """Deletes any successfully copied objects during rollback."""
-    for copy in copies:
+    if not copies:
+        return
+        
+    logger.info(
+        f"Starting cleanup of {len(copies)} copied objects",
+        extra={"operation": "cleanup_rollback", "object_count": len(copies)}
+    )
+    
+    cleanup_errors = []
+    for i, copy in enumerate(copies):
         try:
             s3.delete_object(Bucket=copy["bucket"], Key=copy["key"])
+            logger.info(
+                f"Successfully cleaned up copied object {i+1}/{len(copies)}",
+                extra={
+                    "bucket": copy["bucket"],
+                    "key": copy["key"],
+                    "operation": "cleanup_success"
+                }
+            )
         except ClientError as e:
-            logger.error(f"Failed to cleanup copied object: {str(e)}")
+            error_msg = f"Failed to cleanup copied object {copy['bucket']}/{copy['key']}: {str(e)}"
+            logger.error(error_msg)
+            cleanup_errors.append(error_msg)
+    
+    if cleanup_errors:
+        logger.error(
+            f"Cleanup completed with {len(cleanup_errors)} errors",
+            extra={
+                "operation": "cleanup_completed_with_errors",
+                "error_count": len(cleanup_errors),
+                "errors": cleanup_errors
+            }
+        )
+    else:
+        logger.info(
+            "All copied objects cleaned up successfully",
+            extra={"operation": "cleanup_completed_success"}
+        )
 
 
 @tracer.capture_method
 def delete_original_objects(asset: Dict[str, Any]) -> None:
-    """Deletes original objects after successful copy."""
+    """Deletes original objects after successful copy with improved error handling."""
+    deletion_errors = []
+    objects_to_delete = []
+    
     try:
-        # Delete main representation
+        # Collect all objects to delete first
         main_storage = asset["DigitalSourceAsset"]["MainRepresentation"]["StorageInfo"][
             "PrimaryLocation"
         ]
         main_bucket = main_storage["Bucket"]
         main_key = main_storage["ObjectKey"]["FullPath"]
+        
+        objects_to_delete.append({
+            "bucket": main_bucket,
+            "key": main_key,
+            "type": "main",
+            "index": 0
+        })
 
-        logger.info(
-            "Deleting main representation",
-            extra={
-                "bucket": main_bucket,
-                "key": main_key,
-                "operation": "delete_main_representation",
-            },
-        )
-
-        s3.delete_object(Bucket=main_bucket, Key=main_key)
-
-        logger.info(
-            "Successfully deleted main representation",
-            extra={
-                "bucket": main_bucket,
-                "key": main_key,
-                "operation": "delete_main_representation_success",
-            },
-        )
-
-        # Delete derived representations
+        # Add derived representations
         for idx, derived in enumerate(
             asset["DigitalSourceAsset"].get("DerivedRepresentations", [])
         ):
@@ -441,39 +686,96 @@ def delete_original_objects(asset: Dict[str, Any]) -> None:
             storage = derived["StorageInfo"]["PrimaryLocation"]
             derived_bucket = storage["Bucket"]
             derived_key = storage["ObjectKey"]["FullPath"]
+            
+            objects_to_delete.append({
+                "bucket": derived_bucket,
+                "key": derived_key,
+                "type": "derived",
+                "index": idx
+            })
 
-            logger.info(
-                f"Deleting derived representation {idx + 1}",
-                extra={
-                    "derived_index": idx,
-                    "bucket": derived_bucket,
-                    "key": derived_key,
-                    "operation": "delete_derived_representation",
-                },
-            )
-
-            s3.delete_object(Bucket=derived_bucket, Key=derived_key)
-
-            logger.info(
-                f"Successfully deleted derived representation {idx + 1}",
-                extra={
-                    "derived_index": idx,
-                    "bucket": derived_bucket,
-                    "key": derived_key,
-                    "operation": "delete_derived_representation_success",
-                },
-            )
-
-    except ClientError as e:
-        logger.error(
-            "Failed to delete original objects",
+        logger.info(
+            f"Starting deletion of {len(objects_to_delete)} original objects",
             extra={
-                "error_code": e.response["Error"]["Code"],
-                "error_message": e.response["Error"]["Message"],
-                "operation": "delete_error",
+                "total_objects": len(objects_to_delete),
+                "operation": "delete_original_objects_start"
+            }
+        )
+
+        # Delete objects one by one with individual error handling
+        for obj in objects_to_delete:
+            try:
+                logger.info(
+                    f"Deleting {obj['type']} representation",
+                    extra={
+                        "bucket": obj["bucket"],
+                        "key": obj["key"],
+                        "type": obj["type"],
+                        "index": obj["index"],
+                        "operation": f"delete_{obj['type']}_representation",
+                    },
+                )
+
+                s3.delete_object(Bucket=obj["bucket"], Key=obj["key"])
+
+                logger.info(
+                    f"Successfully deleted {obj['type']} representation",
+                    extra={
+                        "bucket": obj["bucket"],
+                        "key": obj["key"],
+                        "type": obj["type"],
+                        "index": obj["index"],
+                        "operation": f"delete_{obj['type']}_representation_success",
+                    },
+                )
+
+            except ClientError as e:
+                error_msg = f"Failed to delete {obj['type']} object {obj['bucket']}/{obj['key']}: {str(e)}"
+                logger.error(
+                    error_msg,
+                    extra={
+                        "bucket": obj["bucket"],
+                        "key": obj["key"],
+                        "type": obj["type"],
+                        "index": obj["index"],
+                        "error_code": e.response.get("Error", {}).get("Code", "Unknown"),
+                        "operation": f"delete_{obj['type']}_error",
+                    },
+                )
+                deletion_errors.append(error_msg)
+
+        # Report results
+        if deletion_errors:
+            logger.error(
+                f"Deletion completed with {len(deletion_errors)} errors out of {len(objects_to_delete)} objects",
+                extra={
+                    "total_objects": len(objects_to_delete),
+                    "error_count": len(deletion_errors),
+                    "success_count": len(objects_to_delete) - len(deletion_errors),
+                    "errors": deletion_errors,
+                    "operation": "delete_completed_with_errors",
+                },
+            )
+            # Don't raise error - partial success is acceptable for delete operations
+            # The copy was successful and DynamoDB will be updated
+        else:
+            logger.info(
+                f"Successfully deleted all {len(objects_to_delete)} original objects",
+                extra={
+                    "total_objects": len(objects_to_delete),
+                    "operation": "delete_completed_success",
+                }
+            )
+
+    except Exception as e:
+        logger.error(
+            "Unexpected error during deletion process",
+            extra={
+                "error": str(e),
+                "operation": "delete_unexpected_error",
             },
         )
-        raise AssetRenameError("Failed to delete original objects after copy")
+        # Don't raise error - the copy was successful, deletion failure shouldn't fail the rename
 
 
 @tracer.capture_method
@@ -575,7 +877,10 @@ def lambda_handler(
         # Parse request body
         try:
             body = json.loads(event.get("body", "{}"))
-            rename_request = RenameRequest(newName=body.get("newName"))
+            rename_request = RenameRequest(
+                newName=body.get("newName"),
+                updatePathsOnly=body.get("updatePathsOnly", False)
+            )
         except (json.JSONDecodeError, ValueError) as e:
             raise AssetRenameError(
                 f"Invalid request body: {str(e)}", HTTPStatus.BAD_REQUEST
@@ -587,14 +892,101 @@ def lambda_handler(
         # Get asset
         asset = get_asset(inventory_id)
 
-        # Copy all objects with new names
-        successful_copies = copy_s3_objects(asset, rename_request.newName)
+        logger.info(
+            f"Starting asset rename operation",
+            extra={
+                "inventory_id": inventory_id,
+                "new_name": rename_request.newName,
+                "update_paths_only": rename_request.updatePathsOnly,
+                "operation": "rename_start"
+            }
+        )
 
-        # Delete original objects
-        delete_original_objects(asset)
+        if rename_request.updatePathsOnly:
+            # Mode 1: Only update DynamoDB paths without moving S3 objects
+            logger.info(
+                "Performing paths-only rename (no S3 operations)",
+                extra={
+                    "inventory_id": inventory_id,
+                    "operation": "paths_only_rename"
+                }
+            )
+            
+            # Update asset record with new paths
+            updated_asset = update_asset_paths(asset, rename_request.newName)
+            
+            logger.info(
+                "Paths-only rename completed successfully",
+                extra={
+                    "inventory_id": inventory_id,
+                    "operation": "paths_only_rename_success"
+                }
+            )
+        else:
+            # Mode 2: Full rename with S3 copy+delete operations
+            logger.info(
+                "Performing full rename with S3 copy+delete",
+                extra={
+                    "inventory_id": inventory_id,
+                    "operation": "full_rename"
+                }
+            )
+            
+            successful_copies = []
+            try:
+                # Copy all objects with new names
+                successful_copies = copy_s3_objects(asset, rename_request.newName)
 
-        # Update asset record with new paths
-        updated_asset = update_asset_paths(asset, rename_request.newName)
+                # Update asset record with new paths BEFORE deleting originals
+                # This ensures DynamoDB is consistent even if deletion fails
+                updated_asset = update_asset_paths(asset, rename_request.newName)
+
+                # Delete original objects - now with better error handling
+                try:
+                    delete_original_objects(asset)
+                    logger.info(
+                        "Full rename completed successfully",
+                        extra={
+                            "inventory_id": inventory_id,
+                            "copied_objects": len(successful_copies),
+                            "operation": "full_rename_success"
+                        }
+                    )
+                except Exception as delete_error:
+                    # Log deletion failure but don't fail the entire operation
+                    # The copy and DynamoDB update were successful
+                    logger.error(
+                        f"Deletion failed during rename - original files may still exist",
+                        extra={
+                            "inventory_id": inventory_id,
+                            "copied_objects": len(successful_copies),
+                            "deletion_error": str(delete_error),
+                            "operation": "deletion_failed_non_fatal"
+                        }
+                    )
+                    # Continue with success since copy and DB update worked
+                    logger.info(
+                        "Rename completed with deletion warnings - copied objects exist at new location",
+                        extra={
+                            "inventory_id": inventory_id,
+                            "operation": "rename_success_with_warnings"
+                        }
+                    )
+
+            except Exception as e:
+                # If anything fails after copying, clean up the copied objects
+                if successful_copies:
+                    logger.error(
+                        f"Rename failed after copying {len(successful_copies)} objects, initiating rollback",
+                        extra={
+                            "inventory_id": inventory_id,
+                            "error": str(e),
+                            "copied_objects": len(successful_copies),
+                            "operation": "rename_rollback"
+                        }
+                    )
+                    cleanup_copied_objects(successful_copies)
+                raise
 
         # Record successful rename metric
         metrics.add_metric(name="AssetRenames", unit=MetricUnit.Count, value=1)

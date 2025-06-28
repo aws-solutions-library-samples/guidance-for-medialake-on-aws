@@ -536,6 +536,8 @@ class AssetsConstruct(Construct):
                     "s3:DeleteObject",
                     "s3:ListBucket",
                     "s3:PutObjectTagging",
+                    "s3:GetObjectTagging",  # Add missing permission for reading object tags
+                    "s3:CopyObject",  # Add missing permission for copying objects
                 ],
                 resources=[
                     "arn:aws:s3:::*/*",  # Access to all objects in all buckets
