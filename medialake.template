@@ -28,7 +28,7 @@ Parameters:
   PipelineName:
     Description: Name of the CodePipeline
     Type: String
-    Default: CDKDeploymentPipeline
+    Default: MediaLakeCDKPipeline
   
   NodejsVersion:
     Description: Node.js version to use for frontend
