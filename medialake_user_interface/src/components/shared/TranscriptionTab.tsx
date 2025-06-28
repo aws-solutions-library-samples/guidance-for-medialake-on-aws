@@ -14,7 +14,11 @@ import {
     Tooltip,
     Divider,
     Badge,
-    Collapse
+    Collapse,
+    Menu,
+    MenuItem,
+    ListItemIcon,
+    ListItemText
 } from '@mui/material';
 import { TranscriptionResponse } from '../../api/hooks/useAssets';
 import MarkdownRenderer from '../common/MarkdownRenderer';
@@ -28,8 +32,15 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PersonIcon from '@mui/icons-material/Person';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import LanguageIcon from '@mui/icons-material/Language';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
 
 // Types
+interface TranscriptWordAlternative {
+    content: string;
+    confidence: number;
+}
+
 interface TranscriptWord {
     id: number;
     content: string;
@@ -37,6 +48,12 @@ interface TranscriptWord {
     endTime: number;
     confidence: number;
     type: 'pronunciation' | 'punctuation';
+    alternatives?: TranscriptWordAlternative[];
+}
+
+interface LanguageIdentification {
+    code: string;
+    score: number;
 }
 
 interface TranscriptSegment {
@@ -73,10 +90,21 @@ interface TranscriptionTabProps {
 // Custom hooks
 const useTranscriptProcessor = (transcriptionData: TranscriptionResponse | undefined) => {
     return useMemo(() => {
-        if (!transcriptionData?.data?.results) return { segments: [], speakers: [] };
+        if (!transcriptionData?.data?.results) return { segments: [], speakers: [], languageData: null };
 
         const items = transcriptionData.data.results.items || [];
         const audioSegments = (transcriptionData.data.results as any).audio_segments || [];
+        const languageCode = transcriptionData.data.results.language_code;
+        const languageIdentification = (transcriptionData.data.results as any).language_identification || [];
+
+        // Process language detection data
+        const languageData = {
+            primaryLanguage: languageCode,
+            detectedLanguages: languageIdentification.map((lang: any) => ({
+                code: lang.code,
+                score: parseFloat(lang.score)
+            }))
+        };
 
         // If audio_segments exist, use them for better organization
         if (audioSegments.length > 0) {
@@ -90,7 +118,11 @@ const useTranscriptProcessor = (transcriptionData: TranscriptionResponse | undef
                         startTime: parseFloat(String(item.start_time || '0')),
                         endTime: parseFloat(String(item.end_time || '0')),
                         confidence: parseFloat(item.alternatives?.[0]?.confidence || '0'),
-                        type: item.type as 'pronunciation' | 'punctuation'
+                        type: item.type as 'pronunciation' | 'punctuation',
+                        alternatives: item.alternatives?.map((alt: any) => ({
+                            content: alt.content,
+                            confidence: parseFloat(alt.confidence || '0')
+                        })) || []
                     }));
 
                 return {
@@ -104,7 +136,7 @@ const useTranscriptProcessor = (transcriptionData: TranscriptionResponse | undef
             });
 
             const speakers = Array.from(new Set(segments.map(s => s.speaker).filter(Boolean)));
-            return { segments, speakers };
+            return { segments, speakers, languageData };
         }
 
         // Fallback: create segments from individual items
@@ -120,7 +152,11 @@ const useTranscriptProcessor = (transcriptionData: TranscriptionResponse | undef
                 startTime: parseFloat(String(item.start_time || '0')),
                 endTime: parseFloat(String(item.end_time || '0')),
                 confidence: parseFloat(item.alternatives?.[0]?.confidence || '0'),
-                type: item.type as 'pronunciation' | 'punctuation'
+                type: item.type as 'pronunciation' | 'punctuation',
+                alternatives: item.alternatives?.map((alt: any) => ({
+                    content: alt.content,
+                    confidence: parseFloat(alt.confidence || '0')
+                })) || []
             }));
 
             if (words.length > 0) {
@@ -136,7 +172,7 @@ const useTranscriptProcessor = (transcriptionData: TranscriptionResponse | undef
         }
 
         const speakers = Array.from(new Set(segments.map(s => s.speaker).filter(Boolean)));
-        return { segments, speakers };
+        return { segments, speakers, languageData };
     }, [transcriptionData]);
 };
 
@@ -180,18 +216,98 @@ const useCurrentWordHighlight = (currentTime: number, segments: TranscriptSegmen
     return useMemo(() => {
         if (!currentTime) return null;
 
+        let closestWord = null;
+        let closestDistance = Infinity;
+
         for (const segment of segments) {
             for (const word of segment.words) {
+                // Check if current time is within the word's time range
                 if (currentTime >= word.startTime && currentTime <= word.endTime) {
                     return { segmentId: segment.id, wordId: word.id };
                 }
+                
+                // If not exact match, find the closest word for better UX
+                // This helps when seeking to a word's start time
+                const distanceToStart = Math.abs(currentTime - word.startTime);
+                const distanceToMid = Math.abs(currentTime - (word.startTime + word.endTime) / 2);
+                const minDistance = Math.min(distanceToStart, distanceToMid);
+                
+                if (minDistance < closestDistance && minDistance < 0.1) { // Within 100ms tolerance
+                    closestDistance = minDistance;
+                    closestWord = { segmentId: segment.id, wordId: word.id };
+                }
             }
         }
-        return null;
+        
+        return closestWord;
     }, [currentTime, segments]);
 };
 
 // Components
+const LanguageDetectionInfo: React.FC<{
+    languageData: {
+        primaryLanguage: string;
+        detectedLanguages: LanguageIdentification[];
+    } | null;
+}> = ({ languageData }) => {
+    const theme = useTheme();
+    
+    if (!languageData || !languageData.detectedLanguages.length) return null;
+
+    const primaryLang = languageData.detectedLanguages[0];
+    const hasMultipleLanguages = languageData.detectedLanguages.length > 1;
+
+    return (
+        <Paper elevation={0} sx={{
+            mb: 2,
+            p: 1.5,
+            backgroundColor: alpha(theme.palette.background.paper, 0.5),
+            borderRadius: 1,
+            border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
+        }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <LanguageIcon sx={{ fontSize: 16, color: theme.palette.text.secondary }} />
+                <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                    Language Detection:
+                </Typography>
+                <Chip
+                    label={`${primaryLang.code} (${Math.round(primaryLang.score * 100)}%)`}
+                    size="small"
+                    sx={{
+                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                        color: theme.palette.primary.main,
+                        fontSize: '0.7rem'
+                    }}
+                />
+                {hasMultipleLanguages && (
+                    <Tooltip title={
+                        <Box>
+                            <Typography variant="caption" sx={{ fontWeight: 600, display: 'block' }}>
+                                Other detected languages:
+                            </Typography>
+                            {languageData.detectedLanguages.slice(1, 4).map((lang, index) => (
+                                <Typography key={index} variant="caption" sx={{ display: 'block' }}>
+                                    {lang.code}: {Math.round(lang.score * 100)}%
+                                </Typography>
+                            ))}
+                        </Box>
+                    }>
+                        <Chip
+                            label={`+${languageData.detectedLanguages.length - 1} more`}
+                            size="small"
+                            sx={{
+                                backgroundColor: alpha(theme.palette.secondary.main, 0.1),
+                                color: theme.palette.secondary.main,
+                                fontSize: '0.7rem'
+                            }}
+                        />
+                    </Tooltip>
+                )}
+            </Box>
+        </Paper>
+    );
+};
+
 const TranscriptWord: React.FC<{
     word: TranscriptWord;
     isHighlighted: boolean;
@@ -199,29 +315,121 @@ const TranscriptWord: React.FC<{
     onSeek: (time: number) => void;
 }> = ({ word, isHighlighted, isSearchMatch, onSeek }) => {
     const theme = useTheme();
+    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+    const [isHovered, setIsHovered] = useState(false);
+    
+    // Determine confidence level
+    const isLowConfidence = word.confidence < 0.8;
+    const isVeryLowConfidence = word.confidence < 0.6;
+    const hasAlternatives = word.alternatives && word.alternatives.length > 1;
+
+    const handleAlternativesClick = (event: React.MouseEvent<HTMLElement>) => {
+        event.stopPropagation(); // Prevent word seeking
+        setAnchorEl(event.currentTarget);
+    };
+
+    const handleClose = () => {
+        setAnchorEl(null);
+    };
+
+    const handleAlternativeSelect = (alternative: TranscriptWordAlternative) => {
+        // In a real implementation, this would update the transcript
+        // For now, we'll just close the menu
+        handleClose();
+        onSeek(word.startTime + 0.01);
+    };
 
     return (
-        <span
-            onClick={() => onSeek(word.startTime)}
-            style={{
-                cursor: 'pointer',
-                padding: '2px 4px',
-                borderRadius: '4px',
-                margin: '0 1px',
-                backgroundColor: isHighlighted 
-                    ? alpha(theme.palette.primary.main, 0.3)
-                    : isSearchMatch 
-                    ? alpha(theme.palette.warning.main, 0.2)
-                    : 'transparent',
-                color: isHighlighted ? theme.palette.primary.contrastText : 'inherit',
-                fontWeight: isHighlighted ? 600 : 'normal',
-                transition: 'all 0.2s ease-in-out',
-                display: 'inline-block'
-            }}
-            title={`${word.startTime.toFixed(1)}s - ${word.endTime.toFixed(1)}s (${Math.round(word.confidence * 100)}%)`}
-        >
-            {word.content}
-        </span>
+        <>
+            <span
+                onClick={() => onSeek(word.startTime + 0.01)}
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => setIsHovered(false)}
+                style={{
+                    cursor: 'pointer',
+                    padding: '2px 4px',
+                    borderRadius: '4px',
+                    margin: '0 1px',
+                    backgroundColor: isHighlighted
+                        ? alpha(theme.palette.primary.main, 0.3)
+                        : isSearchMatch
+                        ? alpha(theme.palette.warning.main, 0.2)
+                        : isVeryLowConfidence
+                        ? alpha(theme.palette.error.main, 0.1)
+                        : isLowConfidence
+                        ? alpha(theme.palette.warning.main, 0.1)
+                        : 'transparent',
+                    color: isHighlighted
+                        ? theme.palette.primary.contrastText
+                        : isVeryLowConfidence
+                        ? theme.palette.error.main
+                        : isLowConfidence
+                        ? theme.palette.warning.main
+                        : 'inherit',
+                    fontWeight: isHighlighted ? 600 : 'normal',
+                    fontStyle: isLowConfidence ? 'italic' : 'normal',
+                    textDecoration: isVeryLowConfidence ? 'underline dotted' : 'none',
+                    transition: 'all 0.2s ease-in-out',
+                    display: 'inline-block',
+                    position: 'relative'
+                }}
+                title={`${word.startTime.toFixed(1)}s - ${word.endTime.toFixed(1)}s (${Math.round(word.confidence * 100)}% confidence)${isLowConfidence ? ' - Low confidence' : ''}${hasAlternatives ? ' - Click icon for alternatives' : ''}`}
+            >
+                {word.content}
+                {hasAlternatives && (
+                    <IconButton
+                        size="small"
+                        onClick={handleAlternativesClick}
+                        sx={{
+                            ml: 0.3,
+                            p: 0.2,
+                            minWidth: 'auto',
+                            width: 16,
+                            height: 16,
+                            opacity: isHovered ? 1 : 0.4,
+                            transition: 'opacity 0.2s ease-in-out',
+                            '&:hover': {
+                                backgroundColor: alpha(theme.palette.primary.main, 0.1)
+                            }
+                        }}
+                        title="View alternative transcriptions"
+                    >
+                        <MoreVertIcon sx={{ fontSize: 12 }} />
+                    </IconButton>
+                )}
+            </span>
+            
+            {hasAlternatives && (
+                <Menu
+                    anchorEl={anchorEl}
+                    open={Boolean(anchorEl)}
+                    onClose={handleClose}
+                    PaperProps={{
+                        sx: { minWidth: 200 }
+                    }}
+                >
+                    <MenuItem disabled>
+                        <ListItemText
+                            primary="Alternative transcriptions:"
+                            primaryTypographyProps={{ variant: 'caption', fontWeight: 600 }}
+                        />
+                    </MenuItem>
+                    <Divider />
+                    {word.alternatives?.map((alternative, index) => (
+                        <MenuItem
+                            key={index}
+                            onClick={() => handleAlternativeSelect(alternative)}
+                            selected={alternative.content === word.content}
+                        >
+                            <ListItemText
+                                primary={alternative.content}
+                                secondary={`${Math.round(alternative.confidence * 100)}% confidence`}
+                            />
+                        </MenuItem>
+                    ))}
+                </Menu>
+            )}
+        </>
     );
 };
 
@@ -268,7 +476,7 @@ const TranscriptSegment: React.FC<{
                 </Typography>
                 <IconButton
                     size="small"
-                    onClick={() => onSeek(segment.startTime)}
+                    onClick={() => onSeek(segment.startTime + 0.01)}
                     sx={{ ml: 1 }}
                 >
                     <PlayArrowIcon fontSize="small" />
@@ -377,7 +585,7 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
     const transcriptRef = useRef<HTMLDivElement>(null);
     
     // Process transcript data
-    const { segments, speakers } = useTranscriptProcessor(transcriptionData);
+    const { segments, speakers, languageData } = useTranscriptProcessor(transcriptionData);
     
     // Search functionality
     const { searchQuery, setSearchQuery, searchResults } = useTranscriptSearch(segments);
@@ -512,6 +720,99 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
                     searchResults={searchResults}
                     onJumpToResult={handleJumpToResult}
                 />
+            )}
+            
+            {/* Language Detection */}
+            <LanguageDetectionInfo languageData={languageData} />
+            
+            {/* Confidence Legend */}
+            {segments.length > 0 && (
+                <Paper elevation={0} sx={{
+                    mb: 2,
+                    p: 1.5,
+                    backgroundColor: alpha(theme.palette.background.paper, 0.5),
+                    borderRadius: 1,
+                    border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
+                }}>
+                    <Typography variant="caption" sx={{ mb: 1, display: 'block', fontWeight: 600 }}>
+                        Confidence Indicators:
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <span style={{
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                fontSize: '0.75rem',
+                                backgroundColor: 'transparent'
+                            }}>
+                                Normal
+                            </span>
+                            <Typography variant="caption" color="text.secondary">
+                                ≥80% confidence
+                            </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <span style={{
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                fontSize: '0.75rem',
+                                fontStyle: 'italic',
+                                backgroundColor: alpha(theme.palette.warning.main, 0.1),
+                                color: theme.palette.warning.main
+                            }}>
+                                Low
+                            </span>
+                            <Typography variant="caption" color="text.secondary">
+                                60-79% confidence
+                            </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <span style={{
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                fontSize: '0.75rem',
+                                fontStyle: 'italic',
+                                textDecoration: 'underline dotted',
+                                backgroundColor: alpha(theme.palette.error.main, 0.1),
+                                color: theme.palette.error.main
+                            }}>
+                                Very Low
+                            </span>
+                            <Typography variant="caption" color="text.secondary">
+                                &lt;60% confidence
+                            </Typography>
+                        </Box>
+                        {/* <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                <span style={{
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    fontSize: '0.75rem',
+                                    backgroundColor: 'transparent'
+                                }}>
+                                    Word
+                                </span>
+                                <IconButton
+                                    size="small"
+                                    sx={{
+                                        ml: 0.3,
+                                        p: 0.2,
+                                        minWidth: 'auto',
+                                        width: 16,
+                                        height: 16,
+                                        opacity: 0.6
+                                    }}
+                                    disabled
+                                >
+                                    <MoreVertIcon sx={{ fontSize: 12 }} />
+                                </IconButton>
+                            </Box>
+                            <Typography variant="caption" color="text.secondary">
+                                Click icon for alternatives
+                            </Typography>
+                        </Box> */}
+                    </Box>
+                </Paper>
             )}
             
             {/* Speakers Info */}

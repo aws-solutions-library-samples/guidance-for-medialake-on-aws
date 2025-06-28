@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { useMediaController } from '../hooks/useMediaController';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
@@ -712,6 +713,16 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
     const { data: relatedVersionsData, isLoading: isLoadingRelated } = useRelatedVersions(id || '', relatedPage);
     const { data: transcriptionData, isLoading: isLoadingTranscription } = useTranscription(id || '');
     const [showHeader, setShowHeader] = useState(true);
+    
+    // Video media controller for transcript synchronization
+    const mediaController = useMediaController();
+    
+    // Register video element with media controller
+    useEffect(() => {
+        if (videoViewerRef.current) {
+            mediaController.registerVideoElement(videoViewerRef);
+        }
+    }, [mediaController]);
 
     const [expandedMetadata, setExpandedMetadata] = useState<{ [key: string]: boolean }>({});
     const [comments, setComments] = useState([
@@ -992,6 +1003,12 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
                         ref={videoViewerRef}
                         src={proxyUrl}
                         alt={assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID}
+                        onTimeUpdate={(time) => {
+                            mediaController.updateCurrentTime(time);
+                        }}
+                        onVideoElementReady={(ref) => {
+                            mediaController.registerVideoElement(ref);
+                        }}
                     />
                 </Paper>
             </Box>
@@ -1080,6 +1097,7 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
                                     isLoading={isLoadingTranscription}
                                     assetData={assetData}
                                     mediaType="video"
+                                    mediaController={mediaController}
                                 />
                             )}
                             {activeTab === 'related' && (

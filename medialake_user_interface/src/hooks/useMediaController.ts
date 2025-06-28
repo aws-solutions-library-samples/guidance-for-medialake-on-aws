@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { VideoViewerRef } from '../components/common/VideoViewer';
 
 export interface MediaController {
     currentTime: number;
@@ -7,6 +8,8 @@ export interface MediaController {
     seekTo: (time: number) => void;
     onTimeUpdate: (callback: (time: number) => void) => () => void;
     registerAudioElement: (audioElement: HTMLAudioElement) => void;
+    registerVideoElement: (videoViewerRef: React.RefObject<VideoViewerRef>) => void;
+    updateCurrentTime: (time: number) => void;
 }
 
 export const useMediaController = (): MediaController => {
@@ -14,6 +17,7 @@ export const useMediaController = (): MediaController => {
     const [duration, setDuration] = useState(0);
     const [isPlaying, setIsPlaying] = useState(false);
     const audioElementRef = useRef<HTMLAudioElement | null>(null);
+    const videoElementRef = useRef<React.RefObject<VideoViewerRef> | null>(null);
     const timeUpdateCallbacksRef = useRef<Set<(time: number) => void>>(new Set());
 
     const registerAudioElement = useCallback((audioElement: HTMLAudioElement) => {
@@ -52,6 +56,10 @@ export const useMediaController = (): MediaController => {
         if (audioElementRef.current) {
             audioElementRef.current.currentTime = time;
             setCurrentTime(time);
+        } else if (videoElementRef.current?.current) {
+            // Use the video viewer's seek method
+            videoElementRef.current.current.seek(time);
+            setCurrentTime(time);
         }
     }, []);
 
@@ -63,12 +71,23 @@ export const useMediaController = (): MediaController => {
         };
     }, []);
 
+    const registerVideoElement = useCallback((videoViewerRef: React.RefObject<VideoViewerRef>) => {
+        videoElementRef.current = videoViewerRef;
+    }, []);
+
+    const updateCurrentTime = useCallback((time: number) => {
+        setCurrentTime(time);
+        timeUpdateCallbacksRef.current.forEach(callback => callback(time));
+    }, []);
+
     return {
         currentTime,
         duration,
         isPlaying,
         seekTo,
         onTimeUpdate,
-        registerAudioElement
+        registerAudioElement,
+        registerVideoElement,
+        updateCurrentTime
     };
 };
