@@ -421,7 +421,7 @@ class CDKConfig(BaseModel):
 
     lambda_tail_warming: bool = False
     environment: str  # Used for retain decisions
-    deployment_size: DeploymentSize = DeploymentSize.MEDIUM  # NEW: Dynamic deployment sizing
+    opensearch_deployment_size: DeploymentSize = DeploymentSize.MEDIUM  # NEW: Dynamic deployment sizing
     resource_prefix: str
     resource_application_tag: str
     account_id: str
@@ -444,7 +444,7 @@ class CDKConfig(BaseModel):
             return self.opensearch_cluster_settings
         
         # Use preset based on deployment_size
-        preset_config = OpenSearchPresets.get_preset(self.deployment_size)
+        preset_config = OpenSearchPresets.get_preset(self.opensearch_deployment_size)
         return OpenSearchClusterSettings(**preset_config)
 
     @property
