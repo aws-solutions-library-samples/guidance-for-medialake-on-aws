@@ -51,12 +51,18 @@ class ConnectorsProps:
     asset_table_s3_path_index_arn: str
     asset_sync_job_table: dynamodb.TableV2
     asset_sync_engine_lambda: lambda_.Function
+    open_search_endpoint: str
+    opensearch_index: str
     ingest_event_bus: str | None
+    vpc_subnet_ids: str
+    security_group_id: str
     api_resource: str | None = None
     cognito_authorizer: str | None = None
     x_origin_verify_secret: secretsmanager.Secret | None = None
     system_settings_table_name: str | None = None
     system_settings_table_arn: str | None = None
+    
+
 
 
 
@@ -393,6 +399,28 @@ class ConnectorsConstruct(Construct):
             "IngestMediaProcessorLayer",
         )
 
+        # Prepare environment variables
+        env_vars = {
+            "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+            "MEDIALAKE_CONNECTOR_TABLE": self.connectors_table.table_arn,
+            "S3_CONNECTOR_LAMBDA": self.lambda_deployment.deployment_key,
+            "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
+            "INGEST_MEDIA_PROCESSOR_LAYER": ingest_media_processor_layer.layer.layer_version_arn,
+            "INGEST_EVENT_BUS": props.ingest_event_bus.event_bus_name,
+            "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
+            "MEDIALAKE_ASSET_TABLE_FILE_HASH_INDEX": props.asset_table_file_hash_index_arn,
+            "MEDIALAKE_ASSET_TABLE_ASSET_ID_INDEX": props.asset_table_asset_id_index_arn,
+            "MEDIALAKE_ASSET_TABLE_S3_PATH_INDEX": props.asset_table_s3_path_index_arn,
+            "RESOURCE_PREFIX": config.resource_prefix,
+            "RESOURCE_APPLICATION_TAG": config.resource_application_tag,
+            "REGION": config.primary_region,
+            "OPENSEARCH_ENDPOINT": props.open_search_endpoint,
+            "OPENSEARCH_INDEX": props.opensearch_index,
+            "INDEX_NAME": props.opensearch_index,
+            "OPENSEARCH_VPC_SUBNET_IDS": props.vpc_subnet_ids,
+            "OPENSEARCH_SECURITY_GROUP_ID": props.security_group_id,
+        }
+
         connector_s3_post_lambda = Lambda(
             self,
             "ConnectorS3PostLambda",
@@ -400,21 +428,7 @@ class ConnectorsConstruct(Construct):
                 name="connectors_s3_post",
                 entry="lambdas/api/connectors/s3/post_s3",
                 memory_size=256,
-                environment_variables={
-                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
-                    "MEDIALAKE_CONNECTOR_TABLE": self.connectors_table.table_arn,
-                    "S3_CONNECTOR_LAMBDA": self.lambda_deployment.deployment_key,
-                    "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
-                    "INGEST_MEDIA_PROCESSOR_LAYER": ingest_media_processor_layer.layer.layer_version_arn,
-                    "INGEST_EVENT_BUS": props.ingest_event_bus.event_bus_name,
-                    "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
-                    "MEDIALAKE_ASSET_TABLE_FILE_HASH_INDEX": props.asset_table_file_hash_index_arn,
-                    "MEDIALAKE_ASSET_TABLE_ASSET_ID_INDEX": props.asset_table_asset_id_index_arn,
-                    "MEDIALAKE_ASSET_TABLE_S3_PATH_INDEX": props.asset_table_s3_path_index_arn,
-                    "RESOURCE_PREFIX": config.resource_prefix,
-                    "RESOURCE_APPLICATION_TAG": config.resource_application_tag,
-                    "REGION": config.primary_region,
-                },
+                environment_variables=env_vars,
             ),
         )
 
@@ -464,6 +478,44 @@ class ConnectorsConstruct(Construct):
                     f"arn:aws:lambda:*:{account_id}:event-source-mapping:*",
                     "arn:aws:lambda:*:*:layer:*:*",
                 ],
+            )
+        )
+
+        # Add EC2 permissions for VPC Lambda creation
+        connector_s3_post_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "ec2:CreateNetworkInterface",
+                    "ec2:DescribeNetworkInterfaces",
+                    "ec2:DeleteNetworkInterface",
+                    "ec2:AttachNetworkInterface",
+                    "ec2:DetachNetworkInterface",
+                ],
+                resources=[
+                    f"arn:aws:ec2:{scope.region}:{account_id}:network-interface/*",
+                    f"arn:aws:ec2:{scope.region}:{account_id}:subnet/*",
+                    f"arn:aws:ec2:{scope.region}:{account_id}:security-group/*",
+                ],
+            )
+        )
+        
+        # These EC2 actions are used by Lambda when deploying it into a VPC.
+        # They allow the Lambda service to look up network configuration like VPCs, subnets, and security groups.
+        #
+        # These are **read-only** (describe) actions and do not allow modifying or deleting anything.
+        # Because of how AWS permissions work, "describe" actions **cannot** be restricted to specific ARNs.
+        # AWS requires that the `resources` field be set to `"*"` for these actions, since they operate across the account.
+        #
+        # It's safe to include these permissions because they only allow the Lambda to retrieve network info,
+        # which is necessary for it to be deployed into a VPC.
+        connector_s3_post_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "ec2:DescribeSecurityGroups",
+                    "ec2:DescribeSubnets",
+                    "ec2:DescribeVpcs",
+                ],
+                resources=["*"],  # Describe actions require * resource
             )
         )
 
