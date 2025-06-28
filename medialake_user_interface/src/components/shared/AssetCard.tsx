@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useFeatureFlag } from '@/utils/featureFlags';
-import { Box, Typography, IconButton, TextField, Button, CircularProgress, Checkbox } from '@mui/material';
+import { Box, Typography, IconButton, Button, CircularProgress, Checkbox } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
@@ -10,6 +10,7 @@ import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import { AssetAudio } from '../asset';
+import { InlineTextEditor } from '../common/InlineTextEditor';
 
 export interface AssetField {
     id: string;
@@ -78,10 +79,8 @@ const AssetCard: React.FC<AssetCardProps> = ({
     onSelectToggle,
     selectedSearchFields,
 }) => {
-    const [selectionRange, setSelectionRange] = useState<[number, number] | null>(null);
     const [isHovering, setIsHovering] = useState(false);
     const [isMenuClicked, setIsMenuClicked] = useState(false);
-    const inputRef = useRef<HTMLInputElement | null>(null);
     const cardRef = useRef<HTMLDivElement>(null);
 
     // Check if features are enabled
@@ -151,29 +150,6 @@ const AssetCard: React.FC<AssetCardProps> = ({
         };
     }, []);
 
-    useEffect(() => {
-        if (isEditing && inputRef.current) {
-            // Move caret to the beginning of the string
-            inputRef.current.focus();
-            inputRef.current.setSelectionRange(0, 0);
-            setSelectionRange([0, 0]);
-        }
-    }, [isEditing]);
-
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        // Remember where the user was typing
-        const start = e.target.selectionStart ?? 0;
-        const end = e.target.selectionEnd ?? start;
-        onEditNameChange?.(e);
-        setSelectionRange([start, end]);
-    };
-
-    useEffect(() => {
-        if (isEditing && inputRef.current && selectionRange) {
-            // After the new value is in place, reset selection
-            inputRef.current.setSelectionRange(selectionRange[0], selectionRange[1]);
-        }
-    }, [isEditing, editedName, selectionRange]);
 
     // Determine if buttons should be visible
     const shouldShowButtons = isHovering || isMenuClicked;
@@ -504,20 +480,12 @@ const AssetCard: React.FC<AssetCardProps> = ({
                                                 width: '100%',
                                                 mt: 1
                                             }}>
-                                                <TextField
-                                                    inputRef={inputRef}
-                                                    value={editedName}
+                                                <InlineTextEditor
+                                                    initialValue={editedName || ''}
+                                                    onChange={onEditNameChange}
+                                                    onComplete={onEditNameComplete}
+                                                    isEditing={true}
                                                     disabled={isRenaming}
-                                                    onChange={handleInputChange}
-                                                    onKeyPress={(e) => {
-                                                        if (e.key === 'Enter' && !e.shiftKey) {
-                                                            e.preventDefault();
-                                                            onEditNameComplete?.(true);
-                                                        } else if (e.key === 'Escape') {
-                                                            onEditNameComplete?.(false);
-                                                        }
-                                                    }}
-                                                    onClick={(e) => e.stopPropagation()}
                                                     autoFocus
                                                     size="small"
                                                     fullWidth

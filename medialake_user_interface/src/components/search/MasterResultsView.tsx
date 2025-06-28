@@ -144,7 +144,7 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
 }) => {
   // Function to render card fields
   const renderCardField = (fieldId: string, asset: AssetItem): React.ReactNode => {
-    console.log('Rendering field:', fieldId, 'for asset:', asset.InventoryID);
+    // console.log('Rendering field:', fieldId, 'for asset:', asset.InventoryID);
     
     switch (fieldId) {
       case 'name':

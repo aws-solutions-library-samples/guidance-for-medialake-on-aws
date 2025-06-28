@@ -1,5 +1,6 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { Box, Typography, IconButton, TextField, Button, TableContainer, Checkbox } from '@mui/material';
+import { Box, Typography, IconButton, Button, TableContainer, Checkbox } from '@mui/material';
+import { InlineTextEditor } from '../common/InlineTextEditor';
 import {
     useReactTable,
     getCoreRowModel,
@@ -76,6 +77,8 @@ export function AssetTable<T>({
     const containerRef = useRef<HTMLDivElement>(null);
     const columnHelper = createColumnHelper<T>();
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+    const editInputRef = useRef<HTMLInputElement>(null);
+    const hasInitialFocusRef = useRef<boolean>(false);
 
     // Create a mapping between API field IDs and column IDs
     const fieldMapping: Record<string, string> = {
@@ -323,17 +326,12 @@ export function AssetTable<T>({
                                             gap: 1,
                                             width: '100%'
                                         }}>
-                                            <TextField
-                                                value={editedName}
+                                            <InlineTextEditor
+                                                key={`edit-${getId(info.row.original)}`}
+                                                initialValue={editedName || ''}
                                                 onChange={onEditNameChange}
-                                                onKeyPress={(e) => {
-                                                    if (e.key === 'Enter') {
-                                                        onEditNameComplete?.(info.row.original, true);
-                                                    } else if (e.key === 'Escape') {
-                                                        onEditNameComplete?.(info.row.original, false);
-                                                    }
-                                                }}
-                                                onClick={(e) => e.stopPropagation()}
+                                                onComplete={(save) => onEditNameComplete?.(info.row.original, save)}
+                                                isEditing={true}
                                                 autoFocus
                                                 size="small"
                                                 sx={{
