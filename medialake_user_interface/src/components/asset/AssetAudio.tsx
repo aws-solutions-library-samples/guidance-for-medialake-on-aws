@@ -23,6 +23,7 @@ interface AssetAudioProps {
   alt?: string;
   compact?: boolean;
   size?: 'small' | 'medium' | 'large';
+  onAudioElementReady?: (audioElement: HTMLAudioElement) => void;
 }
 
 /**
@@ -80,6 +81,7 @@ const AssetAudio: React.FC<AssetAudioProps> = ({
   alt,
   compact = false,
   size = 'medium',
+  onAudioElementReady,
 }) => {
   const theme = useTheme();
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -96,6 +98,11 @@ const AssetAudio: React.FC<AssetAudioProps> = ({
     const audio = audioRef.current;
     if (!audio) return;
 
+    // Register with media controller if provided
+    if (onAudioElementReady) {
+      onAudioElementReady(audio);
+    }
+
     const updateTime = () => setCurrentTime(audio.currentTime);
     const handleLoadedMetadata = () => setDuration(audio.duration);
     const handleEnded = () => setIsPlaying(false);
@@ -109,7 +116,7 @@ const AssetAudio: React.FC<AssetAudioProps> = ({
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, []);
+  }, [onAudioElementReady]);
 
   const togglePlay = () => {
     if (!audioRef.current) return;

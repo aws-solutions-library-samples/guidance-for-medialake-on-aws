@@ -18,6 +18,21 @@ from aws_lambda_powertools.utilities.validation import validate
 from aws_lambda_powertools.utilities.parser import parse, event_parser
 from decimal import Decimal
 from contextlib import contextmanager
+import http.client
+from botocore.auth import SigV4Auth
+from botocore.awsrequest import AWSRequest
+from urllib.parse import urlparse
+
+
+# OpenSearch configuration
+OPENSEARCH_ENDPOINT = os.environ.get("OPENSEARCH_ENDPOINT", "")
+OPENSEARCH_INDEX    = os.environ.get("INDEX_NAME", "media")
+OPENSEARCH_SERVICE  = os.environ.get("OPENSEARCH_SERVICE", "es")
+AWS_REGION          = os.environ.get("REGION","")
+
+# Re-use boto3’s session credentials
+_session     = boto3.Session()
+_credentials = _session.get_credentials()
 
 # Global clients - initialized once for Lambda container reuse
 s3_client = None
@@ -60,6 +75,7 @@ s3_config = Config(
     connect_timeout=5
 )
 
+
 def initialize_global_clients():
     """Initialize global AWS clients for container reuse"""
     global s3_client, dynamodb_resource, dynamodb_client, eventbridge_client
@@ -91,7 +107,7 @@ class DateTimeEncoder(json.JSONEncoder):
             return float(obj) if obj % 1 != 0 else int(obj)
         return super(DateTimeEncoder, self).default(obj)
 
-# Global instance to reduce instantiation costs
+boto3# Global instance to reduce instantiation costs
 datetime_encoder = DateTimeEncoder()
 
 def json_serialize(obj):
@@ -286,6 +302,75 @@ class AssetProcessor:
         # Add current asset tracking
         self.current_asset_id = None
         self.current_inventory_id = None
+
+        _session           = boto3.Session()
+        self._credentials  = _session.get_credentials()
+
+    def _signed_request(self,
+                    method: str,
+                    url: str,
+                    payload: dict | None = None,
+                    timeout: int = 60) -> tuple[int, str]:
+        """Build, sign and send an HTTPS request with SigV4 auth."""
+        headers = {"Content-Type": "application/json"}
+        if payload:
+            body = json.dumps(payload)
+        else:
+            body = None
+
+        req = AWSRequest(method=method,
+                        url=url,
+                        data=body,
+                        headers=headers)
+        
+        SigV4Auth(self._credentials,  OPENSEARCH_SERVICE, AWS_REGION).add_auth(req)
+
+        prepared = req.prepare()
+
+        parsed = urlparse(prepared.url)
+        path   = parsed.path + (f"?{parsed.query}" if parsed.query else "")
+
+        conn = http.client.HTTPSConnection(parsed.hostname,
+                                        parsed.port or 443,
+                                        timeout=timeout)
+        conn.request(prepared.method,
+                    path,
+                    body=prepared.body,
+                    headers=dict(prepared.headers))
+        resp  = conn.getresponse()
+        resp_body = resp.read().decode("utf-8")
+        conn.close()
+        return resp.status, resp_body
+
+
+    def delete_opensearch_docs(self, asset_id: str) -> None:
+        """Delete all OpenSearch docs for a given DigitalSourceAsset.ID."""
+        if not OPENSEARCH_ENDPOINT:
+            logger.info("OPENSEARCH_ENDPOINT not set – skipping OpenSearch deletion.")
+            return
+
+        host = OPENSEARCH_ENDPOINT.lstrip("https://").lstrip("http://")
+        url  = f"https://{host}/{OPENSEARCH_INDEX}/_delete_by_query?refresh=true&conflicts=proceed"
+        query = {
+            "query": {
+                "term": {
+                    "DigitalSourceAsset.ID": asset_id
+                }
+            }
+        }
+
+        status, body = self._signed_request("POST", url, payload=query)
+        if status not in (200, 202):
+            logger.error(f"OpenSearch deletion failed (status={status}): {body}")
+        else:
+            deleted = 0
+            try:
+                deleted = json.loads(body).get("deleted", 0)
+            except Exception:
+                pass
+            logger.info(f"OpenSearch deletion complete – deleted {deleted} docs for {asset_id}")
+            metrics.add_metric(name="OpenSearchDocsDeleted", unit=MetricUnit.Count, value=deleted)
+
 
     @contextmanager
     def asset_context(self, asset_id=None, inventory_id=None):
@@ -1073,8 +1158,21 @@ class AssetProcessor:
                 
                 # Publish deletion event
                 self.publish_deletion_event(inventory_id)
-                
+
                 logger.info(f"Successfully deleted asset from DynamoDB: {inventory_id}")
+
+                # delete the DynamoDB record
+                self.dynamodb.delete_item(Key={"InventoryID": inventory_id})
+                metrics.add_metric(name="AssetDeletionProcessed", unit=MetricUnit.Count, value=1)
+
+                # publish your deletion event
+                self.publish_deletion_event(inventory_id)
+
+                # *new* — delete associated OpenSearch docs
+                self.delete_opensearch_docs(inventory_id)
+
+                logger.info(f"Successfully deleted asset {inventory_id} from DynamoDB and OpenSearch")
+
             else:
                 # For deletion events, skip trying to find by tags as the object is gone
                 if not is_delete_event:
