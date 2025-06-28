@@ -11,8 +11,7 @@ node:
         handler: utility/ImageProxyLambdaDeployment
         runtime: python3.12
         layers:
-          - CairoSvg
-          - ImageMagick
+          - ResvgCli
         iam_policy:
           statements:
             - effect: Allow

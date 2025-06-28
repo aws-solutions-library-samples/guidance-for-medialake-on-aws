@@ -6,17 +6,18 @@ from aws_cdk import (
     BundlingOptions,
     DockerImage,
 )
+
 from constructs import Construct
 from dataclasses import dataclass
 
 from .layer_base import LambdaLayer, LambdaLayerConfig
 
 
+
 @dataclass
 class PowertoolsLayerConfig:
     architecture: str = lambda_.Architecture.X86_64
     layer_version: str = "68"
-
 
 class PowertoolsLayer(Construct):
     def __init__(
@@ -36,7 +37,6 @@ class PowertoolsLayer(Construct):
             f"arn:{stack.partition}:lambda:{stack.region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-x86_64:4",
         )
         # f"arn:{stack.partition}:lambda:{stack.region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-{'Arm64' if config.architecture == lambda_.Architecture.ARM_64 else ''}:{config.layer_version}",
-
 
 class JinjaLambdaLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
@@ -112,7 +112,6 @@ class ZipmergeLayer(Construct):
             ),
         )
 
-
 class OpenSearchPyLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
         super().__init__(scope, id, **kwargs)
@@ -127,7 +126,6 @@ class OpenSearchPyLayer(Construct):
             ),
         )
 
-
 class PynamoDbLambdaLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
         super().__init__(scope, id, **kwargs)
@@ -141,7 +139,6 @@ class PynamoDbLambdaLayer(Construct):
                 description="A Lambda layer with pynamodb library",
             ),
         )
-
 
 class PyMediaInfo(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
@@ -161,152 +158,57 @@ class PyMediaInfo(Construct):
     def layer(self) -> lambda_.LayerVersion:
         return self.layer_version.layer
 
-class ImageMagickLayer(Construct):
+class ResvgCliLayer(Construct):
     """
-    Bundles a static ImageMagick distribution into a Lambda layer by
-    downloading the official x86_64 tarball and copying its bin/lib.
+    A Lambda layer shipping the `resvg` CLI compiled from source for Amazon Linux 2023.
+    In CI, you can build once and point to a pre-bundled asset under dist/lambdas/layers/resvg.
     """
 
-    TAR_URL = "https://imagemagick.org/archive/binaries/ImageMagick-x86_64-pc-linux-gnu.tar.gz"
-    APPIMAGE_VERSION = "7.1.1-30"  # for reference only
-
-    def __init__(
-        self,
-        scope: Construct,
-        construct_id: str,
-        *,
-        architecture: lambda_.Architecture = lambda_.Architecture.X86_64,
-        **kwargs,
-    ):
-        super().__init__(scope, construct_id, **kwargs)
-
-        # Only x86_64 is supported by this tarball approach
-        if architecture != lambda_.Architecture.X86_64:
-            raise ValueError("ImageMagickLayer currently only supports x86_64")
-
-        self.layer = lambda_.LayerVersion(
-            self,
-            "ImageMagickLayer",
-            layer_version_name="imagemagick-layer",
-            description=f"ImageMagick {self.APPIMAGE_VERSION} CLI & delegates",
-            compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
-            compatible_architectures=[architecture],
-            code=lambda_.Code.from_asset(
-                path=".",  # all work happens in the Docker container
-                bundling=BundlingOptions(
-                    image=DockerImage.from_registry(
-                        "public.ecr.aws/amazonlinux/amazonlinux:2023"
-                    ),
-                    user="root",
-                    command=[
-                        "/bin/bash",
-                        "-c",
-                        f"""
-                        set -euo pipefail
-
-                        # 1. install minimal tools
-                        dnf -y install wget gzip tar
-
-                        # 2. download & extract the official tarball
-                        TMP=$(mktemp -d)
-                        cd "$TMP"
-                        wget -q "{self.TAR_URL}"
-                        tar -xzf ImageMagick-x86_64-pc-linux-gnu.tar.gz
-
-                        # 3. copy the 'magick' binary and its libs
-                        mkdir -p /asset-output/bin /asset-output/lib
-                        cp bin/magick /asset-output/bin/
-                        ln -sf magick /asset-output/bin/convert
-                        cp -r lib/* /asset-output/lib/
-
-                        # 4. tighten permissions
-                        chmod -R 755 /asset-output
-                        """
-                    ],
-                ),
-            ),
-        )
-           
-class CairoSvgLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
         super().__init__(scope, id, **kwargs)
 
         if "CI" in os.environ:
-            self.layer = lambda_.LayerVersion(
-                self,
-                "CairoSvgLayer",
-                layer_version_name="cairosvg-layer",
-                compatible_runtimes=[
-                    lambda_.Runtime.PYTHON_3_12,
-                ],
-                description="Layer containing cairosvg depends",
-                code=lambda_.Code.from_asset("dist/lambdas/layers/cairosvg"),
-            )
+            # In CI, use a prebuilt zip under dist/
+            code = lambda_.Code.from_asset("dist/lambdas/layers/resvg")
         else:
-            self.layer = lambda_.LayerVersion(
-                self,
-                "CairoSvgLayer",
-                layer_version_name="cairosvg-layer",
-                compatible_runtimes=[
-                    lambda_.Runtime.PYTHON_3_12,
-                ],
-                description="Layer containing cairosvg dependencies, including native libraries",
-                code=lambda_.Code.from_asset(
-                    path=".",
-                    bundling=BundlingOptions(
-                        command=[
-                            "/bin/bash",
-                            "-c",
-                            """
-                            set -e
-                            # Update packages and install required dependencies using yum
-                            yum update -y && yum install -y cairo-devel pango-devel gdk-pixbuf2-devel libffi-devel pkg-config python3-pip
-                            # Upgrade pip (optional, but often helpful)
-                            python3 -m pip install --upgrade pip
-                            # Install cairosvg and its dependencies into the python folder
-                            python3 -m pip install cairosvg -t /asset-output/python
-                            mkdir -p /asset-output/lib
-                            # Copy native libraries required by CairoSVG and its dependencies
-                            cp -v /usr/lib64/libcairo.so* /asset-output/lib/ || echo "Cairo libraries not found in /usr/lib64"
-                            cp -v /usr/lib64/libpango-1.0.so* /asset-output/lib/ || echo "Pango libraries not found in /usr/lib64"
-                            cp -v /usr/lib64/libgdk_pixbuf-2.0.so* /asset-output/lib/ || echo "gdk-pixbuf libraries not found in /usr/lib64"
-                            cp -v /usr/lib64/libffi.so* /asset-output/lib/ || echo "libffi libraries not found in /usr/lib64"
+            # Build from source in a container each time
+            code = lambda_.Code.from_asset(
+                path=".",
+                bundling=BundlingOptions(
+                    image=DockerImage.from_registry("public.ecr.aws/amazonlinux/amazonlinux:2.0.20250305.0-amd64"),
+                    user="root",
+                    command=[
+                        "/bin/bash", "-c", """
+                        set -euo pipefail
+                        # 1) Install build tools & deps
+                        yum -y update
+                        yum -y install rust cargo fontconfig fontconfig-devel
 
-                            # Additional dependencies as determined by ldd
-                            cp -v /usr/lib64/libpthread.so* /asset-output/lib/ || echo "libpthread not found in /usr/lib64"
-                            cp -v /usr/lib64/libpixman-1.so* /asset-output/lib/ || echo "libpixman not found in /usr/lib64"
-                            cp -v /usr/lib64/libfontconfig.so* /asset-output/lib/ || echo "libfontconfig not found in /usr/lib64"
-                            cp -v /usr/lib64/libfreetype.so* /asset-output/lib/ || echo "libfreetype not found in /usr/lib64"
-                            cp -v /usr/lib64/libEGL.so* /asset-output/lib/ || echo "libEGL not found in /usr/lib64"
-                            cp -v /usr/lib64/libdl.so* /asset-output/lib/ || echo "libdl not found in /usr/lib64"
-                            cp -v /usr/lib64/libpng15.so* /asset-output/lib/ || echo "libpng15 not found in /usr/lib64"
-                            cp -v /usr/lib64/libxcb-shm.so* /asset-output/lib/ || echo "libxcb-shm not found in /usr/lib64"
-                            cp -v /usr/lib64/libxcb.so* /asset-output/lib/ || echo "libxcb not found in /usr/lib64"
-                            cp -v /usr/lib64/libxcb-render.so* /asset-output/lib/ || echo "libxcb-render not found in /usr/lib64"
-                            cp -v /usr/lib64/libXrender.so* /asset-output/lib/ || echo "libXrender not found in /usr/lib64"
-                            cp -v /usr/lib64/libX11.so* /asset-output/lib/ || echo "libX11 not found in /usr/lib64"
-                            cp -v /usr/lib64/libXext.so* /asset-output/lib/ || echo "libXext not found in /usr/lib64"
-                            cp -v /usr/lib64/libz.so* /asset-output/lib/ || echo "libz not found in /usr/lib64"
-                            cp -v /usr/lib64/libGL.so* /asset-output/lib/ || echo "libGL not found in /usr/lib64"
-                            cp -v /usr/lib64/librt.so* /asset-output/lib/ || echo "librt not found in /usr/lib64"
-                            cp -v /usr/lib64/libm.so* /asset-output/lib/ || echo "libm not found in /usr/lib64"
-                            cp -v /usr/lib64/libc.so* /asset-output/lib/ || echo "libc not found in /usr/lib64"
-                            cp -v /usr/lib64/libexpat.so* /asset-output/lib/ || echo "libexpat not found in /usr/lib64"
-                            cp -v /usr/lib64/libuuid.so* /asset-output/lib/ || echo "libuuid not found in /usr/lib64"
-                            cp -v /usr/lib64/libbz2.so* /asset-output/lib/ || echo "libbz2 not found in /usr/lib64"
-                            cp -v /usr/lib64/libGLdispatch.so* /asset-output/lib/ || echo "libGLdispatch not found in /usr/lib64"
-                            cp -v /usr/lib64/libXau.so* /asset-output/lib/ || echo "libXau not found in /usr/lib64"
-                            cp -v /usr/lib64/libGLX.so* /asset-output/lib/ || echo "libGLX not found in /usr/lib64"
-                            """
-                        ],
-                        user="root",
-                        image=DockerImage.from_registry(
-                            "public.ecr.aws/amazonlinux/amazonlinux:2.0.20250305.0-amd64"
-                        ),
-                    ),
+                        # 2) Install resvg using cargo
+                        cargo install resvg
+
+                        # 3) Package the binary into a layer structure
+                        mkdir -p /asset-output/bin
+                        cp ~/.cargo/bin/resvg /asset-output/bin/
+                        chmod +x /asset-output/bin/resvg
+                        """
+                    ],
                 ),
             )
 
+        self.layer = lambda_.LayerVersion(
+            self,
+            "ResvgCliLayer",
+            layer_version_name="resvg-cli-layer",
+            description="A Lambda layer containing the resvg CLI (SVG→PNG converter)",
+            compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
+            compatible_architectures=[
+                lambda_.Architecture.X86_64,
+                lambda_.Architecture.ARM_64,
+            ],
+            code=code,
+            
+        )
 
 class FFProbeLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
@@ -435,7 +337,6 @@ class GoogleCloudStorageLayer(Construct):
             ),
         )
 
-
 class IngestMediaProcessorLayer(Construct):
     def __init__(self, scope: Construct, construct_id: str, **kwargs):
         super().__init__(scope, construct_id, **kwargs)
@@ -449,7 +350,6 @@ class IngestMediaProcessorLayer(Construct):
                 description="A Lambda layer for analyzing media container media info",
             ),
         )
-
 
 class SearchLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
@@ -468,7 +368,6 @@ class SearchLayer(Construct):
     def layer(self) -> lambda_.LayerVersion:
         return self.layer_version.layer
 
-
 class PyamlLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
         super().__init__(scope, id, **kwargs)
@@ -485,7 +384,6 @@ class PyamlLayer(Construct):
     @property
     def layer(self) -> lambda_.LayerVersion:
         return self.layer_version.layer
-
 
 class ShortuuidLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
@@ -504,3 +402,4 @@ class ShortuuidLayer(Construct):
     @property
     def layer(self) -> lambda_.LayerVersion:
         return self.layer_version.layer
+

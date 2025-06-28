@@ -508,8 +508,8 @@ Resources:
                 - bash .cicd/build_ffprobe.sh
                 - echo "Building FFmpeg"
                 - bash .cicd/build_ffmpeg.sh
-                - echo "Building CairoSVG"
-                - bash .cicd/build_cairosvg.sh
+                - echo "Building RSSVG"
+                - bash .cicd/build_resvg.sh
                 # - cdk synth || (echo "CDK synth failed" && find . -name "cdk.json" -o -name "app.py" | grep -v "node_modules")
                 - echo "CDK synthesis"
                 - cdk synth || (echo "CDK synth failed" && exit 1)
