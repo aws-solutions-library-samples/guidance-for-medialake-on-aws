@@ -83,6 +83,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
     const [isMenuClicked, setIsMenuClicked] = useState(false);
     const cardRef = useRef<HTMLDivElement>(null);
     const preventCommitRef = useRef<boolean>(false);
+    const commitRef = useRef<(() => void) | null>(null);
 
     // Check if features are enabled
     const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', true);
@@ -485,6 +486,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
                                                     initialValue={editedName || ''}
                                                     editingCellId={id}                       // ← pass a stable ID (e.g. asset ID)
                                                     preventCommitRef={preventCommitRef}      // ← pass the ref to prevent commit
+                                                    commitRef={commitRef}                    // ← pass the ref to expose commit function
                                                     onChangeCommit={(value) => {
                                                         // Update parent state
                                                         onEditNameChange({
@@ -522,14 +524,27 @@ const AssetCard: React.FC<AssetCardProps> = ({
                                                 <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
                                                     <Button
                                                         size="small"
+                                                        onMouseDown={(e) => {
+                                                            e.stopPropagation();
+                                                            e.preventDefault();
+                                                            console.log('💾 AssetCard Save mousedown');
+                                                            // Set flag to prevent blur from canceling
+                                                            preventCommitRef.current = true;
+                                                        }}
                                                         onClick={(e) => {
                                                             e.stopPropagation();
+                                                            e.preventDefault();
                                                             console.log('💾 AssetCard Save clicked');
-                                                            // Find the input element and get its current value
-                                                            const inputElement = e.currentTarget.closest('.MuiBox-root')?.querySelector('input') as HTMLInputElement;
-                                                            const currentValue = inputElement?.value || editedName;
-                                                            console.log('💾 Using current value from input:', currentValue);
-                                                            onEditNameComplete?.(true, currentValue);
+                                                            console.log('💾 AssetCard commitRef.current:', commitRef.current);
+                                                            // Reset the prevent flag
+                                                            preventCommitRef.current = false;
+                                                            // Call the commit function directly via ref
+                                                            if (commitRef.current) {
+                                                                console.log('💾 AssetCard calling commitRef.current()');
+                                                                commitRef.current();
+                                                            } else {
+                                                                console.error('💾 AssetCard commitRef.current is null!');
+                                                            }
                                                         }}
                                                         variant="contained"
                                                         disabled={isRenaming}
@@ -539,11 +554,15 @@ const AssetCard: React.FC<AssetCardProps> = ({
                                                     <Button
                                                         size="small"
                                                         disabled={isRenaming}
-                                                        onClick={(e) => {
+                                                        onMouseDown={(e) => {
                                                             e.stopPropagation();
                                                             console.log('🚫 AssetCard Cancel clicked');
                                                             // Set flag to prevent InlineTextEditor commit from being called
+                                                            // Use onMouseDown instead of onClick to set the flag before onBlur
                                                             preventCommitRef.current = true;
+                                                        }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
                                                             onEditNameComplete?.(false, undefined);
                                                         }}
                                                     >

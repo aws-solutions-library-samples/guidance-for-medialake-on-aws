@@ -3,6 +3,7 @@ import React, {
   useEffect,
   useState,
   useLayoutEffect,
+  useCallback,
 } from 'react';
 import { TextField, TextFieldProps } from '@mui/material';
 
@@ -16,6 +17,8 @@ interface InlineTextEditorProps extends Omit<TextFieldProps, 'value'> {
   initialValue: string;
   /** Ref to check if commit should be prevented */
   preventCommitRef?: React.MutableRefObject<boolean>;
+  /** Ref to expose commit function to parent */
+  commitRef?: React.MutableRefObject<(() => void) | null>;
 }
 
 export const InlineTextEditor: React.FC<InlineTextEditorProps> = React.memo(({
@@ -25,6 +28,7 @@ export const InlineTextEditor: React.FC<InlineTextEditorProps> = React.memo(({
   isEditing,
   editingCellId,
   preventCommitRef,
+  commitRef,
   ...textFieldProps
 }) => {
   const [value, setValue] = useState(initialValue);
@@ -48,11 +52,16 @@ export const InlineTextEditor: React.FC<InlineTextEditorProps> = React.memo(({
   };
 
   // 🔑 commit on blur or Enter
-  const commit = () => {
+  const commit = useCallback(() => {
     // Check if commit should be prevented (e.g., when Cancel button is clicked)
     if (preventCommitRef?.current) {
       console.log('🔑 InlineTextEditor commit prevented by preventCommitRef');
-      preventCommitRef.current = false; // Reset the flag
+      // Reset the flag after a small delay to ensure it doesn't interfere with subsequent operations
+      setTimeout(() => {
+        if (preventCommitRef) {
+          preventCommitRef.current = false;
+        }
+      }, 100);
       return;
     }
     
@@ -60,13 +69,33 @@ export const InlineTextEditor: React.FC<InlineTextEditorProps> = React.memo(({
     onChangeCommit(value);
     console.log('🔑 Calling onComplete with value:', value);
     onComplete?.(true, value); // Pass the value directly to avoid state timing issues
-  };
-  const cancel = () => {
+  }, [value, onChangeCommit, onComplete, preventCommitRef]);
+
+  const cancel = useCallback(() => {
     onComplete?.(false, undefined);
-  };
+  }, [onComplete]);
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter')   { commit(); e.preventDefault(); }
     if (e.key === 'Escape')  { cancel(); e.preventDefault(); }
+  };
+
+  // Handle blur - only cancel, don't commit automatically
+  const handleBlur = () => {
+    // Check if commit should be prevented (e.g., when Cancel button is clicked)
+    if (preventCommitRef?.current) {
+      console.log('🔑 InlineTextEditor blur prevented by preventCommitRef');
+      // Reset the flag after a small delay to ensure it doesn't interfere with subsequent operations
+      setTimeout(() => {
+        if (preventCommitRef) {
+          preventCommitRef.current = false;
+        }
+      }, 100);
+      return;
+    }
+    
+    // On blur, cancel the edit instead of committing
+    console.log('🔑 InlineTextEditor blur - canceling edit');
+    cancel();
   };
 
   // 🔄 restore caret position
@@ -77,13 +106,27 @@ export const InlineTextEditor: React.FC<InlineTextEditorProps> = React.memo(({
     }
   }, [value]);
 
+  // Expose commit function to parent via ref
+  useEffect(() => {
+    console.log('🔧 InlineTextEditor useEffect - setting commitRef.current');
+    if (commitRef) {
+      commitRef.current = commit;
+      console.log('🔧 InlineTextEditor commitRef.current set successfully');
+    }
+    return () => {
+      if (commitRef) {
+        commitRef.current = null;
+      }
+    };
+  }, [commit, commitRef]);
+
   return (
     <TextField
       {...textFieldProps}
       inputRef={inputRef}
       value={value}
       onChange={handleChange}
-      onBlur={commit}
+      onBlur={handleBlur}
       onKeyDown={handleKeyDown}
       autoFocus
       fullWidth

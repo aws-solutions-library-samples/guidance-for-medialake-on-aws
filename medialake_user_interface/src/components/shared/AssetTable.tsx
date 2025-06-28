@@ -80,6 +80,7 @@ export function AssetTable<T>({
     const editInputRef = useRef<HTMLInputElement>(null);
     const hasInitialFocusRef = useRef<boolean>(false);
     const preventCommitRef = useRef<boolean>(false);
+    const commitRef = useRef<(() => void) | null>(null);
 
     // Create a mapping between API field IDs and column IDs
     const fieldMapping: Record<string, string> = {
@@ -331,6 +332,7 @@ export function AssetTable<T>({
                                                 initialValue={editedName ?? ''}
                                                 editingCellId={rowId}
                                                 preventCommitRef={preventCommitRef}
+                                                commitRef={commitRef}
                                                 onChangeCommit={value =>
                                                     onEditNameChange?.({ target: { value } } as React.ChangeEvent<HTMLInputElement>)
                                                 }
@@ -351,22 +353,40 @@ export function AssetTable<T>({
                                                 <Button
                                                     size="small"
                                                     variant="contained"
+                                                    onMouseDown={e => {
+                                                        e.stopPropagation();
+                                                        e.preventDefault();
+                                                        console.log('💾 AssetTable Save mousedown');
+                                                        // Set flag to prevent blur from canceling
+                                                        preventCommitRef.current = true;
+                                                    }}
                                                     onClick={e => {
                                                         e.stopPropagation();
-                                                        // The InlineTextEditor will handle both onChangeCommit and onComplete when we trigger its commit
-                                                        const input = e.currentTarget.closest('.MuiBox-root')?.querySelector('input');
-                                                        if (input) {
-                                                            input.blur(); // This triggers the commit in InlineTextEditor
+                                                        e.preventDefault();
+                                                        console.log('💾 AssetTable Save clicked');
+                                                        console.log('💾 AssetTable commitRef.current:', commitRef.current);
+                                                        // Reset the prevent flag
+                                                        preventCommitRef.current = false;
+                                                        // Call the commit function directly via ref
+                                                        if (commitRef.current) {
+                                                            console.log('💾 AssetTable calling commitRef.current()');
+                                                            commitRef.current();
+                                                        } else {
+                                                            console.error('💾 AssetTable commitRef.current is null!');
                                                         }
                                                     }}
                                                 >Save</Button>
                                                 <Button
                                                     size="small"
-                                                    onClick={e => {
+                                                    onMouseDown={e => {
                                                         e.stopPropagation();
                                                         console.log('🚫 AssetTable Cancel clicked');
                                                         // Set flag to prevent InlineTextEditor commit from being called
+                                                        // Use onMouseDown instead of onClick to set the flag before onBlur
                                                         preventCommitRef.current = true;
+                                                    }}
+                                                    onClick={e => {
+                                                        e.stopPropagation();
                                                         onEditNameComplete?.(info.row.original, false, undefined);
                                                     }}
                                                 >Cancel</Button>
