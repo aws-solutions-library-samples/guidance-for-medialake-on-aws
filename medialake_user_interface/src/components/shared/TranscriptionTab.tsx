@@ -863,15 +863,18 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
                                 Language Detection Details:
                             </Typography>
                             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                                {languageData.detectedLanguages.slice(0, 5).map((lang, index) => (
-                                    <Chip
-                                        key={index}
-                                        label={`${lang.code}: ${Math.round(lang.score * 100)}%`}
-                                        size="small"
-                                        variant={index === 0 ? "filled" : "outlined"}
-                                        sx={{ fontSize: '0.7rem' }}
-                                    />
-                                ))}
+                                {languageData.detectedLanguages
+                                    .filter(lang => lang.score >= 0.7) // Only show languages with 70%+ confidence
+                                    .slice(0, 5)
+                                    .map((lang, index) => (
+                                        <Chip
+                                            key={index}
+                                            label={`${lang.code}: ${Math.round(lang.score * 100)}%`}
+                                            size="small"
+                                            variant={index === 0 ? "filled" : "outlined"}
+                                            sx={{ fontSize: '0.7rem' }}
+                                        />
+                                    ))}
                             </Box>
                         </Paper>
                     )}
