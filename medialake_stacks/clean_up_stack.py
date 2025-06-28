@@ -87,18 +87,6 @@ class CleanupStack(Stack):
             )
         )
 
-        # Lambda event source mapping permissions - DeleteEventSourceMapping requires * resource when UUID is unknown
-        self._clean_up_lambda.lambda_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "lambda:DeleteEventSourceMapping",
-                    "lambda:GetEventSourceMapping",
-                ],
-                resources=["*"],  # Required by AWS API - cannot scope to specific UUIDs when they're unknown at deployment time
-            )
-        )
-
         # ListEventSourceMappings requires * resource - AWS API limitation
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
