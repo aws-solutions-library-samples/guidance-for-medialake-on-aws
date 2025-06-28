@@ -17,6 +17,7 @@ sqs = boto3.client("sqs")
 cloudwatch_logs = boto3.client("logs")
 eventbridge = boto3.client("events")
 pipes = boto3.client("pipes")
+secrets_manager = boto3.client("secretsmanager")
 
 # Define log groups to clean up
 LOG_GROUPS_TO_CLEAN = ["/aws/apigateway/medialake-access-logs"]
@@ -533,6 +534,68 @@ def delete_eventbridge_pipe(pipe_arn):
         if e.response["Error"]["Code"] != "ResourceNotFoundException":
             raise
         logger.warning(f"EventBridge Pipe {pipe_arn} already deleted")
+        
+def delete_secrets_manager_secrets():
+    """Delete secrets from Secrets Manager that match specific patterns"""
+    try:
+        # Define the patterns to match
+        patterns = [
+            "integration/",  # Matches integration/{uuid}/api-key
+            "medialake/search/provider/"  # Matches medialake/search/provider/{uuid}
+        ]
+        
+        logger.info("Starting cleanup of Secrets Manager secrets")
+        
+        # List all secrets
+        paginator = secrets_manager.get_paginator('list_secrets')
+        deleted_count = 0
+        
+        for page in paginator.paginate():
+            for secret in page.get('SecretList', []):
+                secret_name = secret['Name']
+                
+                # Check if the secret matches any of our patterns
+                should_delete = False
+                for pattern in patterns:
+                    if secret_name.startswith(pattern):
+                        # Additional validation for integration pattern
+                        if pattern == "integration/":
+                            # Should match: integration/{uuid}/api-key
+                            parts = secret_name.split('/')
+                            if len(parts) == 3 and parts[2] == 'api-key':
+                                should_delete = True
+                                break
+                        elif pattern == "medialake/search/provider/":
+                            # Should match: medialake/search/provider/{uuid}
+                            parts = secret_name.split('/')
+                            if len(parts) == 4:  # medialake/search/provider/{uuid}
+                                should_delete = True
+                                break
+                
+                if should_delete:
+                    try:
+                        # Delete the secret immediately (force delete without recovery window)
+                        secrets_manager.delete_secret(
+                            SecretId=secret_name,
+                            ForceDeleteWithoutRecovery=True
+                        )
+                        logger.info(f"Deleted secret: {secret_name}")
+                        deleted_count += 1
+                    except ClientError as e:
+                        if e.response["Error"]["Code"] == "ResourceNotFoundException":
+                            logger.warning(f"Secret {secret_name} already deleted")
+                        elif e.response["Error"]["Code"] == "InvalidRequestException":
+                            logger.warning(f"Secret {secret_name} already scheduled for deletion")
+                        else:
+                            logger.error(f"Error deleting secret {secret_name}: {str(e)}")
+                    except Exception as e:
+                        logger.error(f"Unexpected error deleting secret {secret_name}: {str(e)}")
+        
+        logger.info(f"Completed Secrets Manager cleanup. Deleted {deleted_count} secrets")
+        
+    except Exception as e:
+        logger.error(f"Error during Secrets Manager cleanup: {str(e)}")
+        raise
 
 
 @tracer.capture_lambda_handler
@@ -556,6 +619,10 @@ def lambda_handler(event, context):
             # Clean up CloudWatch log groups
             logger.info("Starting cleanup of CloudWatch log groups")
             delete_cloudwatch_log_groups(LOG_GROUPS_TO_CLEAN)
+
+            # Clean up Secrets Manager secrets
+            logger.info("Starting cleanup of Secrets Manager secrets")
+            delete_secrets_manager_secrets()
 
             # Additional cleanup for any orphaned resources
             try:
