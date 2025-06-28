@@ -1,21 +1,33 @@
 import hashlib
 from dataclasses import dataclass
 from constructs import Construct
-from typing import Optional
 from aws_cdk import (
     aws_cognito as cognito,
+    aws_iam as iam,
     RemovalPolicy,
     CfnOutput,
     Stack,
     custom_resources as cr,
+    Fn,
+    Aws,
 )
+import aws_cdk as cdk
 from aws_cdk.aws_cognito_identitypool_alpha import (
     IdentityPool,
     UserPoolAuthenticationProvider,
     IdentityPoolAuthenticationProviders,
 )
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
+from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
+from aws_cdk import aws_dynamodb as dynamodb
 from config import config
+
+
+@dataclass
+class CognitoGroupConfig:
+    name: str
+    description: str
+    precedence: int
 
 
 @dataclass
@@ -33,24 +45,48 @@ class CognitoProps:
 
 class CognitoConstruct(Construct):
     def __init__(
-        self, 
-        scope: Construct, 
-        construct_id: str, 
+        self,
+        scope: Construct,
+        construct_id: str,
         props: CognitoProps,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # Get the region from the stack
+        # Setup
         stack = Stack.of(self)
-        account = stack.account
         region = stack.region
-
-        # Use provided props or create default props
         self.props = props or CognitoProps()
-        
-        # Store the placeholder for CloudFront domain that we'll update later
         self._cloudfront_domain = None
+
+        # Create the DynamoDB table for authorization configuration
+        self._auth_table_props = DynamoDBProps(
+            name=f"{config.resource_prefix}-authorization-{config.environment}",
+            partition_key_name="PK",
+            partition_key_type=dynamodb.AttributeType.STRING,
+            sort_key_name="SK",
+            sort_key_type=dynamodb.AttributeType.STRING,
+            point_in_time_recovery=True,
+            billing_mode=dynamodb.Billing.on_demand(),
+            # Enable DynamoDB Streams for policy synchronization
+            stream=dynamodb.StreamViewType.NEW_AND_OLD_IMAGES,
+            global_secondary_indexes=[
+                # GSI1 (Query assignments by PermissionSet or Group)
+                dynamodb.GlobalSecondaryIndexPropsV2(
+                    index_name="GSI1",
+                    partition_key=dynamodb.Attribute(
+                        name="GSI1PK",
+                        type=dynamodb.AttributeType.STRING
+                    ),
+                    sort_key=dynamodb.Attribute(
+                        name="GSI1SK",
+                        type=dynamodb.AttributeType.STRING
+                    ),
+                    projection_type=dynamodb.ProjectionType.ALL
+                ),
+            ]
+        )
+        self._auth_table = DynamoDB(self, "AuthorizationTable", self._auth_table_props)
 
         # Create Lambda functions
         self._cognito_trigger_lambda = Lambda(
@@ -61,8 +97,11 @@ class CognitoConstruct(Construct):
                 entry="lambdas/auth/cognito_trigger",
             ),
         )
-
-        # Create User Pool using L1 construct for more control
+        
+        # Pre-Token Generation Lambda is now created in CognitoUpdateStack
+        # This avoids circular dependencies and timing issues
+        
+        # Create User Pool using L1 construct, needed for configuration parameters
         user_pool_props = {
             "admin_create_user_config": cognito.CfnUserPool.AdminCreateUserConfigProperty(
                 allow_admin_create_user_only=not self.props.self_sign_up_enabled,
@@ -123,7 +162,9 @@ class CognitoConstruct(Construct):
                 )
             ),
             "lambda_config": cognito.CfnUserPool.LambdaConfigProperty(
-                post_confirmation=self._cognito_trigger_lambda.function.function_arn
+                pre_sign_up=self._cognito_trigger_lambda.function.function_arn,
+                post_confirmation=self._cognito_trigger_lambda.function.function_arn,
+                # Pre-token generation config is now set via CognitoUpdateStack
             ),
             "user_pool_add_ons": cognito.CfnUserPool.UserPoolAddOnsProperty(
                 advanced_security_mode="ENFORCED"
@@ -135,13 +176,51 @@ class CognitoConstruct(Construct):
                     mutable=True,
                     required=False,
                     string_attribute_constraints=cognito.CfnUserPool.StringAttributeConstraintsProperty(
-                        min_length="1",
-                        max_length="2048"
-                    )
-                )
+                        min_length="1", max_length="2048"
+                    ),
+                ),
+                cognito.CfnUserPool.SchemaAttributeProperty(
+                    name="email",
+                    attribute_data_type="String",
+                    required=True,
+                    mutable=True,
+                ),
+                cognito.CfnUserPool.SchemaAttributeProperty(
+                    name="given_name",
+                    attribute_data_type="String",
+                    required=False,
+                    mutable=True,
+                ),
+                cognito.CfnUserPool.SchemaAttributeProperty(
+                    name="family_name",
+                    attribute_data_type="String",
+                    required=False,
+                    mutable=True,
+                ),
+                # Custom attributes
+                cognito.CfnUserPool.SchemaAttributeProperty(
+                    name="permission_sets",
+                    attribute_data_type="String",
+                    required=False,
+                    mutable=True,
+                    developer_only_attribute=False,
+                ),
+                cognito.CfnUserPool.SchemaAttributeProperty(
+                    name="avp_entity_id",
+                    attribute_data_type="String",
+                    required=False,
+                    mutable=True,
+                    developer_only_attribute=False,
+                ),
+                cognito.CfnUserPool.SchemaAttributeProperty(
+                    name="organization_id",
+                    attribute_data_type="String",
+                    required=False,
+                    mutable=True,
+                    developer_only_attribute=False,
+                ),
             ],
         }
-
         # Create the user pool with all properties
         cfn_user_pool = cognito.CfnUserPool(
             self, "MediaLakeUserPool", **user_pool_props
@@ -152,12 +231,29 @@ class CognitoConstruct(Construct):
             self, "MediaLakeUserPoolL2", cfn_user_pool.ref
         )
 
+        # Grant permissions AFTER the user pool is created
+        # Grant permission for pre-signup lambda (same as post confirmation)
+        self._cognito_trigger_lambda.function.add_permission(
+            "CognitoInvokePreSignUp",
+            principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
+            source_arn=cfn_user_pool.attr_arn
+        )
+        
+        # Grant permission for post confirmation lambda
+        self._cognito_trigger_lambda.function.add_permission(
+            "CognitoInvokePostConfirmation",
+            principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
+            source_arn=cfn_user_pool.attr_arn
+        )
+        
+        # Pre-token generation lambda permissions are now granted in CognitoUpdateStack
+
         # Using stack name, region, account, and environment ensures uniqueness across different deployments
-        unique_id = hashlib.md5(f"{config.resource_prefix}-{config.primary_region}-{config.account_id}-{config.environment}".encode(), usedforsecurity=False).hexdigest()[:16]
+        unique_id = hashlib.md5(f"{config.resource_prefix}-{config.primary_region}-{config.account_id}-{config.environment}".encode()).hexdigest()[:16]
         domain_prefix = f"{config.resource_prefix}-{config.environment.lower()}-{unique_id}"
         self._domain_prefix = domain_prefix
         
-        print(f"Domain prefix: {domain_prefix}")
+        
         self._domain = self._user_pool.add_domain(
             "CognitoDomain",
             cognito_domain=cognito.CognitoDomainOptions(
@@ -165,8 +261,41 @@ class CognitoConstruct(Construct):
             ),
         )
 
+        # Create default user groups
+        self._user_groups = []
+
+        default_groups = [
+            CognitoGroupConfig(
+                name="superAdministrators",
+                description="Super administrators with full access to all MediaLake features and settings",
+                precedence=1,
+            ),
+            CognitoGroupConfig(
+                name="editors",
+                description="Can upload, edit and manage media assets",
+                precedence=20,
+            ),
+            CognitoGroupConfig(
+                name="read-only",
+                description="Read-only access to media assets",
+                precedence=40,
+            ),
+        ]
+
+        # Create the groups
+        for group in default_groups:
+            group = cognito.CfnUserPoolGroup(
+                self,
+                f"UserGroup-{group.name}",
+                user_pool_id=self._user_pool.user_pool_id,
+                group_name=group.name,
+                description=group.description,
+                precedence=group.precedence,
+            )
+            self._user_groups.append(group)
+
         # Create base client props
-        client_props = {
+        user_pool_client_props = {
             "generate_secret": self.props.generate_secret,
             "auth_flows": cognito.AuthFlow(
                 admin_user_password=self.props.admin_user_password,
@@ -198,7 +327,7 @@ class CognitoConstruct(Construct):
                         "email": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
                         "given_name": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname",
                         "family_name": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname",
-                        "custom:groups": "http://schemas.microsoft.com/ws/2008/06/identity/claims/groups"
+                        "custom:groups": "http://schemas.microsoft.com/ws/2008/06/identity/claims/groups",
                     },
                     idp_identifiers=[provider.identity_provider_name],
                 )
@@ -215,7 +344,7 @@ class CognitoConstruct(Construct):
 
         # Update client props with configured providers
         if supported_providers:
-            client_props.update(
+            user_pool_client_props.update(
                 {
                     "supported_identity_providers": supported_providers,
                     "o_auth": cognito.OAuthSettings(
@@ -232,8 +361,8 @@ class CognitoConstruct(Construct):
                             f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com/saml2/idpresponse",
                         ],
                         logout_urls=[
-                            f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com",  
-                            f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com/",  
+                            f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com",
+                            f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com/",
                             f"https://{domain_prefix.lower()}.auth.{region}.amazoncognito.com/sign-in",
                         ],
                     ),
@@ -242,7 +371,7 @@ class CognitoConstruct(Construct):
 
         # Create the client
         self._user_pool_client = self._user_pool.add_client(
-            "MediaLakeUserPoolClient", **client_props
+            "MediaLakeUserPoolClient", **user_pool_client_props
         )
 
         # Add dependencies for SAML providers if any
@@ -281,38 +410,52 @@ class CognitoConstruct(Construct):
     @property
     def user_pool_id(self) -> str:
         return self._user_pool.user_pool_id
-    
+
     @property
     def user_pool_arn(self) -> str:
         return self._user_pool.user_pool_arn
 
     @property
-    def user_pool_client(self) -> str:
+    def user_pool_client(self) -> cognito.UserPoolClient:
+        """Return the user pool client"""
+        return self._user_pool_client
+
+    @property
+    def user_pool_client_id(self) -> str:
         return self._user_pool_client.user_pool_client_id
 
     @property
     def identity_pool(self) -> str:
         return self._identity_pool.identity_pool_id
-    
+
     @property
     def cognito_domain_prefix(self) -> str:
         return self._domain_prefix
-        
+    
+    @property
+    def auth_table(self):
+        """Return the authorization table"""
+        return self._auth_table.table
+    
+    @property
+    def auth_table_name(self) -> str:
+        """Return the authorization table name"""
+        return self._auth_table.table_name
+
     def update_callback_urls(self, cloudfront_domain: str) -> None:
         """
         Updates the callback URLs for the Cognito User Pool Client with the CloudFront domain.
         This should be called after the CloudFront distribution is created.
-        
+
         Args:
             cloudfront_domain: The CloudFront distribution domain name
         """
         if not cloudfront_domain:
             return
-            
+
         self._cloudfront_domain = cloudfront_domain
-        
-        # Use AWS SDK to update the user pool client
-        custom_resource = cr.AwsCustomResource(
+
+        _ = cr.AwsCustomResource(
             self,
             "UpdateUserPoolClientCallbacks",
             on_update=cr.AwsSdkCall(
@@ -339,13 +482,16 @@ class CognitoConstruct(Construct):
                     "AllowedOAuthFlows": ["code", "implicit"],
                     "AllowedOAuthScopes": ["email", "openid", "profile"],
                     "AllowedOAuthFlowsUserPoolClient": True,
-                    "SupportedIdentityProviders": ["COGNITO"] + [
-                        provider.identity_provider_name 
-                        for provider in config.authZ.identity_providers 
+                    "SupportedIdentityProviders": ["COGNITO"]
+                    + [
+                        provider.identity_provider_name
+                        for provider in config.authZ.identity_providers
                         if provider.identity_provider_method == "saml"
                     ],
                 },
-                physical_resource_id=cr.PhysicalResourceId.of(f"{config.resource_prefix}-cognito-callback-urls-update"),
+                physical_resource_id=cr.PhysicalResourceId.of(
+                    f"{config.resource_prefix}-cognito-callback-urls-update"
+                ),
             ),
             policy=cr.AwsCustomResourcePolicy.from_sdk_calls(
                 resources=cr.AwsCustomResourcePolicy.ANY_RESOURCE

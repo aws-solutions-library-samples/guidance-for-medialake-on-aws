@@ -235,7 +235,8 @@ const FilterModal: React.FC<FilterModalProps> = ({
     
     // Apply extension filters - now supports multiple extensions
     if (selectedExtensions.length > 0) {
-      updatedFilters.extension = selectedExtensions.join(',');
+      // Convert extensions to uppercase before sending to API
+      updatedFilters.extension = selectedExtensions.map(ext => ext.toUpperCase()).join(',');
     }
     
     // Convert size inputs to bytes for API
@@ -252,7 +253,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
       updatedFilters.date_range_option = dateRangeOption;
     }
     
-    // Apply date range filters
+    // Apply date range filters - ensure all timestamps are in ISO 8601 format with explicit UTC timezone (Z suffix)
     if (dateRangeOption === '24h') {
       const now = new Date();
       const yesterday = subDays(now, 1);
@@ -427,7 +428,14 @@ const FilterModal: React.FC<FilterModalProps> = ({
                       px: 1.5,
                       py: 0.5,
                       borderRadius: '4px',
-                      mr: 1
+                      mr: 1,
+                      '&.Mui-selected': {
+                        backgroundColor: '#1a4971', // Darker blue color
+                        color: '#ffffff',
+                        '&:hover': {
+                          backgroundColor: '#153d61', // Even darker on hover
+                        }
+                      }
                     }}
                   >
                     {mediaType.icon}
@@ -450,7 +458,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
                             minWidth: '60px',
                             height: '28px',
                             fontSize: '0.75rem',
-                            textTransform: 'lowercase',
+                            textTransform: 'uppercase', // Changed from lowercase to uppercase
                             py: 0,
                             px: 1,
                             borderRadius: '14px',

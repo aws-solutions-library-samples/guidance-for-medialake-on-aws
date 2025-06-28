@@ -7,6 +7,7 @@ import {
 } from 'aws-amplify/auth';
 import { Hub, HubCapsule } from '@aws-amplify/core';
 import { StorageHelper } from '../common/helpers/storage-helper';
+import PermissionTokenCache from '../permissions/utils/permission-token-cache';
 
 class AuthService {
     constructor() {
@@ -42,6 +43,7 @@ class AuthService {
                 case 'signedOut':
                     console.log('User signed out');
                     this.clearTokens();
+                    PermissionTokenCache.clear();
                     break;
                 case 'tokenRefresh':
                     console.log('Token refresh occurred');
@@ -88,6 +90,15 @@ class AuthService {
 
             if (token) {
                 console.log('Session refresh successful');
+                console.log('=== Refreshed Token Claims ===');
+                const tokenParts = token.split('.');
+                if (tokenParts.length === 3) {
+                    const payload = JSON.parse(atob(tokenParts[1]));
+                    console.log('Refreshed token claims:', JSON.stringify(payload, null, 2));
+                    console.log('cognito:groups after refresh:', payload['cognito:groups']);
+                    console.log('custom:permissions after refresh:', payload['custom:permissions']);
+                }
+                console.log('=============================');
                 StorageHelper.setToken(token);
                 return token;
             }
@@ -129,6 +140,7 @@ class AuthService {
         console.log('Clearing all tokens...');
         StorageHelper.clearToken();
         StorageHelper.clearRefreshToken();
+        PermissionTokenCache.clear();
         StorageHelper.clearUsername();
     }
 
@@ -147,6 +159,14 @@ class AuthService {
             const session = await fetchAuthSession();
             const token = session.tokens?.idToken?.toString();
             if (token) {
+                console.log('=== handleAuthenticationCheck Token ===');
+                const tokenParts = token.split('.');
+                if (tokenParts.length === 3) {
+                    const payload = JSON.parse(atob(tokenParts[1]));
+                    console.log('Token claims in auth check:', JSON.stringify(payload, null, 2));
+                    console.log('cognito:groups in auth check:', payload['cognito:groups']);
+                }
+                console.log('======================================');
                 StorageHelper.setToken(token);
                 try {
                     const attributes = await fetchUserAttributes();

@@ -69,7 +69,7 @@ class ApiGatewayEnvironmentsConstruct(Construct):
             self,
             "GetEnvironmentsHandler",
             config=LambdaConfig(
-                name="get_environments",
+                name="environments-get",
                 entry="lambdas/api/environments/get_environments",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,

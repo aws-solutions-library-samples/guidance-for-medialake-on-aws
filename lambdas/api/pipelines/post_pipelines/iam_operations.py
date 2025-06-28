@@ -868,8 +868,10 @@ def create_service_roles_from_yaml(pipeline_name: str, node_id: str, yaml_data: 
 def get_events_role_arn(pipeline_name: str) -> str:
     """Get or create an IAM role for EventBridge to invoke Step Functions."""
     iam_client = boto3.client("iam")
-    role_name = f"{resource_prefix}_{pipeline_name}_trigger_role"
-    # mldev3_connector_ml-video-repo-pipe-role
+    # Sanitize the pipeline name and construct the role name with proper length limits
+    sanitized_pipeline_name = sanitize_role_name(pipeline_name)
+    base_role_name = f"{resource_prefix}_{sanitized_pipeline_name}_trigger_role"
+    role_name = sanitize_role_name(base_role_name)
     try:
         response = iam_client.get_role(RoleName=role_name)
         return response["Role"]["Arn"]

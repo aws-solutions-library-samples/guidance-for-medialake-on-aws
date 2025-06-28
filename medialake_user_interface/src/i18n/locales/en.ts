@@ -7,12 +7,19 @@ export default {
         chinese: 'Chinese',
         hindi: 'Hindi',
         arabic: 'Arabic',
-        hebrew: 'Hebrew'
+        hebrew: 'Hebrew',
+        japanese: 'Japanese',
+        korean: 'Korean',
+        spanish: 'Spanish'
     },
     assetsPage: {
         title: 'Assets',
         connectors: 'Connectors',
         selectConnector: 'Select a connector'
+    },
+    upload: {
+        title: 'Upload Media Files',
+        description: 'Select an S3 connector and upload your media files. Only audio, video, HLS, and MPEG-DASH formats are supported.'
     },
     connectors: {
         apiMessages: {
@@ -87,7 +94,9 @@ export default {
         smartFolders: 'Smart Folders',
         connectedStorage: 'Connected Storage',
         sharing: 'Sharing',
-        comingSoon: 'Coming Soon'
+        comingSoon: 'Coming Soon',
+        yourFavoriteAssets: 'Your Favorite Assets',
+        noFavoriteAssets: 'No favorite assets yet'
     },
       sidebar: {
         menu: {
@@ -103,7 +112,9 @@ export default {
             userManagement: 'User Management',
             roles: 'Roles',
             integrations: 'Integrations',
-            environments: 'Environments'
+            environments: 'Environments',
+            usersAndGroups: 'Users and Groups',
+            permissionSets: 'Permissions'
         }
     },
     profile: {
@@ -147,6 +158,13 @@ export default {
             dateRange: 'Date Range',
             contentType: 'Content Type',
             storageLocation: 'Storage Location',
+            title: 'Filter Results',
+            apply: 'Apply Filters',
+            reset: 'Reset',
+            toDate: 'To Date & Time',
+            fromDate: 'From Date & Time',
+            maxSize: 'Max',
+            minSize: 'Min',
             comingSoon: 'More filters coming soon...'
         }
     },
@@ -461,6 +479,7 @@ export default {
             deactivate: 'Deactivate'
         },
         columns: {
+            permissionSets: 'Permission Sets',
             username: 'Username',
             firstName: 'First Name',
             lastName: 'Last Name',
@@ -884,6 +903,26 @@ export default {
                     title: 'Environments'
                 }
             }
+        }
+    },
+    groups: {
+        actions: {
+            addGroup: 'Add Group',
+            editGroup: 'Edit Group',
+            deleteGroup: 'Delete Group',
+            createGroup: 'Create Group',
+            manageGroups: 'Manage Groups',
+            assignPermissionSet: 'Assign Permission Set'
+        },
+        permissionSets: 'Permission Sets',
+        noPermissionSets: 'No permission sets assigned'
+    },
+    permissionSets: {
+        noAssignments: 'No permission sets',
+        actions: {
+            addPermissionSet: 'Add Permission Set',
+            editPermissionSet: 'Edit Permission Set',
+            deletePermissionSet: 'Delete Permission Set'
         }
     }
 }

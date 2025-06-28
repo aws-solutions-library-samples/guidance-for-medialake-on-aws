@@ -137,6 +137,8 @@ class S3ConnectorConfig(BaseModel):
     bucket: str
     s3IntegrationMethod: str
     objectPrefix: list[str] | None = None
+    bucketType: str | None = None  # "new" or "existing"
+    region: str | None = None  # region for new buckets
 
 
 class S3Connector(BaseModel):
@@ -501,6 +503,52 @@ def check_existing_connector(s3_bucket: str) -> dict | None:
     except Exception as e:
         logger.error(f"Error checking for existing connector: {str(e)}")
         raise
+
+
+def create_s3_bucket(s3_client, bucket_name, region):
+    """
+    Create an S3 bucket in the specified region
+    
+    Args:
+        s3_client: S3 client instance
+        bucket_name: Name of the bucket to create
+        region: AWS region where the bucket should be created
+        
+    Returns:
+        str: The region where the bucket was created
+        
+    Raises:
+        Exception: If bucket creation fails
+    """
+    try:
+        # For us-east-1, we don't specify LocationConstraint
+        if region == "us-east-1":
+            s3_client.create_bucket(Bucket=bucket_name)
+        else:
+            s3_client.create_bucket(
+                Bucket=bucket_name,
+                CreateBucketConfiguration={'LocationConstraint': region}
+            )
+        
+        logger.info(f"Successfully created S3 bucket '{bucket_name}' in region '{region}'")
+        return region
+        
+    except s3_client.exceptions.BucketAlreadyExists:
+        logger.error(f"Bucket '{bucket_name}' already exists and is owned by another account")
+        raise Exception(f"Bucket '{bucket_name}' already exists and is owned by another account")
+    except s3_client.exceptions.BucketAlreadyOwnedByYou:
+        logger.info(f"Bucket '{bucket_name}' already exists and is owned by you")
+        # Get the bucket's region
+        try:
+            bucket_location = s3_client.get_bucket_location(Bucket=bucket_name)
+            actual_region = bucket_location["LocationConstraint"] or os.environ.get("REGION", "us-east-1")
+            return actual_region
+        except Exception as e:
+            logger.warning(f"Could not determine bucket region, using requested region: {e}")
+            return region
+    except Exception as e:
+        logger.error(f"Failed to create bucket '{bucket_name}': {str(e)}")
+        raise Exception(f"Failed to create bucket '{bucket_name}': {str(e)}")
 
 
 def get_bucket_kms_key(s3_client, bucket_name):
@@ -949,19 +997,38 @@ def create_connector(createconnector: S3Connector) -> dict:
         target_function_name_base = f"{resource_name_prefix}"
         target_function_name = create_resource_name_with_suffix("lambda_function", target_function_name_base, suffix)
 
-        # Validate S3 bucket exists and get its region
-        try:
-            bucket_location = s3_client.get_bucket_location(Bucket=s3_bucket)
-            bucket_region = bucket_location["LocationConstraint"]
-            bucket_region = bucket_region or "us-east-1"
-        except s3_client.exceptions.ClientError:
-            return {
-                "status": "400",
-                "message": (
-                    f"S3 bucket '{s3_bucket}' does not exist or is not accessible"
-                ),
-                "data": {},
-            }
+        # Handle bucket creation or validation based on bucketType
+        bucket_type = createconnector.configuration.bucketType
+        bucket_region = createconnector.configuration.region
+        
+        if bucket_type == "new":
+            # Create new bucket
+            if not bucket_region:
+                bucket_region = os.environ.get("REGION", "us-east-1")  # Use CDK deployment region
+            
+            try:
+                bucket_region = create_s3_bucket(s3_client, s3_bucket, bucket_region)
+                created_resources.append(("s3_bucket", s3_bucket))
+            except Exception as e:
+                return {
+                    "status": "400",
+                    "message": str(e),
+                    "data": {},
+                }
+        else:
+            # Validate existing bucket
+            try:
+                bucket_location = s3_client.get_bucket_location(Bucket=s3_bucket)
+                bucket_region = bucket_location["LocationConstraint"]
+                bucket_region = bucket_region or os.environ.get("REGION", "us-east-1")
+            except s3_client.exceptions.ClientError:
+                return {
+                    "status": "400",
+                    "message": (
+                        f"S3 bucket '{s3_bucket}' does not exist or is not accessible"
+                    ),
+                    "data": {},
+                }
 
         # Initialize S3, SQS, and Lambda clients in the bucket's region with optimized configuration
         s3 = get_optimized_client("s3", bucket_region)
@@ -1425,7 +1492,7 @@ def create_connector(createconnector: S3Connector) -> dict:
         try:
             bucket_location = s3_client.get_bucket_location(Bucket=s3_bucket)
             bucket_region = bucket_location["LocationConstraint"]
-            bucket_region = bucket_region or "us-east-1"
+            bucket_region = bucket_region or os.environ.get("REGION", "us-east-1")
             
             # Create region-specific clients for cleanup with optimized configuration
             eventbridge = get_optimized_client("events", bucket_region)
@@ -1504,6 +1571,31 @@ def create_connector(createconnector: S3Connector) -> dict:
                 elif resource_type == "sqs_queue" and sqs:
                     sqs.delete_queue(QueueUrl=resource_id)
                     logger.info(f"Deleted SQS queue: {resource_id}")
+                elif resource_type == "s3_bucket" and s3:
+                    # Only delete bucket if it's empty
+                    try:
+                        # First, try to delete all objects in the bucket
+                        paginator = s3.get_paginator('list_objects_v2')
+                        pages = paginator.paginate(Bucket=resource_id)
+                        
+                        objects_to_delete = []
+                        for page in pages:
+                            if 'Contents' in page:
+                                objects_to_delete.extend([{'Key': obj['Key']} for obj in page['Contents']])
+                        
+                        if objects_to_delete:
+                            s3.delete_objects(
+                                Bucket=resource_id,
+                                Delete={'Objects': objects_to_delete}
+                            )
+                            logger.info(f"Deleted {len(objects_to_delete)} objects from bucket: {resource_id}")
+                        
+                        # Now delete the bucket
+                        s3.delete_bucket(Bucket=resource_id)
+                        logger.info(f"Deleted S3 bucket: {resource_id}")
+                    except Exception as bucket_cleanup_error:
+                        logger.warning(f"Could not delete S3 bucket {resource_id}: {str(bucket_cleanup_error)}")
+                        # Don't fail the entire cleanup if bucket deletion fails
                 else:
                     logger.warning(f"Skipping cleanup for {resource_type}: {resource_id} - client not available")
             except Exception as cleanup_error:

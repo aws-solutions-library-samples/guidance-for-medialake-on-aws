@@ -7,7 +7,10 @@ export default {
     chinese: 'סינית',
     hindi: 'הינדי',
     arabic: 'ערבית',
-    hebrew: 'עברית'
+    hebrew: 'עברית',
+    japanese: 'יפנית',
+    korean: 'קוריאנית',
+    spanish: 'ספרדית'
   },
   assetsPage: {
     title: 'נכסים',
@@ -327,6 +330,23 @@ export default {
       performance: {
         title: 'הגדרות ביצועים',
         comingSoon: 'הגדרות ביצועים יגיעו בקרוב.'
+      }
+    },
+    groups: {
+      actions: {
+        addGroup: 'הוסף קבוצה',
+        editGroup: 'ערוך קבוצה',
+        deleteGroup: 'מחק קבוצה',
+        createGroup: 'צור קבוצה',
+        manageGroups: 'נהל קבוצות'
+      }
+    },
+    permissionSets: {
+      noAssignments: 'אין סטי הרשאות',
+      actions: {
+        addPermissionSet: 'הוסף סט הרשאות',
+        editPermissionSet: 'ערוך סט הרשאות',
+        deletePermissionSet: 'מחק סט הרשאות'
       }
     }
   },
@@ -765,6 +785,23 @@ export default {
         environments: {
           title: 'סביבות'
         }
+      }
+    },
+    groups: {
+      actions: {
+        addGroup: 'הוסף קבוצה',
+        editGroup: 'ערוך קבוצה',
+        deleteGroup: 'מחק קבוצה',
+        createGroup: 'צור קבוצה',
+        manageGroups: 'נהל קבוצות'
+      }
+    },
+    permissionSets: {
+      noAssignments: 'אין סטי הרשאות',
+      actions: {
+        addPermissionSet: 'הוסף סט הרשאות',
+        editPermissionSet: 'ערוך סט הרשאות',
+        deletePermissionSet: 'מחק סט הרשאות'
       }
     }
   }

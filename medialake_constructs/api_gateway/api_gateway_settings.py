@@ -17,23 +17,13 @@ from aws_cdk import (
     aws_iam as iam,
     aws_secretsmanager as secretsmanager,
     aws_cognito as cognito,
-    aws_dynamodb as dynamodb,
     Stack,
-    aws_lambda_python_alpha as lambda_python_alpha,
-    aws_lambda as _lambda,
-    aws_events as events,
-    aws_s3 as s3,
 )
 from medialake_constructs.shared_constructs.lam_deployment import LambdaDeployment
 
 from medialake_constructs.shared_constructs.lambda_base import (
     Lambda,
     LambdaConfig,
-)
-
-from medialake_constructs.shared_constructs.dynamodb import (
-    DynamoDB,
-    DynamoDBProps,
 )
 
 from .api_gateway_utils import add_cors_options_method
@@ -304,7 +294,11 @@ class SettingsConstruct(Construct):
         settings_users_get_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
-                actions=["cognito-idp:ListUsers", "cognito-idp:AdminGetUser"],
+                actions=[
+                    "cognito-idp:ListUsers", 
+                    "cognito-idp:AdminGetUser",
+                    "cognito-idp:AdminListGroupsForUser"
+                ],
                 resources=[props.cognito_user_pool.user_pool_arn],
             )
         )
@@ -460,50 +454,50 @@ class SettingsConstruct(Construct):
             authorizer=props.cognito_authorizer,
         )
 
-        settings_users_user_post_lambda = Lambda(
-            self,
-            "SettingsUsersUserPostLambda",
-            config=LambdaConfig(
-                name="settings_users_user_post_lambda",
-                entry="lambdas/api/settings/users/user/post_user",
-                environment_variables={
-                    "X_ORIGIN_VERIFY_SECRET_ARN": (
-                        props.x_origin_verify_secret.secret_arn
-                    ),
-                    "USER_POOL_ID": (props.cognito_user_pool.user_pool_id),
-                    "APP_CLIENT_ID": (props.cognito_app_client),
-                },
-            ),
-        )
+        # settings_users_user_post_lambda = Lambda(
+        #     self,
+        #     "SettingsUsersUserPostLambda",
+        #     config=LambdaConfig(
+        #         name="settings_users_user_post_lambda",
+        #         entry="lambdas/api/settings/users/user/post_user",
+        #         environment_variables={
+        #             "X_ORIGIN_VERIFY_SECRET_ARN": (
+        #                 props.x_origin_verify_secret.secret_arn
+        #             ),
+        #             "USER_POOL_ID": (props.cognito_user_pool.user_pool_id),
+        #             "APP_CLIENT_ID": (props.cognito_app_client),
+        #         },
+        #     ),
+        # )
 
-        settings_users_user_post_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "cognito-idp:AdminCreateUser",
-                    "cognito-idp:AdminUpdateUserAttributes",
-                    "cognito-idp:AdminGetUser",
-                    "cognito-idp:AdminAddUserToGroup",
-                    "cognito-idp:AdminListGroupsForUser",
-                    "cognito-idp:ListGroups",
-                    "cognito-idp:AdminSetUserPassword",
-                    "cognito-idp:AdminInitiateAuth",
-                ],
-                resources=[props.cognito_user_pool.user_pool_arn],
-            )
-        )
+        # settings_users_user_post_lambda.function.add_to_role_policy(
+        #     iam.PolicyStatement(
+        #         effect=iam.Effect.ALLOW,
+        #         actions=[
+        #             "cognito-idp:AdminCreateUser",
+        #             "cognito-idp:AdminUpdateUserAttributes",
+        #             "cognito-idp:AdminGetUser",
+        #             "cognito-idp:AdminAddUserToGroup",
+        #             "cognito-idp:AdminListGroupsForUser",
+        #             "cognito-idp:ListGroups",
+        #             "cognito-idp:AdminSetUserPassword",
+        #             "cognito-idp:AdminInitiateAuth",
+        #         ],
+        #         resources=[props.cognito_user_pool.user_pool_arn],
+        #     )
+        # )
 
-        settings_users_user_resource.add_method(
-            "POST",
-            api_gateway.LambdaIntegration(settings_users_user_post_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
-        )
+        # settings_users_user_resource.add_method(
+        #     "POST",
+        #     api_gateway.LambdaIntegration(settings_users_user_post_lambda.function),
+        #     authorization_type=api_gateway.AuthorizationType.COGNITO,
+        #     authorizer=props.cognito_authorizer,
+        # )
         
         # Add CORS support to additional resources
         add_cors_options_method(settings_users_resource)
         add_cors_options_method(settings_users_userid_resource)
-        add_cors_options_method(settings_users_user_resource)
+        # add_cors_options_method(settings_users_user_resource)
         add_cors_options_method(settings_users_user_userid_resource)
         add_cors_options_method(settings_roles_resource)
         add_cors_options_method(settings_roles_role_resource)

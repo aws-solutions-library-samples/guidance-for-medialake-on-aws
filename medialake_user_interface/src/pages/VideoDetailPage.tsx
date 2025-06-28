@@ -327,16 +327,22 @@ const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetD
 
     // Extract metadata from API response
     const metadata = assetData?.data?.asset?.Metadata?.EmbeddedMetadata || {};
-    const generalMetadata = metadata?.General || {};
-    const videoMetadata = metadata?.Video?.[0] || {};
+    const generalMetadata = metadata.general || {};
+    const videoMetadata = Array.isArray(metadata.video) ? metadata.video[0] : {};
+    
+
     const fileSize = assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.FileInfo?.Size || 0;
     const format = assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.Format || 'Unknown';
-    const duration = generalMetadata?.Duration || 'Unknown';
-    const width = videoMetadata?.Width || 'Unknown';
-    const height = videoMetadata?.Height || 'Unknown';
-    const frameRate = videoMetadata?.Framerate || 'Unknown';
-    const bitRate = videoMetadata?.Bitrate ? `${Math.round(videoMetadata.Bitrate / 1000)} kbps` : 'Unknown';
-    const codec = videoMetadata?.CodecName || 'Unknown';
+    const duration = generalMetadata.Duration ? `${parseFloat(generalMetadata.Duration).toFixed(2)} s` : 'Unknown';
+    const width = videoMetadata.Width ?? 'Unknown';
+    const height = videoMetadata.Height ?? 'Unknown';
+    const frameRate = videoMetadata.FrameRate ? `${videoMetadata.FrameRate} FPS` : 'Unknown';
+    const bitRate = (videoMetadata.OverallBitRate || videoMetadata.BitRate)
+      ? `${Math.round((videoMetadata.OverallBitRate || videoMetadata.BitRate) / 1000)} kbps`
+      : 'Unknown';
+    const codec = videoMetadata.codec_name || metadata.general.Format || 'Unknown';
+    
+    
     const createdDate = assetData?.data?.asset?.DigitalSourceAsset?.CreateDate
         ? new Date(assetData.data.asset.DigitalSourceAsset.CreateDate).toLocaleDateString()
         : 'Unknown';
@@ -454,7 +460,7 @@ const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetD
             </Box>
             
             {/* Description & Keywords Section */}
-            <Box sx={{ mb: 3 }}>
+            {/* <Box sx={{ mb: 3 }}>
                 <Typography 
                     sx={{ 
                         color: descKeywordsColor,
@@ -497,7 +503,7 @@ const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetD
                             />
                         ))}
                 </Box>
-            </Box>
+            </Box> */}
         </Box>
     );
 };

@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
-import axios from 'axios';
+import { apiClient } from '@/api/apiClient';
+import { API_ENDPOINTS } from '@/api/endpoints';
 
 interface UploadRequest {
   connector_id: string;
@@ -45,8 +46,8 @@ const useS3Upload = (): UseS3UploadReturn => {
     setError(null);
     
     try {
-      const response = await axios.post<{ status: string; message: string; data: S3UploadResponse }>(
-        '/api/assets/upload',
+      const response = await apiClient.post<{ status: string; message: string; data: S3UploadResponse }>(
+        API_ENDPOINTS.ASSETS.UPLOAD,
         request
       );
       

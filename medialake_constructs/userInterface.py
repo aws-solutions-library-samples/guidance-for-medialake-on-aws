@@ -222,6 +222,7 @@ class UIConstruct(Construct):
                 access_control_allow_credentials=False,
                 access_control_allow_headers=[
                     "Authorization",
+                    "authorization",
                     "Content-Type",
                     "X-Api-Key",
                     "X-Amz-Date",
@@ -296,6 +297,7 @@ class UIConstruct(Construct):
                 access_control_allow_credentials=False,
                 access_control_allow_headers=[
                     "Authorization",
+                    "authorization",
                     "Content-Type",
                     "X-Api-Key",
                     "X-Amz-Date",

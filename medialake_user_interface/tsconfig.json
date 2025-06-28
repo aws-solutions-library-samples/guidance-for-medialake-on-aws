@@ -13,6 +13,7 @@
             "DOM.Iterable",
             "ESNext"
         ],
+        "types": ["node"],
         "allowJs": false,
         "skipLibCheck": true,
         "esModuleInterop": false,
@@ -28,6 +29,8 @@
         "noImplicitAny": false
     },
     "include": [
-        "src"
+        "src",
+        "fixtures",
+        "tests"
     ]
 }

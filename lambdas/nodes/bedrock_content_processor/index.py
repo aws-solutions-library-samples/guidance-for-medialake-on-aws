@@ -4,6 +4,7 @@ from decimal import Decimal
 from typing import Any, Callable, Dict, Union
 
 import boto3
+
 from botocore.exceptions import ClientError
 from jinja2 import Environment, FileSystemLoader
 from aws_lambda_powertools import Logger, Tracer
@@ -208,6 +209,66 @@ def build_bedrock_body(
 # ────────────────────────────────────────────────────────────
 # Utility helpers
 # ────────────────────────────────────────────────────────────
+
+def get_inference_profile_for_model(
+    model_id: str,
+    region_name: str = None
+) -> str:
+    """
+    Find an inference profile that wraps the given model_id.
+    Returns the inferenceProfileId (or ARN) you should pass to invoke_model().
+    Raises:
+      - PermissionError if you can’t list or describe profiles
+      - ValueError if no accessible profile contains model_id
+    """
+    # 1) Build the Bedrock control-plane client
+    kwargs = {}
+    if region_name:
+        kwargs["region_name"] = region_name
+    bedrock = boto3.client("bedrock", **kwargs)
+
+    # 2) Page through list_inference_profiles
+    profiles = []
+    next_token = None
+    try:
+        while True:
+            resp = bedrock.list_inference_profiles(
+                maxResults=50,
+                **({"nextToken": next_token} if next_token else {})
+            )
+            profiles.extend(resp.get("inferenceProfileSummaries", []))
+            next_token = resp.get("nextToken")
+            if not next_token:
+                break
+    except ClientError as e:
+        logger.error("Failed to list inference profiles", exc_info=e)
+        raise PermissionError("Cannot list Bedrock inference profiles") from e
+
+    # 3) For each profile, call get_inference_profile and look for your model
+    for summary in profiles:
+        profile_id = summary["inferenceProfileId"]
+        try:
+            detail = bedrock.get_inference_profile(
+                inferenceProfileIdentifier=profile_id
+            )
+        except ClientError as e:
+            code = e.response.get("Error", {}).get("Code", "")
+            if code in ("AccessDeniedException", "AccessDenied"):
+                logger.error(f"No permission to get profile {profile_id}", exc_info=e)
+                raise PermissionError(f"No access to inference profile {profile_id}") from e
+            logger.warning(f"Skipping profile {profile_id} due to error", exc_info=e)
+            continue
+
+        # detail["models"] is a list of { "modelArn": "...foundation-model/<model-id>" }
+        for m in detail.get("models", []):
+            arn = m.get("modelArn", "")
+            if model_id in arn or arn.endswith(f"/{model_id}"):
+                # Found a profile that contains your model!
+                return profile_id
+
+    # 4) Nothing found
+    raise ValueError(f"Model '{model_id}' not found in any accessible inference profile")
+
 def _format_prompt_name_for_dynamo(prompt_name: str) -> str:
     """
     Format prompt name for DynamoDB field name.
@@ -348,11 +409,21 @@ def lambda_handler(event, context):
         else:
             raise ValueError(f"Unsupported content source '{content_src}'")
 
+
+        try:
+            profile_id = get_inference_profile_for_model(
+                model_id,
+                region_name=os.getenv("AWS_REGION")
+            )
+        except (PermissionError, ValueError) as e:
+            logger.error("Bedrock setup error", exc_info=e)
+            raise
+
         # ── Invoke Bedrock ────────────────────────────────────────────────
         logger.info(f"Invoking {model_id} with payload from {fetched_uri}")
         try:
             resp = bedrock_rt.invoke_model(
-                modelId=model_id,
+                modelId=profile_id,
                 body=body_json,
                 contentType="application/json"
             )

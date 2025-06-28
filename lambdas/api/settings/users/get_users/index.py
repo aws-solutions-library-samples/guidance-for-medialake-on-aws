@@ -1,5 +1,5 @@
 import boto3
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import os
 import json
 from aws_lambda_powertools import Logger, Metrics, Tracer
@@ -9,6 +9,7 @@ from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
 from aws_lambda_powertools.metrics import MetricUnit
 from boto3.session import Session
+import time
 
 
 # Initialize PowerTools
@@ -60,6 +61,54 @@ INPUT_SCHEMA = {
 
 
 @tracer.capture_method
+def get_user_groups(username: str) -> List[str]:
+    """Get groups for a specific user."""
+    try:
+        logger.info(f"Fetching groups for user: {username}")
+        
+        response = cognito.admin_list_groups_for_user(
+            UserPoolId=USER_POOL_ID, 
+            Username=username
+        )
+        
+        logger.debug(f"Raw groups response for user {username}: {response}")
+        
+        groups = []
+        for group in response.get("Groups", []):
+            group_name = group.get("GroupName")
+            if group_name:
+                groups.append(group_name)
+                logger.debug(f"Added group '{group_name}' for user {username}")
+        
+        logger.info(f"Found {len(groups)} groups for user {username}: {groups}")
+        return groups
+        
+    except cognito.exceptions.UserNotFoundException:
+        logger.warning(f"User {username} not found when fetching groups")
+        return []
+    except cognito.exceptions.NotAuthorizedException as e:
+        logger.error(f"Not authorized to get groups for user {username}: {str(e)}")
+        # Add metric for permission errors
+        metrics.add_metric(name="GroupsFetchAuthError", unit=MetricUnit.Count, value=1)
+        return []
+    except cognito.exceptions.InvalidParameterException as e:
+        logger.error(f"Invalid parameter when getting groups for user {username}: {str(e)}")
+        return []
+    except Exception as e:
+        logger.error(
+            f"Unexpected error getting groups for user {username}: {str(e)}",
+            extra={
+                "error_type": type(e).__name__,
+                "user_pool_id": USER_POOL_ID,
+                "username": username,
+            }
+        )
+        # Add metric for general errors
+        metrics.add_metric(name="GroupsFetchError", unit=MetricUnit.Count, value=1)
+        return []
+
+
+@tracer.capture_method
 def get_detailed_user_info(username: str) -> Dict[str, Any]:
     """Get detailed user information using admin_get_user."""
     try:
@@ -69,6 +118,20 @@ def get_detailed_user_info(username: str) -> Dict[str, Any]:
         attributes = {}
         for attr in response.get("UserAttributes", []):
             attributes[attr["Name"]] = attr["Value"]
+
+        # Get user groups with timing
+        start_time = time.time()
+        user_groups = get_user_groups(username)
+        groups_fetch_time = (time.time() - start_time) * 1000
+        
+        # Add metric for groups fetch time
+        metrics.add_metric(
+            name="GroupsFetchTime",
+            unit=MetricUnit.Milliseconds,
+            value=groups_fetch_time
+        )
+        
+        logger.debug(f"Groups fetch took {groups_fetch_time:.2f}ms for user {username}")
 
         return {
             "username": username,
@@ -88,7 +151,7 @@ def get_detailed_user_info(username: str) -> Dict[str, Any]:
             "email_verified": attributes.get("email_verified"),
             "name": attributes.get("given_name"),
             "family_name": attributes.get("family_name"),
-            "groups": [],
+            "groups": user_groups,
         }
     except Exception as e:
         logger.error(f"Error getting detailed user info for {username}: {str(e)}")
@@ -155,12 +218,18 @@ def get_users():
 
         # Process users with detailed information
         users = []
+        total_groups_found = 0
         with tracer.provider.in_subsegment("## get-detailed-users"):
             for user in response.get("Users", []):
                 username = user.get("Username")
                 detailed_user = get_detailed_user_info(username)
                 if detailed_user:
                     users.append(detailed_user)
+                    groups_count = len(detailed_user.get("groups", []))
+                    total_groups_found += groups_count
+                    logger.debug(f"User {username} has {groups_count} groups")
+        
+        logger.info(f"Processed {len(users)} users with total of {total_groups_found} group memberships")
 
         # Prepare search metadata
         search_metadata = {
