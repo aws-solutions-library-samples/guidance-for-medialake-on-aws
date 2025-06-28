@@ -119,7 +119,7 @@ const IntegrationsPage: React.FC = () => {
                 show: true,
                 status: 'success',
                 action: editingIntegration ? 'Integration Updated' : 'Integration Created',
-                message: `Integration "${values.nodeId}" saved.`,
+                message: `Integration "${result.data?.name || values.nodeId.replace('_', ' ')}" saved.`,
             });
             
             // Close the form and refresh data

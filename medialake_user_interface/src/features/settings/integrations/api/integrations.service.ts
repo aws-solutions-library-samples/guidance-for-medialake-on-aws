@@ -1,6 +1,6 @@
 import { apiClient } from '@/api/apiClient';
 import { INTEGRATIONS_API } from './integrations.endpoints';
-import type { CreateIntegrationDto, IntegrationsResponse } from '../types/integrations.types';
+import type { CreateIntegrationDto, UpdateIntegrationDto, IntegrationsResponse } from '../types/integrations.types';
 
 export const IntegrationsService = {
     createIntegration: async (data: CreateIntegrationDto): Promise<IntegrationsResponse> => {
@@ -29,7 +29,7 @@ export const IntegrationsService = {
         );
         return response.data;
     },
-    updateIntegration: async (id: string, data: CreateIntegrationDto): Promise<IntegrationsResponse> => {
+    updateIntegration: async (id: string, data: UpdateIntegrationDto): Promise<IntegrationsResponse> => {
         const response = await apiClient.put<IntegrationsResponse>(
             INTEGRATIONS_API.endpoints.UPDATE_INTEGRATION(id),
             data
