@@ -39,7 +39,7 @@ const ExecutionsPage: React.FC = () => {
     const navigate = useNavigate();
 
     // State declarations
-    const [sorting, setSorting] = useState<SortingState>([]);
+    const [sorting, setSorting] = useState<SortingState>([{ id: 'start_time', desc: true }]);
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
     const [columnVisibility, setColumnVisibility] = useState({});
     const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
