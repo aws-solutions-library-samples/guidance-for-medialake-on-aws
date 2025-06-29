@@ -51,11 +51,15 @@ class SearchConstruct(Construct):
             self,
             "SearchGetLambda",
             config=LambdaConfig(
-                name="search_get_lambda",
+                name="get_search",
                 vpc=props.vpc,
                 security_groups=[props.security_group],
                 entry="lambdas/api/search/get_search",
                 layers=[search_layer.layer],
+                memory_size=9000,
+                snap_start=True,
+                timeout_minutes=10,
+                
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": (
                         props.x_origin_verify_secret.secret_arn
@@ -159,7 +163,7 @@ class SearchConstruct(Construct):
             self,
             "SearchFieldsLambda",
             config=LambdaConfig(
-                name="search-fields-get",
+                name="get_search_fields",
                 entry="lambdas/api/search/fields/get_fields",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": (

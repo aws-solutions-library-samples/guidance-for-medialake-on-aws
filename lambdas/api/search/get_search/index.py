@@ -1,10 +1,11 @@
 from xmlrpc import client
+import time
 from aws_lambda_powertools import Logger, Tracer, Metrics
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from pydantic import BaseModel, Field, conint, ConfigDict
 import os
 import boto3
@@ -24,6 +25,7 @@ from datetime import datetime
 import json
 from search_utils import (
     generate_presigned_url,
+    generate_presigned_urls_batch,
     parse_search_query,
     parse_size_value,
     parse_date_value,
@@ -195,22 +197,31 @@ def build_semantic_query(params: SearchParams) -> Dict:
     from twelvelabs import TwelveLabs
     from twelvelabs.models.embed import SegmentEmbedding
 
-    logger.info(f"Building semantic query for: {params.q}")
+    start_time = time.time()
+    logger.info(f"[PERF] Starting semantic query build for: {params.q}")
 
     # Get the API key from Secrets Manager
+    api_key_start = time.time()
     api_key = get_api_key()
+    logger.info(f"[PERF] API key retrieval took: {time.time() - api_key_start:.3f}s")
+    
     if not api_key:
         raise SearchException("Search provider API key not configured or provider not enabled")
 
     # Initialize the Twelve Labs client
+    client_init_start = time.time()
     twelve_labs_client = TwelveLabs(api_key=api_key)
+    logger.info(f"[PERF] TwelveLabs client initialization took: {time.time() - client_init_start:.3f}s")
 
     try:
         # Create embedding for the search query
+        embedding_start = time.time()
+        logger.info(f"[PERF] Starting embedding creation for query: {params.q}")
         res = twelve_labs_client.embed.create(
             model_name="Marengo-retrieval-2.7",
             text=params.q,
         )
+        logger.info(f"[PERF] Embedding creation took: {time.time() - embedding_start:.3f}s")
 
         if res.text_embedding is not None and res.text_embedding.segments is not None:
             embedding = list(res.text_embedding.segments[0].embeddings_float)
@@ -246,6 +257,7 @@ def build_semantic_query(params: SearchParams) -> Dict:
                 ]
 
             logger.info(f"Semantic query size: {query['size']}, k: {query['query']['bool']['must'][0]['knn']['embedding']['k']}")
+            logger.info(f"[PERF] Total semantic query build time: {time.time() - start_time:.3f}s")
             return query
         else:
             raise SearchException("Failed to generate embedding for search term")
@@ -256,12 +268,17 @@ def build_semantic_query(params: SearchParams) -> Dict:
 
 def build_search_query(params: SearchParams) -> Dict:
     """Build OpenSearch query from search parameters"""
-    logger.info("Building search query", extra={"semantic": params.semantic, "query": params.q})
+    start_time = time.time()
+    logger.info(f"[PERF] Starting search query build - semantic: {params.semantic}, query: {params.q}")
 
     if params.semantic:
-        return build_semantic_query(params)
+        result = build_semantic_query(params)
+        logger.info(f"[PERF] Total search query build time (semantic): {time.time() - start_time:.3f}s")
+        return result
 
+    parse_start = time.time()
     clean_query, parsed_filters = parse_search_query(params.q)
+    logger.info(f"[PERF] Query parsing took: {time.time() - parse_start:.3f}s")
     logger.info("Parsed search query", extra={"clean_query": clean_query})
 
     name_fields = [
@@ -461,6 +478,8 @@ def build_search_query(params: SearchParams) -> Dict:
             ]
         }
     }
+    
+    logger.info(f"[PERF] Total search query build time (regular): {time.time() - start_time:.3f}s")
 
 
 def add_common_fields(result: Dict, prefix: str = "") -> Dict:
@@ -507,6 +526,88 @@ def add_common_fields(result: Dict, prefix: str = "") -> Dict:
         result["metadata"] = result["Metadata"].get("Consolidated", {})
     
     return result
+
+
+def collect_presigned_url_requests(hits: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
+    """
+    Collect all presigned URL requests from search hits without generating URLs.
+    Returns tuple of (processed_hits_data, url_requests)
+    """
+    processed_hits = []
+    url_requests = []
+    
+    for hit in hits:
+        source = hit["_source"]
+        digital_source_asset = source.get("DigitalSourceAsset", {})
+        derived_representations = source.get("DerivedRepresentations", [])
+        
+        asset_id = digital_source_asset.get("ID", "unknown")
+        hit_data = {
+            'hit': hit,
+            'source': source,
+            'asset_id': asset_id,
+            'thumbnail_request_id': None,
+            'proxy_request_id': None
+        }
+        
+        # Collect URL requests for derived representations
+        for representation in derived_representations:
+            purpose = representation.get("Purpose")
+            rep_storage_info = representation.get("StorageInfo", {}).get("PrimaryLocation", {})
+            
+            if rep_storage_info.get("StorageType") == "s3":
+                bucket = rep_storage_info.get("Bucket", "")
+                key = rep_storage_info.get("ObjectKey", {}).get("FullPath", "")
+                
+                if bucket and key:
+                    request_id = f"{asset_id}_{purpose}_{len(url_requests)}"
+                    
+                    url_requests.append({
+                        'request_id': request_id,
+                        'bucket': bucket,
+                        'key': key
+                    })
+                    
+                    if purpose == "thumbnail":
+                        hit_data['thumbnail_request_id'] = request_id
+                    elif purpose == "proxy":
+                        hit_data['proxy_request_id'] = request_id
+        
+        processed_hits.append(hit_data)
+    
+    return processed_hits, url_requests
+
+
+def process_search_hit_with_urls(hit_data: Dict, presigned_urls: Dict[str, Optional[str]]) -> Dict:
+    """Process a single search hit with pre-generated presigned URLs"""
+    hit = hit_data['hit']
+    source = hit_data['source']
+    
+    # Get presigned URLs from the batch results
+    thumbnail_url = None
+    proxy_url = None
+    
+    if hit_data['thumbnail_request_id']:
+        thumbnail_url = presigned_urls.get(hit_data['thumbnail_request_id'])
+    
+    if hit_data['proxy_request_id']:
+        proxy_url = presigned_urls.get(hit_data['proxy_request_id'])
+    
+    # Create base result object
+    result = AssetSearchResult(
+        InventoryID=source.get("InventoryID", ""),
+        DigitalSourceAsset=source.get("DigitalSourceAsset", {}),
+        DerivedRepresentations=source.get("DerivedRepresentations", []),
+        FileHash=source.get("FileHash", ""),
+        Metadata=source.get("Metadata", {}),
+        score=hit["_score"],
+        thumbnailUrl=thumbnail_url,
+        proxyUrl=proxy_url,
+    )
+    
+    # Convert to dictionary and add common fields
+    result_dict = result.model_dump(by_alias=True)
+    return add_common_fields(result_dict)
 
 
 def process_search_hit(hit: Dict) -> Dict:
@@ -805,28 +906,44 @@ def create_search_metadata(total_results: int, params: SearchParams, aggregation
 
 def perform_search(params: SearchParams) -> Dict:
     """Perform search operation in OpenSearch with proper error handling."""
+    overall_start = time.time()
+    logger.info(f"[PERF] Starting search operation for query: {params.q}")
+    
+    client_start = time.time()
     client = get_opensearch_client()
+    logger.info(f"[PERF] OpenSearch client retrieval took: {time.time() - client_start:.3f}s")
+    
     index_name = os.environ["OPENSEARCH_INDEX"]
 
     try:
+        query_build_start = time.time()
         search_body = build_search_query(params)
+        logger.info(f"[PERF] Search query building took: {time.time() - query_build_start:.3f}s")
+        
         logger.info("Executing OpenSearch query", extra={"semantic": params.semantic})
-
+        opensearch_start = time.time()
         response = client.search(body=search_body, index=index_name)
+        opensearch_time = time.time() - opensearch_start
+        logger.info(f"[PERF] OpenSearch query execution took: {opensearch_time:.3f}s")
+        
         hits = response.get("hits", {}).get("hits", [])
         
         logger.info(f"OpenSearch returned {len(hits)} hits from {response['hits']['total']['value']} total")
 
         if params.semantic:
             if CLIP_LOGIC_ENABLED:
+                semantic_processing_start = time.time()
                 processed_results = process_semantic_results_parallel(hits)
+                logger.info(f"[PERF] Semantic results processing took: {time.time() - semantic_processing_start:.3f}s")
                 
                 # Add common fields to each result and clips
+                common_fields_start = time.time()
                 for result in processed_results:
                     add_common_fields(result)
                     if "clips" in result and result["clips"]:
                         for clip in result["clips"]:
                             add_common_fields(clip)
+                logger.info(f"[PERF] Adding common fields took: {time.time() - common_fields_start:.3f}s")
                 
                 # Handle pagination for semantic results
                 total_results = len(processed_results)
@@ -850,6 +967,7 @@ def perform_search(params: SearchParams) -> Dict:
                 )
                 
                 logger.info(f"Semantic search completed: {total_results} total, {len(paged_results)} returned")
+                logger.info(f"[PERF] Total semantic search time: {time.time() - overall_start:.3f}s")
                 
                 return {
                     "status": "200",
@@ -860,15 +978,37 @@ def perform_search(params: SearchParams) -> Dict:
                     },
                 }
             else:
-                # Semantic search without clip logic
+                # Semantic search without clip logic - with batch presigned URL generation
+                batch_processing_start = time.time()
+                
+                # Step 1: Collect all presigned URL requests
+                url_collection_start = time.time()
+                processed_hits_data, url_requests = collect_presigned_url_requests(hits)
+                logger.info(f"[PERF] Semantic URL request collection took: {time.time() - url_collection_start:.3f}s")
+                logger.info(f"Collected {len(url_requests)} presigned URL requests for {len(processed_hits_data)} semantic hits")
+                
+                # Step 2: Generate all presigned URLs in parallel
+                if url_requests:
+                    batch_url_start = time.time()
+                    presigned_urls = generate_presigned_urls_batch(url_requests)
+                    logger.info(f"[PERF] Semantic batch presigned URL generation took: {time.time() - batch_url_start:.3f}s")
+                    logger.info(f"Generated {len([url for url in presigned_urls.values() if url])} successful URLs out of {len(url_requests)} requests")
+                else:
+                    presigned_urls = {}
+                
+                # Step 3: Process all hits with pre-generated URLs
+                results_processing_start = time.time()
                 results = []
-                for hit in hits:
+                for hit_data in processed_hits_data:
                     try:
-                        result = process_search_hit(hit)
+                        result = process_search_hit_with_urls(hit_data, presigned_urls)
                         results.append(result)
                     except Exception as e:
-                        logger.warning(f"Error processing hit: {str(e)}")
+                        logger.warning(f"Error processing semantic hit: {str(e)}")
                         continue
+                
+                logger.info(f"[PERF] Semantic results processing took: {time.time() - results_processing_start:.3f}s")
+                logger.info(f"[PERF] Total semantic batch processing took: {time.time() - batch_processing_start:.3f}s")
 
                 # Handle pagination
                 total_results = len(results)
@@ -894,20 +1034,41 @@ def perform_search(params: SearchParams) -> Dict:
                     },
                 }
         else:
-            # Regular text search
+            # Regular text search with batch presigned URL generation
+            batch_processing_start = time.time()
+            
+            # Step 1: Collect all presigned URL requests
+            url_collection_start = time.time()
+            processed_hits_data, url_requests = collect_presigned_url_requests(hits)
+            logger.info(f"[PERF] URL request collection took: {time.time() - url_collection_start:.3f}s")
+            logger.info(f"Collected {len(url_requests)} presigned URL requests for {len(processed_hits_data)} hits")
+            
+            # Step 2: Generate all presigned URLs in parallel
+            if url_requests:
+                batch_url_start = time.time()
+                presigned_urls = generate_presigned_urls_batch(url_requests)
+                logger.info(f"[PERF] Batch presigned URL generation took: {time.time() - batch_url_start:.3f}s")
+                logger.info(f"Generated {len([url for url in presigned_urls.values() if url])} successful URLs out of {len(url_requests)} requests")
+            else:
+                presigned_urls = {}
+            
+            # Step 3: Process all hits with pre-generated URLs
+            results_processing_start = time.time()
             results = []
-            for hit in hits:
+            for hit_data in processed_hits_data:
                 try:
-                    result = process_search_hit(hit)
+                    result = process_search_hit_with_urls(hit_data, presigned_urls)
                     results.append(result)
                 except Exception as e:
                     logger.warning(f"Error processing hit: {str(e)}")
                     continue
-
+            
+            logger.info(f"[PERF] Results processing took: {time.time() - results_processing_start:.3f}s")
+            logger.info(f"[PERF] Total batch processing took: {time.time() - batch_processing_start:.3f}s")
             logger.info(f"Regular search completed: {len(results)} results processed")
             
             search_metadata = create_search_metadata(
-                response["hits"]["total"]["value"], params, 
+                response["hits"]["total"]["value"], params,
                 response.get("aggregations"), response.get("suggest")
             )
             
@@ -919,6 +1080,9 @@ def perform_search(params: SearchParams) -> Dict:
                     "results": results,
                 },
             }
+        
+        total_time = time.time() - overall_start
+        logger.info(f"[PERF] Total search operation time: {total_time:.3f}s")
 
     except (RequestError, NotFoundError) as e:
         logger.warning(f"OpenSearch error: {str(e)}")
@@ -951,7 +1115,11 @@ def perform_search(params: SearchParams) -> Dict:
 @app.get("/search")
 def handle_search():
     """Handle search requests with validated parameters."""
+    handler_start = time.time()
     try:
+        logger.info(f"[PERF] Starting search handler")
+        
+        param_start = time.time()
         query_params = app.current_event.get("queryStringParameters") or {}
         
         # Ensure required parameter exists
@@ -959,8 +1127,14 @@ def handle_search():
             return {"status": "400", "message": "Missing required parameter 'q'", "data": None}
         
         params = SearchParams(**query_params)
-        result = perform_search(params)
+        logger.info(f"[PERF] Parameter validation took: {time.time() - param_start:.3f}s")
         
+        search_start = time.time()
+        result = perform_search(params)
+        logger.info(f"[PERF] Search execution took: {time.time() - search_start:.3f}s")
+        
+        total_handler_time = time.time() - handler_start
+        logger.info(f"[PERF] Total handler time: {total_handler_time:.3f}s")
         logger.info(f"Search completed successfully for query: {params.q}")
         return result
         
@@ -976,4 +1150,12 @@ def handle_search():
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_HTTP)
 def lambda_handler(event: dict, context: LambdaContext) -> dict:
     """Lambda handler function"""
-    return app.resolve(event, context)
+    lambda_start = time.time()
+    logger.info(f"[PERF] Lambda handler started")
+    
+    result = app.resolve(event, context)
+    
+    total_lambda_time = time.time() - lambda_start
+    logger.info(f"[PERF] Total Lambda execution time: {total_lambda_time:.3f}s")
+    
+    return result
