@@ -5,13 +5,13 @@ const exifr = require('exifr');
 const xml2js = require('xml2js');
 const { lambdaMiddleware } = require('./lambda_middleware');
 
-const MEDIALAKE_ASSET_TABLE  = process.env.MEDIALAKE_ASSET_TABLE;
+const MEDIALAKE_ASSET_TABLE = process.env.MEDIALAKE_ASSET_TABLE;
 const UNSUPPORTED_EXTENSIONS = ['.webp'];
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function sliceArray(arr, limit) {
-  const size   = Math.min(arr.length, limit);
+  const size = Math.min(arr.length, limit);
   const values = arr.slice(0, size);
   return size < arr.length ? [values, arr.length - size] : [values, 0];
 }
@@ -21,17 +21,17 @@ function formatBytes(arr) {
 }
 
 function clipBytes(uint8arr, limit = 60) {
-  const arr              = Array.from(uint8arr);
+  const arr = Array.from(uint8arr);
   const [values, remain] = sliceArray(arr, limit);
-  let out               = formatBytes(values);
+  let out = formatBytes(values);
   if (remain > 0) out += `\n... and ${remain} more`;
   return out;
 }
 
 function clipString(str, limit = 300) {
-  const arr              = str.split('');
+  const arr = str.split('');
   const [values, remain] = sliceArray(arr, limit);
-  let out               = values.join('');
+  let out = values.join('');
   if (remain > 0) out += `\n... and ${remain} more`;
   return out;
 }
@@ -48,9 +48,9 @@ const convertFloatsToDecimals = obj => {
   if (Array.isArray(obj)) return obj.map(convertFloatsToDecimals);
   const res = {};
   for (const [k, v] of Object.entries(obj)) {
-    if (typeof v === 'number')      res[k] = v.toString();
+    if (typeof v === 'number') res[k] = v.toString();
     else if (typeof v === 'object') res[k] = convertFloatsToDecimals(v);
-    else                             res[k] = v;
+    else res[k] = v;
   }
   return res;
 };
@@ -59,7 +59,7 @@ function normalizeDateString(str) {
   const m = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (m) {
     const [, y, mn, d] = m;
-    return `${y}-${mn.padStart(2,'0')}-${d.padStart(2,'0')}`;
+    return `${y}-${mn.padStart(2, '0')}-${d.padStart(2, '0')}`;
   }
   return str;
 }
@@ -80,7 +80,7 @@ function sanitizeMetadata(obj) {
     if (typeof v === 'string') {
       if (!/^0000-00-00/.test(v)) {
         let s = normalizeDateString(v);
-        s     = normalizeDateTimeString(s);
+        s = normalizeDateTimeString(s);
         if (!isNaN(Date.parse(s))) {
           out[k] = s
             .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
@@ -118,7 +118,7 @@ function removeBase64Fields(obj) {
   } else if (obj && typeof obj === 'object') {
     for (const [key, val] of Object.entries(obj)) {
       if (isLikelyBase64(val) ||
-          (Array.isArray(val) && val.every(el => isLikelyBase64(el)))
+        (Array.isArray(val) && val.every(el => isLikelyBase64(el)))
       ) {
         delete obj[key];
       } else {
@@ -149,7 +149,7 @@ async function extractOrganizedMetadata(buffer) {
 }
 
 function organizeMetadata(raw) {
-  const out  = {};
+  const out = {};
   const seen = new Set();
   for (const [seg, data] of Object.entries(raw)) {
     if (seg === 'errors') continue;
@@ -158,10 +158,10 @@ function organizeMetadata(raw) {
       for (const [k, v] of Object.entries(data)) {
         if (!seen.has(k)) {
           const val = v instanceof Uint8Array
-                    ? clipBytes(v)
-                    : typeof v === 'string'
-                      ? clipString(v)
-                      : v;
+            ? clipBytes(v)
+            : typeof v === 'string'
+              ? clipString(v)
+              : v;
           out[seg][prettyCase(k)] = val;
           seen.add(k);
         }
@@ -176,7 +176,7 @@ function organizeMetadata(raw) {
 async function extractSvgMetadata(buffer) {
   try {
     const doc = await new xml2js.Parser({ explicitArray: false })
-                               .parseStringPromise(buffer);
+      .parseStringPromise(buffer);
     return doc.svg?.metadata || null;
   } catch {
     return null;
@@ -212,7 +212,7 @@ exports.lambda_handler = async (event) => {
   for (const asset of assets) {
     // ── 1) pull the ID ────────────────────────────────────────────────
     const inventoryId = asset.InventoryID;
-  
+
     if (!inventoryId) {
       console.warn(
         'Skipping asset without InventoryID:',
@@ -220,11 +220,11 @@ exports.lambda_handler = async (event) => {
       );
       continue;
     }
-  
+
     // ── 2) locate the object in S3 ────────────────────────────────────
     const loc =
       asset.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation;
-  
+
     if (!loc?.Bucket || !loc.ObjectKey?.FullPath) {
       console.error(
         'Skipping asset with missing S3 location:',
@@ -232,34 +232,33 @@ exports.lambda_handler = async (event) => {
       );
       continue;
     }
-  
+
     try {
       // ── 3) extract & clean metadata ────────────────────────────────
-      const rawMeta     = await processImageFile(loc.Bucket, loc.ObjectKey.FullPath);
-      let   cleaned     = sanitizeMetadata(rawMeta);
+      const rawMeta = await processImageFile(loc.Bucket, loc.ObjectKey.FullPath);
+      let cleaned = sanitizeMetadata(rawMeta);
       removeBase64Fields(cleaned);
-  
-      const forced      = forceAllObjects(cleaned);
-      const newMeta     = { EmbeddedMetadata: forced };
-      const converted   = convertFloatsToDecimals(newMeta);
-      const marshalled  = AWS.DynamoDB.Converter.marshall(converted);
-  
-      // ── 4) update the item in DynamoDB ──────────────────────────────
+
+      const forced = forceAllObjects(cleaned);
+      const converted = convertFloatsToDecimals(forced);
+      const marshalled = AWS.DynamoDB.Converter.marshall(converted);
+
+      // ── 4) append under the existing Metadata map ─────────────────
       await dynamoDB.updateItem({
         TableName: MEDIALAKE_ASSET_TABLE,
-        Key: { InventoryID: { S:inventoryId } },
-        UpdateExpression: 'SET Metadata = :m',
-        ExpressionAttributeValues: { ':m': { M: marshalled } },
+        Key: { InventoryID: { S: inventoryId } },
+        UpdateExpression: 'SET #M.#E = :m',
+        ExpressionAttributeNames: {
+          '#M': 'Metadata',
+          '#E': 'EmbeddedMetadata'
+        },
+        ExpressionAttributeValues: {
+          ':m': { M: marshalled }
+        },
         ReturnValues: 'UPDATED_NEW',
       }).promise();
-  
-      // ── 5) read back the full updated item (optional) ───────────────
-      const getResp      = await dynamoDB.getItem({
-        TableName: MEDIALAKE_ASSET_TABLE,
-        Key: { InventoryID:         { S: inventoryId    } },
-      }).promise();
       const updatedAsset = AWS.DynamoDB.Converter.unmarshall(getResp.Item);
-  
+
       console.log(`Updated metadata for ${inventoryId}`);
       results.push({ inventoryId, status: 'OK', updatedAsset });
     } catch (err) {
@@ -267,7 +266,7 @@ exports.lambda_handler = async (event) => {
       results.push({ inventoryId, status: 'ERROR', message: err.message });
     }
   }
-  
+
 
   return {
     statusCode: 200,
@@ -279,12 +278,12 @@ exports.lambda_handler = async (event) => {
 
 const baseHandler = exports.lambda_handler;
 exports.lambda_handler = lambdaMiddleware({
-  eventBusName:         process.env.EVENT_BUS_NAME      || 'default-event-bus',
-  metricsNamespace:     process.env.METRICS_NAMESPACE   || 'MediaLake',
-  cleanupS3:            true,
-  largePayloadBucket:   process.env.EXTERNAL_PAYLOAD_BUCKET,
-  externalPayloadBucket:process.env.EXTERNAL_PAYLOAD_BUCKET,
-  maxRetries:           3,
-  standardizePayloads:  true,
-  maxResponseSize:      240 * 1024, // 240 KB
+  eventBusName: process.env.EVENT_BUS_NAME || 'default-event-bus',
+  metricsNamespace: process.env.METRICS_NAMESPACE || 'MediaLake',
+  cleanupS3: true,
+  largePayloadBucket: process.env.EXTERNAL_PAYLOAD_BUCKET,
+  externalPayloadBucket: process.env.EXTERNAL_PAYLOAD_BUCKET,
+  maxRetries: 3,
+  standardizePayloads: true,
+  maxResponseSize: 240 * 1024, // 240 KB
 })(baseHandler);
