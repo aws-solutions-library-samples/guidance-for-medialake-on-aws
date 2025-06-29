@@ -26,19 +26,13 @@ export const createIntegrationFormDefinition = (): FormDefinition => ({
             name: 'description',
             type: 'text',
             label: 'Description',
-            tooltip: 'Provide a description for this integration',
-            required: true,
+            tooltip: 'Provide a description for this integration (optional)',
+            required: false,
             multiline: true,
             rows: 3,
             validation: {
                 type: 'string',
-                rules: [
-                    {
-                        type: 'min',
-                        value: 1,
-                        message: 'Description is required'
-                    }
-                ]
+                rules: []
             }
         },
         {

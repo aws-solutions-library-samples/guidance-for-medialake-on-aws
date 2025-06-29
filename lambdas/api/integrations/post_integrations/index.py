@@ -132,8 +132,9 @@ def create_integration(
         # Get current UTC timestamp
         current_time = datetime.utcnow().isoformat()
         
-        # Generate name from nodeId by replacing underscores with spaces
-        generated_name = integration_data["nodeId"].replace("_", " ")
+        # Generate name from nodeId by replacing underscores with spaces and title-casing
+        # Use the actual nodeId value as provided (e.g., "twelve_labs" -> "Twelve Labs")
+        generated_name = integration_data["nodeId"].replace("_", " ").title()
         
         # Prepare the item
         item = {

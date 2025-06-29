@@ -13,8 +13,9 @@ def format_integration(item: Dict) -> Dict:
     # Use the stored Name field if available, otherwise generate from nodeId
     stored_name = item.get("Name", "")
     if not stored_name:
-        # Generate name from nodeId by replacing underscores with spaces
-        stored_name = item.get("Node", "").replace("_", " ")
+        # Generate name from nodeId by replacing underscores with spaces and title-casing
+        # Use the actual nodeId value as provided (e.g., "twelve_labs" -> "Twelve Labs")
+        stored_name = item.get("Node", "").replace("_", " ").title()
     
     return {
         "id": item.get("ID", ""),

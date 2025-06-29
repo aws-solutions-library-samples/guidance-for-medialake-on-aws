@@ -115,11 +115,12 @@ const IntegrationsPage: React.FC = () => {
             }
 
             // 3) Show success
+            const displayName = result.data?.name || values.nodeId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
             setApiStatus({
                 show: true,
                 status: 'success',
                 action: editingIntegration ? 'Integration Updated' : 'Integration Created',
-                message: `Integration "${result.data?.name || values.nodeId.replace('_', ' ')}" saved.`,
+                message: `Integration "${displayName}" saved.`,
             });
             
             // Close the form and refresh data
