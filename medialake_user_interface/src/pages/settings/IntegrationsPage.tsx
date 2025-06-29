@@ -299,7 +299,7 @@ const IntegrationsPage: React.FC = () => {
                         {t('common.cancel')}
                     </Button>
                     <Button onClick={confirmDeleteIntegration} color="error" variant="contained" autoFocus>
-                        {t('common.delete')}
+                        {t('common.actions.delete')}
                     </Button>
                 </DialogActions>
             </Dialog>
