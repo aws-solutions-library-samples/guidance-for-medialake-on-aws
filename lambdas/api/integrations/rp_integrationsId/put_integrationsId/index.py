@@ -259,7 +259,7 @@ def handle_put_integration(integration_id: str) -> Dict[str, Any]:
                     "status": updated_integration.get("Status", ""),
                     "description": updated_integration.get("Description", ""),
                     "createdAt": updated_integration.get("CreatedDate", ""),
-                    "updatedAt": updated_integration.get("ModifiedDate", ""),
+                    "updatedAt": updated_integration.get("ModifiedDate", datetime.utcnow().isoformat()),
                 },
             },
         }
