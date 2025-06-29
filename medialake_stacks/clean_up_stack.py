@@ -1,8 +1,6 @@
 from dataclasses import dataclass
 from constructs import Construct
 import aws_cdk as cdk
-import json
-import os
 
 from aws_cdk import (
     Stack,
@@ -29,12 +27,6 @@ class CleanupStack(Stack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # Load config to get resource prefix
-        config_path = os.path.join(os.path.dirname(__file__), "..", "config.json")
-        with open(config_path, "r") as f:
-            config = json.load(f)
-        resource_prefix = config.get("resource_prefix", "medialake")
-
         self._clean_up_lambda = Lambda(
             self,
             "MediaLakeCleanUp",
@@ -42,10 +34,10 @@ class CleanupStack(Stack):
                 name="MediaLakeCleanUp",
                 timeout_minutes=15,
                 entry="lambdas/back_end/provisioned_resource_cleanup",
+                # log_removal_policy=RemovalPolicy.RETAIN,  # Enable to debug
                 environment_variables={
                     "CONNECTOR_TABLE": props.connector_table.table_name,
                     "PIPELINE_TABLE": props.pipeline_table.table_name,
-                    "RESOURCE_PREFIX": resource_prefix,
                 },
             ),
         )
@@ -54,22 +46,31 @@ class CleanupStack(Stack):
         props.pipeline_table.grant_read_write_data(self._clean_up_lambda.function)
 
 
-        # Add EventBridge Pipes permissions - restricted to resource prefix
+        # Add EventBridge Pipes permissions
+        # ListPipes requires * resource - AWS API limitation for list operations
+        self._clean_up_lambda.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "pipes:ListPipes",
+                ],
+                resources=["*"],  # Required by AWS API - cannot be scoped to specific pipes
+            )
+        )
+        
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 actions=[
                     "pipes:DeletePipe",
                     "pipes:DescribePipe",
-                    "pipes:ListPipes",
                     "pipes:StopPipe",
                     "pipes:UntagResource",
                     "pipes:ListTagsForResource"
                 ],
-                resources=[f"arn:aws:pipes:{Stack.of(self).region}:{Stack.of(self).account}:pipe/{resource_prefix}*"],
+                resources=[f"arn:aws:pipes:{Stack.of(self).region}:{Stack.of(self).account}:pipe/*"],
             )
         )
 
-        # Ensure IAM permissions for role deletion are complete - restricted to resource prefix
+        # Ensure IAM permissions for role deletion are complete
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
@@ -82,55 +83,41 @@ class CleanupStack(Stack):
                     "iam:DetachRolePolicy",
                     "iam:DeleteRolePolicy",
                 ],
-                resources=[f"arn:aws:iam::{Stack.of(self).account}:role/{resource_prefix}*"],
+                resources=[f"arn:aws:iam::{Stack.of(self).account}:role/*"],
             )
         )
 
-        self._clean_up_lambda.lambda_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "lambda:DeleteEventSourceMapping",
-                ],
-                resources=[
-                    f"arn:aws:lambda:{Stack.of(self).region}:{Stack.of(self).account}:event-source-mapping:*"
-                ],
-            )
-        )
-
+        # ListEventSourceMappings requires * resource - AWS API limitation
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=[
                     "lambda:ListEventSourceMappings",
                 ],
-                resources=["*"],
+                resources=["*"],  # Required by AWS API - cannot be scoped to specific resources
             )
         )
 
-        # Lambda function deletion - restricted to resource prefix
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=["lambda:DeleteFunction"],
                 resources=[
-                    f"arn:aws:lambda:{Stack.of(self).region}:{Stack.of(self).account}:function:{resource_prefix}*"
-                ],
+                    f"arn:aws:lambda:{Stack.of(self).region}:{Stack.of(self).account}:function:*"
+                ],  # TODO add resource prefix i.e. medialake
             )
         )
 
-        # Step Functions deletion - restricted to resource prefix
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=["states:DeleteStateMachine"],
                 resources=[
-                    f"arn:aws:states:{Stack.of(self).region}:{Stack.of(self).account}:stateMachine:{resource_prefix}*"
-                ],
+                    f"arn:aws:states:{Stack.of(self).region}:{Stack.of(self).account}:stateMachine:*"
+                ],  # TODO add resource prefix i.e. medialake
             )
         )
 
-        # EventBridge rules and targets - restricted to resource prefix
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
@@ -141,14 +128,10 @@ class CleanupStack(Stack):
                     "events:RemoveTargets",
                     "events:DeleteRule",
                 ],
-                resources=[
-                    f"arn:aws:events:{Stack.of(self).region}:{Stack.of(self).account}:rule/{resource_prefix}*",
-                    f"arn:aws:events:{Stack.of(self).region}:{Stack.of(self).account}:event-bus/{resource_prefix}*",
-                ],
+                resources=["*"],
             )
         )
 
-        # SQS queue deletion - restricted to resource prefix
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
@@ -158,11 +141,10 @@ class CleanupStack(Stack):
                     "sqs:ListQueues",
                     "sqs:ListQueueTags",
                 ],
-                resources=[f"arn:aws:sqs:*:{Stack.of(self).account}:{resource_prefix}*"],
+                resources=[f"arn:aws:sqs:*:{Stack.of(self).account}:*"],
             )
         )
 
-        # S3 bucket notification permissions - keep broad for operational needs
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
@@ -174,7 +156,6 @@ class CleanupStack(Stack):
             )
         )
 
-        # CloudWatch Log Groups - restricted to resource prefix patterns
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
@@ -188,8 +169,48 @@ class CleanupStack(Stack):
                     "logs:UntagLogGroup",
                 ],
                 resources=[
-                    f"arn:aws:logs:{Stack.of(self).region}:{Stack.of(self).account}:log-group:/aws/lambda/{resource_prefix}*",
-                    f"arn:aws:logs:{Stack.of(self).region}:{Stack.of(self).account}:log-group:{resource_prefix}*",
+                    f"arn:aws:logs:{Stack.of(self).region}:{Stack.of(self).account}:log-group:*"
+                ],
+            )
+        )
+
+        # Add Secrets Manager permissions
+        # ListSecrets requires * resource - AWS API limitation for list operations
+        self._clean_up_lambda.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "secretsmanager:ListSecrets",
+                ],
+                resources=["*"],  # Required by AWS API - cannot be scoped to specific secrets
+            )
+        )
+        
+        self._clean_up_lambda.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "secretsmanager:DeleteSecret",
+                    "secretsmanager:DescribeSecret",
+                ],
+                resources=[
+                    f"arn:aws:secretsmanager:{Stack.of(self).region}:{Stack.of(self).account}:secret:integration/*",
+                    f"arn:aws:secretsmanager:{Stack.of(self).region}:{Stack.of(self).account}:secret:medialake/search/provider/*"
+                ],
+            )
+        )
+
+        # Add Step Functions permissions
+        self._clean_up_lambda.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "states:ListExecutions",
+                    "states:StopExecution",
+                ],
+                resources=[
+                    f"arn:aws:states:{Stack.of(self).region}:{Stack.of(self).account}:stateMachine:*",
+                    f"arn:aws:states:{Stack.of(self).region}:{Stack.of(self).account}:execution:*"
                 ],
             )
         )

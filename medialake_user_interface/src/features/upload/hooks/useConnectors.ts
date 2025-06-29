@@ -1,7 +1,15 @@
 import { useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import axios from 'axios';
+import { apiClient } from '@/api/apiClient';
+import { API_ENDPOINTS } from '@/api/endpoints';
 import { Connector } from '../types/upload.types';
+
+interface ConnectorsResponse {
+  status: string;
+  data?: {
+    connectors: Connector[];
+  };
+}
 
 /**
  * Hook to fetch S3 connectors
@@ -9,7 +17,7 @@ import { Connector } from '../types/upload.types';
 const useConnectors = () => {
   const fetchConnectors = useCallback(async (): Promise<Connector[]> => {
     try {
-      const response = await axios.get('/api/connectors');
+      const response = await apiClient.get<ConnectorsResponse>(API_ENDPOINTS.CONNECTORS);
       
       if (response.data.status === '200' && response.data.data?.connectors) {
         // Filter only S3 connectors that are active

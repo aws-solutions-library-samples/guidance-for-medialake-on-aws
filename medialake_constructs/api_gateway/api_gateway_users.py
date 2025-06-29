@@ -211,6 +211,15 @@ class UsersApi(Construct):
             ),
         )
 
+        # Add CORS preflight for POST method
+        users_user_resource.add_cors_preflight(
+            allow_origins=["http://localhost:5173"],
+            allow_methods=["GET", "PUT", "OPTIONS", "DELETE", "POST"],
+            allow_headers=["Content-Type", "Authorization", "X-Amz-Date", "X-Api-Key", "X-Amz-Security-Token"],
+            allow_credentials=True,
+            max_age=Duration.seconds(300),
+        )
+
         users_user_resource.add_method(
             "POST",
             api_gateway.LambdaIntegration(users_user_post_lambda.function),
@@ -359,7 +368,8 @@ class UsersApi(Construct):
 
         # Add CORS support
         add_cors_options_method(users_resource)
-        add_cors_options_method(users_user_resource)
+        # users_user_resource already has CORS configuration through add_cors_preflight
+        # add_cors_options_method(users_user_resource)
         # users_user_id_resources already has CORS configuration through add_cors_preflight
         # add_cors_options_method(users_user_id_resources)
         add_cors_options_method(users_user_id_disableuser_resource)

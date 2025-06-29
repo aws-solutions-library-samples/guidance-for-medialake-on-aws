@@ -37,10 +37,10 @@ export const useGetUsers = () => {
             const { data } = await apiClient.get<{ statusCode: number; body: string }>(API_ENDPOINTS.USERS);
             const parsedBody = JSON.parse(data.body) as UsersResponse;
             console.log('Raw user data:', JSON.stringify(parsedBody.data.users[0]));
-            // Map API response to include roles if not present
+            // Map API response to include permissions if not present
             return parsedBody.data.users.map(user => ({
                 ...user,
-                roles: user.roles || [] // Ensure roles is always present
+                permissions: user.permissions || [] // Ensure permissions is always present
             }));
         },
     });
@@ -64,20 +64,54 @@ export const useCreateUser = () => {
 
     return useMutation<CreateUserResponse, Error, CreateUserRequest>({
         mutationFn: async (newUser) => {
-            const { data } = await apiClient.post<{ statusCode: number; body: string }>(API_ENDPOINTS.USER, newUser);
-            console.log('Raw API Response:', data);
+            console.log('Sending user creation request with groups:', newUser.groups);
+            const response = await apiClient.post<CreateUserResponse>(API_ENDPOINTS.USER, newUser);
+            console.log('Raw API Response:', response.data);
 
-            // Parse the stringified body
-            const parsedBody = JSON.parse(data.body);
-            console.log('Parsed body:', parsedBody);
+            // Handle both wrapped and direct response formats
+            let responseData = response.data;
+            
+            // If response is wrapped in statusCode/body format, parse it
+            if (typeof responseData === 'object' && 'statusCode' in responseData && 'body' in responseData) {
+                const wrappedResponse = responseData as { statusCode: number; body: string };
+                if (typeof wrappedResponse.body === 'string') {
+                    responseData = JSON.parse(wrappedResponse.body);
+                    console.log('Parsed wrapped response:', responseData);
+                }
+            }
 
-            // Return the parsed response with the correct structure
+            // Log detailed group assignment results
+            if (responseData.data) {
+                console.log('Group assignment results:', {
+                    groupsAdded: responseData.data.groupsAdded || [],
+                    groupsFailed: responseData.data.groupsFailed || [],
+                    invalidGroups: responseData.data.invalidGroups || [],
+                    groupsAddedCount: responseData.data.groupsAdded?.length || 0,
+                    groupsFailedCount: responseData.data.groupsFailedCount || 0,
+                    invalidGroupsCount: responseData.data.invalidGroupsCount || 0,
+                });
+
+                // Log any issues with group assignment
+                if (responseData.data.groupsFailed && responseData.data.groupsFailed.length > 0) {
+                    console.warn('Some groups failed to be assigned:', responseData.data.groupsFailed);
+                }
+                if (responseData.data.invalidGroups && responseData.data.invalidGroups.length > 0) {
+                    console.warn('Some groups were invalid:', responseData.data.invalidGroups);
+                }
+            }
+
+            // Return the response with the correct structure
             return {
-                status: parsedBody.status,
-                message: parsedBody.message,
+                status: responseData.status,
+                message: responseData.message,
                 data: {
-                    username: parsedBody.data.username,
-                    userStatus: parsedBody.data.userStatus
+                    username: responseData.data?.username,
+                    userStatus: responseData.data?.userStatus,
+                    groupsAdded: responseData.data?.groupsAdded || [],
+                    groupsFailed: responseData.data?.groupsFailed,
+                    groupsFailedCount: responseData.data?.groupsFailedCount,
+                    invalidGroups: responseData.data?.invalidGroups,
+                    invalidGroupsCount: responseData.data?.invalidGroupsCount,
                 }
             };
         },

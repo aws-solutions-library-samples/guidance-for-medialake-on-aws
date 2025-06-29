@@ -12,6 +12,8 @@ from aws_cdk import (
     Duration,
     RemovalPolicy,
     CfnOutput,
+    aws_lambda as lambda_,
+    aws_events_targets as targets,
 )
 import aws_cdk as cdk
 
@@ -34,6 +36,7 @@ from medialake_constructs.shared_constructs.opensearch_ingestion_pipeline import
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 
 from cdk_nag import AwsSolutionsChecks, NagSuppressions
+from constants import Lambda as LambdaConstants
 
 """
 Base infrastructure stack that sets up core AWS resources for the MediaLake application.
@@ -58,10 +61,12 @@ class BaseInfrastructureStack(Stack):
     Args:
         scope (Construct): CDK construct scope
         construct_id (str): Unique identifier for the stack
+        lambda_warmer (bool): If True, create a warming EventBridge rule (default: False)
+        lambda_functions_to_warm (Optional[List[aws_lambda.Function]]): List of Lambda functions to keep warm
         **kwargs: Additional arguments passed to Stack
     """
 
-    def __init__(self, scope: Construct, construct_id: str, **kwargs):
+    def __init__(self, scope: Construct, construct_id: str, lambda_warmer: bool = False, lambda_functions_to_warm=None, **kwargs):
         super().__init__(scope, construct_id, **kwargs)
 
         # env = kwargs.get("env")
@@ -193,7 +198,7 @@ class BaseInfrastructureStack(Stack):
 
         # Create OpenSearch managed cluster
         # Calculate the effective availability zone count based on data node count
-        opensearch_settings = config.opensearch_cluster_settings
+        opensearch_settings = config.resolved_opensearch_cluster_settings
         effective_az_count = min(
             opensearch_settings.availability_zone_count,
             opensearch_settings.data_node_count
@@ -526,6 +531,23 @@ class BaseInfrastructureStack(Stack):
                 security_group=self._security_group,
             ),
         )
+
+        # Lambda warmer EventBridge rule
+        if lambda_warmer and lambda_functions_to_warm:
+            for fn in lambda_functions_to_warm:
+                events.Rule(
+                    self,
+                    f"{fn.node.id}WarmerRule",
+                    event_bus=self._application_service_events_internal_event_bus.event_bus,
+                    schedule=events.Schedule.rate(Duration.minutes(LambdaConstants.WARMER_INTERVAL_MINUTES)),
+                    targets=[
+                        targets.LambdaFunction(
+                            fn,
+                            event=events.RuleTargetInput.from_object({"lambda_warmer": True})
+                        )
+                    ],
+                    description=f"Keeps {fn.function_name} warm via scheduled EventBridge rule."
+                )
 
         # Add outputs for retained resources in prod environment
         self.add_retained_resources_outputs()

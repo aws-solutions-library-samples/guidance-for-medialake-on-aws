@@ -18,6 +18,21 @@ from aws_lambda_powertools.utilities.validation import validate
 from aws_lambda_powertools.utilities.parser import parse, event_parser
 from decimal import Decimal
 from contextlib import contextmanager
+import http.client
+from botocore.auth import SigV4Auth
+from botocore.awsrequest import AWSRequest
+from urllib.parse import urlparse
+
+
+# OpenSearch configuration
+OPENSEARCH_ENDPOINT = os.environ.get("OPENSEARCH_ENDPOINT", "")
+OPENSEARCH_INDEX    = os.environ.get("INDEX_NAME", "media")
+OPENSEARCH_SERVICE  = os.environ.get("OPENSEARCH_SERVICE", "es")
+AWS_REGION          = os.environ.get("REGION","")
+
+# Re-use boto3’s session credentials
+_session     = boto3.Session()
+_credentials = _session.get_credentials()
 
 # Global clients - initialized once for Lambda container reuse
 s3_client = None
@@ -48,6 +63,7 @@ configure_logging()
 
 # Log configuration at startup
 logger.info(f"Lambda configuration - DO_NOT_INGEST_DUPLICATES: {DO_NOT_INGEST_DUPLICATES}")
+logger.info("Note: Files with same hash AND same object key will always be skipped regardless of DO_NOT_INGEST_DUPLICATES setting")
 
 # Configure S3 client with retries
 s3_config = Config(
@@ -58,6 +74,7 @@ s3_config = Config(
     read_timeout=15,
     connect_timeout=5
 )
+
 
 def initialize_global_clients():
     """Initialize global AWS clients for container reuse"""
@@ -90,7 +107,7 @@ class DateTimeEncoder(json.JSONEncoder):
             return float(obj) if obj % 1 != 0 else int(obj)
         return super(DateTimeEncoder, self).default(obj)
 
-# Global instance to reduce instantiation costs
+boto3# Global instance to reduce instantiation costs
 datetime_encoder = DateTimeEncoder()
 
 def json_serialize(obj):
@@ -286,6 +303,75 @@ class AssetProcessor:
         self.current_asset_id = None
         self.current_inventory_id = None
 
+        _session           = boto3.Session()
+        self._credentials  = _session.get_credentials()
+
+    def _signed_request(self,
+                    method: str,
+                    url: str,
+                    payload: dict | None = None,
+                    timeout: int = 60) -> tuple[int, str]:
+        """Build, sign and send an HTTPS request with SigV4 auth."""
+        headers = {"Content-Type": "application/json"}
+        if payload:
+            body = json.dumps(payload)
+        else:
+            body = None
+
+        req = AWSRequest(method=method,
+                        url=url,
+                        data=body,
+                        headers=headers)
+        
+        SigV4Auth(self._credentials,  OPENSEARCH_SERVICE, AWS_REGION).add_auth(req)
+
+        prepared = req.prepare()
+
+        parsed = urlparse(prepared.url)
+        path   = parsed.path + (f"?{parsed.query}" if parsed.query else "")
+
+        conn = http.client.HTTPSConnection(parsed.hostname,
+                                        parsed.port or 443,
+                                        timeout=timeout)
+        conn.request(prepared.method,
+                    path,
+                    body=prepared.body,
+                    headers=dict(prepared.headers))
+        resp  = conn.getresponse()
+        resp_body = resp.read().decode("utf-8")
+        conn.close()
+        return resp.status, resp_body
+
+
+    def delete_opensearch_docs(self, asset_id: str) -> None:
+        """Delete all OpenSearch docs for a given DigitalSourceAsset.ID."""
+        if not OPENSEARCH_ENDPOINT:
+            logger.info("OPENSEARCH_ENDPOINT not set – skipping OpenSearch deletion.")
+            return
+
+        host = OPENSEARCH_ENDPOINT.lstrip("https://").lstrip("http://")
+        url  = f"https://{host}/{OPENSEARCH_INDEX}/_delete_by_query?refresh=true&conflicts=proceed"
+        query = {
+            "query": {
+                "term": {
+                    "DigitalSourceAsset.ID": asset_id
+                }
+            }
+        }
+
+        status, body = self._signed_request("POST", url, payload=query)
+        if status not in (200, 202):
+            logger.error(f"OpenSearch deletion failed (status={status}): {body}")
+        else:
+            deleted = 0
+            try:
+                deleted = json.loads(body).get("deleted", 0)
+            except Exception:
+                pass
+            logger.info(f"OpenSearch deletion complete – deleted {deleted} docs for {asset_id}")
+            metrics.add_metric(name="OpenSearchDocsDeleted", unit=MetricUnit.Count, value=deleted)
+
+
     @contextmanager
     def asset_context(self, asset_id=None, inventory_id=None):
         """Context manager to set asset ID in logs for the duration of an operation"""
@@ -332,10 +418,16 @@ class AssetProcessor:
             logger.info(message, **context)
 
     def _decode_s3_event_key(self, encoded_key: str) -> str:
-        """Decode S3 event key by handling URL encoding"""
-        # Just decode URL encoding without replacing literal '+' characters
-        # urllib.parse.unquote properly handles %20, %2B etc.
-        return urllib.parse.unquote(encoded_key)
+        """Decode S3 event key by handling URL encoding properly"""
+        # First, decode all URL-encoded sequences (%20, %E2%80%AF, etc.)
+        decoded_key = urllib.parse.unquote(encoded_key)
+        
+        # In S3 event notifications, '+' characters typically represent spaces
+        # This is different from general URL encoding where '+' in paths should be literal
+        # But S3 notifications often use '+' to represent spaces in object keys
+        decoded_key = decoded_key.replace('+', ' ')
+        
+        return decoded_key
 
     def _extract_file_extension(self, key: str) -> str:
         """Extract file extension from key"""
@@ -383,7 +475,12 @@ class AssetProcessor:
     @tracer.capture_method
     def process_asset(self, bucket: str, key: str) -> Optional[Dict]:
         """Process new asset from S3 with optimized performance"""
+        original_key = key
         key = self._decode_s3_event_key(key)
+        
+        # Log key transformation for debugging
+        if original_key != key:
+            logger.info(f"Key decoded from '{original_key}' to '{key}'")
 
         try:
             # Get S3 object metadata and tags in parallel
@@ -553,84 +650,21 @@ class AssetProcessor:
             # Calculate MD5 hash for duplicate checking
             md5_hash = self._calculate_md5(bucket, key)
             
-            # Check if file with same hash exists in DynamoDB (if duplicate checking is enabled)
-            existing_file = None
-            if DO_NOT_INGEST_DUPLICATES:
-                existing_file = self._check_existing_file(md5_hash)
-                logger.info(f"Duplicate checking enabled - checked for existing file with hash {md5_hash}")
+            # Always check if file with same hash exists in DynamoDB
+            # We need this check even when DO_NOT_INGEST_DUPLICATES is False to handle same hash + same key scenario
+            existing_file = self._check_existing_file(md5_hash)
+            if existing_file:
+                logger.info(f"Found existing file with hash {md5_hash}")
                 metrics.add_metric(name="DuplicateCheckPerformed", unit=MetricUnit.Count, value=1)
             else:
-                logger.info(f"Duplicate checking disabled - skipping duplicate check for hash {md5_hash}")
-                metrics.add_metric(name="DuplicateCheckSkipped", unit=MetricUnit.Count, value=1)
+                logger.info(f"No existing file found with hash {md5_hash}")
+                metrics.add_metric(name="DuplicateCheckPerformed", unit=MetricUnit.Count, value=1)
             
-            if existing_file and DO_NOT_INGEST_DUPLICATES:
+            # Handle duplicate logic based on DO_NOT_INGEST_DUPLICATES setting
+            if existing_file:
                 logger.info(f"Duplicate file found with hash {md5_hash}")
                 
-                # If we have InventoryID tag but no AssetID tag, generate new AssetID under existing inventory
-                if "InventoryID" in tags and "AssetID" not in tags:
-                    logger.info(f"Object has InventoryID but no AssetID. Generating new AssetID under existing inventory.")
-                    
-                    # Extract asset type from content type
-                    content_type = response.get("ContentType", "")
-                    file_ext = key.split(".")[-1] if "." in key else ""
-                    asset_type = determine_asset_type(content_type, file_ext)
-                    type_abbrev = get_type_abbreviation(asset_type)  # Use cached function
-                    
-                    # Generate new AssetID
-                    new_asset_id = f"asset:{type_abbrev}:{str(uuid.uuid4())}"
-                    
-                    # Tag with existing InventoryID and new AssetID
-                    self.s3.put_object_tagging(
-                        Bucket=bucket,
-                        Key=key,
-                        Tagging={
-                            "TagSet": [
-                                {"Key": "InventoryID", "Value": tags["InventoryID"]},
-                                {"Key": "AssetID", "Value": new_asset_id},
-                                {"Key": "FileHash", "Value": md5_hash},
-                            ]
-                        },
-                    )
-                    
-                    # Create new asset entry with existing inventory ID
-                    metadata = self._create_asset_metadata(response, bucket, key, md5_hash)
-                    dynamo_entry = self.create_dynamo_entry(metadata, inventory_id=tags["InventoryID"], s3_last_modified=s3_last_modified_str)
-                    
-                    self.publish_event(
-                        dynamo_entry["InventoryID"],
-                        dynamo_entry["DigitalSourceAsset"]["ID"],
-                        metadata,
-                    )
-                    
-                    return dynamo_entry
-                
-                # If hash exists in DB but object has no tags, tag with existing IDs and stop processing
-                if "InventoryID" not in tags and "AssetID" not in tags:
-                    logger.info(f"Hash exists in DB but object has no tags. Tagging with existing IDs.")
-                    self.s3.put_object_tagging(
-                        Bucket=bucket,
-                        Key=key,
-                        Tagging={
-                            "TagSet": [
-                                {"Key": "InventoryID", "Value": existing_file["InventoryID"]},
-                                {"Key": "AssetID", "Value": existing_file["DigitalSourceAsset"]["ID"]},
-                                {"Key": "FileHash", "Value": md5_hash},
-                                {"Key": "DuplicateHash", "Value": "true"},
-                            ]
-                        },
-                    )
-                    
-                    # Update lastModifiedDate for the existing file in DynamoDB
-                    self.dynamodb.update_item(
-                        Key={"InventoryID": existing_file["InventoryID"]},
-                        UpdateExpression="SET DigitalSourceAsset.lastModifiedDate = :lastModDate",
-                        ExpressionAttributeValues={":lastModDate": s3_last_modified_str}
-                    )
-                    logger.info(f"Updated lastModifiedDate to {s3_last_modified_str} for existing asset: {existing_file['DigitalSourceAsset']['ID']}")
-                    
-                    return None
-                
-                # Handle other cases from existing code
+                # Get the existing object key to check if it's the same file
                 existing_object_key = (
                     existing_file.get("DigitalSourceAsset", {})
                     .get("MainRepresentation", {})
@@ -640,24 +674,17 @@ class AssetProcessor:
                     .get("FullPath")
                 )
 
+                # Check if it's the same object key (same hash + same key = exact same file)
                 if existing_object_key == key:
-                    logger.info(
-                        "Duplicate file with same object key. Tagging with existing IDs"
-                    )
-                    # Tag with the same IDs as the existing file
+                    logger.info("Duplicate file with same hash AND same object key - skipping processing regardless of DO_NOT_INGEST_DUPLICATES setting")
+                    # Always skip processing if it's the exact same file (same hash + same key)
                     self.s3.put_object_tagging(
                         Bucket=bucket,
                         Key=key,
                         Tagging={
                             "TagSet": [
-                                {
-                                    "Key": "InventoryID",
-                                    "Value": existing_file["InventoryID"],
-                                },
-                                {
-                                    "Key": "AssetID",
-                                    "Value": existing_file["DigitalSourceAsset"]["ID"],
-                                },
+                                {"Key": "InventoryID", "Value": existing_file["InventoryID"]},
+                                {"Key": "AssetID", "Value": existing_file["DigitalSourceAsset"]["ID"]},
                                 {"Key": "FileHash", "Value": md5_hash},
                             ]
                         },
@@ -672,11 +699,77 @@ class AssetProcessor:
                     logger.info(f"Updated lastModifiedDate to {s3_last_modified_str} for existing asset: {existing_file['DigitalSourceAsset']['ID']}")
                     
                     return None
-                else:
+                
+                # Different object key but same hash - behavior depends on DO_NOT_INGEST_DUPLICATES
+                if DO_NOT_INGEST_DUPLICATES:
+                    logger.info("Same hash but different key with DO_NOT_INGEST_DUPLICATES=True - applying duplicate prevention logic")
+                    
+                    # If we have InventoryID tag but no AssetID tag, generate new AssetID under existing inventory
+                    if "InventoryID" in tags and "AssetID" not in tags:
+                        logger.info(f"Object has InventoryID but no AssetID. Generating new AssetID under existing inventory.")
+                        
+                        # Extract asset type from content type
+                        content_type = response.get("ContentType", "")
+                        file_ext = key.split(".")[-1] if "." in key else ""
+                        asset_type = determine_asset_type(content_type, file_ext)
+                        type_abbrev = get_type_abbreviation(asset_type)  # Use cached function
+                        
+                        # Generate new AssetID
+                        new_asset_id = f"asset:{type_abbrev}:{str(uuid.uuid4())}"
+                        
+                        # Tag with existing InventoryID and new AssetID
+                        self.s3.put_object_tagging(
+                            Bucket=bucket,
+                            Key=key,
+                            Tagging={
+                                "TagSet": [
+                                    {"Key": "InventoryID", "Value": tags["InventoryID"]},
+                                    {"Key": "AssetID", "Value": new_asset_id},
+                                    {"Key": "FileHash", "Value": md5_hash},
+                                ]
+                            },
+                        )
+                        
+                        # Create new asset entry with existing inventory ID
+                        metadata = self._create_asset_metadata(response, bucket, key, md5_hash)
+                        dynamo_entry = self.create_dynamo_entry(metadata, inventory_id=tags["InventoryID"], s3_last_modified=s3_last_modified_str)
+                        
+                        self.publish_event(
+                            dynamo_entry["InventoryID"],
+                            dynamo_entry["DigitalSourceAsset"]["ID"],
+                            metadata,
+                        )
+                        
+                        return dynamo_entry
+                    
+                    # If hash exists in DB but object has no tags, tag with existing IDs and stop processing
+                    if "InventoryID" not in tags and "AssetID" not in tags:
+                        logger.info(f"Hash exists in DB but object has no tags. Tagging with existing IDs.")
+                        self.s3.put_object_tagging(
+                            Bucket=bucket,
+                            Key=key,
+                            Tagging={
+                                "TagSet": [
+                                    {"Key": "InventoryID", "Value": existing_file["InventoryID"]},
+                                    {"Key": "AssetID", "Value": existing_file["DigitalSourceAsset"]["ID"]},
+                                    {"Key": "FileHash", "Value": md5_hash},
+                                    {"Key": "DuplicateHash", "Value": "true"},
+                                ]
+                            },
+                        )
+                        
+                        # Update lastModifiedDate for the existing file in DynamoDB
+                        self.dynamodb.update_item(
+                            Key={"InventoryID": existing_file["InventoryID"]},
+                            UpdateExpression="SET DigitalSourceAsset.lastModifiedDate = :lastModDate",
+                            ExpressionAttributeValues={":lastModDate": s3_last_modified_str}
+                        )
+                        logger.info(f"Updated lastModifiedDate to {s3_last_modified_str} for existing asset: {existing_file['DigitalSourceAsset']['ID']}")
+                        
+                        return None
+                    
                     # Same hash but different key - tag with same InventoryID but new AssetID
-                    logger.info(
-                        "Same hash but different key. Tagging with same InventoryID but new AssetID"
-                    )
+                    logger.info("Same hash but different key. Tagging with same InventoryID but new AssetID")
                     # Extract asset type from content type
                     content_type = response.get("ContentType", "")
                     file_ext = key.split(".")[-1] if "." in key else ""
@@ -689,23 +782,17 @@ class AssetProcessor:
                         Key=key,
                         Tagging={
                             "TagSet": [
-                                {
-                                    "Key": "InventoryID",
-                                    "Value": existing_file["InventoryID"],
-                                },
-                                {
-                                    "Key": "AssetID",
-                                    "Value": new_asset_id,
-                                },
+                                {"Key": "InventoryID", "Value": existing_file["InventoryID"]},
+                                {"Key": "AssetID", "Value": new_asset_id},
                                 {"Key": "FileHash", "Value": md5_hash},
-                                {
-                                    "Key": "DuplicateHash",
-                                    "Value": "true",
-                                },
+                                {"Key": "DuplicateHash", "Value": "true"},
                             ]
                         },
                     )
                     return None
+                else:
+                    logger.info("Same hash but different key with DO_NOT_INGEST_DUPLICATES=False - proceeding to create new asset")
+                    # Fall through to process as new asset since DO_NOT_INGEST_DUPLICATES is False
 
             # Process new unique file...
             metadata = self._create_asset_metadata(response, bucket, key, md5_hash)
@@ -1071,8 +1158,21 @@ class AssetProcessor:
                 
                 # Publish deletion event
                 self.publish_deletion_event(inventory_id)
-                
+
                 logger.info(f"Successfully deleted asset from DynamoDB: {inventory_id}")
+
+                # delete the DynamoDB record
+                self.dynamodb.delete_item(Key={"InventoryID": inventory_id})
+                metrics.add_metric(name="AssetDeletionProcessed", unit=MetricUnit.Count, value=1)
+
+                # publish your deletion event
+                self.publish_deletion_event(inventory_id)
+
+                # *new* — delete associated OpenSearch docs
+                self.delete_opensearch_docs(inventory_id)
+
+                logger.info(f"Successfully deleted asset {inventory_id} from DynamoDB and OpenSearch")
+
             else:
                 # For deletion events, skip trying to find by tags as the object is gone
                 if not is_delete_event:
@@ -1515,6 +1615,9 @@ def process_s3_event(processor: AssetProcessor, bucket: str, key: str, event_nam
             # Handle creation/modification/copy events - process all ObjectCreated events the same way
             logger.info(f"Processing ObjectCreated event for {bucket}/{key}")
             
+            # Store original key for fallback in error handling
+            original_event_key = key
+            
             # Verify object exists in S3 before processing
             try:
                 # Try to get tags to identify asset early for logging
@@ -1535,7 +1638,35 @@ def process_s3_event(processor: AssetProcessor, bucket: str, key: str, event_nam
                 logger.error(f"S3 object verification failed for {bucket}/{key}: {str(s3_error)}")
                 # Log exact key for debugging to see if there are encoding issues
                 logger.error(f"Failed key details - length: {len(key)}, contains '+': {'+' in key}, raw key: {repr(key)}")
-                raise
+                
+                # Try alternative key encodings to help diagnose the issue
+                alternative_found = False
+                try:
+                    # Try with '+' decoded as literal '+' (no space replacement)
+                    alt_key = urllib.parse.unquote(key)
+                    if alt_key != key:
+                        logger.info(f"Trying alternative key without space replacement: {repr(alt_key)}")
+                        processor.s3.head_object(Bucket=bucket, Key=alt_key)
+                        logger.warning(f"Object found with alternative key encoding. Using: {repr(alt_key)}")
+                        key = alt_key
+                        alternative_found = True
+                except Exception as alt_error:
+                    logger.debug(f"Alternative key without space replacement failed: {str(alt_error)}")
+                
+                if not alternative_found:
+                    try:
+                        # Try with original key from event (before any decoding)
+                        logger.info(f"Trying original undecoded key: {repr(original_event_key)}")
+                        processor.s3.head_object(Bucket=bucket, Key=original_event_key)
+                        logger.warning(f"Object found with original key. Using: {repr(original_event_key)}")
+                        key = original_event_key
+                        alternative_found = True
+                    except Exception as orig_error:
+                        logger.debug(f"Original key also failed: {str(orig_error)}")
+                
+                if not alternative_found:
+                    logger.error(f"All key variations failed. Object may not exist or there's a different encoding issue.")
+                    raise s3_error
             
             # Process all ObjectCreated events (including Copy) the same way
             result = processor.process_asset(bucket, key)
@@ -1584,12 +1715,15 @@ def extract_s3_details_from_event(event_record: Dict) -> Tuple[Optional[str], Op
     if "s3" in event_record:
         if "bucket" in event_record["s3"] and "object" in event_record["s3"]:
             bucket = event_record["s3"]["bucket"]["name"]
-            key = urllib.parse.unquote(event_record["s3"]["object"]["key"])
+            # Decode S3 key properly - handle both URL encoding and '+' as spaces
+            raw_key = event_record["s3"]["object"]["key"]
+            key = urllib.parse.unquote(raw_key).replace('+', ' ')
             event_name = event_record.get("eventName", "ObjectCreated:")
             version_id = event_record["s3"]["object"].get("versionId")
             # Log the source for debugging
             event_source = event_record.get("eventSource", "unknown")
             logger.info(f"Processing direct S3 record from {event_source}: {bucket}/{key}, version: {version_id}")
+            logger.info(f"Key transformation: '{raw_key}' -> '{key}'")
             return bucket, key, event_name, version_id
     
     # SQS message with EventBridge payload
@@ -1604,11 +1738,14 @@ def extract_s3_details_from_event(event_record: Dict) -> Tuple[Optional[str], Op
                     valid_sources = ["aws:s3", "medialake.AssetSyncProcessor"]
                     if record.get("eventSource") in valid_sources and "s3" in record:
                         bucket = record["s3"]["bucket"]["name"]
-                        key = urllib.parse.unquote(record["s3"]["object"]["key"])
+                        # Decode S3 key properly - handle both URL encoding and '+' as spaces
+                        raw_key = record["s3"]["object"]["key"]
+                        key = urllib.parse.unquote(raw_key).replace('+', ' ')
                         event_name = record.get("eventName", "ObjectCreated:")
                         version_id = record["s3"]["object"].get("versionId")
                         # Log the extracted details for debugging
                         logger.info(f"Extracted from SQS S3 record (source: {record.get('eventSource')}): bucket={bucket}, key={key}, event={event_name}, version={version_id}")
+                        logger.info(f"Key transformation: '{raw_key}' -> '{key}'")
                         return bucket, key, event_name, version_id
             
             # Check if this is an S3 event from EventBridge
@@ -1636,9 +1773,12 @@ def extract_s3_details_from_event(event_record: Dict) -> Tuple[Optional[str], Op
                 if "object" in detail and isinstance(detail["object"], dict):
                     version_id = detail["object"].get("version-id") or detail["object"].get("versionId")
                 
-                # Apply URL decoding to the key if it exists
+                # Apply URL decoding to the key if it exists - handle both URL encoding and '+' as spaces
                 if key:
-                    key = urllib.parse.unquote(key)
+                    raw_key = key
+                    key = urllib.parse.unquote(key).replace('+', ' ')
+                    if raw_key != key:
+                        logger.info(f"EventBridge key transformation: '{raw_key}' -> '{key}'")
                 
                 # Determine event type
                 event_name = "ObjectCreated:"

@@ -79,6 +79,9 @@ class Lambda:
     # Layer names
     COMMON_LAYER_NAME = "media-lake-common-layer"
     AUTH_LAYER_NAME = "media-lake-auth-layer"
+    
+    # Warmer interval (minutes)
+    WARMER_INTERVAL_MINUTES = 5
 
 # IAM constants
 class IAM:

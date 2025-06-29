@@ -82,8 +82,7 @@ class ApiGatewayStackProps:
     identity_pool: str
     user_pool_client: str
     waf_acl_arn: str
-    user_table: dynamodb.Table 
-    asset_sync_engine_lambda: lambda_.Function
+    user_table: dynamodb.TableV2
 
 
 class ApiGatewayStack(cdk.NestedStack):
@@ -126,8 +125,16 @@ class ApiGatewayStack(cdk.NestedStack):
                 ingest_event_bus=props.ingest_event_bus,
                 asset_sync_job_table=props.asset_sync_job_table,
                 asset_sync_engine_lambda=props.asset_sync_engine_lambda,
+                open_search_endpoint=props.collection_endpoint,
+                opensearch_index="media",
+                vpc_subnet_ids=','.join([subnet.subnet_id for subnet in props.vpc.private_subnets]),
+                security_group_id=props.security_group.security_group_id,
+                system_settings_table_name=props.system_settings_table,
+                system_settings_table_arn=f"arn:aws:dynamodb:{self.region}:{self.account}:table/{props.system_settings_table}",
             ),
         )
+
+       
 
         # Update the SearchConstruct to include the system settings table
         self._search_construct = SearchConstruct(
@@ -161,8 +168,7 @@ class ApiGatewayStack(cdk.NestedStack):
                 vpc=props.vpc,
                 security_group=props.security_group,
                 open_search_arn=props.collection_arn,
-                media_assets_bucket=props.media_assets_bucket,
-                user_table=props.user_table,  # User table for bulk download jobs
+                user_table=props.user_table,
             ),
         )
 
