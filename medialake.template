@@ -28,7 +28,7 @@ Parameters:
   PipelineName:
     Description: Name of the CodePipeline
     Type: String
-    Default: CDKDeploymentPipeline
+    Default: MediaLakeCDKPipeline
   
   NodejsVersion:
     Description: Node.js version to use for frontend
@@ -51,6 +51,15 @@ Parameters:
     MaxLength: 10
     AllowedPattern: ^[a-zA-Z0-9]*$
     Default: dev
+  
+  OpenSearchDeploymentSize:
+    Description: OpenSearch deployment size
+    Type: String
+    Default: large
+    AllowedValues:
+      - small
+      - medium
+      - large
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -70,6 +79,7 @@ Metadata:
           - PipelineName
           - NodejsVersion
           - ProjectEnvironment
+          - OpenSearchDeploymentSize
       -
         Label:
           default: Amazon Cognito / Amazon Simple Notification Service
@@ -84,6 +94,8 @@ Metadata:
         default: Nodejs Version
       ProjectEnvironment:
         default: Project Environment
+      OpenSearchDeploymentSize:
+        default: OpenSearch Deployment Size
       SourceType:
         default: Source Type
       GitRepositoryUrl:
@@ -491,6 +503,7 @@ Resources:
                 - echo "$( jq --arg a "${AWS::AccountId}" '.account_id = $a' config.json )" > config.json
                 - echo "$( jq --arg r "${AWS::Region}" '.primary_region = $r' config.json )" > config.json
                 - echo "$( jq --arg u "${InitialUserEmail}" '.initial_user.email = $u' config.json )" > config.json
+                - echo "$( jq --arg s "${OpenSearchDeploymentSize}" '.opensearch_deployment_size = $s' config.json )" > config.json
             build:
               commands:
                 - echo "Building frontend"

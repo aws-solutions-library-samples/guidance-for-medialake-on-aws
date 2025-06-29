@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { useMediaController } from '../hooks/useMediaController';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
@@ -640,210 +641,8 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
     );
 };
 
-const TranscriptionTab: React.FC<{
-    assetId: string;
-    transcriptionData: TranscriptionResponse | undefined;
-    isLoading: boolean;
-    assetData: any;
-}> = ({ assetId, transcriptionData, isLoading, assetData }) => {
-    const theme = useTheme();
-    
-    // Handle loading state
-    if (isLoading) {
-        return (
-            <Box sx={{ p: 2, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
-                <CircularProgress />
-            </Box>
-        );
-    }
-    
-    // Handle missing or invalid data
-    if (!transcriptionData || !transcriptionData.data || !transcriptionData.data.results) {
-        return (
-            <Box sx={{ p: 2, textAlign: 'center' }}>
-                <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
-                    Video Transcription
-                </Typography>
-                <Paper elevation={0} sx={{
-                    mb: 3,
-                    p: 4,
-                    backgroundColor: alpha(theme.palette.background.paper, 0.7),
-                    borderRadius: 1,
-                    border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
-                }}>
-                    <Typography variant="body1" color="text.secondary">
-                        No transcription data available for this video file.
-                    </Typography>
-                </Paper>
-            </Box>
-        );
-    }
-    
-    // Check if transcripts array exists and has items
-    const hasTranscripts = transcriptionData.data.results.transcripts &&
-                          transcriptionData.data.results.transcripts.length > 0;
-    
-    // Check if items array exists
-    const hasItems = transcriptionData.data.results.items &&
-                    transcriptionData.data.results.items.length > 0;
-
-    // Extract summary from asset data
-    const summary = assetData?.data?.asset?.Summary100Result;
-
-    return (
-        <Box sx={{ p: 2 }}>
-            <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
-                Video Transcription
-            </Typography>
-            
-            {/* Summary Section */}
-            {summary && (
-                <Paper elevation={0} sx={{
-                    mb: 3,
-                    p: 2,
-                    backgroundColor: alpha(theme.palette.background.paper, 0.7),
-                    borderRadius: 1,
-                    border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
-                }}>
-                    <Typography variant="body2" sx={{ mb: 2, fontStyle: 'italic', color: theme.palette.text.secondary }}>
-                        Summary:
-                    </Typography>
-                    <MarkdownRenderer content={summary} />
-                </Paper>
-            )}
-            
-            <Paper elevation={0} sx={{
-                mb: 3,
-                p: 2,
-                backgroundColor: alpha(theme.palette.background.paper, 0.7),
-                borderRadius: 1,
-                border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
-            }}>
-                <Typography variant="body2" sx={{ mb: 2, fontStyle: 'italic', color: theme.palette.text.secondary }}>
-                    Full Transcript:
-                </Typography>
-                <Typography variant="body1" paragraph>
-                    {hasTranscripts
-                        ? transcriptionData.data.results.transcripts[0].transcript
-                        : "Full transcript not available"}
-                </Typography>
-            </Paper>
-            
-            {hasItems && (
-                <>
-                    <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
-                        Time-Aligned Segments
-                    </Typography>
-                    
-                    <Paper elevation={0} sx={{
-                        backgroundColor: alpha(theme.palette.background.paper, 0.5),
-                        borderRadius: 1
-                    }}>
-                        {transcriptionData.data.results.items.map((item, index) => (
-                            <Box
-                                key={index}
-                                sx={{
-                                    display: 'flex',
-                                    p: 1.5,
-                                    borderBottom: index < transcriptionData.data.results.items.length - 1 ?
-                                        `1px solid ${alpha(theme.palette.divider, 0.1)}` : 'none',
-                                    '&:hover': {
-                                        backgroundColor: alpha(theme.palette.primary.main, 0.03)
-                                    }
-                                }}
-                            >
-                                <Box sx={{
-                                    minWidth: '100px',
-                                    pr: 2,
-                                    borderRight: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                                    display: 'flex',
-                                    flexDirection: 'column'
-                                }}>
-                                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
-                                        {`${item.start_time}s - ${item.end_time}s`}
-                                    </Typography>
-                                    {item.alternatives && item.alternatives.length > 0 && item.alternatives[0].confidence && (
-                                        <Chip
-                                            size="small"
-                                            label={`${Math.round(parseFloat(item.alternatives[0].confidence) * 100)}%`}
-                                            sx={{
-                                                height: '18px',
-                                                mt: 0.5,
-                                                fontSize: '0.65rem',
-                                                backgroundColor: (() => {
-                                                    const conf = parseFloat(item.alternatives[0].confidence);
-                                                    if (conf >= 0.95) return alpha(theme.palette.success.main, 0.1);
-                                                    if (conf >= 0.85) return alpha(theme.palette.warning.main, 0.1);
-                                                    return alpha(theme.palette.error.main, 0.1);
-                                                })(),
-                                                color: (() => {
-                                                    const conf = parseFloat(item.alternatives[0].confidence);
-                                                    if (conf >= 0.95) return theme.palette.success.main;
-                                                    if (conf >= 0.85) return theme.palette.warning.main;
-                                                    return theme.palette.error.main;
-                                                })()
-                                            }}
-                                        />
-                                    )}
-                                </Box>
-                                <Box sx={{ pl: 2, flex: 1 }}>
-                                    {item.alternatives && item.alternatives.length > 0 ? (
-                                        <>
-                                            <Typography variant="body2">
-                                                {item.alternatives[0].content}
-                                            </Typography>
-                                            {item.alternatives.length > 1 && (
-                                                <Box sx={{ mt: 1 }}>
-                                                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
-                                                        Alternatives:
-                                                    </Typography>
-                                                    {item.alternatives.slice(1).map((alt, altIndex) => {
-                                                        const confidenceValue = alt.confidence ? Math.round(parseFloat(alt.confidence) * 100) : 'N/A';
-                                                        return (
-                                                            <Typography key={altIndex} variant="caption" sx={{
-                                                                display: 'block',
-                                                                color: theme.palette.text.secondary,
-                                                                fontStyle: 'italic',
-                                                                pl: 1
-                                                            }}>
-                                                                {alt.content} ({confidenceValue}%)
-                                                            </Typography>
-                                                        );
-                                                    })}
-                                                </Box>
-                                            )}
-                                        </>
-                                    ) : (
-                                        <Typography variant="body2" color="text.secondary">
-                                            No content available
-                                        </Typography>
-                                    )}
-                                </Box>
-                            </Box>
-                        ))}
-                    </Paper>
-                </>
-            )}
-            
-            <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
-                <Button
-                    variant="outlined"
-                    startIcon={<SubtitlesOutlinedIcon />}
-                    sx={{ mr: 2 }}
-                    disabled={!hasTranscripts}
-                >
-                    Export Transcript
-                </Button>
-                <Button
-                    variant="outlined"
-                    startIcon={<CodeOutlinedIcon />}
-                >
-                    Show Raw JSON
-                </Button>
-            </Box>
-        </Box>
-    );
-};
+// Import the shared TranscriptionTab component
+import TranscriptionTab from '../components/shared/TranscriptionTab';
 
 const RelatedItemsTab: React.FC<{
     assetId: string;
@@ -914,6 +713,16 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
     const { data: relatedVersionsData, isLoading: isLoadingRelated } = useRelatedVersions(id || '', relatedPage);
     const { data: transcriptionData, isLoading: isLoadingTranscription } = useTranscription(id || '');
     const [showHeader, setShowHeader] = useState(true);
+    
+    // Video media controller for transcript synchronization
+    const mediaController = useMediaController();
+    
+    // Register video element with media controller
+    useEffect(() => {
+        if (videoViewerRef.current) {
+            mediaController.registerVideoElement(videoViewerRef);
+        }
+    }, [mediaController]);
 
     const [expandedMetadata, setExpandedMetadata] = useState<{ [key: string]: boolean }>({});
     const [comments, setComments] = useState([
@@ -1194,6 +1003,12 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
                         ref={videoViewerRef}
                         src={proxyUrl}
                         alt={assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID}
+                        onTimeUpdate={(time) => {
+                            mediaController.updateCurrentTime(time);
+                        }}
+                        onVideoElementReady={(ref) => {
+                            mediaController.registerVideoElement(ref);
+                        }}
                     />
                 </Paper>
             </Box>
@@ -1281,6 +1096,8 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
                                     transcriptionData={transcriptionData}
                                     isLoading={isLoadingTranscription}
                                     assetData={assetData}
+                                    mediaType="video"
+                                    mediaController={mediaController}
                                 />
                             )}
                             {activeTab === 'related' && (
