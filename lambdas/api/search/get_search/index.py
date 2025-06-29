@@ -90,6 +90,9 @@ class SearchParams(BaseModelWithConfig):
     ingested_date_gte: Optional[str] = None
     filename: Optional[str] = None
 
+    # For asset explorer
+    storageIdentifier: Optional[str] = None
+
     @property
     def from_(self) -> int:
         """Calculate the from_ value based on page and pageSize"""
@@ -258,6 +261,23 @@ def build_search_query(params: SearchParams) -> Dict:
 
     if params.semantic:
         return build_semantic_query(params)
+
+    # ────────────────────────────────────────────────────────────────
+    # Asset explorer case exact “storageIdentifier:” lookups
+    if params.q.startswith("storageIdentifier:"):
+        # split off the identifier
+        
+        bucket_name = params.q.split(":", 1)[1]
+        print(bucket_name)
+        return {
+            "query": {
+                "match_phrase": {
+                    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket": bucket_name
+                }
+            },
+            "size": params.size
+        }
+    # ─────────────────────────────────────────────────────────────────
 
     clean_query, parsed_filters = parse_search_query(params.q)
     print("the value of clean query is",clean_query)
