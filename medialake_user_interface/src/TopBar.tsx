@@ -32,7 +32,7 @@ import { drawerWidth, collapsedDrawerWidth } from './constants';
 import { S3UploaderModal } from './features/upload';
 import { useFeatureFlag } from './contexts/FeatureFlagsContext';
 import FilterModal from './components/search/FilterModal';
-import { useFacetSearch } from './hooks/useFacetSearch';
+import { useSearchFilters, useSearchQuery, useSemanticSearch, useDomainActions, useUIActions } from './stores/searchStore';
 import { NotificationCenter } from './components/NotificationCenter';
 
 interface SearchTag {
@@ -52,29 +52,39 @@ function TopBar() {
 
   const [searchInput, setSearchInput] = useState('');
   const [searchTags, setSearchTags] = useState<SearchTag[]>([]);
-  // Parse `semantic` from URL on initial render:
-  const initialSemantic =
-    new URLSearchParams(location.search).get('semantic') === 'true';
-  const [isSemanticSearch, setIsSemanticSearch] = useState<boolean>(initialSemantic);
-
-  const { filters, setFilters } = useFacetSearch();
+  
+  // Get search state from store
+  const storeQuery = useSearchQuery();
+  const storeIsSemantic = useSemanticSearch();
+  const filters = useSearchFilters();
+  const { setQuery, setIsSemantic, setFilters } = useDomainActions();
+  const { openFilterModal } = useUIActions();
   const [searchResults, setSearchResults] = useState<any>(null);
   const [searchBoxWidth, setSearchBoxWidth] = useState<number>(0);
   const searchBoxRef = useRef<HTMLDivElement>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const isFileUploadEnabled = useFeatureFlag('file-upload-enabled', true);
   const isChatEnabled = useFeatureFlag('chat-enabled', true);
   const isNotificationEnabled = useFeatureFlag('notification-enabled', true);
   const { toggleChat, isOpen: isChatOpen } = useChat();
 
-  // Whenever the URL’s `semantic` param changes (e.g. on browser refresh),
-  // make sure `isSemanticSearch` reflects that:
+  // Initialize semantic search from URL params on mount
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const semanticParam = params.get('semantic') === 'true';
-    setIsSemanticSearch(semanticParam);
-  }, [location.search]);
+    
+    // Update store if URL has semantic param and store doesn't match
+    if (semanticParam !== storeIsSemantic) {
+      setIsSemantic(semanticParam);
+    }
+  }, []); // Only run on mount
+  
+  // Sync search input with store query when store changes
+  useEffect(() => {
+    if (storeQuery && storeQuery !== searchInput) {
+      setSearchInput(storeQuery);
+    }
+  }, [storeQuery]);
 
   const getSearchQuery = useCallback(() => {
     const tagPart = searchTags
@@ -86,12 +96,29 @@ function TopBar() {
   const debouncedSearch = useCallback(
     debounce((query: string) => {
       if (query.trim()) {
-        navigate('/search', {
-          state: { query, isSemantic: isSemanticSearch }
-        });
+        // Update store state first
+        setQuery(query);
+        setIsSemantic(storeIsSemantic);
+        
+        // Build URL with semantic parameter
+        const params = new URLSearchParams();
+        params.set('q', query);
+        params.set('semantic', storeIsSemantic.toString());
+        
+        // Add filters to URL
+        if (filters.type) params.set('type', filters.type);
+        if (filters.extension) params.set('extension', filters.extension);
+        if (filters.asset_size_gte) params.set('asset_size_gte', filters.asset_size_gte.toString());
+        if (filters.asset_size_lte) params.set('asset_size_lte', filters.asset_size_lte.toString());
+        if (filters.ingested_date_gte) params.set('ingested_date_gte', filters.ingested_date_gte);
+        if (filters.ingested_date_lte) params.set('ingested_date_lte', filters.ingested_date_lte);
+        if (filters.filename) params.set('filename', filters.filename);
+        
+        // Navigate with URL parameters
+        navigate(`/search?${params.toString()}`);
       }
     }, 500),
-    [navigate, isSemanticSearch]
+    [navigate, storeIsSemantic, setQuery, setIsSemantic, filters]
   );
 
   const handleApplyFilters = (newFilters: any) => {
@@ -101,26 +128,21 @@ function TopBar() {
 
     // Build URLSearchParams
     const queryParams = new URLSearchParams();
-    queryParams.append('q', searchQuery);
-    queryParams.append('semantic', isSemanticSearch.toString());
-    if (newFilters.type) queryParams.append('type', newFilters.type);
-    if (newFilters.extension) queryParams.append('extension', newFilters.extension);
-    if (newFilters.LargerThan)
-      queryParams.append('LargerThan', newFilters.LargerThan.toString());
+    queryParams.set('q', searchQuery);
+    queryParams.set('semantic', storeIsSemantic.toString());
+    if (newFilters.type) queryParams.set('type', newFilters.type);
+    if (newFilters.extension) queryParams.set('extension', newFilters.extension);
     if (newFilters.asset_size_lte)
-      queryParams.append('asset_size_lte', newFilters.asset_size_lte.toString());
+      queryParams.set('asset_size_lte', newFilters.asset_size_lte.toString());
     if (newFilters.asset_size_gte)
-      queryParams.append('asset_size_gte', newFilters.asset_size_gte.toString());
+      queryParams.set('asset_size_gte', newFilters.asset_size_gte.toString());
     if (newFilters.ingested_date_lte)
-      queryParams.append('ingested_date_lte', newFilters.ingested_date_lte);
+      queryParams.set('ingested_date_lte', newFilters.ingested_date_lte);
     if (newFilters.ingested_date_gte)
-      queryParams.append('ingested_date_gte', newFilters.ingested_date_gte);
-    if (newFilters.filename) queryParams.append('filename', newFilters.filename);
+      queryParams.set('ingested_date_gte', newFilters.ingested_date_gte);
+    if (newFilters.filename) queryParams.set('filename', newFilters.filename);
 
-    navigate({
-      pathname: '/search',
-      search: queryParams.toString()
-    });
+    navigate(`/search?${queryParams.toString()}`);
   };
 
   // Measure search box width
@@ -179,11 +201,7 @@ function TopBar() {
   };
 
   const handleOpenFilterModal = () => {
-    setIsFilterModalOpen(true);
-  };
-
-  const handleCloseFilterModal = () => {
-    setIsFilterModalOpen(false);
+    openFilterModal();
   };
 
   const createTagFromInput = (input: string): boolean => {
@@ -198,9 +216,13 @@ function TopBar() {
         setSearchTags(prev => [...prev, newTag]);
         setSearchInput('');
         const searchQuery = getSearchQuery();
-        navigate('/search', {
-          state: { query: searchQuery, isSemantic: isSemanticSearch }
-        });
+        
+        // Build URL with parameters
+        const params = new URLSearchParams();
+        params.set('q', searchQuery);
+        params.set('semantic', storeIsSemantic.toString());
+        
+        navigate(`/search?${params.toString()}`);
         return true;
       }
     }
@@ -244,9 +266,26 @@ function TopBar() {
       createTagFromInput(searchInput);
     } else if (searchInput.trim() || searchTags.length > 0) {
       const searchQuery = getSearchQuery();
-      navigate('/search', {
-        state: { query: searchQuery, isSemantic: isSemanticSearch }
-      });
+      
+      // Update store state first
+      setQuery(searchQuery);
+      setIsSemantic(storeIsSemantic);
+      
+      // Build URL with parameters
+      const params = new URLSearchParams();
+      params.set('q', searchQuery);
+      params.set('semantic', storeIsSemantic.toString());
+      
+      // Add current filters to URL
+      if (filters.type) params.set('type', filters.type);
+      if (filters.extension) params.set('extension', filters.extension);
+      if (filters.asset_size_gte) params.set('asset_size_gte', filters.asset_size_gte.toString());
+      if (filters.asset_size_lte) params.set('asset_size_lte', filters.asset_size_lte.toString());
+      if (filters.ingested_date_gte) params.set('ingested_date_gte', filters.ingested_date_gte);
+      if (filters.ingested_date_lte) params.set('ingested_date_lte', filters.ingested_date_lte);
+      if (filters.filename) params.set('filename', filters.filename);
+      
+      navigate(`/search?${params.toString()}`);
     }
   };
 
@@ -262,25 +301,39 @@ function TopBar() {
       const searchQuery = newTags
         .map(tag => `${tag.key}: ${tag.value}`)
         .join(' ');
-      navigate('/search', {
-        state: { query: searchQuery, isSemantic: isSemanticSearch }
-      });
+      
+      // Build URL with parameters
+      const params = new URLSearchParams();
+      params.set('q', searchQuery);
+      params.set('semantic', storeIsSemantic.toString());
+      
+      navigate(`/search?${params.toString()}`);
       return newTags;
     });
   };
 
-  // Updated to handle both switch and icon button clicks
+  // Handle semantic search toggle
   const handleSemanticSearchToggle = (
     event: React.MouseEvent | React.ChangeEvent<HTMLInputElement>
   ) => {
+    let newValue: boolean;
+    
     if ('checked' in (event.target as HTMLInputElement)) {
       // Switch toggle
-      setIsSemanticSearch(
-        (event.target as HTMLInputElement).checked
-      );
+      newValue = (event.target as HTMLInputElement).checked;
     } else {
       // Icon/Button click
-      setIsSemanticSearch(prev => !prev);
+      newValue = !storeIsSemantic;
+    }
+    
+    // Update store state
+    setIsSemantic(newValue);
+    
+    // If we're on search page, update URL immediately
+    if (location.pathname === '/search') {
+      const params = new URLSearchParams(location.search);
+      params.set('semantic', newValue.toString());
+      navigate(`/search?${params.toString()}`, { replace: true });
     }
   };
 
@@ -460,22 +513,22 @@ function TopBar() {
 
           {/* Semantic Search Button */}
           <Button
-            variant={isSemanticSearch ? 'contained' : 'outlined'}
+            variant={storeIsSemantic ? 'contained' : 'outlined'}
             onClick={handleSemanticSearchToggle}
             sx={{
               minWidth: '100px',
               [isRTL ? 'mr' : 'ml']: 2,
               borderRadius: '20px',
               height: '40px',
-              color: isSemanticSearch
+              color: storeIsSemantic
                 ? muiTheme.palette.primary.contrastText
                 : theme === 'dark'
                 ? 'rgba(255,255,255,0.7)'
                 : 'text.secondary',
-              backgroundColor: isSemanticSearch
+              backgroundColor: storeIsSemantic
                 ? muiTheme.palette.primary.main
                 : 'transparent',
-              borderColor: isSemanticSearch
+              borderColor: storeIsSemantic
                 ? muiTheme.palette.primary.main
                 : theme === 'dark'
                 ? 'rgba(255,255,255,0.3)'
@@ -488,7 +541,7 @@ function TopBar() {
                   }
                 ),
               '&:hover': {
-                backgroundColor: isSemanticSearch
+                backgroundColor: storeIsSemantic
                   ? muiTheme.palette.primary.dark
                   : theme === 'dark'
                   ? 'rgba(255,255,255,0.08)'
@@ -497,13 +550,13 @@ function TopBar() {
               },
               '&:focus': {
                 outline: `2px solid ${
-                  isSemanticSearch
+                  storeIsSemantic
                     ? muiTheme.palette.primary.main
                     : 'rgba(0,0,0,0.2)'
                 }`,
                 outlineOffset: '2px'
               },
-              boxShadow: isSemanticSearch
+              boxShadow: storeIsSemantic
                 ? `0 0 8px ${alpha(
                     muiTheme.palette.primary.main,
                     0.4
@@ -511,11 +564,11 @@ function TopBar() {
                 : 'none'
             }}
             title={
-              isSemanticSearch
+              storeIsSemantic
                 ? t('search.semantic.disable', 'Disable semantic search')
                 : t('search.semantic.enable', 'Enable semantic search')
             }
-            aria-pressed={isSemanticSearch}
+            aria-pressed={storeIsSemantic}
           >
             {t('search.semantic.label', 'Semantic')}
           </Button>
@@ -617,10 +670,6 @@ function TopBar() {
 
       {/* Filter Modal */}
       <FilterModal
-        open={isFilterModalOpen}
-        onClose={handleCloseFilterModal}
-        onApplyFilters={handleApplyFilters}
-        activeFilters={filters}
         facetCounts={searchResults?.data?.searchMetadata?.facets}
       />
     </Box>

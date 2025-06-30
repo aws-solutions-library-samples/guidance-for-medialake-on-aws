@@ -858,13 +858,13 @@ class ConnectorsConstruct(Construct):
         
         # CORS support is handled by default_cors_preflight_options at the API Gateway level
         # No need to manually add OPTIONS methods as they're automatically added to all resources
-        # add_cors_options_method(aws_resource)
-        # add_cors_options_method(regions_resource)
-        # add_cors_options_method(connector_id_resource)
-        # add_cors_options_method(connector_s3_resource)
-        # add_cors_options_method(s3_sync_connector_resource)
-        # add_cors_options_method(s3_explorer_resource)
-        # add_cors_options_method(s3_explorer_connector_resource)
+        add_cors_options_method(aws_resource)
+        add_cors_options_method(regions_resource)
+        add_cors_options_method(connector_id_resource)
+        add_cors_options_method(connector_s3_resource)
+        add_cors_options_method(s3_sync_connector_resource)
+        add_cors_options_method(s3_explorer_resource)
+        add_cors_options_method(s3_explorer_connector_resource)
 
     @property
     def connector_table(self) -> dynamodb.TableV2:

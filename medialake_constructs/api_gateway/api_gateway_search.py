@@ -153,7 +153,7 @@ class SearchConstruct(Construct):
         )
         
         # Add CORS support
-        add_cors_options_method(search_resource)
+        
         
         # Create fields resource under search
         fields_resource = search_resource.add_resource("fields")
@@ -207,5 +207,5 @@ class SearchConstruct(Construct):
             authorizer=props.cognito_authorizer,
         )
         
-        # Add CORS support to fields resource
+        add_cors_options_method(search_resource)
         add_cors_options_method(fields_resource)
