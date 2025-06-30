@@ -55,7 +55,6 @@ export const InlineTextEditor: React.FC<InlineTextEditorProps> = React.memo(({
   const commit = useCallback(() => {
     // Check if commit should be prevented (e.g., when Cancel button is clicked)
     if (preventCommitRef?.current) {
-      console.log('🔑 InlineTextEditor commit prevented by preventCommitRef');
       // Reset the flag after a small delay to ensure it doesn't interfere with subsequent operations
       setTimeout(() => {
         if (preventCommitRef) {
@@ -65,9 +64,7 @@ export const InlineTextEditor: React.FC<InlineTextEditorProps> = React.memo(({
       return;
     }
     
-    console.log('🔑 InlineTextEditor commit - value:', value);
     onChangeCommit(value);
-    console.log('🔑 Calling onComplete with value:', value);
     onComplete?.(true, value); // Pass the value directly to avoid state timing issues
   }, [value, onChangeCommit, onComplete, preventCommitRef]);
 
@@ -83,7 +80,6 @@ export const InlineTextEditor: React.FC<InlineTextEditorProps> = React.memo(({
   const handleBlur = () => {
     // Check if commit should be prevented (e.g., when Cancel button is clicked)
     if (preventCommitRef?.current) {
-      console.log('🔑 InlineTextEditor blur prevented by preventCommitRef');
       // Reset the flag after a small delay to ensure it doesn't interfere with subsequent operations
       setTimeout(() => {
         if (preventCommitRef) {
@@ -94,7 +90,6 @@ export const InlineTextEditor: React.FC<InlineTextEditorProps> = React.memo(({
     }
     
     // On blur, cancel the edit instead of committing
-    console.log('🔑 InlineTextEditor blur - canceling edit');
     cancel();
   };
 
@@ -108,10 +103,8 @@ export const InlineTextEditor: React.FC<InlineTextEditorProps> = React.memo(({
 
   // Expose commit function to parent via ref
   useEffect(() => {
-    console.log('🔧 InlineTextEditor useEffect - setting commitRef.current');
     if (commitRef) {
       commitRef.current = commit;
-      console.log('🔧 InlineTextEditor commitRef.current set successfully');
     }
     return () => {
       if (commitRef) {

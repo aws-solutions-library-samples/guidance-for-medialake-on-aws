@@ -12,6 +12,7 @@ interface UseAssetOperationsReturn<T extends AssetBase> {
     editingAssetId: string | null;
     editedName: string;
     isRenameDialogOpen: boolean;
+    alert: { message: string; severity: 'success' | 'error' } | null;
     handleMenuOpen: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
     handleMenuClose: () => void;
     handleAction: (action: string) => void;
@@ -24,11 +25,13 @@ interface UseAssetOperationsReturn<T extends AssetBase> {
     handleDeleteCancel: () => void;
     handleRenameCancel: () => void;
     handleDownloadClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
+    handleAlertClose: () => void;
     isLoading: {
         rename: boolean;
         delete: boolean;
         download: boolean;
     };
+    renamingAssetId?: string;
 }
 
 export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsReturn<T> {
@@ -40,8 +43,13 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
     const [editedName, setEditedName] = useState<string>('');
     const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
     const [downloadingAssetId, setDownloadingAssetId] = useState<string | null>(null);
+    const [alert, setAlert] = useState<{ message: string; severity: 'success' | 'error' } | null>(null);
 
-    const renameAsset = useRenameAsset();
+    const handleRenameError = (message: string) => {
+        setAlert({ message, severity: 'error' });
+    };
+
+    const renameAsset = useRenameAsset(handleRenameError);
     const deleteAsset = useDeleteAsset();
     const generatePresignedUrl = useGeneratePresignedUrl();
 
@@ -227,6 +235,10 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
         setEditingAssetId(null);
     };
 
+    const handleAlertClose = () => {
+        setAlert(null);
+    };
+
     return {
         selectedAsset,
         menuAnchorEl,
@@ -235,6 +247,7 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
         editingAssetId,
         editedName,
         isRenameDialogOpen,
+        alert,
         handleMenuOpen,
         handleMenuClose,
         handleAction,
@@ -247,10 +260,12 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
         handleDeleteCancel,
         handleRenameCancel,
         handleDownloadClick,
+        handleAlertClose,
         isLoading: {
             rename: renameAsset.isPending,
             delete: deleteAsset.isPending,
             download: generatePresignedUrl.isPending || (selectedAsset && selectedAsset.InventoryID === downloadingAssetId),
         },
+        renamingAssetId: renameAsset.variables?.inventoryId,
     };
 }

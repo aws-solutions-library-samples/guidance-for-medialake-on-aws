@@ -129,7 +129,7 @@ function TopBar() {
       if (searchBoxRef.current) {
         const width = searchBoxRef.current.offsetWidth;
         setSearchBoxWidth(width);
-        console.log('Search box width measured:', width);
+        // console.log('Search box width measured:', width);
       }
     };
 

@@ -1,5 +1,5 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { Box, Typography, IconButton, Button, TableContainer, Checkbox } from '@mui/material';
+import { Box, Typography, IconButton, Button, TableContainer, Checkbox, CircularProgress } from '@mui/material';
 import { InlineTextEditor } from '../common/InlineTextEditor';
 import {
     useReactTable,
@@ -46,6 +46,8 @@ export interface AssetTableProps<T> {
     isFavorite?: (item: T) => boolean;
     onFavoriteToggle?: (item: T, event: React.MouseEvent<HTMLElement>) => void;
     selectedSearchFields?: string[]; // Add selectedSearchFields prop
+    isRenaming?: boolean; // Add isRenaming prop for loading state
+    renamingAssetId?: string; // ID of the asset currently being renamed
 }
 
 export function AssetTable<T>({
@@ -73,6 +75,8 @@ export function AssetTable<T>({
     isFavorite = () => false,
     onFavoriteToggle,
     selectedSearchFields,
+    isRenaming = false,
+    renamingAssetId,
 }: AssetTableProps<T>): React.ReactElement {
     const containerRef = useRef<HTMLDivElement>(null);
     const columnHelper = createColumnHelper<T>();
@@ -398,8 +402,13 @@ export function AssetTable<T>({
                                             <IconButton
                                                 size="small"
                                                 onClick={e => { e.stopPropagation(); onEditClick(info.row.original, e); }}
+                                                disabled={isRenaming && renamingAssetId === rowId}
                                             >
-                                                <EditIcon fontSize="small" />
+                                                {isRenaming && renamingAssetId === rowId ? (
+                                                    <CircularProgress size={16} />
+                                                ) : (
+                                                    <EditIcon fontSize="small" />
+                                                )}
                                             </IconButton>
                                         </>
                                     )}

@@ -76,6 +76,8 @@ export interface AssetResultsViewProps<T> {
   onSelectAllToggle?: () => void;
   error?: { status: string; message: string } | null;
   isLoading?: boolean;
+  isRenaming?: boolean; // Add isRenaming prop for loading state
+  renamingAssetId?: string; // ID of the asset currently being renamed
   // Functions to extract data from asset objects
   getAssetId: (asset: T) => string;
   getAssetName: (asset: T) => string;
@@ -132,6 +134,8 @@ function AssetResultsView<T>({
   onSelectAllToggle,
   error,
   isLoading,
+  isRenaming,
+  renamingAssetId,
   getAssetId,
   getAssetName,
   getAssetType,
@@ -381,6 +385,8 @@ function AssetResultsView<T>({
             getAssetProxy={getAssetProxy}
             renderCardField={renderCardField}
             selectedSearchFields={selectedFields}
+            isRenaming={isRenaming}
+            renamingAssetId={renamingAssetId}
           />
         ) : (
           <AssetTableView
@@ -406,6 +412,8 @@ function AssetResultsView<T>({
             isFavorite={isAssetFavorited ? (asset) => isAssetFavorited(getAssetId(asset)) : undefined}
             onFavoriteToggle={onFavoriteToggle}
             selectedSearchFields={selectedFields}
+            isRenaming={isRenaming}
+            renamingAssetId={renamingAssetId}
           />
         );
       })()}

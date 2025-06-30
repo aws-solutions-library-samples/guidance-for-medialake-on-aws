@@ -81,6 +81,10 @@ interface MasterResultsViewProps {
   
   // Asset state accessors
   isAssetFavorited?: (assetId: string) => boolean;
+  
+  // Loading states
+  isRenaming?: boolean;
+  renamingAssetId?: string;
 }
 
 const MasterResultsView: React.FC<MasterResultsViewProps> = ({
@@ -141,6 +145,10 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   
   // Asset state accessors
   isAssetFavorited,
+  
+  // Loading states
+  isRenaming = false,
+  renamingAssetId,
 }) => {
   // Function to render card fields
   const renderCardField = (fieldId: string, asset: AssetItem): React.ReactNode => {
@@ -219,6 +227,8 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       onSelectAllToggle={onSelectAllToggle}
       error={error}
       isLoading={isLoading}
+      isRenaming={isRenaming}
+      renamingAssetId={renamingAssetId}
       getAssetId={(asset) => asset.InventoryID}
       getAssetName={(asset) => asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
       getAssetType={(asset) => asset.DigitalSourceAsset.Type}

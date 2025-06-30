@@ -5,6 +5,7 @@ import { API_ENDPOINTS } from '@/api/endpoints';
 import { logger } from '@/common/helpers/logger';
 import { useErrorModal } from '@/hooks/useErrorModal';
 import { useFeatureFlag } from '@/utils/featureFlags';
+import { useSnackbar, closeSnackbar } from 'notistack';
 import { useAuth } from '@/common/hooks/auth-context';
 
 interface Asset {
@@ -298,9 +299,10 @@ export const useDeleteAsset = () => {
 };
 
 // Hook to rename an asset
-export const useRenameAsset = () => {
+export const useRenameAsset = (onError?: (message: string) => void) => {
     const queryClient = useQueryClient();
     const { showError } = useErrorModal();
+    const { enqueueSnackbar } = useSnackbar();
 
     return useMutation({
         mutationFn: async ({ inventoryId, newName }: { inventoryId: string; newName: string }) => {
@@ -310,9 +312,33 @@ export const useRenameAsset = () => {
                     { newName }
                 );
                 return response.data;
-            } catch (error) {
+            } catch (error: any) {
                 logger.error('Error renaming asset:', error);
-                showError('Failed to rename asset');
+                
+                // Check if this is a 409 Conflict error
+                if (error.response?.status === 409) {
+                    // Use callback if provided, otherwise fall back to snackbar
+                    const errorMessage = error.response?.data?.message ||
+                                       error.response?.data?.error ||
+                                       'Cannot rename: file already exists or conflict occurred';
+                    
+                    if (onError) {
+                        onError(errorMessage);
+                    } else {
+                        enqueueSnackbar(errorMessage, {
+                            variant: 'error',
+                            autoHideDuration: 8000, // Longer duration for important error
+                            persist: false
+                        });
+                    }
+                } else {
+                    // Use modal for other errors
+                    if (onError) {
+                        onError('Failed to rename asset');
+                    } else {
+                        showError('Failed to rename asset');
+                    }
+                }
                 throw error;
             }
         },
@@ -358,9 +384,9 @@ export const useRenameAsset = () => {
 
             // Removed invalidation to avoid eventual consistency issues
         },
-        onError: (error) => {
+        onError: (error: any) => {
             logger.error('Error in rename mutation:', error);
-            showError('Failed to rename asset');
+            // Error handling is now done in mutationFn to avoid duplicate messages
         },
     });
 };

@@ -625,8 +625,13 @@ const AssetCard: React.FC<AssetCardProps> = ({
                                                         e.stopPropagation();
                                                         onEditClick(e);
                                                     }}
+                                                    disabled={isRenaming}
                                                 >
-                                                    <EditIcon fontSize="small" />
+                                                    {isRenaming ? (
+                                                        <CircularProgress size={16} />
+                                                    ) : (
+                                                        <EditIcon fontSize="small" />
+                                                    )}
                                                 </IconButton>
                                             </Box>
                                         )

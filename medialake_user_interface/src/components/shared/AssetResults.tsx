@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Box, Grid, Paper, Typography } from '@mui/material';
+import { Box, Grid, Paper, Typography, Snackbar, Alert } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { ConfirmationModal } from '../common/ConfirmationModal';
 import { RenameDialog } from '../common/RenameDialog';
@@ -160,6 +160,7 @@ function AssetResults<T extends AssetBase>({
         editingAssetId,
         editedName,
         isRenameDialogOpen,
+        alert,
         handleMenuOpen,
         handleMenuClose,
         handleAction,
@@ -171,6 +172,7 @@ function AssetResults<T extends AssetBase>({
         handleRenameConfirm,
         handleDeleteCancel,
         handleRenameCancel,
+        handleAlertClose,
         isLoading,
     } = useAssetOperations<T>();
 
@@ -352,6 +354,21 @@ function AssetResults<T extends AssetBase>({
                     onCancel={handleRenameCancel}
                     isLoading={isLoading.rename}
                 />
+
+                <Snackbar
+                    open={!!alert}
+                    autoHideDuration={6000}
+                    onClose={handleAlertClose}
+                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                >
+                    <Alert
+                        onClose={handleAlertClose}
+                        severity={alert?.severity}
+                        sx={{ width: '100%' }}
+                    >
+                        {alert?.message}
+                    </Alert>
+                </Snackbar>
             </Box>
         </Paper>
     );
