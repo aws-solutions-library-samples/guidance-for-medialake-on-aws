@@ -1,5 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { FacetFilters } from '../../types/facetSearch';
+import { 
+  useFilterModalOpen, 
+  useFilterModalDraft, 
+  useUIActions 
+} from '../../stores/searchStore';
 import {
   Box,
   Dialog,
@@ -8,22 +13,13 @@ import {
   DialogActions,
   Typography,
   Divider,
-  FormGroup,
-  FormControlLabel,
-  Checkbox,
   TextField,
   MenuItem,
   Select,
   FormControl,
   Button,
-  Chip,
-  Stack,
   IconButton,
   useTheme,
-  Grid,
-  Radio,
-  RadioGroup,
-  InputAdornment,
   ToggleButton,
   ToggleButtonGroup
 } from '@mui/material';
@@ -39,7 +35,7 @@ import {
   DateRangeOutlined as DateIcon
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
-import { addDays, subDays, startOfDay } from 'date-fns';
+import { subDays } from 'date-fns';
 
 // File size units for conversion
 const FILE_SIZE_UNITS = [
@@ -77,302 +73,106 @@ const MEDIA_TYPES = [
 ];
 
 export interface FilterModalProps {
-  open: boolean;
-  onClose: () => void;
-  onApplyFilters: (filters: FacetFilters) => void;
   facetCounts?: {
     asset_types?: { buckets: Array<{ key: string; doc_count: number }> };
     file_extensions?: { buckets: Array<{ key: string; doc_count: number }> };
     file_size_ranges?: { buckets: Array<{ key: string; doc_count: number }> };
     ingestion_date?: { buckets: Array<{ key: string; doc_count: number }> };
   };
-  activeFilters?: FacetFilters;
 }
 
 const FilterModal: React.FC<FilterModalProps> = ({
-  open,
-  onClose,
-  onApplyFilters,
-  facetCounts,
-  activeFilters = {}
+  facetCounts
 }) => {
   const { t } = useTranslation();
   const theme = useTheme();
-  const [filters, setFilters] = useState<FacetFilters>(activeFilters);
   
-  // State for media types and extensions
-  const [selectedMediaTypes, setSelectedMediaTypes] = useState<string[]>([]);
-  const [selectedExtensions, setSelectedExtensions] = useState<string[]>([]);
+  // Use store state and actions
+  const isOpen = useFilterModalOpen();
+  const draft = useFilterModalDraft();
+  const {
+    closeFilterModal,
+    updateFilterModalDraft,
+    applyFilterModalDraft,
+    resetFilterModalDraft
+  } = useUIActions();
   
-  // State for file size inputs
-  const [minSizeValue, setMinSizeValue] = useState<number | ''>('');
-  const [maxSizeValue, setMaxSizeValue] = useState<number | ''>('');
-  const [sizeUnit, setSizeUnit] = useState<number>(1024 * 1024); // Default to MB
-  // Removed slider-related state
-  
-  // State for date range
-  const [dateRangeOption, setDateRangeOption] = useState<string | null>(null); // Default to null so no button is selected
-  const [startDate, setStartDate] = useState<Date | null>(
-    filters.ingested_date_gte ? new Date(filters.ingested_date_gte) : null
-  );
-  const [endDate, setEndDate] = useState<Date | null>(
-    filters.ingested_date_lte ? new Date(filters.ingested_date_lte) : null
-  );
-
-  // Initialize state from active filters when the modal opens
-  useEffect(() => {
-    if (open) {
-      setFilters(activeFilters);
-      
-      // Initialize media types - handle comma-separated list
-      if (activeFilters.type) {
-        setSelectedMediaTypes(activeFilters.type.split(','));
-      } else {
-        setSelectedMediaTypes([]);
-      }
-      
-      // Initialize extensions - handle comma-separated list
-      if (activeFilters.extension) {
-        setSelectedExtensions(activeFilters.extension.split(','));
-      } else {
-        setSelectedExtensions([]);
-      }
-      
-      // Initialize file size
-      if (activeFilters.asset_size_gte !== undefined) {
-        // Find appropriate unit for display
-        const { value, unit } = convertBytesToDisplayUnit(activeFilters.asset_size_gte);
-        setMinSizeValue(value);
-        setSizeUnit(unit);
-      } else {
-        setMinSizeValue('');
-      }
-      
-      if (activeFilters.asset_size_lte !== undefined) {
-        // Find appropriate unit for display
-        const { value, unit } = convertBytesToDisplayUnit(activeFilters.asset_size_lte);
-        setMaxSizeValue(value);
-        if (activeFilters.asset_size_gte === undefined) {
-          setSizeUnit(unit);
-        }
-      } else {
-        setMaxSizeValue('');
-      }
-      
-      // Initialize date range
-      if (activeFilters.date_range_option) {
-        // If we have a stored date range option, use it
-        setDateRangeOption(activeFilters.date_range_option);
-        
-        if (activeFilters.ingested_date_gte) {
-          setStartDate(new Date(activeFilters.ingested_date_gte));
-        }
-        
-        if (activeFilters.ingested_date_lte) {
-          setEndDate(new Date(activeFilters.ingested_date_lte));
-        }
-      } else if (activeFilters.ingested_date_gte && activeFilters.ingested_date_lte) {
-        // Try to determine the date range option from the dates
-        const now = new Date();
-        const startDateObj = new Date(activeFilters.ingested_date_gte);
-        const endDateObj = new Date(activeFilters.ingested_date_lte);
-        
-        const daysDiff = Math.round((now.getTime() - startDateObj.getTime()) / (1000 * 60 * 60 * 24));
-        
-        if (daysDiff <= 1 && isSameDay(endDateObj, now)) {
-          setDateRangeOption('24h');
-        } else if (daysDiff <= 7 && isSameDay(endDateObj, now)) {
-          setDateRangeOption('7d');
-        } else if (daysDiff <= 14 && isSameDay(endDateObj, now)) {
-          setDateRangeOption('14d');
-        } else if (daysDiff <= 30 && isSameDay(endDateObj, now)) {
-          setDateRangeOption('30d');
-        } else {
-          setDateRangeOption(null);
-        }
-        
-        setStartDate(startDateObj);
-        setEndDate(endDateObj);
-      } else {
-        // Don't set default values when there are no active filters
-        setDateRangeOption(null);
-        setStartDate(null);
-        setEndDate(null);
-      }
-    }
-  }, [open, activeFilters]);
-
-  // Helper function to check if two dates are the same day
-  const isSameDay = (date1: Date, date2: Date) => {
-    return (
-      date1.getFullYear() === date2.getFullYear() &&
-      date1.getMonth() === date2.getMonth() &&
-      date1.getDate() === date2.getDate()
-    );
-  };
-
-  // Helper function to convert bytes to appropriate unit for display
-  const convertBytesToDisplayUnit = (bytes: number) => {
-    if (bytes >= FILE_SIZE_UNITS[3].value) {
-      return { value: bytes / FILE_SIZE_UNITS[3].value, unit: FILE_SIZE_UNITS[3].value };
-    } else if (bytes >= FILE_SIZE_UNITS[2].value) {
-      return { value: bytes / FILE_SIZE_UNITS[2].value, unit: FILE_SIZE_UNITS[2].value };
-    } else if (bytes >= FILE_SIZE_UNITS[1].value) {
-      return { value: bytes / FILE_SIZE_UNITS[1].value, unit: FILE_SIZE_UNITS[1].value };
-    } else {
-      return { value: bytes, unit: FILE_SIZE_UNITS[0].value };
-    }
-  };
-
-  // Helper function to apply filters with conversions
-  const applyFiltersWithConversions = () => {
-    let updatedFilters: FacetFilters = {};
-    
-    // Apply media type filters - now supports multiple types
-    if (selectedMediaTypes.length > 0) {
-      updatedFilters.type = selectedMediaTypes.join(',');
-    }
-    
-    // Apply extension filters - now supports multiple extensions
-    if (selectedExtensions.length > 0) {
-      // Convert extensions to uppercase before sending to API
-      updatedFilters.extension = selectedExtensions.map(ext => ext.toUpperCase()).join(',');
-    }
-    
-    // Convert size inputs to bytes for API
-    if (minSizeValue !== '') {
-      updatedFilters.asset_size_gte = Number(minSizeValue) * sizeUnit;
-    }
-    
-    if (maxSizeValue !== '') {
-      updatedFilters.asset_size_lte = Number(maxSizeValue) * sizeUnit;
-    }
-    
-    // Store the selected date range option in the filters
-    if (dateRangeOption !== null) {
-      updatedFilters.date_range_option = dateRangeOption;
-    }
-    
-    // Apply date range filters - ensure all timestamps are in ISO 8601 format with explicit UTC timezone (Z suffix)
-    if (dateRangeOption === '24h') {
-      const now = new Date();
-      const yesterday = subDays(now, 1);
-      updatedFilters.ingested_date_gte = startOfDay(yesterday).toISOString();
-      updatedFilters.ingested_date_lte = now.toISOString();
-    } else if (dateRangeOption === '7d') {
-      const now = new Date();
-      const lastWeek = subDays(now, 7);
-      updatedFilters.ingested_date_gte = startOfDay(lastWeek).toISOString();
-      updatedFilters.ingested_date_lte = now.toISOString();
-    } else if (dateRangeOption === '14d') {
-      const now = new Date();
-      const lastTwoWeeks = subDays(now, 14);
-      updatedFilters.ingested_date_gte = startOfDay(lastTwoWeeks).toISOString();
-      updatedFilters.ingested_date_lte = now.toISOString();
-    } else if (dateRangeOption === '30d') {
-      const now = new Date();
-      const lastMonth = subDays(now, 30);
-      updatedFilters.ingested_date_gte = startOfDay(lastMonth).toISOString();
-      updatedFilters.ingested_date_lte = now.toISOString();
-    } else {
-      // If no date range option is selected, use the date pickers
-      if (startDate) {
-        updatedFilters.ingested_date_gte = startDate.toISOString();
-      }
-      
-      if (endDate) {
-        updatedFilters.ingested_date_lte = endDate.toISOString();
-      }
-    }
-    
-    return updatedFilters;
-  };
+  // Destructure draft state for easier access
+  const {
+    selectedMediaTypes,
+    selectedExtensions,
+    minSizeValue,
+    maxSizeValue,
+    sizeUnit,
+    dateRangeOption,
+    startDate,
+    endDate
+  } = draft;
 
   const handleApply = () => {
-    const updatedFilters = applyFiltersWithConversions();
-    onApplyFilters(updatedFilters);
-    onClose();
+    applyFilterModalDraft();
+    closeFilterModal();
   };
 
   const handleReset = () => {
-    setFilters({});
-    setSelectedMediaTypes([]);
-    setSelectedExtensions([]);
-    setMinSizeValue('');
-    setMaxSizeValue('');
-    // Removed slider reset
-    setDateRangeOption(null); // Set to null so no button is selected
-    setStartDate(null);
-    setEndDate(null);
-    
-    // Immediately apply the reset filters
-    onApplyFilters({});
+    resetFilterModalDraft();
+    applyFilterModalDraft(); // Apply the reset immediately
   };
   
-  // Enhanced close handler to reset filters
   const handleClose = () => {
-    handleReset(); // Reset all filters
-    onClose(); // Close the modal
+    closeFilterModal();
   };
 
   const handleMediaTypeToggle = (type: string) => {
-    setSelectedMediaTypes(prev => {
-      if (prev.includes(type)) {
-        return prev.filter(t => t !== type);
-      } else {
-        return [...prev, type];
-      }
-    });
+    const newSelectedMediaTypes = selectedMediaTypes.includes(type)
+      ? selectedMediaTypes.filter(t => t !== type)
+      : [...selectedMediaTypes, type];
+    
+    updateFilterModalDraft({ selectedMediaTypes: newSelectedMediaTypes });
   };
 
   const handleExtensionToggle = (extension: string) => {
-    setSelectedExtensions(prev => {
-      if (prev.includes(extension)) {
-        return prev.filter(e => e !== extension);
-      } else {
-        return [...prev, extension];
-      }
-    });
+    const newSelectedExtensions = selectedExtensions.includes(extension)
+      ? selectedExtensions.filter(e => e !== extension)
+      : [...selectedExtensions, extension];
+    
+    updateFilterModalDraft({ selectedExtensions: newSelectedExtensions });
   };
 
-  // Removed slider-related functions as per requirements
-
-  const handleDateRangeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = event.target.value;
-    setDateRangeOption(value);
+  const handleDateRangeChange = (value: string | null) => {
+    if (value === null) return;
     
     const now = new Date();
+    let newStartDate: Date | null = null;
+    let newEndDate: Date | null = null;
     
     if (value === '24h') {
-      // Set to start of yesterday and end of today
-      setStartDate(startOfDay(subDays(now, 1)));
-      setEndDate(now);
+      newStartDate = subDays(now, 1);
+      newEndDate = now;
     } else if (value === '7d') {
-      // Set to start of 7 days ago and end of today
-      setStartDate(startOfDay(subDays(now, 7)));
-      setEndDate(now);
+      newStartDate = subDays(now, 7);
+      newEndDate = now;
     } else if (value === '14d') {
-      // Set to start of 14 days ago and end of today
-      setStartDate(startOfDay(subDays(now, 14)));
-      setEndDate(now);
+      newStartDate = subDays(now, 14);
+      newEndDate = now;
     } else if (value === '30d') {
-      // Set to start of 30 days ago and end of today
-      setStartDate(startOfDay(subDays(now, 30)));
-      setEndDate(now);
+      newStartDate = subDays(now, 30);
+      newEndDate = now;
     }
+    
+    updateFilterModalDraft({
+      dateRangeOption: value,
+      startDate: newStartDate,
+      endDate: newEndDate
+    });
   };
 
   // Get available extensions from facet counts if available
   const availableExtensions = facetCounts?.file_extensions?.buckets || [];
-  
-  // Helper function to check if an extension is available in facet counts
-  const isExtensionAvailable = (ext: string) => {
-    return availableExtensions.some(e => e.key === ext);
-  };
 
   return (
     <Dialog
-      open={open}
+      open={isOpen}
       onClose={handleClose}
       maxWidth="sm"
       fullWidth
@@ -399,7 +199,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
       
       <DialogContent sx={{ p: 2 }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-          {/* Media Type and Extensions Section - Collapsed and more compact */}
+          {/* Media Type and Extensions Section */}
           <Box>
             <Typography variant="subtitle1" fontWeight="medium" sx={{ mb: 1.5, display: 'flex', alignItems: 'center' }}>
               <Box component="span" sx={{ mr: 1, display: 'flex', alignItems: 'center' }}>
@@ -408,7 +208,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
               Media Type and Extensions
             </Typography>
             
-            {/* Media Types with Extensions directly to the right */}
+            {/* Media Types with Extensions */}
             {MEDIA_TYPES.map((mediaType) => (
               <Box key={mediaType.key} sx={{ mb: 1.5, display: 'flex', flexDirection: 'column' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -430,10 +230,10 @@ const FilterModal: React.FC<FilterModalProps> = ({
                       borderRadius: '4px',
                       mr: 1,
                       '&.Mui-selected': {
-                        backgroundColor: '#1a4971', // Darker blue color
+                        backgroundColor: '#1a4971',
                         color: '#ffffff',
                         '&:hover': {
-                          backgroundColor: '#153d61', // Even darker on hover
+                          backgroundColor: '#153d61',
                         }
                       }
                     }}
@@ -442,7 +242,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
                     <Typography variant="body2">{mediaType.key}</Typography>
                   </ToggleButton>
                   
-                  {/* Extensions directly to the right of type button */}
+                  {/* Extensions */}
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, ml: 1 }}>
                     {mediaType.extensions.map((ext) => {
                       const isSelected = selectedExtensions.includes(ext);
@@ -458,12 +258,12 @@ const FilterModal: React.FC<FilterModalProps> = ({
                             minWidth: '60px',
                             height: '28px',
                             fontSize: '0.75rem',
-                            textTransform: 'uppercase', // Changed from lowercase to uppercase
+                            textTransform: 'uppercase',
                             py: 0,
                             px: 1,
                             borderRadius: '14px',
                             mb: 0.5,
-                            opacity: 1 // Fully opaque
+                            opacity: 1
                           }}
                         >
                           {ext}
@@ -478,7 +278,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
           
           <Divider />
           
-          {/* File Size Section - Without slider, label and inputs on same line */}
+          {/* File Size Section */}
           <Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <Typography variant="subtitle1" fontWeight="medium" sx={{ display: 'flex', alignItems: 'center' }}>
@@ -489,56 +289,56 @@ const FilterModal: React.FC<FilterModalProps> = ({
               </Typography>
               
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <TextField
-                type="number"
-                size="small"
-                value={minSizeValue}
-                onChange={(e) => {
-                  const newValue = e.target.value === '' ? '' : Number(e.target.value);
-                  setMinSizeValue(newValue);
-                }}
-                inputProps={{ min: 0 }}
-                placeholder={t('search.filters.minSize', 'Min')}
-                sx={{ width: '80px' }}
-              />
-              
-              <Typography variant="body2" sx={{ mx: 0.5 }}>to</Typography>
-              
-              <TextField
-                type="number"
-                size="small"
-                value={maxSizeValue}
-                onChange={(e) => {
-                  const newValue = e.target.value === '' ? '' : Number(e.target.value);
-                  setMaxSizeValue(newValue);
-                }}
-                inputProps={{ min: 0 }}
-                placeholder={t('search.filters.maxSize', 'Max')}
-                sx={{ width: '80px' }}
-              />
-              
-              <FormControl size="small" sx={{ width: '70px', ml: 0.5 }}>
-                <Select
-                  value={sizeUnit}
+                <TextField
+                  type="number"
+                  size="small"
+                  value={minSizeValue}
                   onChange={(e) => {
-                    setSizeUnit(Number(e.target.value));
+                    const newValue = e.target.value === '' ? '' : Number(e.target.value);
+                    updateFilterModalDraft({ minSizeValue: newValue });
                   }}
-                  displayEmpty
-                >
-                  {FILE_SIZE_UNITS.map((unit) => (
-                    <MenuItem key={unit.value} value={unit.value}>
-                      {unit.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+                  inputProps={{ min: 0 }}
+                  placeholder={t('search.filters.minSize', 'Min')}
+                  sx={{ width: '80px' }}
+                />
+                
+                <Typography variant="body2" sx={{ mx: 0.5 }}>to</Typography>
+                
+                <TextField
+                  type="number"
+                  size="small"
+                  value={maxSizeValue}
+                  onChange={(e) => {
+                    const newValue = e.target.value === '' ? '' : Number(e.target.value);
+                    updateFilterModalDraft({ maxSizeValue: newValue });
+                  }}
+                  inputProps={{ min: 0 }}
+                  placeholder={t('search.filters.maxSize', 'Max')}
+                  sx={{ width: '80px' }}
+                />
+                
+                <FormControl size="small" sx={{ width: '70px', ml: 0.5 }}>
+                  <Select
+                    value={sizeUnit}
+                    onChange={(e) => {
+                      updateFilterModalDraft({ sizeUnit: Number(e.target.value) });
+                    }}
+                    displayEmpty
+                  >
+                    {FILE_SIZE_UNITS.map((unit) => (
+                      <MenuItem key={unit.value} value={unit.value}>
+                        {unit.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
               </Box>
             </Box>
           </Box>
           
           <Divider />
           
-          {/* Date Created Section - With relative options on same line as label */}
+          {/* Date Created Section */}
           <Box>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
               <Typography variant="subtitle1" fontWeight="medium" sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
@@ -548,31 +348,11 @@ const FilterModal: React.FC<FilterModalProps> = ({
                 Date Created
               </Typography>
               
-              {/* Relative date options on the same line as the label */}
+              {/* Relative date options */}
               <ToggleButtonGroup
                 value={dateRangeOption}
                 exclusive
-                onChange={(e, newValue) => {
-                  if (newValue !== null) {
-                    setDateRangeOption(newValue);
-                    
-                    const now = new Date();
-                    
-                    if (newValue === '24h') {
-                      setStartDate(startOfDay(subDays(now, 1)));
-                      setEndDate(now);
-                    } else if (newValue === '7d') {
-                      setStartDate(startOfDay(subDays(now, 7)));
-                      setEndDate(now);
-                    } else if (newValue === '14d') {
-                      setStartDate(startOfDay(subDays(now, 14)));
-                      setEndDate(now);
-                    } else if (newValue === '30d') {
-                      setStartDate(startOfDay(subDays(now, 30)));
-                      setEndDate(now);
-                    }
-                  }
-                }}
+                onChange={(e, newValue) => handleDateRangeChange(newValue)}
                 size="small"
                 sx={{
                   '& .MuiToggleButton-root': {
@@ -596,7 +376,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
               </ToggleButtonGroup>
             </Box>
             
-            {/* Date pickers with more compact layout */}
+            {/* Date pickers */}
             <LocalizationProvider dateAdapter={AdapterDateFns}>
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                 <Box sx={{ flex: 1, minWidth: '140px' }}>
@@ -606,11 +386,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
                   <DateTimePicker
                     value={startDate}
                     onChange={(newValue) => {
-                      setStartDate(newValue);
-                      // Update date range option based on selected date
-                      if (newValue) {
-                        // No need to switch to custom range as it's been removed
-                      }
+                      updateFilterModalDraft({ startDate: newValue });
                     }}
                     format="yyyy/MM/dd hh:mm a"
                     ampm={true}
@@ -649,11 +425,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
                   <DateTimePicker
                     value={endDate}
                     onChange={(newValue) => {
-                      setEndDate(newValue);
-                      // Update date range option based on selected date
-                      if (newValue) {
-                        // No need to switch to custom range as it's been removed
-                      }
+                      updateFilterModalDraft({ endDate: newValue });
                     }}
                     format="yyyy/MM/dd hh:mm a"
                     ampm={true}
