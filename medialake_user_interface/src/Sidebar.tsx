@@ -38,6 +38,7 @@ import {
     Home as HomeIcon,
     Extension as IntegrationIcon,
     Cloud as EnvironmentIcon,
+    Terrain as LogoIcon,
 } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTheme as useCustomTheme } from './hooks/useTheme';
@@ -286,13 +287,12 @@ function Sidebar() {
                     borderBottom: '1px solid',
                     borderColor: 'divider',
                 }}>
-                    <img
-                        src="/logo.png"
-                        alt={t('app.branding.name', 'MediaLake')}
-                        style={{
-                            height: '32px',
-                            marginRight: isRTL ? 0 : (isCollapsed ? 0 : theme.spacing(1)),
-                            marginLeft: isRTL ? (isCollapsed ? 0 : theme.spacing(1)) : 0
+                    <LogoIcon
+                        sx={{
+                            fontSize: '32px',
+                            color: theme.palette.primary.main,
+                            marginRight: isRTL ? 0 : (isCollapsed ? 0 : 1),
+                            marginLeft: isRTL ? (isCollapsed ? 0 : 1) : 0
                         }}
                     />
                     {!isCollapsed && (
