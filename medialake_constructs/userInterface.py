@@ -577,8 +577,10 @@ class UIConstruct(Construct):
             # The original path calculation used props.app_path.parent which pointed to an incorrect location
             # in the CI environment, causing the build to fail when looking for pre-built frontend assets.
             # The frontend assets are copied to assets/dist by the CI build process (see medialake.template:539)
-            # and need to be referenced correctly for the S3 deployment to succeed.
-            dist_path = Path(__file__).parent.parent / "assets" / "dist"
+            # In CI, we need to reference the assets directory relative to the current working directory
+            import os
+            current_dir = Path(os.getcwd())
+            dist_path = current_dir / "assets" / "dist"
             asset = s3deploy.Source.asset(
                 str(dist_path)
             )
