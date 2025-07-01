@@ -312,15 +312,15 @@ function Sidebar() {
                     onClick={toggleDrawer}
                     sx={{
                         position: 'absolute',
-                        [isRTL ? 'left' : 'right']: -12,
+                        [isRTL ? 'left' : 'right']: -16,
                         top: '50%',
                         transform: 'translateY(-50%)',
-                        minWidth: '24px',
-                        width: '24px',
-                        height: '24px',
+                        minWidth: '32px',
+                        width: '32px',
+                        height: '32px',
                         bgcolor: 'background.paper',
                         borderRadius: '8px',
-                        boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.15)',
+                        boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -330,14 +330,14 @@ function Sidebar() {
                         padding: 0,
                         '&:hover': {
                             bgcolor: 'background.paper',
-                            boxShadow: '0px 6px 12px rgba(0, 0, 0, 0.2)',
+                            boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.1)',
                         },
                     }}
                 >
                     {isCollapsed ? (
-                        isRTL ? <ChevronLeft sx={{ fontSize: 16 }} /> : <ChevronRight sx={{ fontSize: 16 }} />
+                        isRTL ? <ChevronLeft sx={{ fontSize: 20 }} /> : <ChevronRight sx={{ fontSize: 20 }} />
                     ) : (
-                        isRTL ? <ChevronRight sx={{ fontSize: 16 }} /> : <ChevronLeft sx={{ fontSize: 16 }} />
+                        isRTL ? <ChevronRight sx={{ fontSize: 20 }} /> : <ChevronLeft sx={{ fontSize: 20 }} />
                     )}
                 </Button>
                 <List sx={{
