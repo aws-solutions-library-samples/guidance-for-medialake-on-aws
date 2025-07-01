@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useFeatureFlag } from '@/utils/featureFlags';
-import { Box, Typography, IconButton, TextField, Button, CircularProgress, Checkbox } from '@mui/material';
+import { Box, Typography, IconButton, Button, CircularProgress, Checkbox } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
@@ -10,6 +10,7 @@ import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import { AssetAudio } from '../asset';
+import { InlineTextEditor } from '../common/InlineTextEditor';
 
 export interface AssetField {
     id: string;
@@ -35,7 +36,7 @@ export interface AssetCardProps {
     isEditing?: boolean;
     editedName?: string;
     onEditNameChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
-    onEditNameComplete?: (save: boolean) => void;
+    onEditNameComplete?: (save: boolean, value?: string) => void;
     cardSize?: 'small' | 'medium' | 'large';
     aspectRatio?: 'vertical' | 'square' | 'horizontal';
     thumbnailScale?: 'fit' | 'fill';
@@ -78,11 +79,11 @@ const AssetCard: React.FC<AssetCardProps> = ({
     onSelectToggle,
     selectedSearchFields,
 }) => {
-    const [selectionRange, setSelectionRange] = useState<[number, number] | null>(null);
     const [isHovering, setIsHovering] = useState(false);
     const [isMenuClicked, setIsMenuClicked] = useState(false);
-    const inputRef = useRef<HTMLInputElement | null>(null);
     const cardRef = useRef<HTMLDivElement>(null);
+    const preventCommitRef = useRef<boolean>(false);
+    const commitRef = useRef<(() => void) | null>(null);
 
     // Check if features are enabled
     const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', true);
@@ -151,29 +152,6 @@ const AssetCard: React.FC<AssetCardProps> = ({
         };
     }, []);
 
-    useEffect(() => {
-        if (isEditing && inputRef.current) {
-            // Move caret to the beginning of the string
-            inputRef.current.focus();
-            inputRef.current.setSelectionRange(0, 0);
-            setSelectionRange([0, 0]);
-        }
-    }, [isEditing]);
-
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        // Remember where the user was typing
-        const start = e.target.selectionStart ?? 0;
-        const end = e.target.selectionEnd ?? start;
-        onEditNameChange?.(e);
-        setSelectionRange([start, end]);
-    };
-
-    useEffect(() => {
-        if (isEditing && inputRef.current && selectionRange) {
-            // After the new value is in place, reset selection
-            inputRef.current.setSelectionRange(selectionRange[0], selectionRange[1]);
-        }
-    }, [isEditing, editedName, selectionRange]);
 
     // Determine if buttons should be visible
     const shouldShowButtons = isHovering || isMenuClicked;
@@ -504,20 +482,24 @@ const AssetCard: React.FC<AssetCardProps> = ({
                                                 width: '100%',
                                                 mt: 1
                                             }}>
-                                                <TextField
-                                                    inputRef={inputRef}
-                                                    value={editedName}
-                                                    disabled={isRenaming}
-                                                    onChange={handleInputChange}
-                                                    onKeyPress={(e) => {
-                                                        if (e.key === 'Enter' && !e.shiftKey) {
-                                                            e.preventDefault();
-                                                            onEditNameComplete?.(true);
-                                                        } else if (e.key === 'Escape') {
-                                                            onEditNameComplete?.(false);
-                                                        }
+                                                <InlineTextEditor
+                                                    initialValue={editedName || ''}
+                                                    editingCellId={id}                       // ← pass a stable ID (e.g. asset ID)
+                                                    preventCommitRef={preventCommitRef}      // ← pass the ref to prevent commit
+                                                    commitRef={commitRef}                    // ← pass the ref to expose commit function
+                                                    onChangeCommit={(value) => {
+                                                        // Update parent state
+                                                        onEditNameChange({
+                                                            target: { value }
+                                                        } as React.ChangeEvent<HTMLInputElement>);
                                                     }}
-                                                    onClick={(e) => e.stopPropagation()}
+                                                    onComplete={(save, value) => {
+                                                        console.log('🎯 AssetCard onComplete - save:', save, 'value:', value);
+                                                        console.log('🎯 Calling onEditNameComplete with save:', save, 'value:', value);
+                                                        onEditNameComplete?.(save, value);
+                                                    }}
+                                                    isEditing={true}
+                                                    disabled={isRenaming}
                                                     autoFocus
                                                     size="small"
                                                     fullWidth
@@ -542,9 +524,27 @@ const AssetCard: React.FC<AssetCardProps> = ({
                                                 <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
                                                     <Button
                                                         size="small"
+                                                        onMouseDown={(e) => {
+                                                            e.stopPropagation();
+                                                            e.preventDefault();
+                                                            console.log('💾 AssetCard Save mousedown');
+                                                            // Set flag to prevent blur from canceling
+                                                            preventCommitRef.current = true;
+                                                        }}
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            onEditNameComplete?.(true);
+                                                            e.preventDefault();
+                                                            console.log('💾 AssetCard Save clicked');
+                                                            console.log('💾 AssetCard commitRef.current:', commitRef.current);
+                                                            // Reset the prevent flag
+                                                            preventCommitRef.current = false;
+                                                            // Call the commit function directly via ref
+                                                            if (commitRef.current) {
+                                                                console.log('💾 AssetCard calling commitRef.current()');
+                                                                commitRef.current();
+                                                            } else {
+                                                                console.error('💾 AssetCard commitRef.current is null!');
+                                                            }
                                                         }}
                                                         variant="contained"
                                                         disabled={isRenaming}
@@ -554,9 +554,16 @@ const AssetCard: React.FC<AssetCardProps> = ({
                                                     <Button
                                                         size="small"
                                                         disabled={isRenaming}
+                                                        onMouseDown={(e) => {
+                                                            e.stopPropagation();
+                                                            console.log('🚫 AssetCard Cancel clicked');
+                                                            // Set flag to prevent InlineTextEditor commit from being called
+                                                            // Use onMouseDown instead of onClick to set the flag before onBlur
+                                                            preventCommitRef.current = true;
+                                                        }}
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            onEditNameComplete?.(false);
+                                                            onEditNameComplete?.(false, undefined);
                                                         }}
                                                     >
                                                         Cancel
@@ -618,8 +625,13 @@ const AssetCard: React.FC<AssetCardProps> = ({
                                                         e.stopPropagation();
                                                         onEditClick(e);
                                                     }}
+                                                    disabled={isRenaming}
                                                 >
-                                                    <EditIcon fontSize="small" />
+                                                    {isRenaming ? (
+                                                        <CircularProgress size={16} />
+                                                    ) : (
+                                                        <EditIcon fontSize="small" />
+                                                    )}
                                                 </IconButton>
                                             </Box>
                                         )

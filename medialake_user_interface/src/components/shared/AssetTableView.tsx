@@ -14,7 +14,7 @@ interface AssetTableViewProps<T> {
   onDownloadClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onEditClick?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  onEditNameComplete?: (asset: T, save: boolean) => void;
+  onEditNameComplete?: (asset: T, save: boolean, value?: string) => void;
   editingAssetId?: string;
   editedName?: string;
   getAssetId: (asset: T) => string;
@@ -26,6 +26,8 @@ interface AssetTableViewProps<T> {
   isFavorite?: (asset: T) => boolean;
   onFavoriteToggle?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   selectedSearchFields?: string[]; // Add selectedSearchFields prop
+  isRenaming?: boolean; // Add isRenaming prop for loading state
+  renamingAssetId?: string; // ID of the asset currently being renamed
 }
 
 function AssetTableView<T>({
@@ -51,6 +53,8 @@ function AssetTableView<T>({
   isFavorite,
   onFavoriteToggle,
   selectedSearchFields,
+  isRenaming,
+  renamingAssetId,
 }: AssetTableViewProps<T>) {
   // Check if multi-select feature is enabled
   const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
@@ -95,6 +99,8 @@ function AssetTableView<T>({
         isFavorite={favoritesFeature.value ? isFavorite : undefined}
         onFavoriteToggle={favoritesFeature.value ? onFavoriteToggle : undefined}
         selectedSearchFields={selectedSearchFields}
+        isRenaming={isRenaming}
+        renamingAssetId={renamingAssetId}
       />
     );
   }
@@ -136,6 +142,8 @@ function AssetTableView<T>({
               isFavorite={favoritesFeature.value ? isFavorite : undefined}
               onFavoriteToggle={favoritesFeature.value ? onFavoriteToggle : undefined}
               selectedSearchFields={selectedSearchFields}
+              isRenaming={isRenaming}
+              renamingAssetId={renamingAssetId}
             />
           </div>
         ))}

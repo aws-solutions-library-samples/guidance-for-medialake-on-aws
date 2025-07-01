@@ -17,7 +17,9 @@ import {
     Select,
     Chip,
     OutlinedInput,
-    SelectChangeEvent
+    SelectChangeEvent,
+    Snackbar,
+    Alert
 } from '@mui/material';
 import SearchOffIcon from '@mui/icons-material/SearchOff';
 import { RightSidebar, RightSidebarProvider } from '../components/common/RightSidebar';
@@ -289,6 +291,10 @@ const SearchPage: React.FC = () => {
         editedName: currentEditedName,
         isDeleteModalOpen,
         selectedAsset,
+        alert,
+        handleAlertClose,
+        isLoading: assetOperationsLoading,
+        renamingAssetId,
     } = useAssetOperations<AssetItem>();
 
     const handleAssetClick = useCallback((asset: AssetItem) => {
@@ -608,6 +614,8 @@ const SearchPage: React.FC = () => {
                                 onSelectAllToggle={multiSelectFeature.value ? () => {
                                     assetSelection.handleSelectAll(filteredResults);
                                 } : undefined}
+                                isRenaming={assetOperationsLoading.rename}
+                                renamingAssetId={renamingAssetId}
                                 error={error ? {
                                     status: (error as SearchError).apiResponse?.status || error.name,
                                     message: (error as SearchError).apiResponse?.message || error.message
@@ -675,6 +683,21 @@ const SearchPage: React.FC = () => {
                     action={assetSelection.modalState.action}
                     message={assetSelection.modalState.message}
                 />
+
+                <Snackbar
+                    open={!!alert}
+                    autoHideDuration={6000}
+                    onClose={handleAlertClose}
+                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                >
+                    <Alert
+                        onClose={handleAlertClose}
+                        severity={alert?.severity}
+                        sx={{ width: '100%' }}
+                    >
+                        {alert?.message}
+                    </Alert>
+                </Snackbar>
             </>
         </RightSidebarProvider>
     );
