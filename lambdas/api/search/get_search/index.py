@@ -234,6 +234,11 @@ def build_semantic_query(params: SearchParams) -> Dict:
                 "size": params.pageSize * 20,
                 "query": {
                     "bool": {
+                        "filter": {
+                            "bool":{
+                                "must": []                               
+                            }
+                        },                        
                         "must": [
                             {
                                 "knn": {
@@ -255,6 +260,57 @@ def build_semantic_query(params: SearchParams) -> Dict:
                 query["query"]["bool"]["must_not"] = [
                     {"term": {"embedding_scope": "clip"}}
                 ]
+
+             # Process Facet filters
+            
+            if params.type is not None:
+                var_type = params.type.split(",")
+                query["query"]["bool"]["filter"]["bool"]["must"].append(
+                                {
+                                "terms": {
+                                    "DigitalSourceAsset.Type": var_type
+                                }
+                                }
+    
+            )   
+
+            if params.extension is not None:
+                var_ext = params.extension.split(",")
+                query["query"]["bool"]["filter"]["bool"]["must"].append(
+                                {
+                                "terms": {
+                                    "DigitalSourceAsset.MainRepresentation.Format": var_ext
+                                }
+                                }
+            )
+
+            if params.asset_size_lte is not None and params.asset_size_gte is not None:
+                try:
+                    query["query"]["bool"]["filter"]["bool"]["must"].append({
+                        "range": {
+                            "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size": {
+                                "gte": params.asset_size_gte,
+                                "lte": params.asset_size_lte
+                            }
+                        }
+                    }
+                        )            
+                except ValueError:
+                    logger.warning(f"Invalid values for asset size: {params.asset_size_gte,params.asset_size_lte}")
+
+            if params.ingested_date_lte is not None and params.ingested_date_gte is not None:
+                try:
+                    query["query"]["bool"]["filter"]["bool"]["must"].append({
+                        "range": {
+                            "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate": {
+                                "gte": params.ingested_date_gte,
+                                "lte": params.ingested_date_lte
+                            }
+                        }
+                    }   )
+                except ValueError:
+                    logger.warning(f"Invalid values for asset size: {params.asset_size_gte,params.asset_size_lte}")
+
 
             logger.info(f"Semantic query size: {query['size']}, k: {query['query']['bool']['must'][0]['knn']['embedding']['k']}")
             logger.info(f"[PERF] Total semantic query build time: {time.time() - start_time:.3f}s")
