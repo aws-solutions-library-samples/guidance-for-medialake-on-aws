@@ -40,22 +40,18 @@ export interface IntegrationsError {
 // DTOs for API requests
 export interface CreateIntegrationDto {
     nodeId: string;
-    integrationType: string;
-    description: string;
-    integrationEnabled: boolean;
-    createdDate: string;
-    modifiedDate: string;
+    description?: string;
     auth: IntegrationAuth;
 }
 
 export interface UpdateIntegrationDto {
     description?: string;
     auth?: IntegrationAuth;
-    status?: Partial<IntegrationStatus>;
+    status?: string;
 }
 
 export interface IntegrationFormData {
-    description: string;
+    description?: string;
     nodeId: string;
     auth: IntegrationAuth;
 }

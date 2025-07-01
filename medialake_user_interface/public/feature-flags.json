@@ -12,15 +12,15 @@
     "variant": "off"
   },
   "chat-enabled": {
-    "value": true,
+    "value": false,
     "variant": "off"
   },
   "notification-enabled": {
-    "value": true,
+    "value": false,
     "variant": "off"
   },
   "advanced-permissions-enabled": {
-    "value": false,
+    "value": true,
     "variant": "off"
   }
 }

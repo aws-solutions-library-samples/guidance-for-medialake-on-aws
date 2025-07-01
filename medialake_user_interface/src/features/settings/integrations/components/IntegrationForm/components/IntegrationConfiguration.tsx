@@ -31,7 +31,7 @@ export const IntegrationConfiguration: React.FC<IntegrationConfigurationProps & 
     const validationSchema = React.useMemo(() => {
         return z.object({
             nodeId: z.string().min(1, 'Integration selection is required'),
-            description: z.string().min(1, 'Description is required'),
+            description: z.string().optional(), // Made optional
             auth: z.object({
                 type: z.enum(['apiKey', 'awsIam']),
                 credentials: z.object({
@@ -176,7 +176,6 @@ export const IntegrationConfiguration: React.FC<IntegrationConfigurationProps & 
                     tooltip={t('integrations.form.fields.description.tooltip')}
                     multiline
                     rows={3}
-                    required
                     translationPrefix="integrations.form"
                 />
                 {authMethod === 'awsIam' && (
