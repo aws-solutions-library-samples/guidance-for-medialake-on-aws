@@ -81,7 +81,7 @@ export default {
       },
     home: {
         title: 'Startseite',
-        description: 'MediaLake - Ein Data Lake für Ihre Medien und Metadaten',
+                    description: 'Leitfaden für Ihre Medien, Metadaten und Arbeitsabläufe.',
         statistics: 'Statistiken',
         collections: 'Sammlungen',
         sharedCollections: 'Geteilte Sammlungen',
@@ -136,7 +136,7 @@ export default {
         navigating: 'Navigation von'
       },
       branding: {
-        name: 'MediaLake'
+        name: 'Media Lake'
       }
     },
     search: {
@@ -642,7 +642,7 @@ export default {
         settings: 'Einstellungen'
       },
       home: {
-        welcome: 'Willkommen bei MediaLake',
+                    welcome: 'Willkommen bei Media Lake',
         description: 'Verwalten und organisieren Sie Ihre Mediendateien effizient',
         statistics: 'Statistiken',
         collections: 'Sammlungen',
