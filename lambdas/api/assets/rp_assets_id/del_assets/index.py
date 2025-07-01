@@ -86,6 +86,21 @@ def _signed_request(method: str,
 
 
 # ── Utilities ────────────────────────────────────────────────────────────────
+def _parse_s3_uri(s3_uri: str) -> tuple[str, str]:
+    """Parse S3 URI into bucket and key components"""
+    if not s3_uri or not s3_uri.startswith("s3://"):
+        return None, None
+    
+    # Remove s3:// prefix and split
+    path = s3_uri[5:]  # Remove "s3://"
+    parts = path.split("/", 1)
+    
+    if len(parts) != 2:
+        return None, None
+        
+    return parts[0], parts[1]  # bucket, key
+
+
 class DecimalEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, Decimal):
@@ -126,13 +141,21 @@ def delete_s3_objects(asset: Dict[str, Any]) -> None:
                     extra={"bucket": main['Bucket'], "key": main['ObjectKey']['FullPath']})
 
         # Derived
-        for rep in asset["DigitalSourceAsset"].get("DerivedRepresentations", []):
+        for rep in asset.get("DerivedRepresentations", []):
             pl = rep.get("StorageInfo", {}).get("PrimaryLocation")
             if not pl:
                 continue
             s3.delete_object(Bucket=pl["Bucket"], Key=pl["ObjectKey"]["FullPath"])
             logger.info("Deleted derived representation",
                         extra={"bucket": pl['Bucket'], "key": pl['ObjectKey']['FullPath']})
+
+        # Transcript files
+        if transcript_uri := asset.get("TranscriptionS3Uri"):
+            transcript_bucket, transcript_key = _parse_s3_uri(transcript_uri)
+            if transcript_bucket and transcript_key:
+                s3.delete_object(Bucket=transcript_bucket, Key=transcript_key)
+                logger.info("Deleted transcript file",
+                           extra={"bucket": transcript_bucket, "key": transcript_key})
 
     except ClientError as e:
         logger.error(f"S3 deletion error: {e}")
