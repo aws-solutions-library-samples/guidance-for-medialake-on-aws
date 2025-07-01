@@ -366,6 +366,7 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
     try:
         truncated = _truncate_floats(event, max_items=10)
         logger.info("Received event", extra={"event": truncated})
+        logger.info(f"Content Type {CONTENT_TYPE}")
 
         payload: Dict[str, Any] = event.get("payload") or {}
         if not payload:
@@ -513,6 +514,10 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                             "timestamp": datetime.utcnow().isoformat(),
                         }
                     }
+                    if embedding_option == "audio":
+                        update_body["doc"]["audio_embedding"] = embedding_vector
+                    else:
+                        update_body["doc"]["embedding"] = embedding_vector
                     if embedding_option is not None:
                         update_body["doc"]["embedding_option"] = embedding_option
                     
@@ -746,8 +751,14 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                 "timestamp":       datetime.utcnow().isoformat(),
             }
         }
+        if embedding_option == "audio":
+            update_body["doc"]["audio_embedding"] = embedding_vector
+        else:
+            update_body["doc"]["embedding"]       = embedding_vector
+            
         if embedding_option is not None:
             update_body["doc"]["embedding_option"] = embedding_option
+
 
         for attempt in range(50):
             try:
