@@ -77,7 +77,7 @@ export default {
       navigating: 'جارٍ التنقل من'
     },
     branding: {
-      name: 'MediaLake'
+              name: 'Media Lake'
     }
   },
   search: {
@@ -548,8 +548,8 @@ export default {
       settings: 'الإعدادات'
     },
     home: {
-      welcome: 'مرحبًا بكم في MediaLake',
-      description: 'قم بإدارة وتنظيم ملفات الوسائط الخاصة بك بكفاءة',
+      welcome: 'مرحبًا بكم في Media Lake',
+      description: 'إرشادات لوسائطك وبياناتك الوصفية وسير العمل.',
       statistics: 'الإحصائيات',
       collections: 'المجموعات',
       sharedCollections: 'المجموعات المشتركة',

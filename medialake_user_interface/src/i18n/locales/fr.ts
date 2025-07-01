@@ -77,7 +77,7 @@ export default {
         navigating: 'Navigation depuis'
       },
       branding: {
-        name: 'MediaLake'
+        name: 'Media Lake'
       }
     },
     search: {
@@ -531,7 +531,7 @@ export default {
         settings: 'Paramètres'
       },
       home: {
-        welcome: 'Bienvenue sur MediaLake',
+                    welcome: 'Bienvenue sur Media Lake',
         description: 'Gérez et organisez efficacement vos fichiers multimédias',
         statistics: 'Statistiques',
         collections: 'Collections',
