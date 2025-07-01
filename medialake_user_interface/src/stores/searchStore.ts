@@ -185,6 +185,8 @@ export interface SearchState {
   ui: {
     filterModalOpen: boolean;
     filterModalDraft: FilterModalFormState;
+    loading: boolean;
+    error?: string;
   };
   
   // Actions
@@ -202,6 +204,8 @@ export interface SearchState {
     updateFilterModalDraft: (draft: Partial<FilterModalFormState>) => void;
     applyFilterModalDraft: () => void;
     resetFilterModalDraft: () => void;
+    setLoading: (loading: boolean) => void;
+    setError: (error?: string) => void;
     
     // Computed values
     hasActiveFilters: () => boolean;
@@ -221,6 +225,8 @@ export const useSearchStore = create<SearchState>()(
       ui: {
         filterModalOpen: false,
         filterModalDraft: initialFilterModalState,
+        loading: false,
+        error: undefined,
       },
       
       // Actions
@@ -313,6 +319,20 @@ export const useSearchStore = create<SearchState>()(
           }
         }),
         
+        setLoading: (loading: boolean) => set({
+          ui: {
+            ...get().ui,
+            loading
+          }
+        }),
+        
+        setError: (error?: string) => set({
+          ui: {
+            ...get().ui,
+            error
+          }
+        }),
+        
         // Computed values
         hasActiveFilters: () => {
           const filters = get().filters;
@@ -354,6 +374,6 @@ export const useDomainActions = () => {
   return { setQuery, setIsSemantic, setFilters, updateFilter, clearFilters };
 };
 export const useUIActions = () => {
-  const { openFilterModal, closeFilterModal, updateFilterModalDraft, applyFilterModalDraft, resetFilterModalDraft } = useSearchStore((state) => state.actions);
-  return { openFilterModal, closeFilterModal, updateFilterModalDraft, applyFilterModalDraft, resetFilterModalDraft };
+  const { openFilterModal, closeFilterModal, updateFilterModalDraft, applyFilterModalDraft, resetFilterModalDraft, setLoading, setError } = useSearchStore((state) => state.actions);
+  return { openFilterModal, closeFilterModal, updateFilterModalDraft, applyFilterModalDraft, resetFilterModalDraft, setLoading, setError };
 };
