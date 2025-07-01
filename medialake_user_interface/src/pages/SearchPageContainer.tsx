@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useSearchInitialization, useOptimizedSearchParams } from '@/hooks/useSearchState';
+import { useSearchState } from '@/hooks/useSearchState';
 import { useSearch } from '@/api/hooks/useSearch';
 import { useSearchFields } from '@/api/hooks/useSearchFields';
 import { useAssetOperations } from '@/hooks/useAssetOperations';
@@ -11,15 +11,9 @@ import { useFeatureFlag } from '@/utils/featureFlags';
 import {
   useSearchQuery,
   useSemanticSearch,
-  useSelectedFields,
-  useCoreActions,
-  useFilterActions,
-  useUIActions,
-  useTypeFilters,
-  useExtensionFilters,
-  useSizeFilter,
-  useDateFilter,
-  useTextFilters
+  useSearchFilters,
+  useDomainActions,
+  useUIActions
 } from '@/stores/searchStore';
 import SearchPagePresentation from './SearchPagePresentation';
 import { type AssetItem, type LocationState } from './types';
@@ -29,38 +23,34 @@ const SearchPageContainer: React.FC = () => {
   const locationState = location.state as LocationState;
   
   // Initialize search state with URL sync
-  const { initialize } = useSearchInitialization(locationState?.query);
-  
-  // Get optimized search parameters
-  const { apiParams } = useOptimizedSearchParams();
+  const searchState = useSearchState({
+    initialQuery: locationState?.query || '',
+    initialSemantic: false,
+    initialFilters: {}
+  });
   
   // Core search state
   const query = useSearchQuery();
   const semantic = useSemanticSearch();
-  const selectedFields = useSelectedFields();
-  
-  // Filter state
-  const typeFilters = useTypeFilters();
-  const extensionFilters = useExtensionFilters();
-  const sizeFilter = useSizeFilter();
-  const dateFilter = useDateFilter();
-  const textFilters = useTextFilters();
+  const filters = useSearchFilters();
   
   // Actions
-  const { setQuery, setPage, setPageSize, setSemantic } = useCoreActions();
-  const { setTypeFilters, setExtensionFilters, setSizeFilter, setDateFilter, setTextFilters } = useFilterActions();
-  const { setLoading, setError } = useUIActions();
+  const { setQuery, setIsSemantic, setFilters, updateFilter } = useDomainActions();
+  const { openFilterModal, closeFilterModal, setLoading, setError } = useUIActions();
   
-  // Convert optimized parameters to legacy format for useSearch
+  // Convert filters to legacy format for useSearch
   const legacyParams = {
-    page: apiParams.page,
-    pageSize: apiParams.pageSize,
-    isSemantic: apiParams.semantic,
-    fields: selectedFields, // Use the resolved field paths as string array
-    type: apiParams.type,
-    extension: apiParams.extension,
-    filename: apiParams.filename,
-    // Map other parameters as needed
+    page: 1,
+    pageSize: 50,
+    isSemantic: semantic,
+    fields: [], // Default empty fields
+    type: filters.type,
+    extension: filters.extension,
+    filename: filters.filename,
+    asset_size_gte: filters.asset_size_gte,
+    asset_size_lte: filters.asset_size_lte,
+    ingested_date_gte: filters.ingested_date_gte,
+    ingested_date_lte: filters.ingested_date_lte,
   };
 
   // API hooks with legacy parameters
@@ -76,11 +66,6 @@ const SearchPageContainer: React.FC = () => {
     isLoading: isFieldsLoading,
     error: fieldsError
   } = useSearchFields();
-  
-  // Initialize on mount
-  useEffect(() => {
-    initialize();
-  }, [initialize]);
   
   // Sync loading state
   useEffect(() => {
@@ -103,6 +88,7 @@ const SearchPageContainer: React.FC = () => {
   // Extract fields data
   const defaultFields = fieldsData?.data?.defaultFields || [];
   const availableFields = fieldsData?.data?.availableFields || [];
+  const selectedFields: string[] = []; // Default empty for now
   
   // Asset accessors for hooks
   const getAssetId = (asset: AssetItem) => asset.InventoryID;
@@ -143,11 +129,12 @@ const SearchPageContainer: React.FC = () => {
   const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
   
   // Filter state for legacy components
+  const typeArray = filters.type ? filters.type.split(',') : [];
   const legacyFilters = {
     mediaTypes: {
-      videos: typeFilters.includes('Video'),
-      images: typeFilters.includes('Image'),
-      audio: typeFilters.includes('Audio'),
+      videos: typeArray.includes('Video'),
+      images: typeArray.includes('Image'),
+      audio: typeArray.includes('Audio'),
     },
     time: {
       recent: false,
@@ -166,7 +153,7 @@ const SearchPageContainer: React.FC = () => {
   // Event handlers
   const handleFilterChange = (section: string, filter: string) => {
     if (section === 'mediaTypes') {
-      const currentTypes = [...typeFilters];
+      const currentTypes = filters.type ? filters.type.split(',') : [];
       const typeMap: Record<string, string> = {
         videos: 'Video',
         images: 'Image',
@@ -181,7 +168,7 @@ const SearchPageContainer: React.FC = () => {
         } else {
           currentTypes.push(actualType);
         }
-        setTypeFilters(currentTypes);
+        updateFilter('type', currentTypes.length > 0 ? currentTypes.join(',') : undefined);
       }
     }
   };
