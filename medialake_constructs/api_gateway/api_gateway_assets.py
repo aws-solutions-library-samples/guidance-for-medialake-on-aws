@@ -390,6 +390,14 @@ class AssetsConstruct(Construct):
             )
         )
 
+        # Add S3 bucket-level permissions for GetBucketLocation (required for region discovery)
+        generate_presigned_url_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["s3:GetBucketLocation"],
+                resources=["arn:aws:s3:::*"],  # Access to all buckets for location queries
+            )
+        )
+
         # Add POST method to /assets/generate-presigned-url
         presigned_url_resource.add_method(
             "POST",
