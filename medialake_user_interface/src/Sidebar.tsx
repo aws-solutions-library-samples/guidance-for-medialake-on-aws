@@ -256,6 +256,10 @@ function Sidebar() {
                 position: 'fixed',
                 zIndex: theme.zIndex.drawer + 1,
                 height: '100vh',
+                transition: theme => theme.transitions.create(['width'], {
+                    easing: theme.transitions.easing.sharp,
+                    duration: theme.transitions.duration.enteringScreen,
+                }),
                 '& .MuiDrawer-paper': {
                     width: isCollapsed ? collapsedDrawerWidth : drawerWidth,
                     boxSizing: 'border-box',
@@ -267,6 +271,10 @@ function Sidebar() {
                     top: 0,
                     [isRTL ? 'right' : 'left']: 0,
                     overflow: 'visible',
+                    transition: theme => theme.transitions.create(['width'], {
+                        easing: theme.transitions.easing.sharp,
+                        duration: theme.transitions.duration.enteringScreen,
+                    }),
                 },
             }}
         >
