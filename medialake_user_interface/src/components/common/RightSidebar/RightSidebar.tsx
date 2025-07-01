@@ -117,17 +117,6 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
                             '&:hover': {
                                 backgroundColor: theme => alpha(theme.palette.primary.main, 0.1),
                             },
-                            '&::after': {
-                                content: '""',
-                                position: 'absolute',
-                                top: '50%',
-                                left: '3px',
-                                width: '2px',
-                                height: '40px',
-                                backgroundColor: theme => alpha(theme.palette.primary.main, 0.3),
-                                borderRadius: '2px',
-                                transform: 'translateY(-50%)',
-                            }
                         }}
                     />
                 )}
