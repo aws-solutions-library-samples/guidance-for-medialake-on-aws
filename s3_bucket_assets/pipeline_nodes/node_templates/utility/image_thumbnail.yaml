@@ -11,7 +11,7 @@ node:
         handler: utility/ImageThumbnailLambdaDeployment
         runtime: python3.12
         layers:
-          - CairoSvg
+          - ResvgCli
         iam_policy:
           statements:
             - effect: Allow
