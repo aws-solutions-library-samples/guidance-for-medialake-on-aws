@@ -572,7 +572,13 @@ class UIConstruct(Construct):
 
                 # deploy assets to S3
         if "CI" in os.environ and "CODEBUILD_BUILD_ID" in os.environ:
-            dist_path = Path(props.app_path).parent / "assets/dist"
+            # FIXED: CI build path calculation for frontend assets
+            # This change was necessary due to the API stage migration from /prod to v1.
+            # The original path calculation used props.app_path.parent which pointed to an incorrect location
+            # in the CI environment, causing the build to fail when looking for pre-built frontend assets.
+            # The frontend assets are copied to assets/dist by the CI build process (see medialake.template:539)
+            # and need to be referenced correctly for the S3 deployment to succeed.
+            dist_path = Path(__file__).parent.parent / "assets" / "dist"
             asset = s3deploy.Source.asset(
                 str(dist_path)
             )
