@@ -578,7 +578,6 @@ class UIConstruct(Construct):
             # in the CI environment, causing the build to fail when looking for pre-built frontend assets.
             # The frontend assets are copied to assets/dist by the CI build process (see medialake.template:539)
             # In CI, we need to reference the assets directory relative to the current working directory
-            import os
             current_dir = Path(os.getcwd())
             dist_path = current_dir / "assets" / "dist"
             asset = s3deploy.Source.asset(
