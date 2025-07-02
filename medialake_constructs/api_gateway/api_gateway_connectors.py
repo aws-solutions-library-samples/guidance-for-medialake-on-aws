@@ -46,6 +46,7 @@ from constants import DynamoDB as DynamoDBConstants, EnvVars
 class ConnectorsProps:
     asset_table: dynamodb.TableV2
     iac_assets_bucket: s3.IBucket
+    media_assets_bucket: s3.IBucket  # Added for cross-bucket deletion permissions
     asset_table_file_hash_index_arn: str
     asset_table_asset_id_index_arn: str
     asset_table_s3_path_index_arn: str
@@ -405,6 +406,7 @@ class ConnectorsConstruct(Construct):
             "MEDIALAKE_CONNECTOR_TABLE": self.connectors_table.table_arn,
             "S3_CONNECTOR_LAMBDA": self.lambda_deployment.deployment_key,
             "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
+            "MEDIA_ASSETS_BUCKET": props.media_assets_bucket.bucket.bucket_name,  # Added for cross-bucket deletion
             "INGEST_MEDIA_PROCESSOR_LAYER": ingest_media_processor_layer.layer.layer_version_arn,
             "INGEST_EVENT_BUS": props.ingest_event_bus.event_bus_name,
             "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,

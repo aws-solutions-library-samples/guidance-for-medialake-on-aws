@@ -119,6 +119,7 @@ class ApiGatewayStack(cdk.NestedStack):
                 asset_table_asset_id_index_arn=props.asset_table_asset_id_index_arn,
                 asset_table_s3_path_index_arn=props.asset_table_s3_path_index_arn,
                 iac_assets_bucket=props.iac_assets_bucket,
+                media_assets_bucket=props.media_assets_bucket,  # Added for cross-bucket deletion
                 api_resource=api,
                 cognito_authorizer=self._api_gateway_authorizer,
                 x_origin_verify_secret=props.x_origin_verify_secret,
