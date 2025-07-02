@@ -1,5 +1,6 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { Box, Typography, IconButton, TextField, Button, TableContainer, Checkbox } from '@mui/material';
+import { Box, Typography, IconButton, Button, TableContainer, Checkbox, CircularProgress } from '@mui/material';
+import { InlineTextEditor } from '../common/InlineTextEditor';
 import {
     useReactTable,
     getCoreRowModel,
@@ -36,7 +37,7 @@ export interface AssetTableProps<T> {
     editingId?: string;
     editedName?: string;
     onEditNameChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
-    onEditNameComplete?: (item: T, save: boolean) => void;
+    onEditNameComplete?: (item: T, save: boolean, value?: string) => void;
     onFilterClick?: (event: React.MouseEvent<HTMLElement>, columnId: string) => void;
     activeFilters?: Array<{ columnId: string; value: string }>;
     onRemoveFilter?: (columnId: string) => void;
@@ -45,6 +46,8 @@ export interface AssetTableProps<T> {
     isFavorite?: (item: T) => boolean;
     onFavoriteToggle?: (item: T, event: React.MouseEvent<HTMLElement>) => void;
     selectedSearchFields?: string[]; // Add selectedSearchFields prop
+    isRenaming?: boolean; // Add isRenaming prop for loading state
+    renamingAssetId?: string; // ID of the asset currently being renamed
 }
 
 export function AssetTable<T>({
@@ -72,10 +75,16 @@ export function AssetTable<T>({
     isFavorite = () => false,
     onFavoriteToggle,
     selectedSearchFields,
+    isRenaming = false,
+    renamingAssetId,
 }: AssetTableProps<T>): React.ReactElement {
     const containerRef = useRef<HTMLDivElement>(null);
     const columnHelper = createColumnHelper<T>();
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+    const editInputRef = useRef<HTMLInputElement>(null);
+    const hasInitialFocusRef = useRef<boolean>(false);
+    const preventCommitRef = useRef<boolean>(false);
+    const commitRef = useRef<(() => void) | null>(null);
 
     // Create a mapping between API field IDs and column IDs
     const fieldMapping: Record<string, string> = {
@@ -305,55 +314,41 @@ export function AssetTable<T>({
                     size: col.minWidth,
                     enableSorting: true,
                     cell: info => {
+                        // 1) If this is the “name” column and we’re in edit mode, show the inline editor:
                         if (col.id === 'name' && onEditClick) {
-                            const isEditing = editingId === getId(info.row.original);
+                            const rowId = getId(info.row.original);
+                            const isEditing = editingId === rowId;
+
                             return (
-                                <Box sx={{
-                                    display: 'flex',
-                                    alignItems: isEditing ? 'flex-start' : 'center',
-                                    gap: 1,
-                                    p: 1,
-                                    minWidth: 0,
-                                    width: '100%'
-                                }}>
+                                <Box
+                                    sx={{
+                                        display: 'flex',
+                                        alignItems: isEditing ? 'flex-start' : 'center',
+                                        gap: 1,
+                                        p: 1,
+                                        width: '100%',
+                                    }}
+                                >
                                     {isEditing ? (
-                                        <Box sx={{
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            gap: 1,
-                                            width: '100%'
-                                        }}>
-                                            <TextField
-                                                value={editedName}
-                                                onChange={onEditNameChange}
-                                                onKeyPress={(e) => {
-                                                    if (e.key === 'Enter') {
-                                                        onEditNameComplete?.(info.row.original, true);
-                                                    } else if (e.key === 'Escape') {
-                                                        onEditNameComplete?.(info.row.original, false);
-                                                    }
-                                                }}
-                                                onClick={(e) => e.stopPropagation()}
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, width: '100%' }}>
+                                            <InlineTextEditor
+                                                key={rowId}
+                                                initialValue={editedName ?? ''}
+                                                editingCellId={rowId}
+                                                preventCommitRef={preventCommitRef}
+                                                commitRef={commitRef}
+                                                onChangeCommit={value =>
+                                                    onEditNameChange?.({ target: { value } } as React.ChangeEvent<HTMLInputElement>)
+                                                }
+                                                onComplete={(save, value) => onEditNameComplete?.(info.row.original, save, value)}
+                                                isEditing
                                                 autoFocus
                                                 size="small"
                                                 sx={{
                                                     flex: 1,
                                                     minWidth: '100%',
-                                                    '& .MuiInputBase-root': {
-                                                        width: '100%',
-                                                        minHeight: '2.5em',
-                                                        height: 'auto',
-                                                    },
-                                                    '& .MuiInputBase-input': {
-                                                        whiteSpace: 'normal',
-                                                        wordBreak: 'break-word',
-                                                        overflow: 'visible',
-                                                        textOverflow: 'clip',
-                                                        width: '100%',
-                                                        minHeight: '1.5em',
-                                                        height: 'auto',
-                                                        lineHeight: '1.5',
-                                                    }
+                                                    '& .MuiInputBase-root': { width: '100%', minHeight: '2.5em' },
+                                                    '& .MuiInputBase-input': { whiteSpace: 'normal', wordBreak: 'break-word' },
                                                 }}
                                                 multiline
                                                 fullWidth
@@ -361,48 +356,74 @@ export function AssetTable<T>({
                                             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', mt: 1 }}>
                                                 <Button
                                                     size="small"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        onEditNameComplete?.(info.row.original, true);
-                                                    }}
                                                     variant="contained"
-                                                >
-                                                    Save
-                                                </Button>
+                                                    onMouseDown={e => {
+                                                        e.stopPropagation();
+                                                        e.preventDefault();
+                                                        console.log('💾 AssetTable Save mousedown');
+                                                        // Set flag to prevent blur from canceling
+                                                        preventCommitRef.current = true;
+                                                    }}
+                                                    onClick={e => {
+                                                        e.stopPropagation();
+                                                        e.preventDefault();
+                                                        console.log('💾 AssetTable Save clicked');
+                                                        console.log('💾 AssetTable commitRef.current:', commitRef.current);
+                                                        // Reset the prevent flag
+                                                        preventCommitRef.current = false;
+                                                        // Call the commit function directly via ref
+                                                        if (commitRef.current) {
+                                                            console.log('💾 AssetTable calling commitRef.current()');
+                                                            commitRef.current();
+                                                        } else {
+                                                            console.error('💾 AssetTable commitRef.current is null!');
+                                                        }
+                                                    }}
+                                                >Save</Button>
                                                 <Button
                                                     size="small"
-                                                    onClick={(e) => {
+                                                    onMouseDown={e => {
                                                         e.stopPropagation();
-                                                        onEditNameComplete?.(info.row.original, false);
+                                                        console.log('🚫 AssetTable Cancel clicked');
+                                                        // Set flag to prevent InlineTextEditor commit from being called
+                                                        // Use onMouseDown instead of onClick to set the flag before onBlur
+                                                        preventCommitRef.current = true;
                                                     }}
-                                                >
-                                                    Cancel
-                                                </Button>
+                                                    onClick={e => {
+                                                        e.stopPropagation();
+                                                        onEditNameComplete?.(info.row.original, false, undefined);
+                                                    }}
+                                                >Cancel</Button>
                                             </Box>
                                         </Box>
                                     ) : (
                                         <>
-                                            <Typography>{info.getValue()}</Typography>
+                                            <Typography noWrap>{info.getValue()}</Typography>
                                             <IconButton
                                                 size="small"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onEditClick(info.row.original, e);
-                                                }}
+                                                onClick={e => { e.stopPropagation(); onEditClick(info.row.original, e); }}
+                                                disabled={isRenaming && renamingAssetId === rowId}
                                             >
-                                                <EditIcon fontSize="small" />
+                                                {isRenaming && renamingAssetId === rowId ? (
+                                                    <CircularProgress size={16} />
+                                                ) : (
+                                                    <EditIcon fontSize="small" />
+                                                )}
                                             </IconButton>
                                         </>
                                     )}
                                 </Box>
                             );
                         }
+
+                        // 2) Default case for *every other* column:
                         return (
                             <Box sx={{ p: 1 }}>
-                                {col.cell ? col.cell(info) : info.getValue()}
+                                {info.getValue()}
                             </Box>
                         );
                     }
+
                 }
             )),
             columnHelper.display({
@@ -457,6 +478,7 @@ export function AssetTable<T>({
     const table = useReactTable({
         data,
         columns: tableColumns,
+        getRowId: row => getId(row),
         state: {
             sorting,
             columnFilters,
@@ -472,6 +494,8 @@ export function AssetTable<T>({
                 return value.includes(String(filterValue).toLowerCase());
             }
         },
+        autoResetPageIndex: false,
+        autoResetExpanded: false,
     });
 
     const { rows } = table.getRowModel();

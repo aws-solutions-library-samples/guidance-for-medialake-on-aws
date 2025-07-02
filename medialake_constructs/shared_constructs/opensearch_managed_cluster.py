@@ -33,20 +33,20 @@ class OpenSearchClusterProps:
     domain_name: str
 
     engine_version: str = "OpenSearch_2.15"
-    use_dedicated_master_nodes: bool = config.opensearch_cluster_settings.use_dedicated_master_nodes
+    use_dedicated_master_nodes: bool = config.resolved_opensearch_cluster_settings.use_dedicated_master_nodes
     master_node_instance_type: str = (
-        config.opensearch_cluster_settings.master_node_instance_type
+        config.resolved_opensearch_cluster_settings.master_node_instance_type
     )
-    master_node_count: int = config.opensearch_cluster_settings.master_node_count
+    master_node_count: int = config.resolved_opensearch_cluster_settings.master_node_count
     data_node_instance_type: str = (
-        config.opensearch_cluster_settings.data_node_instance_type
+        config.resolved_opensearch_cluster_settings.data_node_instance_type
     )
-    data_node_count: int = config.opensearch_cluster_settings.data_node_count
-    volume_size: int = config.opensearch_cluster_settings.data_node_volume_size
-    volume_type: str = config.opensearch_cluster_settings.data_node_volume_type
-    volume_iops: int = config.opensearch_cluster_settings.data_node_volume_iops
+    data_node_count: int = config.resolved_opensearch_cluster_settings.data_node_count
+    volume_size: int = config.resolved_opensearch_cluster_settings.data_node_volume_size
+    volume_type: str = config.resolved_opensearch_cluster_settings.data_node_volume_type
+    volume_iops: int = config.resolved_opensearch_cluster_settings.data_node_volume_iops
     availability_zone_count: int = (
-        config.opensearch_cluster_settings.availability_zone_count
+        config.resolved_opensearch_cluster_settings.availability_zone_count
     )
     vpc: Optional[ec2.IVpc] = None
     subnet_ids: Optional[List[str]] = None
@@ -57,20 +57,20 @@ class OpenSearchClusterProps:
     encryption_at_rest: bool = True
     collection_indexes: List[str] = field(default_factory=lambda: ["media"])
     off_peak_window_enabled: bool = field(
-        default=config.opensearch_cluster_settings.off_peak_window_enabled
+        default=config.resolved_opensearch_cluster_settings.off_peak_window_enabled
     )
     off_peak_window_start: opensearch.WindowStartTime = field(
         default_factory=lambda: opensearch.WindowStartTime(
             hours=int(
-                config.opensearch_cluster_settings.off_peak_window_start.split(":")[0]
+                config.resolved_opensearch_cluster_settings.off_peak_window_start.split(":")[0]
             ),
             minutes=int(
-                config.opensearch_cluster_settings.off_peak_window_start.split(":")[1]
+                config.resolved_opensearch_cluster_settings.off_peak_window_start.split(":")[1]
             ),
         )
     )
     automated_snapshot_start_hour: int = field(
-        default=config.opensearch_cluster_settings.automated_snapshot_start_hour
+        default=config.resolved_opensearch_cluster_settings.automated_snapshot_start_hour
     )
 
 
@@ -200,14 +200,14 @@ class OpenSearchCluster(Construct):
 
         # Import an existing domain if domain_endpoint is provided
 
-        if config.opensearch_cluster_settings.domain_endpoint:
+        if config.resolved_opensearch_cluster_settings.domain_endpoint:
             # Import the existing domain using the L2 construct
             self.domain = opensearch.Domain.from_domain_endpoint(
                 self,
                 "ImportedDomain",
-                config.opensearch_cluster_settings.domain_endpoint,
+                config.resolved_opensearch_cluster_settings.domain_endpoint,
             )
-            collection_endpoint = config.opensearch_cluster_settings.domain_endpoint
+            collection_endpoint = config.resolved_opensearch_cluster_settings.domain_endpoint
         else:
             ebs_options = opensearch.CfnDomain.EBSOptionsProperty(
                     ebs_enabled=False
@@ -299,7 +299,7 @@ class OpenSearchCluster(Construct):
             else self.domain.domain_arn
         )
 
-        should_create_index = not config.opensearch_cluster_settings.domain_endpoint
+        should_create_index = not config.resolved_opensearch_cluster_settings.domain_endpoint
 
         if should_create_index:
             # Create Lambda function for index creation
@@ -370,13 +370,13 @@ class OpenSearchCluster(Construct):
                 resource_type="Custom::OpenSearchCreateIndex",
             )
         # Only add dependency if we created a new domain.
-        if not config.opensearch_cluster_settings.domain_endpoint:
+        if not config.resolved_opensearch_cluster_settings.domain_endpoint:
             create_index_resource.node.add_dependency(self.domain)
 
         # Output the OpenSearch Domain endpoint (if imported, use the provided endpoint)
         domain_endpoint_output = (
-            config.opensearch_cluster_settings.domain_endpoint
-            if config.opensearch_cluster_settings.domain_endpoint
+            config.resolved_opensearch_cluster_settings.domain_endpoint
+            if config.resolved_opensearch_cluster_settings.domain_endpoint
             else f"https://{self.domain.attr_domain_endpoint}"
         )
         CfnOutput(

@@ -48,10 +48,12 @@ class UPSFApi(Construct):
 
         from config import config
 
-        # Create the base users resource if it doesn't exist
-        users_resource = props.api_resource.get_resource("users")
-        if users_resource is None:
-            users_resource = props.api_resource.add_resource("users")
+        # IMPORTANT: The UsersApi construct creates the /users resource
+        # We should NOT create another /users resource as it will conflict
+        # Instead, we need the UsersApi to expose its users_resource for reuse
+        # For now, we'll disable the UPSFApi endpoints to prevent conflicts
+        # TODO: Refactor to properly share the users resource between constructs
+        return  # Early return to prevent resource conflicts
 
         # Set up common environment variables for all Lambda functions
         common_env_vars = {

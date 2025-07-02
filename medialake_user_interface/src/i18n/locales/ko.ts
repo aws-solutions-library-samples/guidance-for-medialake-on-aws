@@ -81,7 +81,7 @@ export default {
     },
     home: {
         title: '홈',
-        description: 'MediaLake - 미디어와 메타데이터를 위한 데이터 레이크',
+                    description: '미디어, 메타데이터 및 워크플로를 위한 가이던스.',
         statistics: '통계',
         collections: '컬렉션',
         sharedCollections: '공유 컬렉션',
@@ -136,7 +136,7 @@ export default {
         navigating: '네비게이션 중'
       },
       branding: {
-        name: 'MediaLake'
+        name: 'Media Lake'
       }
     },
     search: {
@@ -636,7 +636,7 @@ export default {
         settings: '설정'
       },
       home: {
-        welcome: 'MediaLake에 오신 것을 환영합니다',
+                    welcome: 'Media Lake에 오신 것을 환영합니다',
         description: '미디어 파일을 효율적으로 관리하고 정리하세요',
         statistics: '통계',
         collections: '컬렉션',

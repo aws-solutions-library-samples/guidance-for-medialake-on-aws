@@ -38,6 +38,7 @@ import {
     Home as HomeIcon,
     Extension as IntegrationIcon,
     Cloud as EnvironmentIcon,
+    Terrain as LogoIcon,
 } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTheme as useCustomTheme } from './hooks/useTheme';
@@ -256,6 +257,10 @@ function Sidebar() {
                 position: 'fixed',
                 zIndex: theme.zIndex.drawer + 1,
                 height: '100vh',
+                transition: theme => theme.transitions.create(['width'], {
+                    easing: theme.transitions.easing.sharp,
+                    duration: theme.transitions.duration.enteringScreen,
+                }),
                 '& .MuiDrawer-paper': {
                     width: isCollapsed ? collapsedDrawerWidth : drawerWidth,
                     boxSizing: 'border-box',
@@ -267,6 +272,10 @@ function Sidebar() {
                     top: 0,
                     [isRTL ? 'right' : 'left']: 0,
                     overflow: 'visible',
+                    transition: theme => theme.transitions.create(['width'], {
+                        easing: theme.transitions.easing.sharp,
+                        duration: theme.transitions.duration.enteringScreen,
+                    }),
                 },
             }}
         >
@@ -286,13 +295,12 @@ function Sidebar() {
                     borderBottom: '1px solid',
                     borderColor: 'divider',
                 }}>
-                    <img
-                        src="/logo.png"
-                        alt={t('app.branding.name', 'MediaLake')}
-                        style={{
-                            height: '32px',
-                            marginRight: isRTL ? 0 : (isCollapsed ? 0 : theme.spacing(1)),
-                            marginLeft: isRTL ? (isCollapsed ? 0 : theme.spacing(1)) : 0
+                    <LogoIcon
+                        sx={{
+                            fontSize: '32px',
+                            color: theme.palette.primary.main,
+                            marginRight: isRTL ? 0 : (isCollapsed ? 0 : 1),
+                            marginLeft: isRTL ? (isCollapsed ? 0 : 1) : 0
                         }}
                     />
                     {!isCollapsed && (
@@ -312,15 +320,15 @@ function Sidebar() {
                     onClick={toggleDrawer}
                     sx={{
                         position: 'absolute',
-                        [isRTL ? 'left' : 'right']: -12,
+                        [isRTL ? 'left' : 'right']: -16,
                         top: '50%',
                         transform: 'translateY(-50%)',
-                        minWidth: '24px',
-                        width: '24px',
-                        height: '24px',
+                        minWidth: '32px',
+                        width: '32px',
+                        height: '32px',
                         bgcolor: 'background.paper',
                         borderRadius: '8px',
-                        boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.15)',
+                        boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -330,14 +338,14 @@ function Sidebar() {
                         padding: 0,
                         '&:hover': {
                             bgcolor: 'background.paper',
-                            boxShadow: '0px 6px 12px rgba(0, 0, 0, 0.2)',
+                            boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.1)',
                         },
                     }}
                 >
                     {isCollapsed ? (
-                        isRTL ? <ChevronLeft sx={{ fontSize: 16 }} /> : <ChevronRight sx={{ fontSize: 16 }} />
+                        isRTL ? <ChevronLeft sx={{ fontSize: 20 }} /> : <ChevronRight sx={{ fontSize: 20 }} />
                     ) : (
-                        isRTL ? <ChevronRight sx={{ fontSize: 16 }} /> : <ChevronLeft sx={{ fontSize: 16 }} />
+                        isRTL ? <ChevronRight sx={{ fontSize: 20 }} /> : <ChevronLeft sx={{ fontSize: 20 }} />
                     )}
                 </Button>
                 <List sx={{

@@ -219,7 +219,7 @@ def generate_presigned_url(
             ExpiresIn=expiration,
         )
         
-        logger.info(
+        logger.debug(
             "Generated presigned URL for s3://%s/%s (region %s)",
             bucket, key, s3_client.meta.region_name,
         )
@@ -228,3 +228,59 @@ def generate_presigned_url(
     except Exception as e:
         logger.error(f"Error generating presigned URL: {str(e)}")
         return None
+
+
+def generate_presigned_urls_batch(
+    url_requests: List[Dict[str, str]], expiration: int = 3600
+) -> Dict[str, Optional[str]]:
+    """
+    Generate multiple presigned URLs in parallel for better performance.
+    
+    Args:
+        url_requests: List of dicts with 'bucket', 'key', and 'request_id' keys
+        expiration: URL expiration time in seconds
+        
+    Returns:
+        Dict mapping request_id to presigned URL (or None if failed)
+    """
+    import concurrent.futures
+    import time
+    
+    start_time = time.time()
+    logger.info(f"[PERF] Starting batch presigned URL generation for {len(url_requests)} URLs")
+    
+    def generate_single_url(request):
+        try:
+            return {
+                'request_id': request['request_id'],
+                'url': generate_presigned_url(request['bucket'], request['key'], expiration)
+            }
+        except Exception as e:
+            logger.warning(f"Failed to generate presigned URL for {request['request_id']}: {str(e)}")
+            return {
+                'request_id': request['request_id'],
+                'url': None
+            }
+    
+    results = {}
+    
+    # Use ThreadPoolExecutor for I/O-bound operations
+    with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+        future_to_request = {
+            executor.submit(generate_single_url, request): request
+            for request in url_requests
+        }
+        
+        for future in concurrent.futures.as_completed(future_to_request):
+            try:
+                result = future.result()
+                results[result['request_id']] = result['url']
+            except Exception as e:
+                request = future_to_request[future]
+                logger.warning(f"Exception generating presigned URL for {request['request_id']}: {str(e)}")
+                results[request['request_id']] = None
+    
+    batch_time = time.time() - start_time
+    logger.info(f"[PERF] Batch presigned URL generation completed in {batch_time:.3f}s")
+    
+    return results

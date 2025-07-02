@@ -4,15 +4,15 @@
     "variant": "off"
   },
   "file-upload-enabled": {
-    "value": true,
+    "value": false,
     "variant": "off"
   },
   "search-multi-select-enabled": {
-    "value": true,
+    "value": false,
     "variant": "off"
   },
   "chat-enabled": {
-    "value": true,
+    "value": false,
     "variant": "off"
   },
   "notification-enabled": {
@@ -20,7 +20,7 @@
     "variant": "off"
   },
   "advanced-permissions-enabled": {
-    "value": false,
+    "value": true,
     "variant": "off"
   }
 }

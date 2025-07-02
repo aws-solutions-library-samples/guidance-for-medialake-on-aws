@@ -1,30 +1,30 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
-  Box,
-  CircularProgress,
-  Typography,
-  List,
-  ListItem,
-  Paper,
-  Button,
-  Tabs,
-  Tab,
-  Grid,
-  Card,
-  CardContent,
-  Chip,
-  useTheme,
-  alpha,
-  TextField,
-  InputAdornment,
-  FormControl,
-  Select,
-  MenuItem,
-  IconButton,
-  CardHeader,
-  ListItemText,
-  LinearProgress
+    Box,
+    CircularProgress,
+    Typography,
+    List,
+    ListItem,
+    Paper,
+    Button,
+    Tabs,
+    Tab,
+    Grid,
+    Card,
+    CardContent,
+    Chip,
+    useTheme,
+    alpha,
+    TextField,
+    InputAdornment,
+    FormControl,
+    Select,
+    MenuItem,
+    IconButton,
+    CardHeader,
+    ListItemText,
+    LinearProgress
 } from '@mui/material';
 import { useAsset, useRelatedVersions, RelatedVersionsResponse } from '../api/hooks/useAssets';
 import { RightSidebarProvider, useRightSidebar } from '../components/common/RightSidebar';
@@ -118,6 +118,11 @@ interface MetadataContentProps {
     category?: string;
 }
 
+interface TechnicalMetadataTabProps {
+  metadataAccordions: any[];
+  availableCategories: string[];         // only categories present in this asset
+}
+
 // Color coding for metadata categories
 const getMetadataCategoryColor = (category: string, theme: any) => {
     const categoryColors: Record<string, string> = {
@@ -130,15 +135,15 @@ const getMetadataCategoryColor = (category: string, theme: any) => {
         'technical': theme.palette.primary.light,
         'descriptive': theme.palette.secondary.light
     };
-    
+
     // Try to find an exact match
     if (categoryColors[category]) return categoryColors[category];
-    
+
     // Try to find a partial match
-    const foundKey = Object.keys(categoryColors).find(key => 
+    const foundKey = Object.keys(categoryColors).find(key =>
         category.toLowerCase().includes(key.toLowerCase())
     );
-    
+
     return foundKey ? categoryColors[foundKey] : categoryColors.general;
 };
 
@@ -148,38 +153,38 @@ const TagInput: React.FC<{
     onChange: (newTags: string[]) => void;
 }> = ({ tags, onChange }) => {
     const [inputValue, setInputValue] = useState('');
-    
+
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setInputValue(e.target.value);
     };
-    
+
     const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if ((e.key === ' ' || e.key === 'Enter') && inputValue.trim()) {
             e.preventDefault();
             const newTag = inputValue.trim();
-            
+
             // Only add if it's not a duplicate
             if (!tags.includes(newTag)) {
                 onChange([...tags, newTag]);
             }
-            
+
             setInputValue('');
         } else if (e.key === 'Backspace' && !inputValue && tags.length > 0) {
             // Remove the last tag when backspace is pressed in an empty input
             onChange(tags.slice(0, -1));
         }
     };
-    
+
     const handleDeleteTag = (tagToDelete: string) => {
         onChange(tags.filter(tag => tag !== tagToDelete));
     };
-    
+
     return (
-        <Box 
-            sx={{ 
-                display: 'flex', 
-                flexWrap: 'wrap', 
-                gap: 0.5, 
+        <Box
+            sx={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 0.5,
                 alignItems: 'center',
                 p: 1,
                 border: '1px solid',
@@ -221,16 +226,16 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
     const asset = assetData?.data?.asset;
     const fileInfoColor = '#4299E1';      // Blue
     const techDetailsColor = '#68D391';   // Green/teal
-    
+
     // Extract metadata from API response
     const metadata = asset?.Metadata?.EmbeddedMetadata || {};
     const generalMetadata = metadata?.General || {};
     const imageMetadata = metadata?.Image?.[0] || {};
-    
+
     // Create a helper function to render a field only if it exists in the API response
     const renderField = (label: string, value: any, formatter?: (val: any) => string) => {
         if (value === undefined || value === null) return null;
-        
+
         return (
             <Box sx={{ display: 'flex', mb: 1 }}>
                 <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>{label}:</Typography>
@@ -240,7 +245,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
             </Box>
         );
     };
-    
+
     // File Information fields
     const fileSize = asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.FileInfo?.Size;
     const fileType = asset?.DigitalSourceAsset?.Type;
@@ -249,7 +254,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
     const objectName = asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.Name;
     const objectFullPath = asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.FullPath;
     const s3Uri = s3Bucket && objectFullPath ? `s3://${s3Bucket}/${objectFullPath}` : undefined;
-    
+
     // Technical details
     const width = imageMetadata?.Width || generalMetadata?.ImageWidth;
     const height = imageMetadata?.Height || generalMetadata?.ImageHeight;
@@ -260,7 +265,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
     const createdDate = asset?.DigitalSourceAsset?.CreateDate
         ? new Date(asset.DigitalSourceAsset.CreateDate).toLocaleDateString()
         : undefined;
-    
+
     return (
         <Box>
             {/* File Information Section */}
@@ -281,7 +286,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
                     bgcolor: fileInfoColor,
                     mb: 2
                 }} />
-                
+
                 {renderField('Type', fileType)}
                 {renderField('Size', fileSize, formatFileSize)}
                 {renderField('Format', fileFormat)}
@@ -289,7 +294,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
                 {renderField('Object Name', objectName)}
                 {renderField('S3 URI', s3Uri)}
             </Box>
-            
+
             {/* Technical Details Section */}
             <Box sx={{ mb: 3 }}>
                 <Typography
@@ -308,7 +313,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
                     bgcolor: techDetailsColor,
                     mb: 2
                 }} />
-                
+
                 {renderField('Dimensions', dimensions)}
                 {renderField('Color Depth', colorDepth, (val) => `${val} bit`)}
                 {renderField('Color Space', colorSpace)}
@@ -322,7 +327,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
 // Add new component for grid layout metadata display
 const GridMetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, showAll, category }) => {
     const theme = useTheme();
-    
+
     const sortEntries = (entries: [string, any][]): [string, any][] => {
         if (category && outputFilters[category]) {
             const preferredOrder = outputFilters[category];
@@ -337,12 +342,12 @@ const GridMetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, 
     // Function to flatten nested objects like Tags/Encoder
     const flattenNestedMetadata = (entries: [string, any][]): [string, any][] => {
         const result: [string, any][] = [];
-        
+
         entries.forEach(([key, value]) => {
             if (typeof value === 'object' && value !== null && !Array.isArray(value) && Object.keys(value).length > 0) {
                 // Mark this as a parent with _PARENT_ prefix (for internal use)
                 result.push([`_PARENT_${key}`, '']);
-                
+
                 // Then add the child properties with a visible indent prefix
                 Object.entries(value).forEach(([subKey, subValue]) => {
                     result.push([`      ↳ ${subKey}`, subValue]);
@@ -351,7 +356,7 @@ const GridMetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, 
                 result.push([key, value]);
             }
         });
-        
+
         return result;
     };
 
@@ -389,35 +394,35 @@ const GridMetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, 
         // Flatten nested metadata
         const flattenedEntries = flattenNestedMetadata(sortedEntries);
         const displayEntries = showAll ? flattenedEntries : flattenedEntries.slice(0, 5);
-        
+
         // Create rows efficiently while preserving parent-child relationships
         const rows: [string, any][][] = [];
-        
+
         let currentIndex = 0;
         while (currentIndex < displayEntries.length) {
             const row: [string, any][] = [];
-            
+
             // Process the left column
             if (currentIndex < displayEntries.length) {
                 const leftEntry = displayEntries[currentIndex];
                 const [leftKey] = leftEntry;
-                
+
                 // Parent entries must always be on the left side
                 if (isParentEntry(leftKey)) {
                     row.push([cleanDisplayKey(leftKey), leftEntry[1]]);
                     currentIndex++;
-                    
+
                     // In this case, we don't add a right column entry
                     // because we want to ensure the parent is alone on its row
                 } else {
                     row.push(leftEntry);
                     currentIndex++;
-                    
+
                     // Process the right column if available and not a parent
                     if (currentIndex < displayEntries.length) {
                         const rightEntry = displayEntries[currentIndex];
                         const [rightKey] = rightEntry;
-                        
+
                         if (!isParentEntry(rightKey)) {
                             row.push(rightEntry);
                             currentIndex++;
@@ -425,7 +430,7 @@ const GridMetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, 
                     }
                 }
             }
-            
+
             if (row.length > 0) {
                 rows.push(row);
             }
@@ -440,24 +445,24 @@ const GridMetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, 
                 p: 2
             }}>
                 {rows.map((row, rowIndex) => (
-                    <Box 
-                        key={rowIndex} 
+                    <Box
+                        key={rowIndex}
                         sx={{
                             display: 'grid',
                             gridTemplateColumns: 'minmax(180px, 25%) minmax(180px, 25%) minmax(180px, 25%) minmax(180px, 25%)',
                             py: 1,
-                            borderBottom: rowIndex < rows.length - 1 ? 
+                            borderBottom: rowIndex < rows.length - 1 ?
                                 `1px solid ${alpha(theme.palette.divider, 0.1)}` : 'none',
                         }}
                     >
                         {row.map(([key, value], colIndex) => (
                             <React.Fragment key={`${rowIndex}-${colIndex}`}>
-                                <Typography 
-                                    variant="body2" 
-                                    sx={{ 
+                                <Typography
+                                    variant="body2"
+                                    sx={{
                                         fontWeight: 'bold',
-                                        color: key.trim().startsWith('↳') ? 
-                                            theme.palette.primary.main : 
+                                        color: key.trim().startsWith('↳') ?
+                                            theme.palette.primary.main :
                                             theme.palette.text.secondary,
                                         textAlign: 'left',
                                         pr: 1
@@ -474,9 +479,9 @@ const GridMetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, 
                                             category={category}
                                         />
                                     ) : (
-                                        <Typography 
-                                            variant="body2" 
-                                            sx={{ 
+                                        <Typography
+                                            variant="body2"
+                                            sx={{
                                                 wordBreak: 'break-word',
                                                 whiteSpace: 'nowrap',
                                                 overflow: 'hidden',
@@ -498,177 +503,223 @@ const GridMetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, 
     }
 };
 
-const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadataAccordions }) => {
-    const theme = useTheme();
-    
-    // Create array of all item IDs to pre-expand them
-    const [expandedItems] = useState<string[]>(() => {
-        // Initialize with all items expanded
-        const allItems: string[] = [];
-        
-        metadataAccordions.forEach((parent, parentIndex) => {
-            // Add parent item
-            allItems.push(`parent-${parentIndex}`);
-            
-            // Add all child items
-            parent.subCategories.forEach((_, subIndex) => {
-                allItems.push(`${parentIndex}-${subIndex}`);
-            });
-        });
-        
-        return allItems;
+const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
+  metadataAccordions,
+  availableCategories
+}) => {
+  const theme = useTheme();
+
+  /* ---------------------------------------------------------------------- */
+  /*  Local UI state                                                     */
+  /* ---------------------------------------------------------------------- */
+
+  const [categoryFilter, setCategoryFilter] = useState<'all' | string>('all');
+  const [textFilter, setTextFilter] = useState('');            // (optional)
+
+  /* ---------------------------------------------------------------------- */
+  /*  Filter the accordion list whenever UI filters change              */
+  /* ---------------------------------------------------------------------- */
+
+  const filteredAccordions = useMemo(() => {
+    let result = metadataAccordions;
+
+    // category filter
+    if (categoryFilter !== 'all') {
+      result = result
+        .map(parent => {
+          const subCategories = parent.subCategories.filter(
+            (sub: any) =>
+              sub.category.toLowerCase() === categoryFilter.toLowerCase()
+          );
+          return subCategories.length
+            ? { ...parent, subCategories, count: subCategories.length }
+            : null;
+        })
+        .filter(Boolean);
+    }
+
+    // text filter (inside key/value pairs) – optional stub
+    if (textFilter.trim()) {
+      const term = textFilter.toLowerCase();
+      result = result
+        .map(parent => {
+          const subCategories = parent.subCategories.filter((sub: any) =>
+            JSON.stringify(sub.data).toLowerCase().includes(term)
+          );
+          return subCategories.length
+            ? { ...parent, subCategories, count: subCategories.length }
+            : null;
+        })
+        .filter(Boolean);
+    }
+
+    return result;
+  }, [metadataAccordions, categoryFilter, textFilter]);
+
+  /* ---------------------------------------------------------------------- */
+  /* Default-expand everything that survived the filter                */
+  /* ---------------------------------------------------------------------- */
+
+  const expandedItems = useMemo(() => {
+    const all: string[] = [];
+    filteredAccordions.forEach((parent, pIdx) => {
+      all.push(`parent-${pIdx}`);
+      parent.subCategories.forEach((_: any, sIdx: number) =>
+        all.push(`${pIdx}-${sIdx}`)
+      );
     });
-    
-    // Function to determine which content component to use based on category
-    const getContentComponent = (subCategory: any) => {
-        // Use GridMetadataContent for all categories to ensure consistent formatting
-        return (
-            <GridMetadataContent
-                data={subCategory.data}
-                showAll={true}
-                category={subCategory.category}
-            />
-        );
-    };
-    
-    return (
-        <Box sx={{
-            borderRadius: 1,
-            width: '100%'
-        }}>
-            {/* Keep the filter bar */}
-            <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-                <TextField
-                    placeholder="Filter metadata..." 
-                    size="small"
-                    InputProps={{
-                        startAdornment: (
-                            <InputAdornment position="start">
-                                <SearchIcon fontSize="small" />
-                            </InputAdornment>
-                        ),
-                    }}
-                    onChange={(e) => {
-                        // Implement filtering logic here
-                    }}
-                    sx={{ flex: 1 }}
+    return all;
+  }, [filteredAccordions]);
+
+  /* ---------------------------------------------------------------------- */
+  /* Helper to render the sub-category body                             */
+  /* ---------------------------------------------------------------------- */
+
+  const getContentComponent = (subCategory: any) => (
+    <GridMetadataContent
+      data={subCategory.data}
+      showAll
+      category={subCategory.category}
+    />
+  );
+
+  /* ---------------------------------------------------------------------- */
+  /* UI                                                                 */
+  /* ---------------------------------------------------------------------- */
+
+  return (
+    <Box sx={{ borderRadius: 1, width: '100%' }}>
+      {/* --------------------------------------------------  Filter bar  --- */}
+      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+        <TextField
+          placeholder="Filter metadata…"
+          size="small"
+          value={textFilter}
+          onChange={e => setTextFilter(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon fontSize="small" />
+              </InputAdornment>
+            )
+          }}
+          sx={{ flex: 1, px: 2 }}
+        />
+
+        <FormControl size="small" sx={{ minWidth: 140, px: 2 }}>
+          <Select
+            value={categoryFilter}
+            onChange={e => setCategoryFilter(e.target.value as string)}
+            displayEmpty
+          >
+            <MenuItem value="all">All Categories</MenuItem>
+            {availableCategories.map(key => (
+              <MenuItem key={key} value={key}>
+                {categoryMapping[key]}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Box>
+
+      {/* ----------------------------------------------  Metadata tree  --- */}
+      <SimpleTreeView
+        defaultExpandedItems={expandedItems}
+        sx={{
+          '& .MuiTreeItem-content': {
+            padding: '4px 8px',
+            borderRadius: '4px',
+            '&:hover': {
+              backgroundColor: alpha(theme.palette.primary.main, 0.05)
+            }
+          },
+          '& .MuiTreeItem-group': {
+            marginLeft: '24px',
+            borderLeft: `1px dashed ${alpha(theme.palette.text.primary, 0.2)}`,
+            paddingLeft: '8px'
+          }
+        }}
+        slots={{ collapseIcon: ExpandMoreIcon, expandIcon: ChevronRightIcon }}
+      >
+        {filteredAccordions.map((parent, pIdx) => (
+          <TreeItem
+            key={pIdx}
+            itemId={`parent-${pIdx}`}
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                  {parent.category === 'EmbeddedMetadata'
+                    ? 'Embedded Metadata'
+                    : parent.category}
+                </Typography>
+                <Chip
+                  size="small"
+                  label={parent.count}
+                  sx={{
+                    ml: 1,
+                    height: 20,
+                    fontSize: '0.70rem',
+                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                    color: theme.palette.primary.main
+                  }}
                 />
-                <FormControl size="small" sx={{ minWidth: 120 }}>
-                    <Select
-                        value="all"
-                        onChange={(e) => {/* Category filter logic */}}
-                        displayEmpty
-                    >
-                        <MenuItem value="all">All Categories</MenuItem>
-                        {Object.keys(categoryMapping).map(category => (
-                            <MenuItem key={category} value={category}>{categoryMapping[category]}</MenuItem>
-                        ))}
-                    </Select>
-                </FormControl>
-            </Box>
-            
-            <SimpleTreeView
-                defaultExpandedItems={expandedItems}
-                sx={{
-                    flexGrow: 1,
-                    width: '100%',
-                    '& .MuiTreeItem-root': {
-                        padding: '4px 0',
-                    },
-                    '& .MuiTreeItem-content': {
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        '&:hover': {
-                            backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                        },
-                    },
-                    '& .MuiTreeItem-label': {
-                        fontWeight: 500,
-                    },
-                    '& .MuiTreeItem-group': {
-                        marginLeft: '24px',
-                        borderLeft: `1px dashed ${alpha(theme.palette.text.primary, 0.2)}`,
-                        paddingLeft: '8px',
-                    }
-                }}
-                slots={{
-                    collapseIcon: ExpandMoreIcon,
-                    expandIcon: ChevronRightIcon
-                }}
-            >
-                {metadataAccordions.map((parentAccordion, parentIndex) => (
-                    <TreeItem
-                        key={parentIndex}
-                        itemId={`parent-${parentIndex}`}
-                        label={
-                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                                    {parentAccordion.category === "EmbeddedMetadata" 
-                                        ? "Embedded Metadata" 
-                                        : parentAccordion.category}
-                                </Typography>
-                                <Chip
-                                    size="small"
-                                    label={parentAccordion.count}
-                                    sx={{
-                                        ml: 1,
-                                        height: '20px',
-                                        fontSize: '0.7rem',
-                                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                                        color: theme.palette.primary.main
-                                    }}
-                                />
-                            </Box>
-                        }
-                    >
-                        {parentAccordion.subCategories.map((subCategory, subIndex) => (
-                            <TreeItem
-                                key={`${parentIndex}-${subIndex}`}
-                                itemId={`${parentIndex}-${subIndex}`}
-                                label={
-                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                        <Typography variant="body2">
-                                            {subCategory.category}
-                                        </Typography>
-                                        <Chip
-                                            size="small"
-                                            label={subCategory.count}
-                                            sx={{
-                                                ml: 1,
-                                                height: '18px',
-                                                fontSize: '0.65rem',
-                                                backgroundColor: alpha(theme.palette.secondary.main, 0.1),
-                                                color: theme.palette.secondary.main
-                                            }}
-                                        />
-                                    </Box>
-                                }
-                            >
-                                <Box sx={{
-                                    p: 2,
-                                    backgroundColor: alpha(theme.palette.background.paper, 0.5),
-                                    borderRadius: 1,
-                                    mt: 1
-                                }}>
-                                    {getContentComponent(subCategory)}
-                                </Box>
-                            </TreeItem>
-                        ))}
-                    </TreeItem>
-                ))}
-            </SimpleTreeView>
-        </Box>
-    );
+              </Box>
+            }
+          >
+            {parent.subCategories.map((sub: any, sIdx: number) => (
+              <TreeItem
+                key={sIdx}
+                itemId={`${pIdx}-${sIdx}`}
+                label={
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Typography variant="body2">{sub.category}</Typography>
+                    <Chip
+                      size="small"
+                      label={sub.count}
+                      sx={{
+                        ml: 1,
+                        height: 18,
+                        fontSize: '0.65rem',
+                        backgroundColor: alpha(
+                          theme.palette.secondary.main,
+                          0.1
+                        ),
+                        color: theme.palette.secondary.main
+                      }}
+                    />
+                  </Box>
+                }
+              >
+                <Box
+                  sx={{
+                    p: 2,
+                    mt: 1,
+                    backgroundColor: alpha(
+                      theme.palette.background.paper,
+                      0.5
+                    ),
+                    borderRadius: 1
+                  }}
+                >
+                  {getContentComponent(sub)}
+                </Box>
+              </TreeItem>
+            ))}
+          </TreeItem>
+        ))}
+      </SimpleTreeView>
+    </Box>
+  );
 };
 
-const RelatedItemsTab: React.FC<{ 
+const RelatedItemsTab: React.FC<{
     assetId: string;
     relatedVersionsData: RelatedVersionsResponse | undefined;
     isLoading: boolean;
     onLoadMore: () => void;
 }> = ({ assetId, relatedVersionsData, isLoading, onLoadMore }) => {
     console.log('RelatedItemsTab - relatedVersionsData:', relatedVersionsData);
-    
+
     const items = useMemo(() => {
         if (!relatedVersionsData?.data?.results) {
             console.log('No results found in relatedVersionsData');
@@ -801,11 +852,11 @@ const ImageDetailContent: React.FC = () => {
     // Track scroll position to hide/show header
     useEffect(() => {
         let lastScrollTop = 0;
-        
+
         const handleScroll = () => {
             // Get scrollTop from the parent scrollable container instead
             const currentScrollTop = document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]')?.scrollTop || 0;
-            
+
             if (currentScrollTop <= 10) {
                 setShowHeader(true);
             } else if (currentScrollTop > lastScrollTop) {
@@ -813,16 +864,16 @@ const ImageDetailContent: React.FC = () => {
             } else if (currentScrollTop < lastScrollTop) {
                 setShowHeader(true);
             }
-            
+
             lastScrollTop = currentScrollTop;
         };
-        
+
         // Listen to scroll on the parent container
         const container = document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]');
         if (container) {
             container.addEventListener('scroll', handleScroll, { passive: true });
         }
-        
+
         return () => {
             if (container) {
                 container.removeEventListener('scroll', handleScroll);
@@ -907,6 +958,13 @@ const ImageDetailContent: React.FC = () => {
         if (!assetData?.data?.asset?.Metadata) return [];
         return transformMetadata(assetData.data.asset.Metadata);
     }, [assetData, transformMetadata]);
+
+    // All sub-categories that exist in this asset’s EmbeddedMetadata
+    const availableCategoryKeys = useMemo(() => {
+        const embedded = assetData?.data?.asset?.Metadata?.EmbeddedMetadata ?? {};
+        return Object.keys(embedded).filter(key => key in categoryMapping);
+    }, [assetData]);
+
 
     const versions = useMemo(() => {
         if (!assetData?.data?.asset) return [];
@@ -1011,11 +1069,14 @@ const ImageDetailContent: React.FC = () => {
             case 'summary':
                 return <SummaryTab assetData={assetData} />;
             case 'technical':
-                return <TechnicalMetadataTab metadataAccordions={metadataAccordions} />;
+                return <TechnicalMetadataTab
+                    metadataAccordions={metadataAccordions}
+                    availableCategories={availableCategoryKeys}
+                />;
             case 'related':
                 console.log('Rendering RelatedItemsTab');
                 return (
-                    <RelatedItemsTab 
+                    <RelatedItemsTab
                         assetId={assetData.data.asset.DigitalSourceAsset.ID}
                         relatedVersionsData={relatedVersionsData}
                         isLoading={isLoadingRelated}
@@ -1130,30 +1191,13 @@ const ImageDetailContent: React.FC = () => {
                     >
                         <Tab
                             value="summary"
-                            label={
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <InfoOutlinedIcon fontSize="small" />
-                                    <span>Summary</span>
-                                </Box>
-                            }
+                            label="Summary"
                             id="tab-summary"
                             aria-controls="tabpanel-summary"
                         />
                         <Tab
                             value="technical"
-                            label={
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <CodeOutlinedIcon fontSize="small" />
-                                    <span>Technical</span>
-                                    {metadataAccordions.length > 0 && (
-                                        <Chip 
-                                            size="small" 
-                                            label={metadataAccordions.length} 
-                                            sx={{ height: 20, ml: 0.5 }} 
-                                        />
-                                    )}
-                                </Box>
-                            }
+                            label="Technical Metadata"
                             id="tab-technical"
                             aria-controls="tabpanel-technical"
                         />
@@ -1166,15 +1210,15 @@ const ImageDetailContent: React.FC = () => {
                     </Tabs>
                     <Box
                         sx={{
-                            mt: { xs: 2, sm: 3 },
-                            mx: { xs: 1, sm: 2, md: 3 },
-                            mb: { xs: 2, sm: 3 },
-                            pt: { xs: 1, sm: 2 },
+                            mt: 3,
+                            mx: 3,
+                            mb: 3,
+                            pt: 2,
                             outline: 'none',
                             borderRadius: 1,
-                            backgroundColor: 'transparent',
-                            overflow: 'visible',
-                            maxHeight: 'none'
+                            backgroundColor: theme => alpha(theme.palette.background.paper, 0.5),
+                            maxHeight: 'none',
+                            overflow: 'visible'
                         }}
                         role="tabpanel"
                         id={`tabpanel-${activeTab}`}
@@ -1192,7 +1236,7 @@ const ImageDetailContent: React.FC = () => {
                 onAddComment={handleAddComment}
                 assetId={assetData?.data?.asset?.InventoryID}
             />
-            
+
             {selectedComment !== null && (
                 <CommentPopper
                     id={Boolean(commentAnchorEl) ? 'comment-popper' : undefined}

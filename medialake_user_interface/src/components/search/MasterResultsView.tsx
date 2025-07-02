@@ -70,7 +70,7 @@ interface MasterResultsViewProps {
   onMenuClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onEditClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  onEditNameComplete: (asset: AssetItem, save: boolean) => void;
+  onEditNameComplete: (asset: AssetItem, save: boolean, value?: string) => void;
   onSelectToggle?: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onFavoriteToggle?: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   
@@ -81,6 +81,10 @@ interface MasterResultsViewProps {
   
   // Asset state accessors
   isAssetFavorited?: (assetId: string) => boolean;
+  
+  // Loading states
+  isRenaming?: boolean;
+  renamingAssetId?: string;
 }
 
 const MasterResultsView: React.FC<MasterResultsViewProps> = ({
@@ -141,10 +145,14 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   
   // Asset state accessors
   isAssetFavorited,
+  
+  // Loading states
+  isRenaming = false,
+  renamingAssetId,
 }) => {
   // Function to render card fields
   const renderCardField = (fieldId: string, asset: AssetItem): React.ReactNode => {
-    console.log('Rendering field:', fieldId, 'for asset:', asset.InventoryID);
+    // console.log('Rendering field:', fieldId, 'for asset:', asset.InventoryID);
     
     switch (fieldId) {
       case 'name':
@@ -219,6 +227,8 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       onSelectAllToggle={onSelectAllToggle}
       error={error}
       isLoading={isLoading}
+      isRenaming={isRenaming}
+      renamingAssetId={renamingAssetId}
       getAssetId={(asset) => asset.InventoryID}
       getAssetName={(asset) => asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
       getAssetType={(asset) => asset.DigitalSourceAsset.Type}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { List, ListItemText, ListItemIcon, Radio, Checkbox, ListItemButton, Divider, Collapse, Switch } from '@mui/material';
+import { List, ListItemText, ListItemIcon, Radio, Checkbox, ListItemButton, Divider, Collapse } from '@mui/material';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 
@@ -44,17 +44,13 @@ interface SearchFiltersProps {
     expandedSections: ExpandedSections;
     onFilterChange: (section: string, filter: string) => void;
     onSectionToggle: (section: string) => void;
-    groupByType: boolean;
-    onGroupByTypeChange: (checked: boolean) => void;
 }
 
 const SearchFilters: React.FC<SearchFiltersProps> = ({
     filters,
     expandedSections,
     onFilterChange,
-    onSectionToggle,
-    groupByType,
-    onGroupByTypeChange
+    onSectionToggle
 }) => {
     const renderFilterSection = (title: string, section: string, items: Record<string, boolean>) => (
         <>
@@ -144,31 +140,6 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
 
     return (
         <List component="nav" sx={{ width: '100%' }}>
-            <ListItemButton
-                sx={{
-                    py: 1,
-                    minHeight: 40,
-                    px: 2,
-                    '&:hover': {
-                        bgcolor: 'action.hover'
-                    }
-                }}
-            >
-                <ListItemText
-                    primary="Group by Type"
-                    primaryTypographyProps={{
-                        fontWeight: 600,
-                        fontSize: '0.875rem'
-                    }}
-                />
-                <Switch
-                    edge="end"
-                    checked={groupByType}
-                    onChange={(e) => onGroupByTypeChange(e.target.checked)}
-                    size="small"
-                />
-            </ListItemButton>
-            <Divider />
             {renderFilterSection('Media Types', 'mediaTypes', filters.mediaTypes)}
             {renderFilterSection('Time Period', 'time', filters.time)}
         </List>

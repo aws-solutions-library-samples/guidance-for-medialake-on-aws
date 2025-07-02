@@ -1,5 +1,6 @@
 import React from 'react';
 import { TableCellContent } from '@/components/common/table';
+import { formatLocalDateTime } from '@/shared/utils/dateUtils';
 
 interface DateCellProps {
     value: string;
@@ -8,7 +9,7 @@ interface DateCellProps {
 export const DateCell: React.FC<DateCellProps> = ({ value }) => {
     return (
         <TableCellContent variant="secondary">
-            {new Date(value).toLocaleDateString()}
+            {formatLocalDateTime(value)}
         </TableCellContent>
     );
-}; 
+};

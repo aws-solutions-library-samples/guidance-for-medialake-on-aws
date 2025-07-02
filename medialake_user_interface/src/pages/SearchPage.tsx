@@ -17,7 +17,9 @@ import {
     Select,
     Chip,
     OutlinedInput,
-    SelectChangeEvent
+    SelectChangeEvent,
+    Snackbar,
+    Alert
 } from '@mui/material';
 import SearchOffIcon from '@mui/icons-material/SearchOff';
 import { RightSidebar, RightSidebarProvider } from '../components/common/RightSidebar';
@@ -42,7 +44,7 @@ type AssetItem = (ImageItem | VideoItem | AudioItem) & {
         Type: string;
     };
 };
-import { useFacetSearch } from '../hooks/useFacetSearch';
+import { useSearchState } from '../hooks/useSearchState';
 import { FacetFilters } from '../types/facetSearch';
 
 interface LocationState {
@@ -104,8 +106,6 @@ const SearchPage: React.FC = () => {
     } = (location.state as LocationState) || {};
     const [searchParams, setSearchParams] = useSearchParams();
     const currentPage = parseInt(searchParams.get('page') || '1', 10);
-    const currentQuery = searchParams.get('q') || query || '';
-    const currentSemantic = searchParams.get('semantic') === 'true' || isSemantic || false;
     const navigate = useNavigate();
 
     const [pageSize, setPageSize] = useState<number>(
@@ -138,7 +138,17 @@ const SearchPage: React.FC = () => {
         }
     });
     
-    const { filters: facetFilters } = useFacetSearch({ initialFilters: initialFacetFilters });
+    // Use the new search state hook that integrates with Zustand
+    const searchState = useSearchState({
+        initialQuery: query,
+        initialSemantic: isSemantic,
+        initialFilters: initialFacetFilters
+    });
+    
+    // Get current values from the search state
+    const currentQuery = searchState.query;
+    const currentSemantic = searchState.isSemantic;
+    const facetFilters = searchState.filters;
         
     // State for selected fields
     const [selectedFields, setSelectedFields] = useState<string[]>([]);
@@ -281,6 +291,10 @@ const SearchPage: React.FC = () => {
         editedName: currentEditedName,
         isDeleteModalOpen,
         selectedAsset,
+        alert,
+        handleAlertClose,
+        isLoading: assetOperationsLoading,
+        renamingAssetId,
     } = useAssetOperations<AssetItem>();
 
     const handleAssetClick = useCallback((asset: AssetItem) => {
@@ -412,23 +426,7 @@ const SearchPage: React.FC = () => {
         status: true,
     });
 
-    useEffect(() => {
-        if ((query && !searchParams.has('q')) || (isSemantic !== undefined && !searchParams.has('semantic'))) {
-            setSearchParams(prev => {
-                const newParams = new URLSearchParams(prev);
-                if (query && !prev.has('q')) {
-                    newParams.set('q', query);
-                }
-                if (isSemantic !== undefined && !prev.has('semantic')) {
-                    newParams.set('semantic', isSemantic.toString());
-                }
-                if (!prev.has('page')) {
-                    newParams.set('page', '1');
-                }
-                return newParams;
-            });
-        }
-    }, [query, isSemantic, searchParams, setSearchParams]);
+    // URL synchronization is now handled by useSearchState hook
 
     // No need for these effects as they're now handled in the useAssetSelection hook
 
@@ -616,6 +614,8 @@ const SearchPage: React.FC = () => {
                                 onSelectAllToggle={multiSelectFeature.value ? () => {
                                     assetSelection.handleSelectAll(filteredResults);
                                 } : undefined}
+                                isRenaming={assetOperationsLoading.rename}
+                                renamingAssetId={renamingAssetId}
                                 error={error ? {
                                     status: (error as SearchError).apiResponse?.status || error.name,
                                     message: (error as SearchError).apiResponse?.message || error.message
@@ -641,8 +641,6 @@ const SearchPage: React.FC = () => {
                                         expandedSections={expandedSections}
                                         onFilterChange={handleFilterChange}
                                         onSectionToggle={handleSectionToggle}
-                                        groupByType={viewPreferences.groupByType}
-                                        onGroupByTypeChange={viewPreferences.handleGroupByTypeChange}
                                     />
                                 </>
                             }
@@ -683,6 +681,21 @@ const SearchPage: React.FC = () => {
                     action={assetSelection.modalState.action}
                     message={assetSelection.modalState.message}
                 />
+
+                <Snackbar
+                    open={!!alert}
+                    autoHideDuration={6000}
+                    onClose={handleAlertClose}
+                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                >
+                    <Alert
+                        onClose={handleAlertClose}
+                        severity={alert?.severity}
+                        sx={{ width: '100%' }}
+                    >
+                        {alert?.message}
+                    </Alert>
+                </Snackbar>
             </>
         </RightSidebarProvider>
     );

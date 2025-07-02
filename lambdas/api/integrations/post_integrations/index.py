@@ -2,6 +2,7 @@ import os
 import json
 import boto3
 import uuid
+from datetime import datetime
 from typing import Dict, Any, Optional
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.logging import correlation_paths
@@ -128,17 +129,27 @@ def create_integration(
             else "unknown"
         )
 
+        # Get current UTC timestamp
+        current_time = datetime.utcnow().isoformat()
+        
+        # Generate name from nodeId by replacing underscores with spaces and title-casing
+        # Use the actual nodeId value as provided (e.g., "twelve_labs" -> "Twelve Labs")
+        generated_name = integration_data["nodeId"].replace("_", " ").title()
+        
         # Prepare the item
         item = {
             "PK": f"INTEGRATION#{integration_id}",
             "SK": f"CONFIG#{environment_id}",
             "ID": integration_id,
+            "Name": generated_name,
             "Node": integration_data["nodeId"],
             "Type": node_type,
             "Environment": environment_id,
             "Status": "active",  # Default to active
             "Description": integration_data.get("description", ""),
             "Configuration": {"auth": integration_data["auth"]},
+            "CreatedDate": current_time,
+            "ModifiedDate": current_time,
         }
 
         # Store API key in Secrets Manager if present
@@ -197,11 +208,14 @@ def handle_post_integrations() -> Dict[str, Any]:
                 "message": "Integration created successfully",
                 "data": {
                     "id": integration_id,
+                    "name": integration["Name"],
                     "nodeId": integration["Node"],
                     "type": integration["Type"],
                     "environment": integration["Environment"],
                     "status": integration["Status"],
                     "description": integration["Description"],
+                    "createdAt": integration["CreatedDate"],
+                    "updatedAt": integration["ModifiedDate"],
                 },
             },
         }

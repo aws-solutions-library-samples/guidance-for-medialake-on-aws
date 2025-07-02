@@ -76,6 +76,7 @@ import { Currency } from 'lucide-react';
     getMarkerLane: () => MarkerLane | null;
     getCurrentTime: () => number;
     formatToTimecode: (time: number) => string;
+    seek: (time: number) => void;
   }
   
   /**
@@ -510,6 +511,7 @@ import { Currency } from 'lucide-react';
             return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}:${frames.toString().padStart(2, '0')}`;
 
           },
+          seek: (time: number) => seek(time),
         }),
         [currentTime, customCallbacks,playerRef]
       );

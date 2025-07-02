@@ -81,7 +81,7 @@ export default {
     },
     home: {
         title: 'ホーム',
-        description: 'MediaLake - メディアとメタデータのためのデータレイク',
+                    description: 'メディア、メタデータ、ワークフローのためのガイダンス。',
         statistics: '統計',
         collections: 'コレクション',
         sharedCollections: '共有コレクション',
@@ -136,7 +136,7 @@ export default {
         navigating: 'ナビゲート中'
       },
       branding: {
-        name: 'MediaLake'
+        name: 'Media Lake'
       }
     },
     search: {
@@ -636,7 +636,7 @@ export default {
         settings: '設定'
       },
       home: {
-        welcome: 'MediaLakeへようこそ',
+                    welcome: 'Media Lakeへようこそ',
         description: 'メディアファイルを効率的に管理・整理',
         statistics: '統計',
         collections: 'コレクション',
