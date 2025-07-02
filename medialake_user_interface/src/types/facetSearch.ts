@@ -27,3 +27,18 @@ export interface FacetFilters {
    */
   date_range_option?: string;
 }
+
+/**
+ * Interface for complete search state including query and semantic search
+ */
+export interface SearchFilters extends FacetFilters {
+  /**
+   * Search query string
+   */
+  query?: string;
+  
+  /**
+   * Whether semantic search is enabled
+   */
+  isSemantic?: boolean;
+}

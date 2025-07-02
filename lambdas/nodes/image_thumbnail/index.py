@@ -3,10 +3,12 @@ import boto3
 import io
 import os
 import json
+import subprocess
+import tempfile
+import shutil
 from decimal import Decimal
 
 from PIL import Image, ExifTags
-import cairosvg
 
 from botocore.exceptions import ClientError
 from aws_lambda_powertools import Logger, Tracer
@@ -20,6 +22,52 @@ s3 = boto3.client("s3")
 dynamo = boto3.resource("dynamodb").Table(os.environ["MEDIALAKE_ASSET_TABLE"])
 
 
+def convert_svg_to_png(svg_data: bytes) -> bytes:
+    """
+    Convert SVG → PNG using only the resvg CLI.
+    Expects /opt/bin/resvg in your Lambda layer.
+    """
+    # dump SVG to a temp file
+    with tempfile.NamedTemporaryFile(suffix=".svg", delete=False) as svg_file:
+        svg_file.write(svg_data)
+        svg_path = svg_file.name
+
+    # prepare a temp file for the PNG output
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as png_file:
+        png_path = png_file.name
+
+    # ensure our layer bins come first
+    env = os.environ.copy()
+    env["PATH"] = "/opt/bin:" + env.get("PATH", "")
+
+    # verify resvg is present
+    if shutil.which("resvg", path=env["PATH"]) is None:
+        for p in (svg_path, png_path):
+            try: os.unlink(p)
+            except: pass
+        raise RuntimeError("resvg CLI not found in /opt/bin")
+
+    cmd = ["resvg", svg_path, png_path]
+    logger.info(f"Running: {' '.join(cmd)}")
+
+    try:
+        proc = subprocess.run(cmd, env=env, capture_output=True, timeout=30)
+        if proc.returncode != 0:
+            stderr = proc.stderr.decode().strip()
+            raise RuntimeError(f"resvg failed (rc={proc.returncode}): {stderr}")
+
+        if not os.path.exists(png_path) or os.path.getsize(png_path) == 0:
+            raise RuntimeError("resvg did not produce any output")
+
+        with open(png_path, "rb") as f:
+            data = f.read()
+        return data
+
+    finally:
+        # always clean up temp files
+        for p in (svg_path, png_path):
+            try: os.unlink(p)
+            except: pass
 def get_image_rotation(image):
     try:
         exif = image._getexif() or {}
@@ -128,7 +176,7 @@ def lambda_handler(event, context: LambdaContext):
 
     body = s3.get_object(Bucket=bucket, Key=key)["Body"].read()
     if key.lower().endswith(".svg"):
-        body = cairosvg.svg2png(bytestring=body)
+        body = convert_svg_to_png(body)
     img = Image.open(io.BytesIO(body))
 
     width, height = _resolve_dims(width, height, img.width, img.height)

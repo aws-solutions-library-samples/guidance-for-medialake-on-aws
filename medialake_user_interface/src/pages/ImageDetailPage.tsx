@@ -539,7 +539,7 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
             {/* Keep the filter bar */}
             <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
                 <TextField
-                    placeholder="Filter metadata..." 
+                    placeholder="Filter metadata..."
                     size="small"
                     InputProps={{
                         startAdornment: (
@@ -551,9 +551,9 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
                     onChange={(e) => {
                         // Implement filtering logic here
                     }}
-                    sx={{ flex: 1 }}
+                    sx={{ flex: 1, px: 2 }}
                 />
-                <FormControl size="small" sx={{ minWidth: 120 }}>
+                <FormControl size="small" sx={{ minWidth: 120, px: 2 }}>
                     <Select
                         value="all"
                         onChange={(e) => {/* Category filter logic */}}
@@ -1130,30 +1130,13 @@ const ImageDetailContent: React.FC = () => {
                     >
                         <Tab
                             value="summary"
-                            label={
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <InfoOutlinedIcon fontSize="small" />
-                                    <span>Summary</span>
-                                </Box>
-                            }
+                            label="Summary"
                             id="tab-summary"
                             aria-controls="tabpanel-summary"
                         />
                         <Tab
                             value="technical"
-                            label={
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <CodeOutlinedIcon fontSize="small" />
-                                    <span>Technical</span>
-                                    {metadataAccordions.length > 0 && (
-                                        <Chip 
-                                            size="small" 
-                                            label={metadataAccordions.length} 
-                                            sx={{ height: 20, ml: 0.5 }} 
-                                        />
-                                    )}
-                                </Box>
-                            }
+                            label="Technical Metadata"
                             id="tab-technical"
                             aria-controls="tabpanel-technical"
                         />
@@ -1166,15 +1149,15 @@ const ImageDetailContent: React.FC = () => {
                     </Tabs>
                     <Box
                         sx={{
-                            mt: { xs: 2, sm: 3 },
-                            mx: { xs: 1, sm: 2, md: 3 },
-                            mb: { xs: 2, sm: 3 },
-                            pt: { xs: 1, sm: 2 },
+                            mt: 3,
+                            mx: 3,
+                            mb: 3,
+                            pt: 2,
                             outline: 'none',
                             borderRadius: 1,
-                            backgroundColor: 'transparent',
-                            overflow: 'visible',
-                            maxHeight: 'none'
+                            backgroundColor: theme => alpha(theme.palette.background.paper, 0.5),
+                            maxHeight: 'none',
+                            overflow: 'visible'
                         }}
                         role="tabpanel"
                         id={`tabpanel-${activeTab}`}

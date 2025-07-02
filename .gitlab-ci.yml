@@ -96,6 +96,6 @@ job_deploy:
     - python3 .cicd/build_lambdas.py build
     - bash .cicd/build_ffprobe.sh
     - bash .cicd/build_ffmpeg.sh
-    - bash .cicd/build_cairosvg.sh
+    - bash .cicd/build_resvg.sh
     - cdk bootstrap
     - cdk deploy --all --require-approval never

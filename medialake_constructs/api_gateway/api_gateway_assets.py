@@ -390,6 +390,14 @@ class AssetsConstruct(Construct):
             )
         )
 
+        # Add S3 bucket-level permissions for GetBucketLocation (required for region discovery)
+        generate_presigned_url_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["s3:GetBucketLocation"],
+                resources=["arn:aws:s3:::*"],  # Access to all buckets for location queries
+            )
+        )
+
         # Add POST method to /assets/generate-presigned-url
         presigned_url_resource.add_method(
             "POST",
@@ -536,6 +544,8 @@ class AssetsConstruct(Construct):
                     "s3:DeleteObject",
                     "s3:ListBucket",
                     "s3:PutObjectTagging",
+                    "s3:GetObjectTagging",  # Add missing permission for reading object tags
+                    "s3:CopyObject",  # Add missing permission for copying objects
                 ],
                 resources=[
                     "arn:aws:s3:::*/*",  # Access to all objects in all buckets

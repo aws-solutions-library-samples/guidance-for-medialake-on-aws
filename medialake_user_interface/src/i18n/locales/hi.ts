@@ -77,7 +77,7 @@ export default {
       navigating: 'नेविगेट कर रहे हैं'
     },
     branding: {
-      name: 'MediaLake'
+              name: 'Media Lake'
     }
   },
   search: {
@@ -548,8 +548,8 @@ export default {
       settings: 'सेटिंग्स'
     },
     home: {
-      welcome: 'MediaLake में आपका स्वागत है',
-      description: 'अपनी मीडिया फाइलों का कुशलतापूर्वक प्रबंधन और आयोजन करें',
+      welcome: 'Media Lake में आपका स्वागत है',
+      description: 'आपके मीडिया, मेटाडेटा और वर्कफ़्लो के लिए मार्गदर्शन।',
       statistics: 'सांख्यिकी',
       collections: 'कलेक्शन',
       sharedCollections: 'साझा कलेक्शन',

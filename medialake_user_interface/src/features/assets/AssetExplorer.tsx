@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Typography, LinearProgress, alpha, useTheme, Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button, CircularProgress } from '@mui/material';
+import { Box, Typography, LinearProgress, alpha, useTheme, Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button, CircularProgress, Snackbar, Alert } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { type SortingState } from '@tanstack/react-table';
 import { type AssetTableColumn } from '@/types/shared/assetComponents';
@@ -108,7 +108,10 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
     isDeleteModalOpen,
     menuAnchorEl,
     selectedAsset,
+    alert,
+    handleAlertClose,
     isLoading: assetOperationsLoading,
+    renamingAssetId,
   } = useAssetOperations<AssetItem>();
 
   // Card fields configuration
@@ -353,6 +356,8 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
               message: error.message || 'Failed to load assets'
             } : undefined}
             isLoading={isLoading || isFavoritesLoading}
+            isRenaming={assetOperationsLoading.rename}
+            renamingAssetId={renamingAssetId}
           />
         </Box>
       )}
@@ -453,6 +458,21 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Snackbar
+        open={!!alert}
+        autoHideDuration={6000}
+        onClose={handleAlertClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={handleAlertClose}
+          severity={alert?.severity}
+          sx={{ width: '100%' }}
+        >
+          {alert?.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

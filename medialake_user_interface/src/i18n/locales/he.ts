@@ -77,7 +77,7 @@ export default {
       navigating: 'ניווט מ'
     },
     branding: {
-      name: 'MediaLake'
+              name: 'Media Lake'
     }
   },
   search: {
@@ -548,7 +548,7 @@ export default {
       settings: 'הגדרות'
     },
     home: {
-      welcome: 'ברוכים הבאים ל-MediaLake',
+                  welcome: 'ברוכים הבאים ל-Media Lake',
       description: 'נהל את קבצי המדיה שלך ביעילות',
       statistics: 'סטטיסטיקות',
       collections: 'אוספים',

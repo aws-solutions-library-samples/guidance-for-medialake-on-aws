@@ -252,11 +252,13 @@ def handle_put_integration(integration_id: str) -> Dict[str, Any]:
                 "message": f"Integration {integration_id} updated successfully",
                 "data": {
                     "id": integration_id,
+                    "name": updated_integration.get("Name", ""),
                     "nodeId": updated_integration.get("Node", ""),
                     "type": updated_integration.get("Type", ""),
                     "environment": updated_integration.get("Environment", ""),
                     "status": updated_integration.get("Status", ""),
                     "description": updated_integration.get("Description", ""),
+                    "createdAt": updated_integration.get("CreatedDate", ""),
                     "updatedAt": updated_integration.get("ModifiedDate", datetime.utcnow().isoformat()),
                 },
             },

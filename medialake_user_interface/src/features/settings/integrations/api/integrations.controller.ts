@@ -6,20 +6,16 @@ import type {
     IntegrationsResponse,
     IntegrationsError,
     Integration,
-    CreateIntegrationDto
+    CreateIntegrationDto,
+    UpdateIntegrationDto
 } from '../types/integrations.types';
 import queryClient from '@/api/queryClient';
 import { apiClient } from '@/api/apiClient';
 
-const transformFormDataToDto = (formData: IntegrationFormData): CreateIntegrationDto => {
-    const now = new Date().toISOString();
+const transformFormDataToDto = (formData: IntegrationFormData) => {
     return {
         nodeId: formData.nodeId,
-        integrationType: formData.nodeId.replace('node-', '').replace('-api', ''),
-        description: formData.description,
-        integrationEnabled: true,
-        createdDate: now,
-        modifiedDate: now,
+        description: formData.description || "",
         auth: formData.auth
     };
 };
@@ -85,7 +81,10 @@ export const useCreateIntegration = () => {
 export const useUpdateIntegration = () => {
     return useMutation({
         mutationFn: ({ id, data }: { id: string; data: IntegrationFormData }) => {
-            const dto = transformFormDataToDto(data);
+            const dto: UpdateIntegrationDto = {
+                description: data.description || "",
+                auth: data.auth
+            };
             return IntegrationsService.updateIntegration(id, dto);
         },
         onSuccess: (_, { id }) => {

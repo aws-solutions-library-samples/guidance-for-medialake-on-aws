@@ -77,7 +77,7 @@ export default {
       navigating: '正在从...导航'
     },
     branding: {
-      name: 'MediaLake'
+              name: 'Media Lake'
     }
   },
   search: {
@@ -548,7 +548,7 @@ export default {
       settings: '设置'
     },
     home: {
-      welcome: '欢迎使用 MediaLake',
+                  welcome: '欢迎使用 Media Lake',
       description: '高效管理和组织您的媒体文件',
       statistics: '统计',
       collections: '收藏',

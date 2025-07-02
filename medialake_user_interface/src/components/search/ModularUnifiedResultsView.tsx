@@ -42,7 +42,7 @@ interface ModularUnifiedResultsViewProps {
   onMenuClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onEditClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  onEditNameComplete: (asset: AssetItem, save: boolean) => void;
+  onEditNameComplete: (asset: AssetItem, save: boolean, value?: string) => void;
   editingAssetId?: string;
   editedName?: string;
   // Favorite functionality
@@ -55,6 +55,8 @@ interface ModularUnifiedResultsViewProps {
   onPageSizeChange: (newPageSize: number) => void;
   error?: { status: string; message: string } | null;
   isLoading?: boolean;
+  isRenaming?: boolean;
+  renamingAssetId?: string;
 }
 
 const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
@@ -95,6 +97,8 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
   onPageSizeChange,
   error,
   isLoading,
+  isRenaming = false,
+  renamingAssetId,
 }) => {
   // Check if multi-select feature is enabled
   const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
@@ -164,6 +168,8 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
       onSelectToggle={onSelectToggle}
       error={error}
       isLoading={isLoading}
+      isRenaming={isRenaming}
+      renamingAssetId={renamingAssetId}
       getAssetId={(asset) => asset.InventoryID}
       getAssetName={(asset) => asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
       getAssetType={(asset) => asset.DigitalSourceAsset.Type}

@@ -19,7 +19,7 @@ from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBPr
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 from medialake_constructs.shared_constructs.lambda_layers import (
     PowertoolsLayer, PowertoolsLayerConfig,
-    PyMediaInfo, CairoSvgLayer, FFProbeLayer, FFmpegLayer,
+    PyMediaInfo,ResvgCliLayer,FFProbeLayer, FFmpegLayer,
     PyamlLayer, ShortuuidLayer
 )
 from medialake_constructs.shared_constructs.mediaconvert import (
@@ -67,7 +67,8 @@ class NodesStack(cdk.NestedStack):
         self.shortuuid_layer = ShortuuidLayer(self, "ShortuuidLayer")
         self.pyaml_layer = PyamlLayer(self, "PyamlLayer")
         self.ffprobe_layer = FFProbeLayer(self, "FFProbeLayer")
-        self.cairosvg_layer = CairoSvgLayer(self, "CairoSvgLayer")
+        self.resvgcli_layer = ResvgCliLayer(self, "ResvgCliLayer")
+        
         
         
         
@@ -321,7 +322,8 @@ class NodesStack(cdk.NestedStack):
                     "SHORTUUID_LAYER_ARN": self.shortuuid_layer.layer.layer_version_arn,
                     "PYAML_LAYER_ARN": self.pyaml_layer.layer.layer_version_arn,
                     "FFPROBE_LAYER_ARN": self.ffprobe_layer.layer.layer_version_arn,
-                    "CAIROSVG_LAYER_ARN": self.cairosvg_layer.layer.layer_version_arn
+                    "RESVGCLI_LAYER_ARN": self.resvgcli_layer.layer.layer_version_arn,
+                    
                     
                 },
             ),

@@ -86,7 +86,7 @@ export default {
       },
     home: {
         title: 'Home',
-        description: 'MediaLake - A data lake for your media and metadata',
+                    description: 'Guidance for your media, metadata, and workflows.',
         statistics: 'Statistics',
         collections: 'Collections',
         sharedCollections: 'Shared Collections',
@@ -145,7 +145,7 @@ export default {
             navigating: 'Navigating from'
         },
         branding: {
-            name: 'MediaLake'
+            name: 'Media Lake'
         }
     },
     search: {
@@ -656,8 +656,8 @@ export default {
             settings: 'Settings'
         },
         home: {
-            welcome: 'Welcome to MediaLake',
-            description: 'Manage and organize your media files efficiently',
+            welcome: 'Welcome to Media Lake',
+            description: 'Guidance for your media, metadata, and workflows.',
             statistics: 'Statistics',
             collections: 'Collections',
             sharedCollections: 'Shared Collections',

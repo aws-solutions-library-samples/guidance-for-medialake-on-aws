@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { drawerWidth, collapsedDrawerWidth } from '@/constants';
-import { Box } from '@mui/material';
+import { Box, useTheme } from '@mui/material';
 import { Outlet } from 'react-router-dom';
 import { SidebarContext } from '../contexts/SidebarContext';
 import { useDirection } from '../contexts/DirectionContext';
 import { ChatProvider } from '../contexts/ChatContext';
+import { alpha } from '@mui/material/styles';
 import TopBar from '../TopBar';
 import Sidebar from '../Sidebar';
 import { ChatSidebar } from '../features/chat';
@@ -13,11 +14,23 @@ const AppLayout: React.FC = () => {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const { direction } = useDirection();
     const isRTL = direction === 'rtl';
+    const theme = useTheme();
+
+    const gradientBackground = `
+        radial-gradient(ellipse at top, ${alpha(theme.palette.primary.main, 0.08)} 0%, transparent 50%),
+        radial-gradient(ellipse at bottom, ${alpha(theme.palette.secondary.main, 0.05)} 0%, transparent 50%),
+        linear-gradient(135deg, ${theme.palette.background.default} 0%, ${alpha(theme.palette.primary.main, 0.02)} 100%)
+    `;
 
     return (
         <SidebarContext.Provider value={{ isCollapsed, setIsCollapsed }}>
             <ChatProvider>
-                <Box sx={{ display: 'flex', flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                <Box sx={{ 
+                    display: 'flex', 
+                    flexDirection: isRTL ? 'row-reverse' : 'row',
+                    minHeight: '100vh',
+                    background: gradientBackground,
+                }}>
                 <Sidebar />
                 <Box
                     component="main"
@@ -30,6 +43,7 @@ const AppLayout: React.FC = () => {
                         minHeight: '100vh',
                     }}
                 >
+                    {/* Top Bar with gradient background blend */}
                     <Box sx={{
                         position: 'fixed',
                         top: 0,
@@ -38,7 +52,11 @@ const AppLayout: React.FC = () => {
                         height: '64px',
                         [isRTL ? 'paddingRight' : 'paddingLeft']: `${isCollapsed ? collapsedDrawerWidth : drawerWidth}px`,
                         zIndex: 1100,
-                        bgcolor: theme => theme.palette.background.default,
+                        background: `
+                            radial-gradient(ellipse at top, ${alpha(theme.palette.primary.main, 0.08)} 0%, transparent 50%),
+                            linear-gradient(135deg, ${theme.palette.background.default} 0%, ${alpha(theme.palette.primary.main, 0.02)} 100%)
+                        `,
+                        backdropFilter: 'blur(10px)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -50,11 +68,13 @@ const AppLayout: React.FC = () => {
                         <Box sx={{
                             width: '100%',
                             paddingLeft: 2,
-                            paddingRight: 0, // Remove right padding to allow icons to reach the edge
+                            paddingRight: 0,
                         }}>
                             <TopBar />
                         </Box>
                     </Box>
+
+                    {/* Main Content Area - inherits gradient background */}
                     <Box sx={{
                         flexGrow: 1,
                         p: 4,
@@ -63,7 +83,7 @@ const AppLayout: React.FC = () => {
                         flexDirection: 'column',
                         minWidth: 0,
                         overflow: 'auto',
-                        backgroundColor: theme => theme.palette.background.default
+                        backgroundColor: 'transparent' // Let the gradient show through
                     }}>
                         <Outlet />
                     </Box>

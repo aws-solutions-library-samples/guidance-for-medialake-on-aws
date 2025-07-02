@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, CircularProgress, Button, Typography, Stack, Divider } from '@mui/material';
+import { Terrain as LogoIcon } from '@mui/icons-material';
 import { Authenticator, ThemeProvider as AmplifyThemeProvider } from '@aws-amplify/ui-react';
 import { fetchAuthSession, signIn, confirmSignIn, signInWithRedirect } from 'aws-amplify/auth';
 import { useAuth } from '../common/hooks/auth-context';
@@ -52,12 +53,11 @@ const AuthPage = () => {
                 width: '400px',
             }}>
                 <Box sx={{ mb: 4 }}>
-                    <img
-                        src="/logo.png"
-                        alt="MediaLake Logo"
-                        style={{
-                            height: '40px',
-                            marginBottom: '1rem',
+                    <LogoIcon
+                        sx={{
+                            fontSize: '40px',
+                            color: 'white',
+                            mb: 2,
                         }}
                     />
                     <h1 style={{
@@ -65,7 +65,7 @@ const AuthPage = () => {
                         fontWeight: '600',
                         margin: '0 0 0.5rem',
                     }}>
-                        Welcome to MediaLake
+                        Welcome to Media Lake
                     </h1>
                     <p style={{
                         fontSize: '0.875rem',

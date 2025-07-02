@@ -43,6 +43,20 @@ Parameters:
     Description: Initial Cognito user email
     Type: String
     AllowedPattern: '[^@]+@[^@]+\.[^@]+'
+
+  InitialUserFirstName:
+    Description: Initial Cognito user first name
+    Type: String
+    MinLength: 1
+    MaxLength: 50
+    AllowedPattern: '^[a-zA-Z\s\-\.]+$'
+  
+  InitialUserLastName:
+    Description: Initial Cognito user last name
+    Type: String
+    MinLength: 1
+    MaxLength: 50
+    AllowedPattern: '^[a-zA-Z\s\-\.]+$'
   
   ProjectEnvironment:
     Description: Project environment (dev, prod, ...)
@@ -85,11 +99,17 @@ Metadata:
           default: Amazon Cognito / Amazon Simple Notification Service
         Parameters:
           - InitialUserEmail
+          - InitialUserFirstName
+          - InitialUserLastName
     ParameterLabels:
       PipelineName:
         default: CodePipeline Pipeline Name
       InitialUserEmail:
         default: Email
+      InitialUserFirstName:
+        default: First Name
+      InitialUserLastName:
+        default: Last Name
       NodejsVersion:
         default: Nodejs Version
       ProjectEnvironment:
@@ -503,6 +523,8 @@ Resources:
                 - echo "$( jq --arg a "${AWS::AccountId}" '.account_id = $a' config.json )" > config.json
                 - echo "$( jq --arg r "${AWS::Region}" '.primary_region = $r' config.json )" > config.json
                 - echo "$( jq --arg u "${InitialUserEmail}" '.initial_user.email = $u' config.json )" > config.json
+                - echo "$( jq --arg f "${InitialUserFirstName}" '.initial_user.first_name = $f' config.json )" > config.json
+                - echo "$( jq --arg l "${InitialUserLastName}" '.initial_user.last_name = $l' config.json )" > config.json
                 - echo "$( jq --arg s "${OpenSearchDeploymentSize}" '.opensearch_deployment_size = $s' config.json )" > config.json
             build:
               commands:
@@ -521,8 +543,8 @@ Resources:
                 - bash .cicd/build_ffprobe.sh
                 - echo "Building FFmpeg"
                 - bash .cicd/build_ffmpeg.sh
-                - echo "Building CairoSVG"
-                - bash .cicd/build_cairosvg.sh
+                - echo "Building RSSVG"
+                - bash .cicd/build_resvg.sh
                 # - cdk synth || (echo "CDK synth failed" && find . -name "cdk.json" -o -name "app.py" | grep -v "node_modules")
                 - echo "CDK synthesis"
                 - cdk synth || (echo "CDK synth failed" && exit 1)

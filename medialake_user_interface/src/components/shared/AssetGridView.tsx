@@ -15,7 +15,7 @@ interface AssetGridViewProps<T> {
   onDownloadClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onEditClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  onEditNameComplete: (asset: T, save: boolean) => void;
+  onEditNameComplete: (asset: T, save: boolean, value?: string) => void;
   editingAssetId?: string;
   editedName?: string;
   // Favorite functionality
@@ -33,6 +33,8 @@ interface AssetGridViewProps<T> {
   renderCardField: (fieldId: string, asset: T) => React.ReactNode;
   // Search fields
   selectedSearchFields?: string[];
+  isRenaming?: boolean; // Add isRenaming prop for loading state
+  renamingAssetId?: string; // ID of the asset currently being renamed
 }
 
 function AssetGridView<T>({
@@ -62,6 +64,8 @@ function AssetGridView<T>({
   getAssetProxy,
   renderCardField,
   selectedSearchFields,
+  isRenaming,
+  renamingAssetId,
 }: AssetGridViewProps<T>) {
   // Group results by type if needed
   const groupedResults = React.useMemo(() => {
@@ -110,7 +114,7 @@ function AssetGridView<T>({
               isEditing={editingAssetId === getAssetId(asset)}
               editedName={editedName}
               onEditNameChange={onEditNameChange}
-              onEditNameComplete={(save) => onEditNameComplete(asset, save)}
+              onEditNameComplete={(save, value) => onEditNameComplete(asset, save, value)}
               cardSize={cardSize}
               aspectRatio={aspectRatio}
               thumbnailScale={thumbnailScale}
@@ -120,6 +124,7 @@ function AssetGridView<T>({
               isSelected={isAssetSelected ? isAssetSelected(getAssetId(asset)) : false}
               onSelectToggle={onSelectToggle ? (id, e) => onSelectToggle(asset, e) : undefined}
               selectedSearchFields={selectedSearchFields}
+              isRenaming={isRenaming && renamingAssetId === getAssetId(asset)}
             />
           </Grid>
         ))}
@@ -160,7 +165,7 @@ function AssetGridView<T>({
                   isEditing={editingAssetId === getAssetId(asset)}
                   editedName={editedName}
                   onEditNameChange={onEditNameChange}
-                  onEditNameComplete={(save) => onEditNameComplete(asset, save)}
+                  onEditNameComplete={(save, value) => onEditNameComplete(asset, save, value)}
                   cardSize={cardSize}
                   aspectRatio={aspectRatio}
                   thumbnailScale={thumbnailScale}
@@ -170,6 +175,7 @@ function AssetGridView<T>({
                   isSelected={isAssetSelected ? isAssetSelected(getAssetId(asset)) : false}
                   onSelectToggle={onSelectToggle ? (id, e) => onSelectToggle(asset, e) : undefined}
                   selectedSearchFields={selectedSearchFields}
+                  isRenaming={isRenaming && renamingAssetId === getAssetId(asset)}
                 />
               </Grid>
             ))}
