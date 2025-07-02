@@ -35,24 +35,23 @@ Parameters:
     Type: String
     Default: 20
     AllowedValues:
-      - 18
       - 20
       - 22
   
   InitialUserEmail:
-    Description: Initial Cognito user email
+    Description: Initial Media Lake administrator user email
     Type: String
     AllowedPattern: '[^@]+@[^@]+\.[^@]+'
 
   InitialUserFirstName:
-    Description: Initial Cognito user first name
+    Description: Initial Media Lake administrator first name
     Type: String
     MinLength: 1
     MaxLength: 50
     AllowedPattern: '^[a-zA-Z\s\-\.]+$'
   
   InitialUserLastName:
-    Description: Initial Cognito user last name
+    Description: Initial Media Lake administrator last name
     Type: String
     MinLength: 1
     MaxLength: 50
@@ -88,7 +87,7 @@ Metadata:
           - S3PresignedURL
       -
         Label:
-          default: CDK Build Customization
+          default: Media Lake Customization
         Parameters:
           - PipelineName
           - NodejsVersion
@@ -96,7 +95,7 @@ Metadata:
           - OpenSearchDeploymentSize
       -
         Label:
-          default: Amazon Cognito / Amazon Simple Notification Service
+          default: Initial Media Lake user information
         Parameters:
           - InitialUserEmail
           - InitialUserFirstName
@@ -555,6 +554,7 @@ Resources:
             files:
               - "**/*"
             base-directory: '.'
+      TimeoutInMinutes: 120  # 2 hours
 
   DeployProject:
     Type: 'AWS::CodeBuild::Project'
