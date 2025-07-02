@@ -11,7 +11,7 @@ Parameters:
       - S3PresignedURL
   
   GitRepositoryUrl:
-    Description: URL of the public Git repository (if Git source type is selected)
+    Description: URL of the public Git repository (e.g., https://github.com/username/repository.git)
     Type: String
     Default: ''
   
@@ -118,7 +118,7 @@ Metadata:
       SourceType:
         default: Source Type
       GitRepositoryUrl:
-        default: Git Repository Url
+        default: Git Repository URL
       GitBranch:
         default: Git Branch
       S3PresignedURL:
@@ -127,6 +127,7 @@ Metadata:
 Conditions:
   IsGitSource: !Equals [!Ref SourceType, 'Git']
   IsS3PresignedURLSource: !Equals [!Ref SourceType, 'S3PresignedURL']
+  NeedsInitialSourcePackage: !Or [!Equals [!Ref SourceType, 'Git'], !Equals [!Ref SourceType, 'S3PresignedURL']]
 
 Resources:
   # Add the Service Linked Role Manager resources first
@@ -340,10 +341,10 @@ Resources:
               NoncurrentDays: 1
             ExpiredObjectDeleteMarker: true
 
-  # Initial source package for S3-based pipeline
+  # Initial source package for S3-based and Git-based pipelines
   InitialSourcePackage:
     Type: 'Custom::S3InitialFile'
-    Condition: IsS3PresignedURLSource
+    Condition: NeedsInitialSourcePackage
     Properties:
       ServiceToken: !GetAtt InitialSourceFunction.Arn
       BucketName: !Ref ArtifactBucket
@@ -355,7 +356,7 @@ Resources:
 
   InitialSourceFunction:
     Type: 'AWS::Lambda::Function'
-    Condition: IsS3PresignedURLSource
+    Condition: NeedsInitialSourcePackage
     Properties:
       Handler: index.handler
       Role: !GetAtt LambdaExecutionRole.Arn
@@ -405,7 +406,7 @@ Resources:
 
   LambdaExecutionRole:
     Type: 'AWS::IAM::Role'
-    Condition: IsS3PresignedURLSource
+    Condition: NeedsInitialSourcePackage
     Properties:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
@@ -427,9 +428,64 @@ Resources:
                 Resource: !Sub 'arn:aws:s3:::${ArtifactBucket}/*'
 
   # CodeBuild Projects
+  # Git Clone Project for public repositories
+  GitCloneProject:
+    Type: 'AWS::CodeBuild::Project'
+    Condition: IsGitSource
+    DependsOn: 
+      - ServiceLinkedRoleManager
+      - InitialSourcePackage
+    Properties:
+      Name: !Sub '${PipelineName}-GitClone'
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
+        EnvironmentVariables:
+          - Name: GIT_REPOSITORY_URL
+            Value: !Ref GitRepositoryUrl
+          - Name: GIT_BRANCH
+            Value: !Ref GitBranch
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: !Sub |
+          version: 0.2
+          phases:
+            install:
+              runtime-versions:
+                python: 3.12
+              commands:
+                - 'echo "Installing git"'
+                - 'yum update -y'
+                - 'yum install -y git'
+            build:
+              commands:
+                - 'echo "Cloning repository from $GIT_REPOSITORY_URL"'
+                - 'echo "Branch: $GIT_BRANCH"'
+                - 'git clone --depth 1 --branch $GIT_BRANCH $GIT_REPOSITORY_URL source/'
+                - 'echo "Listing cloned content structure"'
+                - 'find source -type d | sort'
+                - 'echo "Copying files to working directory"'
+                - 'cp -r source/* .'
+                - 'echo "Directory structure after copy"'
+                - 'find . -maxdepth 3 -type d | sort'
+            post_build:
+              commands:
+                - 'echo "Git clone completed"'
+          artifacts:
+            files:
+              - "**/*"
+              - "!source/**/*"
+
   DownloadSourceProject:
     Type: 'AWS::CodeBuild::Project'
     Condition: IsS3PresignedURLSource
+    DependsOn:
+      - ServiceLinkedRoleManager
+      - InitialSourcePackage
     Properties:
       Name: !Sub '${PipelineName}-DownloadSource'
       ServiceRole: !GetAtt CodeBuildServiceRole.Arn
@@ -449,19 +505,19 @@ Resources:
                 python: 3.12
             build:
               commands:
-                - echo "Downloading source code from presigned URL"
-                - curl -L "${S3PresignedURL}" -o source-code.zip
-                - mkdir -p source
-                - unzip -o source-code.zip -d source/
-                - echo "Listing downloaded content structure"
-                - find source -type d | sort
-                - echo "Copying files to working directory"
-                - cp -r source/* .
-                - echo "Directory structure after copy"
-                - find . -maxdepth 3 -type d | sort
+                - 'echo "Downloading source code from presigned URL"'
+                - 'curl -L "${S3PresignedURL}" -o source-code.zip'
+                - 'mkdir -p source'
+                - 'unzip -o source-code.zip -d source/'
+                - 'echo "Listing downloaded content structure"'
+                - 'find source -type d | sort'
+                - 'echo "Copying files to working directory"'
+                - 'cp -r source/* .'
+                - 'echo "Directory structure after copy"'
+                - 'find . -maxdepth 3 -type d | sort'
             post_build:
               commands:
-                - echo "Download completed"
+                - 'echo "Download completed"'
           artifacts:
             files:
               - '**/*'
@@ -599,11 +655,7 @@ Resources:
                 # Bootstrap current region
                 - cdk bootstrap
                 # Also bootstrap us-east-1 if we're not already in that region
-                - |
-                  if [ "${AWS::Region}" != "us-east-1" ]; then
-                    echo "Also bootstrapping us-east-1 for CloudFront WAF deployment"
-                    cdk bootstrap aws://${AWS::AccountId}/us-east-1
-                  fi
+                - 'if [ "${AWS::Region}" != "us-east-1" ]; then echo "Also bootstrapping us-east-1 for CloudFront WAF deployment"; cdk bootstrap aws://${AWS::AccountId}/us-east-1; fi'
                 # Deploy all stacks
                 - cdk deploy --all --require-approval never || (echo "CDK deploy failed" && exit 1)
             post_build:
@@ -613,11 +665,17 @@ Resources:
             files:
               - "**/*"
             base-directory: '.'
+      TimeoutInMinutes: 120  # 2 hours
 
   # Pipeline with Git Source
   GitSourcePipeline:
     Type: 'AWS::CodePipeline::Pipeline'
     Condition: IsGitSource
+    DependsOn: 
+      - InitialSourcePackage
+      - GitCloneProject
+      - BuildProject
+      - DeployProject
     Properties:
       Name: !Ref PipelineName
       RoleArn: !GetAtt CodePipelineServiceRole.Arn
@@ -631,13 +689,27 @@ Resources:
               ActionTypeId:
                 Category: Source
                 Owner: AWS
-                Provider: CodeStarSourceConnection
+                Provider: S3
                 Version: '1'
               Configuration:
-                ConnectionArn: !ImportValue GitHubConnection  # Note: You need to create a connection to GitHub in the CodeStar connections and export its ARN
-                FullRepositoryId: !Ref GitRepositoryUrl
-                BranchName: !Ref GitBranch
-                OutputArtifactFormat: 'CODE_ZIP'
+                S3Bucket: !Ref ArtifactBucket
+                S3ObjectKey: 'source-package.zip'
+                PollForSourceChanges: true
+              OutputArtifacts:
+                - Name: PlaceholderSource
+        
+        - Name: Clone
+          Actions:
+            - Name: CloneFromGitHub
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref GitCloneProject
+              InputArtifacts:
+                - Name: PlaceholderSource
               OutputArtifacts:
                 - Name: SourceCode
         
@@ -673,6 +745,11 @@ Resources:
   S3SourcePipeline:
     Type: 'AWS::CodePipeline::Pipeline'
     Condition: IsS3PresignedURLSource
+    DependsOn:
+      - InitialSourcePackage
+      - DownloadSourceProject
+      - BuildProject
+      - DeployProject
     Properties:
       Name: !Ref PipelineName
       RoleArn: !GetAtt CodePipelineServiceRole.Arn
