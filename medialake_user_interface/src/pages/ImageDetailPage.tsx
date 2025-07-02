@@ -1,30 +1,30 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
-  Box,
-  CircularProgress,
-  Typography,
-  List,
-  ListItem,
-  Paper,
-  Button,
-  Tabs,
-  Tab,
-  Grid,
-  Card,
-  CardContent,
-  Chip,
-  useTheme,
-  alpha,
-  TextField,
-  InputAdornment,
-  FormControl,
-  Select,
-  MenuItem,
-  IconButton,
-  CardHeader,
-  ListItemText,
-  LinearProgress
+    Box,
+    CircularProgress,
+    Typography,
+    List,
+    ListItem,
+    Paper,
+    Button,
+    Tabs,
+    Tab,
+    Grid,
+    Card,
+    CardContent,
+    Chip,
+    useTheme,
+    alpha,
+    TextField,
+    InputAdornment,
+    FormControl,
+    Select,
+    MenuItem,
+    IconButton,
+    CardHeader,
+    ListItemText,
+    LinearProgress
 } from '@mui/material';
 import { useAsset, useRelatedVersions, RelatedVersionsResponse } from '../api/hooks/useAssets';
 import { RightSidebarProvider, useRightSidebar } from '../components/common/RightSidebar';
@@ -130,15 +130,15 @@ const getMetadataCategoryColor = (category: string, theme: any) => {
         'technical': theme.palette.primary.light,
         'descriptive': theme.palette.secondary.light
     };
-    
+
     // Try to find an exact match
     if (categoryColors[category]) return categoryColors[category];
-    
+
     // Try to find a partial match
-    const foundKey = Object.keys(categoryColors).find(key => 
+    const foundKey = Object.keys(categoryColors).find(key =>
         category.toLowerCase().includes(key.toLowerCase())
     );
-    
+
     return foundKey ? categoryColors[foundKey] : categoryColors.general;
 };
 
@@ -148,38 +148,38 @@ const TagInput: React.FC<{
     onChange: (newTags: string[]) => void;
 }> = ({ tags, onChange }) => {
     const [inputValue, setInputValue] = useState('');
-    
+
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setInputValue(e.target.value);
     };
-    
+
     const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if ((e.key === ' ' || e.key === 'Enter') && inputValue.trim()) {
             e.preventDefault();
             const newTag = inputValue.trim();
-            
+
             // Only add if it's not a duplicate
             if (!tags.includes(newTag)) {
                 onChange([...tags, newTag]);
             }
-            
+
             setInputValue('');
         } else if (e.key === 'Backspace' && !inputValue && tags.length > 0) {
             // Remove the last tag when backspace is pressed in an empty input
             onChange(tags.slice(0, -1));
         }
     };
-    
+
     const handleDeleteTag = (tagToDelete: string) => {
         onChange(tags.filter(tag => tag !== tagToDelete));
     };
-    
+
     return (
-        <Box 
-            sx={{ 
-                display: 'flex', 
-                flexWrap: 'wrap', 
-                gap: 0.5, 
+        <Box
+            sx={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 0.5,
                 alignItems: 'center',
                 p: 1,
                 border: '1px solid',
@@ -221,16 +221,16 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
     const asset = assetData?.data?.asset;
     const fileInfoColor = '#4299E1';      // Blue
     const techDetailsColor = '#68D391';   // Green/teal
-    
+
     // Extract metadata from API response
     const metadata = asset?.Metadata?.EmbeddedMetadata || {};
     const generalMetadata = metadata?.General || {};
     const imageMetadata = metadata?.Image?.[0] || {};
-    
+
     // Create a helper function to render a field only if it exists in the API response
     const renderField = (label: string, value: any, formatter?: (val: any) => string) => {
         if (value === undefined || value === null) return null;
-        
+
         return (
             <Box sx={{ display: 'flex', mb: 1 }}>
                 <Typography sx={{ width: '120px', color: 'text.secondary', fontSize: '0.875rem' }}>{label}:</Typography>
@@ -240,7 +240,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
             </Box>
         );
     };
-    
+
     // File Information fields
     const fileSize = asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.FileInfo?.Size;
     const fileType = asset?.DigitalSourceAsset?.Type;
@@ -249,7 +249,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
     const objectName = asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.Name;
     const objectFullPath = asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.FullPath;
     const s3Uri = s3Bucket && objectFullPath ? `s3://${s3Bucket}/${objectFullPath}` : undefined;
-    
+
     // Technical details
     const width = imageMetadata?.Width || generalMetadata?.ImageWidth;
     const height = imageMetadata?.Height || generalMetadata?.ImageHeight;
@@ -260,7 +260,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
     const createdDate = asset?.DigitalSourceAsset?.CreateDate
         ? new Date(asset.DigitalSourceAsset.CreateDate).toLocaleDateString()
         : undefined;
-    
+
     return (
         <Box>
             {/* File Information Section */}
@@ -281,7 +281,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
                     bgcolor: fileInfoColor,
                     mb: 2
                 }} />
-                
+
                 {renderField('Type', fileType)}
                 {renderField('Size', fileSize, formatFileSize)}
                 {renderField('Format', fileFormat)}
@@ -289,7 +289,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
                 {renderField('Object Name', objectName)}
                 {renderField('S3 URI', s3Uri)}
             </Box>
-            
+
             {/* Technical Details Section */}
             <Box sx={{ mb: 3 }}>
                 <Typography
@@ -308,7 +308,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
                     bgcolor: techDetailsColor,
                     mb: 2
                 }} />
-                
+
                 {renderField('Dimensions', dimensions)}
                 {renderField('Color Depth', colorDepth, (val) => `${val} bit`)}
                 {renderField('Color Space', colorSpace)}
@@ -322,7 +322,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
 // Add new component for grid layout metadata display
 const GridMetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, showAll, category }) => {
     const theme = useTheme();
-    
+
     const sortEntries = (entries: [string, any][]): [string, any][] => {
         if (category && outputFilters[category]) {
             const preferredOrder = outputFilters[category];
@@ -337,12 +337,12 @@ const GridMetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, 
     // Function to flatten nested objects like Tags/Encoder
     const flattenNestedMetadata = (entries: [string, any][]): [string, any][] => {
         const result: [string, any][] = [];
-        
+
         entries.forEach(([key, value]) => {
             if (typeof value === 'object' && value !== null && !Array.isArray(value) && Object.keys(value).length > 0) {
                 // Mark this as a parent with _PARENT_ prefix (for internal use)
                 result.push([`_PARENT_${key}`, '']);
-                
+
                 // Then add the child properties with a visible indent prefix
                 Object.entries(value).forEach(([subKey, subValue]) => {
                     result.push([`      ↳ ${subKey}`, subValue]);
@@ -351,7 +351,7 @@ const GridMetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, 
                 result.push([key, value]);
             }
         });
-        
+
         return result;
     };
 
@@ -389,35 +389,35 @@ const GridMetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, 
         // Flatten nested metadata
         const flattenedEntries = flattenNestedMetadata(sortedEntries);
         const displayEntries = showAll ? flattenedEntries : flattenedEntries.slice(0, 5);
-        
+
         // Create rows efficiently while preserving parent-child relationships
         const rows: [string, any][][] = [];
-        
+
         let currentIndex = 0;
         while (currentIndex < displayEntries.length) {
             const row: [string, any][] = [];
-            
+
             // Process the left column
             if (currentIndex < displayEntries.length) {
                 const leftEntry = displayEntries[currentIndex];
                 const [leftKey] = leftEntry;
-                
+
                 // Parent entries must always be on the left side
                 if (isParentEntry(leftKey)) {
                     row.push([cleanDisplayKey(leftKey), leftEntry[1]]);
                     currentIndex++;
-                    
+
                     // In this case, we don't add a right column entry
                     // because we want to ensure the parent is alone on its row
                 } else {
                     row.push(leftEntry);
                     currentIndex++;
-                    
+
                     // Process the right column if available and not a parent
                     if (currentIndex < displayEntries.length) {
                         const rightEntry = displayEntries[currentIndex];
                         const [rightKey] = rightEntry;
-                        
+
                         if (!isParentEntry(rightKey)) {
                             row.push(rightEntry);
                             currentIndex++;
@@ -425,7 +425,7 @@ const GridMetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, 
                     }
                 }
             }
-            
+
             if (row.length > 0) {
                 rows.push(row);
             }
@@ -440,24 +440,24 @@ const GridMetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, 
                 p: 2
             }}>
                 {rows.map((row, rowIndex) => (
-                    <Box 
-                        key={rowIndex} 
+                    <Box
+                        key={rowIndex}
                         sx={{
                             display: 'grid',
                             gridTemplateColumns: 'minmax(180px, 25%) minmax(180px, 25%) minmax(180px, 25%) minmax(180px, 25%)',
                             py: 1,
-                            borderBottom: rowIndex < rows.length - 1 ? 
+                            borderBottom: rowIndex < rows.length - 1 ?
                                 `1px solid ${alpha(theme.palette.divider, 0.1)}` : 'none',
                         }}
                     >
                         {row.map(([key, value], colIndex) => (
                             <React.Fragment key={`${rowIndex}-${colIndex}`}>
-                                <Typography 
-                                    variant="body2" 
-                                    sx={{ 
+                                <Typography
+                                    variant="body2"
+                                    sx={{
                                         fontWeight: 'bold',
-                                        color: key.trim().startsWith('↳') ? 
-                                            theme.palette.primary.main : 
+                                        color: key.trim().startsWith('↳') ?
+                                            theme.palette.primary.main :
                                             theme.palette.text.secondary,
                                         textAlign: 'left',
                                         pr: 1
@@ -474,9 +474,9 @@ const GridMetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, 
                                             category={category}
                                         />
                                     ) : (
-                                        <Typography 
-                                            variant="body2" 
-                                            sx={{ 
+                                        <Typography
+                                            variant="body2"
+                                            sx={{
                                                 wordBreak: 'break-word',
                                                 whiteSpace: 'nowrap',
                                                 overflow: 'hidden',
@@ -498,27 +498,27 @@ const GridMetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, 
     }
 };
 
-const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadataAccordions }) => {
+const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[], availableCategories: string[]; }> = ({ metadataAccordions, availableCategories }) => {
     const theme = useTheme();
-    
+
     // Create array of all item IDs to pre-expand them
     const [expandedItems] = useState<string[]>(() => {
         // Initialize with all items expanded
         const allItems: string[] = [];
-        
+
         metadataAccordions.forEach((parent, parentIndex) => {
             // Add parent item
             allItems.push(`parent-${parentIndex}`);
-            
+
             // Add all child items
             parent.subCategories.forEach((_, subIndex) => {
                 allItems.push(`${parentIndex}-${subIndex}`);
             });
         });
-        
+
         return allItems;
     });
-    
+
     // Function to determine which content component to use based on category
     const getContentComponent = (subCategory: any) => {
         // Use GridMetadataContent for all categories to ensure consistent formatting
@@ -530,7 +530,7 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
             />
         );
     };
-    
+
     return (
         <Box sx={{
             borderRadius: 1,
@@ -556,17 +556,19 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
                 <FormControl size="small" sx={{ minWidth: 120, px: 2 }}>
                     <Select
                         value="all"
-                        onChange={(e) => {/* Category filter logic */}}
+                        onChange={(e) => {/* Category filter logic */ }}
                         displayEmpty
                     >
                         <MenuItem value="all">All Categories</MenuItem>
-                        {Object.keys(categoryMapping).map(category => (
-                            <MenuItem key={category} value={category}>{categoryMapping[category]}</MenuItem>
+                        {availableCategories.map(catKey => (
+                            <MenuItem key={catKey} value={catKey}>
+                                {categoryMapping[catKey]}
+                            </MenuItem>
                         ))}
                     </Select>
                 </FormControl>
             </Box>
-            
+
             <SimpleTreeView
                 defaultExpandedItems={expandedItems}
                 sx={{
@@ -603,8 +605,8 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
                         label={
                             <Box sx={{ display: 'flex', alignItems: 'center' }}>
                                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                                    {parentAccordion.category === "EmbeddedMetadata" 
-                                        ? "Embedded Metadata" 
+                                    {parentAccordion.category === "EmbeddedMetadata"
+                                        ? "Embedded Metadata"
                                         : parentAccordion.category}
                                 </Typography>
                                 <Chip
@@ -661,14 +663,14 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
     );
 };
 
-const RelatedItemsTab: React.FC<{ 
+const RelatedItemsTab: React.FC<{
     assetId: string;
     relatedVersionsData: RelatedVersionsResponse | undefined;
     isLoading: boolean;
     onLoadMore: () => void;
 }> = ({ assetId, relatedVersionsData, isLoading, onLoadMore }) => {
     console.log('RelatedItemsTab - relatedVersionsData:', relatedVersionsData);
-    
+
     const items = useMemo(() => {
         if (!relatedVersionsData?.data?.results) {
             console.log('No results found in relatedVersionsData');
@@ -801,11 +803,11 @@ const ImageDetailContent: React.FC = () => {
     // Track scroll position to hide/show header
     useEffect(() => {
         let lastScrollTop = 0;
-        
+
         const handleScroll = () => {
             // Get scrollTop from the parent scrollable container instead
             const currentScrollTop = document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]')?.scrollTop || 0;
-            
+
             if (currentScrollTop <= 10) {
                 setShowHeader(true);
             } else if (currentScrollTop > lastScrollTop) {
@@ -813,16 +815,16 @@ const ImageDetailContent: React.FC = () => {
             } else if (currentScrollTop < lastScrollTop) {
                 setShowHeader(true);
             }
-            
+
             lastScrollTop = currentScrollTop;
         };
-        
+
         // Listen to scroll on the parent container
         const container = document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]');
         if (container) {
             container.addEventListener('scroll', handleScroll, { passive: true });
         }
-        
+
         return () => {
             if (container) {
                 container.removeEventListener('scroll', handleScroll);
@@ -907,6 +909,13 @@ const ImageDetailContent: React.FC = () => {
         if (!assetData?.data?.asset?.Metadata) return [];
         return transformMetadata(assetData.data.asset.Metadata);
     }, [assetData, transformMetadata]);
+
+    // All sub-categories that exist in this asset’s EmbeddedMetadata
+    const availableCategoryKeys = useMemo(() => {
+        const embedded = assetData?.data?.asset?.Metadata?.EmbeddedMetadata ?? {};
+        return Object.keys(embedded).filter(key => key in categoryMapping);
+    }, [assetData]);
+
 
     const versions = useMemo(() => {
         if (!assetData?.data?.asset) return [];
@@ -1011,11 +1020,14 @@ const ImageDetailContent: React.FC = () => {
             case 'summary':
                 return <SummaryTab assetData={assetData} />;
             case 'technical':
-                return <TechnicalMetadataTab metadataAccordions={metadataAccordions} />;
+                return <TechnicalMetadataTab
+                    metadataAccordions={metadataAccordions}
+                    availableCategories={availableCategoryKeys}
+                />;
             case 'related':
                 console.log('Rendering RelatedItemsTab');
                 return (
-                    <RelatedItemsTab 
+                    <RelatedItemsTab
                         assetId={assetData.data.asset.DigitalSourceAsset.ID}
                         relatedVersionsData={relatedVersionsData}
                         isLoading={isLoadingRelated}
@@ -1175,7 +1187,7 @@ const ImageDetailContent: React.FC = () => {
                 onAddComment={handleAddComment}
                 assetId={assetData?.data?.asset?.InventoryID}
             />
-            
+
             {selectedComment !== null && (
                 <CommentPopper
                     id={Boolean(commentAnchorEl) ? 'comment-popper' : undefined}
