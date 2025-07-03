@@ -46,32 +46,9 @@ import CodeOutlinedIcon from '@mui/icons-material/CodeOutlined';
 import LinkOutlinedIcon from '@mui/icons-material/LinkOutlined';
 import SubtitlesOutlinedIcon from '@mui/icons-material/SubtitlesOutlined';
 import MarkdownRenderer from '../components/common/MarkdownRenderer';
+import SharedTechnicalMetadataTab from '../components/shared/TechnicalMetadataTab';
+import SharedMetadataContent, { outputFilters } from '../components/shared/SharedMetadataContent';
 
-const outputFilters = {
-    'ID3v2': ['Title', 'Artist', 'Album', 'Year', 'Genre', 'Track'],
-    'MP3 Info': ['Bitrate', 'SampleRate', 'Channels', 'Duration'],
-    'FLAC': ['StreamInfo', 'VorbisComment', 'Channels', 'BitsPerSample'],
-    'WAV': ['Format', 'AudioFormat', 'NumChannels', 'SampleRate', 'ByteRate'],
-    'Ogg Vorbis': ['Vendor', 'Comments', 'BitrateNominal', 'Version'],
-    'Audio Metadata': ['Album', 'Artist', 'Composer', 'Genre', 'Year', 'TrackNumber'],
-    'Technical': ['Format', 'Duration', 'BitRate', 'SampleRate', 'Channels'],
-    'MusicBrainz': ['ReleaseID', 'ArtistID', 'ReleaseGroupID'],
-    'Encoding': ['EncodedBy', 'EncoderSettings', 'EncodingTime'],
-    'Rights': ['Copyright', 'License', 'Owner'],
-    'IPTC': ['Headline', 'Byline', 'Credit', 'Caption', 'Source', 'Country'],
-    'ICC': ['ProfileVersion', 'ProfileClass', 'ColorSpaceData', 'ProfileConnectionSpace', 'ProfileFileSignature', 'DeviceManufacturer', 'RenderingIntent', 'ProfileCreator', 'ProfileDescription'],
-    'XMP': ['Creator', 'Title', 'Description', 'Rights'],
-    'Maker Note': [],
-    'User Comment': [],
-    'IPTC Core': ['CreatorContactInfo', 'Scene'],
-    'IPTC Extension': ['PersonInImage', 'LocationCreated'],
-    'PLUS': ['LicenseID', 'ImageCreator', 'CopyrightOwner'],
-    'Dublin Core': ['Format', 'Type', 'Identifier'],
-    'XMP Media Management': ['DerivedFrom', 'DocumentID', 'InstanceID'],
-    'Auxiliary': ['SerialNumber'],
-    'XMP Dynamic Media': ['AudioSampleRate', 'AudioChannelType', 'Duration', 'StartTimeScale'],
-    'Interoperability': ['InteroperabilityIndex', 'InteroperabilityVersion']
-};
 
 interface MetadataContentProps {
     data: any;
@@ -132,195 +109,6 @@ const MetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, show
     }
 };
 
-// New component for audio metadata content with a grid layout like the screenshot
-const AudioMetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, showAll, category }) => {
-    const theme = useTheme();
-
-    const sortEntries = (entries: [string, any][]): [string, any][] => {
-        if (category && outputFilters[category]) {
-            const preferredOrder = outputFilters[category];
-            return [
-                ...preferredOrder.map(key => entries.find(([k]) => k === key)).filter(Boolean),
-                ...entries.filter(([key]) => !preferredOrder.includes(key))
-            ];
-        }
-        return entries;
-    };
-
-    // Function to flatten nested objects like Tags/Encoder
-    const flattenNestedMetadata = (entries: [string, any][]): [string, any][] => {
-        const result: [string, any][] = [];
-
-        entries.forEach(([key, value]) => {
-            if (typeof value === 'object' && value !== null && !Array.isArray(value) && Object.keys(value).length > 0) {
-                // Special case for Tags with Encoder
-                if (key === 'Tags' && 'Encoder' in value) {
-                    // Mark this as a parent with _PARENT_ prefix (for internal use)
-                    result.push([`_PARENT_${key}`, '']);
-
-                    // Then add the Encoder with its value - using a more visible indent prefix
-                    Object.entries(value).forEach(([subKey, subValue]) => {
-                        result.push([`      ↳ ${subKey}`, subValue]);
-                    });
-                } else {
-                    // Mark this as a parent with _PARENT_ prefix (for internal use)
-                    result.push([`_PARENT_${key}`, '']);
-
-                    // Then add the subkeys with more pronounced indentation
-                    Object.entries(value).forEach(([subKey, subValue]) => {
-                        result.push([`      ↳ ${subKey}`, subValue]);
-                    });
-                }
-            } else {
-                result.push([key, value]);
-            }
-        });
-
-        return result;
-    };
-
-    // Function to identify parent-child relationships in entries
-    const isParentEntry = (key: string): boolean => {
-        return key.startsWith('_PARENT_');
-    };
-
-    const isChildEntry = (key: string): boolean => {
-        return key.includes('↳');
-    };
-
-    // Function to clean display keys (remove internal markings)
-    const cleanDisplayKey = (key: string): string => {
-        if (key.startsWith('_PARENT_')) {
-            return key.substring(8); // Remove the _PARENT_ prefix
-        }
-        return key;
-    };
-
-    if (Array.isArray(data)) {
-        const displayData = showAll ? data : data.slice(0, 5);
-        return (
-            <List dense disablePadding>
-                {displayData.map((item, index) => (
-                    <ListItem key={index} sx={{ pl: depth * 2 }}>
-                        <AudioMetadataContent data={item} depth={depth + 1} showAll={showAll} category={category} />
-                    </ListItem>
-                ))}
-            </List>
-        );
-    } else if (typeof data === 'object' && data !== null) {
-        let entries = Object.entries(data);
-        const sortedEntries = sortEntries(entries);
-        // Flatten nested metadata like Tags/Encoder
-        const flattenedEntries = flattenNestedMetadata(sortedEntries);
-        const displayEntries = showAll ? flattenedEntries : flattenedEntries.slice(0, 5);
-
-        // Create rows efficiently while preserving parent-child relationships
-        const rows: [string, any][][] = [];
-
-        let currentIndex = 0;
-        while (currentIndex < displayEntries.length) {
-            const row: [string, any][] = [];
-
-            // Process the left column
-            if (currentIndex < displayEntries.length) {
-                const leftEntry = displayEntries[currentIndex];
-                const [leftKey] = leftEntry;
-
-                // Parent entries must always be on the left side
-                if (isParentEntry(leftKey)) {
-                    row.push([cleanDisplayKey(leftKey), leftEntry[1]]);
-                    currentIndex++;
-
-                    // In this case, we don't add a right column entry
-                    // because we want to ensure the child appears in the next row
-                } else {
-                    row.push(leftEntry);
-                    currentIndex++;
-
-                    // Process the right column if available and not a parent
-                    if (currentIndex < displayEntries.length) {
-                        const rightEntry = displayEntries[currentIndex];
-                        const [rightKey] = rightEntry;
-
-                        if (!isParentEntry(rightKey)) {
-                            row.push(rightEntry);
-                            currentIndex++;
-                        }
-                    }
-                }
-            }
-
-            if (row.length > 0) {
-                rows.push(row);
-            }
-        }
-
-        return (
-            <Box sx={{
-                width: '100%',
-                mb: 2,
-                backgroundColor: alpha(theme.palette.background.paper, 0.3),
-                borderRadius: 1,
-                p: 2
-            }}>
-                {rows.map((row, rowIndex) => (
-                    <Box
-                        key={rowIndex}
-                        sx={{
-                            display: 'grid',
-                            gridTemplateColumns: 'minmax(180px, 25%) minmax(180px, 25%) minmax(180px, 25%) minmax(180px, 25%)',
-                            py: 1,
-                            borderBottom: rowIndex < rows.length - 1 ?
-                                `1px solid ${alpha(theme.palette.divider, 0.1)}` : 'none',
-                        }}
-                    >
-                        {row.map(([key, value], colIndex) => (
-                            <React.Fragment key={`${rowIndex}-${colIndex}`}>
-                                <Typography
-                                    variant="body2"
-                                    sx={{
-                                        fontWeight: 'bold',
-                                        color: key.trim().startsWith('↳') ?
-                                            theme.palette.primary.main :
-                                            theme.palette.text.secondary,
-                                        textAlign: 'left',
-                                        pr: 1
-                                    }}
-                                >
-                                    {formatCamelCase(key)}:
-                                </Typography>
-                                <Box sx={{ mb: colIndex < row.length - 1 ? 0 : 1 }}>
-                                    {typeof value === 'object' && value !== null ? (
-                                        <AudioMetadataContent
-                                            data={value}
-                                            depth={depth + 1}
-                                            showAll={showAll}
-                                            category={category}
-                                        />
-                                    ) : (
-                                        <Typography
-                                            variant="body2"
-                                            sx={{
-                                                wordBreak: 'break-word',
-                                                whiteSpace: 'nowrap',
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis'
-                                            }}
-                                        >
-                                            {String(value)}
-                                        </Typography>
-                                    )}
-                                </Box>
-                            </React.Fragment>
-                        ))}
-                    </Box>
-                ))}
-            </Box>
-        );
-    } else {
-        return <Typography variant="body2">{String(data)}</Typography>;
-    }
-};
 
 // Tab content components
 const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetData: any }) => {
@@ -562,12 +350,13 @@ const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadat
 
     // Function to determine which content component to use based on category
     const getContentComponent = (subCategory: any) => {
-        // Use AudioMetadataContent for all categories to ensure consistent formatting
+        // Use SharedMetadataContent for all categories to ensure consistent formatting
         return (
-            <AudioMetadataContent
+            <SharedMetadataContent
                 data={subCategory.data}
                 showAll={true}
                 category={subCategory.category}
+                mediaType="audio"
             />
         );
     };
@@ -1088,7 +877,11 @@ const AudioDetailContent: React.FC = () => {
                             tabIndex={0}
                         >
                             {activeTab === 'summary' && <SummaryTab metadataFields={metadataFields} assetData={assetData} />}
-                            {activeTab === 'technical' && <TechnicalMetadataTab metadataAccordions={metadataAccordions} />}
+                            {activeTab === 'technical' && <SharedTechnicalMetadataTab
+                                metadataAccordions={metadataAccordions}
+                                availableCategories={Object.keys(assetData?.data?.asset?.Metadata?.EmbeddedMetadata || {})}
+                                mediaType="audio"
+                            />}
                             {activeTab === 'transcription' && (
                                 <TranscriptionTab
                                     assetId={id || ''}
