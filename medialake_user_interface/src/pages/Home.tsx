@@ -35,9 +35,6 @@ const Home: React.FC = () => {
                     easing: theme.transitions.easing.sharp,
                     duration: theme.transitions.duration.leavingScreen,
                 }),
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
             }}
         >
             <Container maxWidth="lg" sx={{ textAlign: 'center', px: { xs: 3, sm: 4 } }}>
