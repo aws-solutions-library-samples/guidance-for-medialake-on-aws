@@ -39,6 +39,9 @@ export const usePipelineExecutions = (
                 if (filters?.sortOrder) {
                     params.sortOrder = filters.sortOrder;
                 }
+                if (filters?.search) {
+                    params.search = filters.search;
+                }
 
                 const searchParams = new URLSearchParams(params);
                 const response = await apiClient.get<PipelineExecutionsResponse>(

@@ -41,6 +41,7 @@ export interface PipelineExecutionFilters {
     endDate?: string;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
+    search?: string;
 }
 
 export interface PipelineExecutionsSearchMetadata {
