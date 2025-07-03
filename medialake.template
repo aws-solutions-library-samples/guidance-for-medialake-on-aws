@@ -50,7 +50,7 @@ Parameters:
   OpenSearchDeploymentSize:
     Description: OpenSearch deployment size
     Type: String
-    Default: large
+    Default: small
     AllowedValues:
       - small
       - medium
@@ -262,7 +262,7 @@ Resources:
               Service: codebuild.amazonaws.com
             Action: 'sts:AssumeRole'
       ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/AdministratorAccess'  # Note: In production, use a more restricted policy based on your CDK stack requirements
+        - 'arn:aws:iam::aws:policy/AdministratorAccess'
 
   CodePipelineServiceRole:
     Type: 'AWS::IAM::Role'
@@ -530,8 +530,8 @@ Resources:
                 - npm install -g aws-cdk
                 - npm install -g esbuild
                 - pip install -U pip
-                - export CDK_DIR=$(if [ -d "./medialake-2-12-25/cdk" ]; then echo "./medialake-2-12-25/cdk"; elif [ -d "./cdk" ]; then echo "./cdk"; else find . -type f -name "cdk.json" -o -name "app.py" | grep -v "node_modules" | head -1 | xargs dirname; fi)
-                - export FRONTEND_DIR=$(if [ -d "./medialake-2-12-25/medialake_user_interface" ]; then echo "./medialake-2-12-25/medialake_user_interface"; elif [ -d "./medialake_user_interface" ]; then echo "./medialake_user_interface"; elif [ -d "./medialake-2-12-25/frontend" ]; then echo "./medialake-2-12-25/frontend"; elif [ -d "./frontend" ]; then echo "./frontend"; else find . -name "package.json" -not -path "*/node_modules/*" | head -1 | xargs dirname; fi)
+                - export CDK_DIR=$(if [ -d "./cdk" ]; then echo "./cdk"; else find . -type f -name "cdk.json" -o -name "app.py" | grep -v "node_modules" | head -1 | xargs dirname; fi)
+                - export FRONTEND_DIR=$(if [ -d "./medialake_user_interface" ]; then echo "./medialake_user_interface"; elif [ -d "./frontend" ]; then echo "./frontend"; else find . -name "package.json" -not -path "*/node_modules/*" | head -1 | xargs dirname; fi)
                 - echo "CDK directory $CDK_DIR"
                 - echo "Frontend directory $FRONTEND_DIR"
                 - if [ -z "$CDK_DIR" ]; then echo "Could not find CDK directory"; exit 1; fi
@@ -583,7 +583,7 @@ Resources:
             files:
               - "**/*"
             base-directory: '.'
-      TimeoutInMinutes: 120  # 2 hours
+      TimeoutInMinutes: 120
 
   DeployProject:
     Type: 'AWS::CodeBuild::Project'
@@ -616,7 +616,7 @@ Resources:
                 - npm install -g aws-cdk
                 - pip install -U pip
                 - echo "Locating CDK directory"
-                - export CDK_DIR=$(if [ -d "./medialake-2-12-25/cdk" ]; then echo "./medialake-2-12-25/cdk"; elif [ -d "./cdk" ]; then echo "./cdk"; else find . -type f -name "cdk.json" -o -name "app.py" | grep -v "node_modules" | head -1 | xargs dirname; fi)
+                - export CDK_DIR=$(if [ -d "./cdk" ]; then echo "./cdk"; else find . -type f -name "cdk.json" -o -name "app.py" | grep -v "node_modules" | head -1 | xargs dirname; fi)
                 - echo "CDK directory $CDK_DIR"
                 - if [ -z "$CDK_DIR" ]; then echo "Could not find CDK directory"; exit 1; fi
                 - cd $CDK_DIR
@@ -638,7 +638,7 @@ Resources:
             files:
               - "**/*"
             base-directory: '.'
-      TimeoutInMinutes: 120  # 2 hours
+      TimeoutInMinutes: 120
 
   # Pipeline with Git Source
   GitSourcePipeline:
