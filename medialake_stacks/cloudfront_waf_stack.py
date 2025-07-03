@@ -7,7 +7,8 @@ class CloudFrontWafStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs):
 
         super().__init__(scope, construct_id, **kwargs)
-
+        self.template_options.description = "Guidance for MediaLake on AWS (SO9598)"
+        
         self.web_acl = wafv2.CfnWebACL(
             self,
             "CloudFrontWAF",
