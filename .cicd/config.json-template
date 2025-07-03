@@ -5,7 +5,7 @@
     "resource_prefix": "medialake",
     "global_prefix": "medialake",
     "resource_application_tag": "medialake",
-    "api_path": "prod",
+    "api_path": "v1",
     "primary_region": "<aws_region>",
     "initial_user": {
         "email": "<initial_user_email>",
