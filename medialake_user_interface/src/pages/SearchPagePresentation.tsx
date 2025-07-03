@@ -430,8 +430,6 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
                     expandedSections={expandedSections}
                     onFilterChange={onFilterChange}
                     onSectionToggle={onSectionToggle}
-                    groupByType={viewPreferences.groupByType}
-                    onGroupByTypeChange={viewPreferences.handleGroupByTypeChange}
                   />
                 </>
               }

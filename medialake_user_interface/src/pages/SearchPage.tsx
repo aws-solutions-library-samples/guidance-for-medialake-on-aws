@@ -641,8 +641,6 @@ const SearchPage: React.FC = () => {
                                         expandedSections={expandedSections}
                                         onFilterChange={handleFilterChange}
                                         onSectionToggle={handleSectionToggle}
-                                        groupByType={viewPreferences.groupByType}
-                                        onGroupByTypeChange={viewPreferences.handleGroupByTypeChange}
                                     />
                                 </>
                             }
