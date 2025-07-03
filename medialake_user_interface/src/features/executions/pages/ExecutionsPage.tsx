@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Box, Button, useTheme, alpha, Chip, Popover, IconButton } from '@mui/material';
 import { formatLocalDateTime } from '@/shared/utils/dateUtils';
+import { useDebounce } from '@/hooks/useDebounce';
 import {
     Visibility as VisibilityIcon,
     RestartAlt as RestartIcon,
@@ -52,15 +53,20 @@ const ExecutionsPage: React.FC = () => {
     // Retry mutations
     const retryFromCurrentMutation = useRetryFromCurrent();
     const retryFromStartMutation = useRetryFromStart();
+
+    // Debounce the search input to avoid excessive API calls
+    const debouncedGlobalFilter = useDebounce(globalFilter, 500); // 500ms delay
  
     const filters = useMemo<PipelineExecutionFilters>(() => ({
         sortBy: sorting[0]?.id || 'start_time',
         sortOrder: sorting[0]?.desc ? 'desc' as const : 'asc' as const,
+        // If globalFilter is empty, clear search immediately; otherwise use debounced value
+        ...(globalFilter === '' ? {} : debouncedGlobalFilter && { search: debouncedGlobalFilter }),
         ...columnFilters.reduce((acc, filter) => ({
             ...acc,
             [filter.id]: filter.value
         }), {})
-    }), [sorting, columnFilters]);
+    }), [sorting, columnFilters, globalFilter, debouncedGlobalFilter]);
        
     // Data fetching and memoization
     const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } = usePipelineExecutions(PAGE_SIZE, filters);

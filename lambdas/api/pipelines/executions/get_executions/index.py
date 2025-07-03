@@ -114,12 +114,13 @@ def format_execution_response(execution: PipelineExecution) -> Dict[str, Any]:
 
 @tracer.capture_method
 def get_pipeline_executions(
-    page_size: int, next_token: str = None, status: str = None, sort_by: str = "start_time", sort_order: str = "desc"
+    page_size: int, next_token: str = None, status: str = None, sort_by: str = "start_time", sort_order: str = "desc", search: str = None
 ) -> Dict[str, Any]:
     """
     Retrieve paginated pipeline executions from DynamoDB using PynamoDB
     """
     try:
+        logger.info(f"Getting pipeline executions with search: {search}, status: {status}, sort_by: {sort_by}, sort_order: {sort_order}")
         # Configure scan parameters
         scan_kwargs = {
             "limit": page_size,
@@ -138,14 +139,40 @@ def get_pipeline_executions(
         # Execute scan
         executions = []
         count = 0
+        total_scanned = 0
         
         # Perform the scan
         scan_operation = PipelineExecution.scan(**scan_kwargs)
         
-        # Get items
+        # Get items and apply search filter if provided
         for item in scan_operation:
+            total_scanned += 1
+            
+            # Apply search filter if search term is provided
+            if search:
+                search_term = search.lower()
+                # Search across multiple fields
+                searchable_fields = [
+                    item.pipeline_name or "",
+                    item.status or "",
+                    item.execution_id or "",
+                    getattr(item, 'dsa_type', '') or "",
+                    getattr(item, 'object_key_name', '') or "",
+                    getattr(item, 'pipeline_trace_id', '') or "",
+                    getattr(item, 'stepname', '') or "",
+                    getattr(item, 'stepresult', '') or "",
+                    getattr(item, 'stepstatus', '') or ""
+                ]
+                
+                # Check if search term is found in any of the searchable fields
+                if not any(search_term in field.lower() for field in searchable_fields):
+                    continue
+            
             executions.append(item)
             count += 1
+        
+        if search:
+            logger.info(f"Search filtering: scanned {total_scanned} items, found {count} matches for term '{search}'")
         
         # Sort based on the provided sort parameters
         reverse_order = sort_order.lower() == "desc"
@@ -241,11 +268,14 @@ def handle_get_executions() -> Dict[str, Any]:
         # Get status filter if provided
         status = query_string.get("status")
         
+        # Get search parameter if provided
+        search = query_string.get("search")
+        
         # Get sorting parameters
         sort_by = query_string.get("sortBy", "start_time")
         sort_order = query_string.get("sortOrder", "desc")
 
-        return get_pipeline_executions(page_size, next_token, status, sort_by, sort_order)
+        return get_pipeline_executions(page_size, next_token, status, sort_by, sort_order, search)
     except PipelineExecutionError as e:
         logger.exception("Error processing pipeline executions request")
         return {
