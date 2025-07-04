@@ -16,7 +16,7 @@ import { TreeItem } from '@mui/x-tree-view/TreeItem';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import SearchIcon from '@mui/icons-material/Search';
-import SharedMetadataContent from './SharedMetadataContent';
+import MetadataContent from './MetadataContent';
 
 // Category mapping for display names
 const categoryMapping = {
@@ -136,7 +136,7 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
     /* ---------------------------------------------------------------------- */
 
     const getContentComponent = (subCategory: any) => (
-        <SharedMetadataContent
+        <MetadataContent
             data={subCategory.data}
             showAll
             category={subCategory.category}
@@ -176,7 +176,7 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
                         <MenuItem value="all">All Categories</MenuItem>
                         {availableCategories.map(key => (
                             <MenuItem key={key} value={key}>
-                                {categoryMapping[key] || key}
+                                {categoryMapping[key] || key.charAt(0).toUpperCase() + key.slice(1)}
                             </MenuItem>
                         ))}
                     </Select>

@@ -46,8 +46,8 @@ import CodeOutlinedIcon from '@mui/icons-material/CodeOutlined';
 import LinkOutlinedIcon from '@mui/icons-material/LinkOutlined';
 import SubtitlesOutlinedIcon from '@mui/icons-material/SubtitlesOutlined';
 import MarkdownRenderer from '../components/common/MarkdownRenderer';
-import SharedTechnicalMetadataTab from '../components/shared/TechnicalMetadataTab';
-import SharedMetadataContent, { outputFilters } from '../components/shared/SharedMetadataContent';
+import TechnicalMetadataTab, { categoryMapping } from '../components/TechnicalMetadataTab';
+import MetadataContent, { outputFilters } from '../components/MetadataContent';
 
 
 interface MetadataContentProps {
@@ -57,57 +57,6 @@ interface MetadataContentProps {
     category?: string;
 }
 
-const MetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, showAll, category }) => {
-    const sortEntries = (entries: [string, any][]): [string, any][] => {
-        if (category && outputFilters[category]) {
-            const preferredOrder = outputFilters[category];
-            return [
-                ...preferredOrder.map(key => entries.find(([k]) => k === key)).filter(Boolean),
-                ...entries.filter(([key]) => !preferredOrder.includes(key))
-            ];
-        }
-        return entries;
-    };
-
-    if (Array.isArray(data)) {
-        const displayData = showAll ? data : data.slice(0, 5);
-        return (
-            <List dense disablePadding>
-                {displayData.map((item, index) => (
-                    <ListItem key={index} sx={{ pl: depth * 2 }}>
-                        <MetadataContent data={item} depth={depth + 1} showAll={showAll} category={category} />
-                    </ListItem>
-                ))}
-            </List>
-        );
-    } else if (typeof data === 'object' && data !== null) {
-        const entries = Object.entries(data);
-        const sortedEntries = sortEntries(entries);
-        const displayEntries = showAll ? sortedEntries : sortedEntries.slice(0, 5);
-
-        return (
-            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 2 }}>
-                {displayEntries.map(([key, value]) => (
-                    <Box key={key}>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                            {formatCamelCase(key)}:
-                        </Typography>
-                        <Box sx={{ pl: 2 }}>
-                            <MetadataContent
-                                data={value}
-                                depth={depth + 1}
-                                showAll={showAll}
-                                category={category}
-                            />
-                        </Box>
-                    </Box>
-                ))}
-            </Box>
-        );
-    } else {
-        return <TruncatedTextWithTooltip text={String(data)} />;
-    }
-};
 
 
 // Tab content components
@@ -327,139 +276,6 @@ const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetD
     );
 };
 
-const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadataAccordions }) => {
-    const theme = useTheme();
-
-    // Create array of all item IDs to pre-expand them
-    const [expandedItems] = useState<string[]>(() => {
-        // Initialize with all items expanded
-        const allItems: string[] = [];
-
-        metadataAccordions.forEach((parent, parentIndex) => {
-            // Add parent item
-            allItems.push(`parent-${parentIndex}`);
-
-            // Add all child items
-            parent.subCategories.forEach((_, subIndex) => {
-                allItems.push(`${parentIndex}-${subIndex}`);
-            });
-        });
-
-        return allItems;
-    });
-
-    // Function to determine which content component to use based on category
-    const getContentComponent = (subCategory: any) => {
-        // Use SharedMetadataContent for all categories to ensure consistent formatting
-        return (
-            <SharedMetadataContent
-                data={subCategory.data}
-                showAll={true}
-                category={subCategory.category}
-                mediaType="audio"
-            />
-        );
-    };
-
-    return (
-        <Box sx={{
-            borderRadius: 1,
-            width: '100%'
-        }}>
-            <SimpleTreeView
-                defaultExpandedItems={expandedItems}
-                sx={{
-                    flexGrow: 1,
-                    width: '100%',
-                    '& .MuiTreeItem-root': {
-                        padding: '4px 0',
-                    },
-                    '& .MuiTreeItem-content': {
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        '&:hover': {
-                            backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                        },
-                    },
-                    '& .MuiTreeItem-label': {
-                        fontWeight: 500,
-                    },
-                    '& .MuiTreeItem-group': {
-                        marginLeft: '24px',
-                        borderLeft: `1px dashed ${alpha(theme.palette.text.primary, 0.2)}`,
-                        paddingLeft: '8px',
-                    }
-                }}
-                slots={{
-                    collapseIcon: ExpandMoreIcon,
-                    expandIcon: ChevronRightIcon
-                }}
-            >
-                {metadataAccordions.map((parentAccordion, parentIndex) => (
-                    <TreeItem
-                        key={parentIndex}
-                        itemId={`parent-${parentIndex}`}
-                        label={
-                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                                    {/* Replace "EmbeddedMetadata" with "Embedded Metadata" */}
-                                    {parentAccordion.category === "EmbeddedMetadata"
-                                        ? "Embedded Metadata"
-                                        : parentAccordion.category}
-                                </Typography>
-                                <Chip
-                                    size="small"
-                                    label={parentAccordion.count}
-                                    sx={{
-                                        ml: 1,
-                                        height: '20px',
-                                        fontSize: '0.7rem',
-                                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                                        color: theme.palette.primary.main
-                                    }}
-                                />
-                            </Box>
-                        }
-                    >
-                        {parentAccordion.subCategories.map((subCategory, subIndex) => (
-                            <TreeItem
-                                key={`${parentIndex}-${subIndex}`}
-                                itemId={`${parentIndex}-${subIndex}`}
-                                label={
-                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                        <Typography variant="body2">
-                                            {subCategory.category}
-                                        </Typography>
-                                        <Chip
-                                            size="small"
-                                            label={subCategory.count}
-                                            sx={{
-                                                ml: 1,
-                                                height: '18px',
-                                                fontSize: '0.65rem',
-                                                backgroundColor: alpha(theme.palette.secondary.main, 0.1),
-                                                color: theme.palette.secondary.main
-                                            }}
-                                        />
-                                    </Box>
-                                }
-                            >
-                                <Box sx={{
-                                    p: 2,
-                                    backgroundColor: alpha(theme.palette.background.paper, 0.5),
-                                    borderRadius: 1,
-                                    mt: 1
-                                }}>
-                                    {getContentComponent(subCategory)}
-                                </Box>
-                            </TreeItem>
-                        ))}
-                    </TreeItem>
-                ))}
-            </SimpleTreeView>
-        </Box>
-    );
-};
 
 // Import the shared TranscriptionTab component
 import TranscriptionTab from '../components/shared/TranscriptionTab';
@@ -877,7 +693,7 @@ const AudioDetailContent: React.FC = () => {
                             tabIndex={0}
                         >
                             {activeTab === 'summary' && <SummaryTab metadataFields={metadataFields} assetData={assetData} />}
-                            {activeTab === 'technical' && <SharedTechnicalMetadataTab
+                            {activeTab === 'technical' && <TechnicalMetadataTab
                                 metadataAccordions={metadataAccordions}
                                 availableCategories={Object.keys(assetData?.data?.asset?.Metadata?.EmbeddedMetadata || {})}
                                 mediaType="audio"

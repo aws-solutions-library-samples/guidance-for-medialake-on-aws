@@ -7,11 +7,11 @@ import {
     useTheme,
     alpha
 } from '@mui/material';
-import { formatCamelCase } from '../../utils/stringUtils';
+import { formatCamelCase } from '../utils/stringUtils';
+import { TruncatedTextWithTooltip } from './common/TruncatedTextWithTooltip';
 
-// Consolidated output filters from all three pages
-const outputFilters = {
-    // Image-specific filters (from ImageDetailPage)
+// Output filters for metadata categories
+export const outputFilters = {
     'Image (IFD0)': ['ImageWidth', 'ImageHeight', 'Make', 'Model', 'Software'],
     'EXIF': ['ExposureTime', 'ShutterSpeedValue', 'FNumber', 'ApertureValue', 'ISO', 'LensModel'],
     'GPS': ['GPSLatitude', 'GPSLongitude', 'GPSAltitude'],
@@ -34,21 +34,10 @@ const outputFilters = {
     'Camera Raw Settings': ['Version', 'ProcessVersion', 'WhiteBalance', 'Temperature', 'Tint'],
     'EXIF Extended': ['Gamma', 'CameraOwnerName', 'BodySerialNumber'],
     'XMP Dynamic Media': ['AudioSampleRate', 'AudioChannelType', 'VideoFrameRate', 'StartTimeScale', 'Duration'],
-    'Interoperability': ['InteroperabilityIndex', 'InteroperabilityVersion'],
-    
-    // Audio-specific filters (from AudioDetailPage)
-    'ID3v2': ['Title', 'Artist', 'Album', 'Year', 'Genre', 'Track'],
-    'MP3 Info': ['Bitrate', 'SampleRate', 'Channels', 'Duration'],
-    'FLAC': ['StreamInfo', 'VorbisComment', 'Channels', 'BitsPerSample'],
-    'WAV': ['Format', 'AudioFormat', 'NumChannels', 'SampleRate', 'ByteRate'],
-    'Ogg Vorbis': ['Vendor', 'Comments', 'BitrateNominal', 'Version'],
-    'Audio Metadata': ['Album', 'Artist', 'Composer', 'Genre', 'Year', 'TrackNumber'],
-    'Technical': ['Format', 'Duration', 'BitRate', 'SampleRate', 'Channels'],
-    'MusicBrainz': ['ReleaseID', 'ArtistID', 'ReleaseGroupID'],
-    'Encoding': ['EncodedBy', 'EncoderSettings', 'EncodingTime']
+    'Interoperability': ['InteroperabilityIndex', 'InteroperabilityVersion']
 };
 
-interface SharedMetadataContentProps {
+interface MetadataContentProps {
     data: any;
     depth?: number;
     showAll: boolean;
@@ -56,7 +45,7 @@ interface SharedMetadataContentProps {
     mediaType?: 'image' | 'audio' | 'video';
 }
 
-const SharedMetadataContent: React.FC<SharedMetadataContentProps> = ({ 
+const MetadataContent: React.FC<MetadataContentProps> = ({ 
     data, 
     depth = 0, 
     showAll, 
@@ -64,7 +53,7 @@ const SharedMetadataContent: React.FC<SharedMetadataContentProps> = ({
     mediaType = 'image'
 }) => {
     const theme = useTheme();
-
+    
     const sortEntries = (entries: [string, any][]): [string, any][] => {
         if (category && outputFilters[category]) {
             const preferredOrder = outputFilters[category];
@@ -79,12 +68,12 @@ const SharedMetadataContent: React.FC<SharedMetadataContentProps> = ({
     // Function to flatten nested objects like Tags/Encoder
     const flattenNestedMetadata = (entries: [string, any][]): [string, any][] => {
         const result: [string, any][] = [];
-
+        
         entries.forEach(([key, value]) => {
             if (typeof value === 'object' && value !== null && !Array.isArray(value) && Object.keys(value).length > 0) {
                 // Mark this as a parent with _PARENT_ prefix (for internal use)
                 result.push([`_PARENT_${key}`, '']);
-
+                
                 // Then add the child properties with a visible indent prefix
                 Object.entries(value).forEach(([subKey, subValue]) => {
                     result.push([`      ↳ ${subKey}`, subValue]);
@@ -93,17 +82,13 @@ const SharedMetadataContent: React.FC<SharedMetadataContentProps> = ({
                 result.push([key, value]);
             }
         });
-
+        
         return result;
     };
 
     // Function to identify parent-child relationships in entries
     const isParentEntry = (key: string): boolean => {
         return key.startsWith('_PARENT_');
-    };
-
-    const isChildEntry = (key: string): boolean => {
-        return key.includes('↳');
     };
 
     // Function to clean display keys (remove internal markings)
@@ -120,7 +105,7 @@ const SharedMetadataContent: React.FC<SharedMetadataContentProps> = ({
             <List dense disablePadding>
                 {displayData.map((item, index) => (
                     <ListItem key={index} sx={{ pl: depth * 2 }}>
-                        <SharedMetadataContent 
+                        <MetadataContent 
                             data={item} 
                             depth={depth + 1} 
                             showAll={showAll} 
@@ -137,47 +122,14 @@ const SharedMetadataContent: React.FC<SharedMetadataContentProps> = ({
         // Flatten nested metadata
         const flattenedEntries = flattenNestedMetadata(sortedEntries);
         const displayEntries = showAll ? flattenedEntries : flattenedEntries.slice(0, 5);
-
-        // Create rows efficiently while preserving parent-child relationships
-        const rows: [string, any][][] = [];
-
-        let currentIndex = 0;
-        while (currentIndex < displayEntries.length) {
-            const row: [string, any][] = [];
-
-            // Process the left column
-            if (currentIndex < displayEntries.length) {
-                const leftEntry = displayEntries[currentIndex];
-                const [leftKey] = leftEntry;
-
-                // Parent entries must always be on the left side
-                if (isParentEntry(leftKey)) {
-                    row.push([cleanDisplayKey(leftKey), leftEntry[1]]);
-                    currentIndex++;
-
-                    // In this case, we don't add a right column entry
-                    // because we want to ensure the child appears in the next row
-                } else {
-                    row.push(leftEntry);
-                    currentIndex++;
-
-                    // Process the right column if available and not a parent
-                    if (currentIndex < displayEntries.length) {
-                        const rightEntry = displayEntries[currentIndex];
-                        const [rightKey] = rightEntry;
-
-                        if (!isParentEntry(rightKey)) {
-                            row.push(rightEntry);
-                            currentIndex++;
-                        }
-                    }
-                }
+        
+        // Create rows with simple key-value pairs (one per row)
+        const rows: [string, any][] = displayEntries.map(([key, value]) => {
+            if (isParentEntry(key)) {
+                return [cleanDisplayKey(key), value];
             }
-
-            if (row.length > 0) {
-                rows.push(row);
-            }
-        }
+            return [key, value];
+        });
 
         return (
             <Box sx={{
@@ -187,57 +139,52 @@ const SharedMetadataContent: React.FC<SharedMetadataContentProps> = ({
                 borderRadius: 1,
                 p: 2
             }}>
-                {rows.map((row, rowIndex) => (
+                {rows.map(([key, value], rowIndex) => (
                     <Box
                         key={rowIndex}
                         sx={{
                             display: 'grid',
-                            gridTemplateColumns: 'minmax(180px, 25%) minmax(180px, 25%) minmax(180px, 25%) minmax(180px, 25%)',
+                            gridTemplateColumns: 'auto 1fr',
+                            gap: 3,
                             py: 1,
                             borderBottom: rowIndex < rows.length - 1 ?
                                 `1px solid ${alpha(theme.palette.divider, 0.1)}` : 'none',
                         }}
                     >
-                        {row.map(([key, value], colIndex) => (
-                            <React.Fragment key={`${rowIndex}-${colIndex}`}>
+                        <Typography
+                            variant="body2"
+                            sx={{
+                                fontWeight: 'bold',
+                                color: key.trim().startsWith('↳') ?
+                                    theme.palette.primary.main :
+                                    theme.palette.text.secondary,
+                                textAlign: 'left',
+                                minWidth: 'max-content'
+                            }}
+                        >
+                            {formatCamelCase(key)}:
+                        </Typography>
+                        <Box>
+                            {typeof value === 'object' && value !== null ? (
+                                <MetadataContent
+                                    data={value}
+                                    depth={depth + 1}
+                                    showAll={showAll}
+                                    category={category}
+                                    mediaType={mediaType}
+                                />
+                            ) : (
                                 <Typography
                                     variant="body2"
                                     sx={{
-                                        fontWeight: 'bold',
-                                        color: key.trim().startsWith('↳') ?
-                                            theme.palette.primary.main :
-                                            theme.palette.text.secondary,
-                                        textAlign: 'left',
-                                        pr: 1
+                                        wordBreak: 'break-word',
+                                        whiteSpace: 'normal'
                                     }}
                                 >
-                                    {formatCamelCase(key)}:
+                                    {String(value)}
                                 </Typography>
-                                <Box sx={{ mb: colIndex < row.length - 1 ? 0 : 1 }}>
-                                    {typeof value === 'object' && value !== null ? (
-                                        <SharedMetadataContent
-                                            data={value}
-                                            depth={depth + 1}
-                                            showAll={showAll}
-                                            category={category}
-                                            mediaType={mediaType}
-                                        />
-                                    ) : (
-                                        <Typography
-                                            variant="body2"
-                                            sx={{
-                                                wordBreak: 'break-word',
-                                                whiteSpace: 'nowrap',
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis'
-                                            }}
-                                        >
-                                            {String(value)}
-                                        </Typography>
-                                    )}
-                                </Box>
-                            </React.Fragment>
-                        ))}
+                            )}
+                        </Box>
                     </Box>
                 ))}
             </Box>
@@ -247,5 +194,4 @@ const SharedMetadataContent: React.FC<SharedMetadataContentProps> = ({
     }
 };
 
-export default SharedMetadataContent;
-export { outputFilters };
+export default MetadataContent;

@@ -43,8 +43,8 @@ import { TreeItem } from '@mui/x-tree-view/TreeItem';
 import { Chip as MuiChip } from '@mui/material';
 import { RelatedItemsView } from '../components/shared/RelatedItemsView';
 import { RelatedVersionsResponse as NewRelatedVersionsResponse } from '../api/types/asset.types';
-import SharedTechnicalMetadataTab, { categoryMapping } from '../components/shared/TechnicalMetadataTab';
-import SharedMetadataContent, { outputFilters } from '../components/shared/SharedMetadataContent';
+import TechnicalMetadataTab, { categoryMapping } from '../components/TechnicalMetadataTab';
+import MetadataContent, { outputFilters } from '../components/MetadataContent';
 
 // MUI Icons
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -325,57 +325,6 @@ const RelatedItemsTab: React.FC<{
     );
 };
 
-const MetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, showAll, category }) => {
-    const sortEntries = (entries: [string, any][]): [string, any][] => {
-        if (category && outputFilters[category]) {
-            const preferredOrder = outputFilters[category];
-            return [
-                ...preferredOrder.map(key => entries.find(([k]) => k === key)).filter(Boolean),
-                ...entries.filter(([key]) => !preferredOrder.includes(key))
-            ];
-        }
-        return entries;
-    };
-
-    if (Array.isArray(data)) {
-        const displayData = showAll ? data : data.slice(0, 5);
-        return (
-            <List dense disablePadding>
-                {displayData.map((item, index) => (
-                    <ListItem key={index} sx={{ pl: depth * 2 }}>
-                        <MetadataContent data={item} depth={depth + 1} showAll={showAll} category={category} />
-                    </ListItem>
-                ))}
-            </List>
-        );
-    } else if (typeof data === 'object' && data !== null) {
-        const entries = Object.entries(data);
-        const sortedEntries = sortEntries(entries);
-        const displayEntries = showAll ? sortedEntries : sortedEntries.slice(0, 5);
-
-        return (
-            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 2 }}>
-                {displayEntries.map(([key, value]) => (
-                    <Box key={key}>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                            {formatCamelCase(key)}:
-                        </Typography>
-                        <Box sx={{ pl: 2 }}>
-                            <MetadataContent
-                                data={value}
-                                depth={depth + 1}
-                                showAll={showAll}
-                                category={category}
-                            />
-                        </Box>
-                    </Box>
-                ))}
-            </Box>
-        );
-    } else {
-        return <TruncatedTextWithTooltip text={String(data)} />;
-    }
-};
 
 const ImageDetailContent: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -523,7 +472,7 @@ const ImageDetailContent: React.FC = () => {
     // All sub-categories that exist in this asset’s EmbeddedMetadata
     const availableCategoryKeys = useMemo(() => {
         const embedded = assetData?.data?.asset?.Metadata?.EmbeddedMetadata ?? {};
-        return Object.keys(embedded).filter(key => key in categoryMapping);
+        return Object.keys(embedded);
     }, [assetData]);
 
 
@@ -630,7 +579,7 @@ const ImageDetailContent: React.FC = () => {
             case 'summary':
                 return <SummaryTab assetData={assetData} />;
             case 'technical':
-                return <SharedTechnicalMetadataTab
+                return <TechnicalMetadataTab
                     metadataAccordions={metadataAccordions}
                     availableCategories={availableCategoryKeys}
                     mediaType="image"

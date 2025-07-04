@@ -35,6 +35,8 @@ import { Chip as MuiChip } from '@mui/material';
 import { RelatedItemsView } from '../components/shared/RelatedItemsView';
 import { AssetResponse } from '../api/types/asset.types';
 import { formatFileSize } from '../utils/imageUtils';
+import TechnicalMetadataTab, { categoryMapping } from '../components/TechnicalMetadataTab';
+import MetadataContent, { outputFilters } from '../components/MetadataContent';
 
 // MUI Icons
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -50,269 +52,7 @@ import MarkdownRenderer from '../components/common/MarkdownRenderer';
 
 import { VideoViewer, VideoViewerRef } from '../components/common/VideoViewer';
 
-const outputFilters = {
-    'Image (IFD0)': ['ImageWidth', 'ImageHeight', 'Make', 'Model', 'Software'],
-    'EXIF': ['ExposureTime', 'ShutterSpeedValue', 'FNumber', 'ApertureValue', 'ISO', 'LensModel'],
-    'GPS': ['GPSLatitude', 'GPSLongitude', 'GPSAltitude'],
-    'Thumbnail (IFD1)': ['ImageWidth', 'ImageHeight', 'ThumbnailLength'],
-    'IPTC': ['Headline', 'Byline', 'Credit', 'Caption', 'Source', 'Country'],
-    'ICC': ['ProfileVersion', 'ProfileClass', 'ColorSpaceData', 'ProfileConnectionSpace', 'ProfileFileSignature', 'DeviceManufacturer', 'RenderingIntent', 'ProfileCreator', 'ProfileDescription'],
-    'XMP': ['Creator', 'Title', 'Description', 'Rights'],
-    'JFIF (JPEG only)': ['JFIFVersion', 'ResolutionUnit', 'XResolution', 'YResolution'],
-    'IHDR (PNG only)': ['Width', 'Height', 'BitDepth', 'ColorType', 'CompressionMethod', 'FilterMethod', 'InterlaceMethod'],
-    'Maker Note': [],
-    'User Comment': [],
-    'Rights': ['UsageTerms', 'CopyrightNotice', 'WebStatement'],
-    'IPTC Core': ['CreatorContactInfo', 'Scene'],
-    'IPTC Extension': ['PersonInImage', 'LocationCreated'],
-    'Photoshop': ['Category', 'SupplementalCategories', 'AuthorsPosition'],
-    'PLUS': ['LicenseID', 'ImageCreator', 'CopyrightOwner'],
-    'Dublin Core': ['Format', 'Type', 'Identifier'],
-    'XMP Media Management': ['DerivedFrom', 'DocumentID', 'InstanceID'],
-    'Auxiliary': ['Lens', 'SerialNumber'],
-    'Camera Raw Settings': ['Version', 'ProcessVersion', 'WhiteBalance', 'Temperature', 'Tint'],
-    'EXIF Extended': ['Gamma', 'CameraOwnerName', 'BodySerialNumber'],
-    'XMP Dynamic Media': ['AudioSampleRate', 'AudioChannelType', 'VideoFrameRate', 'StartTimeScale', 'Duration'],
-    'Interoperability': ['InteroperabilityIndex', 'InteroperabilityVersion']
-};
 
-interface MetadataContentProps {
-    data: any;
-    depth?: number;
-    showAll: boolean;
-    category?: string;
-}
-
-const MetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, showAll, category }) => {
-    const sortEntries = (entries: [string, any][]): [string, any][] => {
-        if (category && outputFilters[category]) {
-            const preferredOrder = outputFilters[category];
-            return [
-                ...preferredOrder.map(key => entries.find(([k]) => k === key)).filter(Boolean),
-                ...entries.filter(([key]) => !preferredOrder.includes(key))
-            ];
-        }
-        return entries;
-    };
-
-    if (Array.isArray(data)) {
-        const displayData = showAll ? data : data.slice(0, 5);
-        return (
-            <List dense disablePadding>
-                {displayData.map((item, index) => (
-                    <ListItem key={index} sx={{ pl: depth * 2 }}>
-                        <MetadataContent data={item} depth={depth + 1} showAll={showAll} category={category} />
-                    </ListItem>
-                ))}
-            </List>
-        );
-    } else if (typeof data === 'object' && data !== null) {
-        const entries = Object.entries(data);
-        const sortedEntries = sortEntries(entries);
-        const displayEntries = showAll ? sortedEntries : sortedEntries.slice(0, 5);
-
-        return (
-            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 2 }}>
-                {displayEntries.map(([key, value]) => (
-                    <Box key={key}>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                            {formatCamelCase(key)}:
-                        </Typography>
-                        <Box sx={{ pl: 2 }}>
-                            <MetadataContent
-                                data={value}
-                                depth={depth + 1}
-                                showAll={showAll}
-                                category={category}
-                            />
-                        </Box>
-                    </Box>
-                ))}
-            </Box>
-        );
-    } else {
-        return <TruncatedTextWithTooltip text={String(data)} />;
-    }
-};
-
-// Add new component for grid layout metadata display
-const GridMetadataContent: React.FC<MetadataContentProps> = ({ data, depth = 0, showAll, category }) => {
-    const theme = useTheme();
-    
-    const sortEntries = (entries: [string, any][]): [string, any][] => {
-        if (category && outputFilters[category]) {
-            const preferredOrder = outputFilters[category];
-            return [
-                ...preferredOrder.map(key => entries.find(([k]) => k === key)).filter(Boolean),
-                ...entries.filter(([key]) => !preferredOrder.includes(key))
-            ];
-        }
-        return entries;
-    };
-
-    // Function to flatten nested objects like Tags/Encoder
-    const flattenNestedMetadata = (entries: [string, any][]): [string, any][] => {
-        const result: [string, any][] = [];
-        
-        entries.forEach(([key, value]) => {
-            if (typeof value === 'object' && value !== null && !Array.isArray(value) && Object.keys(value).length > 0) {
-                // Mark this as a parent with _PARENT_ prefix (for internal use)
-                result.push([`_PARENT_${key}`, '']);
-                
-                // Then add the child properties with a visible indent prefix
-                Object.entries(value).forEach(([subKey, subValue]) => {
-                    result.push([`      ↳ ${subKey}`, subValue]);
-                });
-            } else {
-                result.push([key, value]);
-            }
-        });
-        
-        return result;
-    };
-
-    // Function to identify parent-child relationships in entries
-    const isParentEntry = (key: string): boolean => {
-        return key.startsWith('_PARENT_');
-    };
-
-    const isChildEntry = (key: string): boolean => {
-        return key.includes('↳');
-    };
-
-    // Function to clean display keys (remove internal markings)
-    const cleanDisplayKey = (key: string): string => {
-        if (key.startsWith('_PARENT_')) {
-            return key.substring(8); // Remove the _PARENT_ prefix
-        }
-        return key;
-    };
-
-    if (Array.isArray(data)) {
-        const displayData = showAll ? data : data.slice(0, 5);
-        return (
-            <List dense disablePadding>
-                {displayData.map((item, index) => (
-                    <ListItem key={index} sx={{ pl: depth * 2 }}>
-                        <GridMetadataContent data={item} depth={depth + 1} showAll={showAll} category={category} />
-                    </ListItem>
-                ))}
-            </List>
-        );
-    } else if (typeof data === 'object' && data !== null) {
-        let entries = Object.entries(data);
-        const sortedEntries = sortEntries(entries);
-        // Flatten nested metadata
-        const flattenedEntries = flattenNestedMetadata(sortedEntries);
-        const displayEntries = showAll ? flattenedEntries : flattenedEntries.slice(0, 5);
-        
-        // Create rows efficiently while preserving parent-child relationships
-        const rows: [string, any][][] = [];
-        
-        let currentIndex = 0;
-        while (currentIndex < displayEntries.length) {
-            const row: [string, any][] = [];
-            
-            // Process the left column
-            if (currentIndex < displayEntries.length) {
-                const leftEntry = displayEntries[currentIndex];
-                const [leftKey] = leftEntry;
-                
-                // Parent entries must always be on the left side
-                if (isParentEntry(leftKey)) {
-                    row.push([cleanDisplayKey(leftKey), leftEntry[1]]);
-                    currentIndex++;
-                    
-                    // In this case, we don't add a right column entry
-                    // because we want to ensure the parent is alone on its row
-                } else {
-                    row.push(leftEntry);
-                    currentIndex++;
-                    
-                    // Process the right column if available and not a parent
-                    if (currentIndex < displayEntries.length) {
-                        const rightEntry = displayEntries[currentIndex];
-                        const [rightKey] = rightEntry;
-                        
-                        if (!isParentEntry(rightKey)) {
-                            row.push(rightEntry);
-                            currentIndex++;
-                        }
-                    }
-                }
-            }
-            
-            if (row.length > 0) {
-                rows.push(row);
-            }
-        }
-
-        return (
-            <Box sx={{
-                width: '100%',
-                mb: 2,
-                backgroundColor: alpha(theme.palette.background.paper, 0.3),
-                borderRadius: 1,
-                p: 2
-            }}>
-                {rows.map((row, rowIndex) => (
-                    <Box 
-                        key={rowIndex} 
-                        sx={{
-                            display: 'grid',
-                            gridTemplateColumns: 'minmax(180px, 25%) minmax(180px, 25%) minmax(180px, 25%) minmax(180px, 25%)',
-                            py: 1,
-                            borderBottom: rowIndex < rows.length - 1 ? 
-                                `1px solid ${alpha(theme.palette.divider, 0.1)}` : 'none',
-                        }}
-                    >
-                        {row.map(([key, value], colIndex) => (
-                            <React.Fragment key={`${rowIndex}-${colIndex}`}>
-                                <Typography 
-                                    variant="body2" 
-                                    sx={{ 
-                                        fontWeight: 'bold',
-                                        color: key.trim().startsWith('↳') ? 
-                                            theme.palette.primary.main : 
-                                            theme.palette.text.secondary,
-                                        textAlign: 'left',
-                                        pr: 1
-                                    }}
-                                >
-                                    {formatCamelCase(key)}:
-                                </Typography>
-                                <Box sx={{ mb: colIndex < row.length - 1 ? 0 : 1 }}>
-                                    {typeof value === 'object' && value !== null ? (
-                                        <GridMetadataContent
-                                            data={value}
-                                            depth={depth + 1}
-                                            showAll={showAll}
-                                            category={category}
-                                        />
-                                    ) : (
-                                        <Typography 
-                                            variant="body2" 
-                                            sx={{ 
-                                                wordBreak: 'break-word',
-                                                whiteSpace: 'nowrap',
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis'
-                                            }}
-                                        >
-                                            {String(value)}
-                                        </Typography>
-                                    )}
-                                </Box>
-                            </React.Fragment>
-                        ))}
-                    </Box>
-                ))}
-            </Box>
-        );
-    } else {
-        return <Typography variant="body2">{String(data)}</Typography>;
-    }
-};
 
 // Tab content components
 const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetData: any }) => {
@@ -509,137 +249,6 @@ const SummaryTab = ({ metadataFields, assetData }: { metadataFields: any, assetD
     );
 };
 
-const TechnicalMetadataTab: React.FC<{ metadataAccordions: any[] }> = ({ metadataAccordions }) => {
-    const theme = useTheme();
-    
-    // Create array of all item IDs to pre-expand them
-    const [expandedItems] = useState<string[]>(() => {
-        // Initialize with all items expanded
-        const allItems: string[] = [];
-        
-        metadataAccordions.forEach((parent, parentIndex) => {
-            // Add parent item
-            allItems.push(`parent-${parentIndex}`);
-            
-            // Add all child items
-            parent.subCategories.forEach((_, subIndex) => {
-                allItems.push(`${parentIndex}-${subIndex}`);
-            });
-        });
-        
-        return allItems;
-    });
-    
-    // Function to determine which content component to use based on category
-    const getContentComponent = (subCategory: any) => {
-        // Use GridMetadataContent for all categories to ensure consistent formatting
-        return (
-            <GridMetadataContent
-                data={subCategory.data}
-                showAll={true}
-                category={subCategory.category}
-            />
-        );
-    };
-    
-    return (
-        <Box sx={{
-            borderRadius: 1,
-            width: '100%'
-        }}>
-            <SimpleTreeView
-                defaultExpandedItems={expandedItems}
-                sx={{
-                    flexGrow: 1,
-                    width: '100%',
-                    '& .MuiTreeItem-root': {
-                        padding: '4px 0',
-                    },
-                    '& .MuiTreeItem-content': {
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        '&:hover': {
-                            backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                        },
-                    },
-                    '& .MuiTreeItem-label': {
-                        fontWeight: 500,
-                    },
-                    '& .MuiTreeItem-group': {
-                        marginLeft: '24px',
-                        borderLeft: `1px dashed ${alpha(theme.palette.text.primary, 0.2)}`,
-                        paddingLeft: '8px',
-                    }
-                }}
-                slots={{
-                    collapseIcon: ExpandMoreIcon,
-                    expandIcon: ChevronRightIcon
-                }}
-            >
-                {metadataAccordions.map((parentAccordion, parentIndex) => (
-                    <TreeItem
-                        key={parentIndex}
-                        itemId={`parent-${parentIndex}`}
-                        label={
-                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                                    {parentAccordion.category === "EmbeddedMetadata" 
-                                        ? "Embedded Metadata" 
-                                        : parentAccordion.category}
-                                </Typography>
-                                <Chip
-                                    size="small"
-                                    label={parentAccordion.count}
-                                    sx={{
-                                        ml: 1,
-                                        height: '20px',
-                                        fontSize: '0.7rem',
-                                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                                        color: theme.palette.primary.main
-                                    }}
-                                />
-                            </Box>
-                        }
-                    >
-                        {parentAccordion.subCategories.map((subCategory, subIndex) => (
-                            <TreeItem
-                                key={`${parentIndex}-${subIndex}`}
-                                itemId={`${parentIndex}-${subIndex}`}
-                                label={
-                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                        <Typography variant="body2">
-                                            {subCategory.category}
-                                        </Typography>
-                                        <Chip
-                                            size="small"
-                                            label={subCategory.count}
-                                            sx={{
-                                                ml: 1,
-                                                height: '18px',
-                                                fontSize: '0.65rem',
-                                                backgroundColor: alpha(theme.palette.secondary.main, 0.1),
-                                                color: theme.palette.secondary.main
-                                            }}
-                                        />
-                                    </Box>
-                                }
-                            >
-                                <Box sx={{
-                                    p: 2,
-                                    backgroundColor: alpha(theme.palette.background.paper, 0.5),
-                                    borderRadius: 1,
-                                    mt: 1
-                                }}>
-                                    {getContentComponent(subCategory)}
-                                </Box>
-                            </TreeItem>
-                        ))}
-                    </TreeItem>
-                ))}
-            </SimpleTreeView>
-        </Box>
-    );
-};
 
 // Import the shared TranscriptionTab component
 import TranscriptionTab from '../components/shared/TranscriptionTab';
@@ -814,6 +423,12 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
     const metadataAccordions = useMemo(() => {
         if (!assetData?.data?.asset?.Metadata) return [];
         return transformMetadata(assetData.data.asset.Metadata);
+    }, [assetData]);
+
+    // All sub-categories that exist in this asset's EmbeddedMetadata
+    const availableCategoryKeys = useMemo(() => {
+        const embedded = assetData?.data?.asset?.Metadata?.EmbeddedMetadata ?? {};
+        return Object.keys(embedded);
     }, [assetData]);
 
     const handleAddComment = (comment: string) => {
@@ -1089,7 +704,13 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
                             tabIndex={0} // Make the panel focusable
                         >
                             {activeTab === 'summary' && <SummaryTab metadataFields={metadataFields} assetData={assetData} />}
-                            {activeTab === 'technical' && <TechnicalMetadataTab metadataAccordions={metadataAccordions} />}
+                            {activeTab === 'technical' && (
+                                <TechnicalMetadataTab
+                                    metadataAccordions={metadataAccordions}
+                                    availableCategories={availableCategoryKeys}
+                                    mediaType="video"
+                                />
+                            )}
                             {activeTab === 'transcription' && (
                                 <TranscriptionTab
                                     assetId={id || ''}
