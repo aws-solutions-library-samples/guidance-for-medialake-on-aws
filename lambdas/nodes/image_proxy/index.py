@@ -18,12 +18,12 @@ tracer = Tracer()
 s3 = boto3.client("s3")
 dynamo = boto3.resource("dynamodb").Table(os.environ["MEDIALAKE_ASSET_TABLE"])
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 def convert_svg_to_png(svg_data: bytes) -> bytes:
-    """
-    Convert SVG → PNG using only the resvg CLI.
-    Expects /opt/bin/resvg in your Lambda layer.
-    """
+    """Convert SVG → PNG using the resvg CLI shipped in a Lambda layer."""
     # dump SVG to a temp file
     with tempfile.NamedTemporaryFile(suffix=".svg", delete=False) as svg_file:
         svg_file.write(svg_data)
@@ -40,8 +40,10 @@ def convert_svg_to_png(svg_data: bytes) -> bytes:
     # verify resvg is present
     if shutil.which("resvg", path=env["PATH"]) is None:
         for p in (svg_path, png_path):
-            try: os.unlink(p)
-            except: pass
+            try:
+                os.unlink(p)
+            except Exception:
+                pass
         raise RuntimeError("resvg CLI not found in /opt/bin")
 
     cmd = ["resvg", svg_path, png_path]
@@ -57,17 +59,17 @@ def convert_svg_to_png(svg_data: bytes) -> bytes:
             raise RuntimeError("resvg did not produce any output")
 
         with open(png_path, "rb") as f:
-            data = f.read()
-        return data
-
+            return f.read()
     finally:
-        # always clean up temp files
         for p in (svg_path, png_path):
-            try: os.unlink(p)
-            except: pass
+            try:
+                os.unlink(p)
+            except Exception:
+                pass
 
 
 def get_image_rotation(image: Image.Image) -> int:
+    """Read EXIF orientation tag and return the rotation angle."""
     try:
         exif = image._getexif() or {}
         key = next(k for k, v in ExifTags.TAGS.items() if v == "Orientation")
@@ -143,29 +145,41 @@ def _strip_decimals(obj):
         return int(obj) if obj % 1 == 0 else float(obj)
     return obj
 
+# ---------------------------------------------------------------------------
+# Lambda handler
+# ---------------------------------------------------------------------------
+
+JPEG_QUALITY = int(os.getenv("JPEG_QUALITY", "85"))
+
 
 @lambda_middleware(event_bus_name=os.environ.get("EVENT_BUS_NAME", "default-event-bus"))
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
 def lambda_handler(event, context: LambdaContext):
+    # ── parse event --------------------------------------------------------
     asset, mode, width, height, crop = _extract_from_event(event)
 
     dsa = asset["DigitalSourceAsset"]
     loc = dsa["MainRepresentation"]["StorageInfo"]["PrimaryLocation"]
     bucket = loc.get("Bucket") or _raise("PrimaryLocation.Bucket missing")
-    key = loc.get("ObjectKey", {}).get("FullPath") or _raise("PrimaryLocation.ObjectKey.FullPath missing")
+    key = (
+        loc.get("ObjectKey", {}).get("FullPath")
+        or _raise("PrimaryLocation.ObjectKey.FullPath missing")
+    )
     inv_id = asset.get("InventoryID") or _raise("InventoryID missing")
 
-    out_bucket = os.environ.get("MEDIA_ASSETS_BUCKET_NAME") or _raise("MEDIA_ASSETS_BUCKET_NAME missing")
+    out_bucket = os.environ.get("MEDIA_ASSETS_BUCKET_NAME") or _raise(
+        "MEDIA_ASSETS_BUCKET_NAME missing"
+    )
 
-    # ── fetch source ───────────────────────────────────────────────────────
+    # ── fetch source -------------------------------------------------------
     body = s3.get_object(Bucket=bucket, Key=key)["Body"].read()
     if key.lower().endswith(".svg"):
         body = convert_svg_to_png(body)
 
     img = Image.open(io.BytesIO(body))
 
-    # ── process image ──────────────────────────────────────────────────────
+    # ── process image ------------------------------------------------------
     if mode == "thumbnail":
         if width is None and height is None:
             _raise("Both width and height cannot be None for thumbnail")
@@ -177,36 +191,63 @@ def lambda_handler(event, context: LambdaContext):
     else:
         _raise(f"Invalid mode: {mode}")
 
-    # always output PNG
-    ext, fmt = "png", "PNG"
-    if proc.mode not in ("RGB", "RGBA"):
-        proc = proc.convert("RGB")
+    # -------------------------------------------------------------------
+    # Choose an efficient output encoding to avoid huge files
+    # -------------------------------------------------------------------
+    has_alpha = proc.mode in ("RGBA", "LA") or ("transparency" in proc.info)
+
+    if has_alpha:
+        ext, fmt = "png", "PNG"
+        save_kwargs = dict(optimize=True, compress_level=9)
+        if proc.mode not in ("RGBA", "LA"):
+            proc = proc.convert("RGBA")
+    else:
+        ext, fmt = "jpg", "JPEG"
+        save_kwargs = dict(quality=JPEG_QUALITY, optimize=True, progressive=True)
+        if proc.mode != "RGB":
+            proc = proc.convert("RGB")
+
+    # ── encode ------------------------------------------------------------
     buf = io.BytesIO()
-    proc.save(buf, format=fmt)
+    proc.save(buf, format=fmt, **save_kwargs)
     data = buf.getvalue()
 
-    new_key = f"{bucket}/{key.rsplit('.', 1)[0]}_{mode}.{ext}"
+    # build a new key alongside the source asset
+    stem = key.rsplit(".", 1)[0]
+    new_key = f"{stem}_{mode}.{ext}"
 
-    # ── fetch existing reps & split out to_delete ──────────────────────────
+    # ── fetch existing representations -----------------------------------
     resp = dynamo.get_item(Key={"InventoryID": clean_asset_id(inv_id)})
     existing = resp.get("Item", {}).get("DerivedRepresentations", [])
     to_delete = [r for r in existing if r.get("Purpose") == mode]
     cur_reps = [r for r in existing if r.get("Purpose") != mode]
 
-    # ── upload new image ───────────────────────────────────────────────────
-    s3.put_object(Bucket=out_bucket, Key=new_key, Body=data, ContentType=f"image/{ext}")
+    # ── upload new image ---------------------------------------------------
+    content_type = f"image/{'jpeg' if fmt == 'JPEG' else 'png'}"
+    s3.put_object(
+        Bucket=out_bucket,
+        Key=new_key,
+        Body=data,
+        ContentType=content_type,
+    )
 
-    # ── delete old S3 objects for this mode ───────────────────────────────
+    # ── delete superseded reps -------------------------------------------
     for old in to_delete:
         ob = old["StorageInfo"]["PrimaryLocation"]["Bucket"]
         ok = old["StorageInfo"]["PrimaryLocation"]["ObjectKey"]["FullPath"]
         try:
             s3.delete_object(Bucket=ob, Key=ok)
-            logger.info("Deleted old representation", extra={"mode": mode, "bucket": ob, "key": ok})
+            logger.info(
+                "Deleted old representation",
+                extra={"mode": mode, "bucket": ob, "key": ok},
+            )
         except Exception as err:
-            logger.warning("Failed to delete old representation", extra={"error": str(err), "bucket": ob, "key": ok})
+            logger.warning(
+                "Failed to delete old representation",
+                extra={"error": str(err), "bucket": ob, "key": ok},
+            )
 
-    # ── update DynamoDB ────────────────────────────────────────────────────
+    # ── update DynamoDB ----------------------------------------------------
     new_rep = {
         "ID": f"{clean_asset_id(inv_id)}:{mode}",
         "Type": "Image",
@@ -222,7 +263,15 @@ def lambda_handler(event, context: LambdaContext):
                 "FileInfo": {"Size": len(data)},
             }
         },
-        **({"ImageSpec": {"Resolution": {"Width": width, "Height": height}}} if mode == "thumbnail" else {})
+        **(
+            {
+                "ImageSpec": {
+                    "Resolution": {"Width": width, "Height": height}
+                }
+            }
+            if mode == "thumbnail"
+            else {}
+        ),
     }
 
     try:
@@ -236,13 +285,16 @@ def lambda_handler(event, context: LambdaContext):
         logger.exception("Error updating DynamoDB")
         raise
 
+    # ── response ----------------------------------------------------------
     return {
         "statusCode": 200,
-        "body": json.dumps({
-            "bucket": out_bucket,
-            "key": new_key,
-            "mode": mode,
-            "format": fmt,
-            "updatedAsset": _strip_decimals(updated_item),
-        }),
+        "body": json.dumps(
+            {
+                "bucket": out_bucket,
+                "key": new_key,
+                "mode": mode,
+                "format": fmt,
+                "updatedAsset": _strip_decimals(updated_item),
+            }
+        ),
     }
