@@ -15,6 +15,7 @@ import {
     IconButton
 } from '@mui/material';
 import { ThumbUp, ThumbDown, Comment, Close } from '@mui/icons-material';
+import { PLACEHOLDER_IMAGE } from '../utils/placeholderSvg';
 
 interface Comment {
     id: string;
@@ -41,7 +42,7 @@ const VideoReviewInterface: React.FC<VideoReviewInterfaceProps> = ({ onClose }) 
         id: '1',
         title: 'Sample Video',
         description: 'This is a sample video for review',
-        thumbnailUrl: 'https://placehold.co/300x200?text=Placeholder',
+        thumbnailUrl: PLACEHOLDER_IMAGE,
         status: 'pending',
         comments: []
     });

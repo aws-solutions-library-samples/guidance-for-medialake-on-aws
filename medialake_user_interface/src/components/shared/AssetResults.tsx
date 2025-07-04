@@ -8,6 +8,7 @@ import { type AssetTableColumn } from '@/types/shared/assetComponents';
 import AssetCard from './AssetCard';
 import AssetTable from './AssetTable';
 import AssetViewControls from './AssetViewControls';
+import { PLACEHOLDER_IMAGE } from '@/utils/placeholderSvg';
 import AssetPagination from './AssetPagination';
 import AssetActionsMenu from './AssetActionsMenu';
 import { useAssetResults } from '@/hooks/useAssetResults';
@@ -79,7 +80,7 @@ function AssetResults<T extends AssetBase>({
         defaultColumns,
         sortOptions,
         renderCardField,
-        placeholderImage = 'https://placehold.co/300x200?text=Placeholder',
+        placeholderImage = PLACEHOLDER_IMAGE,
     } = config;
 
     // Initialize asset results state and handlers

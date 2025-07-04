@@ -5,6 +5,7 @@ import AssetResults from '@/components/shared/AssetResults';
 import { formatFileSize } from '@/utils/fileSize';
 import { formatDate } from '@/utils/dateFormat';
 import { RecentlyViewedProvider } from '@/contexts/RecentlyViewedContext';
+import { PLACEHOLDER_IMAGE } from '@/utils/placeholderSvg';
 
 interface ImageResultsProps {
     images: ImageItem[];
@@ -123,7 +124,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({
                     defaultColumns,
                     sortOptions,
                     renderCardField,
-                    placeholderImage: 'https://placehold.co/300x200?text=Placeholder',
+                    placeholderImage: PLACEHOLDER_IMAGE,
                 }}
                 searchTerm={searchTerm}
                 actions={actions}

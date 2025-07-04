@@ -1,4 +1,5 @@
 import React from 'react';
+import { VIDEO_PLACEHOLDER_IMAGE } from '@/utils/placeholderSvg';
 import { VideoItem, CardFieldConfig } from '@/types/search/searchResults';
 import { type AssetTableColumn } from '@/types/shared/assetComponents';
 import AssetResults from '@/components/shared/AssetResults';
@@ -123,7 +124,7 @@ const VideoResults: React.FC<VideoResultsProps> = ({
                     defaultColumns,
                     sortOptions,
                     renderCardField,
-                    placeholderImage: 'https://placehold.co/300x200?text=Video'
+                    placeholderImage: VIDEO_PLACEHOLDER_IMAGE
                 }}
                 searchTerm={searchTerm}
                 actions={actions}

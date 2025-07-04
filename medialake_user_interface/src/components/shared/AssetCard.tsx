@@ -8,6 +8,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
+import { PLACEHOLDER_IMAGE } from '@/utils/placeholderSvg';
 import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import { AssetAudio } from '../asset';
 import { InlineTextEditor } from '../common/InlineTextEditor';
@@ -61,7 +62,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
     onDeleteClick,
     onDownloadClick,
     onEditClick,
-    placeholderImage = 'https://placehold.co/300x200?text=Placeholder',
+    placeholderImage = PLACEHOLDER_IMAGE,
     onImageError,
     isRenaming = false,
     isEditing,

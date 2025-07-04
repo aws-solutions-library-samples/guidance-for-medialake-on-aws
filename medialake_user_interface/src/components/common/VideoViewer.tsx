@@ -37,6 +37,7 @@ import React, {
   import './VideoViewer.css';
 
   import addMakerDiv from '../asset/AssetSidebar'
+  import { createTimecodePlaceholder } from '@/utils/placeholderSvg';
   
   import { filter } from 'rxjs';
   import { randomHexColor } from './utils';
@@ -399,7 +400,7 @@ import { Currency } from 'lucide-react';
       .padStart(2, '0')}:${seconds.toString().padStart(2, '0')}:${frames
       .toString()
       .padStart(2, '0')}`;
-    return `https://placehold.co/100x56/black/white?text=${timeString}`;
+    return createTimecodePlaceholder(timeString);
   }
   
   export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
