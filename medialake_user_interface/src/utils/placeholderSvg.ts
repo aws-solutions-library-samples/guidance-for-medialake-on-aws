@@ -36,7 +36,7 @@ export const PLACEHOLDER_IMAGE = createPlaceholderSvg(300, 200, 'Placeholder');
 /**
  * Creates a video placeholder image (300x200)
  */
-export const VIDEO_PLACEHOLDER_IMAGE = createPlaceholderSvg(300, 200, 'Video');
+export const VIDEO_PLACEHOLDER_IMAGE = createPlaceholderSvg(300, 200, 'Placeholder');
 
 /**
  * Creates a small timecode placeholder for video scrubbing (100x56)
