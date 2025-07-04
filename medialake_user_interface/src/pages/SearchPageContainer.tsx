@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useSearchState } from '@/hooks/useSearchState';
 import { useSearch } from '@/api/hooks/useSearch';
