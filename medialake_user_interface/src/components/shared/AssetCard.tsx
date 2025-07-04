@@ -8,6 +8,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
+import { PLACEHOLDER_IMAGE } from '@/utils/placeholderSvg';
 import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import { AssetAudio } from '../asset';
 import { InlineTextEditor } from '../common/InlineTextEditor';
@@ -61,7 +62,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
     onDeleteClick,
     onDownloadClick,
     onEditClick,
-    placeholderImage = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjREREREREIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIzNiIgZm9udC13ZWlnaHQ9ImJvbGQiIGZpbGw9IiM5OTk5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPlBsYWNlaG9sZGVyPC90ZXh0Pgo8L3N2Zz4=',
+    placeholderImage = PLACEHOLDER_IMAGE,
     onImageError,
     isRenaming = false,
     isEditing,

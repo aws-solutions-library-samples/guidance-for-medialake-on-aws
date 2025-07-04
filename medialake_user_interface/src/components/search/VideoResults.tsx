@@ -1,4 +1,5 @@
 import React from 'react';
+import { VIDEO_PLACEHOLDER_IMAGE } from '@/utils/placeholderSvg';
 import { VideoItem, CardFieldConfig } from '@/types/search/searchResults';
 import { type AssetTableColumn } from '@/types/shared/assetComponents';
 import AssetResults from '@/components/shared/AssetResults';
@@ -123,7 +124,7 @@ const VideoResults: React.FC<VideoResultsProps> = ({
                     defaultColumns,
                     sortOptions,
                     renderCardField,
-                    placeholderImage: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjREREREREIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIzNiIgZm9udC13ZWlnaHQ9ImJvbGQiIGZpbGw9IiM5OTk5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPlZpZGVvPC90ZXh0Pgo8L3N2Zz4='
+                    placeholderImage: VIDEO_PLACEHOLDER_IMAGE
                 }}
                 searchTerm={searchTerm}
                 actions={actions}

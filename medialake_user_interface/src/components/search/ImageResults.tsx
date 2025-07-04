@@ -5,6 +5,7 @@ import AssetResults from '@/components/shared/AssetResults';
 import { formatFileSize } from '@/utils/fileSize';
 import { formatDate } from '@/utils/dateFormat';
 import { RecentlyViewedProvider } from '@/contexts/RecentlyViewedContext';
+import { PLACEHOLDER_IMAGE } from '@/utils/placeholderSvg';
 
 interface ImageResultsProps {
     images: ImageItem[];
@@ -123,7 +124,7 @@ const ImageResults: React.FC<ImageResultsProps> = ({
                     defaultColumns,
                     sortOptions,
                     renderCardField,
-                    placeholderImage: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjREREREREIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIzNiIgZm9udC13ZWlnaHQ9ImJvbGQiIGZpbGw9IiM5OTk5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPlBsYWNlaG9sZGVyPC90ZXh0Pgo8L3N2Zz4=',
+                    placeholderImage: PLACEHOLDER_IMAGE,
                 }}
                 searchTerm={searchTerm}
                 actions={actions}
