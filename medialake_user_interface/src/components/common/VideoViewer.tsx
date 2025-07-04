@@ -399,7 +399,11 @@ import { Currency } from 'lucide-react';
       .padStart(2, '0')}:${seconds.toString().padStart(2, '0')}:${frames
       .toString()
       .padStart(2, '0')}`;
-    return `https://placehold.co/100x56/black/white?text=${timeString}`;
+    const svg = `<svg width="100" height="56" xmlns="http://www.w3.org/2000/svg">
+  <rect width="100%" height="100%" fill="#000000"/>
+  <text x="50%" y="50%" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle">${timeString}</text>
+</svg>`;
+    return `data:image/svg+xml;base64,${btoa(svg)}`;
   }
   
   export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
