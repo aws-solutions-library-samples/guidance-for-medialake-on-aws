@@ -343,6 +343,63 @@ class AssetProcessor:
         return resp.status, resp_body
 
 
+    def _parse_s3_uri(self, s3_uri: str) -> tuple[str, str]:
+        """Parse S3 URI into bucket and key components"""
+        if not s3_uri or not s3_uri.startswith("s3://"):
+            return None, None
+        
+        # Remove s3:// prefix and split
+        path = s3_uri[5:]  # Remove "s3://"
+        parts = path.split("/", 1)
+        
+        if len(parts) != 2:
+            return None, None
+            
+        return parts[0], parts[1]  # bucket, key
+
+    def _delete_associated_s3_files(self, asset_record: Dict, main_bucket: str, main_key: str) -> None:
+        """Delete all S3 files associated with this asset (excluding already deleted main file)"""
+        files_to_delete = []
+        
+        # Extract derived representations
+        for rep in asset_record.get("DerivedRepresentations", []):
+            storage_info = rep.get("StorageInfo", {}).get("PrimaryLocation", {})
+            if storage_info:
+                bucket = storage_info.get("Bucket")
+                key = storage_info.get("ObjectKey", {}).get("FullPath")
+                if bucket and key and not (bucket == main_bucket and key == main_key):
+                    files_to_delete.append((bucket, key))
+        
+        # Extract transcript files
+        if transcript_uri := asset_record.get("TranscriptionS3Uri"):
+            transcript_bucket, transcript_key = self._parse_s3_uri(transcript_uri)
+            if transcript_bucket and transcript_key:
+                files_to_delete.append((transcript_bucket, transcript_key))
+        
+        # Delete files in parallel
+        if files_to_delete:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+                futures = {
+                    executor.submit(self._safe_delete_s3_file, bucket, key): (bucket, key)
+                    for bucket, key in files_to_delete
+                }
+                
+                for future in concurrent.futures.as_completed(futures):
+                    bucket, key = futures[future]
+                    try:
+                        future.result()
+                        logger.info(f"Deleted associated file: {bucket}/{key}")
+                    except Exception as e:
+                        logger.error(f"Failed to delete associated file {bucket}/{key}: {str(e)}")
+
+    def _safe_delete_s3_file(self, bucket: str, key: str) -> None:
+        """Safely delete S3 file with error handling"""
+        try:
+            self.s3.delete_object(Bucket=bucket, Key=key)
+        except Exception as e:
+            logger.error(f"Error deleting S3 file {bucket}/{key}: {str(e)}")
+            raise
+
     def delete_opensearch_docs(self, asset_id: str) -> None:
         """Delete all OpenSearch docs for a given DigitalSourceAsset.ID."""
         if not OPENSEARCH_ENDPOINT:
@@ -1145,33 +1202,24 @@ class AssetProcessor:
             
             if response["Items"]:
                 # Found the item in DynamoDB
-                item = response["Items"][0]
-                inventory_id = item["InventoryID"]
+                asset_record = response["Items"][0]
+                inventory_id = asset_record["InventoryID"]
                 logger.info(f"Found item in DynamoDB by S3 path: {inventory_id}")
                 
-                # Delete from DynamoDB
-                self.dynamodb.delete_item(
-                    Key={
-                        "InventoryID": inventory_id
-                    }
-                )
+                # Delete all associated S3 files BEFORE deleting DynamoDB record
+                self._delete_associated_s3_files(asset_record, bucket, key)
                 
-                # Publish deletion event
-                self.publish_deletion_event(inventory_id)
-
-                logger.info(f"Successfully deleted asset from DynamoDB: {inventory_id}")
-
-                # delete the DynamoDB record
+                # Delete from DynamoDB
                 self.dynamodb.delete_item(Key={"InventoryID": inventory_id})
                 metrics.add_metric(name="AssetDeletionProcessed", unit=MetricUnit.Count, value=1)
 
-                # publish your deletion event
-                self.publish_deletion_event(inventory_id)
-
-                # *new* — delete associated OpenSearch docs
+                # Delete associated OpenSearch docs
                 self.delete_opensearch_docs(inventory_id)
 
-                logger.info(f"Successfully deleted asset {inventory_id} from DynamoDB and OpenSearch")
+                # Publish deletion event
+                self.publish_deletion_event(inventory_id)
+
+                logger.info(f"Successfully deleted asset {inventory_id} and all associated files")
 
             else:
                 # For deletion events, skip trying to find by tags as the object is gone

@@ -1187,6 +1187,7 @@ def create_connector(createconnector: S3Connector) -> dict:
                             "s3:GetBucketLocation",
                             "s3:GetObject",
                             "s3:ListBucket",
+                            "s3:DeleteObject",  # Added for asset deletion
                         ],
                         "Resource": [
                             f"arn:aws:s3:::{s3_bucket}",
@@ -1198,6 +1199,30 @@ def create_connector(createconnector: S3Connector) -> dict:
             s3_policy_name_base = f"{role_name}-s3-policy"
             s3_policy_name = truncate_resource_name("iam_policy", s3_policy_name_base)
             policies_to_attach.append((s3_policy_name, s3_policy))
+
+            # Media assets bucket policy for derived representations and transcripts
+            media_assets_bucket = os.environ.get("MEDIA_ASSETS_BUCKET")
+            if media_assets_bucket:
+                media_assets_policy = {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:DeleteObject",
+                                "s3:GetObject",
+                                "s3:ListBucket",
+                            ],
+                            "Resource": [
+                                f"arn:aws:s3:::{media_assets_bucket}",
+                                f"arn:aws:s3:::{media_assets_bucket}/*",
+                            ],
+                        }
+                    ],
+                }
+                media_assets_policy_name_base = f"{role_name}-media-assets-policy"
+                media_assets_policy_name = truncate_resource_name("iam_policy", media_assets_policy_name_base)
+                policies_to_attach.append((media_assets_policy_name, media_assets_policy))
 
             # EventBridge policy
             eventbridge_policy = {
