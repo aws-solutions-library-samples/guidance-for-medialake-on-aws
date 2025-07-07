@@ -933,7 +933,7 @@ class AssetProcessor:
                 }
             },
             "Metadata": {
-                "Embedded": {
+                "ObjectMetadata": {
                     "ExtractedDate": datetime.utcnow().isoformat(),
                     "S3": {
                         "Metadata": s3_response.get("Metadata", {}),
