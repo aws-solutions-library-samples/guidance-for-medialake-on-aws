@@ -4,18 +4,38 @@
 >
 > - [Overview](#overview)
 > - [Cost](#cost)
-> - [Prerequisites](#prerequisites)
-> - [Operating System](#operating-system)
+>   - [Cost Table](#cost-table)
+> - [Development](#development)
+>   - [Prerequisites](#prerequisites)
+>   - [Operating System](#operating-system)
 > - [Deployment Steps](#deployment-steps)
+>   - [Clone the repository](#1-clone-the-repository)
+>   - [Prepare the environment](#2-prepare-the-environment)
+>   - [Configure AWS account and region](#3-configure-aws-account-and-region)
+>   - [Configuration Setup](#4-configuration-setup)
+>   - [Deploy using AWS CDK](#5-deploy-using-aws-cdk)
+>   - [Alternative: Deploy using CloudFormation](#6-alternative-deploy-using-cloudformation-and-shell-script)
 > - [Deployment Validation](#deployment-validation)
 > - [Running the Guidance](#running-the-guidance)
+>   - [Login](#1-login)
+>   - [Connect Storage](#2-connect-storage)
+>   - [Ingest Media](#3-ingest-media)
+>   - [Enable Semantic Search and Integrations](#4-enable-semantic-search-and-integrations)
+>   - [Process and Retrieve Assets](#5-process-and-retrieve-assets)
 > - [Next Steps](#next-steps)
 > - [Project Structure](#project-structure)
 > - [Key Components](#key-components)
-> - [API Documentation](#api-documentation)
+>   - [Storage Connectors](#storage-connectors)
+>   - [Processing Pipelines](#processing-pipelines)
+>   - [AWS Services Used](#aws-services-used)
 > - [Security Features](#security-features)
 > - [Supported Media Types](#supported-media-types)
+>   - [Audio Files](#audio-files)
+>   - [Video Files](#video-files)
+>   - [Image Files](#image-files)
 > - [Cleanup](#cleanup)
+>   - [Using the Deletion Script](#using-the-deletion-script)
+>   - [Manual Cleanup (AWS Console)](#manual-cleanup-aws-console)
 > - [FAQ, Known Issues, and Additional Considerations](#faq-known-issues-and-additional-considerations)
 > - [Revisions](#revisions)
 > - [Notices](#notices)
@@ -26,7 +46,7 @@
 
 ## Overview
 
-**Guidance for MediaLake on AWS** provides a comprehensive, serverless, and scalable platform for media ingestion, processing, management, and workflow orchestration on AWS. MediaLake enables you to connect various storage sources, ingest and organize media at scale, run customizable processing pipelines (such as proxy/thumbnail generation and AI enrichment), and integrate with both AWS native and partner services (including Twelve Labs, Transcription, and more). 
+**Guidance for MediaLake on AWS** provides a comprehensive, serverless, and scalable platform for media ingestion, processing, management, and workflow orchestration on AWS. MediaLake enables you to connect various storage sources, ingest and organize media at scale, run customizable processing pipelines (such as proxy/thumbnail generation and AI enrichment), and integrate with both AWS native and partner services. 
 
 MediaLake is designed for:
 - Media organizations and content creators needing automated processing and enrichment of large media libraries.
@@ -36,67 +56,74 @@ MediaLake is designed for:
 ### High-Level Overview
 ![MediaLake Overview](assets/images/medialake-architecture-overview.png)
 
+> _Diagram: MediaLake provides a comprehensive serverless platform connecting storage sources, processing pipelines, and enrichment services with secure user interfaces and API endpoints for scalable media management workflows._
+
 ### Application Architecture
 ![MediaLake Application Architecture](assets/images/medialake-architecture-application.png)
+
+> _Diagram: MediaLake application layer shows the React UI, API Gateway endpoints, Lambda functions, and data flow between Cognito authentication, DynamoDB storage, and OpenSearch indexing for user interactions and asset management._
 
 ### Pipeline Execution and Deployment
 ![MediaLake Pipeline Architecture](assets/images/medialake-architecture-pipeline.png)
 
-> _Diagram: MediaLake processes media through S3 ingestion, EventBridge routing, Lambda orchestration, Step Functions, and enrichment with metadata, search, and integration endpoints. See architecture for full AWS service breakdown._
+> _Diagram: MediaLake processes media through S3 ingestion, EventBridge routing, Lambda orchestration, Step Functions, and enrichment with metadata, search, and integration endpoints._
 
 ---
 
 ## Cost
 
 You are responsible for the cost of the AWS services used while running this Guidance.
-As of July 2025, the cost for running this Guidance with the **large deployment configuration** in the **US East (N. Virginia)** region is approximately **$580.43 per month** for the core infrastructure (not including add-ons or variable workloads). Add-on processing and enrichment services (like Twelve Labs and Transcription) will increase the cost depending on usage.
+As of July 2025, the cost for running this Guidance with the **large deployment configuration** in the **US East (N. Virginia)** region is approximately **$401.23 per month** for the core infrastructure (not including add-ons or variable workloads). Add-on processing and enrichment services (like Twelve Labs and Transcription) will increase the cost depending on usage.
 
 We recommend creating a **Budget through AWS Cost Explorer** to help manage costs. Prices are subject to change. For full details, refer to the pricing webpage for each AWS service used in this Guidance.
 
 ### Cost Table
 
-| **What’s Being Counted (by Service)**      | **How It Relates to Your Team’s Usage**                                                                                                    |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Users (Cognito)**                        | We assume your team will have **50 active members** signing in and using the system each month.                                            |
-| **Media Uploads (S3, Step Functions)**     | We assume your team will upload about **1,000 new media files** each month (each upload starts an automated workflow).                     |
-| **Images (S3/CloudFront)**                 | Each team member will view or download about **200 images** per month (2MB each), delivered via S3 and CloudFront.                         |
-| **Audio (S3/CloudFront)**                  | Each person will listen to or download around **20 audio files** per month (5MB each), delivered via S3 and CloudFront.                    |
-| **Short Videos (S3/CloudFront)**           | Each person will stream or download about **15 short videos** (100MB each) every month, via S3 and CloudFront.                             |
-| **Long Videos (S3/CloudFront)**            | Each person will stream or download about **5 long-form videos** (1GB each) every month, via S3 and CloudFront.                            |
-| **Total Media Downloaded (S3/CloudFront)** | Across all users, this adds up to **about 350GB of media files viewed or downloaded every month**.                                         |
-| **Web/App Requests (CloudFront)**          | The team will make about **25,000 clicks or page loads** per month (like opening media or UI pages) through CloudFront.                    |
-| **API Requests (API Gateway/Lambda)**      | Every action—searching, uploading, updating, or tagging—means **about 500,000 API interactions per month**.                                |
-| **Database Usage (DynamoDB)**              | As your team adds and updates files, **about 200,000 database records** will be created or updated each month.                             |
-| **Message Queues (SQS)**                   | Each upload or process triggers **at least 10,000 automatic messages or job updates** between services per month.                          |
-| **Automated Processing (Lambda)**          | For every new file ingested, backend scripts run—totaling **about 1 million automated processing tasks per month**.                        |
-| **Workflow Automations (Step Functions)**  | Each upload triggers a pipeline, resulting in **about 1,000 file processing workflows (20 steps each) every month**.                       |
-| **Encryption (KMS)**                       | To keep data safe, we’ll use **30 unique encryption keys** for storage and messages, with **311,000 security checks on files each month**. |
+| **Service & Usage**                           | **How It Relates to Your Team’s Usage**                                                                           | **Estimated Monthly Cost (USD)**                                                        |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| **Cognito (Users)**                           | 50 active users signing in and using the system each month                                                        | \$2.00                                                                                  |
+| **S3 + Step Functions (Uploads)**             | 1,000 new media files uploaded/month, each triggering a workflow                                                  | S3 storage: \$23.55<br>Step Functions: \$2.40                                           |
+| **S3/CloudFront (Images, Audio, Video)**      | All users viewing/downloading images, audio, and video each month (aggregate, served via S3 and CloudFront)       | S3 requests: \$0.05 + \$0.40<br>CloudFront data: \$29.75<br>CloudFront requests: \$0.03 |
+| **Total Media Downloaded (S3/CloudFront)**    | About 350GB of media files viewed/downloaded per month                                                            | S3 data transfer out: \$45.00                                                           |
+| **Web/App Requests (CloudFront)**             | 25,000 clicks or page loads/month through CDN                                                                     | \$0.03                                                                                  |
+| **API Gateway (API Requests)**                | 500,000 system actions/searches/uploads per month                                                                 | \$1.75                                                                                  |
+| **Lambda (All Automated and API Processing)** | All automated backend tasks, API logic, file processing, and event handling; includes 1,000,000 invocations/month | \~\$13.00                                                                               |
+| **Database Usage (DynamoDB)**                 | 200,000 new or updated records per month (write/read/storage)                                                     | Writes: \$18.75<br>Reads: \$7.50<br>Storage: \$25.00                                    |
+| **Message Queues (SQS)**                      | 10,000 standard and 1,000 FIFO auto-messages per month                                                            | Standard: \$0.002<br>FIFO: \$0.0005                                                     |
+| **Workflow Automations (Step Functions)**     | 1,000 automated workflows (pipelines), 20 steps each every month                                                  | \$2.40                                                                                  |
+| **Encryption (KMS)**                          | 30 keys, 311,000 encryption/decryption actions per month                                                          | \$30.00 (CMK/month) + \$15.00 (requests) = \$45.00                                      |
+| **Monitoring/Logging (CloudWatch)**           | Storage, metrics, logs for all services                                                                           | Data: \$7.50<br>Storage: \$0.07                                                         |
+| **OpenSearch (Search)**                       | Search and index storage and compute                                                                              | t3.small: \$131.40 (2 instances)<br>Storage: \$2.44 (gp3)                               |
+| **NAT Gateway (VPC)**                         | Outbound internet access from VPC                                                                                 | \$33.30                                                                                 |
+| **WAF (Web Application Firewall)**            | API & web protection (rules + ACLs + requests)                                                                    | WebACL: \$5.00<br>Rules: \$2.00<br>Requests: \$0.30                                     |
+| **EventBridge**                               | Event-driven triggers                                                                                             | \$0.01                                                                                  |
+| **X-Ray (Tracing)**                           | Distributed trace monitoring                                                                                      | \$5.00                                                                                  |
+| **TOTAL**                                     | **Monthly cost estimate for large deployment**                                                                   | **\$401.23**                                                                            |
 
 
-## Prerequisites
+
+## Development
+
+### Prerequisites
 
 - An AWS account with appropriate permissions to create and manage resources.
 - **AWS CLI** configured with your account credentials.
 - **AWS CDK CLI** (`npm install -g aws-cdk`).
 - **Node.js** (v20.x or later).
-- **Python** (3.12 or later).
+- **Python** (3.12).
 - **Docker** (for local development).
 - **Git** for cloning the repository.
 - Optional: Third-party services (such as Twelve Labs) require separate setup and API credentials for integration.
 
-See [Operating System](#operating-system) for supported platforms.
+### Operating System
 
----
-
-## Operating System
-
-Development and deployment instructions are validated for **MacOS**, **Windows**, and **Linux**.  
+Development and deployment instructions are validated for **MacOS**, **Windows**, and **Linux**.
 Deployment to AWS services is fully managed through the AWS CLI and Console and does not depend on local OS beyond the tools above.
 
 > These deployment instructions are optimized for modern developer environments (MacOS/Windows/Linux). Deployment to AWS services (e.g., Lambda, CloudFormation, CDK) runs on AWS-managed infrastructure.
 
-**Required Packages:**  
-- Python 3.12+ (`python3 --version`)
+**Required Packages:**
+- Python 3.12 (`python3 --version`)
 - Node.js 20+ (`node --version`)
 - Docker (`docker --version`)
 - AWS CLI (`aws --version`)
@@ -174,21 +201,27 @@ Key configuration parameters include:
 - **vpc**: VPC configuration for using existing or creating new VPC
 - **authZ**: Identity provider configuration (Cognito, SAML)
 
-See the [`config.json-template`](.cicd/config.json-template) for a complete configuration example.
+See the [`config-example.json`](config-example.json) for a complete configuration example.
 
 ---
 
-### 5. **Deploy using AWS CDK**
+### 5. **Deploy using CloudFormation Template**
 
-```bash
-cdk deploy --all --profile <profile> --region <region>
-```
+Deploy directly using the CloudFormation template from GitHub:
+
+1. Go to the AWS Console > CloudFormation > "Create Stack" > "With new resources (standard)".
+2. Choose **Upload a template file**, select `medialake.template`.
+3. Set stack name to `medialake-cf`.
+4. Enter the required parameters as defined in your [`config.json`](config.json).
+5. Accept the required IAM capabilities and deploy.
+
+See the [`MediaLake-Installation-Guide.md`](assets/docs/MediaLake-Installation-Guide.md) for a complete CloudFormation deployment guide.
 
 ---
 
-### 6. **Alternative: Deploy using CloudFormation and Shell Script**
+### 6. **Deploy using Deployment Script**
 
-If you prefer CloudFormation and automation, use the provided shell script:
+Use the provided shell script for automated deployment:
 
 ```bash
 chmod +x assets/scripts/deploy-medialake.sh
@@ -196,15 +229,13 @@ chmod +x assets/scripts/deploy-medialake.sh
 ```
 - The script automates S3 uploads, CloudFormation stack creation, and (optionally) redeployments or stack deletions.
 
-**Manual CloudFormation steps:**
-1. Go to the AWS Console > CloudFormation > "Create Stack" > "With new resources (standard)".
-2. Upload `medialake.template` as the template file.
-3. Set stack name to `medialake-cf`.
-4. Enter the required parameters, including the S3 Presigned URL (provided by the script).
-5. Accept the required IAM capabilities and deploy.
+---
 
-> See the detailed step-by-step instructions in [MediaLake-Instructions.docx](assets/docs/MediaLake-Instructions.docx) for screenshots and advanced usage.
+### 7. **Deploy using AWS CDK**
 
+```bash
+cdk deploy --all --profile <profile> --region <region>
+```
 ---
 
 ## Deployment Validation
@@ -236,22 +267,18 @@ Use the emailed credentials to log in to the MediaLake UI.
 ### 4. **Enable Semantic Search and Integrations**
 
 - Enable and configure semantic search providers (e.g., Twelve Labs) as described in the UI and [MediaLake-Instructions.docx](assets/docs/MediaLake-Instructions.docx).
-- Import pipelines for enrichment and transcription, and configure any third-party integrations required.
+- Import pipelines for enrichment and transcription.
 
 ### 5. **Process and Retrieve Assets**
 
 - Monitor pipeline executions, view extracted metadata, and use search/discovery features in the UI.
-- Integrate with external systems via the REST API (see API documentation in the repo).
 
 ---
 
 ## Next Steps
 
 - Customize pipeline configurations for your use case.
-- Integrate with additional third-party providers (see instructions in the repo and documentation).
 - Scale up OpenSearch or DynamoDB for higher performance.
-- Add or modify IAM roles and security settings as needed.
-- Explore API endpoints for automation and integration.
 
 ---
 
@@ -308,6 +335,8 @@ medialake/
 - **Amazon EventBridge** - Event routing and pipeline triggers
 - **Amazon API Gateway** - REST API endpoint management
 - **Amazon DynamoDB** - Asset metadata and configuration storage
+- **AWS MediaConvert** - Media transcoding and format conversion service
+- **Amazon Transcribe** - Speech-to-text transcription service (only when pipeline is imported and enabled)
 
 **Security & Authentication:**
 - **AWS Cognito** - User authentication and authorization
@@ -317,21 +346,6 @@ medialake/
 **Monitoring & Search:**
 - **Amazon CloudWatch** - Metrics, logging, and alerting
 - **Amazon OpenSearch** - Search and analytics engine
-
----
-
-## API Documentation
-
-The REST API includes the following main endpoints:
-
-- `POST /connectors/s3`: Create new S3 storage connector
-- `GET /connectors`: List all storage connectors
-- `DELETE /connectors/{id}`: Remove a storage connector
-- `GET /connectors/s3/explorer/{connector_id}`: Browse S3 bucket contents
-- `POST /pipelines`: Create processing pipeline
-- `DELETE /pipelines/{id}`: Remove pipeline
-- `GET /assets`: List and search media assets
-- `POST /assets/upload`: Upload media assets
 
 ---
 
