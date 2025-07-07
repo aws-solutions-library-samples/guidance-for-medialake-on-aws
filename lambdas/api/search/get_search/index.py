@@ -284,7 +284,7 @@ def build_semantic_query(params: SearchParams) -> Dict:
                                 }
             )
 
-            if params.asset_size_lte is not None and params.asset_size_gte is not None:
+            if params.asset_size_lte is not None or params.asset_size_gte is not None:
                 try:
                     query["query"]["bool"]["filter"]["bool"]["must"].append({
                         "range": {
@@ -298,7 +298,7 @@ def build_semantic_query(params: SearchParams) -> Dict:
                 except ValueError:
                     logger.warning(f"Invalid values for asset size: {params.asset_size_gte,params.asset_size_lte}")
 
-            if params.ingested_date_lte is not None and params.ingested_date_gte is not None:
+            if params.ingested_date_lte is not None or params.ingested_date_gte is not None:
                 try:
                     query["query"]["bool"]["filter"]["bool"]["must"].append({
                         "range": {
@@ -441,7 +441,7 @@ def build_search_query(params: SearchParams) -> Dict:
         var_ext = params.extension.split(",")
         filters_to_add.append({"terms": {"DigitalSourceAsset.MainRepresentation.Format": var_ext}})
 
-    if params.asset_size_lte is not None and params.asset_size_gte is not None:
+    if params.asset_size_lte is not None or params.asset_size_gte is not None:
         filters_to_add.append({
             "range": {
                 "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size": {
@@ -451,7 +451,7 @@ def build_search_query(params: SearchParams) -> Dict:
             }
         })
 
-    if params.ingested_date_lte is not None and params.ingested_date_gte is not None:
+    if params.ingested_date_lte is not None or params.ingested_date_gte is not None:
         filters_to_add.append({
             "range": {
                 "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate": {
