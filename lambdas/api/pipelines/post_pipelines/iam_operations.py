@@ -12,7 +12,7 @@ from config import (
     MEDIA_ASSETS_BUCKET_NAME,
     OPENSEARCH_ENDPOINT,
     MEDIALAKE_ASSET_TABLE,
-    INGEST_EVENT_BUS_NAME,
+    PIPELINES_EVENT_BUS_NAME,
 )
 
 # Initialize logger
@@ -431,7 +431,7 @@ def create_lambda_execution_policy(role_name: str, yaml_data: Dict[str, Any]) ->
                 "Effect": "Allow",
                 "Action": ["events:PutEvents"],
                 "Resource": [
-                    f"arn:aws:events:{os.environ.get('AWS_REGION', 'us-east-1')}:{os.environ['ACCOUNT_ID']}:event-bus/{INGEST_EVENT_BUS_NAME}",
+                    f"arn:aws:events:{os.environ.get('AWS_REGION', 'us-east-1')}:{os.environ['ACCOUNT_ID']}:event-bus/{PIPELINES_EVENT_BUS_NAME}",
                 ],
             },
             {

@@ -56,7 +56,7 @@ def update_eventbridge_rule_state(rule_name: str, enabled: bool) -> None:
         enabled: True to enable, False to disable
     """
     # Get the event bus name from environment variable
-    event_bus_name = os.environ.get("INGEST_EVENT_BUS_NAME")
+    event_bus_name = os.environ.get("PIPELINES_EVENT_BUS_NAME")
     events_client = boto3.client("events")
     
     try:

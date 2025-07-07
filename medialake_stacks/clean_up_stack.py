@@ -16,7 +16,7 @@ from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaCon
 
 @dataclass
 class CleanupStackProps:
-    ingest_event_bus: events.EventBus
+    pipelines_event_bus: events.EventBus
     pipeline_table: dynamodb.TableV2
     connector_table: dynamodb.TableV2
 

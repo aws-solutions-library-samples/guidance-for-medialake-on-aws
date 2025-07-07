@@ -1106,7 +1106,7 @@ def create_connector(createconnector: S3Connector) -> dict:
         # Deploy lambda if environment variables are set
         try:
             # Get the Lambda environment variable
-            ingest_event_bus = os.environ.get("INGEST_EVENT_BUS")
+            pipelines_event_bus = os.environ.get("PIPELINES_EVENT_BUS")
             medialake_asset_table = os.environ.get("MEDIALAKE_ASSET_TABLE")
             asset_table_file_hash_index_arn = os.environ.get(
                 "MEDIALAKE_ASSET_TABLE_FILE_HASH_INDEX"
@@ -1231,7 +1231,7 @@ def create_connector(createconnector: S3Connector) -> dict:
                     {
                         "Effect": "Allow",
                         "Action": ["events:PutEvents"],
-                        "Resource": f"arn:aws:events:{bucket_region}:{account_id}:event-bus/{ingest_event_bus}",
+                        "Resource": f"arn:aws:events:{bucket_region}:{account_id}:event-bus/{pipelines_event_bus}",
                     }
                 ],
             }
@@ -1385,12 +1385,12 @@ def create_connector(createconnector: S3Connector) -> dict:
                 "Tags": {"medialake": medialake_tag},
                 "Environment": {
                     "Variables": {
-                        "INGEST_EVENT_BUS": ingest_event_bus,
+                        "PIPELINES_EVENT_BUS": pipelines_event_bus,
                         "MEDIALAKE_ASSET_TABLE": medialake_asset_table,
                         "POWERTOOLS_SERVICE_NAME": "asset-processor",
                         "POWERTOOLS_METRICS_NAMESPACE": "AssetProcessor",
                         "ASSETS_TABLE": medialake_asset_table,
-                        "EVENT_BUS_NAME": ingest_event_bus,
+                        "EVENT_BUS_NAME": pipelines_event_bus,
                         "DO_NOT_INGEST_DUPLICATES": "True",
                         "OPENSEARCH_ENDPOINT": os.environ["OPENSEARCH_ENDPOINT"],
                         "INDEX_NAME": os.environ.get("INDEX_NAME", "media"),
