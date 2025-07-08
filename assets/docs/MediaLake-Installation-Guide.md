@@ -110,6 +110,8 @@ After deployment, you'll need to configure storage connectors to connect MediaLa
    - **S3 Integration Method**: Choose the integration method from available options
    - **New Bucket Name**: Enter the S3 bucket name (must be globally unique and follow S3 naming rules)
    
+   > **Important**: New S3 buckets created through MediaLake will need to be manually emptied and deleted during cleanup as they are not automatically removed when the MediaLake stack is deleted.
+   
    **Advanced Configuration** (optional):
    - **Object Prefix**: Enter an optional prefix to filter objects (e.g., 'folder/')
    - Click **Add Prefix** to add additional prefixes if needed
@@ -238,6 +240,7 @@ To update source code from Git repository:
 
 - In CloudFormation, delete all stacks prefixed with `MediaLake` and `medialake-cf`.
   ![CloudFormation Stacks](../images/installation-guide/medialake-go-to-cloudformation-screen.png)
+- **Important for S3 Buckets**: For new buckets created via MediaLake, you must manually empty and delete them as they are not automatically cleaned up during stack deletion.
 - If you encounter dependency errors, retry after deleting prerequisite stacks.
   ![Dependency Errors](../images/installation-guide/medialake-go-to-cloudformation-screen-2.png)
 - When clean, redeploy using the base install steps above.

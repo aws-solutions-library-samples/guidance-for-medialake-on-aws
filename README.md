@@ -293,6 +293,7 @@ Use the emailed credentials to log in to the MediaLake UI.
 
 - Navigate to **Settings > Connectors** in the UI.
 - Add a connector, choosing Amazon S3 and providing your bucket details.
+- **Note**: If you create new S3 buckets through MediaLake, remember that these will need to be manually emptied and deleted during cleanup as they are not automatically removed when the MediaLake stack is deleted.
 
 ### 3. **Ingest Media**
 
@@ -434,7 +435,8 @@ To remove all MediaLake resources:
 
 - Go to CloudFormation console
 - Delete all stacks with prefix "MediaLake" and `medialake-cf`
-- Delete any associated S3 buckets, DynamoDB tables, or other resources as needed
+- **Important for S3 Buckets**: For new buckets created via MediaLake, you must manually empty and delete them as they are not automatically cleaned up during stack deletion
+- Delete any other associated S3 buckets, DynamoDB tables, or resources as needed
 
 > **Warning:** This will permanently remove all MediaLake data and resources. Use with caution.
 
