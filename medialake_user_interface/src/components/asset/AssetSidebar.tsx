@@ -204,10 +204,10 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
                                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                                     {getVersionIcon(version)}
                                     <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                                        {version.type}
+                                        {version.type.charAt(0).toUpperCase() + version.type.slice(1).toLowerCase()}
                                     </Typography>
-                                    <Typography 
-                                        variant="caption" 
+                                    <Typography
+                                        variant="caption"
                                         color="text.secondary"
                                         sx={{ ml: 'auto' }}
                                     >
@@ -215,7 +215,7 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
                                     </Typography>
                                 </Box>
                                 <Typography variant="body2" color="text.secondary">
-                                    {version.description}
+                                    <strong>Size:</strong> {version.size || 'N/A'}
                                 </Typography>
                                 <Box sx={{ display: 'flex', mt: 1 }}>
                                     <Tooltip title="Download this version">
@@ -234,7 +234,7 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
                                             {downloadingVersionId === version.id ? 'Downloading...' : 'Download'}
                                         </Button>
                                     </Tooltip>
-                                    <Tooltip title="Preview this version">
+                                    {/* <Tooltip title="Preview this version">
                                         <Button 
                                             variant="text" 
                                             size="small" 
@@ -243,7 +243,7 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
                                         >
                                             Preview
                                         </Button>
-                                    </Tooltip>
+                                    </Tooltip> */}
                                 </Box>
                             </Box>
                         </ListItem>
@@ -1027,10 +1027,55 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = (props) => {
                     >
                         {currentTab === 1 && (
                             <AssetVersions
-                                versions={versions.map(v => ({
-                                    ...v,
-                                    assetId: assetId // Add assetId to each version
-                                }))}
+                                versions={versions.map(v => {
+                                    // Helper function to format file size in a friendly way
+                                    const formatFileSize = (bytes: number): string => {
+                                        if (bytes === 0) return '0 B';
+                                        
+                                        const k = 1024;
+                                        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+                                        const i = Math.floor(Math.log(bytes) / Math.log(k));
+                                        
+                                        const size = bytes / Math.pow(k, i);
+                                        
+                                        // Format with appropriate decimal places
+                                        if (i === 0) return `${size} B`; // Bytes - no decimals
+                                        if (i === 1) return `${Math.round(size)} KB`; // KB - no decimals
+                                        if (i === 2) return `${size.toFixed(1)} MB`; // MB - 1 decimal
+                                        return `${size.toFixed(2)} ${sizes[i]}`; // GB+ - 2 decimals
+                                    };
+                                    
+                                    // Use the existing fileSize property from the version object
+                                    let size = null;
+                                    
+                                    if (v.fileSize) {
+                                        // If fileSize is already formatted (contains 'KB', 'MB', etc.), check if it needs reformatting
+                                        if (typeof v.fileSize === 'string' && (v.fileSize.includes('KB') || v.fileSize.includes('MB') || v.fileSize.includes('GB'))) {
+                                            // Extract the numeric value and reformat it
+                                            const numericValue = parseFloat(v.fileSize);
+                                            if (!isNaN(numericValue)) {
+                                                // Convert back to bytes based on unit, then reformat
+                                                let bytes = numericValue;
+                                                if (v.fileSize.includes('KB')) bytes *= 1024;
+                                                else if (v.fileSize.includes('MB')) bytes *= 1024 * 1024;
+                                                else if (v.fileSize.includes('GB')) bytes *= 1024 * 1024 * 1024;
+                                                size = formatFileSize(bytes);
+                                            } else {
+                                                size = v.fileSize; // Keep original if parsing fails
+                                            }
+                                        } else {
+                                            // If fileSize is raw bytes, format it
+                                            const bytes = parseFloat(v.fileSize);
+                                            size = formatFileSize(bytes);
+                                        }
+                                    }
+                                    
+                                    return {
+                                        ...v,
+                                        assetId: assetId,
+                                        size: size
+                                    };
+                                })}
                             />
                         )}
                     </Box>
