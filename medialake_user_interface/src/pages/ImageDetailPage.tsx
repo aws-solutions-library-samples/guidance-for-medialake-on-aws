@@ -746,6 +746,7 @@ const ImageDetailContent: React.FC = () => {
                 comments={comments}
                 onAddComment={handleAddComment}
                 assetId={assetData?.data?.asset?.InventoryID}
+                asset={assetData?.data?.asset}
             />
 
             {selectedComment !== null && (

@@ -204,10 +204,10 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
                                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                                     {getVersionIcon(version)}
                                     <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                                        {version.type}
+                                        {version.type.charAt(0).toUpperCase() + version.type.slice(1).toLowerCase()}
                                     </Typography>
-                                    <Typography 
-                                        variant="caption" 
+                                    <Typography
+                                        variant="caption"
                                         color="text.secondary"
                                         sx={{ ml: 'auto' }}
                                     >
@@ -215,7 +215,10 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
                                     </Typography>
                                 </Box>
                                 <Typography variant="body2" color="text.secondary">
-                                    {version.description}
+                                    <strong>Size:</strong> {version.size || 'N/A'}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    <strong>Resolution:</strong> {version.resolution ? `${version.resolution.width}x${version.resolution.height}` : 'N/A'}
                                 </Typography>
                                 <Box sx={{ display: 'flex', mt: 1 }}>
                                     <Tooltip title="Download this version">
@@ -234,7 +237,7 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
                                             {downloadingVersionId === version.id ? 'Downloading...' : 'Download'}
                                         </Button>
                                     </Tooltip>
-                                    <Tooltip title="Preview this version">
+                                    {/* <Tooltip title="Preview this version">
                                         <Button 
                                             variant="text" 
                                             size="small" 
@@ -243,7 +246,7 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
                                         >
                                             Preview
                                         </Button>
-                                    </Tooltip>
+                                    </Tooltip> */}
                                 </Box>
                             </Box>
                         </ListItem>
@@ -1027,10 +1030,57 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = (props) => {
                     >
                         {currentTab === 1 && (
                             <AssetVersions
-                                versions={versions.map(v => ({
-                                    ...v,
-                                    assetId: assetId // Add assetId to each version
-                                }))}
+                                versions={versions.map(v => {
+                                    // Use the existing fileSize property from the version object
+                                    let size = null;
+                                    let resolution = null;
+                                    
+                                    if (v.fileSize) {
+                                        // If fileSize is already formatted (contains 'KB', 'MB', etc.), use it as is
+                                        if (typeof v.fileSize === 'string' && (v.fileSize.includes('KB') || v.fileSize.includes('MB') || v.fileSize.includes('GB'))) {
+                                            size = v.fileSize;
+                                        } else {
+                                            // If fileSize is raw bytes, convert to KB
+                                            const bytes = parseFloat(v.fileSize);
+                                            size = (bytes / 1024).toFixed(2) + ' KB';
+                                        }
+                                    }
+                                    
+                                    // Extract resolution based on version type
+                                    if (v.type?.toLowerCase() === 'original' || v.type?.toLowerCase() === 'master') {
+                                        // For original/master, get resolution from EmbeddedMetadata.ihdr
+                                        const width = asset?.Metadata?.EmbeddedMetadata?.ihdr?.['Image Width']?.value;
+                                        const height = asset?.Metadata?.EmbeddedMetadata?.ihdr?.['Image Height']?.value;
+                                        if (width && height) {
+                                            resolution = { width: parseInt(width), height: parseInt(height) };
+                                        }
+                                    } else if (v.type?.toLowerCase() === 'proxy') {
+                                        // For proxy, also use EmbeddedMetadata.ihdr (same as original)
+                                        const width = asset?.Metadata?.EmbeddedMetadata?.ihdr?.['Image Width']?.value;
+                                        const height = asset?.Metadata?.EmbeddedMetadata?.ihdr?.['Image Height']?.value;
+                                        if (width && height) {
+                                            resolution = { width: parseInt(width), height: parseInt(height) };
+                                        }
+                                    } else if (v.type?.toLowerCase() === 'thumbnail') {
+                                        // For thumbnail, get from DerivedRepresentations ImageSpec
+                                        const derivedRep = asset?.DerivedRepresentations?.find(rep =>
+                                            rep.Purpose?.toLowerCase() === 'thumbnail'
+                                        );
+                                        if (derivedRep?.ImageSpec?.Resolution) {
+                                            resolution = {
+                                                width: Math.round(derivedRep.ImageSpec.Resolution.Width),
+                                                height: Math.round(derivedRep.ImageSpec.Resolution.Height)
+                                            };
+                                        }
+                                    }
+                                    
+                                    return {
+                                        ...v,
+                                        assetId: assetId,
+                                        size: size,
+                                        resolution: resolution
+                                    };
+                                })}
                             />
                         )}
                     </Box>
