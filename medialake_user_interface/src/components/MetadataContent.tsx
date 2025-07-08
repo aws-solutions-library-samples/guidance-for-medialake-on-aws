@@ -162,7 +162,7 @@ const MetadataContent: React.FC<MetadataContentProps> = ({
                                 minWidth: 'max-content'
                             }}
                         >
-                            {formatCamelCase(key)}:
+                            {formatCamelCase(key)}
                         </Typography>
                         <Box>
                             {typeof value === 'object' && value !== null ? (
