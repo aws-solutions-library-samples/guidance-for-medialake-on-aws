@@ -8,12 +8,10 @@ import {
   HeadBucketCommand,
   BucketLocationConstraint
 } from '@aws-sdk/client-s3';
-import { fromIni } from '@aws-sdk/credential-providers';
 import * as crypto from 'crypto';
 import { TestInfo } from '@playwright/test';
 
 const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
-const AWS_PROFILE = 'medialake-dev4';
 
 // Generate a random bucket name
 function generateRandomBucketName(): string {
@@ -59,34 +57,37 @@ async function emptyBucket(s3Client: S3Client, bucketName: string): Promise<void
   }
 }
 
-// Helper function to create S3 client
-function createS3Client(): S3Client {
-  const credentials = fromIni({ profile: AWS_PROFILE });
-  return new S3Client({ 
-    region: AWS_REGION,
-    credentials 
-  });
-}
-
-// Define the types for our fixtures
+// Define the type for our new fixture
 type S3Fixtures = {
   s3BucketName: string;
-  s3BucketCreation: string;
-  s3BucketDeletion: void;
 };
 
 // Extend the base Playwright test fixture
+// Exporting this as 'test' now, only contains S3 fixture
 export const test = base.extend<S3Fixtures>({
-  // Fixture to create the S3 bucket before tests
-  s3BucketCreation: [async ({ }, use, testInfo) => {
-    const bucketName = generateRandomBucketName() + `-test-${testInfo.workerIndex}-${Date.now()}`;
-    console.log(`[S3 Creation Fixture] Generated bucket name: ${bucketName}`);
+  // @ts-expect-error - Playwright's type inference struggles with worker-scoped fixtures in extensions
+  s3BucketName: [async ({ /* No base fixtures needed here */ }, use, workerInfo) => {
+    const bucketName = generateRandomBucketName() + `-worker-${workerInfo.workerIndex}`;
+    console.log(`[Fixture Worker ${workerInfo.workerIndex}] Generated bucket name: ${bucketName}`);
 
-    const s3Client = createS3Client();
+    // Initialize S3 client.
+    // The AWS SDK automatically uses the standard credential chain:
+    // 1. Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN)
+    // 2. Profile from AWS_PROFILE environment variable (if set)
+    // 3. Shared credentials file (~/.aws/credentials)
+    // 4. Shared config file (~/.aws/config)
+    // 5. IAM role (if running on EC2/ECS/etc.)
+    // To use 'medialake-dev4', run tests like: 
+    // AWS_PROFILE=medialake-dev4 npx playwright test
+    const s3Client = new S3Client({ region: AWS_REGION }); 
+
+    // Alternatively, force a profile (less flexible):
+    // const credentials = fromIni({ profile: 'medialake-dev4' });
+    // const s3Client = new S3Client({ region: AWS_REGION, credentials });
 
     try {
       // Create the bucket
-      console.log(`[S3 Creation Fixture] Creating bucket ${bucketName} in region ${AWS_REGION}...`);
+      console.log(`[Fixture Worker ${workerInfo.workerIndex}] Creating bucket ${bucketName} in region ${AWS_REGION}...`);
       const createBucketParams: any = { Bucket: bucketName };
       if (AWS_REGION !== 'us-east-1') {
         createBucketParams.CreateBucketConfiguration = {
@@ -94,67 +95,39 @@ export const test = base.extend<S3Fixtures>({
         };
       }
       await s3Client.send(new CreateBucketCommand(createBucketParams));
-      console.log(`[S3 Creation Fixture] Bucket ${bucketName} created.`);
+      console.log(`[Fixture Worker ${workerInfo.workerIndex}] Bucket ${bucketName} created.`);
 
-      // Wait for bucket to be available and verify multiple times
-      let bucketReady = false;
-      let attempts = 0;
-      const maxAttempts = 10;
-      
-      while (!bucketReady && attempts < maxAttempts) {
-        try {
-          await new Promise(resolve => setTimeout(resolve, 2000)); 
-          await s3Client.send(new HeadBucketCommand({ Bucket: bucketName }));
-          bucketReady = true;
-          console.log(`[S3 Creation Fixture] Bucket ${bucketName} confirmed to exist after ${attempts + 1} attempts.`);
-        } catch (error) {
-          attempts++;
-          console.log(`[S3 Creation Fixture] Bucket ${bucketName} not ready yet, attempt ${attempts}/${maxAttempts}`);
-          if (attempts === maxAttempts) {
-            throw new Error(`Bucket ${bucketName} not available after ${maxAttempts} attempts`);
-          }
-        }
-      }
+      // Wait briefly for bucket to be available
+      await new Promise(resolve => setTimeout(resolve, 2000)); 
 
-      // Store the bucket name in the test context (we'll pass this to s3BucketName)
+      // Verify bucket exists
+      await s3Client.send(new HeadBucketCommand({ Bucket: bucketName }));
+      console.log(`[Fixture Worker ${workerInfo.workerIndex}] Bucket ${bucketName} confirmed to exist.`);
+
+      // Use the bucket name in the test
       await use(bucketName);
 
     } catch (error) {
-        console.error(`[S3 Creation Fixture] Error setting up bucket ${bucketName}:`, error);
+        console.error(`[Fixture Worker ${workerInfo.workerIndex}] Error setting up bucket ${bucketName}:`, error);
+        // If setup fails, ensure cleanup still attempts (though bucket might not exist)
         throw error; // Fail the test if setup fails
+    } finally {
+        // Teardown: Delete the bucket after the tests for this worker are done
+        console.log(`[Fixture Worker ${workerInfo.workerIndex}] Cleaning up bucket ${bucketName}...`);
+        try {
+          await emptyBucket(s3Client, bucketName);
+          await s3Client.send(new DeleteBucketCommand({ Bucket: bucketName }));
+          console.log(`[Fixture Worker ${workerInfo.workerIndex}] Successfully deleted bucket ${bucketName}`);
+        } catch (error: any) {
+          if (error.name === 'NoSuchBucket') {
+             console.log(`[Fixture Worker ${workerInfo.workerIndex}] Bucket ${bucketName} already deleted or never created.`);
+          } else {
+            console.error(`[Fixture Worker ${workerInfo.workerIndex}] Error deleting bucket ${bucketName}:`, error);
+            // Log error but don't fail the teardown unless critical
+          }
+        }
     }
-  }, { scope: 'test' }],
-
-  // Fixture to provide the bucket name to tests
-  s3BucketName: [async ({ s3BucketCreation }, use) => {
-    console.log(`[S3 BucketName Fixture] Using bucket: ${s3BucketCreation}`);
-    await use(s3BucketCreation);
-  }, { scope: 'test' }],
-
-  // Fixture to delete the S3 bucket after tests
-  s3BucketDeletion: [async ({ s3BucketCreation }, use, testInfo) => {
-    // This fixture runs after the test
-    await use();
-
-    // Now clean up the bucket
-    const bucketName = s3BucketCreation;
-    console.log(`[S3 Deletion Fixture] Cleaning up bucket ${bucketName}...`);
-    
-    const s3Client = createS3Client();
-    
-    try {
-      await emptyBucket(s3Client, bucketName);
-      await s3Client.send(new DeleteBucketCommand({ Bucket: bucketName }));
-      console.log(`[S3 Deletion Fixture] Successfully deleted bucket ${bucketName}`);
-    } catch (error: any) {
-      if (error.name === 'NoSuchBucket') {
-         console.log(`[S3 Deletion Fixture] Bucket ${bucketName} already deleted or never created.`);
-      } else {
-        console.error(`[S3 Deletion Fixture] Error deleting bucket ${bucketName}:`, error);
-        // Log error but don't fail the teardown unless critical
-      }
-    }
-  }, { scope: 'test' }], 
+  }, { scope: 'worker' }], 
 });
 
 export { expect } from '@playwright/test'; 
