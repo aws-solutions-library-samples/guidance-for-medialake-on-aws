@@ -13,8 +13,8 @@
 >   - [Prepare the environment](#2-prepare-the-environment)
 >   - [Configure AWS account and region](#3-configure-aws-account-and-region)
 >   - [Configuration Setup](#4-configuration-setup)
->   - [Deploy using AWS CDK](#5-deploy-using-aws-cdk)
->   - [Alternative: Deploy using CloudFormation](#6-alternative-deploy-using-cloudformation-and-shell-script)
+>   - [Deploy using CloudFormation Template (Recommended)](#5-deploy-using-cloudformation-template-recommended)
+>   - [Alternative: Deploy using AWS CDK](#6-alternative-deploy-using-aws-cdk)
 > - [Deployment Validation](#deployment-validation)
 > - [Running the Guidance](#running-the-guidance)
 >   - [Login](#1-login)
@@ -34,7 +34,6 @@
 >   - [Video Files](#video-files)
 >   - [Image Files](#image-files)
 > - [Cleanup](#cleanup)
->   - [Using the Deletion Script](#using-the-deletion-script)
 >   - [Manual Cleanup (AWS Console)](#manual-cleanup-aws-console)
 > - [FAQ, Known Issues, and Additional Considerations](#faq-known-issues-and-additional-considerations)
 > - [Revisions](#revisions)
@@ -73,7 +72,19 @@ MediaLake is designed for:
 ## Cost
 
 You are responsible for the cost of the AWS services used while running this Guidance.
-As of July 2025, the cost for running this Guidance with the **large deployment configuration** in the **US East (N. Virginia)** region is approximately **$401.23 per month** for the core infrastructure (not including add-ons or variable workloads). Add-on processing and enrichment services (like Twelve Labs and Transcription) will increase the cost depending on usage.
+
+**Base Infrastructure Cost (without variable workloads):**
+As of July 2025, the cost for running this Guidance with the **large deployment configuration** in the **US East (N. Virginia)** region is approximately **$401.23 per month** for the core infrastructure only.
+
+**Variable Workload Costs:**
+Additional costs will be incurred based on actual usage:
+- Media processing and enrichment services (Twelve Labs, Transcription)
+- S3 storage and data transfer
+- Lambda execution time
+- OpenSearch queries and indexing
+- Step Functions executions
+
+The total monthly cost will vary significantly based on the volume of media processed, storage requirements, and usage patterns.
 
 We recommend creating a **Budget through AWS Cost Explorer** to help manage costs. Prices are subject to change. For full details, refer to the pricing webpage for each AWS service used in this Guidance.
 
@@ -117,36 +128,68 @@ We recommend creating a **Budget through AWS Cost Explorer** to help manage cost
 
 ### Operating System
 
-Development and deployment instructions are validated for **MacOS**, **Windows**, and **Linux**.
+Development and deployment instructions are validated for **MacOS** and **Windows**.
 Deployment to AWS services is fully managed through the AWS CLI and Console and does not depend on local OS beyond the tools above.
 
-> These deployment instructions are optimized for modern developer environments (MacOS/Windows/Linux). Deployment to AWS services (e.g., Lambda, CloudFormation, CDK) runs on AWS-managed infrastructure.
+> These deployment instructions are optimized for modern developer environments (MacOS/Windows). Deployment to AWS services (e.g., Lambda, CloudFormation, CDK) runs on AWS-managed infrastructure.
 
 **Required Packages:**
 - Python 3.12 (`python3 --version`)
 - Node.js 20+ (`node --version`)
-- Docker (`docker --version`)
+- Docker Desktop (`docker --version`)
 - AWS CLI (`aws --version`)
 - AWS CDK (`cdk --version`)
 
-**Install examples (MacOS):**
+**Install Python 3.12 specifically:**
+
+**MacOS:**
 ```bash
-brew install python node awscli docker
+# Download and install Python 3.12 directly from python.org
+# Visit https://www.python.org/downloads/release/python-3120/
+
+# Alternative: Use pyenv without brew
+curl https://pyenv.run | bash
+pyenv install 3.12.0
+pyenv global 3.12.0
+```
+
+**Windows:**
+```powershell
+# Download Python 3.12 from python.org
+# Visit https://www.python.org/downloads/release/python-3120/
+```
+
+**Install other dependencies:**
+
+**MacOS:**
+```bash
+# Install Docker Desktop from https://www.docker.com/products/docker-desktop
+
+# Install Node.js from https://nodejs.org/
+# Download and install the LTS version
+
+# Install AWS CLI
+curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"
+sudo installer -pkg AWSCLIV2.pkg -target /
+
+# Install AWS CDK
 npm install -g aws-cdk
 ```
 
-**Install examples (Linux, Ubuntu):**
-```bash
-sudo apt-get update
-sudo apt-get install python3 python3-venv nodejs npm awscli docker.io
-sudo npm install -g aws-cdk
+**Windows:**
+```powershell
+# Install Docker Desktop from https://www.docker.com/products/docker-desktop
+# Install Node.js from https://nodejs.org/
+# Install AWS CLI
+winget install Amazon.AWSCLI
+npm install -g aws-cdk
 ```
 
 ---
 
 ## Deployment Steps
 
-You can deploy MediaLake using either the AWS CDK or the provided CloudFormation/script-based workflow.
+You can deploy MediaLake using either the CloudFormation template (recommended) or AWS CDK.
 
 ### 1. **Clone the repository**
 
@@ -160,8 +203,8 @@ cd guidance-for-medialake
 #### (a) **Python virtual environment (recommended):**
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate      # Mac/Linux
-# OR
+source .venv/bin/activate      # Mac
+# OR for Windows
 .venv\Scriptsctivate.bat     # Windows
 ```
 
@@ -205,7 +248,7 @@ See the [`config-example.json`](config-example.json) for a complete configuratio
 
 ---
 
-### 5. **Deploy using CloudFormation Template**
+### 5. **Deploy using CloudFormation Template (Recommended)**
 
 Deploy directly using the CloudFormation template from GitHub:
 
@@ -219,19 +262,9 @@ See the [`MediaLake-Installation-Guide.md`](assets/docs/MediaLake-Installation-G
 
 ---
 
-### 6. **Deploy using Deployment Script**
+### 6. **Alternative: Deploy using AWS CDK**
 
-Use the provided shell script for automated deployment:
-
-```bash
-chmod +x assets/scripts/deploy-medialake.sh
-./assets/scripts/deploy-medialake.sh --profile <your-aws-profile> --region us-east-1 --deploy
-```
-- The script automates S3 uploads, CloudFormation stack creation, and (optionally) redeployments or stack deletions.
-
----
-
-### 7. **Deploy using AWS CDK**
+For advanced users who prefer CDK deployment:
 
 ```bash
 cdk deploy --all --profile <profile> --region <region>
@@ -395,16 +428,6 @@ Each media type is automatically processed through dedicated pipelines that hand
 ## Cleanup
 
 To remove all MediaLake resources:
-
-### Using the Deletion Script:
-
-```bash
-chmod +x assets/scripts/delete_medialake_stacks.py
-./assets/scripts/delete_medialake_stacks.py --profile <your-aws-profile> --region us-east-1
-```
-- The script will:
-  - Identify all stacks with "MediaLake" prefix
-  - Attempt deletion, handling dependencies automatically
 
 ### Manual Cleanup (AWS Console):
 
