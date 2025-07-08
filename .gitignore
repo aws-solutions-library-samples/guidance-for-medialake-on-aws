@@ -53,7 +53,7 @@ cdk.context.json
 *.clinerules
 *.cursorrules
 *.cursorignore
-docs/
+/docs/
 cline_docs/
 CLAUDE.md
 *.claude

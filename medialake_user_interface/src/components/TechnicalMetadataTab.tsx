@@ -53,7 +53,9 @@ const categoryMapping = {
     technical: 'Technical',
     musicBrainz: 'MusicBrainz',
     encoding: 'Encoding',
-    rights: 'Rights'
+    rights: 'Rights',
+    // Add mapping for ObjectMetadata to display as "Object Metadata"
+    ObjectMetadata: 'Object Metadata'
 };
 
 interface TechnicalMetadataTabProps {
@@ -211,7 +213,7 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
                                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
                                     {parent.category === 'EmbeddedMetadata'
                                         ? 'Embedded Metadata'
-                                        : parent.category}
+                                        : categoryMapping[parent.category as keyof typeof categoryMapping] || parent.category}
                                 </Typography>
                                 <Chip
                                     size="small"
@@ -233,7 +235,9 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
                                 itemId={`${pIdx}-${sIdx}`}
                                 label={
                                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                        <Typography variant="body2">{sub.category}</Typography>
+                                        <Typography variant="body2">
+                                            {categoryMapping[sub.category as keyof typeof categoryMapping] || sub.category}
+                                        </Typography>
                                         <Chip
                                             size="small"
                                             label={sub.count}

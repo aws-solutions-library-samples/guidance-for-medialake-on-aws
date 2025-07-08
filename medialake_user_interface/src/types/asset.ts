@@ -20,10 +20,10 @@ export interface AssetStorageInfo {
 }
 
 export interface AssetMetadata {
-    Embedded: {
-        ExtractedDate: string;
+    ObjectMetadata: {
+        // ExtractedDate: string;
         S3: {
-            Metadata: Record<string, any>;
+            // Metadata: Record<string, any>;
             ContentType: string;
             LastModified: string;
         };

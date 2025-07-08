@@ -118,6 +118,8 @@ const MetadataContent: React.FC<MetadataContentProps> = ({
         );
     } else if (typeof data === 'object' && data !== null) {
         let entries = Object.entries(data);
+        // Filter out keys that contain "Metadata" to hide them from display
+        entries = entries.filter(([key]) => !key.includes('Metadata'));
         const sortedEntries = sortEntries(entries);
         // Flatten nested metadata
         const flattenedEntries = flattenNestedMetadata(sortedEntries);
@@ -162,7 +164,7 @@ const MetadataContent: React.FC<MetadataContentProps> = ({
                                 minWidth: 'max-content'
                             }}
                         >
-                            {formatCamelCase(key)}:
+                            {formatCamelCase(key)}
                         </Typography>
                         <Box>
                             {typeof value === 'object' && value !== null ? (
