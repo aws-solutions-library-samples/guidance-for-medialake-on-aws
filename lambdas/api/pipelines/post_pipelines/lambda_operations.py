@@ -9,7 +9,7 @@ import shortuuid
 import boto3
 from aws_lambda_powertools import Logger
 
-from config import IAC_ASSETS_BUCKET, NODE_TEMPLATES_BUCKET, INGEST_EVENT_BUS_NAME, OPENSEARCH_VPC_SUBNET_IDS, OPENSEARCH_SECURITY_GROUP_ID, MEDIA_ASSETS_BUCKET_NAME, MEDIALAKE_ASSET_TABLE
+from config import IAC_ASSETS_BUCKET, NODE_TEMPLATES_BUCKET, PIPELINES_EVENT_BUS_NAME, OPENSEARCH_VPC_SUBNET_IDS, OPENSEARCH_SECURITY_GROUP_ID, MEDIA_ASSETS_BUCKET_NAME, MEDIALAKE_ASSET_TABLE
 from iam_operations import create_lambda_role, wait_for_role_propagation, sanitize_role_name, create_service_roles_from_yaml
 from dynamodb_operations import (
     get_node_info,
@@ -480,7 +480,7 @@ def create_lambda_function(pipeline_name: str, node: Any, is_first: bool = False
                 # Common environment variables for all Lambda functions
                 common_env_vars = {
                     "EXTERNAL_PAYLOAD_BUCKET": os.environ.get("EXTERNAL_PAYLOAD_BUCKET"),
-                    "EVENT_BUS_NAME": INGEST_EVENT_BUS_NAME or "default-event-bus",
+                    "EVENT_BUS_NAME": PIPELINES_EVENT_BUS_NAME or "default-event-bus",
                     "MEDIA_ASSETS_BUCKET_NAME": os.environ.get("MEDIA_ASSETS_BUCKET_NAME", ""),
                     "MEDIALAKE_ASSET_TABLE": MEDIALAKE_ASSET_TABLE,
                     "API_TEMPLATE_BUCKET": os.environ.get("NODE_TEMPLATES_BUCKET"),

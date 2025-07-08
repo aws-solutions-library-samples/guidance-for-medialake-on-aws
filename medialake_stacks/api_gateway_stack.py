@@ -64,7 +64,7 @@ class ApiGatewayStackProps:
     asset_table_file_hash_index_arn: str
     asset_table_asset_id_index_arn: str
     asset_table_s3_path_index_arn: str
-    ingest_event_bus: events.EventBus
+    pipelines_event_bus: events.EventBus
     vpc: ec2.Vpc
     security_group: ec2.SecurityGroup
     collection_endpoint: str
@@ -123,7 +123,7 @@ class ApiGatewayStack(cdk.NestedStack):
                 api_resource=api,
                 cognito_authorizer=self._api_gateway_authorizer,
                 x_origin_verify_secret=props.x_origin_verify_secret,
-                ingest_event_bus=props.ingest_event_bus,
+                pipelines_event_bus=props.pipelines_event_bus.event_bus_name,
                 asset_sync_job_table=props.asset_sync_job_table,
                 asset_sync_engine_lambda=props.asset_sync_engine_lambda,
                 open_search_endpoint=props.collection_endpoint,

@@ -189,7 +189,7 @@ class MediaLakeStack(cdk.Stack):
             "MediaLakeAssetSyncStack",
             props=AssetSyncStackProps(
                 asset_table=props.base_infrastructure.asset_table,
-                ingest_event_bus=props.base_infrastructure.ingest_event_bus,
+                pipelines_event_bus=props.base_infrastructure.pipelines_event_bus,
             ),
         )
 
@@ -219,7 +219,7 @@ class MediaLakeStack(cdk.Stack):
                 asset_table_file_hash_index_arn=props.base_infrastructure.asset_table_file_hash_index_arn,
                 asset_table_asset_id_index_arn=props.base_infrastructure.asset_table_asset_id_index_arn,
                 asset_table_s3_path_index_arn=props.base_infrastructure.asset_table_s3_path_index_arn,
-                ingest_event_bus=props.base_infrastructure.ingest_event_bus,
+                pipelines_event_bus=props.base_infrastructure.pipelines_event_bus,
                 asset_table=props.base_infrastructure.asset_table,
                 vpc=props.base_infrastructure.vpc,
                 security_group=props.base_infrastructure.security_group,
@@ -255,7 +255,7 @@ class MediaLakeStack(cdk.Stack):
             open_search_endpoint=props.base_infrastructure.collection_endpoint,
             vpc=props.base_infrastructure.vpc,
             security_group=props.base_infrastructure.security_group,
-            ingest_event_bus=props.base_infrastructure.ingest_event_bus,
+            pipelines_event_bus=props.base_infrastructure.pipelines_event_bus,
             media_assets_bucket=props.base_infrastructure.media_assets_s3_bucket,
             x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
             collection_endpoint=props.base_infrastructure.collection_endpoint,
@@ -367,7 +367,7 @@ cleanup_stack = CleanupStack(
     app,
     "MediaLakeCleanupStack",
     props=CleanupStackProps(
-        ingest_event_bus=base_infrastructure.ingest_event_bus,
+        pipelines_event_bus=base_infrastructure.pipelines_event_bus,
         pipeline_table=base_infrastructure.pipeline_table,
         connector_table=medialake_stack.connector_table,
     ),

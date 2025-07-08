@@ -59,7 +59,7 @@ class PipelineStackProps:
     open_search_endpoint: str
     vpc: ec2.Vpc
     security_group: ec2.SecurityGroup
-    ingest_event_bus: events.EventBus
+    pipelines_event_bus: events.EventBus
     media_assets_bucket: s3.IBucket
     x_origin_verify_secret: secretsmanager.Secret
     collection_endpoint: str
@@ -119,7 +119,7 @@ class PipelineStack(cdk.NestedStack):
                 open_search_endpoint=props.collection_endpoint,
                 vpc=props.vpc,
                 security_group=props.security_group,
-                ingest_event_bus=props.ingest_event_bus,
+                pipelines_event_bus=props.pipelines_event_bus,
                 media_assets_bucket=props.media_assets_bucket,
                 get_pipelines_executions_lambda=self._pipelines_executions_stack.get_pipelines_executions_lambda,
                 post_retry_pipelines_executions_lambda=self._pipelines_executions_stack.post_retry_pipelines_executions_lambda,

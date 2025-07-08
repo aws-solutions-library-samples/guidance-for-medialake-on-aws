@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional
 import boto3
 from aws_lambda_powertools import Logger
 
-from config import INGEST_EVENT_BUS_NAME, NODE_TEMPLATES_BUCKET, IAC_ASSETS_BUCKET, resource_prefix
+from config import PIPELINES_EVENT_BUS_NAME, NODE_TEMPLATES_BUCKET, IAC_ASSETS_BUCKET, resource_prefix
 from iam_operations import get_events_role_arn
 from lambda_operations import read_yaml_from_s3, get_zip_file_key
 
@@ -617,7 +617,7 @@ def create_eventbridge_rule(
         events_client = boto3.client("events")
 
         # Get the event bus name from environment variable
-        event_bus_name = INGEST_EVENT_BUS_NAME
+        event_bus_name = PIPELINES_EVENT_BUS_NAME
 
         # Create the rule
         rule_response = events_client.put_rule(
@@ -954,7 +954,7 @@ def update_eventbridge_rule_state(rule_name: str, enabled: bool) -> None:
         enabled: True to enable, False to disable
     """
     events_client = boto3.client("events")
-    event_bus_name = INGEST_EVENT_BUS_NAME
+    event_bus_name = PIPELINES_EVENT_BUS_NAME
     
     try:
         if enabled:
@@ -983,7 +983,7 @@ def delete_eventbridge_rule(rule_name: str) -> None:
     events_client = boto3.client("events")
     sqs_client = boto3.client("sqs")
     lambda_client = boto3.client("lambda")
-    event_bus_name = INGEST_EVENT_BUS_NAME
+    event_bus_name = PIPELINES_EVENT_BUS_NAME
 
     try:
         # Extract the pipeline name from the rule name (it's usually the first part)

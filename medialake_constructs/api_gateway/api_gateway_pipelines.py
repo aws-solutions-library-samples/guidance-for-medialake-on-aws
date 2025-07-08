@@ -43,7 +43,7 @@ class ApiGatewayPipelinesProps:
     pipelines_nodes_templates_bucket: s3.IBucket
     open_search_endpoint: str
     api_resource: apigateway.IResource
-    ingest_event_bus: events.EventBus
+    pipelines_event_bus: events.EventBus
     iac_assets_bucket: s3.IBucket
     media_assets_bucket: S3Bucket
     x_origin_verify_secret: secretsmanager.Secret
@@ -258,7 +258,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
                 "EXTERNAL_PAYLOAD_BUCKET": props.external_payload_bucket.bucket_name,
                 "NODE_TEMPLATES_BUCKET": props.pipelines_nodes_templates_bucket.bucket_name,
-                "INGEST_EVENT_BUS_NAME": props.ingest_event_bus.event_bus_name,
+                "PIPELINES_EVENT_BUS_NAME": props.pipelines_event_bus.event_bus_name,
                 "RESOURCE_PREFIX": config.resource_prefix,
                 "MEDIACONVERT_QUEUE_ARN": props.mediaconvert_queue_arn,
                 "MEDIACONVERT_ROLE_ARN": props.mediaconvert_role_arn,
@@ -538,7 +538,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                 # "IMAGE_PROXY_LAMBDA": self.image_proxy_lambda_deployment.deployment_key,
                 "PIPELINE_TRIGGER_LAMBDA_ARN": self._pipeline_trigger_lambda.function_arn,
                 "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
-                "INGEST_EVENT_BUS": props.ingest_event_bus.event_bus_name,
+                "PIPELINES_EVENT_BUS": props.pipelines_event_bus.event_bus_name,
                 "CONNECTOR_TABLE": props.connector_table.table_arn,
                 "AWS_ACCOUNT_ID": scope.account,
                 "GLOBAL_PREFIX": config.resource_prefix,
@@ -598,7 +598,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             environment_variables={
                 "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                 "PIPELINES_TABLE_NAME": props.pipeline_table.table_name,
-                "INGEST_EVENT_BUS_NAME": props.ingest_event_bus.event_bus_name
+                "PIPELINES_EVENT_BUS_NAME": props.pipelines_event_bus.event_bus_name
             },
         )
 
@@ -643,7 +643,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
                 "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
                 "NODE_TEMPLATES_BUCKET": props.pipelines_nodes_templates_bucket.bucket_name,
-                "INGEST_EVENT_BUS_NAME": props.ingest_event_bus.event_bus_name,
+                "PIPELINES_EVENT_BUS_NAME": props.pipelines_event_bus.event_bus_name,
                 "MEDIA_ASSETS_BUCKET_NAME": props.media_assets_bucket.bucket_name,
                 "MEDIA_ASSETS_BUCKET_ARN_KMS_KEY": props.media_assets_bucket.key_arn,
             },

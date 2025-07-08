@@ -62,7 +62,7 @@ class SettingsConstruct(Construct):
         api_resource (apigateway.IResource): The API Gateway resource to attach to
         cognito_authorizer (apigateway.IAuthorizer): Cognito authorizer for API endpoints
         x_origin_verify_secret (secretsmanager.Secret): Secret for origin verification
-        ingest_event_bus (events.EventBus): EventBus for ingestion events
+        pipelines_event_bus (events.EventBus): EventBus for pipeline events
         iac_assets_bucket (s3.Bucket): S3 bucket for infrastructure assets
         props (settingsProps): Configuration properties for the construct
     """

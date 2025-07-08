@@ -32,7 +32,7 @@ from config import config
 @dataclass
 class AssetSyncStackProps:
     asset_table: dynamodb.TableV2
-    ingest_event_bus: events.EventBus
+    pipelines_event_bus: events.EventBus
 
 
 class AssetSyncStack(cdk.NestedStack):
@@ -384,8 +384,8 @@ class AssetSyncStack(cdk.NestedStack):
             )
         )
 
-        # Ingest event bus permissions
-        props.ingest_event_bus.grant_put_events_to(self._asset_sync_processor_lambda.function)
+        # Pipelines event bus permissions
+        props.pipelines_event_bus.grant_put_events_to(self._asset_sync_processor_lambda.function)
 
         # S3 cross-region permissions for engine
         self._asset_sync_engine_lambda.function.add_to_role_policy(

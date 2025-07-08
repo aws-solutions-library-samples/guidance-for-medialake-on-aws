@@ -108,5 +108,5 @@ class EventBus(Construct):
         return self._event_bus.event_bus_name
     
     @property
-    def ingest_event_bus_name(self) -> str:
+    def pipelines_event_bus_name(self) -> str:
         return self._event_bus.event_bus_name

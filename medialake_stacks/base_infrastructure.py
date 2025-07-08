@@ -306,11 +306,11 @@ class BaseInfrastructureStack(Stack):
             ),
         )
 
-        self._ingest_event_bus = EventBus(
+        self._pipelines_event_bus = EventBus(
             self,
-            "IngestEventBus",
+            "PipelinesEventBus",
             props=EventBusConfig(
-                bus_name=f"{config.resource_prefix}-ingest-{region}-{config.environment}",
+                bus_name=f"{config.resource_prefix}-pipelines-{region}-{config.environment}",
                 description="event bus",
                 log_all=False,
             ),
@@ -652,26 +652,26 @@ class BaseInfrastructureStack(Stack):
         )
 
     @property
-    def ingest_event_bus(self) -> events.EventBus:
+    def pipelines_event_bus(self) -> events.EventBus:
         """
-        Returns the EventBridge event bus used for ingestion events.
+        Returns the EventBridge event bus used for pipeline events.
 
         Returns:
             events.EventBus: The configured EventBridge event bus
         """
 
-        return self._ingest_event_bus.event_bus
+        return self._pipelines_event_bus.event_bus
 
     @property
-    def ingest_event_bus_name(self) -> str:
+    def pipelines_event_bus_name(self) -> str:
         """
-        Returns the name of the ingestion event bus.
+        Returns the name of the pipelines event bus.
 
         Returns:
             str: Name of the EventBridge event bus
         """
 
-        return self._ingest_event_bus.event_bus_name
+        return self._pipelines_event_bus.event_bus_name
 
     @property
     def asset_table(self) -> dynamodb.ITable:

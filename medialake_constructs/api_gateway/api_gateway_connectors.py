@@ -54,7 +54,7 @@ class ConnectorsProps:
     asset_sync_engine_lambda: lambda_.Function
     open_search_endpoint: str
     opensearch_index: str
-    ingest_event_bus: str | None
+    pipelines_event_bus: str | None
     vpc_subnet_ids: str
     security_group_id: str
     api_resource: str | None = None
@@ -408,7 +408,7 @@ class ConnectorsConstruct(Construct):
             "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
             "MEDIA_ASSETS_BUCKET": props.media_assets_bucket.bucket.bucket_name,  # Added for cross-bucket deletion
             "INGEST_MEDIA_PROCESSOR_LAYER": ingest_media_processor_layer.layer.layer_version_arn,
-            "INGEST_EVENT_BUS": props.ingest_event_bus.event_bus_name,
+            "PIPELINES_EVENT_BUS": props.pipelines_event_bus,
             "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
             "MEDIALAKE_ASSET_TABLE_FILE_HASH_INDEX": props.asset_table_file_hash_index_arn,
             "MEDIALAKE_ASSET_TABLE_ASSET_ID_INDEX": props.asset_table_asset_id_index_arn,
