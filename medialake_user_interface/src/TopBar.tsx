@@ -22,7 +22,8 @@ import {
   Psychology as PsychologyIcon
 } from '@mui/icons-material';
 import { useChat } from './contexts/ChatContext';
-import { useNavigate, useLocation } from 'react-router-dom'; // <-- import useLocation
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import debounce from 'lodash/debounce';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from './hooks/useTheme';
@@ -34,6 +35,7 @@ import { useFeatureFlag } from './contexts/FeatureFlagsContext';
 import FilterModal from './components/search/FilterModal';
 import { useSearchFilters, useSearchQuery, useSemanticSearch, useDomainActions, useUIActions } from './stores/searchStore';
 import { NotificationCenter } from './components/NotificationCenter';
+import { QUERY_KEYS } from './api/queryKeys';
 
 interface SearchTag {
   key: string;
@@ -45,7 +47,8 @@ function TopBar() {
   const { theme } = useTheme();
   const { isCollapsed } = useSidebar();
   const navigate = useNavigate();
-  const location = useLocation(); // <-- grab location
+  const location = useLocation();
+  const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { direction } = useDirection();
   const isRTL = direction === 'rtl';
@@ -100,6 +103,29 @@ function TopBar() {
         setQuery(query);
         setIsSemantic(storeIsSemantic);
         
+        // Build facet parameters for cache invalidation
+        const facetParams = {
+          type: filters.type,
+          extension: filters.extension,
+          asset_size_gte: filters.asset_size_gte,
+          asset_size_lte: filters.asset_size_lte,
+          ingested_date_gte: filters.ingested_date_gte,
+          ingested_date_lte: filters.ingested_date_lte,
+          filename: filters.filename
+        };
+        
+        // Remove undefined values from facetParams
+        Object.keys(facetParams).forEach(key => {
+          if (facetParams[key as keyof typeof facetParams] === undefined) {
+            delete facetParams[key as keyof typeof facetParams];
+          }
+        });
+        
+        // Invalidate search cache to force refetch
+        queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.SEARCH.list(query, 1, 50, storeIsSemantic, [], facetParams)
+        });
+        
         // Build URL with semantic parameter
         const params = new URLSearchParams();
         params.set('q', query);
@@ -118,13 +144,36 @@ function TopBar() {
         navigate(`/search?${params.toString()}`);
       }
     }, 500),
-    [navigate, storeIsSemantic, setQuery, setIsSemantic, filters]
+    [navigate, storeIsSemantic, setQuery, setIsSemantic, filters, queryClient]
   );
 
   const handleApplyFilters = (newFilters: any) => {
     setFilters(newFilters);
     // Trigger search with the new filters
     const searchQuery = getSearchQuery();
+
+    // Build facet parameters for cache invalidation
+    const facetParams = {
+      type: newFilters.type,
+      extension: newFilters.extension,
+      asset_size_gte: newFilters.asset_size_gte,
+      asset_size_lte: newFilters.asset_size_lte,
+      ingested_date_gte: newFilters.ingested_date_gte,
+      ingested_date_lte: newFilters.ingested_date_lte,
+      filename: newFilters.filename
+    };
+    
+    // Remove undefined values from facetParams
+    Object.keys(facetParams).forEach(key => {
+      if (facetParams[key as keyof typeof facetParams] === undefined) {
+        delete facetParams[key as keyof typeof facetParams];
+      }
+    });
+    
+    // Invalidate search cache to force refetch with new filters
+    queryClient.invalidateQueries({
+      queryKey: QUERY_KEYS.SEARCH.list(searchQuery, 1, 50, storeIsSemantic, [], facetParams)
+    });
 
     // Build URLSearchParams
     const queryParams = new URLSearchParams();
@@ -217,6 +266,29 @@ function TopBar() {
         setSearchInput('');
         const searchQuery = getSearchQuery();
         
+        // Build facet parameters for cache invalidation
+        const facetParams = {
+          type: filters.type,
+          extension: filters.extension,
+          asset_size_gte: filters.asset_size_gte,
+          asset_size_lte: filters.asset_size_lte,
+          ingested_date_gte: filters.ingested_date_gte,
+          ingested_date_lte: filters.ingested_date_lte,
+          filename: filters.filename
+        };
+        
+        // Remove undefined values from facetParams
+        Object.keys(facetParams).forEach(key => {
+          if (facetParams[key as keyof typeof facetParams] === undefined) {
+            delete facetParams[key as keyof typeof facetParams];
+          }
+        });
+        
+        // Invalidate search cache to force refetch
+        queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.SEARCH.list(searchQuery, 1, 50, storeIsSemantic, [], facetParams)
+        });
+        
         // Build URL with parameters
         const params = new URLSearchParams();
         params.set('q', searchQuery);
@@ -271,6 +343,29 @@ function TopBar() {
       setQuery(searchQuery);
       setIsSemantic(storeIsSemantic);
       
+      // Build facet parameters for cache invalidation
+      const facetParams = {
+        type: filters.type,
+        extension: filters.extension,
+        asset_size_gte: filters.asset_size_gte,
+        asset_size_lte: filters.asset_size_lte,
+        ingested_date_gte: filters.ingested_date_gte,
+        ingested_date_lte: filters.ingested_date_lte,
+        filename: filters.filename
+      };
+      
+      // Remove undefined values from facetParams
+      Object.keys(facetParams).forEach(key => {
+        if (facetParams[key as keyof typeof facetParams] === undefined) {
+          delete facetParams[key as keyof typeof facetParams];
+        }
+      });
+      
+      // Invalidate search cache to force refetch even with identical parameters
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.SEARCH.list(searchQuery, 1, 50, storeIsSemantic, [], facetParams)
+      });
+      
       // Build URL with parameters
       const params = new URLSearchParams();
       params.set('q', searchQuery);
@@ -301,6 +396,29 @@ function TopBar() {
       const searchQuery = newTags
         .map(tag => `${tag.key}: ${tag.value}`)
         .join(' ');
+      
+      // Build facet parameters for cache invalidation
+      const facetParams = {
+        type: filters.type,
+        extension: filters.extension,
+        asset_size_gte: filters.asset_size_gte,
+        asset_size_lte: filters.asset_size_lte,
+        ingested_date_gte: filters.ingested_date_gte,
+        ingested_date_lte: filters.ingested_date_lte,
+        filename: filters.filename
+      };
+      
+      // Remove undefined values from facetParams
+      Object.keys(facetParams).forEach(key => {
+        if (facetParams[key as keyof typeof facetParams] === undefined) {
+          delete facetParams[key as keyof typeof facetParams];
+        }
+      });
+      
+      // Invalidate search cache to force refetch
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.SEARCH.list(searchQuery, 1, 50, storeIsSemantic, [], facetParams)
+      });
       
       // Build URL with parameters
       const params = new URLSearchParams();
