@@ -74,7 +74,7 @@ MediaLake is designed for:
 You are responsible for the cost of the AWS services used while running this Guidance.
 
 **Base Infrastructure Cost (without variable workloads):**
-As of July 2025, the cost for running this Guidance with the **large deployment configuration** in the **US East (N. Virginia)** region is approximately **$401.23 per month** for the core infrastructure only.
+As of July 2025, the cost for running this Guidance with the **small deployment configuration** in the **US East (N. Virginia)** region is approximately **$379.12 per month** for the core infrastructure only.
 
 **Variable Workload Costs:**
 Additional costs will be incurred based on actual usage:
@@ -104,12 +104,13 @@ We recommend creating a **Budget through AWS Cost Explorer** to help manage cost
 | **Workflow Automations (Step Functions)**     | 1,000 automated workflows (pipelines), 20 steps each every month                                                  | \$2.40                                                                                  |
 | **Encryption (KMS)**                          | 30 keys, 311,000 encryption/decryption actions per month                                                          | \$30.00 (CMK/month) + \$15.00 (requests) = \$45.00                                      |
 | **Monitoring/Logging (CloudWatch)**           | Storage, metrics, logs for all services                                                                           | Data: \$7.50<br>Storage: \$0.07                                                         |
-| **OpenSearch (Search)**                       | Search and index storage and compute                                                                              | t3.small: \$131.40 (2 instances)<br>Storage: \$2.44 (gp3)                               |
+| **OpenSearch Service (Search)**               | Search and index storage and compute                                                                              | t3.small: \$28.72 (1 instance)<br>Storage: \$2.44 (gp3)                                |
+| **OpenSearch Ingestion (OSI)**                | Data ingestion processing units                                                                                   | \$350.40 (2 OCUs)                                                                       |
 | **NAT Gateway (VPC)**                         | Outbound internet access from VPC                                                                                 | \$33.30                                                                                 |
 | **WAF (Web Application Firewall)**            | API & web protection (rules + ACLs + requests)                                                                    | WebACL: \$5.00<br>Rules: \$2.00<br>Requests: \$0.30                                     |
 | **EventBridge**                               | Event-driven triggers                                                                                             | \$0.01                                                                                  |
 | **X-Ray (Tracing)**                           | Distributed trace monitoring                                                                                      | \$5.00                                                                                  |
-| **TOTAL**                                     | **Monthly cost estimate for large deployment**                                                                   | **\$401.23**                                                                            |
+| **TOTAL**                                     | **Monthly cost estimate for small deployment**                                                                   | **\$379.12**                                                                            |
 
 
 
