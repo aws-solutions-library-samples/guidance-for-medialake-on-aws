@@ -213,7 +213,7 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
                                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
                                     {parent.category === 'EmbeddedMetadata'
                                         ? 'Embedded Metadata'
-                                        : parent.category}
+                                        : categoryMapping[parent.category as keyof typeof categoryMapping] || parent.category}
                                 </Typography>
                                 <Chip
                                     size="small"
