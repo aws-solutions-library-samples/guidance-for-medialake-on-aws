@@ -229,7 +229,6 @@ const SystemSettingsPage: React.FC = () => {
             }}
           >
             <Tab label={t('settings.systemSettings.tabs.search', 'Search')} />
-            <Tab label={t('settings.systemSettings.tabs.regions', 'Regions')} />
           </Tabs>
         </Box>
         
@@ -388,16 +387,6 @@ const SystemSettingsPage: React.FC = () => {
                 )}
               </>
             )}
-          </TabPanel>
-          
-          <TabPanel value={tabValue} index={1}>
-            <Typography variant="h6" gutterBottom>
-              {t('settings.systemSettings.regions.title', 'Regions')}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" paragraph>
-              {t('settings.systemSettings.regions.description', 
-                'Enable and disable regions that assets can be indexed from and pipelines can be deployed to.')}
-            </Typography>
           </TabPanel>
         </Box>
       </Paper>
