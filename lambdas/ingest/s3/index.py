@@ -142,17 +142,17 @@ def determine_asset_type(content_type: str, file_extension: str) -> str:
     content_type = content_type.lower() if content_type else ""
     file_extension = file_extension.lower() if file_extension else ""
     
-    # Image classification
+    # Image classification - matching Default Image Pipeline: PSD, TIF, JPG, JPEG, PNG, WEBP, GIF, SVG
     image_mimes = ["image/", "application/photoshop", "application/illustrator"]
-    image_extensions = ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "tif", "svg", "webp", "heic", "heif", "raw", "psd", "ai", "eps"]
+    image_extensions = ["psd", "tif", "tiff", "jpg", "jpeg", "png", "webp", "gif", "svg"]
     
-    # Video classification
+    # Video classification - matching Default Video Pipeline: FLV, MP4, MOV, AVI, MKV, WEBM, MXF
     video_mimes = ["video/"]
-    video_extensions = ["mp4", "mov", "avi", "wmv", "webm", "flv", "mkv", "m4v", "mpg", "mpeg", "3gp"]
+    video_extensions = ["flv", "mp4", "mov", "avi", "mkv", "webm", "mxf"]
     
-    # Audio classification
+    # Audio classification - matching Default Audio Pipeline: WAV, AIFF, AIF, MP3, PCM, M4A
     audio_mimes = ["audio/"]
-    audio_extensions = ["mp3", "wav", "aac", "flac", "ogg", "wma", "m4a", "aiff", "opus"]
+    audio_extensions = ["wav", "aiff", "aif", "mp3", "pcm", "m4a"]
     
     # Check MIME type first as it's more reliable
     for prefix in image_mimes:
