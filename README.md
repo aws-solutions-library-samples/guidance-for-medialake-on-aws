@@ -416,7 +416,7 @@ medialake/
 
 ## Supported Media Types
 
-media lake supports processing of the following file types through its default pipelines:
+Media lake supports processing of the following file types through its default pipelines:
 
 ### Audio Files
 - **WAV** - Waveform Audio File Format
