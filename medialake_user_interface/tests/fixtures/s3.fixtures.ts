@@ -60,6 +60,7 @@ async function emptyBucket(s3Client: S3Client, bucketName: string): Promise<void
 // Define the type for our new fixture
 type S3Fixtures = {
   s3BucketName: string;
+  s3BucketDeletion: () => Promise<void>;
 };
 
 // Extend the base Playwright test fixture
@@ -127,7 +128,28 @@ export const test = base.extend<S3Fixtures>({
           }
         }
     }
-  }, { scope: 'worker' }], 
+  }, { scope: 'worker' }],
+
+  s3BucketDeletion: [async ({ s3BucketName }, use) => {
+    // Provide a cleanup function that can be called manually if needed
+    const cleanup = async () => {
+      console.log(`[Fixture] Manual cleanup requested for bucket ${s3BucketName}`);
+      const s3Client = new S3Client({ region: AWS_REGION });
+      try {
+        await emptyBucket(s3Client, s3BucketName);
+        await s3Client.send(new DeleteBucketCommand({ Bucket: s3BucketName }));
+        console.log(`[Fixture] Successfully manually deleted bucket ${s3BucketName}`);
+      } catch (error: any) {
+        if (error.name === 'NoSuchBucket') {
+          console.log(`[Fixture] Bucket ${s3BucketName} already deleted or never created.`);
+        } else {
+          console.error(`[Fixture] Error manually deleting bucket ${s3BucketName}:`, error);
+        }
+      }
+    };
+    
+    await use(cleanup);
+  }, { scope: 'test' }],
 });
 
 export { expect } from '@playwright/test'; 

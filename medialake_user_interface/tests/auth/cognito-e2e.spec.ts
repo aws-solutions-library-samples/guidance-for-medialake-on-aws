@@ -1,4 +1,4 @@
-import { test, expect } from '../../fixtures/auth.fixtures';
+import { test, expect } from '../fixtures/auth.fixtures';
 
 test.describe('Cognito E2E Authentication Tests', () => {
   test('should create test user and login successfully', async ({ cognitoTestUser, authenticatedPage, baseURL }) => {
