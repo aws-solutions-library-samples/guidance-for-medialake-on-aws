@@ -1,4 +1,4 @@
-# Guidance for MediaLake on AWS
+# Guidance for Media Lake on AWS
 
 > **Table of Contents**
 >
@@ -45,9 +45,9 @@
 
 ## Overview
 
-**Guidance for MediaLake on AWS** provides a comprehensive, serverless, and scalable platform for media ingestion, processing, management, and workflow orchestration on AWS. MediaLake enables you to connect various storage sources, ingest and organize media at scale, run customizable processing pipelines (such as proxy/thumbnail generation and AI enrichment), and integrate with both AWS native and partner services. 
+**Guidance for Media Lake on AWS** provides a comprehensive, serverless, and scalable platform for media ingestion, processing, management, and workflow orchestration on AWS. Media lake enables you to connect various storage sources, ingest and organize media at scale, run customizable processing pipelines (such as proxy/thumbnail generation and AI enrichment), and integrate with both AWS native and partner services.
 
-MediaLake is designed for:
+Media lake is designed for:
 - Media organizations and content creators needing automated processing and enrichment of large media libraries.
 - Use cases such as media asset management, automated compliance, and media AI/ML workflows.
 - Organizations requiring secure, event-driven, and highly available media workflows.
@@ -55,17 +55,17 @@ MediaLake is designed for:
 ### High-Level Overview
 ![MediaLake Overview](assets/images/medialake-architecture-overview.png)
 
-> _Diagram: MediaLake provides a comprehensive serverless platform connecting storage sources, processing pipelines, and enrichment services with secure user interfaces and API endpoints for scalable media management workflows._
+> _Diagram: Media Lake provides a comprehensive serverless platform connecting storage sources, processing pipelines, and enrichment services with secure user interfaces and API endpoints for scalable media management workflows._
 
 ### Application Architecture
 ![MediaLake Application Architecture](assets/images/medialake-architecture-application.png)
 
-> _Diagram: MediaLake application layer shows the React UI, API Gateway endpoints, Lambda functions, and data flow between Cognito authentication, DynamoDB storage, and OpenSearch indexing for user interactions and asset management._
+> _Diagram: Media lake application layer shows the React UI, API Gateway endpoints, Lambda functions, and data flow between Cognito authentication, DynamoDB storage, and OpenSearch indexing for user interactions and asset management._
 
 ### Pipeline Execution and Deployment
 ![MediaLake Pipeline Architecture](assets/images/medialake-architecture-pipeline.png)
 
-> _Diagram: MediaLake processes media through S3 ingestion, EventBridge routing, Lambda orchestration, Step Functions, and enrichment with metadata, search, and integration endpoints._
+> _Diagram: Media lake processes media through S3 ingestion, EventBridge routing, Lambda orchestration, Step Functions, and enrichment with metadata, search, and integration endpoints._
 
 ---
 
@@ -190,7 +190,7 @@ npm install -g aws-cdk
 
 ## Deployment Steps
 
-You can deploy MediaLake using either the CloudFormation template (recommended) or AWS CDK.
+You can deploy media lake using either the CloudFormation template (recommended) or AWS CDK.
 
 ### 1. **Clone the repository**
 
@@ -236,7 +236,7 @@ touch config.json
 ```
 
 Key configuration parameters include:
-- **environment**: Choose between "dev" or "prod"
+- **environment**: Choose between "dev" or "prd"
 - **deployment_size**: OpenSearch deployment size ("small", "medium", "large")
 - **resource_prefix**: Prefix for all AWS resources created
 - **account_id**: AWS Account ID for deployment
@@ -256,7 +256,27 @@ Deploy directly using the CloudFormation template from GitHub:
 1. Go to the AWS Console > CloudFormation > "Create Stack" > "With new resources (standard)".
 2. Choose **Upload a template file**, select `medialake.template`.
 3. Set stack name to `medialake-cf`.
-4. Enter the required parameters as defined in your [`config.json`](config.json).
+4. Configure the CloudFormation template parameters:
+
+   ### Initial Media Lake User
+   - **InitialUserEmail**: Email address for the initial administrator account (required)
+   - **InitialUserFirstName**: First name of the initial administrator (1-50 characters, letters/spaces/hyphens/periods only)
+   - **InitialUserLastName**: Last name of the initial administrator (1-50 characters, letters/spaces/hyphens/periods only)
+
+   ### Media Lake Configuration
+   - **MediaLakeEnvironmentName**: Environment identifier (1-10 alphanumeric characters, default: `dev`)
+   - **OpenSearchDeploymentSize**: Controls the size of your OpenSearch cluster
+     - `small`: Suitable for development and testing environments
+     - `medium`: Recommended for moderate production workloads
+     - `large`: Designed for high-volume production environments
+
+   ### Media Lake Deployment Configuration
+   - **SourceType**: Deployment source method
+     - `Git`: Deploy directly from a public Git repository
+     - `S3PresignedURL`: Deploy from a ZIP file via presigned URL
+   - **GitRepositoryUrl**: Public Git repository URL (default: AWS Solutions Library media lake repository)
+   - **S3PresignedURL**: Presigned URL for ZIP file download (required when using S3PresignedURL source type)
+
 5. Accept the required IAM capabilities and deploy.
 
 See the [`MediaLake-Installation-Guide.md`](assets/docs/MediaLake-Installation-Guide.md) for a complete CloudFormation deployment guide.
@@ -274,12 +294,12 @@ cdk deploy --all --profile <profile> --region <region>
 
 ## Deployment Validation
 
-1. In the AWS CloudFormation console, check that the stack `medialake-cf` (and related MediaLake stacks) are in **CREATE_COMPLETE** status.
+1. In the AWS CloudFormation console, check that the stack `medialake-cf` (and related media lake stacks) are in **CREATE_COMPLETE** status.
 2. After deployment, you will receive a welcome email at the address you provided, containing:
-   - The MediaLake application URL
+   - The media lake application URL
    - Username (your email)
    - Temporary password
-3. Log in at the URL provided. You should see the MediaLake user interface and be able to add storage connectors and media.
+3. Log in at the URL provided. You should see the media lake user interface and be able to add storage connectors and media.
 
 ---
 
@@ -287,13 +307,13 @@ cdk deploy --all --profile <profile> --region <region>
 
 ### 1. **Login**
 
-Use the emailed credentials to log in to the MediaLake UI.
+Use the emailed credentials to log in to the media lake UI.
 
 ### 2. **Connect Storage**
 
 - Navigate to **Settings > Connectors** in the UI.
 - Add a connector, choosing Amazon S3 and providing your bucket details.
-- **Note**: If you create new S3 buckets through MediaLake, remember that these will need to be manually emptied and deleted during cleanup as they are not automatically removed when the MediaLake stack is deleted.
+- **Note**: If you create new S3 buckets through media lake, remember that these will need to be manually emptied and deleted during cleanup as they are not automatically removed when the media lake stack is deleted.
 
 ### 3. **Ingest Media**
 
@@ -396,7 +416,7 @@ medialake/
 
 ## Supported Media Types
 
-MediaLake supports processing of the following file types through its default pipelines:
+media lake supports processing of the following file types through its default pipelines:
 
 ### Audio Files
 - **WAV** - Waveform Audio File Format
@@ -429,16 +449,16 @@ Each media type is automatically processed through dedicated pipelines that hand
 
 ## Cleanup
 
-To remove all MediaLake resources:
+To remove all media lake resources:
 
 ### Manual Cleanup (AWS Console):
 
 - Go to CloudFormation console
-- Delete all stacks with prefix "MediaLake" and `medialake-cf`
-- **Important for S3 Buckets**: For new buckets created via MediaLake, you must manually empty and delete them as they are not automatically cleaned up during stack deletion
+- Delete all stacks with prefix "Media Lake" and `medialake-cf`
+- **Important for S3 Buckets**: For new buckets created via media lake, you must manually empty and delete them as they are not automatically cleaned up during stack deletion
 - Delete any other associated S3 buckets, DynamoDB tables, or resources as needed
 
-> **Warning:** This will permanently remove all MediaLake data and resources. Use with caution.
+> **Warning:** This will permanently remove all media lake data and resources. Use with caution.
 
 ---
 
@@ -446,7 +466,7 @@ To remove all MediaLake resources:
 
 - For feedback, questions, or suggestions, please use the [GitHub Issues page](https://github.com/aws-solutions-library-samples/guidance-for-medialake/issues).
 - Known issues and deployment tips will be tracked in the Issues section.
-- Service quotas: MediaLake relies on OpenSearch, DynamoDB, Lambda, and S3 limits; monitor and request increases if needed for large-scale deployments.
+- Service quotas: media lake relies on OpenSearch, DynamoDB, Lambda, and S3 limits; monitor and request increases if needed for large-scale deployments.
 - For SAML integration and advanced identity provider setup, refer to the SAML instructions in [MediaLake-Instructions.docx](assets/docs/MediaLake-Instructions.docx).
 
 ---
