@@ -33,6 +33,26 @@ class LambdaBuilder:
         layer_build = self.layer_build_path / layer_dir.name
         layer_build.mkdir(parents=True, exist_ok=True)
 
+        print(f"🔨 Building layer {layer_dir.name}...")
+
+        # Check for custom build script first
+        build_script = layer_dir / "build.py"
+        if build_script.exists():
+            print(f"  Using custom build script for {layer_dir.name}")
+            # Run custom build script in the layer directory
+            subprocess.run([
+                "python3", str(build_script)
+            ], cwd=str(layer_dir), check=True)
+            
+            # Copy the built python directory to the layer build path
+            layer_python_dir = layer_dir / "python"
+            if layer_python_dir.exists():
+                target_python_dir = layer_build / "python"
+                if target_python_dir.exists():
+                    shutil.rmtree(target_python_dir)
+                shutil.copytree(layer_python_dir, target_python_dir)
+            return
+
         # Create python directory for the layer
         python_dir = layer_build / "python"
         python_dir.mkdir(parents=True, exist_ok=True)
