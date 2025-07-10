@@ -1,0 +1,11 @@
+aws-cdk-lib>=2.177.0
+constructs>=10.0.0,<11.0.0
+aws_cdk.aws_lambda_python_alpha
+aws_cdk.aws_cognito_identitypool_alpha
+boto3
+cdk_nag
+python-dotenv
+pydantic
+Jinja2>=3.1.5
+aws-lambda-powertools
+click

@@ -1,0 +1,19 @@
+{
+    "name": "image_metadata_extractor",
+    "version": "1.0.0",
+    "description": "Function using exifr to extract EXIF data",
+    "main": "index.js",
+    "dependencies": {
+        "exifr": "7.1.3",
+        "aws-sdk": "2.1692.0",
+        "xml2js": "0.6.2",
+        "lodash": "4.17.21",
+        "@aws-lambda-powertools/logger": "^1.0.0",
+        "@aws-lambda-powertools/metrics": "^1.0.0",
+        "@aws-lambda-powertools/tracer": "^1.0.0"
+    },
+    "scripts": {
+        "preinstall":"cd $(pwd)",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    }
+}
