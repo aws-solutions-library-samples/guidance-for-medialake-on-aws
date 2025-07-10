@@ -1,458 +1,350 @@
-# MediaLake
+# Guidance for Media Lake on AWS
 
-MediaLake is a serverless media processing platform built on AWS, designed to handle small to large-scale media ingestion, processing, management, and workflows. MediaLake provides a flexible connector system for various storage sources and customizable processing pipelines.
+> **Table of Contents**
+>
+> - [Overview](#overview)
+> - [Cost](#cost)
+>   - [Cost Table](#cost-table)
+> - [Development](#development)
+>   - [Prerequisites](#prerequisites)
+>   - [Operating System](#operating-system)
+> - [Deployment Steps](#deployment-steps)
+>   - [Clone the repository](#1-clone-the-repository)
+>   - [Prepare the environment](#2-prepare-the-environment)
+>   - [Configure AWS account and region](#3-configure-aws-account-and-region)
+>   - [Configuration Setup](#4-configuration-setup)
+>   - [Deploy using CloudFormation Template (Recommended)](#5-deploy-using-cloudformation-template-recommended)
+>   - [Alternative: Deploy using AWS CDK](#6-alternative-deploy-using-aws-cdk)
+> - [Deployment Validation](#deployment-validation)
+> - [Running the Guidance](#running-the-guidance)
+>   - [Login](#1-login)
+>   - [Connect Storage](#2-connect-storage)
+>   - [Ingest Media](#3-ingest-media)
+>   - [Enable Semantic Search and Integrations](#4-enable-semantic-search-and-integrations)
+>   - [Process and Retrieve Assets](#5-process-and-retrieve-assets)
+> - [Next Steps](#next-steps)
+> - [Project Structure](#project-structure)
+> - [Key Components](#key-components)
+>   - [Storage Connectors](#storage-connectors)
+>   - [Processing Pipelines](#processing-pipelines)
+>   - [AWS Services Used](#aws-services-used)
+> - [Security Features](#security-features)
+> - [Supported Media Types](#supported-media-types)
+>   - [Audio Files](#audio-files)
+>   - [Video Files](#video-files)
+>   - [Image Files](#image-files)
+> - [Cleanup](#cleanup)
+>   - [Manual Cleanup (AWS Console)](#manual-cleanup-aws-console)
+> - [FAQ, Known Issues, and Additional Considerations](#faq-known-issues-and-additional-considerations)
+> - [Revisions](#revisions)
+> - [Notices](#notices)
+> - [Acknowledgments](#acknowledgments)
+> - [Authors](#authors)
 
-## 🚀 Features
+---
 
-- S3 Storage Connectors with multiple integration methods (EventBridge/S3 Events)
-- FIFO Queue-based media processing
-- Serverless architecture using AWS Lambda and Step Functions
-- Customizable media processing pipelines
-- Real-time event processing and notifications
-- Secure asset management with KMS encryption
-- IAM-based access control
-- REST API with Cognito authentication
+## Overview
 
-## 📋 Prerequisites
+**Guidance for Media Lake on AWS** provides a comprehensive, serverless, and scalable platform for media ingestion, processing, management, and workflow orchestration on AWS. Media lake enables you to connect various storage sources, ingest and organize media at scale, run customizable processing pipelines (such as proxy/thumbnail generation and AI enrichment), and integrate with both AWS native and partner services.
 
-- Node.js (v20.x or later)
-- Python 3.12 or later
-- AWS CLI configured with appropriate credentials
-- AWS CDK CLI (`npm install -g aws-cdk`)
-- Docker (for local development)
+Media lake is designed for:
+- Media organizations and content creators needing automated processing and enrichment of large media libraries.
+- Use cases such as media asset management, automated compliance, and media AI/ML workflows.
+- Organizations requiring secure, event-driven, and highly available media workflows.
 
-## 📋 Account preperation for deployment
+### High-Level Overview
+![MediaLake Overview](assets/images/medialake-architecture-overview.png)
 
+> _Diagram: Media Lake provides a comprehensive serverless platform connecting storage sources, processing pipelines, and enrichment services with secure user interfaces and API endpoints for scalable media management workflows._
+
+### Application Architecture
+![MediaLake Application Architecture](assets/images/medialake-architecture-application.png)
+
+> _Diagram: Media lake application layer shows the React UI, API Gateway endpoints, Lambda functions, and data flow between Cognito authentication, DynamoDB storage, and OpenSearch indexing for user interactions and asset management._
+
+### Pipeline Execution and Deployment
+![MediaLake Pipeline Architecture](assets/images/medialake-architecture-pipeline.png)
+
+> _Diagram: Media lake processes media through S3 ingestion, EventBridge routing, Lambda orchestration, Step Functions, and enrichment with metadata, search, and integration endpoints._
+
+---
+
+## Cost
+
+You are responsible for the cost of the AWS services used while running this Guidance.
+
+**Base Infrastructure Cost (without variable workloads):**
+As of July 2025, the cost for running this Guidance with the **small deployment configuration** in the **US East (N. Virginia)** region is approximately **$379.12 per month** for the core infrastructure only.
+
+**Variable Workload Costs:**
+Additional costs will be incurred based on actual usage:
+- Media processing and enrichment services (Twelve Labs, Transcription)
+- S3 storage and data transfer
+- Lambda execution time
+- OpenSearch queries and indexing
+- Step Functions executions
+
+The total monthly cost will vary significantly based on the volume of media processed, storage requirements, and usage patterns.
+
+We recommend creating a **Budget through AWS Cost Explorer** to help manage costs. Prices are subject to change. For full details, refer to the pricing webpage for each AWS service used in this Guidance.
+
+### Cost Table
+
+| **Service & Usage**                           | **How It Relates to Your Team’s Usage**                                                                           | **Estimated Monthly Cost (USD)**                                                        |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| **Cognito (Users)**                           | 50 active users signing in and using the system each month                                                        | \$2.00                                                                                  |
+| **S3 + Step Functions (Uploads)**             | 1,000 new media files uploaded/month, each triggering a workflow                                                  | S3 storage: \$23.55<br>Step Functions: \$2.40                                           |
+| **S3/CloudFront (Images, Audio, Video)**      | All users viewing/downloading images, audio, and video each month (aggregate, served via S3 and CloudFront)       | S3 requests: \$0.05 + \$0.40<br>CloudFront data: \$29.75<br>CloudFront requests: \$0.03 |
+| **Total Media Downloaded (S3/CloudFront)**    | About 350GB of media files viewed/downloaded per month                                                            | S3 data transfer out: \$45.00                                                           |
+| **Web/App Requests (CloudFront)**             | 25,000 clicks or page loads/month through CDN                                                                     | \$0.03                                                                                  |
+| **API Gateway (API Requests)**                | 500,000 system actions/searches/uploads per month                                                                 | \$1.75                                                                                  |
+| **Lambda (All Automated and API Processing)** | All automated backend tasks, API logic, file processing, and event handling; includes 1,000,000 invocations/month | \~\$13.00                                                                               |
+| **Database Usage (DynamoDB)**                 | 200,000 new or updated records per month (write/read/storage)                                                     | Writes: \$18.75<br>Reads: \$7.50<br>Storage: \$25.00                                    |
+| **Message Queues (SQS)**                      | 10,000 standard and 1,000 FIFO auto-messages per month                                                            | Standard: \$0.002<br>FIFO: \$0.0005                                                     |
+| **Workflow Automations (Step Functions)**     | 1,000 automated workflows (pipelines), 20 steps each every month                                                  | \$2.40                                                                                  |
+| **Encryption (KMS)**                          | 30 keys, 311,000 encryption/decryption actions per month                                                          | \$30.00 (CMK/month) + \$15.00 (requests) = \$45.00                                      |
+| **Monitoring/Logging (CloudWatch)**           | Storage, metrics, logs for all services                                                                           | Data: \$7.50<br>Storage: \$0.07                                                         |
+| **OpenSearch Service (Search)**               | Search and index storage and compute                                                                              | t3.small: \$28.72 (1 instance)<br>Storage: \$2.44 (gp3)                                |
+| **OpenSearch Ingestion (OSI)**                | Data ingestion processing units                                                                                   | \$350.40 (2 OCUs)                                                                       |
+| **NAT Gateway (VPC)**                         | Outbound internet access from VPC                                                                                 | \$33.30                                                                                 |
+| **WAF (Web Application Firewall)**            | API & web protection (rules + ACLs + requests)                                                                    | WebACL: \$5.00<br>Rules: \$2.00<br>Requests: \$0.30                                     |
+| **EventBridge**                               | Event-driven triggers                                                                                             | \$0.01                                                                                  |
+| **X-Ray (Tracing)**                           | Distributed trace monitoring                                                                                      | \$5.00                                                                                  |
+| **TOTAL**                                     | **Monthly cost estimate for small deployment**                                                                   | **\$379.12**                                                                            |
+
+
+
+## Development
+
+### Prerequisites
+
+- An AWS account with appropriate permissions to create and manage resources.
+- **AWS CLI** configured with your account credentials.
+- **AWS CDK CLI** (`npm install -g aws-cdk`).
+- **Node.js** (v20.x or later).
+- **Python** (3.12).
+- **Docker** (for local development).
+- **Git** for cloning the repository.
+- Optional: Third-party services (such as Twelve Labs) require separate setup and API credentials for integration.
+
+### Operating System
+
+Development and deployment instructions are validated for **MacOS** and **Windows**.
+Deployment to AWS services is fully managed through the AWS CLI and Console and does not depend on local OS beyond the tools above.
+
+> These deployment instructions are optimized for modern developer environments (MacOS/Windows). Deployment to AWS services (e.g., Lambda, CloudFormation, CDK) runs on AWS-managed infrastructure.
+
+**Required Packages:**
+- Python 3.12 (`python3 --version`)
+- Node.js 20+ (`node --version`)
+- Docker Desktop (`docker --version`)
+- AWS CLI (`aws --version`)
+- AWS CDK (`cdk --version`)
+
+**Install Python 3.12 specifically:**
+
+**MacOS:**
 ```bash
-cdk bootstrap
+# Download and install Python 3.12 directly from python.org
+# Visit https://www.python.org/downloads/release/python-3120/
 
-or if you are using a specific profile and/or region
-
-cdk bootstrap --profile <profile> --region <region>
+# Alternative: Use pyenv without brew
+curl https://pyenv.run | bash
+pyenv install 3.12.0
+pyenv global 3.12.0
 ```
 
-- Bootstrap the account for CDK deployment, ensure the right region is selected
-
-## 🧹 MediaLake CloudFormation Stack Deletion
-
-For cleaning up MediaLake deployments, you can use the included stack deletion script:
-
-```bash
-./delete_medialake_stacks.py --profile your-aws-profile --region us-east-1
+**Windows:**
+```powershell
+# Download Python 3.12 from python.org
+# Visit https://www.python.org/downloads/release/python-3120/
 ```
 
-The script automatically:
-1. Lists all CloudFormation stacks with the "MediaLake" prefix
-2. Attempts to delete each stack
-3. Waits 60 seconds before checking again
-4. Repeats until all stacks are deleted, handling dependencies between stacks
+**Install other dependencies:**
 
-### Prerequisites for Stack Deletion
-
-- Python 3.6+
-- Required Python packages:
-  - boto3
-  - aws-lambda-powertools
-
-Install the requirements:
+**MacOS:**
 ```bash
-pip install boto3 aws-lambda-powertools
-chmod +x delete_medialake_stacks.py
+# Install Docker Desktop from https://www.docker.com/products/docker-desktop
+
+# Install Node.js from https://nodejs.org/
+# Download and install the LTS version
+
+# Install AWS CLI
+curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"
+sudo installer -pkg AWSCLIV2.pkg -target /
+
+# Install AWS CDK
+npm install -g aws-cdk
 ```
 
-⚠️ **Warning**: This script will permanently delete all CloudFormation stacks that match the criteria. Use with caution in production environments.
+**Windows:**
+```powershell
+# Install Docker Desktop from https://www.docker.com/products/docker-desktop
+# Install Node.js from https://nodejs.org/
+# Install AWS CLI
+winget install Amazon.AWSCLI
+npm install -g aws-cdk
+```
 
-## 🛠️ Installation
+---
 
-1. Clone the repository:
+## Deployment Steps
+
+You can deploy media lake using either the CloudFormation template (recommended) or AWS CDK.
+
+### 1. **Clone the repository**
 
 ```bash
 git clone git@github.com:aws-solutions-library-samples/guidance-for-medialake.git
 cd guidance-for-medialake
 ```
 
-2. Create and activate a virtual environment:
+### 2. **Prepare the environment**
 
-**MacOS/Linux:**
-
+#### (a) **Python virtual environment (recommended):**
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate      # Mac
+# OR for Windows
+.venv\Scriptsctivate.bat     # Windows
 ```
 
-**Windows:**
-
-```bash
-python3 -m venv .venv
-.venv\Scripts\activate.bat
-```
-
-3. Install dependencies:
-
+#### (b) **Install dependencies:**
 ```bash
 pip install -r requirements.txt
 npm install
 ```
-
-if you are developing locally, you can install the requirements for development
-
+For development:
 ```bash
 pip install -r requirements-dev.txt
 ```
 
-## 🔧 Configuration
+### 3. **Configure AWS account and region**
 
-1. Configure your AWS credentials if you haven't already:
+Ensure AWS credentials are configured (`aws configure`), and bootstrap your account for CDK (if using CDK):
 
 ```bash
-aws configure
+cdk bootstrap --profile <profile> --region <region>
 ```
 
-2. Create a `config.json` file in the project root:
+### 4. **Configuration Setup**
+
+Create a [`config.json`](config.json) file in the project root with your deployment settings:
 
 ```bash
 touch config.json
 ```
 
-3. Add the following configuration to `config.json` (modify values as needed):
+Key configuration parameters include:
+- **environment**: Choose between "dev" or "prd"
+- **deployment_size**: OpenSearch deployment size ("small", "medium", "large")
+- **resource_prefix**: Prefix for all AWS resources created
+- **account_id**: AWS Account ID for deployment
+- **primary_region**: Primary region for deployment (tested in us-east-1)
+- **initial_user**: Initial user configuration with email and name
+- **vpc**: VPC configuration for using existing or creating new VPC
+- **authZ**: Identity provider configuration (Cognito, SAML)
 
-```json
-{
-  "environment": "dev",
-  "deployment_size": "medium",
-  "resource_prefix": "examplePrefix",
-  "account_id": "123456789012",
-  "global_prefix": "exampleGlobal",
-  "resource_application_tag": "exampleTag",
-  "api_path": "prod",
-  "primary_region": "us-east-1",
-  "initial_user": {
-    "email": "user@example.com",
-    "first_name": "John",
-    "last_name": "Doe"
-  },
-  "logging": {
-    "retention_days": 90,
-    "s3_retention_days": 90,
-    "cloudwatch_retention_days": 90,
-    "waf_retention_days": 90,
-    "api_gateway_retention_days": 90
-  },
-  "authZ": {
-    "identity_providers": [
-      {
-        "identity_provider_method": "saml",
-        "identity_provider_name": "ExampleIDP",
-        "identity_provider_metadata_url": "https://example.com/metadata"
-      },
-      {
-        "identity_provider_method": "cognito"
-      }
-    ]
-  },
-  "vpc": {
-    "use_existing_vpc": false,
-    "existing_vpc": {
-      "vpc_id": "vpc-xxxxxxxx",
-      "vpc_cidr": "10.0.0.0/16",
-      "subnet_ids": {
-        "public": [
-          "subnet-aaaaaaa",
-          "subnet-bbbbbbb",
-          "subnet-ccccccc"
-        ],
-        "private": [
-          "subnet-ddddddd",
-          "subnet-eeeeeee",
-          "subnet-fffffff"
-        ]
-      }
-    },
-    "new_vpc": {
-      "vpc_name": "ExampleVPC",
-      "max_azs": 3,
-      "cidr": "10.0.0.0/16",
-      "enable_dns_hostnames": true,
-      "enable_dns_support": true
-    },
-    "security_groups": {
-      "use_existing_groups": false,
-      "existing_groups": {
-        "media_lake_sg": "sg-xxxxxxxx",
-        "opensearch_sg": "sg-yyyyyyyy"
-      },
-      "new_groups": {
-        "media_lake_sg": {
-          "name": "ExampleMediaLakeSecurityGroup",
-          "description": "Example MediaLake Security Group"
-        },
-        "opensearch_sg": {
-          "name": "ExampleOpenSearchSG",
-          "description": "Example OpenSearch Security Group"
-        }
-      }
-    }
-  },
-  "db": {
-    "use_existing_tables": false,
-    "pipelines_executions_arn": "arn:aws:dynamodb:us-east-1:123456789012:table/example-pipelines_executions_prod",
-    "pipeline_nodes_table_arn": "arn:aws:dynamodb:us-east-1:123456789012:table/example_pipeline_nodes_table",
-    "asset_table_arn": "arn:aws:dynamodb:us-east-1:123456789012:table/example-asset-table",
-    "assetv2_table_arn": "arn:aws:dynamodb:us-east-1:123456789012:table/example-asset-table-v2"
-  },
-  "s3": {
-    "use_existing_buckets": false,
-    "access_logs_bucket": {
-      "bucket_name": "example-access-logs-123456789012-us-east-1-prod",
-      "bucket_arn": "arn:aws:s3:::example-access-logs-123456789012-us-east-1-prod"
-    },
-    "asset_bucket": {
-      "bucket_name": "example-asset-bucket-123456789012-us-east-1-prod",
-      "bucket_arn": "arn:aws:s3:::example-asset-bucket-123456789012-us-east-1-prod",
-      "kms_key_arn": "arn:aws:kms:us-east-1:123456789012:key/example-key-id"
-    }
-  }
-}
-```
+See the [`config-example.json`](config-example.json) for a complete configuration example.
 
-3. Config changes 
+---
 
-1. environment - Choose between dev or prod, currently use dev
-2. resource_prefix - This will be a prefix string added to all AWS resources created, choose what you want to be added
-3. account_id - This is the account that you will be deploying to, this should be the same account that the aws credentials or profile is configured for that you will be using.
-4. global_prefix - Make this the same as the resource prefix, this is retiring in the near future
-5. resource_application_tag - This is the application tag that is used across resources
-6. api_path - Don't modify this 
-7. 
+### 5. **Deploy using CloudFormation Template (Recommended)**
 
-## 📚 Configuration Parameters
+Deploy directly using the CloudFormation template from GitHub:
 
-- environment - Environment name, used in resource naming and configuration
-- deployment_size - OpenSearch deployment size ("small", "medium", "large")
-- account_id - AWS Account ID that will be deployed to
-- resource_prefix - Prefix for resources being previsioned
-- api_path - API path, used in resource naming and configuration
-- primary_region - Primary region for deployment - tested in us-east-1
-- initial_user_email - Initial user email, used in Cognito
-- logging - Retention for specific logs generated by this solution
-- authZ - Identity provider configuration
-- vpc - VPC configuration settings
+1. Go to the AWS Console > CloudFormation > "Create Stack" > "With new resources (standard)".
+2. Choose **Upload a template file**, select `medialake.template`.
+3. Set stack name to `medialake-cf`.
+4. Configure the CloudFormation template parameters:
 
-## 🔧 OpenSearch Deployment Sizes
+   ### Initial Media Lake User
+   - **InitialUserEmail**: Email address for the initial administrator account (required)
+   - **InitialUserFirstName**: First name of the initial administrator (1-50 characters, letters/spaces/hyphens/periods only)
+   - **InitialUserLastName**: Last name of the initial administrator (1-50 characters, letters/spaces/hyphens/periods only)
 
-MediaLake now supports three predefined OpenSearch deployment configurations that automatically configure cluster settings based on your use case:
+   ### Media Lake Configuration
+   - **MediaLakeEnvironmentName**: Environment identifier (1-10 alphanumeric characters, default: `dev`)
+   - **OpenSearchDeploymentSize**: Controls the size of your OpenSearch cluster
+     - `small`: Suitable for development and testing environments
+     - `medium`: Recommended for moderate production workloads
+     - `large`: Designed for high-volume production environments
 
-### Small (Development)
-**Use Case**: Development and testing environments
-**Cost**: Minimal
-**Configuration**:
-- 3 master nodes (t3.small.search)
-- 2 data nodes (t3.small.search)
-- 10GB storage with 3000 IOPS
-- Multi-AZ deployment (2 AZs)
-- Off-peak window enabled
+   ### Media Lake Deployment Configuration
+   - **SourceType**: Deployment source method
+     - `Git`: Deploy directly from a public Git repository
+     - `S3PresignedURL`: Deploy from a ZIP file via presigned URL
+   - **GitRepositoryUrl**: Public Git repository URL (default: AWS Solutions Library media lake repository)
+   - **S3PresignedURL**: Presigned URL for ZIP file download (required when using S3PresignedURL source type)
 
-```json
-{
-  "deployment_size": "small"
-}
-```
+5. Accept the required IAM capabilities and deploy.
 
-### Medium (Staging)
-**Use Case**: Staging, UAT, or small production workloads
-**Cost**: Moderate
-**Configuration**:
-- 3 master nodes (t3.medium.search)
-- 2 data nodes (t3.medium.search)
-- 50GB storage with 3000 IOPS
-- Multi-AZ deployment (2 AZs)
-- Off-peak window enabled
+See the [`MediaLake-Installation-Guide.md`](assets/docs/MediaLake-Installation-Guide.md) for a complete CloudFormation deployment guide.
 
-```json
-{
-  "deployment_size": "medium"
-}
-```
+---
 
-### Large (Production)
-**Use Case**: Production-scale deployments
-**Cost**: High performance
-**Configuration**:
-- 3 master nodes (r7g.medium.search)
-- 2 data nodes (r7g.medium.search)
-- 10GB storage with 3000 IOPS
-- Multi-AZ deployment (2 AZs)
-- Off-peak window enabled
+### 6. **Alternative: Deploy using AWS CDK**
 
-```json
-{
-  "deployment_size": "large"
-}
-```
-
-### Custom Configuration Override
-You can still override specific OpenSearch settings while using a deployment size preset:
-
-```json
-{
-  "deployment_size": "large",
-  "opensearch_cluster_settings": {
-    "data_node_count": 4,
-    "data_node_volume_size": 100
-  }
-}
-```
-
-The system will use the "large" preset as a base and override only the specified settings.
-
-### Production Environment Behavior
-
-When `config.environment` is set to "prod" in config.json, it triggers several important retention behaviors:
-
-1. **DynamoDB Tables Retention**
-   - Asset tables (both v1 and v2) are retained with `RemovalPolicy.RETAIN` instead of being destroyed on stack deletion
-   - This includes all Global Secondary Indexes (GSIs) on these tables
-   - For Asset Table v1: Retains AssetIDIndex and FileHashIndex
-   - For Asset Table v2: Retains GSI1 through GSI6
-
-2. **S3 Buckets**
-   The following S3 buckets are retained in production mode:
-   - Access Logs Bucket (`{global_prefix}-access-logs-{account_id}-{region}-{environment}`)
-   - Media Assets Bucket (`{global_prefix}-asset-bucket-{account_id}-{region}-{environment}`)
-   
-   The following buckets are always set to destroy, regardless of environment:
-   - DynamoDB Export Bucket (`{global_prefix}-ddb-export-{account_id}-{region}-{environment}`)
-   - IAC Assets Bucket (`{global_prefix}-iac-assets-{account_id}-{region}-{environment}`)
-
-3. **Infrastructure Resources**
-   - Security Groups are retained when in prod mode
-   - VPC and associated networking components are preserved
-   - OpenSearch cluster and its configurations are preserved
-
-4. **KMS Keys**
-   - KMS keys used for S3 bucket encryption are retained in prod mode (specifically for Access Logs and Media Assets buckets)
-   - Key rotation remains enabled for these retained keys
-   - When importing existing buckets, their associated KMS keys are also preserved
-
-5. **CloudFormation Outputs**
-   In production mode, the system automatically creates CloudFormation outputs for all retained resources, including:
-   - VPC ID and CIDR
-   - Security Group IDs
-   - DynamoDB table names and ARNs (including GSIs)
-   - OpenSearch cluster endpoint and ARN
-   - S3 bucket names and ARNs (access logs, assets, IAC assets)
-
-6. **Existing Resources**
-   - When in prod mode, the system is configured to use existing tables (`should_use_existing_tables` property returns true)
-   - This allows for preserving data and maintaining continuity across deployments
-
-### VPC Configuration
-
-The VPC configuration allows you to either use an existing VPC or create a new one. This is controlled by the `use_existing_vpc` flag in the `vpc` section of the configuration.
-
-When using an existing VPC (`use_existing_vpc: true`):
-- Provide the `vpc_id`, `vpc_cidr`, and `subnet_ids` in the `existing_vpc` section.
-- `subnet_ids` should include both `public` and `private` subnets.
-
-When creating a new VPC (`use_existing_vpc: false`):
-- Specify the VPC settings in the `new_vpc` section, including `vpc_name`, `max_azs`, `cidr`, `enable_dns_hostnames`, and `enable_dns_support`.
-
-### OpenSearch Cluster Settings
-
-OpenSearch cluster settings are now automatically configured based on the `deployment_size` parameter. The system provides three predefined configurations (small, medium, large) that are optimized for different use cases.
-
-You can still manually override specific settings by including an `opensearch_cluster_settings` section in your configuration. When provided, these settings will override the preset values while keeping the rest of the preset configuration intact.
-
-Key settings that can be overridden include:
-- `master_node_count` and `master_node_instance_type`
-- `data_node_count` and `data_node_instance_type`
-- `data_node_volume_size`, `data_node_volume_type`, and `data_node_volume_iops`
-- `availability_zone_count`
-- `multi_az_with_standby_enabled`
-- `off_peak_window_enabled` and `off_peak_window_start`
-- `domain_endpoint` (for importing existing domains)
-
-### Relationship and Limitations
-
-1. VPC and OpenSearch Integration:
-   - The OpenSearch cluster is deployed within the VPC specified in the configuration.
-   - The number of private subnets in the VPC must be at least equal to the `availability_zone_count` specified in the OpenSearch cluster settings.
-
-2. Availability Zones:
-   - The `availability_zone_count` in OpenSearch settings must not exceed the number of available AZs in the region or the number of private subnets in the VPC.
-   - When using an existing VPC, ensure that the private subnets are distributed across different AZs.
-
-3. Subnet Selection:
-   - For OpenSearch deployment, the system automatically selects private subnets from the VPC, up to the number specified by `availability_zone_count`.
-   - Each selected subnet must be in a different Availability Zone.
-
-4. Validation:
-   - The configuration system validates that there are enough private subnets in different AZs to meet the OpenSearch cluster requirements.
-   - If using an existing VPC, it checks that the number of private subnets meets or exceeds the `availability_zone_count`.
-
-5. Multi-AZ Deployment:
-   - Setting `multi_az_with_standby_enabled` to true requires at least three dedicated master nodes (`master_node_count >= 3`).
-
-6. Instance Types:
-   - The configuration validates that the specified instance types for master and data nodes are valid for OpenSearch.
-
-These configurations and their relationships ensure that the OpenSearch cluster is properly deployed within the VPC, with the correct number of nodes distributed across the specified number of Availability Zones.
-
-### SAML Configuration
-
-- identity_provider_method - Method for identity provider (saml or cognito)
-- identity_provider_name - Name of identity provider
-- identity_provider_metadata_url - Metadata URL for identity provider
-
-## 🚀 Deployment
-
-1. Bootstrap CDK (first time only):
+For advanced users who prefer CDK deployment:
 
 ```bash
-cdk bootstrap
+cdk deploy --all --profile <profile> --region <region>
 ```
+---
 
-2. OpenSearch - Provisioned
+## Deployment Validation
 
-This service is highly sensitive to VPC subnet Availability Zone selection. When using an external VPC, ensure that:
+1. In the AWS CloudFormation console, check that the stack `medialake-cf` (and related media lake stacks) are in **CREATE_COMPLETE** status.
+2. After deployment, you will receive a welcome email at the address you provided, containing:
+   - The media lake application URL
+   - Username (your email)
+   - Temporary password
+3. Log in at the URL provided. You should see the media lake user interface and be able to add storage connectors and media.
 
-When using instances smaller than r7g.medium.search, you cannot configure dedicated master nodes. Instead, your data nodes must also serve as master nodes.  Due to this we recommend using r7g.medium.search or larger.
+---
 
-1. The number of private subnets is at least equal to the `availability_zone_count` specified in OpenSearch cluster settings.
-2. Each subnet is in a distinct Availability Zone.
+## Running the Guidance
 
-OpenSearch Provisioned CDK creates service-linked roles, but these may not be immediately recognized during a first-time deployment. You might encounter the following error:
+### 1. **Login**
 
-"Invalid request provided: Before you can proceed, you must enable a service-linked role to give Amazon OpenSearch Service permissions to access your VPC."
+Use the emailed credentials to log in to the media lake UI.
 
-If this occurs:
+### 2. **Connect Storage**
 
-1. Wait 5 minutes after your initial deployment attempt.
-2. Clear any previous stack in CloudFormation.
-3. Attempt the deployment again.
+- Navigate to **Settings > Connectors** in the UI.
+- Add a connector, choosing Amazon S3 and providing your bucket details.
+- **Note**: If you create new S3 buckets through media lake, remember that these will need to be manually emptied and deleted during cleanup as they are not automatically removed when the media lake stack is deleted.
 
-If issues persist, manually create the required roles using the following AWS CLI commands:
+### 3. **Ingest Media**
 
-```bash
-aws iam create-service-linked-role --aws-service-name es.amazonaws.com
-aws iam create-service-linked-role --aws-service-name opensearchservice.amazonaws.com
-aws iam create-service-linked-role --aws-service-name osis.amazonaws.com
-```
+- Upload media to your configured S3 bucket or use the UI’s manual upload feature.
 
-3. Deploy the stack:
+### 4. **Enable Semantic Search and Integrations**
 
-```bash
-cdk deploy --all
+- Enable and configure semantic search providers (e.g., Twelve Labs) as described in the UI and [MediaLake-Instructions.docx](assets/docs/MediaLake-Instructions.docx).
+- Import pipelines for enrichment and transcription.
 
-or if you are using a specific profile and/or region
+### 5. **Process and Retrieve Assets**
 
-cdk deploy --profile <profile> --region <region> --all
-```
+- Monitor pipeline executions, view extracted metadata, and use search/discovery features in the UI.
 
-## 🏗️ Project Structure
+---
+
+## Next Steps
+
+- Customize pipeline configurations for your use case.
+- Scale up OpenSearch or DynamoDB for higher performance.
+
+---
+
+## Project Structure
 
 ```
 medialake/
+├── assets/                   # Documentation, images, and scripts
+│   ├── docs/                 # Documentation files
+│   ├── images/               # Architecture diagrams
+│   └── scripts/              # Deployment and utility scripts
 ├── medialake_constructs/     # CDK construct definitions
 │   ├── shared_constructs/    # Shared AWS constructs
 │   └── api_gateway_connectors.py
@@ -462,93 +354,151 @@ medialake/
 ├── lambdas/                  # Lambda functions
 │   ├── api/                  # API handlers
 │   └── pipelines/           # Pipeline processors
-├── tests/                    # Test files
+├── medialake_user_interface/ # React-based user interface
+├── pipeline_library/         # Pipeline templates and configurations
+├── s3_bucket_assets/         # S3 deployment assets
 ├── app.py                    # Main CDK app
 ├── requirements.txt          # Python dependencies
 ├── cdk.json                 # CDK configuration
-├── config.py                # Configuration interpertor and validator
+├── config.py                # Configuration interpreter and validator
 ├── config.json              # Configuration file
-├── requirements-dev.txt     # Development dependencies
-├── README.md                # This file
-└── LICENSE                  # License
+└── README.md                # This file
 ```
 
-## 🔑 Key Components
+---
+
+## Key Components
 
 ### Storage Connectors
-
 - S3 Connector with EventBridge/S3 event integration
 - Automatic resource provisioning (SQS, Lambda, IAM roles)
 - Bucket exploration and management capabilities
 
 ### Processing Pipelines
-
 - FIFO queue-based media processing
 - Step Functions workflow orchestration
 - Customizable processing steps
 - Event-driven architecture
 
-## ☁️ AWS Services
+### AWS Services Used
 
-### Core Services
-
+**Core Services:**
 - **AWS Lambda** - Serverless compute for API handlers and media processing
-- **Amazon S3** - Object storage for media assets, metadata, and temporary processing files
+- **Amazon S3** - Object storage for media assets and metadata
 - **AWS Step Functions** - Orchestration of media processing workflows
-- **Amazon SQS** - queues for ordered media processing and flow control
-- **Amazon EventBridge** - Event routing and processing pipeline triggers
+- **Amazon SQS** - Queues for ordered media processing
+- **Amazon EventBridge** - Event routing and pipeline triggers
 - **Amazon API Gateway** - REST API endpoint management
-- **Amazon DynamoDB** - Database for asset metadata, storage connector configuration, pipeline configuration, resource state, and pipeline execution history
+- **Amazon DynamoDB** - Asset metadata and configuration storage
+- **AWS MediaConvert** - Media transcoding and format conversion service
+- **Amazon Transcribe** - Speech-to-text transcription service (only when pipeline is imported and enabled)
 
-### Security & Authentication
-
+**Security & Authentication:**
 - **AWS Cognito** - User authentication and authorization
 - **AWS KMS** - Encryption key management
-- **AWS IAM** - Resource access control and permissions
-- **AWS Secrets Manager** - Secret management
-- **AWS Amplify** - Frontend development framework
-- **AWS WAF** - Web application firewall
+- **AWS IAM** - Resource access control
 
-### Monitoring & Logging
-
+**Monitoring & Search:**
 - **Amazon CloudWatch** - Metrics, logging, and alerting
-- **AWS X-Ray** - Distributed tracing and performance monitoring
-- **Amazon CloudTrail** - API activity and resource change tracking
+- **Amazon OpenSearch** - Search and analytics engine
 
-### Others
+---
 
-- **MediaConvert** - Video & Audio for transcoding.
+## Security Features
 
-### Development & Deployment
-
-- **AWS CDK** - Infrastructure as code
-- **AWS CloudFormation** - Resource provisioning
-
-## 📚 API Documentation
-
-The API includes the following main endpoints:
-
-- `POST /connectors/s3`: Create new S3 storage connector
-- `GET /connectors`: List all storage connectors
-- `DELETE /connectors/{id}`: Remove a storage connector
-- `GET /connectors/s3/explorer/{connector_id}`: Browse S3 bucket contents
-- `POST /pipelines`: Create processing pipeline
-- `DELETE /pipelines/{id}`: Remove pipeline
-
-## 🔒 Security
-
-- AWS Cognito authentication and authorization including support for local username and password as well as federated authentication via SAML.
+- AWS Cognito authentication and authorization including support for local username/password and federated authentication via SAML
 - KMS encryption for sensitive data
 - IAM role-based access control
 - CORS-enabled API endpoints
+- VPC deployment options for network isolation
 
-## 🙏 Acknowledgments
+---
+
+## Supported Media Types
+
+Media lake supports processing of the following file types through its default pipelines:
+
+### Audio Files
+- **WAV** - Waveform Audio File Format
+- **AIFF/AIF** - Audio Interchange File Format
+- **MP3** - MPEG Audio Layer III
+- **PCM** - Pulse Code Modulation
+- **M4A** - MPEG-4 Audio
+
+### Video Files
+- **FLV** - Flash Video
+- **MP4** - MPEG-4 Part 14
+- **MOV** - QuickTime Movie
+- **AVI** - Audio Video Interleave
+- **MKV** - Matroska Video
+- **WEBM** - WebM Video
+- **MXF** - Material Exchange Format
+
+### Image Files
+- **PSD** - Adobe Photoshop Document
+- **TIF** - Tagged Image File Format
+- **JPG/JPEG** - Joint Photographic Experts Group
+- **PNG** - Portable Network Graphics
+- **WEBP** - WebP Image Format
+- **GIF** - Graphics Interchange Format
+- **SVG** - Scalable Vector Graphics
+
+Each media type is automatically processed through dedicated pipelines that handle metadata extraction, proxy/thumbnail generation, and integration with AI services for enhanced search and analysis capabilities.
+
+---
+
+## Cleanup
+
+To remove all media lake resources:
+
+### Manual Cleanup (AWS Console):
+
+- Go to CloudFormation console
+- Delete all stacks with prefix "Media Lake" and `medialake-cf`
+- **Important for S3 Buckets**: For new buckets created via media lake, you must manually empty and delete them as they are not automatically cleaned up during stack deletion
+- Delete any other associated S3 buckets, DynamoDB tables, or resources as needed
+
+> **Warning:** This will permanently remove all media lake data and resources. Use with caution.
+
+---
+
+## FAQ, Known Issues, and Additional Considerations
+
+- For feedback, questions, or suggestions, please use the [GitHub Issues page](https://github.com/aws-solutions-library-samples/guidance-for-medialake/issues).
+- Known issues and deployment tips will be tracked in the Issues section.
+- Service quotas: media lake relies on OpenSearch, DynamoDB, Lambda, and S3 limits; monitor and request increases if needed for large-scale deployments.
+- For SAML integration and advanced identity provider setup, refer to the SAML instructions in [MediaLake-Instructions.docx](assets/docs/MediaLake-Instructions.docx).
+
+---
+
+## Revisions
+
+- July 2025: Initial Alchemy format conversion.  
+- See repository commit history for further changes.
+
+---
+
+## Notices
+
+Customers are responsible for making their own independent assessment of the information in this Guidance. This Guidance: (a) is for informational purposes only, (b) represents AWS current product offerings and practices, which are subject to change without notice, and (c) does not create any commitments or assurances from AWS and its affiliates, suppliers or licensors. AWS products or services are provided “as is” without warranties, representations, or conditions of any kind, whether express or implied. AWS responsibilities and liabilities to its customers are controlled by AWS agreements, and this Guidance is not part of, nor does it modify, any agreement between AWS and its customers.
+
+---
+
+## Acknowledgments
 
 - AWS CDK team for the excellent infrastructure as code framework
 - AWS Lambda Powertools for Python
 - The open-source community for various tools and libraries used in this project
 
-LICENSE
+---
+
+## Authors
+
+- Amazon Web Services, Inc. and contributors.
+
+---
+
+## License
 
 Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
@@ -558,53 +508,4 @@ Licensed under the Apache License, Version 2.0 (the "License"). You may not use 
 
 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 
-# MediaLake CloudFormation Stack Deletion Script
 
-This script automates the deletion of all CloudFormation stacks with the prefix "MediaLake" in a specified AWS region. It handles stack dependencies by repeatedly attempting deletion until all stacks are removed.
-
-## Prerequisites
-
-- Python 3.6+
-- AWS CLI configured with appropriate credentials
-- Required Python packages:
-  - boto3
-  - aws-lambda-powertools
-
-## Installation
-
-1. Install required packages:
-
-```bash
-pip install boto3 aws-lambda-powertools
-```
-
-2. Make the script executable:
-
-```bash
-chmod +x delete_medialake_stacks.py
-```
-
-## Usage
-
-Run the script specifying your AWS profile and region:
-
-```bash
-./delete_medialake_stacks.py --profile your-aws-profile --region us-east-1
-```
-
-### Parameters
-
-- `--profile`: Required. The AWS profile name to use.
-- `--region`: Required. The AWS region where the stacks are deployed.
-
-## How It Works
-
-1. The script lists all CloudFormation stacks with the "MediaLake" prefix in the specified region.
-2. It attempts to delete each stack.
-3. Then it waits for 60 seconds before checking again.
-4. This process repeats until all "MediaLake" stacks are deleted.
-5. Since some stacks may depend on others, the script will retry deletion until all stacks are gone.
-
-## Security Warning
-
-This script will permanently delete all CloudFormation stacks that match the criteria. Use with caution in production environments.

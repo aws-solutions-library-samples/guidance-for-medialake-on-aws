@@ -40,7 +40,7 @@ Parameters:
     AllowedPattern: '^[a-zA-Z\s\-\.]+$'
   
   MediaLakeEnvironmentName:
-    Description: Media Lake environment name (dev, prod, ...)
+    Description: Media Lake environment name (dev, prd, ...)
     Type: String
     MinLength: 1
     MaxLength: 10
