@@ -1,7 +1,6 @@
 import json
 import os
 import glob
-# from jinja2 import Environment, FileSystemLoader
 import time
 import aws_cdk as cdk
 
@@ -29,7 +28,6 @@ from medialake_stacks.pipelines_executions_stack import (
     PipelinesExecutionsStack,
     PipelinesExecutionsStackProps,
 )
-# from config import config
 from constructs import Construct
 from dataclasses import dataclass
 
@@ -37,22 +35,12 @@ from dataclasses import dataclass
 @dataclass
 class PipelineStackProps:
     iac_assets_bucket: s3.IBucket
-    # trigger_node_function_arn: str
-    # image_metadata_extractor_function_arn: str
-    # image_proxy_function_arn: str
-    # video_metadata_extractor_function_arn: str
-    # video_proxy_thumbnail_function_arn: str
-    # audio_metadata_extractor_function_arn: str
-    # audio_proxy_thumbnail_function_arn: str
-    # check_media_convert_status_function_arn: str
     cognito_user_pool: cognito.UserPool
     cognito_app_client: cognito.UserPoolClient
     asset_table: dynamodb.TableV2
     connector_table: dynamodb.TableV2
     node_table: dynamodb.TableV2
     pipeline_table: dynamodb.TableV2
-    # image_proxy_lambda: lambda_.Function
-    # image_metadata_extractor_lambda: lambda_.Function
     iac_assets_bucket: s3.IBucket
     external_payload_bucket: s3.IBucket
     pipelines_nodes_templates_bucket: s3.IBucket
@@ -126,7 +114,7 @@ class PipelineStack(cdk.NestedStack):
             ),
         )
         
-         ## pipelines deploy
+        # Pipelines deploy
         # Get all JSON files from the pipeline library directory
         pipeline_library_dir = os.path.join(
             os.path.dirname(__file__), "..", "s3_bucket_assets", "pipeline_library", "default"

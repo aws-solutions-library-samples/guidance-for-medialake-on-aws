@@ -72,15 +72,13 @@ from medialake_constructs.api_gateway.api_gateway_authorization import (
     AuthorizationApiProps,
 )
 
-# from medialake_stacks.monitoring_stack import MonitoringStack - Development paused, commented out for now
-
 # Initialize global logger configuration
 if hasattr(config, "logging") and hasattr(config.logging, "level"):
     CDKLogger.set_level(config.logging.level)
 
 # Create application-level logger
 logger = get_logger("CDKApp")
-logger.info(f"Initializing MediaLake CDK App with log level: {config.logging.level}")
+logger.info(f"Initializing media lake CDK code with log level: {config.logging.level}")
 
 app = cdk.App()
 
@@ -99,7 +97,6 @@ cloudfront_waf_stack = CloudFrontWafStack(
     app, "MediaLakeCloudFrontWAF", env=env_us_east_1
 )
 
-# Create the BaseInfrastructureStack
 base_infrastructure = BaseInfrastructureStack(
     app, "MediaLakeBaseInfrastructure", env=env
 )
@@ -154,7 +151,7 @@ class MediaLakeStack(cdk.Stack):
 
         users_groups_roles_stack = UsersGroupsStack(
             self,
-            "MediaLakeUsersGroupsRolesStack",
+            "UsersGroupsRolesStack",
             props=UsersGroupsStackProps(
                 cognito_user_pool=props.cognito_stack.user_pool,
                 cognito_app_client=props.cognito_stack.user_pool_client,
@@ -167,9 +164,8 @@ class MediaLakeStack(cdk.Stack):
 
         groups_stack = GroupsStack(
             self,
-            "MediaLakeGroupsStack",
+            "GroupsStack",
             props=GroupsStackProps(
-                # x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
                 cognito_user_pool=props.cognito_stack.user_pool,
                 auth_table=props.authorization_stack.auth_table,
             ),
@@ -178,7 +174,7 @@ class MediaLakeStack(cdk.Stack):
 
         nodes_stack = NodesStack(
             self,
-            "MediaLakeNodes",
+            "Nodes",
             props=NodesStackProps(
                 iac_bucket=props.base_infrastructure.iac_assets_bucket,
             ),
@@ -186,7 +182,7 @@ class MediaLakeStack(cdk.Stack):
 
         asset_sync_stack = AssetSyncStack(
             self,
-            "MediaLakeAssetSyncStack",
+            "AssetSyncStack",
             props=AssetSyncStackProps(
                 asset_table=props.base_infrastructure.asset_table,
                 pipelines_event_bus=props.base_infrastructure.pipelines_event_bus,
@@ -194,7 +190,7 @@ class MediaLakeStack(cdk.Stack):
         )
 
         settings_stack = SettingsStack(
-            self, "MediaLakeSettings", props=SettingsStackProps(
+            self, "Settings", props=SettingsStackProps(
                 access_logs_bucket_name=props.base_infrastructure.access_logs_bucket.bucket_name,
                 media_assets_bucket_name=props.base_infrastructure.media_assets_s3_bucket.bucket_name,
                 iac_assets_bucket_name=props.base_infrastructure.iac_assets_bucket.bucket_name,
