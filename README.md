@@ -1,4 +1,4 @@
-# Guidance for Media Lake on AWS
+# Guidance for a Media Lake on AWS
 
 > **Table of Contents**
 >
@@ -38,14 +38,13 @@
 > - [FAQ, Known Issues, and Additional Considerations](#faq-known-issues-and-additional-considerations)
 > - [Revisions](#revisions)
 > - [Notices](#notices)
-> - [Acknowledgments](#acknowledgments)
 > - [Authors](#authors)
 
 ---
 
 ## Overview
 
-**Guidance for Media Lake on AWS** provides a comprehensive, serverless, and scalable platform for media ingestion, processing, management, and workflow orchestration on AWS. Media lake enables you to connect various storage sources, ingest and organize media at scale, run customizable processing pipelines (such as proxy/thumbnail generation and AI enrichment), and integrate with both AWS native and partner services.
+**Guidance for a Media Lake on AWS** provides a comprehensive, serverless, and scalable platform for media ingestion, processing, management, and workflow orchestration on AWS. Media lake enables you to connect various storage sources, ingest and organize media at scale, run customizable processing pipelines (such as proxy/thumbnail generation and AI enrichment), and integrate with both AWS native and partner services.
 
 Media lake is designed for:
 - Media organizations and content creators needing automated processing and enrichment of large media libraries.
@@ -53,17 +52,17 @@ Media lake is designed for:
 - Organizations requiring secure, event-driven, and highly available media workflows.
 
 ### High-Level Overview
-![MediaLake Overview](assets/images/medialake-architecture-overview.png)
+![Guidance for a Media Lake Overview](assets/images/medialake-architecture-overview.png)
 
 > _Diagram: Media Lake provides a comprehensive serverless platform connecting storage sources, processing pipelines, and enrichment services with secure user interfaces and API endpoints for scalable media management workflows._
 
 ### Application Architecture
-![MediaLake Application Architecture](assets/images/medialake-architecture-application.png)
+![Guidance for a Media Lake Architecture](assets/images/medialake-architecture-application.png)
 
 > _Diagram: Media lake application layer shows the React UI, API Gateway endpoints, Lambda functions, and data flow between Cognito authentication, DynamoDB storage, and OpenSearch indexing for user interactions and asset management._
 
 ### Pipeline Execution and Deployment
-![MediaLake Pipeline Architecture](assets/images/medialake-architecture-pipeline.png)
+![Guidance for a Media Lake Pipeline Architecture](assets/images/medialake-architecture-pipeline.png)
 
 > _Diagram: Media lake processes media through S3 ingestion, EventBridge routing, Lambda orchestration, Step Functions, and enrichment with metadata, search, and integration endpoints._
 
@@ -321,7 +320,7 @@ Use the emailed credentials to log in to the media lake UI.
 
 ### 4. **Enable Semantic Search and Integrations**
 
-- Enable and configure semantic search providers (e.g., Twelve Labs) as described in the UI and [MediaLake-Instructions.docx](assets/docs/MediaLake-Instructions.docx).
+- Enable and configure semantic search providers (e.g., Twelve Labs) as described in the UI and [MediaLake-Instructions.md](assets/docs/MediaLake-Instructions.md).
 - Import pipelines for enrichment and transcription.
 
 ### 5. **Process and Retrieve Assets**
@@ -473,7 +472,7 @@ To remove all media lake resources:
 
 ## Revisions
 
-- July 2025: Initial Alchemy format conversion.  
+- July 2025: Initial release and commit of repository.
 - See repository commit history for further changes.
 
 ---
@@ -484,28 +483,7 @@ Customers are responsible for making their own independent assessment of the inf
 
 ---
 
-## Acknowledgments
-
-- AWS CDK team for the excellent infrastructure as code framework
-- AWS Lambda Powertools for Python
-- The open-source community for various tools and libraries used in this project
-
----
-
 ## Authors
-
-- Amazon Web Services, Inc. and contributors.
-
----
-
-## License
-
-Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-
-Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except in compliance with the License. You may obtain a copy of the License at
-
-<http://www.apache.org/licenses/LICENSE-2.0>
-
-Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
-
-
+- Joao Seike
+- Lior Berezinski
+- Robert Raver
