@@ -55,19 +55,6 @@ class CognitoUpdateStack(Stack):
             "COGNITO_USER_POOL_ID": props.cognito_user_pool_id,
         }
 
-        # TODO: Create the Cognito Pre-Signup Lambda for additional signup validation
-        # Commented out for now as requested
-        # self._pre_signup_lambda = Lambda(
-        #     self,
-        #     "PreSignupLambda",
-        #     config=LambdaConfig(
-        #         name="cognito_pre_signup",
-        #         entry="lambdas/auth/cognito_pre_signup",
-        #         memory_size=256,
-        #         timeout_minutes=1,
-        #         environment_variables=common_env_vars,
-        #     ),
-        # )
 
         # Create the Pre-Token Generation Lambda
         pre_token_env_vars = {
@@ -149,13 +136,6 @@ class CognitoUpdateStack(Stack):
             },
         )
         
-        # TODO: Grant permissions for Cognito to invoke pre-signup Lambda (commented out for now)
-        # self._pre_signup_lambda.function.add_permission(
-        #     "CognitoInvokePermissionPreSignup",
-        #     principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
-        #     source_arn=props.cognito_user_pool_arn,
-        # )
-        
         # Grant permissions for Cognito to invoke the pre-token generation Lambda
         self._pre_token_generation_lambda.function.add_permission(
             "CognitoInvokePermissionPreTokenGeneration",
@@ -163,12 +143,6 @@ class CognitoUpdateStack(Stack):
             source_arn=props.cognito_user_pool_arn,
         )
 
-    # TODO: Re-enable when pre-signup lambda is uncommented
-    # @property
-    # def pre_signup_lambda(self):
-    #     """Return the pre-signup Lambda function"""
-    #     return self._pre_signup_lambda.function
-        
     @property
     def pre_token_generation_lambda(self):
         """Return the pre-token generation Lambda function"""
