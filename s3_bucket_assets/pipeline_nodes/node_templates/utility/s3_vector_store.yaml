@@ -1,0 +1,135 @@
+spec: v1.0.0
+node:
+  id: s3_vector_store
+  title: S3 Vector Store
+  description: Store and retrieve vector embeddings using S3 Vectors
+  version: 1.0.0
+  type: utility
+  integration:
+    config:
+      lambda:
+        handler: utility/S3VectorStoreLambdaDeployment
+        runtime: python3.12
+        layers:
+          - CustomBoto3
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              resources:
+                - "*"
+            - effect: Allow
+              actions:
+                - s3:GetObject
+                - s3:PutObject
+                - s3:DeleteObject
+                - s3:ListBucket
+              resources:
+                - "*"
+            - effect: Allow
+              actions:
+                - kms:Decrypt
+                - kms:Encrypt
+                - kms:GenerateDataKey
+              resources:
+                - "*"
+actions:
+  store:
+    summary: Store Vector Embeddings
+    description: Store vector embeddings in S3 with metadata
+    operationId: storeVectorEmbeddings
+    parameters:
+      - in: body
+        name: S3 Location
+        required: true
+        schema:
+          type: object
+          properties:
+            bucket:
+              type: string
+              description: S3 bucket name
+            key:
+              type: string
+              description: S3 object key
+            vector_data:
+              type: object
+              properties:
+                embeddings:
+                  type: array
+                  items:
+                    type: number
+                metadata:
+                  type: object
+          required:
+            - bucket
+            - key
+            - vector_data
+    connections:
+      incoming:
+        type: [any]
+      outgoing:
+        type: [vector]
+  
+  retrieve:
+    summary: Retrieve Vector Embeddings
+    description: Retrieve vector embeddings from S3
+    operationId: retrieveVectorEmbeddings
+    parameters:
+      - in: body
+        name: S3 Location
+        required: true
+        schema:
+          type: object
+          properties:
+            bucket:
+              type: string
+              description: S3 bucket name
+            key:
+              type: string
+              description: S3 object key
+          required:
+            - bucket
+            - key
+    connections:
+      incoming:
+        type: [any]
+      outgoing:
+        type: [vector]
+  
+  search:
+    summary: Search Similar Vectors
+    description: Search for similar vectors using cosine similarity
+    operationId: searchSimilarVectors
+    parameters:
+      - in: body
+        name: Search Parameters
+        required: true
+        schema:
+          type: object
+          properties:
+            bucket:
+              type: string
+              description: S3 bucket name
+            prefix:
+              type: string
+              description: S3 key prefix to search within
+            query_vector:
+              type: array
+              items:
+                type: number
+              description: Query vector for similarity search
+            top_k:
+              type: integer
+              default: 10
+              description: Number of top similar vectors to return
+          required:
+            - bucket
+            - query_vector
+    connections:
+      incoming:
+        type: [vector]
+      outgoing:
+        type: [vector]

@@ -1,0 +1,1 @@
+# No additional requirements needed - using custom boto3 from layer

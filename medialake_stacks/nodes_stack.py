@@ -20,7 +20,7 @@ from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaCon
 from medialake_constructs.shared_constructs.lambda_layers import (
     PowertoolsLayer, PowertoolsLayerConfig,
     PyMediaInfo,ResvgCliLayer,FFProbeLayer, FFmpegLayer,
-    PyamlLayer, ShortuuidLayer
+    PyamlLayer, ShortuuidLayer, CustomBoto3Layer
 )
 from medialake_constructs.shared_constructs.mediaconvert import (
     MediaConvert,
@@ -68,6 +68,7 @@ class NodesStack(cdk.NestedStack):
         self.pyaml_layer = PyamlLayer(self, "PyamlLayer")
         self.ffprobe_layer = FFProbeLayer(self, "FFProbeLayer")
         self.resvgcli_layer = ResvgCliLayer(self, "ResvgCliLayer")
+        self.custom_boto3_layer = CustomBoto3Layer(self, "CustomBoto3Layer")
         
         
         
@@ -230,6 +231,14 @@ class NodesStack(cdk.NestedStack):
             
         )
 
+        self.s3_vector_store_lambda_deployment = LambdaDeployment(
+            self,
+            "S3VectorStoreLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "s3_vector_store"],
+        )
+
         # Create DynamoDB table for nodes
         self._pipelines_nodes_table = DynamoDB(
             self,
@@ -323,6 +332,7 @@ class NodesStack(cdk.NestedStack):
                     "PYAML_LAYER_ARN": self.pyaml_layer.layer.layer_version_arn,
                     "FFPROBE_LAYER_ARN": self.ffprobe_layer.layer.layer_version_arn,
                     "RESVGCLI_LAYER_ARN": self.resvgcli_layer.layer.layer_version_arn,
+                    "CUSTOMBOTO3_LAYER_ARN": self.custom_boto3_layer.layer.layer_version_arn,
                     
                     
                 },
