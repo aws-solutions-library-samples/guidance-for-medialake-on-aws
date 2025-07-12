@@ -44,6 +44,7 @@ from medialake_constructs.shared_constructs.lambda_layers import (
     PowertoolsLayer,
     PowertoolsLayerConfig,
     PynamoDbLambdaLayer,
+    CommonLibrariesLayer,
 )
 from aws_lambda_powertools import Logger
 
@@ -235,6 +236,9 @@ class Lambda(Construct):
         lambda_function = Lambda(self, "MyFunction", config)
         ```
     """
+    
+    # Class-level shared layer instances per stack to avoid duplicate layer creation
+    _shared_common_libraries_layers = {}
 
     def __init__(
         self, scope: Construct, construct_id: str, config: LambdaConfig, **kwargs
@@ -291,7 +295,21 @@ class Lambda(Construct):
         powertools_layer = PowertoolsLayer(
             self, "PowertoolsLayer", config=power_tools_layer_config
         )
-        layer_objects = [powertools_layer.layer]
+
+        # Create or reuse common libraries layer (per-stack singleton pattern)
+        stack_id = stack.stack_name
+        if stack_id not in Lambda._shared_common_libraries_layers:
+            logger.debug(f"Creating shared Common Libraries layer for stack: {stack_id}")
+            # Use the stack variable that was already created above
+            Lambda._shared_common_libraries_layers[stack_id] = CommonLibrariesLayer(
+                stack, "CommonLibsLayer"
+            )
+        else:
+            logger.debug(f"Reusing existing Common Libraries layer for stack: {stack_id}")
+        
+        common_libraries_layer = Lambda._shared_common_libraries_layers[stack_id]
+
+        layer_objects = [powertools_layer.layer, common_libraries_layer.layer]
 
         # Add layers from config
         if config.layers:

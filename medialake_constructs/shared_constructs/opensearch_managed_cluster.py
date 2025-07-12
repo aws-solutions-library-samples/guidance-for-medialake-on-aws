@@ -22,7 +22,7 @@ from constructs import Construct
 
 from config import config
 from medialake_constructs.shared_constructs.lambda_layers import (
-    PowertoolsLayer, PowertoolsLayerConfig
+    PowertoolsLayer, PowertoolsLayerConfig, CommonLibrariesLayer
 )
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 

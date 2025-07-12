@@ -403,3 +403,21 @@ class ShortuuidLayer(Construct):
     def layer(self) -> lambda_.LayerVersion:
         return self.layer_version.layer
 
+
+class CommonLibrariesLayer(Construct):
+    def __init__(self, scope: Construct, id: str, **kwargs):
+        super().__init__(scope, id, **kwargs)
+
+        # Define the Lambda layer
+        self.layer_version = LambdaLayer(
+            self,
+            "CommonLibrariesLayer",
+            config=LambdaLayerConfig(
+                entry="lambdas/common_libraries",
+                description="Common utility libraries for all MediaLake Lambda functions",
+            ),
+        )
+
+    @property
+    def layer(self) -> lambda_.LayerVersion:
+        return self.layer_version.layer
