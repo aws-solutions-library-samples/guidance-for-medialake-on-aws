@@ -27,7 +27,8 @@ from medialake_constructs.shared_constructs.lambda_layers import (
     PyamlLayer,
     ShortuuidLayer,
     PowertoolsLayer,
-    PowertoolsLayerConfig
+    PowertoolsLayerConfig,
+    CommonLibrariesLayer
 )
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 
@@ -238,6 +239,7 @@ class ApiGatewayPipelinesConstruct(Construct):
         ## Pipelines
         pyaml_layer = PyamlLayer(self, "PyamlLayer")
         shortuuid_layer = ShortuuidLayer(self, "ShortuuidLayer")
+        common_libraries_layer = CommonLibrariesLayer(self, "CommonLibrariesLayer")
         powertools_layer_config = PowertoolsLayerConfig()
         powertools_layer = PowertoolsLayer(
             self, "PowertoolsLayer", config=powertools_layer_config
@@ -268,6 +270,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "OPENSEARCH_SECURITY_GROUP_ID": props.security_group.security_group_id,
                 "ACCOUNT_ID": self.account_id,
                 "POWERTOOLS_LAYER_ARN":   powertools_layer.layer.layer_version_arn,
+                "COMMON_LIBRARIES_LAYER_ARN": common_libraries_layer.layer.layer_version_arn,
             },
         )
         

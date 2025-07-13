@@ -280,12 +280,6 @@ def determine_layers_for_node(node_id: str, node_type: str, yaml_data: Dict[str,
     """
     layers = []
     
-    # Always add common libraries layer first
-    common_libraries_layer_arn = os.environ.get("COMMON_LIBRARIES_LAYER_ARN")
-    if common_libraries_layer_arn:
-        layers.append(common_libraries_layer_arn)
-        logger.info(f"Adding common libraries layer to Lambda function for node {node_id}: {common_libraries_layer_arn}")
-    
     # Then, try to get layers from DynamoDB
     try:
         # Get the layers item from DynamoDB
@@ -308,6 +302,13 @@ def determine_layers_for_node(node_id: str, node_type: str, yaml_data: Dict[str,
         if powertools_layer_arn:
             layers.append(powertools_layer_arn)
             logger.info(f"Adding default Powertools layer to Lambda function for node {node_id}")
+    
+    # Always add the Common Libraries layer for all Lambda functions if not already specified
+    if not any("COMMON_LIBRARIES_LAYER_ARN" in layer for layer in layers):
+        common_libraries_layer_arn = os.environ.get("COMMON_LIBRARIES_LAYER_ARN")
+        if common_libraries_layer_arn:
+            layers.append(common_libraries_layer_arn)
+            logger.info(f"Adding default Common Libraries layer to Lambda function for node {node_id}")
     
     return layers
 

@@ -20,7 +20,7 @@ from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaCon
 from medialake_constructs.shared_constructs.lambda_layers import (
     PowertoolsLayer, PowertoolsLayerConfig,
     PyMediaInfo,ResvgCliLayer,FFProbeLayer, FFmpegLayer,
-    PyamlLayer, ShortuuidLayer
+    PyamlLayer, ShortuuidLayer, CommonLibrariesLayer
 )
 from medialake_constructs.shared_constructs.mediaconvert import (
     MediaConvert,
@@ -62,6 +62,7 @@ class NodesStack(cdk.NestedStack):
 
         # Create Lambda Layers
         self.powertools_layer = PowertoolsLayer(self, "PowertoolsLayer", PowertoolsLayerConfig())
+        self.common_libraries_layer = CommonLibrariesLayer(self, "CommonLibrariesLayer")
         self.ffmpeg_layer = FFmpegLayer(self, "FFmpegLayer")
         self.pymediainfo_layer = PyMediaInfo(self, "PyMediaInfoLayer")
         self.shortuuid_layer = ShortuuidLayer(self, "ShortuuidLayer")
@@ -315,6 +316,7 @@ class NodesStack(cdk.NestedStack):
                     "SERVICE_NAME": "pipeline-nodes-deployer",
                     # Layer ARNs for automatic layer attachment
                     "POWERTOOLS_LAYER_ARN":  self.powertools_layer.layer.layer_version_arn,
+                    "COMMON_LIBRARIES_LAYER_ARN": self.common_libraries_layer.layer.layer_version_arn,
                     "FFMPEG_LAYER_ARN": self.ffmpeg_layer.layer.layer_version_arn,
                     "PYMEDIAINFO_LAYER_ARN": self.pymediainfo_layer.layer.layer_version_arn,
                     # "JINJA_LAYER_ARN": self.jinja_layer.layer.layer_version_arn,

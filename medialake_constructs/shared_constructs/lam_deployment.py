@@ -148,18 +148,6 @@ python
             if os.path.isfile(s):
                 shutil.copy2(s, d)
         
-        # Copy common libraries to package directory
-        common_libraries_path = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..", "..", "lambdas", "common_libraries")
-        )
-        if os.path.exists(common_libraries_path):
-            for item in os.listdir(common_libraries_path):
-                s = os.path.join(common_libraries_path, item)
-                d = os.path.join(package_path, item)
-                if os.path.isfile(s):
-                    shutil.copy2(s, d)
-                    print(f"Copied common library: {item} to {package_path}")
-
         shutil.make_archive(zip_path.replace(".zip", ""), "zip", package_path)
 
     def _package_nodejs_lambda(self, source_path, package_path, zip_path):
