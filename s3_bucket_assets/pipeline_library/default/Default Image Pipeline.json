@@ -76,9 +76,7 @@
             },
             "ref": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "label": "Ingest Completed (trigger)",
           "nodeId": "trigger_ingest_completed",
           "outputTypes": [
@@ -117,9 +115,7 @@
             },
             "ref": null
           },
-          "inputTypes": [
-            "image"
-          ],
+          "inputTypes": ["image"],
           "label": "Image Thumbnail (extract)",
           "nodeId": "image_thumbnail",
           "outputTypes": [
@@ -158,9 +154,7 @@
             },
             "ref": null
           },
-          "inputTypes": [
-            "image"
-          ],
+          "inputTypes": ["image"],
           "label": "Image Proxy (extract)",
           "nodeId": "image_proxy",
           "outputTypes": [
@@ -199,9 +193,7 @@
             },
             "ref": null
           },
-          "inputTypes": [
-            "image"
-          ],
+          "inputTypes": ["image"],
           "label": "Image Metadata Extractor (extract)",
           "nodeId": "image_metadata_extractor",
           "outputTypes": [
@@ -236,9 +228,7 @@
             },
             "ref": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "label": "Success",
           "nodeId": "success",
           "outputTypes": [],

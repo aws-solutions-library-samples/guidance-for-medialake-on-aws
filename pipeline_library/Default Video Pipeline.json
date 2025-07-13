@@ -118,9 +118,7 @@
             },
             "ref": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "label": "Ingest Completed (trigger)",
           "nodeId": "trigger_ingest_completed",
           "outputTypes": [
@@ -159,9 +157,7 @@
             },
             "ref": null
           },
-          "inputTypes": [
-            "video"
-          ],
+          "inputTypes": ["video"],
           "label": "Video Metadata Extractor (extract) (extract)",
           "nodeId": "video_metadata_extractor",
           "outputTypes": [
@@ -201,9 +197,7 @@
             },
             "ref": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "label": "Check MediaConvert Status (extract)",
           "nodeId": "check_media_convert_status",
           "outputTypes": [
@@ -238,9 +232,7 @@
             },
             "ref": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "label": "Success",
           "nodeId": "success",
           "outputTypes": [],
@@ -276,9 +268,7 @@
             },
             "ref": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "label": "Wait (wait)",
           "nodeId": "wait",
           "outputTypes": [
@@ -319,9 +309,7 @@
             },
             "ref": null
           },
-          "inputTypes": [
-            "video"
-          ],
+          "inputTypes": ["video"],
           "label": "Video Proxy and Thumbnail (extract)",
           "nodeId": "video_proxy_and_thumbnail",
           "outputTypes": [
@@ -356,9 +344,7 @@
             },
             "ref": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "label": "Choice",
           "nodeId": "choice",
           "outputTypes": [
@@ -408,9 +394,7 @@
             },
             "ref": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "label": "Fail (fail)",
           "nodeId": "fail",
           "outputTypes": [],

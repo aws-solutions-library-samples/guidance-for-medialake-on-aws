@@ -5,9 +5,7 @@
     "BuildStepFunctionDefinition": {
       "Catch": [
         {
-          "ErrorEquals": [
-            "States.ALL"
-          ],
+          "ErrorEquals": ["States.ALL"],
           "Next": "FailState",
           "ResultPath": "$.error"
         }
@@ -17,9 +15,7 @@
       "Retry": [
         {
           "BackoffRate": 2,
-          "ErrorEquals": [
-            "States.TaskFailed"
-          ],
+          "ErrorEquals": ["States.TaskFailed"],
           "IntervalSeconds": 2,
           "MaxAttempts": 3
         }
@@ -29,9 +25,7 @@
     "CheckExistingPipeline": {
       "Catch": [
         {
-          "ErrorEquals": [
-            "States.ALL"
-          ],
+          "ErrorEquals": ["States.ALL"],
           "Next": "FailState",
           "ResultPath": "$.error"
         }
@@ -41,9 +35,7 @@
       "Retry": [
         {
           "BackoffRate": 2,
-          "ErrorEquals": [
-            "States.TaskFailed"
-          ],
+          "ErrorEquals": ["States.TaskFailed"],
           "IntervalSeconds": 2,
           "MaxAttempts": 3
         }
@@ -64,9 +56,7 @@
     "CleanupExistingResources": {
       "Catch": [
         {
-          "ErrorEquals": [
-            "States.ALL"
-          ],
+          "ErrorEquals": ["States.ALL"],
           "Next": "FailState",
           "ResultPath": "$.error"
         }
@@ -76,9 +66,7 @@
       "Retry": [
         {
           "BackoffRate": 2,
-          "ErrorEquals": [
-            "States.TaskFailed"
-          ],
+          "ErrorEquals": ["States.TaskFailed"],
           "IntervalSeconds": 2,
           "MaxAttempts": 3
         }
@@ -88,9 +76,7 @@
     "CreateEventBridgeRules": {
       "Catch": [
         {
-          "ErrorEquals": [
-            "States.ALL"
-          ],
+          "ErrorEquals": ["States.ALL"],
           "Next": "FailState",
           "ResultPath": "$.error"
         }
@@ -100,9 +86,7 @@
       "Retry": [
         {
           "BackoffRate": 2,
-          "ErrorEquals": [
-            "States.TaskFailed"
-          ],
+          "ErrorEquals": ["States.TaskFailed"],
           "IntervalSeconds": 2,
           "MaxAttempts": 3
         }
@@ -112,9 +96,7 @@
     "CreateLambdaFunctions": {
       "Catch": [
         {
-          "ErrorEquals": [
-            "States.ALL"
-          ],
+          "ErrorEquals": ["States.ALL"],
           "Next": "FailState",
           "ResultPath": "$.error"
         }
@@ -124,9 +106,7 @@
       "Retry": [
         {
           "BackoffRate": 2,
-          "ErrorEquals": [
-            "States.TaskFailed"
-          ],
+          "ErrorEquals": ["States.TaskFailed"],
           "IntervalSeconds": 2,
           "MaxAttempts": 3
         }
@@ -136,9 +116,7 @@
     "CreateStepFunction": {
       "Catch": [
         {
-          "ErrorEquals": [
-            "States.ALL"
-          ],
+          "ErrorEquals": ["States.ALL"],
           "Next": "FailState",
           "ResultPath": "$.error"
         }
@@ -148,9 +126,7 @@
       "Retry": [
         {
           "BackoffRate": 2,
-          "ErrorEquals": [
-            "States.TaskFailed"
-          ],
+          "ErrorEquals": ["States.TaskFailed"],
           "IntervalSeconds": 2,
           "MaxAttempts": 3
         }
@@ -176,9 +152,7 @@
     "StorePipelineInfo": {
       "Catch": [
         {
-          "ErrorEquals": [
-            "States.ALL"
-          ],
+          "ErrorEquals": ["States.ALL"],
           "Next": "FailState",
           "ResultPath": "$.error"
         }
@@ -188,9 +162,7 @@
       "Retry": [
         {
           "BackoffRate": 2,
-          "ErrorEquals": [
-            "States.TaskFailed"
-          ],
+          "ErrorEquals": ["States.TaskFailed"],
           "IntervalSeconds": 2,
           "MaxAttempts": 3
         }
@@ -203,9 +175,7 @@
     "ValidatePipelineDefinition": {
       "Catch": [
         {
-          "ErrorEquals": [
-            "States.ALL"
-          ],
+          "ErrorEquals": ["States.ALL"],
           "Next": "FailState",
           "ResultPath": "$.error"
         }
@@ -215,9 +185,7 @@
       "Retry": [
         {
           "BackoffRate": 2,
-          "ErrorEquals": [
-            "States.TaskFailed"
-          ],
+          "ErrorEquals": ["States.TaskFailed"],
           "IntervalSeconds": 2,
           "MaxAttempts": 3
         }

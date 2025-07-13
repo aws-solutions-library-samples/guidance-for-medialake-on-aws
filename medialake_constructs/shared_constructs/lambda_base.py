@@ -579,7 +579,7 @@ class Lambda(Construct):
             del props["deps_lock_file_path"]
 
             # Add a default index document if not defined
-            if not "." in props["handler"]:
+            if "." not in props["handler"]:
                 props["handler"] = f"index.{props['handler']}"
 
             self._function = lambda_.Function(
@@ -700,7 +700,7 @@ class Lambda(Construct):
             del props["entry"]
 
             # Add a default index document if not defined
-            if not "." in props["handler"]:
+            if "." not in props["handler"]:
                 props["handler"] = f"index.{props['handler']}"
 
             self._function = lambda_.Function(

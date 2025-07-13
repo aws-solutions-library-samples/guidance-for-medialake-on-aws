@@ -100,9 +100,7 @@
             },
             "ref": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "label": "Map (map)",
           "nodeId": "map",
           "outputTypes": [
@@ -148,9 +146,7 @@
             },
             "ref": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "label": "Audio Processing Completed (trigger)",
           "nodeId": "trigger_audio_processing_completed",
           "outputTypes": [
@@ -185,9 +181,7 @@
             },
             "ref": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "label": "Success",
           "nodeId": "success",
           "outputTypes": [],
@@ -221,9 +215,7 @@
             },
             "ref": null
           },
-          "inputTypes": [
-            "audio"
-          ],
+          "inputTypes": ["audio"],
           "label": "Audio Splitter (split)",
           "nodeId": "audio_splitter",
           "outputTypes": [
@@ -264,9 +256,7 @@
             },
             "ref": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "label": "Presigned URL Generator (generate)",
           "nodeId": "pre_signed_url",
           "outputTypes": [
@@ -347,9 +337,7 @@
             },
             "ref": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "label": "Embedding Store (store)",
           "nodeId": "embedding_store",
           "outputTypes": [],

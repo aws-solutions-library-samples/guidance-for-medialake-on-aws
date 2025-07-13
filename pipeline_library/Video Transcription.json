@@ -106,10 +106,7 @@
             },
             "ref": null
           },
-          "inputTypes": [
-            "audio",
-            "video"
-          ],
+          "inputTypes": ["audio", "video"],
           "label": "Transcribe Audio using Amazon Transcribe",
           "nodeId": "audio_transcription_transcribe",
           "outputTypes": [
@@ -144,9 +141,7 @@
             },
             "ref": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "label": "Transcription Job Status",
           "nodeId": "audio_transcription_transcribe_status",
           "outputTypes": [
@@ -181,9 +176,7 @@
             },
             "ref": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "label": "Choice",
           "nodeId": "choice",
           "outputTypes": [
@@ -222,9 +215,7 @@
             },
             "ref": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "label": "Success",
           "nodeId": "success",
           "outputTypes": [],
@@ -258,9 +249,7 @@
             },
             "ref": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "label": "Wait (wait)",
           "nodeId": "wait",
           "outputTypes": [
@@ -301,9 +290,7 @@
             },
             "ref": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "label": "Bedrock Content Processor (process_content)",
           "nodeId": "bedrock_content_processor",
           "outputTypes": [
@@ -344,9 +331,7 @@
             },
             "ref": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "label": "Video Processing Completed (trigger)",
           "nodeId": "trigger_video_processing_completed",
           "outputTypes": [

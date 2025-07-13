@@ -797,7 +797,7 @@ class ApiGatewayPipelinesConstruct(Construct):
         return self._post_pipelines_async_handler
 
     @property
-    def post_pipelines_async_handler(self) -> lambda_.Function:
+    def post_pipelines_handler(self) -> lambda_.Function:
         return self._post_pipelines_handler.function
 
     @property

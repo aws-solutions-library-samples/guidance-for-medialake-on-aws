@@ -63,9 +63,7 @@
             },
             "ref": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "label": "Image Processing Completed (trigger)",
           "nodeId": "trigger_image_processing_completed",
           "outputTypes": [
@@ -104,9 +102,7 @@
             },
             "ref": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "label": "Presigned URL Generator (generate)",
           "nodeId": "pre_signed_url",
           "outputTypes": [
@@ -183,9 +179,7 @@
             },
             "ref": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "label": "Embedding Store (store)",
           "nodeId": "embedding_store",
           "outputTypes": [],
