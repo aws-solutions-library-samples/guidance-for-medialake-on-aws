@@ -168,7 +168,9 @@
             "ref": null
           },
           "id": "trigger_video_processing_completed",
-          "inputTypes": ["any"],
+          "inputTypes": [
+            "any"
+          ],
           "label": "Video Processing Completed (trigger)",
           "nodeId": "trigger_video_processing_completed",
           "outputTypes": [
@@ -208,7 +210,9 @@
             "ref": null
           },
           "id": "pre_signed_url",
-          "inputTypes": ["any"],
+          "inputTypes": [
+            "any"
+          ],
           "label": "Presigned URL Generator (generate)",
           "nodeId": "pre_signed_url",
           "outputTypes": [
@@ -324,7 +328,9 @@
             "ref": null
           },
           "id": "wait",
-          "inputTypes": ["any"],
+          "inputTypes": [
+            "any"
+          ],
           "label": "Wait (wait)",
           "nodeId": "wait",
           "outputTypes": [
@@ -405,7 +411,9 @@
             "ref": null
           },
           "id": "map",
-          "inputTypes": ["any"],
+          "inputTypes": [
+            "any"
+          ],
           "label": "Map (map)",
           "nodeId": "map",
           "outputTypes": [
@@ -445,7 +453,9 @@
             "ref": null
           },
           "id": "success",
-          "inputTypes": ["any"],
+          "inputTypes": [
+            "any"
+          ],
           "label": "Success",
           "nodeId": "success",
           "outputTypes": [],
@@ -481,7 +491,9 @@
             "ref": null
           },
           "id": "embedding_store",
-          "inputTypes": ["any"],
+          "inputTypes": [
+            "any"
+          ],
           "label": "Embedding Store (store)",
           "nodeId": "embedding_store",
           "outputTypes": [],
@@ -511,7 +523,9 @@
             },
             "ref": null
           },
-          "inputTypes": ["any"],
+          "inputTypes": [
+            "any"
+          ],
           "label": "Choice",
           "nodeId": "choice",
           "outputTypes": [
@@ -561,7 +575,9 @@
             },
             "ref": null
           },
-          "inputTypes": ["any"],
+          "inputTypes": [
+            "any"
+          ],
           "label": "Fail (fail)",
           "nodeId": "fail",
           "outputTypes": [],

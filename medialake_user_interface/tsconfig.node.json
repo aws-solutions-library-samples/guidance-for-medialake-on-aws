@@ -7,13 +7,20 @@
     "moduleResolution": "node",
     "outDir": "./dist",
     "paths": {
-      "*": ["node_modules/*"]
+      "*": [
+        "node_modules/*"
+      ]
     },
     "rootDir": "./src",
     "skipLibCheck": true,
     "strict": true,
     "target": "es2016"
   },
-  "exclude": ["node_modules", "dist"],
-  "include": ["src/**/*"]
+  "exclude": [
+    "node_modules",
+    "dist"
+  ],
+  "include": [
+    "src/**/*"
+  ]
 }

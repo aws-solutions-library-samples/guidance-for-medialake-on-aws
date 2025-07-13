@@ -167,9 +167,6 @@ class LambdaDeployment(Construct):
     @property
     def deployment_key(self) -> str:
         if self.parent_folder:
-            return f"lambda-code/{self.parent_folder}/{self.id}/{variable}"
-                                                                               0,
-                                                                               self.deployment.object_keys
-                                                                           )}"
+            return f"lambda-code/{self.parent_folder}/{self.id}/{Fn.select(0, self.deployment.object_keys)}"
         else:
             return f"lambda-code/{self.id}/{Fn.select(0, self.deployment.object_keys)}"

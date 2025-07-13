@@ -13,7 +13,9 @@
     },
     "1.2_frontend_patterns_review": {
       "agent": "Research",
-      "dependencies": ["1.1_current_state_analysis"],
+      "dependencies": [
+        "1.1_current_state_analysis"
+      ],
       "description": "Deep dive into frontEndSystemPatterns.md and current frontend implementation",
       "outputs": [
         "frontend-patterns-compliance.md",
@@ -41,7 +43,9 @@
     },
     "2.2_frontend_state_architecture": {
       "agent": "Architect",
-      "dependencies": ["1.2_frontend_patterns_review"],
+      "dependencies": [
+        "1.2_frontend_patterns_review"
+      ],
       "description": "Design frontend state management following established patterns",
       "outputs": [
         "search-state-architecture.md",
@@ -55,7 +59,9 @@
   "Phase_3_Backend_Implementation": {
     "3.1_lambda_parameter_processing": {
       "agent": "Code",
-      "dependencies": ["2.1_parameter_optimization_design"],
+      "dependencies": [
+        "2.1_parameter_optimization_design"
+      ],
       "description": "Optimize Lambda search functions for comma-separated field processing",
       "outputs": [
         "lambdas/api/search/get_search/index.py",
@@ -68,7 +74,9 @@
     },
     "3.2_api_gateway_optimization": {
       "agent": "Code",
-      "dependencies": ["2.1_parameter_optimization_design"],
+      "dependencies": [
+        "2.1_parameter_optimization_design"
+      ],
       "description": "Optimize API Gateway parameter handling and validation",
       "outputs": [
         "api-gateway-parameter-mapping.json",
@@ -98,7 +106,9 @@
     },
     "4.2_search_components_update": {
       "agent": "Code",
-      "dependencies": ["4.1_search_state_optimization"],
+      "dependencies": [
+        "4.1_search_state_optimization"
+      ],
       "description": "Update search components to use optimized parameter handling",
       "outputs": [
         "medialake_user_interface/src/pages/SearchPage.tsx",
@@ -112,7 +122,9 @@
   "Phase_5_Integration_Testing": {
     "5.1_end_to_end_testing": {
       "agent": "Debug",
-      "dependencies": ["4.2_search_components_update"],
+      "dependencies": [
+        "4.2_search_components_update"
+      ],
       "description": "Test complete search parameter flow from frontend to backend",
       "outputs": [
         "search-parameter-test-results.md",
@@ -124,7 +136,9 @@
     },
     "5.2_performance_validation": {
       "agent": "Debug",
-      "dependencies": ["5.1_end_to_end_testing"],
+      "dependencies": [
+        "5.1_end_to_end_testing"
+      ],
       "description": "Validate performance improvements and identify any remaining bottlenecks",
       "outputs": [
         "performance-comparison-report.md",
@@ -137,7 +151,9 @@
   "Phase_6_Documentation": {
     "6.1_implementation_documentation": {
       "agent": "Research",
-      "dependencies": ["5.2_performance_validation"],
+      "dependencies": [
+        "5.2_performance_validation"
+      ],
       "description": "Document the optimized search parameter implementation",
       "outputs": [
         "search-optimization-guide.md",

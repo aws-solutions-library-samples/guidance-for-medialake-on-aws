@@ -13,7 +13,10 @@
             "type": "string"
           }
         },
-        "required": ["region", "bucketName"],
+        "required": [
+          "region",
+          "bucketName"
+        ],
         "type": "object"
       },
       "requestMapping": {
@@ -38,8 +41,13 @@
       "endpoints": {
         "required": false
       },
-      "optional": ["region", "assumeRoleDuration"],
-      "required": ["roleArn"]
+      "optional": [
+        "region",
+        "assumeRoleDuration"
+      ],
+      "required": [
+        "roleArn"
+      ]
     }
   },
   "isActive": true,

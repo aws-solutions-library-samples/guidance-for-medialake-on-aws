@@ -43,7 +43,10 @@
     "@aws-cdk/core:checkSecretUsage": true,
     "@aws-cdk/core:enablePartitionLiterals": true,
     "@aws-cdk/core:includePrefixInUniqueNameGeneration": true,
-    "@aws-cdk/core:target-partitions": ["aws", "aws-cn"],
+    "@aws-cdk/core:target-partitions": [
+      "aws",
+      "aws-cn"
+    ],
     "@aws-cdk/core:validateSnapshotRemovalPolicy": true,
     "@aws-cdk/customresources:installLatestAwsSdkDefault": false
   },
@@ -57,6 +60,8 @@
       "**/__pycache__",
       "tests"
     ],
-    "include": ["**"]
+    "include": [
+      "**"
+    ]
   }
 }

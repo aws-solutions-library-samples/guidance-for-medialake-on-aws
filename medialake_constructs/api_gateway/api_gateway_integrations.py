@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from aws_cdk import aws_apigateway as apigateway
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_iam as iam
+from aws_cdk import aws_lambda as lambda_
 from aws_cdk import aws_secretsmanager as secretsmanager
 from constructs import Construct
 
@@ -245,8 +246,8 @@ class ApiGatewayIntegrationsConstruct(Construct):
         return self._get_integrations_handler
 
     @property
-    def post_integrations_handler(self) -> Lambda:
-        return self._post_integrations_handler
+    def post_integrations_handler(self) -> lambda_.Function:
+        return self._post_integrations_handler.function
 
     @property
     def put_integration_handler(self) -> Lambda:
