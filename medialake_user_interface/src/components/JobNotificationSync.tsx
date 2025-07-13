@@ -13,7 +13,7 @@ export const JobNotificationSync: React.FC = () => {
 
   // This hook will automatically sync jobs with notifications
   useJobNotifications();
-  
+
   // This component doesn't render anything visible
   return null;
 };

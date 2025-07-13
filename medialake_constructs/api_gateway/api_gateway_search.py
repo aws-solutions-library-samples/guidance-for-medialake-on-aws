@@ -1,22 +1,18 @@
 from dataclasses import dataclass
-from aws_cdk import (
-    aws_apigateway as apigateway,
-    aws_secretsmanager as secretsmanager,
-    aws_dynamodb as dynamodb,
-    aws_ec2 as ec2,
-    aws_iam as iam,
-)
-from aws_cdk import Fn, Stack
-from constructs import Construct
-from medialake_constructs.shared_constructs.lambda_base import (
-    Lambda,
-    LambdaConfig,
-)
-from medialake_constructs.shared_constructs.s3bucket import S3Bucket
-from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
-from config import config
 from typing import Optional
+
+from aws_cdk import Stack
+from aws_cdk import aws_apigateway as apigateway
+from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_ec2 as ec2
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_secretsmanager as secretsmanager
+from constructs import Construct
+
+from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
+from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 from medialake_constructs.shared_constructs.lambda_layers import SearchLayer
+from medialake_constructs.shared_constructs.s3bucket import S3Bucket
 
 
 @dataclass
@@ -59,7 +55,6 @@ class SearchConstruct(Construct):
                 memory_size=9000,
                 snap_start=True,
                 timeout_minutes=10,
-                
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": (
                         props.x_origin_verify_secret.secret_arn
@@ -141,7 +136,9 @@ class SearchConstruct(Construct):
                     "dynamodb:Query",
                     "dynamodb:Scan",
                 ],
-                resources=[f"arn:aws:dynamodb:{Stack.of(self).region}:{Stack.of(self).account}:table/{props.system_settings_table}"],
+                resources=[
+                    f"arn:aws:dynamodb:{Stack.of(self).region}:{Stack.of(self).account}:table/{props.system_settings_table}"
+                ],
             )
         )
 
@@ -151,13 +148,12 @@ class SearchConstruct(Construct):
             authorization_type=apigateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
-        
+
         # Add CORS support
-        
-        
+
         # Create fields resource under search
         fields_resource = search_resource.add_resource("fields")
-        
+
         # Create Lambda for search fields endpoint
         search_fields_lambda = Lambda(
             self,
@@ -173,7 +169,7 @@ class SearchConstruct(Construct):
                 },
             ),
         )
-        
+
         # Add permissions to access Secrets Manager
         search_fields_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -185,7 +181,7 @@ class SearchConstruct(Construct):
                 resources=["*"],
             )
         )
-        
+
         # Add permissions to access the system settings table
         search_fields_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -195,10 +191,12 @@ class SearchConstruct(Construct):
                     "dynamodb:Query",
                     "dynamodb:Scan",
                 ],
-                resources=[f"arn:aws:dynamodb:{Stack.of(self).region}:{Stack.of(self).account}:table/{props.system_settings_table}"],
+                resources=[
+                    f"arn:aws:dynamodb:{Stack.of(self).region}:{Stack.of(self).account}:table/{props.system_settings_table}"
+                ],
             )
         )
-        
+
         # Add the GET method to the fields resource
         fields_resource.add_method(
             "GET",
@@ -206,6 +204,6 @@ class SearchConstruct(Construct):
             authorization_type=apigateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
-        
+
         add_cors_options_method(search_resource)
         add_cors_options_method(fields_resource)

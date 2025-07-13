@@ -10,29 +10,31 @@ export default {
     hebrew: 'हिब्रू',
     japanese: 'जापानी',
     korean: 'कोरियाई',
-    spanish: 'स्पेनिश'
+    spanish: 'स्पेनिश',
   },
   assetsPage: {
     title: 'संपत्तियाँ',
     connectors: 'कनेक्टर',
-    selectConnector: 'कनेक्टर चुनें'
+    selectConnector: 'कनेक्टर चुनें',
   },
   assetExplorer: {
     noConnectorSelected: 'संपत्तियाँ देखने के लिए कनेक्टर चुनें',
     noAssetsFound: 'इस कनेक्टर के लिए कोई संपत्ति नहीं मिली',
-    noIndexedAssets: 'बकेट "{{bucketName}}" के साथ इस कनेक्टर के लिए कोई इंडेक्स की गई संपत्ति नहीं मिली।',
+    noIndexedAssets:
+      'बकेट "{{bucketName}}" के साथ इस कनेक्टर के लिए कोई इंडेक्स की गई संपत्ति नहीं मिली।',
     loadingAssets: 'संपत्तियाँ लोड हो रही हैं...',
     menu: {
       rename: 'नाम बदलें',
       share: 'साझा करें',
-      download: 'डाउनलोड करें'
+      download: 'डाउनलोड करें',
     },
     deleteDialog: {
       title: 'हटाने की पुष्टि करें',
-      description: 'क्या आप वाकई इस संपत्ति को हटाना चाहते हैं? यह कार्रवाई पूर्ववत नहीं की जा सकती।',
+      description:
+        'क्या आप वाकई इस संपत्ति को हटाना चाहते हैं? यह कार्रवाई पूर्ववत नहीं की जा सकती।',
       cancel: 'रद्द करें',
-      confirm: 'हटाएँ'
-    }
+      confirm: 'हटाएँ',
+    },
   },
   sidebar: {
     menu: {
@@ -40,7 +42,7 @@ export default {
       assets: 'संपत्तियाँ',
       pipelines: 'पाइपलाइन्स',
       pipelineExecutions: 'पाइपलाइन निष्पादन',
-      settings: 'सेटिंग्स'
+      settings: 'सेटिंग्स',
     },
     submenu: {
       system: 'सिस्टम सेटिंग्स',
@@ -48,8 +50,8 @@ export default {
       userManagement: 'उपयोगकर्ता प्रबंधन',
       roles: 'भूमिकाएँ',
       integrations: 'एकीकरण',
-      environments: 'पर्यावरण'
-    }
+      environments: 'पर्यावरण',
+    },
   },
   profile: {
     title: 'प्रोफ़ाइल',
@@ -63,22 +65,22 @@ export default {
     pushNotifications: 'पुश सूचनाएँ',
     changePassword: 'पासवर्ड बदलें',
     twoFactorAuth: 'दो-कारक प्रमाणीकरण',
-    appearance: 'दिखावट'
+    appearance: 'दिखावट',
   },
   app: {
     loading: 'लोड हो रहा है...',
     errors: {
       loadingConfig: 'AWS विन्यास लोड करते समय त्रुटि:',
       loadingUserAttributes: 'उपयोगकर्ता गुण लोड करते समय त्रुटि:',
-      signingOut: 'साइन आउट करते समय त्रुटि:'
+      signingOut: 'साइन आउट करते समय त्रुटि:',
     },
     navigation: {
       preventedDuplicate: 'डुप्लिकेट नेविगेशन रोका गया',
-      navigating: 'नेविगेट कर रहे हैं'
+      navigating: 'नेविगेट कर रहे हैं',
     },
     branding: {
-              name: 'Media Lake'
-    }
+      name: 'Media Lake',
+    },
   },
   search: {
     semantic: 'सार्थक खोज',
@@ -86,30 +88,30 @@ export default {
       dateRange: 'तारीख सीमा',
       contentType: 'सामग्री का प्रकार',
       storageLocation: 'स्टोरेज स्थान',
-      comingSoon: 'अधिक फ़िल्टर जल्द ही आ रहे हैं...'
-    }
+      comingSoon: 'अधिक फ़िल्टर जल्द ही आ रहे हैं...',
+    },
   },
   admin: {
     metrics: {
       storageUsage: 'स्टोरेज उपयोग',
       apiUsage: 'API उपयोग',
       activeUsers: 'सक्रिय उपयोगकर्ता',
-      systemLoad: 'सिस्टम लोड'
+      systemLoad: 'सिस्टम लोड',
     },
     errors: {
       userDeletionNotImplemented: 'उपयोगकर्ता हटाना अभी लागू नहीं किया गया है।',
       userCreationNotImplemented: 'उपयोगकर्ता निर्माण अभी लागू नहीं किया गया है।',
       userEditingNotImplemented: 'उपयोगकर्ता संपादन अभी लागू नहीं किया गया है।',
       analyticsExportNotImplemented: 'एनालिटिक्स निर्यात अभी लागू नहीं किया गया है।',
-      systemResetNotImplemented: 'सिस्टम रीसेट अभी लागू नहीं किया गया है।'
+      systemResetNotImplemented: 'सिस्टम रीसेट अभी लागू नहीं किया गया है।',
     },
     columns: {
-      lastActive: 'अंतिम सक्रियता'
+      lastActive: 'अंतिम सक्रियता',
     },
     buttons: {
       exportAnalytics: 'एनालिटिक्स निर्यात करें',
-      resetSystem: 'सिस्टम रीसेट करें'
-    }
+      resetSystem: 'सिस्टम रीसेट करें',
+    },
   },
   integrations: {
     title: 'एकीकरण',
@@ -120,7 +122,7 @@ export default {
     addIntegration: 'एकीकरण जोड़ें',
     form: {
       search: {
-        placeholder: 'एकीकरण खोजें'
+        placeholder: 'एकीकरण खोजें',
       },
       title: 'एकीकरण जोड़ें',
       fields: {
@@ -128,30 +130,30 @@ export default {
           label: 'एकीकरण',
           tooltip: 'एक एकीकरण प्रदाता चुनें',
           errors: {
-            required: 'एकीकरण का चयन अनिवार्य है'
-          }
+            required: 'एकीकरण का चयन अनिवार्य है',
+          },
         },
         description: {
           label: 'विवरण',
           tooltip: 'इस एकीकरण के लिए विवरण प्रदान करें',
           helper: 'इस एकीकरण का संक्षिप्त विवरण',
           errors: {
-            required: 'विवरण आवश्यक है'
-          }
+            required: 'विवरण आवश्यक है',
+          },
         },
         environmentId: {
           label: 'पर्यावरण',
           tooltip: 'इस एकीकरण के लिए पर्यावरण चुनें',
           errors: {
-            required: 'पर्यावरण का चयन अनिवार्य है'
-          }
+            required: 'पर्यावरण का चयन अनिवार्य है',
+          },
         },
         enabled: {
           label: 'सक्रिय',
           tooltip: 'इस एकीकरण को सक्रिय या निष्क्रिय करें',
           errors: {
-            required: 'सक्रिय अनिवार्य है'
-          }
+            required: 'सक्रिय अनिवार्य है',
+          },
         },
         auth: {
           type: {
@@ -159,11 +161,11 @@ export default {
             tooltip: 'प्रमाणीकरण विधि चुनें',
             options: {
               awsIam: 'AWS IAM',
-              apiKey: 'API कुंजी'
+              apiKey: 'API कुंजी',
             },
             errors: {
-              required: 'प्रमाणीकरण प्रकार अनिवार्य है'
-            }
+              required: 'प्रमाणीकरण प्रकार अनिवार्य है',
+            },
           },
           credentials: {
             apiKey: {
@@ -171,26 +173,26 @@ export default {
               tooltip: 'अपनी API कुंजी दर्ज करें',
               helper: 'सेवा के साथ प्रमाणीकरण के लिए API कुंजी',
               errors: {
-                required: 'API कुंजी आवश्यक है'
-              }
+                required: 'API कुंजी आवश्यक है',
+              },
             },
             iamRole: {
               label: 'IAM भूमिका',
               tooltip: 'IAM भूमिका का ARN दर्ज करें',
               errors: {
-                required: 'IAM भूमिका आवश्यक है'
-              }
-            }
-          }
-        }
+                required: 'IAM भूमिका आवश्यक है',
+              },
+            },
+          },
+        },
       },
       errors: {
         required: 'यह फ़ील्ड अनिवार्य है',
         nodeId: {
-          unrecognized_keys: 'अमान्य एकीकरण चयन'
-        }
-      }
-    }
+          unrecognized_keys: 'अमान्य एकीकरण चयन',
+        },
+      },
+    },
   },
   pipelines: {
     title: 'पाइपलाइन्स',
@@ -198,8 +200,8 @@ export default {
     searchPlaceholder: 'पाइपलाइन्स खोजें...',
     actions: {
       create: 'नया पाइपलाइन जोड़ें',
-      import: 'पाइपलाइन आयात करें'
-    }
+      import: 'पाइपलाइन आयात करें',
+    },
   },
   executions: {
     title: 'पाइपलाइन निष्पादन',
@@ -211,39 +213,39 @@ export default {
       startTime: 'शुरू होने का समय',
       endTime: 'समाप्ति समय',
       duration: 'अवधि',
-      actions: 'क्रियाएँ'
+      actions: 'क्रियाएँ',
     },
     actions: {
       retryFromCurrent: 'वर्तमान स्थिति से पुनः प्रयास करें',
       retryFromStart: 'शुरू से पुनः प्रयास करें',
-      viewDetails: 'विवरण देखें'
-    }
+      viewDetails: 'विवरण देखें',
+    },
   },
   users: {
     title: 'उपयोगकर्ता प्रबंधन',
     description: 'सिस्टम उपयोगकर्ताओं और उनके एक्सेस का प्रबंधन करें',
     actions: {
-      addUser: 'उपयोगकर्ता जोड़ें'
+      addUser: 'उपयोगकर्ता जोड़ें',
     },
     form: {
       title: {
-        add: 'उपयोगकर्ता जोड़ें'
+        add: 'उपयोगकर्ता जोड़ें',
       },
       fields: {
         given_name: {
           label: 'पहला नाम',
           tooltip: 'उपयोगकर्ता का पहला नाम दर्ज करें',
-          helper: ''
+          helper: '',
         },
         family_name: {
           label: 'अंतिम नाम',
           tooltip: 'उपयोगकर्ता का अंतिम नाम दर्ज करें',
-          helper: ''
+          helper: '',
         },
         email: {
           label: 'ईमेल',
           tooltip: 'उपयोगकर्ता का ईमेल पता दर्ज करें',
-          helper: ''
+          helper: '',
         },
         roles: {
           label: 'भूमिकाएँ',
@@ -251,31 +253,31 @@ export default {
           options: {
             Admin: 'प्रशासक',
             Editor: 'संपादक',
-            Viewer: 'दर्शक'
-          }
+            Viewer: 'दर्शक',
+          },
         },
         email_verified: {
           label: 'ईमेल सत्यापित',
-          tooltip: 'यह संकेत करें कि उपयोगकर्ता का ईमेल सत्यापित है'
+          tooltip: 'यह संकेत करें कि उपयोगकर्ता का ईमेल सत्यापित है',
         },
         enabled: {
           label: 'सक्रिय',
-          tooltip: 'उपयोगकर्ता को सक्रिय या निष्क्रिय करें'
-        }
-      }
+          tooltip: 'उपयोगकर्ता को सक्रिय या निष्क्रिय करें',
+        },
+      },
     },
     roles: {
       admin: 'प्रशासक',
       editor: 'संपादक',
-      viewer: 'दर्शक'
-    }
+      viewer: 'दर्शक',
+    },
   },
   roles: {
     title: 'भूमिका प्रबंधन',
     description: 'सिस्टम भूमिकाओं और उनके अनुमतियों का प्रबंधन करें',
     actions: {
-      addRole: 'भूमिका जोड़ें'
-    }
+      addRole: 'भूमिका जोड़ें',
+    },
   },
   settings: {
     environments: {
@@ -290,11 +292,11 @@ export default {
         status: {
           name: 'स्थिति',
           active: 'सक्रिय',
-          disabled: 'निष्क्रिय'
+          disabled: 'निष्क्रिय',
         },
         costCenter: 'लागत केंद्र',
-        team: 'टीम'
-      }
+        team: 'टीम',
+      },
     },
     systemSettings: {
       title: 'सिस्टम सेटिंग्स',
@@ -302,11 +304,12 @@ export default {
         search: 'खोज',
         notifications: 'सूचनाएँ',
         security: 'सुरक्षा',
-        performance: 'प्रदर्शन'
+        performance: 'प्रदर्शन',
       },
       search: {
         title: 'खोज विन्यास',
-        description: 'अपने मीडिया संपत्तियों में उन्नत खोज क्षमताओं के लिए खोज प्रदाता को कॉन्फ़िगर करें।',
+        description:
+          'अपने मीडिया संपत्तियों में उन्नत खोज क्षमताओं के लिए खोज प्रदाता को कॉन्फ़िगर करें।',
         provider: 'खोज प्रदाता:',
         configureProvider: 'खोज प्रदाता कॉन्फ़िगर करें',
         editProvider: 'प्रदाता संपादित करें',
@@ -317,20 +320,20 @@ export default {
         endpoint: 'एंडपॉइंट URL (वैकल्पिक)',
         enabled: 'खोज सक्षम',
         noProvider: 'कोई खोज प्रदाता कॉन्फ़िगर नहीं है।',
-        configurePrompt: 'खोज क्षमताओं को सक्षम करने के लिए Twelve Labs कॉन्फ़िगर करें।'
+        configurePrompt: 'खोज क्षमताओं को सक्षम करने के लिए Twelve Labs कॉन्फ़िगर करें।',
       },
       notifications: {
         title: 'सूचना सेटिंग्स',
-        comingSoon: 'जल्द ही सूचनाओं की सेटिंग्स उपलब्ध होंगी।'
+        comingSoon: 'जल्द ही सूचनाओं की सेटिंग्स उपलब्ध होंगी।',
       },
       security: {
         title: 'सुरक्षा सेटिंग्स',
-        comingSoon: 'जल्द ही सुरक्षा सेटिंग्स उपलब्ध होंगी।'
+        comingSoon: 'जल्द ही सुरक्षा सेटिंग्स उपलब्ध होंगी।',
       },
       performance: {
         title: 'प्रदर्शन सेटिंग्स',
-        comingSoon: 'जल्द ही प्रदर्शन सेटिंग्स उपलब्ध होंगी।'
-      }
+        comingSoon: 'जल्द ही प्रदर्शन सेटिंग्स उपलब्ध होंगी।',
+      },
     },
     groups: {
       actions: {
@@ -338,17 +341,17 @@ export default {
         editGroup: 'समूह संपादित करें',
         deleteGroup: 'समूह हटाएँ',
         createGroup: 'समूह बनाएँ',
-        manageGroups: 'समूहों का प्रबंधन करें'
-      }
+        manageGroups: 'समूहों का प्रबंधन करें',
+      },
     },
     permissionSets: {
       noAssignments: 'कोई अनुमति सेट नहीं',
       actions: {
         addPermissionSet: 'अनुमति सेट जोड़ें',
         editPermissionSet: 'अनुमति सेट संपादित करें',
-        deletePermissionSet: 'अनुमति सेट हटाएँ'
-      }
-    }
+        deletePermissionSet: 'अनुमति सेट हटाएँ',
+      },
+    },
   },
   common: {
     select: 'चुनें',
@@ -370,7 +373,7 @@ export default {
     delete: 'हटाएँ',
     create: 'बनाएँ',
     actions: {
-      add: 'जोड़ें'
+      add: 'जोड़ें',
     },
     columns: {
       username: 'उपयोगकर्ता नाम',
@@ -381,12 +384,12 @@ export default {
       groups: 'समूह',
       created: 'निर्मित',
       modified: 'संशोधित',
-      actions: 'क्रियाएँ'
+      actions: 'क्रियाएँ',
     },
     status: {
       active: 'सक्रिय',
-      inactive: 'निष्क्रिय'
-    }
+      inactive: 'निष्क्रिय',
+    },
   },
   translation: {
     common: {
@@ -396,7 +399,7 @@ export default {
         delete: 'हटाएँ',
         activate: 'सक्रिय करें',
         deactivate: 'निष्क्रिय करें',
-        create: 'बनाएँ'
+        create: 'बनाएँ',
       },
       tableDensity: 'टेबल घनत्व',
       theme: 'थीम',
@@ -426,7 +429,7 @@ export default {
       all: 'सभी',
       status: {
         active: 'सक्रिय',
-        inactive: 'निष्क्रिय'
+        inactive: 'निष्क्रिय',
       },
       rename: 'नाम बदलें',
       root: 'मूल',
@@ -447,11 +450,11 @@ export default {
         groups: 'समूह',
         created: 'निर्मित',
         modified: 'संशोधित',
-        actions: 'क्रियाएँ'
+        actions: 'क्रियाएँ',
       },
       noGroups: 'कोई समूह नहीं',
       select: 'चुनें',
-      moreInfo: 'अधिक जानकारी'
+      moreInfo: 'अधिक जानकारी',
     },
     users: {
       title: 'उपयोगकर्ता प्रबंधन',
@@ -463,47 +466,47 @@ export default {
             label: 'पहला नाम',
             tooltip: 'उपयोगकर्ता का पहला नाम दर्ज करें',
             errors: {
-              required: 'पहला नाम आवश्यक है'
-            }
+              required: 'पहला नाम आवश्यक है',
+            },
           },
           family_name: {
             label: 'अंतिम नाम',
             tooltip: 'उपयोगकर्ता का अंतिम नाम दर्ज करें',
             errors: {
-              required: 'अंतिम नाम आवश्यक है'
-            }
+              required: 'अंतिम नाम आवश्यक है',
+            },
           },
           email: {
             label: 'ईमेल',
             tooltip: 'उपयोगकर्ता का ईमेल पता दर्ज करें',
             errors: {
               required: 'ईमेल आवश्यक है',
-              invalid: 'अमान्य ईमेल पता'
-            }
+              invalid: 'अमान्य ईमेल पता',
+            },
           },
           enabled: {
             label: 'सक्रिय',
             tooltip: 'उपयोगकर्ता को सक्रिय या निष्क्रिय करें',
             errors: {
-              required: 'सक्रिय होना आवश्यक है'
-            }
+              required: 'सक्रिय होना आवश्यक है',
+            },
           },
           roles: {
             label: 'भूमिकाएँ',
             tooltip: 'उपयोगकर्ता के लिए भूमिकाएँ चुनें',
             errors: {
-              required: 'भूमिकाएँ आवश्यक हैं'
-            }
+              required: 'भूमिकाएँ आवश्यक हैं',
+            },
           },
           email_verified: {
             label: 'ईमेल सत्यापित',
             tooltip: 'यह संकेत करें कि उपयोगकर्ता का ईमेल सत्यापित है',
             errors: {
-              required: 'ईमेल सत्यापन आवश्यक है'
-            }
-          }
-        }
-      }
+              required: 'ईमेल सत्यापन आवश्यक है',
+            },
+          },
+        },
+      },
     },
     roles: {
       title: 'भूमिका प्रबंधन',
@@ -512,8 +515,8 @@ export default {
       editor: 'संपादक',
       viewer: 'दर्शक',
       actions: {
-        addRole: 'भूमिका जोड़ें'
-      }
+        addRole: 'भूमिका जोड़ें',
+      },
     },
     columns: {
       username: 'उपयोगकर्ता नाम',
@@ -524,28 +527,28 @@ export default {
       groups: 'समूह',
       created: 'निर्मित',
       modified: 'संशोधित',
-      actions: 'क्रियाएँ'
+      actions: 'क्रियाएँ',
     },
     actions: {
       addUser: 'उपयोगकर्ता जोड़ें',
       edit: 'उपयोगकर्ता संपादित करें',
       delete: 'उपयोगकर्ता हटाएँ',
       activate: 'उपयोगकर्ता सक्रिय करें',
-      deactivate: 'उपयोगकर्ता निष्क्रिय करें'
+      deactivate: 'उपयोगकर्ता निष्क्रिय करें',
     },
     status: {
       active: 'सक्रिय',
-      inactive: 'निष्क्रिय'
+      inactive: 'निष्क्रिय',
     },
     errors: {
       loadFailed: 'उपयोगकर्ता लोड करने में विफल',
       saveFailed: 'उपयोगकर्ता सहेजने में विफल',
-      deleteFailed: 'उपयोगकर्ता हटाने में विफल'
+      deleteFailed: 'उपयोगकर्ता हटाने में विफल',
     },
     navigation: {
       home: 'होम',
       collections: 'कलेक्शन',
-      settings: 'सेटिंग्स'
+      settings: 'सेटिंग्स',
     },
     home: {
       welcome: 'Media Lake में आपका स्वागत है',
@@ -557,21 +560,22 @@ export default {
       smartFolders: 'स्मार्ट फ़ोल्डर',
       connectedStorage: 'कनेक्टेड स्टोरेज',
       sharing: 'शेयरिंग',
-      comingSoon: 'जल्द आ रहा है'
+      comingSoon: 'जल्द आ रहा है',
     },
     notifications: {
       'Pipeline Complete': 'पाइपलाइन पूर्ण',
-      'Asset processing pipeline completed successfully': 'संपत्ति प्रसंस्करण पाइपलाइन सफलतापूर्वक पूर्ण हुई',
+      'Asset processing pipeline completed successfully':
+        'संपत्ति प्रसंस्करण पाइपलाइन सफलतापूर्वक पूर्ण हुई',
       'Storage Warning': 'स्टोरेज चेतावनी',
       'Storage capacity reaching 80%': 'स्टोरेज क्षमता 80% तक पहुँच रही है',
       'Pipeline Failed': 'पाइपलाइन विफल',
-      'Video processing pipeline failed': 'वीडियो प्रसंस्करण पाइपलाइन विफल हुई'
+      'Video processing pipeline failed': 'वीडियो प्रसंस्करण पाइपलाइन विफल हुई',
     },
     modal: {
       confirmDelete: 'क्या आप वाकई इस आइटम को हटाना चाहते हैं?',
       confirmAction: 'क्या आप वाकई यह कार्रवाई करना चाहते हैं?',
       error: 'एक त्रुटि हुई',
-      success: 'संचालन सफलतापूर्वक पूरा हुआ'
+      success: 'संचालन सफलतापूर्वक पूरा हुआ',
     },
     executions: {
       title: 'पाइपलाइन निष्पादन',
@@ -583,47 +587,47 @@ export default {
         startTime: 'शुरू होने का समय',
         endTime: 'समाप्ति समय',
         duration: 'अवधि',
-        actions: 'क्रियाएँ'
+        actions: 'क्रियाएँ',
       },
       status: {
         succeeded: 'सफल',
         failed: 'विफल',
         running: 'चल रहा',
         timedOut: 'समय समाप्त',
-        aborted: 'रद्द किया गया'
+        aborted: 'रद्द किया गया',
       },
       actions: {
         retryFromCurrent: 'वर्तमान स्थिति से पुनः प्रयास करें',
         retryFromStart: 'शुरू से पुनः प्रयास करें',
-        viewDetails: 'विवरण देखें'
+        viewDetails: 'विवरण देखें',
       },
       pagination: {
         page: 'पृष्ठ {{page}} में से {{total}}',
-        showEntries: '{{count}} दिखाएँ'
-      }
+        showEntries: '{{count}} दिखाएँ',
+      },
     },
     s3Explorer: {
       filter: {
-        label: 'नाम से फ़िल्टर करें'
+        label: 'नाम से फ़िल्टर करें',
       },
       error: {
-        loading: 'S3 वस्तुओं को लोड करते समय त्रुटि: {{message}}'
+        loading: 'S3 वस्तुओं को लोड करते समय त्रुटि: {{message}}',
       },
       file: {
-        info: 'आकार: {{size}} • स्टोरेज वर्ग: {{storageClass}} • संशोधित: {{modified}}'
+        info: 'आकार: {{size}} • स्टोरेज वर्ग: {{storageClass}} • संशोधित: {{modified}}',
       },
       menu: {
         rename: 'नाम बदलें',
-        delete: 'हटाएँ'
-      }
+        delete: 'हटाएँ',
+      },
     },
     assets: {
       title: 'संपत्तियाँ',
-      connectedStorage: 'कनेक्टेड स्टोरेज'
+      connectedStorage: 'कनेक्टेड स्टोरेज',
     },
     metadata: {
       title: 'जल्द ही आ रहा है',
-      description: 'हम आपके लिए मेटाडाटा प्रबंधन क्षमताएँ लाने पर काम कर रहे हैं। जुड़े रहें!'
+      description: 'हम आपके लिए मेटाडाटा प्रबंधन क्षमताएँ लाने पर काम कर रहे हैं। जुड़े रहें!',
     },
     pipelines: {
       title: 'पाइपलाइन्स',
@@ -633,7 +637,7 @@ export default {
         create: 'नया पाइपलाइन जोड़ें',
         deploy: 'इमेज पाइपलाइन डिप्लॉय करें',
         addNew: 'नया पाइपलाइन जोड़ें',
-        viewAll: 'सभी पाइपलाइन्स देखें'
+        viewAll: 'सभी पाइपलाइन्स देखें',
       },
       search: 'पाइपलाइन्स खोजें',
       deploy: 'इमेज पाइपलाइन डिप्लॉय करें',
@@ -643,7 +647,7 @@ export default {
         creationDate: 'निर्माण तिथि',
         system: 'सिस्टम',
         type: 'प्रकार',
-        actions: 'क्रियाएँ'
+        actions: 'क्रियाएँ',
       },
       editor: {
         title: 'पाइपलाइन संपादक',
@@ -653,29 +657,30 @@ export default {
           title: 'नोड्स',
           dragNodes: 'नोड्स को कैनवास पर खींचें',
           loading: 'नोड्स लोड हो रहे हैं...',
-          error: 'नोड्स लोड करने में त्रुटि'
+          error: 'नोड्स लोड करने में त्रुटि',
         },
         node: {
           configure: '{{type}} को कॉन्फ़िगर करें',
           delete: 'नोड हटाएँ',
-          edit: 'नोड संपादित करें'
+          edit: 'नोड संपादित करें',
         },
         edge: {
           title: 'एज लेबल संपादित करें',
           label: 'एज लेबल',
-          delete: 'कनेक्शन हटाएँ'
+          delete: 'कनेक्शन हटाएँ',
         },
         modals: {
           error: {
             title: 'त्रुटि',
             incompatibleNodes: 'पिछले नोड का आउटपुट लक्ष्य नोड के इनपुट के अनुकूल नहीं है।',
-            validation: 'पाइपलाइन सत्यापन विफल'
+            validation: 'पाइपलाइन सत्यापन विफल',
           },
           delete: {
             title: 'पाइपलाइन हटाएँ',
-            message: 'क्या आप वाकई इस पाइपलाइन को हटाना चाहते हैं? यह कार्रवाई पूर्ववत नहीं की जा सकती।',
-            confirm: 'हटाने की पुष्टि के लिए पाइपलाइन का नाम टाइप करें:'
-          }
+            message:
+              'क्या आप वाकई इस पाइपलाइन को हटाना चाहते हैं? यह कार्रवाई पूर्ववत नहीं की जा सकती।',
+            confirm: 'हटाने की पुष्टि के लिए पाइपलाइन का नाम टाइप करें:',
+          },
         },
         controls: {
           undo: 'पूर्ववत करें',
@@ -683,7 +688,7 @@ export default {
           zoomIn: 'ज़ूम इन',
           zoomOut: 'ज़ूम आउट',
           fitView: 'दृश्य के अनुसार फिट करें',
-          lockView: 'दृश्य लॉक करें'
+          lockView: 'दृश्य लॉक करें',
         },
         notifications: {
           saved: 'पाइपलाइन सफलतापूर्वक सहेजा गया',
@@ -691,10 +696,10 @@ export default {
           error: {
             save: 'पाइपलाइन सहेजने में विफल',
             validation: 'पाइपलाइन सत्यापन विफल',
-            incompatibleNodes: 'नोड कनेक्शन असंगत'
-          }
-        }
-      }
+            incompatibleNodes: 'नोड कनेक्शन असंगत',
+          },
+        },
+      },
     },
     integrations: {
       title: 'एकीकरण',
@@ -710,29 +715,29 @@ export default {
             label: 'एकीकरण',
             tooltip: 'एक एकीकरण प्रदाता चुनें',
             errors: {
-              required: 'एकीकरण का चयन अनिवार्य है'
-            }
+              required: 'एकीकरण का चयन अनिवार्य है',
+            },
           },
           description: {
             label: 'विवरण',
             tooltip: 'इस एकीकरण के लिए विवरण प्रदान करें',
             errors: {
-              required: 'विवरण आवश्यक है'
-            }
+              required: 'विवरण आवश्यक है',
+            },
           },
           environmentId: {
             label: 'पर्यावरण',
             tooltip: 'इस एकीकरण के लिए पर्यावरण चुनें',
             errors: {
-              required: 'पर्यावरण का चयन अनिवार्य है'
-            }
+              required: 'पर्यावरण का चयन अनिवार्य है',
+            },
           },
           enabled: {
             label: 'सक्रिय',
             tooltip: 'इस एकीकरण को सक्रिय या निष्क्रिय करें',
             errors: {
-              required: 'सक्रिय अनिवार्य है'
-            }
+              required: 'सक्रिय अनिवार्य है',
+            },
           },
           auth: {
             type: {
@@ -740,52 +745,52 @@ export default {
               tooltip: 'प्रमाणीकरण विधि चुनें',
               options: {
                 awsIam: 'AWS IAM',
-                apiKey: 'API कुंजी'
+                apiKey: 'API कुंजी',
               },
               errors: {
-                required: 'प्रमाणीकरण प्रकार अनिवार्य है'
-              }
+                required: 'प्रमाणीकरण प्रकार अनिवार्य है',
+              },
             },
             credentials: {
               apiKey: {
                 label: 'API कुंजी',
                 tooltip: 'अपनी API कुंजी दर्ज करें',
                 errors: {
-                  required: 'API कुंजी आवश्यक है'
-                }
+                  required: 'API कुंजी आवश्यक है',
+                },
               },
               iamRole: {
                 label: 'IAM भूमिका',
                 tooltip: 'IAM भूमिका का ARN दर्ज करें',
                 errors: {
-                  required: 'IAM भूमिका आवश्यक है'
-                }
-              }
-            }
-          }
+                  required: 'IAM भूमिका आवश्यक है',
+                },
+              },
+            },
+          },
         },
         search: {
-          placeholder: 'एकीकरण खोजें'
+          placeholder: 'एकीकरण खोजें',
         },
         errors: {
           required: 'यह फ़ील्ड अनिवार्य है',
           nodeId: {
-            unrecognized_keys: 'अमान्य एकीकरण चयन'
-          }
-        }
+            unrecognized_keys: 'अमान्य एकीकरण चयन',
+          },
+        },
       },
       columns: {
         nodeName: 'नोड का नाम',
         environment: 'पर्यावरण',
         createdDate: 'निर्माण तिथि',
         modifiedDate: 'संशोधित तिथि',
-        actions: 'क्रियाएँ'
+        actions: 'क्रियाएँ',
       },
       settings: {
         environments: {
-          title: 'पर्यावरण'
-        }
-      }
+          title: 'पर्यावरण',
+        },
+      },
     },
     groups: {
       actions: {
@@ -793,16 +798,16 @@ export default {
         editGroup: 'समूह संपादित करें',
         deleteGroup: 'समूह हटाएँ',
         createGroup: 'समूह बनाएँ',
-        manageGroups: 'समूहों का प्रबंधन करें'
-      }
+        manageGroups: 'समूहों का प्रबंधन करें',
+      },
     },
     permissionSets: {
       noAssignments: 'कोई अनुमति सेट नहीं',
       actions: {
         addPermissionSet: 'अनुमति सेट जोड़ें',
         editPermissionSet: 'अनुमति सेट संपादित करें',
-        deletePermissionSet: 'अनुमति सेट हटाएँ'
-      }
-    }
-  }
-}
+        deletePermissionSet: 'अनुमति सेट हटाएँ',
+      },
+    },
+  },
+};

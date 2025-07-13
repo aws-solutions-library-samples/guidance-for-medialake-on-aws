@@ -63,16 +63,24 @@ function AssetTableView<T>({
   const groupedResults = React.useMemo(() => {
     if (!groupByType) return { all: results };
 
-    return results.reduce((acc, item) => {
-      const type = getAssetType(item).toLowerCase();
-      const normalizedType = type === 'image' ? 'Image' :
-                           type === 'video' ? 'Video' :
-                           type === 'audio' ? 'Audio' : 'Other';
-      
-      if (!acc[normalizedType]) acc[normalizedType] = [];
-      acc[normalizedType].push(item);
-      return acc;
-    }, {} as Record<string, T[]>);
+    return results.reduce(
+      (acc, item) => {
+        const type = getAssetType(item).toLowerCase();
+        const normalizedType =
+          type === 'image'
+            ? 'Image'
+            : type === 'video'
+              ? 'Video'
+              : type === 'audio'
+                ? 'Audio'
+                : 'Other';
+
+        if (!acc[normalizedType]) acc[normalizedType] = [];
+        acc[normalizedType].push(item);
+        return acc;
+      },
+      {} as Record<string, T[]>
+    );
   }, [results, groupByType, getAssetType]);
 
   if (!groupByType) {
@@ -108,16 +116,20 @@ function AssetTableView<T>({
   return (
     <React.Fragment>
       {Object.entries(groupedResults)
-        .filter(([type]) => ['Image', 'Video', 'Audio'].includes(type) && groupedResults[type].length > 0)
+        .filter(
+          ([type]) => ['Image', 'Video', 'Audio'].includes(type) && groupedResults[type].length > 0
+        )
         .map(([type, assets]) => (
           <div key={type} style={{ marginBottom: '2rem' }}>
-            <h3 style={{ 
-              marginBottom: '1rem', 
-              background: 'linear-gradient(45deg, #1976d2, #9c27b0)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              fontWeight: 600
-            }}>
+            <h3
+              style={{
+                marginBottom: '1rem',
+                background: 'linear-gradient(45deg, #1976d2, #9c27b0)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                fontWeight: 600,
+              }}
+            >
               {type}
             </h3>
             <AssetTable<T>

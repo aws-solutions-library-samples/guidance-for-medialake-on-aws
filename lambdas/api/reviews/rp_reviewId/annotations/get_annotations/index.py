@@ -1,8 +1,9 @@
-from aws_lambda_powertools import Logger, Tracer, Metrics
+from typing import Any, Dict
+
+from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from typing import Dict, Any
 
 # Initialize Powertools
 logger = Logger()
@@ -36,7 +37,7 @@ def get_annotations(review_id: str) -> Dict[str, Any]:
             },
         }
 
-    except Exception as e:
+    except Exception:
         logger.exception("Error processing request")
         return {"statusCode": 500, "body": {"message": "Internal server error"}}
 

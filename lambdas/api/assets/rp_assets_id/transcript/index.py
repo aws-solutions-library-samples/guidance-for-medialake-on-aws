@@ -11,19 +11,21 @@ It implements AWS best practices including:
 - Performance optimization through global clients
 """
 
-from typing import Dict, Any, Optional
-from aws_lambda_powertools import Logger, Tracer, Metrics
-from aws_lambda_powertools.logging import correlation_paths
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
-from aws_lambda_powertools.metrics import MetricUnit
-from botocore.exceptions import ClientError
-import boto3
-import os
 import json
+import os
 from http import HTTPStatus
+from typing import Any, Dict, Optional
+
 # from utils import generate_presigned_url, replace_binary_data
 from urllib.parse import urlparse
+
+import boto3
+from aws_lambda_powertools import Logger, Metrics, Tracer
+from aws_lambda_powertools.logging import correlation_paths
+from aws_lambda_powertools.metrics import MetricUnit
+from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
+from aws_lambda_powertools.utilities.typing import LambdaContext
+from botocore.exceptions import ClientError
 
 # Initialize AWS Lambda Powertools
 logger = Logger(service="asset-details-service")
@@ -168,10 +170,8 @@ def lambda_handler(
 
         # Check if the asset has a transcript
         if "TranscriptionS3Uri" not in asset_data:
-            return create_response(
-                HTTPStatus.NOT_FOUND, "Asset transcript not found"
-            )
-        
+            return create_response(HTTPStatus.NOT_FOUND, "Asset transcript not found")
+
         # Add transcript
         transcript = get_asset_transcript(asset_data)
         print(transcript)
@@ -219,13 +219,14 @@ def get_asset_transcript(asset: Dict[str, Any]) -> Dict[str, Any]:
 
         # Get the transcript from S3
         s3_data = s3.Object(bucket, key)
-        transcript_data = s3_data.get()['Body'].read().decode('utf-8')
+        transcript_data = s3_data.get()["Body"].read().decode("utf-8")
         transcript = json.loads(transcript_data)
-        
+
         return transcript
     except Exception as e:
         logger.error(f"Error getting asset transcript data: {str(e)}")
         return None
+
 
 @tracer.capture_method
 def parse_s3_uri(s3_uri):

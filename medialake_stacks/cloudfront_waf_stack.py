@@ -1,6 +1,7 @@
-from aws_cdk import Stack, Environment, aws_wafv2 as wafv2, aws_ssm as ssm, CfnOutput
+from aws_cdk import CfnOutput, Stack
+from aws_cdk import aws_ssm as ssm
+from aws_cdk import aws_wafv2 as wafv2
 from constructs import Construct
-import aws_cdk as cdk
 
 
 class CloudFrontWafStack(Stack):
@@ -8,7 +9,7 @@ class CloudFrontWafStack(Stack):
 
         super().__init__(scope, construct_id, **kwargs)
         self.template_options.description = "Guidance for MediaLake on AWS (SO9598)"
-        
+
         self.web_acl = wafv2.CfnWebACL(
             self,
             "CloudFrontWAF",
@@ -28,14 +29,12 @@ class CloudFrontWafStack(Stack):
                         "managedRuleGroupStatement": {
                             "vendorName": "AWS",
                             "name": "AWSManagedRulesCommonRuleSet",
-                             "ruleActionOverrides": [
+                            "ruleActionOverrides": [
                                 {
                                     "name": "SizeRestrictions_BODY",
-                                    "actionToUse": {
-                                        "allow": {}
-                                    }
+                                    "actionToUse": {"allow": {}},
                                 }
-                            ]
+                            ],
                         }
                     },
                     "visibilityConfig": {
@@ -61,21 +60,21 @@ class CloudFrontWafStack(Stack):
                     },
                 },
             ],
-        ) 
-        
+        )
+
         # Store WAF ACL ARN in SSM Parameter Store for cross-region access
         self.waf_acl_parameter = ssm.StringParameter(
             self,
             "CloudFrontWafAclArnParam",
             parameter_name="/medialake/cloudfront-waf-acl-arn",
             string_value=self.web_acl.attr_arn,
-            description="ARN of the CloudFront WAF ACL"
+            description="ARN of the CloudFront WAF ACL",
         )
-        
+
         # Output the WAF ACL ARN for reference
         CfnOutput(
             self,
             "CloudFrontWafAclArn",
             value=self.web_acl.attr_arn,
             description="ARN of the CloudFront WAF ACL",
-        ) 
+        )

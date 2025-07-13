@@ -1,15 +1,15 @@
-import os
 import json
+import os
 import uuid
-import boto3
-from typing import Dict, Any
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.metrics import MetricUnit
-from botocore.exceptions import ClientError
-from pydantic import BaseModel, Field
 from datetime import datetime
+from typing import Any, Dict
 
-from lambda_utils import lambda_handler_decorator, logger, metrics, tracer, handle_error
+import boto3
+from aws_lambda_powertools.metrics import MetricUnit
+from aws_lambda_powertools.utilities.typing import LambdaContext
+from botocore.exceptions import ClientError
+from lambda_utils import handle_error, lambda_handler_decorator, logger, metrics, tracer
+from pydantic import BaseModel, Field
 
 # Initialize DynamoDB
 dynamodb = boto3.resource("dynamodb")

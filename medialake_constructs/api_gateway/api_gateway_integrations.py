@@ -1,22 +1,15 @@
 from dataclasses import dataclass
-from aws_cdk import (
-    aws_apigateway as apigateway,
-    aws_iam as iam,
-    aws_dynamodb as dynamodb,
-    aws_secretsmanager as secretsmanager,
-)
+
+from aws_cdk import aws_apigateway as apigateway
+from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_secretsmanager as secretsmanager
 from constructs import Construct
+
 from config import config
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
-
-from medialake_constructs.shared_constructs.lambda_base import (
-    Lambda,
-    LambdaConfig,
-)
-from medialake_constructs.shared_constructs.dynamodb import (
-    DynamoDB,
-    DynamoDBProps,
-)
+from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
+from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 
 @dataclass
@@ -162,7 +155,7 @@ class ApiGatewayIntegrationsConstruct(Construct):
         self._integrations_table.table.grant_write_data(
             self._put_integration_handler.function
         )
-        
+
         # Add specific DynamoDB permissions for query and update operations
         self._put_integration_handler.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -170,7 +163,7 @@ class ApiGatewayIntegrationsConstruct(Construct):
                 resources=[self._integrations_table.table_arn],
             )
         )
-        
+
         # Add Secrets Manager permissions for updating API key secrets
         self._put_integration_handler.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -207,15 +200,19 @@ class ApiGatewayIntegrationsConstruct(Construct):
         self._integrations_table.table.grant_write_data(
             self._delete_integration_handler.function
         )
-        
+
         # Add specific DynamoDB permissions for batch operations
         self._delete_integration_handler.function.add_to_role_policy(
             iam.PolicyStatement(
-                actions=["dynamodb:DeleteItem", "dynamodb:BatchWriteItem", "dynamodb:Query"],
+                actions=[
+                    "dynamodb:DeleteItem",
+                    "dynamodb:BatchWriteItem",
+                    "dynamodb:Query",
+                ],
                 resources=[self._integrations_table.table_arn],
             )
         )
-        
+
         # Add Secrets Manager permissions for deleting API key secrets
         self._delete_integration_handler.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -258,11 +255,3 @@ class ApiGatewayIntegrationsConstruct(Construct):
     @property
     def delete_integration_handler(self) -> Lambda:
         return self._delete_integration_handler.function
-
-    @property
-    def get_integrations_handler(self) -> Lambda:
-        return self._get_integrations_handler.function
-
-    @property
-    def post_integrations_handler(self) -> Lambda:
-        return self._post_integrations_handler.function

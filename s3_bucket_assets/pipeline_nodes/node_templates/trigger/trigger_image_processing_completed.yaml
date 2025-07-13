@@ -21,7 +21,6 @@ actions:
     description: This step will trigger after image processing is completed
     operationId: triggerImageProcessingCompleted
     parameters:
-
       - in: body
         name: Prefix
         required: false

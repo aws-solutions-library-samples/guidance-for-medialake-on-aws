@@ -32,11 +32,11 @@ class GlobalPermissionCache {
   private static CACHE_KEY = 'medialake_global_permission_cache';
   private static CHECK_CACHE_KEY = 'medialake_permission_checks';
   private static instance: GlobalPermissionCache;
-  
+
   private memoryCache: GlobalCacheData | null = null;
   private checkCache: PermissionCheckCache = {};
   private readonly TTL = 5 * 60 * 1000; // 5 minutes for permission checks
-  
+
   constructor() {
     // Load existing cache from localStorage on initialization
     this.loadFromStorage();
@@ -67,16 +67,19 @@ class GlobalPermissionCache {
       ability: serializedAbility,
       permissionSets,
       token,
-      expiresAt: Date.now() + (expiresIn * 1000),
-      lastUpdated: Date.now()
+      expiresAt: Date.now() + expiresIn * 1000,
+      lastUpdated: Date.now(),
     };
 
     this.memoryCache = cacheData;
-    
+
     try {
       // Store in localStorage for persistence across page reloads
       localStorage.setItem(GlobalPermissionCache.CACHE_KEY, JSON.stringify(cacheData));
-      console.log('Global permission cache updated, expires at:', new Date(cacheData.expiresAt).toISOString());
+      console.log(
+        'Global permission cache updated, expires at:',
+        new Date(cacheData.expiresAt).toISOString()
+      );
     } catch (error) {
       console.error('Failed to store global permission cache:', error);
     }
@@ -98,7 +101,7 @@ class GlobalPermissionCache {
     if (this.memoryCache && this.isValidCache(this.memoryCache, currentToken)) {
       return {
         ...this.memoryCache,
-        ability: this.deserializeAbility(this.memoryCache.ability)
+        ability: this.deserializeAbility(this.memoryCache.ability),
       };
     }
 
@@ -108,13 +111,13 @@ class GlobalPermissionCache {
       if (!stored) return null;
 
       const cacheData: GlobalCacheData = JSON.parse(stored);
-      
+
       if (this.isValidCache(cacheData, currentToken)) {
         // Restore to memory cache
         this.memoryCache = cacheData;
         return {
           ...cacheData,
-          ability: this.deserializeAbility(cacheData.ability)
+          ability: this.deserializeAbility(cacheData.ability),
         };
       }
     } catch (error) {
@@ -146,7 +149,7 @@ class GlobalPermissionCache {
   setPermissionCheck(cacheKey: string, result: boolean): void {
     this.checkCache[cacheKey] = {
       result,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
 
     // Clean up old entries periodically
@@ -167,7 +170,7 @@ class GlobalPermissionCache {
   clear(): void {
     this.memoryCache = null;
     this.checkCache = {};
-    
+
     try {
       localStorage.removeItem(GlobalPermissionCache.CACHE_KEY);
       localStorage.removeItem(GlobalPermissionCache.CHECK_CACHE_KEY);
@@ -183,7 +186,7 @@ class GlobalPermissionCache {
   updateToken(newToken: string, expiresIn: number): void {
     if (this.memoryCache) {
       this.memoryCache.token = newToken;
-      this.memoryCache.expiresAt = Date.now() + (expiresIn * 1000);
+      this.memoryCache.expiresAt = Date.now() + expiresIn * 1000;
       this.memoryCache.lastUpdated = Date.now();
 
       try {
@@ -209,7 +212,7 @@ class GlobalPermissionCache {
       hasGlobalCache: cache !== null,
       cacheAge: cache ? Date.now() - cache.lastUpdated : null,
       expiresIn: cache ? cache.expiresAt - Date.now() : null,
-      permissionChecksCount: Object.keys(this.checkCache).length
+      permissionChecksCount: Object.keys(this.checkCache).length,
     };
   }
 
@@ -259,7 +262,7 @@ class GlobalPermissionCache {
       }
     }
 
-    keysToDelete.forEach(key => delete this.checkCache[key]);
+    keysToDelete.forEach((key) => delete this.checkCache[key]);
 
     // Persist cleaned cache
     try {
@@ -280,12 +283,12 @@ class GlobalPermissionCache {
   private deserializeAbility(serializedAbility: SerializedAbility): AppAbility {
     // Recreate ability from serialized format
     const ability = createAppAbility();
-    
+
     // Restore the rules
     if (serializedAbility && serializedAbility.rules) {
       ability.update(serializedAbility.rules);
     }
-    
+
     return ability;
   }
 }

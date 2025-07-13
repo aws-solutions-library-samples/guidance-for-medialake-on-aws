@@ -1,18 +1,19 @@
-from typing import Dict, Any, Optional, List
+import json
+import os
+from typing import Any, Dict, List
+
+import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.utilities.parser import parse
-from aws_lambda_powertools.utilities.parser.models import APIGatewayProxyEventModel
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import MetricUnit
-from pydantic import BaseModel, Field
-import boto3
-import os
+from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
-import json
+from pydantic import BaseModel, Field
 
 # Initialize AWS PowerToolsf
-logger = Logger(service="authorization-service", level=os.getenv("LOG_LEVEL", "WARNING"))
+logger = Logger(
+    service="authorization-service", level=os.getenv("LOG_LEVEL", "WARNING")
+)
 tracer = Tracer(service="authorization-service")
 metrics = Metrics(namespace="medialake", service="assignments-group-list")
 
@@ -22,9 +23,14 @@ dynamodb = boto3.resource("dynamodb")
 
 class PermissionSetAssignment(BaseModel):
     """Model for a permission set assignment"""
+
     permissionSetId: str = Field(..., description="ID of the permission set")
-    assignedAt: str = Field(..., description="Timestamp when the permission set was assigned")
-    assignedBy: str = Field(..., description="ID of the user who assigned the permission set")
+    assignedAt: str = Field(
+        ..., description="Timestamp when the permission set was assigned"
+    )
+    assignedBy: str = Field(
+        ..., description="ID of the user who assigned the permission set"
+    )
 
 
 class ErrorResponse(BaseModel):
@@ -42,42 +48,49 @@ class AssignmentsResponse(BaseModel):
 @tracer.capture_lambda_handler
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
 @metrics.log_metrics(capture_cold_start_metric=True)
-def lambda_handler(
-    event: Dict[str, Any], context: LambdaContext
-) -> Dict[str, Any]:
+def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
     """
     Lambda handler to list permission sets assigned to a group in DynamoDB
     """
     try:
         # Log the entire event structure for debugging
         logger.info("Received event", extra={"event": json.dumps(event)})
-        
+
         # Extract user ID from Cognito authorizer context
         request_context = event.get("requestContext", {})
-        logger.info("Request context", extra={"request_context": json.dumps(request_context)})
-        
+        logger.info(
+            "Request context", extra={"request_context": json.dumps(request_context)}
+        )
+
         authorizer = request_context.get("authorizer", {})
         logger.info("Authorizer context", extra={"authorizer": json.dumps(authorizer)})
-        
+
         claims = authorizer.get("claims", {})
         logger.info("Claims", extra={"claims": json.dumps(claims)})
-        
+
         # Get the user ID from the Cognito claims or directly from the authorizer context
         admin_user_id = claims.get("sub")
-        
+
         # If not found in claims, try to get it directly from the authorizer context
         if not admin_user_id:
             admin_user_id = authorizer.get("userId")
-            logger.info("Using userId from authorizer context", extra={"user_id": admin_user_id})
+            logger.info(
+                "Using userId from authorizer context", extra={"user_id": admin_user_id}
+            )
         else:
             logger.info("Using sub from claims", extra={"user_id": admin_user_id})
-        
+
         if not admin_user_id:
-            logger.error("Missing user_id in both Cognito claims and authorizer context")
+            logger.error(
+                "Missing user_id in both Cognito claims and authorizer context"
+            )
             metrics.add_metric(
                 name="MissingUserIdError", unit=MetricUnit.Count, value=1
             )
-            return _create_error_response(400, "Unable to identify user - missing from both claims and authorizer context")
+            return _create_error_response(
+                400,
+                "Unable to identify user - missing from both claims and authorizer context",
+            )
 
         # Get the auth table name from environment variable
         auth_table_name = os.getenv("AUTH_TABLE_NAME")
@@ -91,7 +104,7 @@ def lambda_handler(
         # Get the target group ID from path parameters
         path_parameters = event.get("pathParameters", {})
         group_id = path_parameters.get("groupId")
-        
+
         if not group_id:
             logger.error("Missing groupId in path parameters")
             metrics.add_metric(
@@ -102,9 +115,7 @@ def lambda_handler(
         # Verify that the group exists
         if not _verify_group_exists(auth_table_name, group_id):
             logger.error(f"Group {group_id} does not exist")
-            metrics.add_metric(
-                name="InvalidGroupError", unit=MetricUnit.Count, value=1
-            )
+            metrics.add_metric(name="InvalidGroupError", unit=MetricUnit.Count, value=1)
             return _create_error_response(404, f"Group {group_id} not found")
 
         # List the permission sets assigned to the group
@@ -114,15 +125,16 @@ def lambda_handler(
         response = AssignmentsResponse(
             status="200",
             message="Permission set assignments retrieved successfully",
-            data={
-                "groupId": group_id,
-                "assignments": assignments
-            },
+            data={"groupId": group_id, "assignments": assignments},
         )
 
-        logger.info("Successfully retrieved permission set assignments", 
-                   extra={"group_id": group_id, "assignment_count": len(assignments)})
-        metrics.add_metric(name="SuccessfulListOperation", unit=MetricUnit.Count, value=1)
+        logger.info(
+            "Successfully retrieved permission set assignments",
+            extra={"group_id": group_id, "assignment_count": len(assignments)},
+        )
+        metrics.add_metric(
+            name="SuccessfulListOperation", unit=MetricUnit.Count, value=1
+        )
 
         return {
             "statusCode": 200,
@@ -143,16 +155,11 @@ def _verify_group_exists(table_name: str, group_id: str) -> bool:
     """
     try:
         table = dynamodb.Table(table_name)
-        
-        response = table.get_item(
-            Key={
-                "PK": f"GROUP#{group_id}",
-                "SK": "METADATA"
-            }
-        )
-        
+
+        response = table.get_item(Key={"PK": f"GROUP#{group_id}", "SK": "METADATA"})
+
         return "Item" in response
-    
+
     except ClientError as e:
         logger.error(f"DynamoDB error", extra={"error": str(e)})
         raise
@@ -165,37 +172,37 @@ def _list_group_assignments(table_name: str, group_id: str) -> List[Dict[str, An
     """
     try:
         table = dynamodb.Table(table_name)
-        
+
         # Query for all permission set assignments for the group
         response = table.query(
             KeyConditionExpression="PK = :pk AND begins_with(SK, :sk_prefix)",
             ExpressionAttributeValues={
                 ":pk": f"GROUP#{group_id}",
-                ":sk_prefix": "ASSIGNMENT#PS#"
-            }
+                ":sk_prefix": "ASSIGNMENT#PS#",
+            },
         )
-        
+
         # Extract the permission set IDs and assignment details
         assignments = []
         for item in response.get("Items", []):
             # Extract the permission set ID from the SK
             sk = item.get("SK", "")
             if sk.startswith("ASSIGNMENT#PS#"):
-                permission_set_id = sk[len("ASSIGNMENT#PS#"):]
-                
+                permission_set_id = sk[len("ASSIGNMENT#PS#") :]
+
                 assignment = {
                     "permissionSetId": permission_set_id,
                     "assignedAt": item.get("assignedAt"),
-                    "assignedBy": item.get("assignedBy")
+                    "assignedBy": item.get("assignedBy"),
                 }
-                
+
                 assignments.append(assignment)
-        
+
         # Optionally, we could fetch the full permission set details for each ID
         # But for now, we'll just return the IDs and assignment metadata
-        
+
         return assignments
-    
+
     except ClientError as e:
         logger.error(f"DynamoDB error", extra={"error": str(e)})
         metrics.add_metric(name="DynamoDBError", unit=MetricUnit.Count, value=1)

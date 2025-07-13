@@ -21,7 +21,10 @@ interface ModularUnifiedResultsViewProps {
   searchTerm: string;
   groupByType: boolean;
   viewMode: 'card' | 'table';
-  onViewModeChange: (event: React.MouseEvent<HTMLElement>, newMode: 'card' | 'table' | null) => void;
+  onViewModeChange: (
+    event: React.MouseEvent<HTMLElement>,
+    newMode: 'card' | 'table' | null
+  ) => void;
   cardSize: 'small' | 'medium' | 'large';
   onCardSizeChange: (size: 'small' | 'medium' | 'large') => void;
   aspectRatio: 'vertical' | 'square' | 'horizontal';
@@ -32,7 +35,7 @@ interface ModularUnifiedResultsViewProps {
   onShowMetadataChange: (show: boolean) => void;
   sorting: SortingState;
   onSortChange: (sorting: SortingState) => void;
-  cardFields: { id: string; label: string; visible: boolean; }[];
+  cardFields: { id: string; label: string; visible: boolean }[];
   onCardFieldToggle: (fieldId: string) => void;
   columns: AssetTableColumn<AssetItem>[];
   onColumnToggle: (columnId: string) => void;
@@ -102,31 +105,36 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
 }) => {
   // Check if multi-select feature is enabled
   const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
-  
+
   const renderCardField = (fieldId: string, asset: AssetItem): React.ReactNode => {
     switch (fieldId) {
       case 'name':
-        return asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name;
+        return asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey
+          .Name;
       case 'type':
         return asset.DigitalSourceAsset.Type;
       case 'format':
         return asset.DigitalSourceAsset.MainRepresentation.Format;
       case 'size':
-        const sizeInBytes = asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size;
+        const sizeInBytes =
+          asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size;
         return formatFileSize(sizeInBytes);
       case 'createdAt':
         return formatDate(asset.DigitalSourceAsset.CreateDate);
       case 'modifiedAt':
-        return formatDate(asset.DigitalSourceAsset.ModifiedDate || asset.DigitalSourceAsset.CreateDate);
+        return formatDate(
+          asset.DigitalSourceAsset.ModifiedDate || asset.DigitalSourceAsset.CreateDate
+        );
       default:
         return '';
     }
   };
 
   // Function to check if an asset is selected - only if multi-select feature is enabled
-  const isAssetSelected = (multiSelectFeature.value && selectedAssets && selectedAssets.length > 0)
-    ? (assetId: string) => selectedAssets.includes(assetId)
-    : undefined;
+  const isAssetSelected =
+    multiSelectFeature.value && selectedAssets && selectedAssets.length > 0
+      ? (assetId: string) => selectedAssets.includes(assetId)
+      : undefined;
 
   return (
     <AssetResultsView
@@ -171,7 +179,9 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
       isRenaming={isRenaming}
       renamingAssetId={renamingAssetId}
       getAssetId={(asset) => asset.InventoryID}
-      getAssetName={(asset) => asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
+      getAssetName={(asset) =>
+        asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name
+      }
       getAssetType={(asset) => asset.DigitalSourceAsset.Type}
       getAssetThumbnail={(asset) => asset.thumbnailUrl || ''}
       getAssetProxy={(asset) => asset.proxyUrl || ''}

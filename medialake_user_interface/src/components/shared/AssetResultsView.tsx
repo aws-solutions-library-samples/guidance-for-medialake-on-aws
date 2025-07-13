@@ -25,7 +25,7 @@ export interface AssetResultsViewProps<T> {
   onPageSizeChange: (newPageSize: number) => void;
   searchTerm?: string;
   title?: string;
-  
+
   // Search fields
   selectedFields?: string[];
   availableFields?: Array<{
@@ -36,11 +36,14 @@ export interface AssetResultsViewProps<T> {
     isDefault: boolean;
   }>;
   onFieldsChange?: (event: any) => void;
-  
+
   groupByType: boolean;
   onGroupByTypeChange: (checked: boolean) => void;
   viewMode: 'card' | 'table';
-  onViewModeChange: (event: React.MouseEvent<HTMLElement>, newMode: 'card' | 'table' | null) => void;
+  onViewModeChange: (
+    event: React.MouseEvent<HTMLElement>,
+    newMode: 'card' | 'table' | null
+  ) => void;
   cardSize: 'small' | 'medium' | 'large';
   onCardSizeChange: (size: 'small' | 'medium' | 'large') => void;
   aspectRatio: 'vertical' | 'square' | 'horizontal';
@@ -154,7 +157,8 @@ function AssetResultsView<T>({
             sx={{
               fontWeight: 700,
               mb: 1,
-              background: theme => `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+              background: (theme) =>
+                `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
               backgroundClip: 'text',
               WebkitBackgroundClip: 'text',
               color: 'transparent',
@@ -163,31 +167,32 @@ function AssetResultsView<T>({
             {title}
           </Typography>
         </Box>
-        
+
         <AssetViewControls
           viewMode={viewMode}
           onViewModeChange={onViewModeChange}
           title=""
           sorting={sorting}
           sortOptions={columns
-            .filter(col => col.sortable)
-            .map(col => ({
+            .filter((col) => col.sortable)
+            .map((col) => ({
               id: col.id,
-              label: col.label
-            }))
-          }
+              label: col.label,
+            }))}
           onSortChange={(columnId) => {
             const currentSort = sorting[0];
             const desc = currentSort?.id === columnId ? !currentSort.desc : false;
             onSortChange([{ id: columnId, desc }]);
           }}
-          fields={viewMode === 'card'
-            ? cardFields
-            : columns.map(col => ({
-              id: col.id,
-              label: col.label,
-              visible: col.visible
-            }))}
+          fields={
+            viewMode === 'card'
+              ? cardFields
+              : columns.map((col) => ({
+                  id: col.id,
+                  label: col.label,
+                  visible: col.visible,
+                }))
+          }
           onFieldToggle={viewMode === 'card' ? onCardFieldToggle : onColumnToggle}
           selectedFields={selectedFields}
           availableFields={availableFields}
@@ -206,10 +211,10 @@ function AssetResultsView<T>({
           selectAllState={selectAllState}
           onSelectAllToggle={onSelectAllToggle}
         />
-        
-        <ErrorDisplay 
-          title="Error" 
-          message="There was a problem retrieving content." 
+
+        <ErrorDisplay
+          title="Error"
+          message="There was a problem retrieving content."
           detailedMessage={error.message}
         />
       </Box>
@@ -217,7 +222,9 @@ function AssetResultsView<T>({
   }
 
   return (
-    <Box sx={{ mt: 1 }}>  {/* Changed from -2 to 1 to move the view controller down */}
+    <Box sx={{ mt: 1 }}>
+      {' '}
+      {/* Changed from -2 to 1 to move the view controller down */}
       {isLoading && (
         <LinearProgress
           sx={{
@@ -225,18 +232,18 @@ function AssetResultsView<T>({
             top: 0,
             left: 0,
             right: 0,
-            zIndex: 9999
+            zIndex: 9999,
           }}
         />
       )}
-
       <Box sx={{ mb: 2 }}>
         <Typography
           variant="h4"
           component="h1"
           sx={{
             fontWeight: 700,
-            background: theme => `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+            background: (theme) =>
+              `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
             backgroundClip: 'text',
             WebkitBackgroundClip: 'text',
             color: 'transparent',
@@ -246,14 +253,15 @@ function AssetResultsView<T>({
             zIndex: 1,
           }}
         >
-          {title} {searchMetadata?.totalResults > 0 && searchTerm && (
-            <Typography 
-              component="span" 
-              sx={{ 
-                fontWeight: 300, 
+          {title}{' '}
+          {searchMetadata?.totalResults > 0 && searchTerm && (
+            <Typography
+              component="span"
+              sx={{
+                fontWeight: 300,
                 fontSize: '0.5em',
                 color: 'text.secondary',
-                opacity: 0.75
+                opacity: 0.75,
               }}
             >
               (Found {searchMetadata.totalResults} results for "{searchTerm}")
@@ -261,31 +269,31 @@ function AssetResultsView<T>({
           )}
         </Typography>
       </Box>
-      
       <AssetViewControls
         viewMode={viewMode}
         onViewModeChange={onViewModeChange}
         title=""
         sorting={sorting}
         sortOptions={columns
-          .filter(col => col.sortable)
-          .map(col => ({
+          .filter((col) => col.sortable)
+          .map((col) => ({
             id: col.id,
-            label: col.label
-          }))
-        }
+            label: col.label,
+          }))}
         onSortChange={(columnId) => {
           const currentSort = sorting[0];
           const desc = currentSort?.id === columnId ? !currentSort.desc : false;
           onSortChange([{ id: columnId, desc }]);
         }}
-        fields={viewMode === 'card'
-          ? cardFields
-          : columns.map(col => ({
-            id: col.id,
-            label: col.label,
-            visible: col.visible
-          }))}
+        fields={
+          viewMode === 'card'
+            ? cardFields
+            : columns.map((col) => ({
+                id: col.id,
+                label: col.label,
+                visible: col.visible,
+              }))
+        }
         onFieldToggle={viewMode === 'card' ? onCardFieldToggle : onColumnToggle}
         selectedFields={selectedFields}
         availableFields={availableFields}
@@ -304,7 +312,6 @@ function AssetResultsView<T>({
         selectAllState={selectAllState}
         onSelectAllToggle={onSelectAllToggle}
       />
-
       {/* Sort the results based on the current sorting state */}
       {(() => {
         // Sort the results if sorting is specified
@@ -313,7 +320,7 @@ function AssetResultsView<T>({
           const { id: sortField, desc } = sorting[0];
           sortedResults.sort((a, b) => {
             let valueA, valueB;
-            
+
             // Get values based on field ID
             switch (sortField) {
               case 'name':
@@ -328,34 +335,42 @@ function AssetResultsView<T>({
                 // Assuming there's a way to get size from the asset
                 const sizeFieldA = a as any;
                 const sizeFieldB = b as any;
-                valueA = sizeFieldA?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.FileInfo?.Size || 0;
-                valueB = sizeFieldB?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.FileInfo?.Size || 0;
+                valueA =
+                  sizeFieldA?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation
+                    ?.FileInfo?.Size || 0;
+                valueB =
+                  sizeFieldB?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation
+                    ?.FileInfo?.Size || 0;
                 break;
               case 'date':
                 // Assuming there's a way to get date from the asset
                 const dateFieldA = a as any;
                 const dateFieldB = b as any;
-                valueA = dateFieldA?.DigitalSourceAsset?.CreateDate ? new Date(dateFieldA.DigitalSourceAsset.CreateDate).getTime() : 0;
-                valueB = dateFieldB?.DigitalSourceAsset?.CreateDate ? new Date(dateFieldB.DigitalSourceAsset.CreateDate).getTime() : 0;
+                valueA = dateFieldA?.DigitalSourceAsset?.CreateDate
+                  ? new Date(dateFieldA.DigitalSourceAsset.CreateDate).getTime()
+                  : 0;
+                valueB = dateFieldB?.DigitalSourceAsset?.CreateDate
+                  ? new Date(dateFieldB.DigitalSourceAsset.CreateDate).getTime()
+                  : 0;
                 break;
               default:
                 valueA = (a as any)[sortField];
                 valueB = (b as any)[sortField];
             }
-            
+
             // Compare values
             if (valueA === valueB) return 0;
-            
+
             // Handle string comparison
             if (typeof valueA === 'string' && typeof valueB === 'string') {
               return desc ? valueB.localeCompare(valueA) : valueA.localeCompare(valueB);
             }
-            
+
             // Handle number comparison
             return desc ? valueB - valueA : valueA - valueB;
           });
         }
-        
+
         // Return the appropriate view based on viewMode
         return viewMode === 'card' ? (
           <AssetGridView
@@ -365,7 +380,7 @@ function AssetResultsView<T>({
             aspectRatio={aspectRatio}
             thumbnailScale={thumbnailScale}
             showMetadata={showMetadata}
-            cardFields={cardFields.filter(f => f.visible)}
+            cardFields={cardFields.filter((f) => f.visible)}
             onAssetClick={onAssetClick}
             onDeleteClick={onDeleteClick}
             onDownloadClick={onDownloadClick}
@@ -409,7 +424,9 @@ function AssetResultsView<T>({
             getAssetThumbnail={getAssetThumbnail}
             isSelected={isAssetSelected ? (asset) => isAssetSelected(getAssetId(asset)) : undefined}
             onSelectToggle={onSelectToggle}
-            isFavorite={isAssetFavorited ? (asset) => isAssetFavorited(getAssetId(asset)) : undefined}
+            isFavorite={
+              isAssetFavorited ? (asset) => isAssetFavorited(getAssetId(asset)) : undefined
+            }
             onFavoriteToggle={onFavoriteToggle}
             selectedSearchFields={selectedFields}
             isRenaming={isRenaming}
@@ -417,7 +434,6 @@ function AssetResultsView<T>({
           />
         );
       })()}
-
       <AssetPagination
         page={searchMetadata.page}
         pageSize={searchMetadata.pageSize}

@@ -1,6 +1,6 @@
-import { NavigationPanelState } from "../types";
+import { NavigationPanelState } from '../types';
 
-const PREFIX = "medialake";
+const PREFIX = 'medialake';
 const THEME_STORAGE_NAME = `${PREFIX}-theme`;
 const NAVIGATION_PANEL_STATE_STORAGE_NAME = `${PREFIX}-navigation-panel-state`;
 const TOKEN_KEY = `${PREFIX}-auth-token`;
@@ -11,7 +11,7 @@ const AWS_CONFIG_KEY = `${PREFIX}-aws-config`;
 export abstract class StorageHelper {
   static getTheme(): 'light' | 'dark' {
     const savedTheme = localStorage.getItem('theme');
-    return (savedTheme === 'dark' ? 'dark' : 'light');
+    return savedTheme === 'dark' ? 'dark' : 'light';
   }
 
   static setTheme(theme: 'light' | 'dark'): void {
@@ -57,7 +57,6 @@ export abstract class StorageHelper {
     localStorage.removeItem(AWS_CONFIG_KEY);
   }
 
-
   static setToken(token: string) {
     localStorage.setItem(TOKEN_KEY, token);
   }
@@ -70,7 +69,6 @@ export abstract class StorageHelper {
     localStorage.removeItem(TOKEN_KEY);
   }
 
-
   static setRefreshToken(token: string) {
     localStorage.setItem(REFRESH_TOKEN_KEY, token);
   }
@@ -82,8 +80,6 @@ export abstract class StorageHelper {
   static clearRefreshToken() {
     localStorage.removeItem(REFRESH_TOKEN_KEY);
   }
-
-
 
   static setUsername(username: string) {
     localStorage.setItem(USERNAME_KEY, username);

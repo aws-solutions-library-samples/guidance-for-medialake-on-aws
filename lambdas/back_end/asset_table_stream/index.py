@@ -1,17 +1,17 @@
-from typing import Any, Dict, Optional
+import json
+import os
+import time
+import uuid
+from typing import Any, Dict
+
+import boto3
 from aws_lambda_powertools import Logger
-from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.utilities.data_classes import DynamoDBStreamEvent
 from aws_lambda_powertools.utilities.data_classes.dynamo_db_stream_event import (
     DynamoDBRecord,
 )
-import json
-import boto3
-import os
-from requests_aws4auth import AWS4Auth
-from opensearchpy import RequestsHttpConnection, OpenSearch, AWSV4SignerAuth
-import time  
-import uuid
+from aws_lambda_powertools.utilities.typing import LambdaContext
+from opensearchpy import AWSV4SignerAuth, OpenSearch, RequestsHttpConnection
 
 # Initialize logger with default level WARNING, but check environment variable
 log_level = os.environ.get("LOG_LEVEL", "DEBUG").upper()
@@ -73,10 +73,7 @@ class OpenSearchClient:
                 f"Updating document {doc_id} with body: {json.dumps(body, default=str)}"
             )
             result = self.client.update(
-                index=INDEX_NAME,
-                id=doc_id,
-                body=body,
-                refresh=True
+                index=INDEX_NAME, id=doc_id, body=body, refresh=True
             )
             logger.info(f"Update result: {json.dumps(result, default=str)}")
             return result
@@ -96,7 +93,7 @@ class OpenSearchClient:
         try:
             # Add sleep before searching
             logger.info("Sleeping for 5 seconds before searching...")
-            SEARCH_DELAY = float(os.environ.get('SEARCH_DELAY', '0'))
+            SEARCH_DELAY = float(os.environ.get("SEARCH_DELAY", "0"))
             if SEARCH_DELAY > 0:
                 logger.info(f"Sleeping for {SEARCH_DELAY} seconds before searching...")
                 time.sleep(SEARCH_DELAY)
@@ -151,7 +148,10 @@ class OpenSearchClient:
                     )
                     deletion_results.append(result)
                     logger.info(
-                        f"Delete result for doc {doc_id}: {json.dumps(result, default=str)}"
+                        f"Delete result for doc {doc_id}: {variable}"
+                                                                          result,
+                                                                          default=str
+                                                                      )}"
                     )
 
                 return {
@@ -419,20 +419,40 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         stream_event = DynamoDBStreamEvent(event)
         opensearch_client = OpenSearchClient()
 
-       
         for record in stream_event.records:
-            print(f"STREAM22 {record.event_name}",batch_id,"-LIST-",record.dynamodb.new_image['DigitalSourceAsset']['MainRepresentation']['StorageInfo']['PrimaryLocation']['ObjectKey']['Name'])
-          
+            print(
+                f"STREAM22 {record.event_name}",
+                batch_id,
+                "-LIST-",
+                record.dynamodb.new_image["DigitalSourceAsset"]["MainRepresentation"][
+                    "StorageInfo"
+                ]["PrimaryLocation"]["ObjectKey"]["Name"],
+            )
+
         for record in stream_event.records:
-            print(f"STREAM22 {record.event_name}",batch_id,"-PROCESS-",record.dynamodb.new_image['DigitalSourceAsset']['MainRepresentation']['StorageInfo']['PrimaryLocation']['ObjectKey']['Name'])
+            print(
+                f"STREAM22 {record.event_name}",
+                batch_id,
+                "-PROCESS-",
+                record.dynamodb.new_image["DigitalSourceAsset"]["MainRepresentation"][
+                    "StorageInfo"
+                ]["PrimaryLocation"]["ObjectKey"]["Name"],
+            )
             if record.event_source != "aws:dynamodb":
                 logger.warning(
                     f"Skipping non-DynamoDB event source: {record.event_source}"
                 )
                 continue
-            
+
             process_dynamodb_record(record, opensearch_client)
-            print(f"STREAM22 {record.event_name}",batch_id,"-COMPLETED-",record.dynamodb.new_image['DigitalSourceAsset']['MainRepresentation']['StorageInfo']['PrimaryLocation']['ObjectKey']['Name'])
+            print(
+                f"STREAM22 {record.event_name}",
+                batch_id,
+                "-COMPLETED-",
+                record.dynamodb.new_image["DigitalSourceAsset"]["MainRepresentation"][
+                    "StorageInfo"
+                ]["PrimaryLocation"]["ObjectKey"]["Name"],
+            )
 
         return {
             "statusCode": 200,

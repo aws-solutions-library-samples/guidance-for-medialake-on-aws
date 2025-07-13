@@ -27,7 +27,7 @@ const TabbedSidebar: React.FC<TabbedSidebarProps> = ({
   isDownloadLoading,
   onClearSelection,
   onRemoveItem,
-  filterComponent
+  filterComponent,
 }) => {
   const { setHasSelectedItems } = useRightSidebar();
   const [activeTab, setActiveTab] = React.useState<'filter' | 'batch'>(
@@ -40,7 +40,7 @@ const TabbedSidebar: React.FC<TabbedSidebarProps> = ({
     // Only auto-switch when going from 0 to some selected items
     if (selectedAssets.length > 0) {
       setHasSelectedItems(true);
-      
+
       // Only switch to batch tab if this is the initial selection
       // (when going from 0 selected to some selected)
       if (selectedAssets.length === 1) {
@@ -57,7 +57,14 @@ const TabbedSidebar: React.FC<TabbedSidebarProps> = ({
   };
 
   return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper' }}>
+    <Box
+      sx={{
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        bgcolor: 'background.paper',
+      }}
+    >
       {/* Only show tabs when there are selected assets, otherwise show filter directly */}
       {selectedAssets.length > 0 ? (
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
@@ -69,11 +76,11 @@ const TabbedSidebar: React.FC<TabbedSidebarProps> = ({
             sx={{
               '& .MuiTab-root': {
                 py: 1.5,
-                fontWeight: 500
+                fontWeight: 500,
               },
               '& .Mui-selected': {
-                fontWeight: 600
-              }
+                fontWeight: 600,
+              },
             }}
           >
             <Tab
@@ -101,7 +108,10 @@ const TabbedSidebar: React.FC<TabbedSidebarProps> = ({
               hidden={activeTab !== 'filter'}
               id="filter-panel"
               aria-labelledby="filter-tab"
-              sx={{ height: '100%', display: activeTab === 'filter' ? 'block' : 'none' }}
+              sx={{
+                height: '100%',
+                display: activeTab === 'filter' ? 'block' : 'none',
+              }}
             >
               <FilterOperations filterComponent={filterComponent} />
             </Box>
@@ -111,7 +121,10 @@ const TabbedSidebar: React.FC<TabbedSidebarProps> = ({
               hidden={activeTab !== 'batch'}
               id="batch-panel"
               aria-labelledby="batch-tab"
-              sx={{ height: '100%', display: activeTab === 'batch' ? 'block' : 'none' }}
+              sx={{
+                height: '100%',
+                display: activeTab === 'batch' ? 'block' : 'none',
+              }}
             >
               <BatchOperationsWrapper
                 selectedAssets={selectedAssets}

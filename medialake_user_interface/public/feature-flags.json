@@ -1,5 +1,9 @@
 {
-  "user-favorites-enabled": {
+  "advanced-permissions-enabled": {
+    "value": true,
+    "variant": "off"
+  },
+  "chat-enabled": {
     "value": false,
     "variant": "off"
   },
@@ -7,20 +11,16 @@
     "value": false,
     "variant": "off"
   },
-  "search-multi-select-enabled": {
-    "value": false,
-    "variant": "off"
-  },
-  "chat-enabled": {
-    "value": false,
-    "variant": "off"
-  },
   "notification-enabled": {
     "value": false,
     "variant": "off"
   },
-  "advanced-permissions-enabled": {
-    "value": true,
+  "search-multi-select-enabled": {
+    "value": false,
+    "variant": "off"
+  },
+  "user-favorites-enabled": {
+    "value": false,
     "variant": "off"
   }
 }

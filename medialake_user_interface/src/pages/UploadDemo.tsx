@@ -28,7 +28,8 @@ const UploadDemo: React.FC = () => {
             S3 Upload System
           </Typography>
           <Alert severity="info" sx={{ mt: 2 }}>
-            The file upload feature is currently disabled. Please contact your administrator for more information.
+            The file upload feature is currently disabled. Please contact your administrator for
+            more information.
           </Alert>
         </Paper>
       </Container>
@@ -42,7 +43,8 @@ const UploadDemo: React.FC = () => {
           S3 Upload System
         </Typography>
         <Typography variant="body1" paragraph>
-          This demo showcases an Uppy-based upload system with dynamic S3 connector selection and presigned URL generation.
+          This demo showcases an Uppy-based upload system with dynamic S3 connector selection and
+          presigned URL generation.
         </Typography>
         <Typography variant="body1" paragraph>
           Features:
@@ -65,12 +67,7 @@ const UploadDemo: React.FC = () => {
           </Box>
         </Box>
         <Box sx={{ mt: 4, textAlign: 'center' }}>
-          <Button
-            variant="contained"
-            color="primary"
-            size="large"
-            onClick={handleOpenModal}
-          >
+          <Button variant="contained" color="primary" size="large" onClick={handleOpenModal}>
             Open Upload Dialog
           </Button>
         </Box>

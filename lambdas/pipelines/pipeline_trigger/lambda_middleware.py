@@ -1,18 +1,17 @@
 # middleware.py
-import os
+import copy
 import json
+import os
 import time
 import uuid
-import copy
-import boto3
-from decimal import Decimal
-from typing import Any, Dict, Callable, Optional, TypeVar
 from collections.abc import Mapping
-from boto3.dynamodb.conditions import Key
+from decimal import Decimal
+from typing import Any, Callable, Dict, Optional, TypeVar
+
+import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.middleware_factory import lambda_handler_decorator
-from botocore.exceptions import ClientError   # already imported? keep just once
-
+from botocore.exceptions import ClientError  # already imported? keep just once
 
 R = TypeVar("R")
 
@@ -138,20 +137,20 @@ class LambdaMiddleware:
         # ── 0. Was the entire payload off-loaded to S3? ─────────────────────
         meta = ev.get("metadata", {})
         if meta.get("stepExternalPayload") == "True":
-            loc    = meta.get("stepExternalPayloadLocation", {})
+            loc = meta.get("stepExternalPayloadLocation", {})
             bucket = loc.get("bucket")
-            key    = loc.get("key")
+            key = loc.get("key")
 
             data: Any = {}
             if bucket and key:
-                obj  = self.s3.get_object(Bucket=bucket, Key=key)
+                obj = self.s3.get_object(Bucket=bucket, Key=key)
                 body = obj["Body"].read().decode("utf-8")
-                data = json.loads(body)          # dict OR list – keep as-is
+                data = json.loads(body)  # dict OR list – keep as-is
 
             return {
                 "metadata": meta,
                 "payload": {
-                    "data":   data,
+                    "data": data,
                     "assets": ev.get("payload", {}).get("assets", []),
                 },
             }
@@ -166,44 +165,44 @@ class LambdaMiddleware:
         ):
             exec_id, pipe_id = _pick_pipeline_ids(ev)
             inner_event = copy.deepcopy(ev["payload"])
-            std_inner   = self._standardize_input(inner_event)
+            std_inner = self._standardize_input(inner_event)
             std_inner.setdefault("metadata", {})
             std_inner["metadata"]["pipelineExecutionId"] = exec_id
-            std_inner["metadata"]["pipelineId"]          = pipe_id
+            std_inner["metadata"]["pipelineId"] = pipe_id
             return std_inner
         # ────────────────────────────────────────────────────────────────────
 
         # ── 2. Map/Task wrapper containing inventory_id ─────────────────────
         if isinstance(ev.get("item"), dict) and ev["item"].get("inventory_id"):
-            item_obj      = copy.deepcopy(ev["item"])
-            inventory_id  = item_obj["inventory_id"]
+            item_obj = copy.deepcopy(ev["item"])
+            inventory_id = item_obj["inventory_id"]
 
             # did the Map placeholder indicate off-load?
-            step_ext      = item_obj.pop("stepExternalPayload", False)
-            step_ext_loc  = item_obj.pop("stepExternalPayloadLocation", {})
+            step_ext = item_obj.pop("stepExternalPayload", False)
+            step_ext_loc = item_obj.pop("stepExternalPayloadLocation", {})
 
             if step_ext:
                 bucket = step_ext_loc.get("bucket")
-                key    = step_ext_loc.get("key")
-                data   = {}
+                key = step_ext_loc.get("key")
+                data = {}
 
                 if bucket and key:
-                    obj  = self.s3.get_object(Bucket=bucket, Key=key)
+                    obj = self.s3.get_object(Bucket=bucket, Key=key)
                     body = obj["Body"].read().decode("utf-8")
                     data = json.loads(body)
 
                 meta = {
-                    "service":          self.service,
-                    "stepName":         self.step_name,
-                    "pipelineName":     self.pipe_name,
-                    "pipelineTraceId":  str(uuid.uuid4()),
-                    "stepExternalPayload":     "True",
+                    "service": self.service,
+                    "stepName": self.step_name,
+                    "pipelineName": self.pipe_name,
+                    "pipelineTraceId": str(uuid.uuid4()),
+                    "stepExternalPayload": "True",
                     "stepExternalPayloadLocation": step_ext_loc,
                 }
                 return {
                     "metadata": meta,
                     "payload": {
-                        "data":   data,        # full JSON (dict OR list)
+                        "data": data,  # full JSON (dict OR list)
                         "assets": ev.get("payload", {}).get("assets", []),
                     },
                 }
@@ -213,22 +212,21 @@ class LambdaMiddleware:
             exec_id, pipe_id = _pick_pipeline_ids(ev)
 
             meta = {
-                "service":           self.service,
-                "stepName":          self.step_name,
-                "pipelineName":      self.pipe_name,
-                "pipelineTraceId":   str(uuid.uuid4()),
+                "service": self.service,
+                "stepName": self.step_name,
+                "pipelineName": self.pipe_name,
+                "pipelineTraceId": str(uuid.uuid4()),
                 "pipelineExecutionId": exec_id,
-                "pipelineId":        pipe_id,
+                "pipelineId": pipe_id,
             }
             return {
                 "metadata": meta,
                 "payload": {
-                    "data":   item_obj,
+                    "data": item_obj,
                     "assets": [asset_rec] if asset_rec else [],
-                    "map":    {"item": item_obj},
+                    "map": {"item": item_obj},
                 },
             }
-
 
         # ── 2) Already‑standardised top‑level object ──────────────────────────
         if (
@@ -340,30 +338,36 @@ class LambdaMiddleware:
             "stepStatus": "Completed",
             "stepResult": "Success",
             "pipelineTraceId": prev_meta.get("pipelineTraceId", str(uuid.uuid4())),
-            "stepExecutionStartTime": prev_meta.get("stepExecutionStartTime", step_start),
-            "stepExecutionEndTime":   now,
-            "stepExecutionDuration":  round(now - step_start, 3),
+            "stepExecutionStartTime": prev_meta.get(
+                "stepExecutionStartTime", step_start
+            ),
+            "stepExecutionEndTime": now,
+            "stepExecutionDuration": round(now - step_start, 3),
             "pipelineExecutionStartTime": orig.get("pipelineExecutionStartTime", ""),
-            "pipelineExecutionEndTime":   now if self.is_last else "",
-            "pipelineName":   self.pipe_name,
-            "pipelineStatus": ("Started" if self.is_first
-                               else "Completed" if status_is_complete
-                               else "InProgress"),
-            "pipelineId":        prev_meta.get("pipelineId", ""),
+            "pipelineExecutionEndTime": now if self.is_last else "",
+            "pipelineName": self.pipe_name,
+            "pipelineStatus": (
+                "Started"
+                if self.is_first
+                else "Completed" if status_is_complete else "InProgress"
+            ),
+            "pipelineId": prev_meta.get("pipelineId", ""),
             "pipelineExecutionId": prev_meta.get("pipelineExecutionId", ""),
-            "externalJobResult":  ext_rs,
-            "externalJobId":      ext_id,
-            "externalJobStatus":  ext_st,
+            "externalJobResult": ext_rs,
+            "externalJobId": ext_id,
+            "externalJobStatus": ext_st,
             "stepExternalPayload": "False",
             "stepExternalPayloadLocation": {},
         }
 
         # ───────────────────────── 1. Assets gather (unchanged) ─────────────────────────
         def _inner_assets(obj: Any) -> list:
-            if (isinstance(obj, dict) and
-                isinstance(obj.get("metadata"), dict) and
-                isinstance(obj.get("payload"), dict) and
-                isinstance(obj["payload"].get("assets"), list)):
+            if (
+                isinstance(obj, dict)
+                and isinstance(obj.get("metadata"), dict)
+                and isinstance(obj.get("payload"), dict)
+                and isinstance(obj["payload"].get("assets"), list)
+            ):
                 return copy.deepcopy(obj["payload"]["assets"])
             return [copy.deepcopy(obj)]
 
@@ -373,8 +377,7 @@ class LambdaMiddleware:
             asset_from_detail = (
                 orig.get("input", {}).get("detail")
                 if isinstance(orig, dict) and "input" in orig
-                else orig.get("detail") if isinstance(orig, dict)
-                else orig
+                else orig.get("detail") if isinstance(orig, dict) else orig
             )
             prev_assets = []
             if isinstance(orig, dict):
@@ -384,12 +387,15 @@ class LambdaMiddleware:
                     prev_assets = copy.deepcopy(orig["payload"]["assets"])
                 elif isinstance(orig.get("assets"), list):
                     prev_assets = copy.deepcopy(orig["assets"])
-            assets = prev_assets + (_inner_assets(asset_from_detail) if asset_from_detail else [])
+            assets = prev_assets + (
+                _inner_assets(asset_from_detail) if asset_from_detail else []
+            )
 
         # map-block passthrough
         map_block = None
-        if (isinstance(orig.get("payload"), dict) and
-            isinstance(orig["payload"].get("map"), dict)):
+        if isinstance(orig.get("payload"), dict) and isinstance(
+            orig["payload"].get("map"), dict
+        ):
             map_block = copy.deepcopy(orig["payload"]["map"])
 
         # initial payload
@@ -398,8 +404,9 @@ class LambdaMiddleware:
             payload["map"] = map_block
 
         # ───────────────────────── 2. Off-load logic ─────────────────────────
-        candidate_raw  = json.dumps({"metadata": meta, "payload": payload},
-                                    default=_json_default).encode()
+        candidate_raw = json.dumps(
+            {"metadata": meta, "payload": payload}, default=_json_default
+        ).encode()
         if len(candidate_raw) > self.max_response_size:
 
             # a) off-load only DATA blob
@@ -410,14 +417,18 @@ class LambdaMiddleware:
                 Body=json.dumps(payload["data"], default=_json_default).encode(),
                 ContentType="application/json",
             )
-            self.logger.info("[middleware] Off-loaded data to S3", extra={
-                "bucket": self.external_payload_bucket, "key": key
-            })
+            self.logger.info(
+                "[middleware] Off-loaded data to S3",
+                extra={"bucket": self.external_payload_bucket, "key": key},
+            )
 
             # b) create lightweight placeholders
             assets_from_orig = orig.get("payload", {}).get("assets", [])
-            inv_id = (assets_from_orig[0].get("InventoryID")
-                      if isinstance(assets_from_orig, list) and assets_from_orig else None)
+            inv_id = (
+                assets_from_orig[0].get("InventoryID")
+                if isinstance(assets_from_orig, list) and assets_from_orig
+                else None
+            )
 
             placeholder_list = [
                 {
@@ -431,9 +442,9 @@ class LambdaMiddleware:
             ]
 
             # c) shrink inline payload
-            payload["data"]   = placeholder_list
-            payload["assets"] = []      # drop heavy assets
-            payload.pop("map", None)    # drop map block entirely
+            payload["data"] = placeholder_list
+            payload["assets"] = []  # drop heavy assets
+            payload.pop("map", None)  # drop map block entirely
 
             meta["stepExternalPayload"] = "True"
             meta["stepExternalPayloadLocation"] = {
@@ -444,9 +455,10 @@ class LambdaMiddleware:
         # ───────────────────────── 3. Return ─────────────────────────
         final_out = {"metadata": meta, "payload": payload}
         final_size = len(json.dumps(final_out, default=_json_default).encode())
-        self.logger.info("[middleware] Final output size (bytes)",
-                         extra={"bytes": final_size})
-        print (final_out)
+        self.logger.info(
+            "[middleware] Final output size (bytes)", extra={"bytes": final_size}
+        )
+        print(final_out)
         return final_out
 
     # ---------------------------------------------------------------- publish
@@ -498,4 +510,3 @@ class LambdaMiddleware:
 def lambda_middleware(**kw):
     mw = LambdaMiddleware(**kw)
     return lambda handler: mw(handler)
-

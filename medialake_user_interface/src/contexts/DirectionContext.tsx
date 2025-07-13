@@ -28,9 +28,14 @@ export const DirectionProvider: React.FC<DirectionProviderProps> = ({ children }
   useEffect(() => {
     const handleLanguageChange = () => {
       const newDirection = isRTL(i18n.language) ? 'rtl' : 'ltr';
-      console.log('DirectionContext: Language changed to', i18n.language, 'Setting direction to', newDirection);
+      console.log(
+        'DirectionContext: Language changed to',
+        i18n.language,
+        'Setting direction to',
+        newDirection
+      );
       setDirection(newDirection);
-      
+
       // Update HTML dir attribute
       document.documentElement.setAttribute('dir', newDirection);
       document.documentElement.setAttribute('lang', i18n.language);
@@ -42,7 +47,7 @@ export const DirectionProvider: React.FC<DirectionProviderProps> = ({ children }
 
     // Listen for language changes
     i18n.on('languageChanged', handleLanguageChange);
-    
+
     return () => {
       i18n.off('languageChanged', handleLanguageChange);
     };

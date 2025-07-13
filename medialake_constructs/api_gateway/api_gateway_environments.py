@@ -1,23 +1,15 @@
 from dataclasses import dataclass
-from aws_cdk import (
-    aws_apigateway as apigateway,
-    aws_iam as iam,
-    aws_dynamodb as dynamodb,
-    aws_secretsmanager as secretsmanager,
-    aws_lambda as lambda_,
-)
+
+from aws_cdk import aws_apigateway as apigateway
+from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_lambda as lambda_
+from aws_cdk import aws_secretsmanager as secretsmanager
 from constructs import Construct
+
 from config import config
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
-
-from medialake_constructs.shared_constructs.lambda_base import (
-    Lambda,
-    LambdaConfig,
-)
-from medialake_constructs.shared_constructs.dynamodb import (
-    DynamoDB,
-    DynamoDBProps,
-)
+from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
+from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 
 @dataclass
@@ -56,11 +48,11 @@ class ApiGatewayEnvironmentsConstruct(Construct):
         )
 
         self._environments_table.table.grant_read_data(props.post_integrations_handler)
-        
+
         props.post_integrations_handler.add_environment(
             "ENVIRONMENTS_TABLE", self._environments_table.table_name
         )
-        
+
         # Create environments resource
         environments_resource = props.api_resource.add_resource("environments")
 
@@ -171,7 +163,7 @@ class ApiGatewayEnvironmentsConstruct(Construct):
             authorization_type=apigateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
-        
+
         # Add CORS support to all API resources
         add_cors_options_method(environments_resource)
         add_cors_options_method(environment_id_resource)

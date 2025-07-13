@@ -1,19 +1,20 @@
 import json
-from typing import Optional, Dict, List, Union
+import os
+import warnings
 from datetime import datetime
+from enum import Enum
+from typing import Dict, List, Optional
+
 from aws_cdk import aws_logs as logs
 from pydantic import (
     BaseModel,
     Field,
+    ValidationInfo,
     field_validator,
     model_validator,
-    validator,
     root_validator,
-    ValidationInfo,
+    validator,
 )
-import warnings
-import os
-from enum import Enum
 
 
 class DeploymentSize(str, Enum):
@@ -24,7 +25,7 @@ class DeploymentSize(str, Enum):
 
 class OpenSearchPresets:
     """Predefined OpenSearch cluster configurations for different deployment sizes."""
-    
+
     @staticmethod
     def get_preset(deployment_size: DeploymentSize) -> Dict:
         """Get OpenSearch configuration preset based on deployment size."""
@@ -43,7 +44,7 @@ class OpenSearchPresets:
                 "automated_snapshot_start_hour": 20,
                 "off_peak_window_enabled": True,
                 "off_peak_window_start": "20:00",
-                "domain_endpoint": None
+                "domain_endpoint": None,
             },
             DeploymentSize.MEDIUM: {
                 "use_dedicated_master_nodes": True,
@@ -59,7 +60,7 @@ class OpenSearchPresets:
                 "automated_snapshot_start_hour": 20,
                 "off_peak_window_enabled": True,
                 "off_peak_window_start": "20:00",
-                "domain_endpoint": None
+                "domain_endpoint": None,
             },
             DeploymentSize.LARGE: {
                 "use_dedicated_master_nodes": True,
@@ -75,18 +76,30 @@ class OpenSearchPresets:
                 "automated_snapshot_start_hour": 20,
                 "off_peak_window_enabled": True,
                 "off_peak_window_start": "20:00",
-                "domain_endpoint": None
-            }
+                "domain_endpoint": None,
+            },
         }
-        
+
         if deployment_size not in presets:
             raise ValueError(f"Unknown deployment size: {deployment_size}")
-            
+
         return presets[deployment_size]
 
 
 def validate_opensearch_instance_type(instance_type: str) -> str:
-    valid_prefixes = ["c5", "c6g", "m5", "m6g", "r5", "r6g", "r7g", "r7gd", "t3", "i3", "i3en"]
+    valid_prefixes = [
+        "c5",
+        "c6g",
+        "m5",
+        "m6g",
+        "r5",
+        "r6g",
+        "r7g",
+        "r7gd",
+        "t3",
+        "i3",
+        "i3en",
+    ]
     valid_suffixes = [
         "small",
         "medium",
@@ -113,6 +126,7 @@ def validate_opensearch_instance_type(instance_type: str) -> str:
         raise ValueError(f"Invalid instance size: {size}")
 
     return instance_type
+
 
 class LoggingConfig(BaseModel):
     level: str = "INFO"
@@ -222,7 +236,7 @@ class OpenSearchClusterSettings(BaseModel):
                 "number of available AZs in the region. This might cause deployment issues."
             )
         return self
-        
+
     @model_validator(mode="after")
     def check_collapsed_node_config(self):
         if not self.use_dedicated_master_nodes and self.data_node_count < 2:
@@ -421,7 +435,9 @@ class CDKConfig(BaseModel):
 
     lambda_tail_warming: bool = False
     environment: str  # Used for retain decisions
-    opensearch_deployment_size: DeploymentSize = DeploymentSize.MEDIUM  # NEW: Dynamic deployment sizing
+    opensearch_deployment_size: DeploymentSize = (
+        DeploymentSize.MEDIUM
+    )  # NEW: Dynamic deployment sizing
     resource_prefix: str
     resource_application_tag: str
     account_id: str
@@ -430,19 +446,21 @@ class CDKConfig(BaseModel):
     initial_user: UserConfig
     logging: LoggingConfig = LoggingConfig()
     secondary_region: Optional[str] = None
-    opensearch_cluster_settings: Optional[OpenSearchClusterSettings] = None  # Can override presets
+    opensearch_cluster_settings: Optional[OpenSearchClusterSettings] = (
+        None  # Can override presets
+    )
     authZ: AuthConfig = AuthConfig()
     vpc: VpcConfig = Field(default_factory=VpcConfig)
     db: DatabaseConfig = Field(default_factory=DatabaseConfig)
     s3: S3Config = Field(default_factory=S3Config)
-    
+
     @property
     def resolved_opensearch_cluster_settings(self) -> OpenSearchClusterSettings:
         """Get OpenSearch cluster settings, using preset if not explicitly configured."""
         if self.opensearch_cluster_settings is not None:
             # Use explicitly provided settings
             return self.opensearch_cluster_settings
-        
+
         # Use preset based on deployment_size
         preset_config = OpenSearchPresets.get_preset(self.opensearch_deployment_size)
         return OpenSearchClusterSettings(**preset_config)

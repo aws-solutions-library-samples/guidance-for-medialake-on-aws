@@ -5,6 +5,7 @@ This Lambda function handles the creation of groups in both DynamoDB and Amazon 
 ## Overview
 
 The function creates groups in two systems:
+
 1. **DynamoDB**: Stores group metadata in the auth table following the authorization schema
 2. **Amazon Cognito**: Creates the group for user management and authentication
 
@@ -34,7 +35,7 @@ The function follows this DynamoDB schema for group storage:
 ```json
 {
   "name": "MediaLake Super Admin",
-  "id": "administrators", 
+  "id": "administrators",
   "description": "System administrators with full access to all features and settings",
   "department": "IT",
   "assignedPermissionSets": ["superAdministrator"]
@@ -42,17 +43,20 @@ The function follows this DynamoDB schema for group storage:
 ```
 
 ### Required Fields
+
 - `name`: Display name of the group
 - `id`: Unique identifier (alphanumeric and underscores only)
 - `description`: Description of the group
 
 ### Optional Fields
+
 - `department`: Department associated with the group
 - `assignedPermissionSets`: Array of permission sets assigned to the group
 
 ## Response Format
 
 ### Success (201)
+
 ```json
 {
   "status": "201",
@@ -71,6 +75,7 @@ The function follows this DynamoDB schema for group storage:
 ```
 
 ### Error (400/500)
+
 ```json
 {
   "status": "400",
@@ -123,4 +128,4 @@ The function includes comprehensive CloudWatch metrics:
 
 ## Usage
 
-This function is automatically deployed and configured through the `GroupsStack` CDK stack and is accessible via the `/groups` POST endpoint in the API Gateway. 
+This function is automatically deployed and configured through the `GroupsStack` CDK stack and is accessible via the `/groups` POST endpoint in the API Gateway.

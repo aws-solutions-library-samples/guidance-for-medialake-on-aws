@@ -1,12 +1,13 @@
-from aws_lambda_powertools import Logger, Tracer, Metrics
-from aws_lambda_powertools.event_handler import APIGatewayRestResolver, CORSConfig
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.metrics import MetricUnit
-from aws_lambda_powertools.logging import correlation_paths
-from typing import Dict, Any
-import boto3
 import json
 import os
+from typing import Any, Dict
+
+import boto3
+from aws_lambda_powertools import Logger, Metrics, Tracer
+from aws_lambda_powertools.event_handler import APIGatewayRestResolver, CORSConfig
+from aws_lambda_powertools.logging import correlation_paths
+from aws_lambda_powertools.metrics import MetricUnit
+from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
 
 # Initialize PowerTools with configurable log level
@@ -48,24 +49,26 @@ USER_POOL_ID = os.environ["COGNITO_USER_POOL_ID"]
 def validate_groups_exist(group_ids: list) -> tuple[list, list]:
     """
     Validate that the specified groups exist in Cognito
-    
+
     Args:
         group_ids: List of group IDs to validate
-    
+
     Returns:
         Tuple of (valid_groups, invalid_groups)
     """
     if not group_ids:
         return [], []
-    
+
     valid_groups = []
     invalid_groups = []
-    
+
     try:
         # Get all groups in the user pool
         response = cognito.list_groups(UserPoolId=USER_POOL_ID)
-        existing_group_names = {group['GroupName'] for group in response.get('Groups', [])}
-        
+        existing_group_names = {
+            group["GroupName"] for group in response.get("Groups", [])
+        }
+
         logger.debug(
             {
                 "message": "Retrieved existing groups from Cognito",
@@ -74,13 +77,13 @@ def validate_groups_exist(group_ids: list) -> tuple[list, list]:
                 "operation": "validate_groups_exist",
             }
         )
-        
+
         for group_id in group_ids:
             if group_id in existing_group_names:
                 valid_groups.append(group_id)
             else:
                 invalid_groups.append(group_id)
-        
+
         logger.info(
             {
                 "message": "Group validation completed",
@@ -89,7 +92,7 @@ def validate_groups_exist(group_ids: list) -> tuple[list, list]:
                 "operation": "validate_groups_exist",
             }
         )
-        
+
     except ClientError as e:
         logger.error(
             {
@@ -102,7 +105,7 @@ def validate_groups_exist(group_ids: list) -> tuple[list, list]:
         # If we can't validate, assume all groups are valid and let Cognito handle the errors
         valid_groups = group_ids
         invalid_groups = []
-    
+
     return valid_groups, invalid_groups
 
 
@@ -176,9 +179,9 @@ def create_user():
                     "operation": "group_assignment_start",
                 }
             )
-            
+
             valid_groups, invalid_groups = validate_groups_exist(request_data["groups"])
-            
+
             # Log about invalid groups
             if invalid_groups:
                 logger.warning(
@@ -189,7 +192,7 @@ def create_user():
                         "operation": "invalid_groups_detected",
                     }
                 )
-            
+
             for group_id in valid_groups:
                 logger.info(
                     {
@@ -203,7 +206,7 @@ def create_user():
                     cognito.admin_add_user_to_group(
                         UserPoolId=USER_POOL_ID,
                         Username=request_data["email"],
-                        GroupName=group_id
+                        GroupName=group_id,
                     )
                     groups_added.append(group_id)
                     logger.info(
@@ -217,12 +220,14 @@ def create_user():
                 except ClientError as group_error:
                     error_code = group_error.response["Error"]["Code"]
                     error_message = group_error.response["Error"]["Message"]
-                    groups_failed.append({
-                        "group_id": group_id,
-                        "error_code": error_code,
-                        "error_message": error_message
-                    })
-                    
+                    groups_failed.append(
+                        {
+                            "group_id": group_id,
+                            "error_code": error_code,
+                            "error_message": error_message,
+                        }
+                    )
+
                     logger.error(
                         {
                             "message": "Failed to add user to group",
@@ -234,12 +239,14 @@ def create_user():
                         }
                     )
                 except Exception as unexpected_error:
-                    groups_failed.append({
-                        "group_id": group_id,
-                        "error_code": "UnexpectedError",
-                        "error_message": str(unexpected_error)
-                    })
-                    
+                    groups_failed.append(
+                        {
+                            "group_id": group_id,
+                            "error_code": "UnexpectedError",
+                            "error_message": str(unexpected_error),
+                        }
+                    )
+
                     logger.error(
                         {
                             "message": "Unexpected error adding user to group",
@@ -250,7 +257,7 @@ def create_user():
                             "operation": "add_user_to_group_unexpected_error",
                         }
                     )
-            
+
             # Final summary of group assignment
             logger.info(
                 {
@@ -272,15 +279,21 @@ def create_user():
         )
         if groups_added:
             metrics.add_metric(
-                name="UserGroupAssignments", unit=MetricUnit.Count, value=len(groups_added)
+                name="UserGroupAssignments",
+                unit=MetricUnit.Count,
+                value=len(groups_added),
             )
         if groups_failed:
             metrics.add_metric(
-                name="FailedGroupAssignments", unit=MetricUnit.Count, value=len(groups_failed)
+                name="FailedGroupAssignments",
+                unit=MetricUnit.Count,
+                value=len(groups_failed),
             )
         if invalid_groups:
             metrics.add_metric(
-                name="InvalidGroupsRequested", unit=MetricUnit.Count, value=len(invalid_groups)
+                name="InvalidGroupsRequested",
+                unit=MetricUnit.Count,
+                value=len(invalid_groups),
             )
 
         # Include group assignment details in response
@@ -289,12 +302,12 @@ def create_user():
             "userStatus": response["User"]["UserStatus"],
             "groupsAdded": groups_added,
         }
-        
+
         # Include failed groups in response if any failed
         if groups_failed:
             response_data["groupsFailed"] = groups_failed
             response_data["groupsFailedCount"] = len(groups_failed)
-        
+
         # Include invalid groups in response if any were invalid
         if invalid_groups:
             response_data["invalidGroups"] = invalid_groups

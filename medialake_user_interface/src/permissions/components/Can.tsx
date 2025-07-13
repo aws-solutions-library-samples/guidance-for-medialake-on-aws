@@ -7,36 +7,30 @@ import { Actions, Subjects } from '../types/ability.types';
 
 /**
  * Component for conditional rendering based on permissions
- * 
+ *
  * @param props Component props
  * @returns React element or null
  */
-export function Can({
-  I: action,
-  a: subject,
-  field,
-  passThrough = false,
-  children
-}: CanProps) {
+export function Can({ I: action, a: subject, field, passThrough = false, children }: CanProps) {
   const { can, loading } = usePermission();
   const { isAuthenticated, isInitialized } = useAuth();
   const [lastKnownResult, setLastKnownResult] = useState<boolean | null>(null);
-  
+
   // Don't do permission checks until we're authenticated and initialized
   if (!isAuthenticated || !isInitialized) {
     return null;
   }
-  
+
   // Calculate allowed value (always call hooks first)
   const allowed = can(action as Actions, subject as Subjects, field);
-  
+
   // Update last known result (always call useEffect)
   useEffect(() => {
     if (!loading) {
       setLastKnownResult(allowed);
     }
   }, [allowed, loading]);
-  
+
   // If loading and we have a previous result, use it to prevent flickering
   // If loading and no previous result, hide content
   if (loading) {
@@ -49,17 +43,17 @@ export function Can({
       return null;
     }
   }
-  
+
   // If children is a function, call it with the allowed status
   if (typeof children === 'function') {
     return <>{children(allowed)}</>;
   }
-  
+
   // If allowed, render the children
   if (allowed) {
     return <>{children}</>;
   }
-  
+
   // If passThrough is true, render the children with disabled styling
   if (passThrough) {
     return (
@@ -67,14 +61,14 @@ export function Can({
         style={{
           opacity: 0.5,
           pointerEvents: 'none',
-          cursor: 'not-allowed'
+          cursor: 'not-allowed',
         }}
       >
         {children}
       </div>
     );
   }
-  
+
   // Otherwise, render nothing
   return null;
 }

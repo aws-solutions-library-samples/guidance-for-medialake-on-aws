@@ -4,12 +4,12 @@ AWS-specific operations for Step Functions state machines.
 
 import json
 import time
-from typing import Dict, Any, Optional
+from typing import Any, Dict
+
 import boto3
 from aws_lambda_powertools import Logger
-
-from sanitizers import sanitize_role_name, sanitize_state_machine_name
 from iam_operations import create_sfn_role
+from sanitizers import sanitize_role_name, sanitize_state_machine_name
 
 logger = Logger()
 
@@ -155,10 +155,7 @@ def create_step_function(
         logger.info(
             f"Created state machine for pipeline '{pipeline_name}' with name '{sanitized_state_machine_name}': {response}"
         )
-        return {
-            "response": response,
-            "role_arn": role_arn
-        }
+        return {"response": response, "role_arn": role_arn}
     except Exception as e:
         logger.exception(
             f"Failed to create/update state machine for pipeline '{pipeline_name}': {e}"
@@ -210,7 +207,9 @@ def start_state_machine_execution(
             stateMachineArn=state_machine_arn,
             input=json.dumps(input_data),
         )
-        logger.info(f"Started execution of state machine {state_machine_arn}: {response}")
+        logger.info(
+            f"Started execution of state machine {state_machine_arn}: {response}"
+        )
         return response
     except Exception as e:
         logger.error(f"Error starting state machine execution: {e}")

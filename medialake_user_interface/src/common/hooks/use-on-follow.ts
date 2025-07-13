@@ -1,5 +1,5 @@
-import { useCallback } from "react";
-import { useNavigate } from "react-router";
+import { useCallback } from 'react';
+import { useNavigate } from 'react-router';
 
 interface FollowDetail {
   external?: boolean;
@@ -11,16 +11,13 @@ export function useOnFollow() {
 
   return useCallback(
     (event: CustomEvent<FollowDetail>): void => {
-      if (
-        event.detail.external === true ||
-        typeof event.detail.href === "undefined"
-      ) {
+      if (event.detail.external === true || typeof event.detail.href === 'undefined') {
         return;
       }
 
       event.preventDefault();
       navigate(event.detail.href);
     },
-    [navigate],
+    [navigate]
   );
 }

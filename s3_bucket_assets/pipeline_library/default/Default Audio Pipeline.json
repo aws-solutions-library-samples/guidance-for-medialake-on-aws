@@ -1,433 +1,415 @@
 {
-  "name": "Default Audio Pipeline",
-  "description": "",
   "active": true,
   "configuration": {
+    "edges": [
+      {
+        "data": {
+          "id": "dndnode_0-dndnode_1",
+          "text": "to Audio Metadata",
+          "type": "custom"
+        },
+        "id": "dndnode_0-dndnode_1",
+        "source": "dndnode_0",
+        "sourceHandle": "audio",
+        "target": "dndnode_1",
+        "targetHandle": "input-audio",
+        "type": "custom"
+      },
+      {
+        "data": {
+          "id": "dndnode_1-dndnode_23",
+          "text": "Connected",
+          "type": "custom"
+        },
+        "id": "dndnode_1-dndnode_23",
+        "source": "dndnode_1",
+        "sourceHandle": "metadata",
+        "target": "dndnode_23",
+        "targetHandle": "input-audio",
+        "type": "custom"
+      },
+      {
+        "data": {
+          "id": "dndnode_23-dndnode_3",
+          "text": "Connected",
+          "type": "custom"
+        },
+        "id": "dndnode_23-dndnode_3",
+        "source": "dndnode_23",
+        "sourceHandle": "any",
+        "target": "dndnode_3",
+        "targetHandle": "input-audio",
+        "type": "custom"
+      },
+      {
+        "data": {
+          "id": "dndnode_5-dndnode_3",
+          "text": "Connected",
+          "type": "custom"
+        },
+        "id": "dndnode_5-dndnode_3",
+        "source": "dndnode_5",
+        "sourceHandle": "wait_complete",
+        "target": "dndnode_3",
+        "targetHandle": "input-audio",
+        "type": "custom"
+      },
+      {
+        "data": {
+          "text": "Connected"
+        },
+        "id": "dndnode_3-dndnode_29",
+        "source": "dndnode_3",
+        "sourceHandle": "status",
+        "target": "dndnode_29",
+        "targetHandle": "input-any",
+        "type": "custom"
+      },
+      {
+        "data": {
+          "text": "Connected"
+        },
+        "id": "dndnode_29-dndnode_28",
+        "source": "dndnode_29",
+        "sourceHandle": "Completed",
+        "target": "dndnode_28",
+        "targetHandle": "input-any",
+        "type": "custom"
+      },
+      {
+        "data": {
+          "text": "Connected"
+        },
+        "id": "dndnode_29-dndnode_5",
+        "source": "dndnode_29",
+        "sourceHandle": "In Progress",
+        "target": "dndnode_5",
+        "targetHandle": "input-any",
+        "type": "custom"
+      },
+      {
+        "data": {
+          "text": "Connected"
+        },
+        "id": "dndnode_29-dndnode_30",
+        "source": "dndnode_29",
+        "sourceHandle": "Fail",
+        "target": "dndnode_30",
+        "targetHandle": "input-any",
+        "type": "custom"
+      }
+    ],
     "nodes": [
       {
+        "data": {
+          "configuration": {
+            "method": "trigger",
+            "operationId": "",
+            "parameters": {
+              "Format": "WAV, AIFF, AIF, MP3, PCM, M4A",
+              "Prefix": ""
+            },
+            "path": "",
+            "requestMapping": null,
+            "responseMapping": null
+          },
+          "description": "This step will trigger after ingest is completed",
+          "icon": {
+            "_owner": null,
+            "key": null,
+            "props": {
+              "size": 20
+            },
+            "ref": null
+          },
+          "inputTypes": ["any"],
+          "label": "Ingest Completed (trigger)",
+          "nodeId": "trigger_ingest_completed",
+          "outputTypes": [
+            {
+              "description": "Output type: any",
+              "name": "any"
+            }
+          ],
+          "type": "TRIGGER"
+        },
+        "height": 100,
         "id": "dndnode_0",
-        "type": "custom",
         "position": {
           "x": 187,
           "y": 380
         },
+        "type": "custom",
+        "width": 200
+      },
+      {
         "data": {
-          "nodeId": "trigger_ingest_completed",
-          "label": "Ingest Completed (trigger)",
-          "description": "This step will trigger after ingest is completed",
+          "configuration": {
+            "method": "extract",
+            "operationId": "extractAudioMetadata",
+            "parameters": {},
+            "path": ""
+          },
+          "description": "Extract metadata from audio files stored in S3",
           "icon": {
+            "_owner": null,
             "key": null,
-            "ref": null,
             "props": {
               "size": 20
             },
-            "_owner": null
+            "ref": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["audio"],
+          "label": "Audio Metadata Extractor (extract)",
+          "nodeId": "audio_metadata_extractor",
           "outputTypes": [
             {
-              "name": "any",
-              "description": "Output type: any"
+              "description": "Output type: metadata",
+              "name": "metadata"
             }
           ],
-          "type": "TRIGGER",
-          "configuration": {
-            "path": "",
-            "operationId": "",
-            "method": "trigger",
-            "parameters": {
-              "Prefix": "",
-              "Format": "WAV, AIFF, AIF, MP3, PCM, M4A"
-            },
-            "requestMapping": null,
-            "responseMapping": null
-          }
+          "type": "UTILITY"
         },
-        "width": 200,
-        "height": 100
-      },
-      {
+        "height": 100,
         "id": "dndnode_1",
-        "type": "custom",
         "position": {
           "x": 448,
           "y": 384
         },
+        "type": "custom",
+        "width": 200
+      },
+      {
         "data": {
-          "nodeId": "audio_metadata_extractor",
-          "label": "Audio Metadata Extractor (extract)",
-          "description": "Extract metadata from audio files stored in S3",
+          "configuration": {
+            "method": "check",
+            "operationId": "checkStatus",
+            "parameters": {
+              "MediaConvert Queue Arn": "${MEDIACONVERT_QUEUE_ARN}",
+              "MediaConvert Role Arn": "${MEDIACONVERT_ROLE_ARN}"
+            },
+            "path": ""
+          },
+          "description": "Checks the status of MediaConvert jobs",
           "icon": {
+            "_owner": null,
             "key": null,
-            "ref": null,
             "props": {
               "size": 20
             },
-            "_owner": null
+            "ref": null
           },
-          "inputTypes": [
-            "audio"
-          ],
+          "inputTypes": ["audio"],
+          "label": "Check MediaConvert Status (check)",
+          "nodeId": "check_media_convert_status",
           "outputTypes": [
             {
-              "name": "metadata",
-              "description": "Output type: metadata"
+              "description": "MediaConvert job status",
+              "name": "status"
             }
           ],
-          "type": "UTILITY",
-          "configuration": {
-            "path": "",
-            "operationId": "extractAudioMetadata",
-            "method": "extract",
-            "parameters": {}
-          }
+          "type": "UTILITY"
         },
-        "width": 200,
-        "height": 100
-      },
-      {
+        "height": 100,
         "id": "dndnode_3",
-        "type": "custom",
         "position": {
           "x": 176,
           "y": 576
         },
-        "data": {
-          "nodeId": "check_media_convert_status",
-          "label": "Check MediaConvert Status (check)",
-          "description": "Checks the status of MediaConvert jobs",
-          "icon": {
-            "key": null,
-            "ref": null,
-            "props": {
-              "size": 20
-            },
-            "_owner": null
-          },
-          "inputTypes": [
-            "audio"
-          ],
-          "outputTypes": [
-            {
-              "name": "status",
-              "description": "MediaConvert job status"
-            }
-          ],
-          "type": "UTILITY",
-          "configuration": {
-            "path": "",
-            "operationId": "checkStatus",
-            "method": "check",
-            "parameters": {
-              "MediaConvert Queue Arn": "${MEDIACONVERT_QUEUE_ARN}",
-              "MediaConvert Role Arn": "${MEDIACONVERT_ROLE_ARN}"
-            }
-          }
-        },
-        "width": 200,
-        "height": 100
+        "type": "custom",
+        "width": 200
       },
       {
-        "id": "dndnode_5",
-        "type": "custom",
-        "position": {
-          "x": 176,
-          "y": 768
-        },
         "data": {
-          "nodeId": "wait",
-          "label": "Wait 1 Minute",
-          "description": "A Wait state",
-          "icon": {
-            "key": null,
-            "ref": null,
-            "props": {
-              "size": 20
-            },
-            "_owner": null
-          },
-          "inputTypes": [
-            "any"
-          ],
-          "outputTypes": [
-            {
-              "name": "wait_complete",
-              "description": "Wait completed"
-            }
-          ],
-          "type": "FLOW",
           "configuration": {
             "method": "wait",
             "parameters": {
               "seconds": "60"
             }
-          }
+          },
+          "description": "A Wait state",
+          "icon": {
+            "_owner": null,
+            "key": null,
+            "props": {
+              "size": 20
+            },
+            "ref": null
+          },
+          "inputTypes": ["any"],
+          "label": "Wait 1 Minute",
+          "nodeId": "wait",
+          "outputTypes": [
+            {
+              "description": "Wait completed",
+              "name": "wait_complete"
+            }
+          ],
+          "type": "FLOW"
         },
-        "width": 200,
-        "height": 100
+        "height": 100,
+        "id": "dndnode_5",
+        "position": {
+          "x": 176,
+          "y": 768
+        },
+        "type": "custom",
+        "width": 200
       },
       {
+        "data": {
+          "configuration": {
+            "method": "extract",
+            "operationId": "",
+            "parameters": {
+              "MediaConvert Queue Arn": "${MEDIACONVERT_QUEUE_ARN}",
+              "MediaConvert Role Arn": "${MEDIACONVERT_ROLE_ARN}",
+              "output_bucket": ""
+            },
+            "path": ""
+          },
+          "description": "Create an audio proxy from an audio file stored in S3",
+          "icon": {
+            "_owner": null,
+            "key": null,
+            "props": {
+              "size": 20
+            },
+            "ref": null
+          },
+          "inputTypes": ["audio"],
+          "label": "Audio Proxy (extract) (extract) (extract) (extract)",
+          "nodeId": "audio_proxy",
+          "outputTypes": [
+            {
+              "description": "Output type: any",
+              "name": "any"
+            }
+          ],
+          "type": "UTILITY"
+        },
+        "height": 113,
         "id": "dndnode_23",
-        "type": "custom",
         "position": {
           "x": 704,
           "y": 384
         },
+        "type": "custom",
+        "width": 200
+      },
+      {
         "data": {
-          "nodeId": "audio_proxy",
-          "label": "Audio Proxy (extract) (extract) (extract) (extract)",
-          "description": "Create an audio proxy from an audio file stored in S3",
+          "configuration": {
+            "method": "success",
+            "parameters": {}
+          },
+          "description": "This step will end the execution with a success status",
           "icon": {
+            "_owner": null,
             "key": null,
-            "ref": null,
             "props": {
               "size": 20
             },
-            "_owner": null
+            "ref": null
           },
-          "inputTypes": [
-            "audio"
-          ],
-          "outputTypes": [
-            {
-              "name": "any",
-              "description": "Output type: any"
-            }
-          ],
-          "type": "UTILITY",
-          "configuration": {
-            "path": "",
-            "operationId": "",
-            "method": "extract",
-            "parameters": {
-              "MediaConvert Queue Arn": "${MEDIACONVERT_QUEUE_ARN}",
-              "output_bucket": "",
-              "MediaConvert Role Arn": "${MEDIACONVERT_ROLE_ARN}"
-            }
-          }
+          "inputTypes": ["any"],
+          "label": "Success",
+          "nodeId": "success",
+          "outputTypes": [],
+          "type": "FLOW"
         },
-        "width": 200,
-        "height": 113
-      },
-      {
+        "dragging": false,
+        "height": 113,
         "id": "dndnode_28",
-        "type": "custom",
         "position": {
           "x": 720,
           "y": 576
         },
+        "selected": false,
+        "type": "custom",
+        "width": 200
+      },
+      {
         "data": {
-          "nodeId": "success",
-          "label": "Success",
-          "description": "This step will end the execution with a success status",
+          "configuration": {
+            "method": "choice",
+            "parameters": {}
+          },
+          "description": "This step will branch the workflow based on a condition",
           "icon": {
+            "_owner": null,
             "key": null,
-            "ref": null,
             "props": {
               "size": 20
             },
-            "_owner": null
+            "ref": null
           },
-          "inputTypes": [
-            "any"
+          "inputTypes": ["any"],
+          "label": "Choice",
+          "nodeId": "choice",
+          "outputTypes": [
+            {
+              "description": "Path taken when condition evaluates to true",
+              "name": "Completed"
+            },
+            {
+              "description": "Path taken when condition evaluates to false",
+              "name": "In Progress"
+            },
+            {
+              "description": "Path taken when condition evaluates to false",
+              "name": "Fail"
+            }
           ],
-          "outputTypes": [],
-          "type": "FLOW",
-          "configuration": {
-            "method": "success",
-            "parameters": {}
-          }
+          "type": "FLOW"
         },
-        "width": 200,
+        "dragging": false,
         "height": 113,
-        "selected": false,
-        "dragging": false
-      },
-      {
         "id": "dndnode_29",
-        "type": "custom",
         "position": {
           "x": 480,
           "y": 576
         },
+        "selected": false,
+        "type": "custom",
+        "width": 200
+      },
+      {
         "data": {
-          "nodeId": "choice",
-          "label": "Choice",
-          "description": "This step will branch the workflow based on a condition",
+          "configuration": {
+            "method": "fail",
+            "operationId": "",
+            "parameters": {
+              "Cause": "Flow step failed",
+              "Error": "Failed"
+            },
+            "path": ""
+          },
+          "description": "This step will end the state machine execution with a failure status",
           "icon": {
+            "_owner": null,
             "key": null,
-            "ref": null,
             "props": {
               "size": 20
             },
-            "_owner": null
+            "ref": null
           },
-          "inputTypes": [
-            "any"
-          ],
-          "outputTypes": [
-            {
-              "name": "Completed",
-              "description": "Path taken when condition evaluates to true"
-            },
-            {
-              "name": "In Progress",
-              "description": "Path taken when condition evaluates to false"
-            },
-            {
-              "name": "Fail",
-              "description": "Path taken when condition evaluates to false"
-            }
-          ],
-          "type": "FLOW",
-          "configuration": {
-            "method": "choice",
-            "parameters": {}
-          }
+          "inputTypes": ["any"],
+          "label": "Fail (fail)",
+          "nodeId": "fail",
+          "outputTypes": [],
+          "type": "FLOW"
         },
-        "width": 200,
+        "dragging": false,
         "height": 113,
-        "selected": false,
-        "dragging": false
-      },
-      {
         "id": "dndnode_30",
-        "type": "custom",
         "position": {
           "x": 480,
           "y": 752
         },
-        "data": {
-          "nodeId": "fail",
-          "label": "Fail (fail)",
-          "description": "This step will end the state machine execution with a failure status",
-          "icon": {
-            "key": null,
-            "ref": null,
-            "props": {
-              "size": 20
-            },
-            "_owner": null
-          },
-          "inputTypes": [
-            "any"
-          ],
-          "outputTypes": [],
-          "type": "FLOW",
-          "configuration": {
-            "method": "fail",
-            "parameters": {
-              "Error": "Failed",
-              "Cause": "Flow step failed"
-            },
-            "path": "",
-            "operationId": ""
-          }
-        },
-        "width": 200,
-        "height": 113,
         "selected": true,
-        "dragging": false
-      }
-    ],
-    "edges": [
-      {
-        "id": "dndnode_0-dndnode_1",
-        "source": "dndnode_0",
-        "target": "dndnode_1",
         "type": "custom",
-        "data": {
-          "type": "custom",
-          "text": "to Audio Metadata",
-          "id": "dndnode_0-dndnode_1"
-        },
-        "sourceHandle": "audio",
-        "targetHandle": "input-audio"
-      },
-      {
-        "id": "dndnode_1-dndnode_23",
-        "source": "dndnode_1",
-        "target": "dndnode_23",
-        "type": "custom",
-        "data": {
-          "type": "custom",
-          "text": "Connected",
-          "id": "dndnode_1-dndnode_23"
-        },
-        "sourceHandle": "metadata",
-        "targetHandle": "input-audio"
-      },
-      {
-        "id": "dndnode_23-dndnode_3",
-        "source": "dndnode_23",
-        "target": "dndnode_3",
-        "type": "custom",
-        "data": {
-          "type": "custom",
-          "text": "Connected",
-          "id": "dndnode_23-dndnode_3"
-        },
-        "sourceHandle": "any",
-        "targetHandle": "input-audio"
-      },
-      {
-        "id": "dndnode_5-dndnode_3",
-        "source": "dndnode_5",
-        "target": "dndnode_3",
-        "type": "custom",
-        "data": {
-          "type": "custom",
-          "text": "Connected",
-          "id": "dndnode_5-dndnode_3"
-        },
-        "sourceHandle": "wait_complete",
-        "targetHandle": "input-audio"
-      },
-      {
-        "source": "dndnode_3",
-        "sourceHandle": "status",
-        "target": "dndnode_29",
-        "targetHandle": "input-any",
-        "id": "dndnode_3-dndnode_29",
-        "type": "custom",
-        "data": {
-          "text": "Connected"
-        }
-      },
-      {
-        "source": "dndnode_29",
-        "sourceHandle": "Completed",
-        "target": "dndnode_28",
-        "targetHandle": "input-any",
-        "id": "dndnode_29-dndnode_28",
-        "type": "custom",
-        "data": {
-          "text": "Connected"
-        }
-      },
-      {
-        "source": "dndnode_29",
-        "sourceHandle": "In Progress",
-        "target": "dndnode_5",
-        "targetHandle": "input-any",
-        "id": "dndnode_29-dndnode_5",
-        "type": "custom",
-        "data": {
-          "text": "Connected"
-        }
-      },
-      {
-        "source": "dndnode_29",
-        "sourceHandle": "Fail",
-        "target": "dndnode_30",
-        "targetHandle": "input-any",
-        "id": "dndnode_29-dndnode_30",
-        "type": "custom",
-        "data": {
-          "text": "Connected"
-        }
+        "width": 200
       }
     ],
     "settings": {
@@ -435,5 +417,7 @@
       "retryAttempts": 3,
       "timeout": 3600
     }
-  }
+  },
+  "description": "",
+  "name": "Default Audio Pipeline"
 }

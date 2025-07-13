@@ -1,21 +1,15 @@
 import secrets
 import string
 from dataclasses import dataclass
-import aws_cdk as cdk
+
+from aws_cdk import Stack, Token
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_s3 as s3
+from aws_cdk import custom_resources as cr
 
 # from medialake_stacks.auth_stack import AuthStack
 from constructs import Construct
-from aws_cdk import (
-    Stack,
-    aws_s3 as s3,
-    aws_iam as iam,
-    aws_cognito as cognito,
-    custom_resources as cr,
-    aws_secretsmanager as secretsmanager,
-    aws_cognito_identitypool_alpha as cognito_identity,
-    Token,
-    aws_ssm as ssm,
-)
+
 from config import config
 from medialake_constructs.userInterface import UIConstruct, UIConstructProps
 
@@ -31,6 +25,8 @@ class UserInterfaceStackProps:
     cognito_user_pool_arn: str
     cloudfront_waf_acl_arn: str
     cognito_domain_prefix: str
+
+
 def generate_random_password(length=16):
     # Ensure at least one of each required character type
     lowercase = string.ascii_lowercase
@@ -52,6 +48,7 @@ def generate_random_password(length=16):
 
     return "".join(password_list)
 
+
 class UserInterfaceStack(Stack):
     def __init__(
         self,
@@ -61,11 +58,11 @@ class UserInterfaceStack(Stack):
         **kwargs,
     ):
         super().__init__(scope, construct_id, **kwargs)
-        
+
         # Look up the WAF ACL ARN from SSM Parameter Store
         # If props.cloudfront_waf_acl_arn starts with '/', assume it's an SSM parameter path
         waf_acl_arn = props.cloudfront_waf_acl_arn
-        if props.cloudfront_waf_acl_arn.startswith('/'):
+        if props.cloudfront_waf_acl_arn.startswith("/"):
             # Use a custom resource to get the parameter from us-east-1
             waf_acl_param = cr.AwsCustomResource(
                 self,
@@ -73,21 +70,23 @@ class UserInterfaceStack(Stack):
                 on_update={
                     "service": "SSM",
                     "action": "getParameter",
-                    "parameters": {
-                        "Name": props.cloudfront_waf_acl_arn
-                    },
+                    "parameters": {"Name": props.cloudfront_waf_acl_arn},
                     "region": "us-east-1",  # Important: specify us-east-1 region
-                    "physical_resource_id": cr.PhysicalResourceId.of("waf-acl-arn-param-" + props.cloudfront_waf_acl_arn),
+                    "physical_resource_id": cr.PhysicalResourceId.of(
+                        "waf-acl-arn-param-" + props.cloudfront_waf_acl_arn
+                    ),
                 },
-                policy=cr.AwsCustomResourcePolicy.from_statements([
-                    iam.PolicyStatement(
-                        actions=["ssm:GetParameter"],
-                        resources=["*"],  # You can restrict this further if needed
-                    )
-                ])
+                policy=cr.AwsCustomResourcePolicy.from_statements(
+                    [
+                        iam.PolicyStatement(
+                            actions=["ssm:GetParameter"],
+                            resources=["*"],  # You can restrict this further if needed
+                        )
+                    ]
+                ),
             )
             waf_acl_arn = waf_acl_param.get_response_field("Parameter.Value")
-        
+
         self._ui = UIConstruct(
             self,
             "UserInterface",
@@ -102,7 +101,7 @@ class UserInterfaceStack(Stack):
                 cognito_domain_prefix=props.cognito_domain_prefix,
             ),
         )
-        
+
         _ = cr.AwsCustomResource(
             self,
             "UpdateCognitoVerificationMessage",
@@ -206,7 +205,10 @@ class UserInterfaceStack(Stack):
             policy=cr.AwsCustomResourcePolicy.from_statements(
                 [
                     iam.PolicyStatement(
-                        actions=["cognito-idp:AdminCreateUser", "cognito-idp:AdminDeleteUser"],
+                        actions=[
+                            "cognito-idp:AdminCreateUser",
+                            "cognito-idp:AdminDeleteUser",
+                        ],
                         resources=[props.cognito_user_pool_arn],
                     )
                 ]
@@ -239,7 +241,9 @@ class UserInterfaceStack(Stack):
                     "Username": config.initial_user.email,
                     "GroupName": "superAdministrators",
                 },
-                physical_resource_id=cr.PhysicalResourceId.of("RemoveFromAdminGroupHandler"),
+                physical_resource_id=cr.PhysicalResourceId.of(
+                    "RemoveFromAdminGroupHandler"
+                ),
                 ignore_error_codes_matching="UserNotFoundException|ResourceNotFoundException",
             ),
             policy=cr.AwsCustomResourcePolicy.from_statements(
@@ -259,8 +263,6 @@ class UserInterfaceStack(Stack):
         # Ensure the user is created before adding to group
         add_to_admin_group_handler.node.add_dependency(create_user_handler)
 
-
     @property
     def user_interface_url(self) -> str:
         return self._ui.user_interface_url
-    

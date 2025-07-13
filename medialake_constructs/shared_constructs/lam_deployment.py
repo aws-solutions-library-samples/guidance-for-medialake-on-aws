@@ -1,55 +1,51 @@
-import tempfile
 import os
 import shutil
 import subprocess
-import zipfile
-from typing import List, Optional
-from aws_cdk import (
-    aws_s3_deployment as s3deploy,
-    aws_s3 as s3,
-    aws_lambda as lambda_,
-    Fn,
-)
+import tempfile
+
+from aws_cdk import Fn
+from aws_cdk import aws_s3 as s3
+from aws_cdk import aws_s3_deployment as s3deploy
 from constructs import Construct
 
 
 class LambdaDeployment(Construct):
     """
-    A construct that packages Lambda code and deploys it to an S3 bucket.
-    
-    This construct handles packaging Lambda code (Python or Node.js) with its dependencies,
-    creating a zip file, and deploying it to an S3 bucket. 
+        A construct that packages Lambda code and deploys it to an S3 bucket.
 
-    When layers are provided, their content is extracted and included directly in the Lambda
-    deployment package. This is particularly useful for:
-    1. Reducing cold start times by eliminating the need to download layers separately
-    2. Ensuring consistent access to layer resources in all environments
-    3. Simplifying deployment by bundling everything into a single package
+        This construct handles packaging Lambda code (Python or Node.js) with its dependencies,
+        creating a zip file, and deploying it to an S3 bucket.
 
-    Example:
-    
-python
-    # Create a Lambda deployment with layers
-    lambda_deployment = LambdaDeployment(
-        self,
-        "MyLambda",
-        destination_bucket=my_bucket,
-        code_path=["lambdas", "my_function"],
-        
-    )
-    
-    # Create the Lambda function with the deployment
-    lambda_function = lambda_.Function(
-        self,
-        "MyLambdaFunction",
-        code=lambda_.S3Code(
-            bucket=my_bucket,
-            key=lambda_deployment.deployment_key
-        ),
-        handler="index.handler",
-        runtime=lambda_.Runtime.PYTHON_3_12,
-        # No need to specify layers here as they're already baked into the deployment
-    )
+        When layers are provided, their content is extracted and included directly in the Lambda
+        deployment package. This is particularly useful for:
+        1. Reducing cold start times by eliminating the need to download layers separately
+        2. Ensuring consistent access to layer resources in all environments
+        3. Simplifying deployment by bundling everything into a single package
+
+        Example:
+
+    python
+        # Create a Lambda deployment with layers
+        lambda_deployment = LambdaDeployment(
+            self,
+            "MyLambda",
+            destination_bucket=my_bucket,
+            code_path=["lambdas", "my_function"],
+
+        )
+
+        # Create the Lambda function with the deployment
+        lambda_function = lambda_.Function(
+            self,
+            "MyLambdaFunction",
+            code=lambda_.S3Code(
+                bucket=my_bucket,
+                key=lambda_deployment.deployment_key
+            ),
+            handler="index.handler",
+            runtime=lambda_.Runtime.PYTHON_3_12,
+            # No need to specify layers here as they're already baked into the deployment
+        )
 
     """
 
@@ -61,12 +57,11 @@ python
         code_path: list,
         runtime: str = "python3.12",
         parent_folder: str = "",
-
         **kwargs,
     ):
         """
         Initialize a new LambdaDeployment.
-        
+
         Parameters:
         -----------
         scope: Construct
@@ -81,12 +76,11 @@ python
             The Lambda runtime (default: "python3.12")
         parent_folder: str
             An optional parent folder for the Lambda code in the S3 bucket
-       
+
         """
         super().__init__(scope, id, **kwargs)
         self.id = id
         self.parent_folder = parent_folder
-    
 
         lambda_source_path = os.path.abspath(
             os.path.join(os.path.dirname(__file__), "..", "..", *code_path)
@@ -105,8 +99,6 @@ python
                 )
             else:
                 raise ValueError(f"Unsupported runtime: {runtime}")
-            
-
 
             # Construct the destination_key_prefix
             if parent_folder:
@@ -147,10 +139,12 @@ python
             d = os.path.join(package_path, item)
             if os.path.isfile(s):
                 shutil.copy2(s, d)
-        
+
         # Copy common libraries to package directory
         common_libraries_path = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..", "..", "lambdas", "common_libraries")
+            os.path.join(
+                os.path.dirname(__file__), "..", "..", "lambdas", "common_libraries"
+            )
         )
         if os.path.exists(common_libraries_path):
             for item in os.listdir(common_libraries_path):
@@ -169,11 +163,13 @@ python
 
         shutil.copytree(source_path, package_path, dirs_exist_ok=True)
         shutil.make_archive(zip_path.replace(".zip", ""), "zip", package_path)
-    
 
     @property
     def deployment_key(self) -> str:
         if self.parent_folder:
-            return f"lambda-code/{self.parent_folder}/{self.id}/{Fn.select(0, self.deployment.object_keys)}"
+            return f"lambda-code/{self.parent_folder}/{self.id}/{variable}"
+                                                                               0,
+                                                                               self.deployment.object_keys
+                                                                           )}"
         else:
             return f"lambda-code/{self.id}/{Fn.select(0, self.deployment.object_keys)}"

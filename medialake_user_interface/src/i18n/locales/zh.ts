@@ -10,12 +10,12 @@ export default {
     hebrew: '希伯来语',
     japanese: '日语',
     korean: '韩语',
-    spanish: '西班牙语'
+    spanish: '西班牙语',
   },
   assetsPage: {
     title: '资产',
     connectors: '连接器',
-    selectConnector: '选择连接器'
+    selectConnector: '选择连接器',
   },
   assetExplorer: {
     noConnectorSelected: '选择连接器以查看资产',
@@ -25,14 +25,14 @@ export default {
     menu: {
       rename: '重命名',
       share: '分享',
-      download: '下载'
+      download: '下载',
     },
     deleteDialog: {
       title: '确认删除',
       description: '您确定要删除此资产吗？此操作不可撤销。',
       cancel: '取消',
-      confirm: '删除'
-    }
+      confirm: '删除',
+    },
   },
   sidebar: {
     menu: {
@@ -40,7 +40,7 @@ export default {
       assets: '资产',
       pipelines: '管道',
       pipelineExecutions: '管道执行',
-      settings: '设置'
+      settings: '设置',
     },
     submenu: {
       system: '系统设置',
@@ -48,8 +48,8 @@ export default {
       userManagement: '用户管理',
       roles: '角色',
       integrations: '集成',
-      environments: '环境'
-    }
+      environments: '环境',
+    },
   },
   profile: {
     title: '个人资料',
@@ -63,22 +63,22 @@ export default {
     pushNotifications: '推送通知',
     changePassword: '更改密码',
     twoFactorAuth: '两步验证',
-    appearance: '外观'
+    appearance: '外观',
   },
   app: {
     loading: '加载中...',
     errors: {
       loadingConfig: '加载AWS配置错误：',
       loadingUserAttributes: '加载用户属性错误：',
-      signingOut: '退出登录错误：'
+      signingOut: '退出登录错误：',
     },
     navigation: {
       preventedDuplicate: '阻止了重复导航到',
-      navigating: '正在从...导航'
+      navigating: '正在从...导航',
     },
     branding: {
-              name: 'Media Lake'
-    }
+      name: 'Media Lake',
+    },
   },
   search: {
     semantic: '语义搜索',
@@ -86,30 +86,30 @@ export default {
       dateRange: '日期范围',
       contentType: '内容类型',
       storageLocation: '存储位置',
-      comingSoon: '更多筛选即将推出...'
-    }
+      comingSoon: '更多筛选即将推出...',
+    },
   },
   admin: {
     metrics: {
       storageUsage: '存储使用量',
       apiUsage: 'API使用量',
       activeUsers: '活跃用户',
-      systemLoad: '系统负载'
+      systemLoad: '系统负载',
     },
     errors: {
       userDeletionNotImplemented: '用户删除功能尚未实现。',
       userCreationNotImplemented: '用户创建功能尚未实现。',
       userEditingNotImplemented: '用户编辑功能尚未实现。',
       analyticsExportNotImplemented: '分析数据导出功能尚未实现。',
-      systemResetNotImplemented: '系统重置功能尚未实现。'
+      systemResetNotImplemented: '系统重置功能尚未实现。',
     },
     columns: {
-      lastActive: '最后活动时间'
+      lastActive: '最后活动时间',
     },
     buttons: {
       exportAnalytics: '导出分析',
-      resetSystem: '重置系统'
-    }
+      resetSystem: '重置系统',
+    },
   },
   integrations: {
     title: '集成',
@@ -120,7 +120,7 @@ export default {
     addIntegration: '添加集成',
     form: {
       search: {
-        placeholder: '搜索集成'
+        placeholder: '搜索集成',
       },
       title: '添加集成',
       fields: {
@@ -128,30 +128,30 @@ export default {
           label: '集成',
           tooltip: '选择一个集成提供商',
           errors: {
-            required: '必须选择集成'
-          }
+            required: '必须选择集成',
+          },
         },
         description: {
           label: '描述',
           tooltip: '为此集成提供描述',
           helper: '此集成的简要描述',
           errors: {
-            required: '描述为必填项'
-          }
+            required: '描述为必填项',
+          },
         },
         environmentId: {
           label: '环境',
           tooltip: '选择此集成的环境',
           errors: {
-            required: '必须选择环境'
-          }
+            required: '必须选择环境',
+          },
         },
         enabled: {
           label: '启用',
           tooltip: '启用或禁用此集成',
           errors: {
-            required: '启用为必填项'
-          }
+            required: '启用为必填项',
+          },
         },
         auth: {
           type: {
@@ -159,11 +159,11 @@ export default {
             tooltip: '选择认证方法',
             options: {
               awsIam: 'AWS IAM',
-              apiKey: 'API密钥'
+              apiKey: 'API密钥',
             },
             errors: {
-              required: '必须选择认证类型'
-            }
+              required: '必须选择认证类型',
+            },
           },
           credentials: {
             apiKey: {
@@ -171,26 +171,26 @@ export default {
               tooltip: '输入您的API密钥',
               helper: '用于服务认证的API密钥',
               errors: {
-                required: '必须输入API密钥'
-              }
+                required: '必须输入API密钥',
+              },
             },
             iamRole: {
               label: 'IAM角色',
               tooltip: '输入IAM角色ARN',
               errors: {
-                required: '必须输入IAM角色'
-              }
-            }
-          }
-        }
+                required: '必须输入IAM角色',
+              },
+            },
+          },
+        },
       },
       errors: {
         required: '此字段为必填项',
         nodeId: {
-          unrecognized_keys: '无效的集成选择'
-        }
-      }
-    }
+          unrecognized_keys: '无效的集成选择',
+        },
+      },
+    },
   },
   pipelines: {
     title: '管道',
@@ -198,8 +198,8 @@ export default {
     searchPlaceholder: '搜索管道...',
     actions: {
       create: '添加新管道',
-      import: '导入管道'
-    }
+      import: '导入管道',
+    },
   },
   executions: {
     title: '管道执行',
@@ -211,39 +211,39 @@ export default {
       startTime: '开始时间',
       endTime: '结束时间',
       duration: '时长',
-      actions: '操作'
+      actions: '操作',
     },
     actions: {
       retryFromCurrent: '从当前位置重试',
       retryFromStart: '从头重试',
-      viewDetails: '查看详情'
-    }
+      viewDetails: '查看详情',
+    },
   },
   users: {
     title: '用户管理',
     description: '管理系统用户及其权限',
     actions: {
-      addUser: '添加用户'
+      addUser: '添加用户',
     },
     form: {
       title: {
-        add: '添加用户'
+        add: '添加用户',
       },
       fields: {
         given_name: {
           label: '名',
           tooltip: '输入用户的名字',
-          helper: ''
+          helper: '',
         },
         family_name: {
           label: '姓',
           tooltip: '输入用户的姓',
-          helper: ''
+          helper: '',
         },
         email: {
           label: '电子邮件',
           tooltip: '输入用户的电子邮件地址',
-          helper: ''
+          helper: '',
         },
         roles: {
           label: '角色',
@@ -251,31 +251,31 @@ export default {
           options: {
             Admin: '管理员',
             Editor: '编辑',
-            Viewer: '查看者'
-          }
+            Viewer: '查看者',
+          },
         },
         email_verified: {
           label: '邮箱验证',
-          tooltip: '指示用户的邮箱是否已验证'
+          tooltip: '指示用户的邮箱是否已验证',
         },
         enabled: {
           label: '启用',
-          tooltip: '启用或禁用该用户'
-        }
-      }
+          tooltip: '启用或禁用该用户',
+        },
+      },
     },
     roles: {
       admin: '管理员',
       editor: '编辑',
-      viewer: '查看者'
-    }
+      viewer: '查看者',
+    },
   },
   roles: {
     title: '角色管理',
     description: '管理系统角色及其权限',
     actions: {
-      addRole: '添加角色'
-    }
+      addRole: '添加角色',
+    },
   },
   settings: {
     environments: {
@@ -290,11 +290,11 @@ export default {
         status: {
           name: '状态',
           active: '激活',
-          disabled: '禁用'
+          disabled: '禁用',
         },
         costCenter: '成本中心',
-        team: '团队'
-      }
+        team: '团队',
+      },
     },
     systemSettings: {
       title: '系统设置',
@@ -302,7 +302,7 @@ export default {
         search: '搜索',
         notifications: '通知',
         security: '安全',
-        performance: '性能'
+        performance: '性能',
       },
       search: {
         title: '搜索配置',
@@ -317,20 +317,20 @@ export default {
         endpoint: '端点URL（可选）',
         enabled: '启用搜索',
         noProvider: '未配置搜索提供商。',
-        configurePrompt: '配置 Twelve Labs 以启用搜索功能。'
+        configurePrompt: '配置 Twelve Labs 以启用搜索功能。',
       },
       notifications: {
         title: '通知设置',
-        comingSoon: '通知设置即将推出。'
+        comingSoon: '通知设置即将推出。',
       },
       security: {
         title: '安全设置',
-        comingSoon: '安全设置即将推出。'
+        comingSoon: '安全设置即将推出。',
       },
       performance: {
         title: '性能设置',
-        comingSoon: '性能设置即将推出。'
-      }
+        comingSoon: '性能设置即将推出。',
+      },
     },
     groups: {
       actions: {
@@ -338,17 +338,17 @@ export default {
         editGroup: '编辑组',
         deleteGroup: '删除组',
         createGroup: '创建组',
-        manageGroups: '管理组'
-      }
+        manageGroups: '管理组',
+      },
     },
     permissionSets: {
       noAssignments: '无权限集',
       actions: {
         addPermissionSet: '添加权限集',
         editPermissionSet: '编辑权限集',
-        deletePermissionSet: '删除权限集'
-      }
-    }
+        deletePermissionSet: '删除权限集',
+      },
+    },
   },
   common: {
     select: '选择',
@@ -370,7 +370,7 @@ export default {
     delete: '删除',
     create: '创建',
     actions: {
-      add: '添加'
+      add: '添加',
     },
     columns: {
       username: '用户名',
@@ -381,12 +381,12 @@ export default {
       groups: '组',
       created: '创建时间',
       modified: '修改时间',
-      actions: '操作'
+      actions: '操作',
     },
     status: {
       active: '激活',
-      inactive: '未激活'
-    }
+      inactive: '未激活',
+    },
   },
   translation: {
     common: {
@@ -396,7 +396,7 @@ export default {
         delete: '删除',
         activate: '激活',
         deactivate: '停用',
-        create: '创建'
+        create: '创建',
       },
       tableDensity: '表格密度',
       theme: '主题',
@@ -426,7 +426,7 @@ export default {
       all: '全部',
       status: {
         active: '激活',
-        inactive: '未激活'
+        inactive: '未激活',
       },
       rename: '重命名',
       root: '根目录',
@@ -447,11 +447,11 @@ export default {
         groups: '组',
         created: '创建时间',
         modified: '修改时间',
-        actions: '操作'
+        actions: '操作',
       },
       noGroups: '无组',
       select: '选择',
-      moreInfo: '更多信息'
+      moreInfo: '更多信息',
     },
     users: {
       title: '用户管理',
@@ -463,47 +463,47 @@ export default {
             label: '名',
             tooltip: '输入用户的名字',
             errors: {
-              required: '名字为必填项'
-            }
+              required: '名字为必填项',
+            },
           },
           family_name: {
             label: '姓',
             tooltip: '输入用户的姓',
             errors: {
-              required: '姓为必填项'
-            }
+              required: '姓为必填项',
+            },
           },
           email: {
             label: '电子邮件',
             tooltip: '输入用户的电子邮件地址',
             errors: {
               required: '电子邮件为必填项',
-              invalid: '无效的电子邮件地址'
-            }
+              invalid: '无效的电子邮件地址',
+            },
           },
           enabled: {
             label: '启用',
             tooltip: '启用或禁用用户',
             errors: {
-              required: '必须启用'
-            }
+              required: '必须启用',
+            },
           },
           roles: {
             label: '角色',
             tooltip: '选择用户的角色',
             errors: {
-              required: '必须选择角色'
-            }
+              required: '必须选择角色',
+            },
           },
           email_verified: {
             label: '邮箱验证',
             tooltip: '指示用户邮箱是否已验证',
             errors: {
-              required: '邮箱验证为必填项'
-            }
-          }
-        }
-      }
+              required: '邮箱验证为必填项',
+            },
+          },
+        },
+      },
     },
     roles: {
       title: '角色管理',
@@ -512,8 +512,8 @@ export default {
       editor: '编辑',
       viewer: '查看者',
       actions: {
-        addRole: '添加角色'
-      }
+        addRole: '添加角色',
+      },
     },
     columns: {
       username: '用户名',
@@ -524,31 +524,31 @@ export default {
       groups: '组',
       created: '创建时间',
       modified: '修改时间',
-      actions: '操作'
+      actions: '操作',
     },
     actions: {
       addUser: '添加用户',
       edit: '编辑用户',
       delete: '删除用户',
       activate: '激活用户',
-      deactivate: '停用用户'
+      deactivate: '停用用户',
     },
     status: {
       active: '激活',
-      inactive: '未激活'
+      inactive: '未激活',
     },
     errors: {
       loadFailed: '加载用户失败',
       saveFailed: '保存用户失败',
-      deleteFailed: '删除用户失败'
+      deleteFailed: '删除用户失败',
     },
     navigation: {
       home: '首页',
       collections: '收藏',
-      settings: '设置'
+      settings: '设置',
     },
     home: {
-                  welcome: '欢迎使用 Media Lake',
+      welcome: '欢迎使用 Media Lake',
       description: '高效管理和组织您的媒体文件',
       statistics: '统计',
       collections: '收藏',
@@ -557,7 +557,7 @@ export default {
       smartFolders: '智能文件夹',
       connectedStorage: '已连接存储',
       sharing: '分享',
-      comingSoon: '即将推出'
+      comingSoon: '即将推出',
     },
     notifications: {
       'Pipeline Complete': '管道完成',
@@ -565,13 +565,13 @@ export default {
       'Storage Warning': '存储警告',
       'Storage capacity reaching 80%': '存储容量达到80%',
       'Pipeline Failed': '管道失败',
-      'Video processing pipeline failed': '视频处理管道失败'
+      'Video processing pipeline failed': '视频处理管道失败',
     },
     modal: {
       confirmDelete: '您确定要删除此项吗？',
       confirmAction: '您确定要执行此操作吗？',
       error: '发生错误',
-      success: '操作成功完成'
+      success: '操作成功完成',
     },
     executions: {
       title: '管道执行',
@@ -583,47 +583,47 @@ export default {
         startTime: '开始时间',
         endTime: '结束时间',
         duration: '时长',
-        actions: '操作'
+        actions: '操作',
       },
       status: {
         succeeded: '成功',
         failed: '失败',
         running: '运行中',
         timedOut: '超时',
-        aborted: '中止'
+        aborted: '中止',
       },
       actions: {
         retryFromCurrent: '从当前位置重试',
         retryFromStart: '从头重试',
-        viewDetails: '查看详情'
+        viewDetails: '查看详情',
       },
       pagination: {
         page: '第 {{page}} 页，共 {{total}} 页',
-        showEntries: '显示 {{count}}'
-      }
+        showEntries: '显示 {{count}}',
+      },
     },
     s3Explorer: {
       filter: {
-        label: '按名称过滤'
+        label: '按名称过滤',
       },
       error: {
-        loading: '加载S3对象时出错：{{message}}'
+        loading: '加载S3对象时出错：{{message}}',
       },
       file: {
-        info: '大小：{{size}} • 存储类别：{{storageClass}} • 修改时间：{{modified}}'
+        info: '大小：{{size}} • 存储类别：{{storageClass}} • 修改时间：{{modified}}',
       },
       menu: {
         rename: '重命名',
-        delete: '删除'
-      }
+        delete: '删除',
+      },
     },
     assets: {
       title: '资产',
-      connectedStorage: '已连接存储'
+      connectedStorage: '已连接存储',
     },
     metadata: {
       title: '敬请期待',
-      description: '我们正在努力为您带来元数据管理功能，请继续关注！'
+      description: '我们正在努力为您带来元数据管理功能，请继续关注！',
     },
     pipelines: {
       title: '管道',
@@ -633,7 +633,7 @@ export default {
         create: '添加新管道',
         deploy: '部署图像管道',
         addNew: '添加新管道',
-        viewAll: '查看所有管道'
+        viewAll: '查看所有管道',
       },
       search: '搜索管道',
       deploy: '部署图像管道',
@@ -643,7 +643,7 @@ export default {
         creationDate: '创建日期',
         system: '系统',
         type: '类型',
-        actions: '操作'
+        actions: '操作',
       },
       editor: {
         title: '管道编辑器',
@@ -653,29 +653,29 @@ export default {
           title: '节点',
           dragNodes: '将节点拖到画布上',
           loading: '加载节点中...',
-          error: '加载节点错误'
+          error: '加载节点错误',
         },
         node: {
           configure: '配置 {{type}}',
           delete: '删除节点',
-          edit: '编辑节点'
+          edit: '编辑节点',
         },
         edge: {
           title: '编辑连线标签',
           label: '连线标签',
-          delete: '删除连接'
+          delete: '删除连接',
         },
         modals: {
           error: {
             title: '错误',
             incompatibleNodes: '前一个节点的输出与目标节点的输入不兼容。',
-            validation: '管道验证失败'
+            validation: '管道验证失败',
           },
           delete: {
             title: '删除管道',
             message: '您确定要删除此管道吗？此操作不可撤销。',
-            confirm: '输入管道名称以确认删除：'
-          }
+            confirm: '输入管道名称以确认删除：',
+          },
         },
         controls: {
           undo: '撤销',
@@ -683,7 +683,7 @@ export default {
           zoomIn: '放大',
           zoomOut: '缩小',
           fitView: '适应视图',
-          lockView: '锁定视图'
+          lockView: '锁定视图',
         },
         notifications: {
           saved: '管道保存成功',
@@ -691,10 +691,10 @@ export default {
           error: {
             save: '保存管道失败',
             validation: '管道验证失败',
-            incompatibleNodes: '节点连接不兼容'
-          }
-        }
-      }
+            incompatibleNodes: '节点连接不兼容',
+          },
+        },
+      },
     },
     integrations: {
       title: '集成',
@@ -710,29 +710,29 @@ export default {
             label: '集成',
             tooltip: '选择一个集成提供商',
             errors: {
-              required: '必须选择集成'
-            }
+              required: '必须选择集成',
+            },
           },
           description: {
             label: '描述',
             tooltip: '为此集成提供描述',
             errors: {
-              required: '描述为必填项'
-            }
+              required: '描述为必填项',
+            },
           },
           environmentId: {
             label: '环境',
             tooltip: '选择此集成的环境',
             errors: {
-              required: '必须选择环境'
-            }
+              required: '必须选择环境',
+            },
           },
           enabled: {
             label: '启用',
             tooltip: '启用或禁用此集成',
             errors: {
-              required: '启用为必填项'
-            }
+              required: '启用为必填项',
+            },
           },
           auth: {
             type: {
@@ -740,52 +740,52 @@ export default {
               tooltip: '选择认证方法',
               options: {
                 awsIam: 'AWS IAM',
-                apiKey: 'API密钥'
+                apiKey: 'API密钥',
               },
               errors: {
-                required: '必须选择认证类型'
-              }
+                required: '必须选择认证类型',
+              },
             },
             credentials: {
               apiKey: {
                 label: 'API密钥',
                 tooltip: '输入您的API密钥',
                 errors: {
-                  required: '必须输入API密钥'
-                }
+                  required: '必须输入API密钥',
+                },
               },
               iamRole: {
                 label: 'IAM角色',
                 tooltip: '输入IAM角色ARN',
                 errors: {
-                  required: '必须输入IAM角色'
-                }
-              }
-            }
-          }
+                  required: '必须输入IAM角色',
+                },
+              },
+            },
+          },
         },
         search: {
-          placeholder: '搜索集成'
+          placeholder: '搜索集成',
         },
         errors: {
           required: '此字段为必填项',
           nodeId: {
-            unrecognized_keys: '无效的集成选择'
-          }
-        }
+            unrecognized_keys: '无效的集成选择',
+          },
+        },
       },
       columns: {
         nodeName: '节点名称',
         environment: '环境',
         createdDate: '创建日期',
         modifiedDate: '修改日期',
-        actions: '操作'
+        actions: '操作',
       },
       settings: {
         environments: {
-          title: '环境'
-        }
-      }
+          title: '环境',
+        },
+      },
     },
     groups: {
       actions: {
@@ -793,16 +793,16 @@ export default {
         editGroup: '编辑组',
         deleteGroup: '删除组',
         createGroup: '创建组',
-        manageGroups: '管理组'
-      }
+        manageGroups: '管理组',
+      },
     },
     permissionSets: {
       noAssignments: '无权限集',
       actions: {
         addPermissionSet: '添加权限集',
         editPermissionSet: '编辑权限集',
-        deletePermissionSet: '删除权限集'
-      }
-    }
-  }
-}
+        deletePermissionSet: '删除权限集',
+      },
+    },
+  },
+};

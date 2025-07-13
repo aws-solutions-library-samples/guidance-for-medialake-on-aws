@@ -15,10 +15,10 @@ const ChatSidebar: React.FC = () => {
   const [isResizing, setIsResizing] = useState(false);
   const [width, setWidth] = useState(SIDEBAR_WIDTH);
   const resizeHandleRef = useRef<HTMLDivElement | null>(null);
-  
+
   // Reference to scroll to bottom when new messages are added
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
-  
+
   // Scroll to bottom when messages change
   React.useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -54,7 +54,7 @@ const ChatSidebar: React.FC = () => {
       if (isResizing && isOpen) {
         // Calculate new width based on mouse position
         const newWidth = window.innerWidth - e.clientX;
-        
+
         // Apply constraints
         if (newWidth >= 300 && newWidth <= 600) {
           setWidth(newWidth);
@@ -97,11 +97,18 @@ const ChatSidebar: React.FC = () => {
           flexDirection: 'column',
           zIndex: 1200,
           borderRadius: '16px 0 0 16px',
-          boxShadow: theme => `0 4px 20px ${alpha(theme.palette.common.black, theme.palette.mode === 'dark' ? 0.5 : 0.1)}`,
-          transition: isResizing ? 'none' : theme => theme.transitions.create(['width', 'box-shadow'], {
-            easing: theme.transitions.easing.easeInOut,
-            duration: theme.transitions.duration.standard,
-          }),
+          boxShadow: (theme) =>
+            `0 4px 20px ${alpha(
+              theme.palette.common.black,
+              theme.palette.mode === 'dark' ? 0.5 : 0.1
+            )}`,
+          transition: isResizing
+            ? 'none'
+            : (theme) =>
+                theme.transitions.create(['width', 'box-shadow'], {
+                  easing: theme.transitions.easing.easeInOut,
+                  duration: theme.transitions.duration.standard,
+                }),
           overflow: 'hidden',
         }}
       >
@@ -118,7 +125,7 @@ const ChatSidebar: React.FC = () => {
             cursor: 'col-resize',
             zIndex: 1300,
             '&:hover': {
-              backgroundColor: theme => alpha(theme.palette.primary.main, 0.1),
+              backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.1),
             },
             '&::after': {
               content: '""',
@@ -127,10 +134,10 @@ const ChatSidebar: React.FC = () => {
               left: '3px',
               width: '2px',
               height: '40px',
-              backgroundColor: theme => alpha(theme.palette.primary.main, 0.3),
+              backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.3),
               borderRadius: '2px',
               transform: 'translateY(-50%)',
-            }
+            },
           }}
         />
 
@@ -143,16 +150,19 @@ const ChatSidebar: React.FC = () => {
             justifyContent: 'space-between',
             borderBottom: '1px solid',
             borderColor: 'divider',
-            bgcolor: theme => theme.palette.mode === 'dark'
-              ? alpha(theme.palette.background.paper, 0.8)
-              : alpha(theme.palette.background.paper, 0.95),
+            bgcolor: (theme) =>
+              theme.palette.mode === 'dark'
+                ? alpha(theme.palette.background.paper, 0.8)
+                : alpha(theme.palette.background.paper, 0.95),
             backdropFilter: 'blur(8px)',
             position: 'sticky',
             top: 0,
             zIndex: 10,
           }}
         >
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>Chat</Typography>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            Chat
+          </Typography>
           <Box>
             {messages.length > 0 && (
               <IconButton
@@ -164,8 +174,8 @@ const ChatSidebar: React.FC = () => {
                   color: 'text.secondary',
                   '&:hover': {
                     color: 'error.main',
-                    bgcolor: theme => alpha(theme.palette.error.main, 0.1),
-                  }
+                    bgcolor: (theme) => alpha(theme.palette.error.main, 0.1),
+                  },
                 }}
               >
                 <DeleteIcon fontSize="small" />
@@ -179,8 +189,8 @@ const ChatSidebar: React.FC = () => {
                 color: 'text.secondary',
                 '&:hover': {
                   color: 'text.primary',
-                  bgcolor: theme => alpha(theme.palette.text.primary, 0.1),
-                }
+                  bgcolor: (theme) => alpha(theme.palette.text.primary, 0.1),
+                },
               }}
             >
               <CloseIcon fontSize="small" />
@@ -196,11 +206,12 @@ const ChatSidebar: React.FC = () => {
             p: 2,
             display: 'flex',
             flexDirection: 'column',
-            bgcolor: theme => theme.palette.mode === 'dark'
-              ? alpha(theme.palette.background.default, 0.3)
-              : alpha(theme.palette.background.default, 0.5),
+            bgcolor: (theme) =>
+              theme.palette.mode === 'dark'
+                ? alpha(theme.palette.background.default, 0.3)
+                : alpha(theme.palette.background.default, 0.5),
             scrollbarWidth: 'thin',
-            scrollbarColor: theme => `${alpha(theme.palette.text.secondary, 0.3)} transparent`,
+            scrollbarColor: (theme) => `${alpha(theme.palette.text.secondary, 0.3)} transparent`,
             '&::-webkit-scrollbar': {
               width: '6px',
             },
@@ -208,11 +219,11 @@ const ChatSidebar: React.FC = () => {
               background: 'transparent',
             },
             '&::-webkit-scrollbar-thumb': {
-              background: theme => alpha(theme.palette.text.secondary, 0.3),
+              background: (theme) => alpha(theme.palette.text.secondary, 0.3),
               borderRadius: '3px',
             },
             '&::-webkit-scrollbar-thumb:hover': {
-              background: theme => alpha(theme.palette.text.secondary, 0.5),
+              background: (theme) => alpha(theme.palette.text.secondary, 0.5),
             },
           }}
         >
@@ -252,15 +263,16 @@ const ChatSidebar: React.FC = () => {
             p: 2,
             borderTop: '1px solid',
             borderColor: 'divider',
-            bgcolor: theme => theme.palette.mode === 'dark'
-              ? alpha(theme.palette.background.paper, 0.8)
-              : alpha(theme.palette.background.paper, 0.95),
+            bgcolor: (theme) =>
+              theme.palette.mode === 'dark'
+                ? alpha(theme.palette.background.paper, 0.8)
+                : alpha(theme.palette.background.paper, 0.95),
             backdropFilter: 'blur(8px)',
           }}
         >
           <ChatInput />
         </Box>
-        
+
         {/* Optional overlay for better UX during resizing */}
         {isResizing && (
           <Box

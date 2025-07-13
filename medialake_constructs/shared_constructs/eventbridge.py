@@ -1,20 +1,18 @@
-from aws_cdk import (
-    Stack,
-    aws_events as events,
-    aws_kms as kms,
-    aws_logs as logs,
-    aws_iam as iam,
-    RemovalPolicy,
-    Duration,
-    aws_events_targets as targets,
-)
-from constructs import Construct
-from typing import Dict, Optional, List
 from dataclasses import dataclass
+
+from aws_cdk import RemovalPolicy, Stack
+from aws_cdk import aws_events as events
+from aws_cdk import aws_events_targets as targets
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_kms as kms
+from aws_cdk import aws_logs as logs
+from constructs import Construct
+
 
 @dataclass
 class EventBusConfig:
     """Configuration for EventBus creation."""
+
     bus_name: str
     description: str = None
     encryption: bool = False
@@ -22,8 +20,11 @@ class EventBusConfig:
     log_retention: logs.RetentionDays = logs.RetentionDays.ONE_MONTH
     log_all: bool = False
 
+
 class EventBus(Construct):
-    def __init__(self, scope: Construct, construct_id: str, props: EventBusConfig, **kwargs) -> None:
+    def __init__(
+        self, scope: Construct, construct_id: str, props: EventBusConfig, **kwargs
+    ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         # Create KMS Key for encryption
@@ -36,7 +37,7 @@ class EventBus(Construct):
                 removal_policy=RemovalPolicy.DESTROY,
             )
         else:
-            encryption_key = None
+            pass
 
         # Create EventBridge Event Bus
         self._event_bus = events.EventBus(
@@ -82,10 +83,8 @@ class EventBus(Construct):
                 self,
                 "LogAllEventsRule",
                 event_bus=self._event_bus,
-                event_pattern=events.EventPattern(
-                    account=[Stack.of(self).account]
-                ),
-                targets=[targets.CloudWatchLogGroup(log_all_group)]
+                event_pattern=events.EventPattern(account=[Stack.of(self).account]),
+                targets=[targets.CloudWatchLogGroup(log_all_group)],
             )
 
         # Grant permissions to the event bus
@@ -96,17 +95,17 @@ class EventBus(Construct):
         Grants permissions to put events to the Event Bus
         """
         return self._event_bus.grant_put_events_to(grantee)
-    
+
     @property
     def event_bus(self) -> events.EventBus:
         """Get the EventBus instance."""
         return self._event_bus
-    
+
     @property
     def event_bus_name(self) -> str:
         """Get the name of the EventBus."""
         return self._event_bus.event_bus_name
-    
+
     @property
     def pipelines_event_bus_name(self) -> str:
         return self._event_bus.event_bus_name

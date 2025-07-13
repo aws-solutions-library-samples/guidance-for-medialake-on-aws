@@ -7,7 +7,9 @@ test('login with credentials', async ({ page }) => {
   await page.fill('input[name="password"]', 'ChangeMe123!');
   await page.click('.amplify-button[type="submit"]');
   await page.waitForURL('http://localhost:5173/');
-  await expect(page.locator('h1')).toContainText('MediaLake', { timeout: 10000 });
+  await expect(page.locator('h1')).toContainText('MediaLake', {
+    timeout: 10000,
+  });
 });
 
 test('test', async ({ page }) => {
@@ -24,7 +26,7 @@ test('test', async ({ page }) => {
   await page.getByRole('textbox', { name: 'First Name' }).click();
   await page.getByRole('textbox', { name: 'First Name' }).fill('load');
   await page.getByRole('textbox', { name: 'First Name' }).press('Tab');
-  await page.getByRole('button', { name: 'Enter the user\'s first name' }).press('Tab');
+  await page.getByRole('button', { name: "Enter the user's first name" }).press('Tab');
   await page.getByRole('textbox', { name: 'Last Name' }).fill('user');
   await page.getByRole('textbox', { name: 'Email' }).click();
   await page.getByRole('textbox', { name: 'Email' }).fill('medialake+testuser@amazon.com');
@@ -35,7 +37,10 @@ test('test', async ({ page }) => {
   await page.waitForTimeout(20000); // Wait for 2 seconds
   await page.getByText('Add User').click();
   await page.getByRole('button', { name: 'Cancel' }).click();
-  await page.getByRole('row', { name: 'load user medialake+testuser@' }).getByLabel('Delete').click();
+  await page
+    .getByRole('row', { name: 'load user medialake+testuser@' })
+    .getByLabel('Delete')
+    .click();
   await page.getByRole('button').click();
   await page.getByRole('button', { name: 'System Settings' }).click();
 });

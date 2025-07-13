@@ -26,4 +26,3 @@ actions:
         type: [any]
       outgoing:
         type: [any]
-      

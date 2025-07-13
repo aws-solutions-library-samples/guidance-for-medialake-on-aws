@@ -1,9 +1,10 @@
+import decimal
 import json
 import uuid
-import decimal
-from typing import Dict, Any, Optional
-from aws_lambda_powertools import Logger
+from typing import Any, Optional
+
 import boto3
+from aws_lambda_powertools import Logger
 from botocore.config import Config
 
 logger = Logger(service="asset-details-service-utils")

@@ -9,5 +9,7 @@ export const SYSTEM_QUERY_KEYS = {
 
 export const invalidateSystemQueries = (queryClient: QueryClient) => {
   queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SYSTEM_SETTINGS.all });
-  queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SYSTEM_SETTINGS.search() });
-}; 
+  queryClient.invalidateQueries({
+    queryKey: QUERY_KEYS.SYSTEM_SETTINGS.search(),
+  });
+};

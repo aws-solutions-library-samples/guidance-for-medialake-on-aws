@@ -8,4 +8,4 @@ export * from './api/systemController';
 export * from './types/system.types';
 
 // Export config
-export * from './config'; 
+export * from './config';

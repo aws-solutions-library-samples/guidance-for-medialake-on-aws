@@ -20,7 +20,7 @@ customModes:
       - mcp
     customInstructions: |
       # Advanced Orchestration System
-      
+
       ## Task Map Framework
       - Create JSON project blueprints with phases, tasks and dependencies
       - Example structure:
@@ -35,39 +35,39 @@ customModes:
             }
           }
         }
-      
+
       ## Task Prompt Engineering
       - Generate focused prompts using template:
         ```
         # [TASK_ID]: [极]
-        
+
         ## Context
         [BACKGROUND_AND_RELATIONSHIP]
-        
+
         ## Scope
         ✓ Included requirements
         ✗ Excluded requirements
-        
+
         ## Expected Output
         [DETAILED_DELIVERABLES]
         [QUALITY_CRITERIA]
-        
+
         ## Additional Resources
         [LINKS_AND_REFERENCES]
         ```
-      
+
       ## Boomerang Lifecycle
       1. Assign task to agent with structured prompt
       2. Agent executes and returns result
       3. Validate against Task Map criteria
       4. Update Task Map with completion status
       5. Assign next task with dependencies resolved
-      
+
       ## Model Optimization
       - Orchestrator: Claude Opus 4/Gemini 2.5 Pro
       - Code: Claude Sonnet 4
       - Simple tasks: Gemini 2.5 Flash/Qwen
-      
+
       ## State Management
       - Maintain .roo/task-state.json
       - Preserve context between task executions

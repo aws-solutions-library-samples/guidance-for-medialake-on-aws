@@ -41,10 +41,10 @@ export const useGetFavorites = (itemType?: string) => {
   return useQuery<Favorite[], Error>({
     queryKey: QUERY_KEYS.FAVORITES.list(itemType),
     queryFn: async () => {
-      const url = itemType 
+      const url = itemType
         ? `${API_ENDPOINTS.FAVORITES.BASE}?itemType=${itemType}`
         : API_ENDPOINTS.FAVORITES.BASE;
-      
+
       const { data } = await apiClient.get<FavoritesResponse>(url);
       return data.data.favorites;
     },
@@ -68,15 +68,15 @@ export const useAddFavorite = () => {
     onSuccess: (data, variables) => {
       console.log('Adding favorite succeeded:', data);
       console.log('Invalidating queries with key:', QUERY_KEYS.FAVORITES.all);
-      
+
       // Invalidate all favorites queries to refresh data
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FAVORITES.all });
-      
+
       // Also explicitly invalidate the specific query for the item type
       // This ensures that filtered queries like useGetFavorites('ASSET') are also refreshed
       console.log('Invalidating specific query with itemType:', variables.itemType);
       queryClient.invalidateQueries({
-        queryKey: QUERY_KEYS.FAVORITES.list(variables.itemType)
+        queryKey: QUERY_KEYS.FAVORITES.list(variables.itemType),
       });
     },
   });
@@ -95,14 +95,14 @@ export const useRemoveFavorite = () => {
     onSuccess: (_, variables) => {
       console.log('Removing favorite succeeded for:', variables);
       console.log('Invalidating queries with key:', QUERY_KEYS.FAVORITES.all);
-      
+
       // Invalidate all favorites queries to refresh data
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FAVORITES.all });
-      
+
       // Also explicitly invalidate the specific query for the item type
       console.log('Invalidating specific query with itemType:', variables.itemType);
       queryClient.invalidateQueries({
-        queryKey: QUERY_KEYS.FAVORITES.list(variables.itemType)
+        queryKey: QUERY_KEYS.FAVORITES.list(variables.itemType),
       });
     },
   });
@@ -114,11 +114,11 @@ export const useRemoveFavorite = () => {
  */
 export const useIsFavorited = (itemId: string, itemType: string) => {
   const { data: favorites, isLoading } = useGetFavorites(itemType);
-  
-  const isFavorited = favorites?.some(favorite => favorite.itemId === itemId) || false;
-  
+
+  const isFavorited = favorites?.some((favorite) => favorite.itemId === itemId) || false;
+
   return {
     isFavorited,
-    isLoading
+    isLoading,
   };
 };
