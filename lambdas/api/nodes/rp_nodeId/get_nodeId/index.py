@@ -52,11 +52,7 @@ def get_unconfigured_nodes():
         node_methods[node_id].append(item)
 
     logger.info(
-        f"Grouped methods by node: {variable}"
-                                                   node_methods,
-                                                   cls=DecimalEncoder,
-                                                   default=str
-                                               )}"
+        f"Grouped methods by node: {json.dumps(node_methods, cls=DecimalEncoder, default=str)}"
     )
 
     # Get node info and combine with methods
@@ -71,11 +67,7 @@ def get_unconfigured_nodes():
         try:
             node_info = table.get_item(**get_item_params).get("Item")
             logger.info(
-                f"Node info response: {variable}"
-                                                      node_info,
-                                                      cls=DecimalEncoder,
-                                                      default=str
-                                                  )}"
+                f"Node info response: {json.dumps(node_info, cls=DecimalEncoder, default=str)}"
             )
 
             if not node_info:
@@ -91,11 +83,7 @@ def get_unconfigured_nodes():
                     "updatedAt": methods[0].get("updatedAt", ""),
                 }
                 logger.info(
-                    f"Created node info from method: {variable}"
-                                                                     node_info,
-                                                                     cls=DecimalEncoder,
-                                                                     default=str
-                                                                 )}"
+                    f"Created node info from method: {json.dumps(node_info, cls=DecimalEncoder, default=str)}"
                 )
         except Exception as e:
             logger.error(f"Error getting node info: {str(e)}")
@@ -180,11 +168,7 @@ def get_unconfigured_nodes():
                 )
 
             logger.info(
-                f"Created node data: {variable}"
-                                                     node_data,
-                                                     cls=DecimalEncoder,
-                                                     default=str
-                                                 )}"
+                f"Created node data: {json.dumps(node_data, cls=DecimalEncoder, default=str)}"
             )
             nodes.append(node_data)
         else:
@@ -225,11 +209,7 @@ def get_node_methods(node_id: str):
 
     methods_response = table.query(**query_params)
     logger.info(
-        f"Methods query response: {variable}"
-                                                  methods_response,
-                                                  cls=DecimalEncoder,
-                                                  default=str
-                                              )}"
+        f"Methods query response: {json.dumps(methods_response, cls=DecimalEncoder, default=str)}"
     )
 
     # Format response

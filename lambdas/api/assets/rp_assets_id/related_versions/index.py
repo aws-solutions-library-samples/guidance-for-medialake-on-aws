@@ -375,10 +375,7 @@ def perform_vector_search(asset_id: str, params: QueryParams) -> Dict:
                             field_value
                             if not isinstance(field_value, (dict, list))
                             or len(str(field_value)) < 200
-                            else f"[{variable}"
-                                              field_value).__name__} with {len(field_value) if hasattr(field_value,
-                                              '__len__'
-                                          ) else 'unknown'} items]"
+                            else f"[{type(field_value).__name__} with {len(field_value) if hasattr(field_value, '__len__') else 'unknown'} items]"
                         ),
                     }
 
