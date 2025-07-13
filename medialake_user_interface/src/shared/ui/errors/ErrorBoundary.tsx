@@ -19,7 +19,7 @@ interface FallbackProps {
 const DefaultFallback: React.FC<FallbackProps> = ({ error, resetErrorBoundary }) => {
   const { t } = useTranslation();
   const [showDetails, setShowDetails] = useState(false);
-  
+
   return (
     <Paper
       elevation={1}
@@ -35,56 +35,51 @@ const DefaultFallback: React.FC<FallbackProps> = ({ error, resetErrorBoundary })
       <Stack spacing={2}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <ErrorOutlineIcon color="error" />
-          <Typography variant="h6">
-            {t('errors.componentError', 'Component Error')}
-          </Typography>
+          <Typography variant="h6">{t('errors.componentError', 'Component Error')}</Typography>
         </Box>
-        
+
         <Typography variant="body2" color="text.secondary">
-          {t('errors.componentErrorMessage', 'An error occurred in this component. You can try resetting it.')}
+          {t(
+            'errors.componentErrorMessage',
+            'An error occurred in this component. You can try resetting it.'
+          )}
         </Typography>
-        
+
         <Box>
-          <Button 
-            variant="text" 
+          <Button
+            variant="text"
             size="small"
             color="primary"
             onClick={() => setShowDetails(!showDetails)}
             sx={{ mb: 1 }}
           >
-            {showDetails 
-              ? t('errors.hideDetails', 'Hide Details') 
+            {showDetails
+              ? t('errors.hideDetails', 'Hide Details')
               : t('errors.showDetails', 'Show Details')}
           </Button>
-          
+
           {showDetails && (
             <Alert severity="error" sx={{ mb: 2 }}>
-              <pre style={{ 
-                whiteSpace: 'pre-wrap', 
-                wordBreak: 'break-word',
-                margin: 0,
-                fontSize: '0.875rem'
-              }}>
+              <pre
+                style={{
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  margin: 0,
+                  fontSize: '0.875rem',
+                }}
+              >
                 {error.message}
                 {error.stack ? `\n\n${error.stack}` : ''}
               </pre>
             </Alert>
           )}
         </Box>
-        
+
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={() => window.location.reload()}
-          >
+          <Button variant="outlined" size="small" onClick={() => window.location.reload()}>
             {t('errors.refreshPage', 'Refresh Page')}
           </Button>
-          <Button
-            variant="contained"
-            size="small"
-            onClick={resetErrorBoundary}
-          >
+          <Button variant="contained" size="small" onClick={resetErrorBoundary}>
             {t('errors.tryAgain', 'Try Again')}
           </Button>
         </Box>
@@ -93,17 +88,20 @@ const DefaultFallback: React.FC<FallbackProps> = ({ error, resetErrorBoundary })
   );
 };
 
-export const ErrorBoundary: React.FC<ErrorBoundaryProps> = ({ 
-  children, 
-  fallbackRender, 
+export const ErrorBoundary: React.FC<ErrorBoundaryProps> = ({
+  children,
+  fallbackRender,
   onReset,
-  onError
+  onError,
 }) => {
   // Log the error to the console by default
-  const handleError = useCallback((error: Error, info: { componentStack: string }) => {
-    console.error('Caught an error:', error, info);
-    onError?.(error, info);
-  }, [onError]);
+  const handleError = useCallback(
+    (error: Error, info: { componentStack: string }) => {
+      console.error('Caught an error:', error, info);
+      onError?.(error, info);
+    },
+    [onError]
+  );
 
   return (
     <ReactErrorBoundary
@@ -114,4 +112,4 @@ export const ErrorBoundary: React.FC<ErrorBoundaryProps> = ({
       {children}
     </ReactErrorBoundary>
   );
-}; 
+};

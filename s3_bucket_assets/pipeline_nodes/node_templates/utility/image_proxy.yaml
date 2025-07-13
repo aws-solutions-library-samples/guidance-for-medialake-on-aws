@@ -41,8 +41,8 @@ node:
               actions:
                 - kms:GenerateDataKey
               resources:
-                - '*'
-                
+                - "*"
+
 actions:
   extract:
     summary: Create an image proxy

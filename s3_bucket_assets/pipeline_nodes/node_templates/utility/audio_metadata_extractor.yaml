@@ -39,13 +39,13 @@ node:
               actions:
                 - kms:GenerateDataKey
               resources:
-                - '*'
+                - "*"
             - effect: Allow
               actions:
                 - s3:GetObject
               resources:
-                - '*'
-                
+                - "*"
+
 actions:
   extract:
     summary: Extract audio metadata

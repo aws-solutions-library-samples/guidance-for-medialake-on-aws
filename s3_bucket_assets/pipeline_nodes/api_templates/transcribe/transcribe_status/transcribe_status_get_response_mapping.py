@@ -29,27 +29,32 @@ def translate_event_to_request(response_body_and_event):
         "statusCode": 200,
         "inventory_id": inventory_id,
         "status": status,
-        "transcription": {
-            "job_name": job_name
-        }
+        "transcription": {"job_name": job_name},
     }
 
     # If completed, pull transcript info
     if status == "COMPLETED":
         detected_language = transcription_job.get("LanguageCode", "")
-        transcript_uri = transcription_job.get("Transcript", {}).get("TranscriptFileUri", "")
+        transcript_uri = transcription_job.get("Transcript", {}).get(
+            "TranscriptFileUri", ""
+        )
         # parse S3 URI
         import re
-        m = re.match(r"https://s3\.(?:[a-z0-9-]+)\.amazonaws\.com/([^/]+)/(.*)", transcript_uri)
+
+        m = re.match(
+            r"https://s3\.(?:[a-z0-9-]+)\.amazonaws\.com/([^/]+)/(.*)", transcript_uri
+        )
         if m:
             bucket, s3_key = m.group(1), m.group(2)
             # (in your real code you'd read S3; here we simulate)
             transcript = "…actual transcript text from S3…"
-            result["transcription"].update({
-                "transcript": transcript,
-                "detected_language": detected_language,
-                "object": {"bucket": bucket, "key": s3_key}
-            })
+            result["transcription"].update(
+                {
+                    "transcript": transcript,
+                    "detected_language": detected_language,
+                    "object": {"bucket": bucket, "key": s3_key},
+                }
+            )
 
     # If failed, include an error
     if status == "FAILED":
@@ -60,11 +65,11 @@ def translate_event_to_request(response_body_and_event):
 
     # Map job status → your pipeline’s externalJobStatus
     status_mapping = {
-        "COMPLETED":  "Completed",
-        "IN_PROGRESS":"inProgress",
-        "QUEUED":     "Started",
+        "COMPLETED": "Completed",
+        "IN_PROGRESS": "inProgress",
+        "QUEUED": "Started",
         "PROCESSING": "inProgress",
-        "FAILED":     "Failed"
+        "FAILED": "Failed",
     }
     result["externalJobStatus"] = status_mapping.get(status, "Started")
 

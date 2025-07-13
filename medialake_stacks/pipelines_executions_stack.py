@@ -1,25 +1,20 @@
-from aws_cdk import (
-    Stack,
-    Environment,
-    aws_events as events,
-    aws_dynamodb as dynamodb,
-    aws_lambda as lambda_,
-    aws_events_targets as targets,
-    aws_secretsmanager as secretsmanager,
-    aws_iam as iam,
-)
-from aws_cdk import aws_lambda_event_sources as eventsources
-from constructs import Construct
 from dataclasses import dataclass
+
+from aws_cdk import Stack
+from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_events as events
+from aws_cdk import aws_events_targets as targets
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_lambda as lambda_
+from aws_cdk import aws_secretsmanager as secretsmanager
+from constructs import Construct
+
+from config import config
+from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 
 # Local imports
 from medialake_constructs.shared_constructs.eventbridge import EventBus, EventBusConfig
-from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
-from medialake_constructs.shared_constructs.lambda_base import (
-    Lambda,
-    LambdaConfig,
-)
-from config import config
+from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 
 @dataclass
@@ -181,9 +176,9 @@ class PipelinesExecutionsStack(Stack):
                 actions=[
                     "states:DescribeExecution",
                     "states:RedriveExecution",
-                    "states:StartExecution"
+                    "states:StartExecution",
                 ],
-                resources=["*"]  # Allow access to all state machines and executions
+                resources=["*"],  # Allow access to all state machines and executions
             )
         )
 

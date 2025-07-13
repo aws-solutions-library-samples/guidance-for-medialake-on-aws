@@ -15,17 +15,17 @@ The function implements AWS best practices including:
 
 import json
 import os
-import uuid
 import time
-from typing import Dict, Any, List
+import uuid
 from datetime import datetime, timedelta
+from typing import Any, Dict, List
 
 import boto3
-from aws_lambda_powertools import Logger, Tracer, Metrics
+from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.logging import correlation_paths
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
 from aws_lambda_powertools.metrics import MetricUnit
+from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
+from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
 
 # Initialize AWS Lambda Powertools
@@ -38,7 +38,9 @@ dynamodb = boto3.resource("dynamodb")
 step_functions = boto3.client("stepfunctions")
 
 # Get environment variables
-USER_TABLE_NAME = os.environ["USER_TABLE_NAME"]  # User table now stores bulk download jobs
+USER_TABLE_NAME = os.environ[
+    "USER_TABLE_NAME"
+]  # User table now stores bulk download jobs
 STEP_FUNCTION_ARN = os.environ["STEP_FUNCTION_ARN"]
 
 # Initialize DynamoDB table
@@ -46,11 +48,12 @@ user_table = dynamodb.Table(USER_TABLE_NAME)
 
 # Constants
 MAX_ASSETS_PER_JOB = 1000  # Maximum number of assets per job
-JOB_EXPIRATION_DAYS = 7    # Number of days until job expires
+JOB_EXPIRATION_DAYS = 7  # Number of days until job expires
 
 
 class BulkDownloadError(Exception):
     """Custom exception for bulk download errors"""
+
     def __init__(self, message: str, status_code: int = 400):
         super().__init__(message)
         self.status_code = status_code
@@ -61,69 +64,71 @@ class BulkDownloadError(Exception):
 def validate_request(body: Dict[str, Any]) -> List[str]:
     """
     Validate the bulk download request.
-    
+
     Args:
         body: Request body containing assetIds and options
-        
+
     Returns:
         List of validated asset IDs
-        
+
     Raises:
         BulkDownloadError: If validation fails
     """
     # Check if assetIds is present and is a list
     if "assetIds" not in body or not isinstance(body["assetIds"], list):
         raise BulkDownloadError("Missing or invalid assetIds. Must be a list.", 400)
-    
+
     # Check if assetIds is empty
     if len(body["assetIds"]) == 0:
         raise BulkDownloadError("assetIds list cannot be empty.", 400)
-    
+
     # Check if assetIds exceeds maximum limit
     if len(body["assetIds"]) > MAX_ASSETS_PER_JOB:
         raise BulkDownloadError(
             f"Too many assets requested. Maximum is {MAX_ASSETS_PER_JOB}.", 400
         )
-    
+
     # Validate each asset ID
     asset_ids = []
     for asset_id in body["assetIds"]:
         if not isinstance(asset_id, str) or not asset_id.strip():
             raise BulkDownloadError("Each assetId must be a non-empty string.", 400)
         asset_ids.append(asset_id.strip())
-    
+
     # Check for duplicates
     if len(asset_ids) != len(set(asset_ids)):
         logger.warning("Duplicate asset IDs found. Removing duplicates.")
         asset_ids = list(set(asset_ids))
-    
+
     return asset_ids
 
 
 @tracer.capture_method
-def create_job_record(user_id: str, asset_ids: List[str], options: Dict[str, Any]) -> str:
+def create_job_record(
+    user_id: str, asset_ids: List[str], options: Dict[str, Any]
+) -> str:
     """
     Create a new bulk download job record in the user table.
-    
+
     Args:
         user_id: ID of the user requesting the download
         asset_ids: List of asset IDs to download
         options: Download options
-        
+
     Returns:
         Job ID of the created job
-        
+
     Raises:
         BulkDownloadError: If job creation fails
     """
     job_id = str(uuid.uuid4())
     current_time = datetime.utcnow()
     expiration_time = current_time + timedelta(days=JOB_EXPIRATION_DAYS)
-    
+
     # Generate a reverse timestamp for sorting (newest first)
     current_time_ms = int(time.time() * 1000)
     reverse_timestamp = str(9999999999999 - current_time_ms)
-    
+
     # Format keys according to user table pattern
     formatted_user_id = f"USER#{user_id}"
     item_key = f"BULK_DOWNLOAD#{job_id}#{reverse_timestamp}"
@@ -132,7 +137,7 @@ def create_job_record(user_id: str, asset_ids: List[str], options: Dict[str, Any
     gsi2_sk = reverse_timestamp
     gsi3_pk = f"JOB#{job_id}"
     gsi3_sk = formatted_user_id
-    
+
     try:
         # Create job record in user table
         user_table.put_item(
@@ -140,7 +145,6 @@ def create_job_record(user_id: str, asset_ids: List[str], options: Dict[str, Any
                 # Primary key
                 "userId": formatted_user_id,
                 "itemKey": item_key,
-                
                 # Job data
                 "itemType": "BULK_DOWNLOAD",
                 "jobId": job_id,
@@ -152,7 +156,6 @@ def create_job_record(user_id: str, asset_ids: List[str], options: Dict[str, Any
                 "createdAt": current_time.isoformat(),
                 "updatedAt": current_time.isoformat(),
                 "expiresAt": int(expiration_time.timestamp()),
-                
                 # GSI keys for querying
                 "gsi1Sk": gsi1_sk,
                 "gsi2Pk": gsi2_pk,
@@ -161,7 +164,7 @@ def create_job_record(user_id: str, asset_ids: List[str], options: Dict[str, Any
                 "gsi3Sk": gsi3_sk,
             }
         )
-        
+
         logger.info(
             "Created bulk download job in user table",
             extra={
@@ -171,11 +174,11 @@ def create_job_record(user_id: str, asset_ids: List[str], options: Dict[str, Any
                 "itemKey": item_key,
             },
         )
-        
+
         metrics.add_metric(name="JobsCreated", unit=MetricUnit.Count, value=1)
-        
+
         return job_id
-    
+
     except ClientError as e:
         logger.error(
             "Failed to create job record in user table",
@@ -190,19 +193,21 @@ def create_job_record(user_id: str, asset_ids: List[str], options: Dict[str, Any
 
 
 @tracer.capture_method
-def start_step_function(job_id: str, user_id: str, asset_ids: List[str], options: Dict[str, Any]) -> str:
+def start_step_function(
+    job_id: str, user_id: str, asset_ids: List[str], options: Dict[str, Any]
+) -> str:
     """
     Start a Step Functions execution to process the bulk download.
-    
+
     Args:
         job_id: ID of the job to process
         user_id: ID of the user requesting the download
         asset_ids: List of asset IDs to download
         options: Download options
-        
+
     Returns:
         Execution ARN of the started Step Functions execution
-        
+
     Raises:
         BulkDownloadError: If starting the execution fails
     """
@@ -218,14 +223,14 @@ def start_step_function(job_id: str, user_id: str, asset_ids: List[str], options
             "smallFiles": [],
             "largeFiles": [],
         }
-        
+
         # Start execution
         response = step_functions.start_execution(
             stateMachineArn=STEP_FUNCTION_ARN,
             name=f"bulk-download-{job_id}",
             input=json.dumps(step_function_input),
         )
-        
+
         logger.info(
             "Started Step Functions execution",
             extra={
@@ -233,11 +238,13 @@ def start_step_function(job_id: str, user_id: str, asset_ids: List[str], options
                 "executionArn": response["executionArn"],
             },
         )
-        
-        metrics.add_metric(name="StepFunctionsExecutionsStarted", unit=MetricUnit.Count, value=1)
-        
+
+        metrics.add_metric(
+            name="StepFunctionsExecutionsStarted", unit=MetricUnit.Count, value=1
+        )
+
         return response["executionArn"]
-    
+
     except ClientError as e:
         logger.error(
             "Failed to start Step Functions execution",
@@ -246,7 +253,7 @@ def start_step_function(job_id: str, user_id: str, asset_ids: List[str], options
                 "jobId": job_id,
             },
         )
-        
+
         # Update job status to FAILED in user table
         try:
             formatted_user_id = f"USER#{user_id}"
@@ -255,12 +262,9 @@ def start_step_function(job_id: str, user_id: str, asset_ids: List[str], options
             current_time_ms = int(time.time() * 1000)
             reverse_timestamp = str(9999999999999 - current_time_ms)
             item_key = f"BULK_DOWNLOAD#{job_id}#{reverse_timestamp}"
-            
+
             user_table.update_item(
-                Key={
-                    "userId": formatted_user_id,
-                    "itemKey": item_key
-                },
+                Key={"userId": formatted_user_id, "itemKey": item_key},
                 UpdateExpression="SET #status = :status, #error = :error, #updatedAt = :updatedAt",
                 ExpressionAttributeNames={
                     "#status": "status",
@@ -281,8 +285,10 @@ def start_step_function(job_id: str, user_id: str, asset_ids: List[str], options
                     "jobId": job_id,
                 },
             )
-        
-        metrics.add_metric(name="StepFunctionsExecutionErrors", unit=MetricUnit.Count, value=1)
+
+        metrics.add_metric(
+            name="StepFunctionsExecutionErrors", unit=MetricUnit.Count, value=1
+        )
         raise BulkDownloadError("Failed to start download processing", 500)
 
 
@@ -302,14 +308,16 @@ def create_response(status_code: int, body: Dict[str, Any]) -> Dict[str, Any]:
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
 @tracer.capture_lambda_handler
 @metrics.log_metrics(capture_cold_start_metric=True)
-def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext) -> Dict[str, Any]:
+def lambda_handler(
+    event: APIGatewayProxyEvent, context: LambdaContext
+) -> Dict[str, Any]:
     """
     Lambda handler for initiating a bulk download job.
-    
+
     Args:
         event: API Gateway event
         context: Lambda context
-        
+
     Returns:
         API Gateway response
     """
@@ -317,29 +325,34 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext) -> Dict[
         # Parse request body
         if not event.get("body"):
             raise BulkDownloadError("Missing request body", 400)
-        
+
         try:
             body = json.loads(event["body"])
         except json.JSONDecodeError:
             raise BulkDownloadError("Invalid JSON in request body", 400)
-        
+
         # Get user ID from Cognito identity
-        user_id = event.get("requestContext", {}).get("authorizer", {}).get("claims", {}).get("sub")
+        user_id = (
+            event.get("requestContext", {})
+            .get("authorizer", {})
+            .get("claims", {})
+            .get("sub")
+        )
         if not user_id:
             raise BulkDownloadError("User ID not found in request", 401)
-        
+
         # Validate request
         asset_ids = validate_request(body)
-        
+
         # Get download options
         options = body.get("options", {})
-        
+
         # Create job record
         job_id = create_job_record(user_id, asset_ids, options)
-        
+
         # Start Step Functions execution
         execution_arn = start_step_function(job_id, user_id, asset_ids, options)
-        
+
         # Return success response
         return create_response(
             202,
@@ -354,7 +367,7 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext) -> Dict[
                 },
             },
         )
-    
+
     except BulkDownloadError as e:
         logger.warning(
             f"Bulk download error: {e.message}",
@@ -368,7 +381,7 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext) -> Dict[
                 "data": {},
             },
         )
-    
+
     except Exception as e:
         logger.error(
             f"Unexpected error: {str(e)}",

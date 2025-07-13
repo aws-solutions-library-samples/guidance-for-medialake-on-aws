@@ -14,20 +14,18 @@ The function implements AWS best practices including:
 - Metrics and monitoring
 """
 
-import json
 import os
-import io
-import time
-import zipfile
 import tempfile
+import time
 import uuid
-from typing import Dict, Any, List, Tuple, BinaryIO
+import zipfile
 from datetime import datetime
+from typing import Any, Dict, List
 
 import boto3
-from aws_lambda_powertools import Logger, Tracer, Metrics
-from aws_lambda_powertools.utilities.typing import LambdaContext
+from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.metrics import MetricUnit
+from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
 
 # Initialize AWS Lambda Powertools
@@ -60,13 +58,13 @@ CHUNK_SIZE = 8 * 1024 * 1024  # 8MB chunks for streaming
 def get_job_details(job_id: str) -> Dict[str, Any]:
     """
     Retrieve job details from DynamoDB.
-    
+
     Args:
         job_id: ID of the job to retrieve
-        
+
     Returns:
         Job details
-        
+
     Raises:
         Exception: If job retrieval fails
     """
@@ -75,12 +73,12 @@ def get_job_details(job_id: str) -> Dict[str, Any]:
             Key={"jobId": job_id},
             ConsistentRead=True,
         )
-        
+
         if "Item" not in response:
             raise Exception(f"Job {job_id} not found")
-        
+
         return response["Item"]
-    
+
     except ClientError as e:
         logger.error(
             "Failed to retrieve job details",
@@ -96,13 +94,13 @@ def get_job_details(job_id: str) -> Dict[str, Any]:
 def get_asset_details(asset_id: str) -> Dict[str, Any]:
     """
     Retrieve asset details from DynamoDB.
-    
+
     Args:
         asset_id: ID of the asset to retrieve
-        
+
     Returns:
         Asset details
-        
+
     Raises:
         Exception: If asset retrieval fails
     """
@@ -111,12 +109,12 @@ def get_asset_details(asset_id: str) -> Dict[str, Any]:
             Key={"InventoryID": asset_id},
             ConsistentRead=True,
         )
-        
+
         if "Item" not in response:
             raise Exception(f"Asset {asset_id} not found")
-        
+
         return response["Item"]
-    
+
     except ClientError as e:
         logger.error(
             "Failed to retrieve asset details",
@@ -129,21 +127,26 @@ def get_asset_details(asset_id: str) -> Dict[str, Any]:
 
 
 @tracer.capture_method
-def update_job_progress(job_id: str, processed_count: int, total_count: int, large_zip_files: List[str] = None) -> None:
+def update_job_progress(
+    job_id: str,
+    processed_count: int,
+    total_count: int,
+    large_zip_files: List[str] = None,
+) -> None:
     """
     Update job progress in DynamoDB.
-    
+
     Args:
         job_id: ID of the job to update
         processed_count: Number of files processed
         total_count: Total number of files to process
         large_zip_files: List of created zip files
-        
+
     Raises:
         Exception: If job update fails
     """
     progress = int((processed_count / total_count) * 100) if total_count > 0 else 0
-    
+
     update_expression = "SET #status = :status, #progress = :progress, #processedFiles = :processedFiles, #updatedAt = :updatedAt"
     expression_attribute_names = {
         "#status": "status",
@@ -157,13 +160,13 @@ def update_job_progress(job_id: str, processed_count: int, total_count: int, lar
         ":processedFiles": processed_count,
         ":updatedAt": datetime.utcnow().isoformat(),
     }
-    
+
     # Add zip files if provided
     if large_zip_files:
         update_expression += ", #largeZipFiles = :largeZipFiles"
         expression_attribute_names["#largeZipFiles"] = "largeZipFiles"
         expression_attribute_values[":largeZipFiles"] = large_zip_files
-    
+
     try:
         bulk_download_table.update_item(
             Key={"jobId": job_id},
@@ -171,7 +174,7 @@ def update_job_progress(job_id: str, processed_count: int, total_count: int, lar
             ExpressionAttributeNames=expression_attribute_names,
             ExpressionAttributeValues=expression_attribute_values,
         )
-        
+
         logger.info(
             "Updated job progress",
             extra={
@@ -181,7 +184,7 @@ def update_job_progress(job_id: str, processed_count: int, total_count: int, lar
                 "totalFiles": total_count,
             },
         )
-    
+
     except ClientError as e:
         logger.error(
             "Failed to update job progress",
@@ -195,28 +198,25 @@ def update_job_progress(job_id: str, processed_count: int, total_count: int, lar
 
 @tracer.capture_method
 def stream_s3_object_to_zip(
-    bucket: str, 
-    key: str, 
-    zip_file: zipfile.ZipFile, 
-    archive_name: str
+    bucket: str, key: str, zip_file: zipfile.ZipFile, archive_name: str
 ) -> bool:
     """
     Stream an S3 object directly into a zip file without downloading the entire file.
-    
+
     Args:
         bucket: S3 bucket name
         key: S3 object key
         zip_file: Open ZipFile object
         archive_name: Name to use in the archive
-        
+
     Returns:
         True if streaming was successful, False otherwise
     """
     try:
         # Get object size
         response = s3.head_object(Bucket=bucket, Key=key)
-        content_length = response.get('ContentLength', 0)
-        
+        content_length = response.get("ContentLength", 0)
+
         logger.info(
             "Streaming file from S3 to zip",
             extra={
@@ -226,31 +226,31 @@ def stream_s3_object_to_zip(
                 "archiveName": archive_name,
             },
         )
-        
+
         # Create a ZipInfo object to store file info
         zip_info = zipfile.ZipInfo(archive_name)
         zip_info.compress_type = zipfile.ZIP_DEFLATED
         zip_info.date_time = time.localtime(time.time())[:6]
-        
+
         # Stream the file in chunks
-        with zip_file.open(zip_info, 'w') as dest_file:
+        with zip_file.open(zip_info, "w") as dest_file:
             # Get the S3 object
             s3_object = s3_resource.Object(bucket, key)
-            
+
             # Stream the object in chunks
             offset = 0
             while offset < content_length:
                 end = min(offset + CHUNK_SIZE, content_length)
-                range_str = f'bytes={offset}-{end-1}'
-                
+                range_str = f"bytes={offset}-{end-1}"
+
                 response = s3_object.get(Range=range_str)
-                data = response['Body'].read()
+                data = response["Body"].read()
                 dest_file.write(data)
-                
+
                 offset = end
-        
+
         return True
-    
+
     except Exception as e:
         logger.error(
             "Failed to stream S3 object to zip",
@@ -265,27 +265,24 @@ def stream_s3_object_to_zip(
 
 @tracer.capture_method
 def create_zip_with_large_files(
-    asset_batch: List[Dict[str, Any]], 
-    quality: str,
-    temp_dir: str,
-    job_id: str
+    asset_batch: List[Dict[str, Any]], quality: str, temp_dir: str, job_id: str
 ) -> str:
     """
     Create a zip file containing large files streamed directly from S3.
-    
+
     Args:
         asset_batch: List of asset details
         quality: Quality option (original or proxy)
         temp_dir: Temporary directory for zip creation
         job_id: Job ID for naming
-        
+
     Returns:
         Path to the created zip file, or None if creation failed
     """
     # Create a unique zip file name
     zip_file_name = f"large_{job_id}_{uuid.uuid4()}.zip"
     zip_file_path = os.path.join(temp_dir, zip_file_name)
-    
+
     try:
         with zipfile.ZipFile(zip_file_path, "w", zipfile.ZIP_DEFLATED) as zipf:
             for asset in asset_batch:
@@ -294,51 +291,63 @@ def create_zip_with_large_files(
                     # Look for proxy representation
                     file_path = None
                     bucket = None
-                    
+
                     for rep in asset.get("DerivedRepresentations", []):
                         if rep.get("Purpose") == "proxy":
-                            storage_info = rep.get("StorageInfo", {}).get("PrimaryLocation", {})
+                            storage_info = rep.get("StorageInfo", {}).get(
+                                "PrimaryLocation", {}
+                            )
                             bucket = storage_info.get("Bucket", MEDIA_ASSETS_BUCKET)
-                            file_path = storage_info.get("ObjectKey", {}).get("FullPath")
+                            file_path = storage_info.get("ObjectKey", {}).get(
+                                "FullPath"
+                            )
                             break
-                    
+
                     # If no proxy found, use original
                     if not file_path:
                         logger.warning(
                             "No proxy representation found, using original",
-                            extra={"assetId": asset.get("InventoryID")}
+                            extra={"assetId": asset.get("InventoryID")},
                         )
-                        main_rep = asset.get("DigitalSourceAsset", {}).get("MainRepresentation", {})
-                        storage_info = main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
+                        main_rep = asset.get("DigitalSourceAsset", {}).get(
+                            "MainRepresentation", {}
+                        )
+                        storage_info = main_rep.get("StorageInfo", {}).get(
+                            "PrimaryLocation", {}
+                        )
                         bucket = storage_info.get("Bucket", MEDIA_ASSETS_BUCKET)
                         file_path = storage_info.get("ObjectKey", {}).get("FullPath")
                 else:
                     # Use original representation
-                    main_rep = asset.get("DigitalSourceAsset", {}).get("MainRepresentation", {})
-                    storage_info = main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
+                    main_rep = asset.get("DigitalSourceAsset", {}).get(
+                        "MainRepresentation", {}
+                    )
+                    storage_info = main_rep.get("StorageInfo", {}).get(
+                        "PrimaryLocation", {}
+                    )
                     bucket = storage_info.get("Bucket", MEDIA_ASSETS_BUCKET)
                     file_path = storage_info.get("ObjectKey", {}).get("FullPath")
-                
+
                 if not file_path:
                     logger.warning(
                         "No file path found for asset",
-                        extra={"assetId": asset.get("InventoryID")}
+                        extra={"assetId": asset.get("InventoryID")},
                     )
                     continue
-                
+
                 # Get file name from path
                 file_name = os.path.basename(file_path)
-                
+
                 # Stream file directly from S3 to zip
                 stream_s3_object_to_zip(bucket, file_path, zipf, file_name)
-        
+
         # Upload zip file to S3
         s3_key = f"temp/zip/{job_id}/{zip_file_name}"
         s3.upload_file(zip_file_path, MEDIA_ASSETS_BUCKET, s3_key)
-        
+
         # Return the S3 path
         return f"s3://{MEDIA_ASSETS_BUCKET}/{s3_key}"
-    
+
     except Exception as e:
         logger.error(
             "Failed to create zip with large files",
@@ -357,7 +366,7 @@ def create_zip_with_large_files(
         except Exception as e:
             logger.warning(
                 f"Failed to remove temporary zip file: {str(e)}",
-                extra={"zipPath": zip_file_path}
+                extra={"zipPath": zip_file_path},
             )
 
 
@@ -366,11 +375,11 @@ def create_zip_with_large_files(
 def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
     """
     Lambda handler for processing large files for bulk download.
-    
+
     Args:
         event: Event containing job details
         context: Lambda context
-        
+
     Returns:
         Updated job details with paths to created zip files
     """
@@ -379,13 +388,13 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         job_id = event.get("jobId")
         if not job_id:
             raise ValueError("Missing jobId in event")
-        
+
         try:
             logger.info("Processing large files job", extra={"jobId": job_id})
-            
+
             # Get job details
             job = get_job_details(job_id)
-            
+
             # Get asset IDs from job
             asset_ids = job.get("foundAssets", [])
             if not asset_ids:
@@ -397,21 +406,21 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                     "processedFiles": 0,
                     "totalFiles": 0,
                 }
-            
+
             # Get download options
             options = job.get("options", {})
             quality = options.get("quality", "original")  # original or proxy
-            
+
             # Process files in batches and create zip files
             zip_files = []
             processed_count = 0
             total_count = len(asset_ids)
-            
+
             # Process assets in batches
             for i in range(0, len(asset_ids), MAX_FILES_PER_ZIP):
-                batch_asset_ids = asset_ids[i:i + MAX_FILES_PER_ZIP]
+                batch_asset_ids = asset_ids[i : i + MAX_FILES_PER_ZIP]
                 batch_assets = []
-                
+
                 # Get asset details for the batch
                 for asset_id in batch_asset_ids:
                     try:
@@ -420,30 +429,31 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                     except Exception as e:
                         logger.error(
                             f"Error retrieving asset {asset_id}: {str(e)}",
-                            exc_info=True
+                            exc_info=True,
                         )
                         # Continue with next asset
-                
+
                 # Create zip file for the batch
                 if batch_assets:
                     zip_file_path = create_zip_with_large_files(
-                        batch_assets, 
-                        quality,
-                        temp_dir,
-                        job_id
+                        batch_assets, quality, temp_dir, job_id
                     )
-                    
+
                     if zip_file_path:
                         zip_files.append(zip_file_path)
                         processed_count += len(batch_assets)
-                    
+
                     # Update progress
                     update_job_progress(job_id, processed_count, total_count, zip_files)
-            
+
             # Add metrics
-            metrics.add_metric(name="LargeFilesProcessed", unit=MetricUnit.Count, value=processed_count)
-            metrics.add_metric(name="LargeZipFilesCreated", unit=MetricUnit.Count, value=len(zip_files))
-            
+            metrics.add_metric(
+                name="LargeFilesProcessed", unit=MetricUnit.Count, value=processed_count
+            )
+            metrics.add_metric(
+                name="LargeZipFilesCreated", unit=MetricUnit.Count, value=len(zip_files)
+            )
+
             # Return updated job details for the next step
             return {
                 "jobId": job_id,
@@ -452,14 +462,14 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                 "processedFiles": processed_count,
                 "totalFiles": total_count,
             }
-        
+
         except Exception as e:
             logger.error(
                 f"Error processing large files: {str(e)}",
                 exc_info=True,
                 extra={"jobId": job_id},
             )
-            
+
             # Update job status to FAILED
             try:
                 bulk_download_table.update_item(
@@ -481,8 +491,10 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                     f"Failed to update job status after error: {str(update_error)}",
                     extra={"jobId": job_id},
                 )
-            
-            metrics.add_metric(name="LargeFilesProcessingErrors", unit=MetricUnit.Count, value=1)
-            
+
+            metrics.add_metric(
+                name="LargeFilesProcessingErrors", unit=MetricUnit.Count, value=1
+            )
+
             # Re-raise the exception to be handled by Step Functions
             raise

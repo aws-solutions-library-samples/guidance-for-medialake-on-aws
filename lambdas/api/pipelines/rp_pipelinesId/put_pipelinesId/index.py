@@ -1,16 +1,16 @@
+import json
 import os
-from typing import Optional, Dict, Any, List, Union
-from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools.logging import correlation_paths
-from aws_lambda_powertools.event_handler import APIGatewayRestResolver
-from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
+from typing import Optional
 
 import boto3
+from aws_lambda_powertools import Logger, Metrics, Tracer
+from aws_lambda_powertools.event_handler import APIGatewayRestResolver
+from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
+from aws_lambda_powertools.logging import correlation_paths
+from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
+from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
 from pydantic import BaseModel
-import json
 
 # Initialize Power Tools
 logger = Logger(service="put_pipeline_service", level=os.getenv("LOG_LEVEL", "WARNING"))
@@ -50,7 +50,7 @@ class PipelineResponse(BaseModel):
 def update_eventbridge_rule_state(rule_name: str, enabled: bool) -> None:
     """
     Enable or disable an EventBridge rule.
-    
+
     Args:
         rule_name: Name of the rule
         enabled: True to enable, False to disable
@@ -58,19 +58,13 @@ def update_eventbridge_rule_state(rule_name: str, enabled: bool) -> None:
     # Get the event bus name from environment variable
     event_bus_name = os.environ.get("PIPELINES_EVENT_BUS_NAME")
     events_client = boto3.client("events")
-    
+
     try:
         if enabled:
-            events_client.enable_rule(
-                Name=rule_name,
-                EventBusName=event_bus_name
-            )
+            events_client.enable_rule(Name=rule_name, EventBusName=event_bus_name)
             logger.info(f"Enabled EventBridge rule: {rule_name}")
         else:
-            events_client.disable_rule(
-                Name=rule_name,
-                EventBusName=event_bus_name
-            )
+            events_client.disable_rule(Name=rule_name, EventBusName=event_bus_name)
             logger.info(f"Disabled EventBridge rule: {rule_name}")
     except Exception as e:
         logger.error(f"Error updating EventBridge rule state for {rule_name}: {e}")
@@ -80,7 +74,7 @@ def update_eventbridge_rule_state(rule_name: str, enabled: bool) -> None:
 def update_pipeline_active_state(pipeline_id: str, active: bool) -> None:
     """
     Update the active state of a pipeline and enable/disable its EventBridge rules.
-    
+
     Args:
         pipeline_id: ID of the pipeline
         active: New active state
@@ -89,11 +83,11 @@ def update_pipeline_active_state(pipeline_id: str, active: bool) -> None:
         # Get the pipeline record to find its EventBridge rules
         response = table.get_item(Key={"id": pipeline_id})
         pipeline = response.get("Item")
-        
+
         if not pipeline:
             logger.error(f"Pipeline not found: {pipeline_id}")
             return
-        
+
         # Update EventBridge rules
         dependent_resources = pipeline.get("dependentResources", [])
         for resource_type, resource_value in dependent_resources:
@@ -104,11 +98,13 @@ def update_pipeline_active_state(pipeline_id: str, active: bool) -> None:
                 else:
                     # Extract rule name from ARN
                     rule_name = resource_value.split("/")[-1]
-                
+
                 if rule_name:
                     update_eventbridge_rule_state(rule_name, active)
-                    logger.info(f"Updated EventBridge rule {rule_name} state to {'enabled' if active else 'disabled'}")
-    
+                    logger.info(
+                        f"Updated EventBridge rule {rule_name} state to {'enabled' if active else 'disabled'}"
+                    )
+
     except Exception as e:
         logger.error(f"Error updating pipeline active state: {e}")
         raise
@@ -135,7 +131,7 @@ def put_pipeline(pipeline_id: str):
             return PipelineResponse(
                 status="error", message="Request body is required", data=None
             ).dict()
-        
+
         # Check if active state is being updated
         if "active" in body:
             active = body.get("active")

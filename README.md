@@ -47,21 +47,25 @@
 **Guidance for a Media Lake on AWS** provides a comprehensive, serverless, and scalable platform for media ingestion, processing, management, and workflow orchestration on AWS. Media lake enables you to connect various storage sources, ingest and organize media at scale, run customizable processing pipelines (such as proxy/thumbnail generation and AI enrichment), and integrate with both AWS native and partner services.
 
 Media lake is designed for:
+
 - Media organizations and content creators needing automated processing and enrichment of large media libraries.
 - Use cases such as media asset management, automated compliance, and media AI/ML workflows.
 - Organizations requiring secure, event-driven, and highly available media workflows.
 
 ### High-Level Overview
+
 ![Guidance for a Media Lake Overview](assets/images/medialake-architecture-overview.png)
 
 > _Diagram: Media Lake provides a comprehensive serverless platform connecting storage sources, processing pipelines, and enrichment services with secure user interfaces and API endpoints for scalable media management workflows._
 
 ### Application Architecture
+
 ![Guidance for a Media Lake Architecture](assets/images/medialake-architecture-application.png)
 
 > _Diagram: Media lake application layer shows the React UI, API Gateway endpoints, Lambda functions, and data flow between Cognito authentication, DynamoDB storage, and OpenSearch indexing for user interactions and asset management._
 
 ### Pipeline Execution and Deployment
+
 ![Guidance for a Media Lake Pipeline Architecture](assets/images/medialake-architecture-pipeline.png)
 
 > _Diagram: Media lake processes media through S3 ingestion, EventBridge routing, Lambda orchestration, Step Functions, and enrichment with metadata, search, and integration endpoints._
@@ -77,6 +81,7 @@ As of July 2025, the cost for running this Guidance with the **small deployment 
 
 **Variable Workload Costs:**
 Additional costs will be incurred based on actual usage:
+
 - Media processing and enrichment services (Twelve Labs, Transcription)
 - S3 storage and data transfer
 - Lambda execution time
@@ -103,15 +108,13 @@ We recommend creating a **Budget through AWS Cost Explorer** to help manage cost
 | **Workflow Automations (Step Functions)**     | 1,000 automated workflows (pipelines), 20 steps each every month                                                  | \$2.40                                                                                  |
 | **Encryption (KMS)**                          | 30 keys, 311,000 encryption/decryption actions per month                                                          | \$30.00 (CMK/month) + \$15.00 (requests) = \$45.00                                      |
 | **Monitoring/Logging (CloudWatch)**           | Storage, metrics, logs for all services                                                                           | Data: \$7.50<br>Storage: \$0.07                                                         |
-| **OpenSearch Service (Search)**               | Search and index storage and compute                                                                              | t3.small: \$28.72 (1 instance)<br>Storage: \$2.44 (gp3)                                |
+| **OpenSearch Service (Search)**               | Search and index storage and compute                                                                              | t3.small: \$28.72 (1 instance)<br>Storage: \$2.44 (gp3)                                 |
 | **OpenSearch Ingestion (OSI)**                | Data ingestion processing units                                                                                   | \$350.40 (2 OCUs)                                                                       |
 | **NAT Gateway (VPC)**                         | Outbound internet access from VPC                                                                                 | \$33.30                                                                                 |
 | **WAF (Web Application Firewall)**            | API & web protection (rules + ACLs + requests)                                                                    | WebACL: \$5.00<br>Rules: \$2.00<br>Requests: \$0.30                                     |
 | **EventBridge**                               | Event-driven triggers                                                                                             | \$0.01                                                                                  |
 | **X-Ray (Tracing)**                           | Distributed trace monitoring                                                                                      | \$5.00                                                                                  |
-| **TOTAL**                                     | **Monthly cost estimate for small deployment**                                                                   | **\$379.12**                                                                            |
-
-
+| **TOTAL**                                     | **Monthly cost estimate for small deployment**                                                                    | **\$379.12**                                                                            |
 
 ## Development
 
@@ -134,6 +137,7 @@ Deployment to AWS services is fully managed through the AWS CLI and Console and 
 > These deployment instructions are optimized for modern developer environments (MacOS/Windows). Deployment to AWS services (e.g., Lambda, CloudFormation, CDK) runs on AWS-managed infrastructure.
 
 **Required Packages:**
+
 - Python 3.12 (`python3 --version`)
 - Node.js 20+ (`node --version`)
 - Docker Desktop (`docker --version`)
@@ -143,6 +147,7 @@ Deployment to AWS services is fully managed through the AWS CLI and Console and 
 **Install Python 3.12 specifically:**
 
 **MacOS:**
+
 ```bash
 # Download and install Python 3.12 directly from python.org
 # Visit https://www.python.org/downloads/release/python-3120/
@@ -154,6 +159,7 @@ pyenv global 3.12.0
 ```
 
 **Windows:**
+
 ```powershell
 # Download Python 3.12 from python.org
 # Visit https://www.python.org/downloads/release/python-3120/
@@ -162,6 +168,7 @@ pyenv global 3.12.0
 **Install other dependencies:**
 
 **MacOS:**
+
 ```bash
 # Install Docker Desktop from https://www.docker.com/products/docker-desktop
 
@@ -177,6 +184,7 @@ npm install -g aws-cdk
 ```
 
 **Windows:**
+
 ```powershell
 # Install Docker Desktop from https://www.docker.com/products/docker-desktop
 # Install Node.js from https://nodejs.org/
@@ -201,6 +209,7 @@ cd guidance-for-medialake
 ### 2. **Prepare the environment**
 
 #### (a) **Python virtual environment (recommended):**
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate      # Mac
@@ -209,11 +218,14 @@ source .venv/bin/activate      # Mac
 ```
 
 #### (b) **Install dependencies:**
+
 ```bash
 pip install -r requirements.txt
 npm install
 ```
+
 For development:
+
 ```bash
 pip install -r requirements-dev.txt
 ```
@@ -235,6 +247,7 @@ touch config.json
 ```
 
 Key configuration parameters include:
+
 - **environment**: Choose between "dev" or "prd"
 - **deployment_size**: OpenSearch deployment size ("small", "medium", "large")
 - **resource_prefix**: Prefix for all AWS resources created
@@ -258,11 +271,13 @@ Deploy directly using the CloudFormation template from GitHub:
 4. Configure the CloudFormation template parameters:
 
    ### Initial Media Lake User
+
    - **InitialUserEmail**: Email address for the initial administrator account (required)
    - **InitialUserFirstName**: First name of the initial administrator (1-50 characters, letters/spaces/hyphens/periods only)
    - **InitialUserLastName**: Last name of the initial administrator (1-50 characters, letters/spaces/hyphens/periods only)
 
    ### Media Lake Configuration
+
    - **MediaLakeEnvironmentName**: Environment identifier (1-10 alphanumeric characters, default: `dev`)
    - **OpenSearchDeploymentSize**: Controls the size of your OpenSearch cluster
      - `small`: Suitable for development and testing environments
@@ -270,6 +285,7 @@ Deploy directly using the CloudFormation template from GitHub:
      - `large`: Designed for high-volume production environments
 
    ### Media Lake Deployment Configuration
+
    - **SourceType**: Deployment source method
      - `Git`: Deploy directly from a public Git repository
      - `S3PresignedURL`: Deploy from a ZIP file via presigned URL
@@ -289,6 +305,7 @@ For advanced users who prefer CDK deployment:
 ```bash
 cdk deploy --all --profile <profile> --region <region>
 ```
+
 ---
 
 ## Deployment Validation
@@ -369,11 +386,13 @@ medialake/
 ## Key Components
 
 ### Storage Connectors
+
 - S3 Connector with EventBridge/S3 event integration
 - Automatic resource provisioning (SQS, Lambda, IAM roles)
 - Bucket exploration and management capabilities
 
 ### Processing Pipelines
+
 - FIFO queue-based media processing
 - Step Functions workflow orchestration
 - Customizable processing steps
@@ -382,6 +401,7 @@ medialake/
 ### AWS Services Used
 
 **Core Services:**
+
 - **AWS Lambda** - Serverless compute for API handlers and media processing
 - **Amazon S3** - Object storage for media assets and metadata
 - **AWS Step Functions** - Orchestration of media processing workflows
@@ -393,11 +413,13 @@ medialake/
 - **Amazon Transcribe** - Speech-to-text transcription service (only when pipeline is imported and enabled)
 
 **Security & Authentication:**
+
 - **AWS Cognito** - User authentication and authorization
 - **AWS KMS** - Encryption key management
 - **AWS IAM** - Resource access control
 
 **Monitoring & Search:**
+
 - **Amazon CloudWatch** - Metrics, logging, and alerting
 - **Amazon OpenSearch** - Search and analytics engine
 
@@ -418,6 +440,7 @@ medialake/
 Media lake supports processing of the following file types through its default pipelines:
 
 ### Audio Files
+
 - **WAV** - Waveform Audio File Format
 - **AIFF/AIF** - Audio Interchange File Format
 - **MP3** - MPEG Audio Layer III
@@ -425,6 +448,7 @@ Media lake supports processing of the following file types through its default p
 - **M4A** - MPEG-4 Audio
 
 ### Video Files
+
 - **FLV** - Flash Video
 - **MP4** - MPEG-4 Part 14
 - **MOV** - QuickTime Movie
@@ -434,6 +458,7 @@ Media lake supports processing of the following file types through its default p
 - **MXF** - Material Exchange Format
 
 ### Image Files
+
 - **PSD** - Adobe Photoshop Document
 - **TIF** - Tagged Image File Format
 - **JPG/JPEG** - Joint Photographic Experts Group
@@ -484,6 +509,9 @@ Customers are responsible for making their own independent assessment of the inf
 ---
 
 ## Authors
+
 - Joao Seike
 - Lior Berezinski
 - Robert Raver
+
+# test

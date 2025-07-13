@@ -1,11 +1,12 @@
+import json
+import os
+from typing import Any, Dict, Optional
+
+import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.logging import correlation_paths
-from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
-from typing import Dict, Any, Optional
-import os
-import boto3
-import json
+from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.config import Config
 from pydantic import BaseModel, Field
 
@@ -41,8 +42,10 @@ def _get_s3_client_for_bucket(bucket: str) -> boto3.client:
     )
 
     try:
-        region = (generic.get_bucket_location(Bucket=bucket)
-                        .get("LocationConstraint") or "us-east-1")
+        region = (
+            generic.get_bucket_location(Bucket=bucket).get("LocationConstraint")
+            or "us-east-1"
+        )
     except generic.exceptions.NoSuchBucket:
         raise ValueError(f"S3 bucket {bucket!r} does not exist")
 
@@ -61,7 +64,9 @@ class RequestBody(BaseModel):
     expiration_time: Optional[int] = Field(
         default=DEFAULT_EXPIRATION, ge=60, le=604800
     )  # Between 1 minute and 7 days
-    purpose: Optional[str] = None  # Optional purpose to specify which representation to use
+    purpose: Optional[str] = (
+        None  # Optional purpose to specify which representation to use
+    )
 
 
 class APIError(Exception):
@@ -90,7 +95,7 @@ def generate_presigned_url(bucket: str, key: str, expiration: int) -> str:
     try:
         # Get region-specific S3 client
         s3_client = _get_s3_client_for_bucket(bucket)
-        
+
         url = s3_client.generate_presigned_url(
             "get_object",
             Params={
@@ -100,11 +105,11 @@ def generate_presigned_url(bucket: str, key: str, expiration: int) -> str:
             },
             ExpiresIn=expiration,
         )
-        
+
         logger.info(
             f"Generated presigned URL for s3://{bucket}/{key} (region {s3_client.meta.region_name}) valid {expiration}s"
         )
-        
+
         return url
     except Exception as e:
         logger.error(f"Error generating presigned URL: {str(e)}")
@@ -128,22 +133,24 @@ def lambda_handler(
 
         # Determine which representation to use based on purpose
         purpose = request.purpose
-        
+
         if purpose and purpose.lower() != "original" and purpose.lower() != "master":
             # Look for a derived representation matching the purpose
             derived_representations = asset.get("DerivedRepresentations", [])
             matching_representation = None
-            
+
             for rep in derived_representations:
                 if rep.get("Purpose", "").lower() == purpose.lower():
                     matching_representation = rep
                     break
-            
+
             if matching_representation:
                 logger.info(f"Using derived representation with purpose: {purpose}")
                 storage_info = matching_representation.get("StorageInfo", {})
             else:
-                logger.info(f"No derived representation found for purpose: {purpose}, falling back to main representation")
+                logger.info(
+                    f"No derived representation found for purpose: {purpose}, falling back to main representation"
+                )
                 storage_info = (
                     asset.get("DigitalSourceAsset", {})
                     .get("MainRepresentation", {})
@@ -157,7 +164,7 @@ def lambda_handler(
                 .get("MainRepresentation", {})
                 .get("StorageInfo", {})
             )
-            
+
         location = storage_info.get("PrimaryLocation", {})
 
         bucket = location.get("Bucket")

@@ -57,24 +57,27 @@ const router = createBrowserRouter([
         path: 'dashboard',
         element: <Dashboard />,
         // You can also add an errorElement to individual routes
-        errorElement: <RouteErrorBoundary />
-      }
-    ]
-  }
+        errorElement: <RouteErrorBoundary />,
+      },
+    ],
+  },
 ]);
 ```
 
 ## Best Practices
 
 1. **Component-Level Errors**:
+
    - Wrap complex components with `<ErrorBoundary>` to prevent the entire app from crashing
    - For key UI sections, always use an ErrorBoundary
 
 2. **Route-Level Errors**:
+
    - Use `errorElement: <RouteErrorBoundary />` on your routes to handle navigation and data loading errors
    - Consider adding more specific errorElements for important routes
 
 3. **Async Error Handling**:
+
    - Use React Query's error handling for data fetching errors
    - Consider wrapping async components with ErrorBoundary
 
@@ -83,4 +86,4 @@ const router = createBrowserRouter([
 
 ## Example
 
-See `features/ui/ExampleWithErrorHandling.tsx` for a complete working example. 
+See `features/ui/ExampleWithErrorHandling.tsx` for a complete working example.

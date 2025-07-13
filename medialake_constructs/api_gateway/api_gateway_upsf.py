@@ -6,26 +6,21 @@ and associated Lambda functions for User Profile, Settings, and Favorites (UPSF)
 """
 
 from dataclasses import dataclass
-from constructs import Construct
-from aws_cdk import (
-    aws_apigateway as api_gateway,
-    aws_dynamodb as dynamodb,
-    aws_iam as iam,
-    aws_cognito as cognito,
-    aws_secretsmanager as secrets_manager,
-    Duration,
-)
-from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 
-from medialake_constructs.shared_constructs.lambda_base import (
-    Lambda,
-    LambdaConfig,
-)
+from aws_cdk import aws_apigateway as api_gateway
+from aws_cdk import aws_cognito as cognito
+from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_secretsmanager as secrets_manager
+from constructs import Construct
+
+from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
+from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 
 @dataclass
 class UPSFApiProps:
     """Properties for the UPSF API construct."""
+
     x_origin_verify_secret: secrets_manager.Secret
     api_resource: api_gateway.IResource
     cognito_authorizer: api_gateway.IAuthorizer
@@ -45,8 +40,6 @@ class UPSFApi(Construct):
         props: UPSFApiProps,
     ) -> None:
         super().__init__(scope, constructor_id)
-
-        from config import config
 
         # IMPORTANT: The UsersApi construct creates the /users resource
         # We should NOT create another /users resource as it will conflict
@@ -127,8 +120,9 @@ class UPSFApi(Construct):
 
         # PUT /users/settings/{namespace}/{key} - Update user setting
         settings_namespace_resource = settings_resource.add_resource("{namespace}")
-        settings_namespace_key_resource = settings_namespace_resource.add_resource("{key}")
-
+        settings_namespace_key_resource = settings_namespace_resource.add_resource(
+            "{key}"
+        )
 
         put_setting_lambda = Lambda(
             self,
@@ -155,7 +149,6 @@ class UPSFApi(Construct):
 
         # 3. User Favorites Endpoints
         favorites_resource = users_resource.add_resource("favorites")
-
 
         # POST /users/favorites - Add favorite
         post_favorite_lambda = Lambda(
@@ -197,8 +190,9 @@ class UPSFApi(Construct):
 
         # DELETE /users/favorites/{itemType}/{itemId} - Remove favorite
         favorites_item_type_resource = favorites_resource.add_resource("{itemType}")
-        favorites_item_type_item_id_resource = favorites_item_type_resource.add_resource("{itemId}")
-
+        favorites_item_type_item_id_resource = (
+            favorites_item_type_resource.add_resource("{itemId}")
+        )
 
         delete_favorite_lambda = Lambda(
             self,

@@ -1,20 +1,21 @@
-from typing import Dict, Any, Optional, List
-from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.utilities.parser import parse
-from aws_lambda_powertools.utilities.parser.models import APIGatewayProxyEventModel
-from aws_lambda_powertools.logging import correlation_paths
-from aws_lambda_powertools.metrics import MetricUnit
-from pydantic import BaseModel, Field, validator
-import boto3
-import os
-from botocore.exceptions import ClientError
 import json
+import os
 import uuid
 from datetime import datetime
+from typing import Any, Dict, Optional
+
+import boto3
+from aws_lambda_powertools import Logger, Metrics, Tracer
+from aws_lambda_powertools.logging import correlation_paths
+from aws_lambda_powertools.metrics import MetricUnit
+from aws_lambda_powertools.utilities.typing import LambdaContext
+from botocore.exceptions import ClientError
+from pydantic import BaseModel, Field, validator
 
 # Initialize AWS PowerTools
-logger = Logger(service="authorization-service", level=os.getenv("LOG_LEVEL", "WARNING"))
+logger = Logger(
+    service="authorization-service", level=os.getenv("LOG_LEVEL", "WARNING")
+)
 tracer = Tracer(service="authorization-service")
 metrics = Metrics(namespace="medialake", service="groups-create")
 
@@ -24,14 +25,17 @@ dynamodb = boto3.resource("dynamodb")
 
 class GroupRequest(BaseModel):
     """Model for group creation request from frontend"""
+
     name: str = Field(..., description="Name of the group")
     description: str = Field(..., description="Description of the group")
-    department: Optional[str] = Field(None, description="Department associated with the group")
-    
-    @validator('name')
+    department: Optional[str] = Field(
+        None, description="Department associated with the group"
+    )
+
+    @validator("name")
     def name_not_empty(cls, v, values, **kwargs):
         if not v.strip():
-            raise ValueError('name cannot be empty')
+            raise ValueError("name cannot be empty")
         return v
 
 
@@ -50,12 +54,10 @@ class GroupResponse(BaseModel):
 @tracer.capture_lambda_handler
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
 @metrics.log_metrics(capture_cold_start_metric=True)
-def lambda_handler(
-    event: Dict[str, Any], context: LambdaContext
-) -> Dict[str, Any]:
+def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
     """
     Lambda handler to create a new group in DynamoDB
-    
+
     This function handles requests from the frontend to create a new group
     following the single table design pattern with primary key structure:
     PK="GROUP#{groupId}", SK="METADATA"
@@ -64,30 +66,39 @@ def lambda_handler(
     try:
         # Extract user ID from Cognito authorizer context
         request_context = event.get("requestContext", {})
-        logger.info("Request context", extra={"request_context": json.dumps(request_context)})
-        
+        logger.info(
+            "Request context", extra={"request_context": json.dumps(request_context)}
+        )
+
         authorizer = request_context.get("authorizer", {})
         logger.info("Authorizer context", extra={"authorizer": json.dumps(authorizer)})
-        
+
         claims = authorizer.get("claims", {})
         logger.info("Claims", extra={"claims": json.dumps(claims)})
-        
+
         # Get the user ID from the Cognito claims or directly from the authorizer context
         user_id = claims.get("sub")
-        
+
         # If not found in claims, try to get it directly from the authorizer context
         if not user_id:
             user_id = authorizer.get("userId")
-            logger.info("Using userId from authorizer context", extra={"user_id": user_id})
+            logger.info(
+                "Using userId from authorizer context", extra={"user_id": user_id}
+            )
         else:
             logger.info("Using sub from claims", extra={"user_id": user_id})
-        
+
         if not user_id:
-            logger.error("Missing user_id in both Cognito claims and authorizer context")
+            logger.error(
+                "Missing user_id in both Cognito claims and authorizer context"
+            )
             metrics.add_metric(
                 name="MissingUserIdError", unit=MetricUnit.Count, value=1
             )
-            return _create_error_response(400, "Unable to identify user - missing from both claims and authorizer context")
+            return _create_error_response(
+                400,
+                "Unable to identify user - missing from both claims and authorizer context",
+            )
 
         # Check if user has admin permissions (this would be a more robust check in production)
         # In a real implementation, you would check if the user has the 'manageGroups' permission
@@ -115,11 +126,7 @@ def lambda_handler(
             return _create_error_response(400, f"Invalid request: {str(e)}")
 
         # Create the group in DynamoDB
-        group = _create_group(
-            auth_table_name, 
-            group_request, 
-            user_id
-        )
+        group = _create_group(auth_table_name, group_request, user_id)
 
         # Create success response
         try:
@@ -128,22 +135,23 @@ def lambda_handler(
                 message="Group created successfully",
                 data=group,
             )
-            
-            logger.info("Successfully created group",
-                       extra={"group_id": group["id"]})
-            metrics.add_metric(name="SuccessfulGroupCreation", unit=MetricUnit.Count, value=1)
-            
+
+            logger.info("Successfully created group", extra={"group_id": group["id"]})
+            metrics.add_metric(
+                name="SuccessfulGroupCreation", unit=MetricUnit.Count, value=1
+            )
+
             # Try to serialize the response
             response_json = response.model_dump_json()
             logger.info(f"Response JSON: {response_json}")
-            
+
             return {
                 "statusCode": 201,
                 "headers": {
                     "Content-Type": "application/json",
                     "Access-Control-Allow-Origin": "*",
                     "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-                    "Access-Control-Allow-Methods": "OPTIONS,GET,PUT,POST,DELETE,PATCH"
+                    "Access-Control-Allow-Methods": "OPTIONS,GET,PUT,POST,DELETE,PATCH",
                 },
                 "body": response_json,
             }
@@ -159,17 +167,15 @@ def lambda_handler(
 
 @tracer.capture_method
 def _create_group(
-    table_name: str, 
-    group_request: GroupRequest, 
-    created_by: str
+    table_name: str, group_request: GroupRequest, created_by: str
 ) -> Dict[str, Any]:
     """
     Create a new group in DynamoDB following the single table design pattern
-    
+
     Primary key structure:
     - PK: "GROUP#{groupId}"
     - SK: "METADATA"
-    
+
     This function also sets up GSI1 keys for backward compatibility, but
     the list_groups function has been modified to use a direct scan with
     a filter expression on the primary key instead of using the GSI.
@@ -177,10 +183,10 @@ def _create_group(
     try:
         # Generate a unique ID for the group
         group_id = str(uuid.uuid4())
-        
+
         # Get the current timestamp
         current_time = datetime.utcnow().isoformat()
-        
+
         # Create the DynamoDB item
         group_item = {
             "PK": f"GROUP#{group_id}",
@@ -192,23 +198,23 @@ def _create_group(
             "createdAt": current_time,
             "updatedAt": current_time,
             "entity": "group",
-            "type": "GROUP"
+            "type": "GROUP",
         }
-        
+
         # Add optional fields if provided
         if group_request.department:
             group_item["department"] = group_request.department
-        
+
         # Add GSI1 keys for backward compatibility
         # Note: The list_groups function has been modified to use a direct scan
         # with a filter expression on the primary key instead of using the GSI
         group_item["GSI1PK"] = "GROUPS"
         group_item["GSI1SK"] = f"GROUP#{group_id}"
-        
+
         # Write to DynamoDB
         table = dynamodb.Table(table_name)
         table.put_item(Item=group_item)
-        
+
         # Return the created group (without the DynamoDB-specific keys)
         result = {
             "id": group_id,
@@ -216,13 +222,13 @@ def _create_group(
             "description": group_request.description,
             "createdBy": created_by,
             "createdAt": current_time,
-            "updatedAt": current_time
+            "updatedAt": current_time,
         }
-        
+
         # Include optional fields in the response if they were provided
         if group_request.department:
             result["department"] = group_request.department
-        
+
         return result
 
     except ClientError as e:
@@ -243,7 +249,7 @@ def _create_error_response(status_code: int, message: str) -> Dict[str, Any]:
             "Content-Type": "application/json",
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-            "Access-Control-Allow-Methods": "OPTIONS,GET,PUT,POST,DELETE,PATCH"
+            "Access-Control-Allow-Methods": "OPTIONS,GET,PUT,POST,DELETE,PATCH",
         },
         "body": error_response.model_dump_json(),
     }

@@ -1,42 +1,30 @@
 # import json
-from constructs import Construct
-from aws_cdk import (
-    Stack,
-    Fn,
-    Environment,
-    aws_events as events,
-    aws_dynamodb as dynamodb,
-    aws_s3 as s3,
-    aws_ec2 as ec2,
-    aws_kms as kms,
-    Duration,
-    RemovalPolicy,
-    CfnOutput,
-    aws_lambda as lambda_,
-    aws_events_targets as targets,
-)
 import aws_cdk as cdk
+from aws_cdk import CfnOutput, Duration, RemovalPolicy, Stack
+from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_ec2 as ec2
+from aws_cdk import aws_events as events
+from aws_cdk import aws_events_targets as targets
+from aws_cdk import aws_s3 as s3
+from constructs import Construct
 
 from config import config
-from medialake_constructs.shared_constructs.s3_logging import (
-    add_s3_access_logging_policy,
-)
-
-from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
+from constants import Lambda as LambdaConstants
+from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.eventbridge import EventBus, EventBusConfig
-from medialake_constructs.vpc import CustomVpc, CustomVpcProps
-from medialake_constructs.shared_constructs.opensearch_managed_cluster import (
-    OpenSearchCluster,
-    OpenSearchClusterProps,
-)
 from medialake_constructs.shared_constructs.opensearch_ingestion_pipeline import (
     OpenSearchIngestionPipeline,
     OpenSearchIngestionPipelineProps,
 )
-from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
-
-from cdk_nag import AwsSolutionsChecks, NagSuppressions
-from constants import Lambda as LambdaConstants
+from medialake_constructs.shared_constructs.opensearch_managed_cluster import (
+    OpenSearchCluster,
+    OpenSearchClusterProps,
+)
+from medialake_constructs.shared_constructs.s3_logging import (
+    add_s3_access_logging_policy,
+)
+from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
+from medialake_constructs.vpc import CustomVpc, CustomVpcProps
 
 """
 Base infrastructure stack that sets up core AWS resources for the MediaLake application.
@@ -44,7 +32,7 @@ Base infrastructure stack that sets up core AWS resources for the MediaLake appl
 This stack creates and configures:
 - VPC and networking components
 - OpenSearch cluster
-- S3 buckets for media assets, IAC assets, and DynamoDB exports  
+- S3 buckets for media assets, IAC assets, and DynamoDB exports
 - EventBridge event bus
 - DynamoDB tables for asset management
 - Ingestion pipeline for syncing DynamoDB to OpenSearch
@@ -61,21 +49,31 @@ class BaseInfrastructureStack(Stack):
     Args:
         scope (Construct): CDK construct scope
         construct_id (str): Unique identifier for the stack
-        lambda_warmer (bool): If True, create a warming EventBridge rule (default: False)
+        lambda_warmer (
+                           bool): If True,
+                           create a warming EventBridge rule (default: False
+                       )
         lambda_functions_to_warm (Optional[List[aws_lambda.Function]]): List of Lambda functions to keep warm
         **kwargs: Additional arguments passed to Stack
     """
 
-    def __init__(self, scope: Construct, construct_id: str, lambda_warmer: bool = False, lambda_functions_to_warm=None, **kwargs):
+    def __init__(
+        self,
+        scope: Construct,
+        construct_id: str,
+        lambda_warmer: bool = False,
+        lambda_functions_to_warm=None,
+        **kwargs,
+    ):
         super().__init__(scope, construct_id, **kwargs)
 
         # env = kwargs.get("env")
-        account = Stack.of(self).account
+        Stack.of(self).account
         region = Stack.of(self).region
         opensearch_index_name = "media"
         parent_stack = cdk.Stack.of(self)
-        concrete_region = parent_stack.region
-        
+        parent_stack.region
+
         if config.s3.use_existing_buckets:
             # Import existing buckets
             self._access_logs_bucket = S3Bucket(
@@ -201,22 +199,19 @@ class BaseInfrastructureStack(Stack):
         opensearch_settings = config.resolved_opensearch_cluster_settings
         effective_az_count = min(
             opensearch_settings.availability_zone_count,
-            opensearch_settings.data_node_count
+            opensearch_settings.data_node_count,
         )
-        
+
         if config.vpc.use_existing_vpc:
             selected_subnet_ids = config.vpc.existing_vpc.subnet_ids["private"][
-                : effective_az_count
+                :effective_az_count
             ]
         else:
             private_subnets = self._vpc.get_subnet_ids(
                 ec2.SubnetType.PRIVATE_WITH_EGRESS
             )
             selected_subnet_ids = [
-                subnet["subnet_id"]
-                for subnet in private_subnets[
-                    : effective_az_count
-                ]
+                subnet["subnet_id"] for subnet in private_subnets[:effective_az_count]
             ]
 
         self._opensearch_cluster = OpenSearchCluster(
@@ -316,7 +311,6 @@ class BaseInfrastructureStack(Stack):
             ),
         )
 
-
         self._application_service_events_internal_event_bus = EventBus(
             self,
             "ApplicationServiceEventsInternalEventBus",
@@ -336,7 +330,7 @@ class BaseInfrastructureStack(Stack):
                 log_all=False,
             ),
         )
-        
+
         # Create a rule to forward all events from internal to external event bus
         # events.Rule(
         #     self,
@@ -350,7 +344,7 @@ class BaseInfrastructureStack(Stack):
         #         events.EventBus(self._application_service_events_external_event_bus.event_bus)
         #     ],
         # )
-           
+
         # Pipeline table
 
         pipeline_table = DynamoDB(
@@ -405,8 +399,6 @@ class BaseInfrastructureStack(Stack):
                 ),
                 projection_type=dynamodb.ProjectionType.ALL,
             )
-
-            
 
             self._asset_table.add_global_secondary_index(
                 index_name="FileHashIndex",
@@ -539,14 +531,18 @@ class BaseInfrastructureStack(Stack):
                     self,
                     f"{fn.node.id}WarmerRule",
                     event_bus=self._application_service_events_internal_event_bus.event_bus,
-                    schedule=events.Schedule.rate(Duration.minutes(LambdaConstants.WARMER_INTERVAL_MINUTES)),
+                    schedule=events.Schedule.rate(
+                        Duration.minutes(LambdaConstants.WARMER_INTERVAL_MINUTES)
+                    ),
                     targets=[
                         targets.LambdaFunction(
                             fn,
-                            event=events.RuleTargetInput.from_object({"lambda_warmer": True})
+                            event=events.RuleTargetInput.from_object(
+                                {"lambda_warmer": True}
+                            ),
                         )
                     ],
-                    description=f"Keeps {fn.function_name} warm via scheduled EventBridge rule."
+                    description=f"Keeps {fn.function_name} warm via scheduled EventBridge rule.",
                 )
 
         # Add outputs for retained resources in prod environment
@@ -766,7 +762,7 @@ class BaseInfrastructureStack(Stack):
         Returns the ARN of the S3Path GSI on the asset table.
         """
         return f"{self._asset_table.table_arn}/index/S3PathIndex"
-        
+
     @property
     def collection_dashboards_url(self) -> str:
         """

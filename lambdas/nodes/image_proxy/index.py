@@ -1,16 +1,16 @@
-import os
+import decimal
 import io
 import json
-import decimal
+import os
+import shutil
 import subprocess
 import tempfile
-import shutil
 
 import boto3
-from PIL import Image, ExifTags
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from lambda_middleware import lambda_middleware
+from PIL import ExifTags, Image
 
 logger = Logger()
 tracer = Tracer()
@@ -21,6 +21,7 @@ dynamo = boto3.resource("dynamodb").Table(os.environ["MEDIALAKE_ASSET_TABLE"])
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def convert_svg_to_png(svg_data: bytes) -> bytes:
     """Convert SVG → PNG using the resvg CLI shipped in a Lambda layer."""
@@ -79,7 +80,9 @@ def get_image_rotation(image: Image.Image) -> int:
         return 0
 
 
-def create_thumbnail(img: Image.Image, w: int, h: int, crop: bool = False) -> Image.Image:
+def create_thumbnail(
+    img: Image.Image, w: int, h: int, crop: bool = False
+) -> Image.Image:
     rot = get_image_rotation(img)
     if rot:
         img = img.rotate(rot, expand=True)
@@ -145,6 +148,7 @@ def _strip_decimals(obj):
         return int(obj) if obj % 1 == 0 else float(obj)
     return obj
 
+
 # ---------------------------------------------------------------------------
 # Lambda handler
 # ---------------------------------------------------------------------------
@@ -162,9 +166,8 @@ def lambda_handler(event, context: LambdaContext):
     dsa = asset["DigitalSourceAsset"]
     loc = dsa["MainRepresentation"]["StorageInfo"]["PrimaryLocation"]
     bucket = loc.get("Bucket") or _raise("PrimaryLocation.Bucket missing")
-    key = (
-        loc.get("ObjectKey", {}).get("FullPath")
-        or _raise("PrimaryLocation.ObjectKey.FullPath missing")
+    key = loc.get("ObjectKey", {}).get("FullPath") or _raise(
+        "PrimaryLocation.ObjectKey.FullPath missing"
     )
     inv_id = asset.get("InventoryID") or _raise("InventoryID missing")
 
@@ -264,11 +267,7 @@ def lambda_handler(event, context: LambdaContext):
             }
         },
         **(
-            {
-                "ImageSpec": {
-                    "Resolution": {"Width": width, "Height": height}
-                }
-            }
+            {"ImageSpec": {"Resolution": {"Width": width, "Height": height}}}
             if mode == "thumbnail"
             else {}
         ),
@@ -280,7 +279,9 @@ def lambda_handler(event, context: LambdaContext):
             UpdateExpression="SET DerivedRepresentations = :dr",
             ExpressionAttributeValues={":dr": cur_reps + [new_rep]},
         )
-        updated_item = dynamo.get_item(Key={"InventoryID": clean_asset_id(inv_id)})["Item"]
+        updated_item = dynamo.get_item(Key={"InventoryID": clean_asset_id(inv_id)})[
+            "Item"
+        ]
     except Exception:
         logger.exception("Error updating DynamoDB")
         raise

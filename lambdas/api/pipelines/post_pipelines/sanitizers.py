@@ -2,9 +2,8 @@
 Sanitization utilities for Step Functions state machine names and IAM roles.
 """
 
-import re
 import os
-from typing import Dict, Any
+import re
 
 # Get resource prefix from environment
 resource_prefix = os.environ.get("RESOURCE_PREFIX", "")
@@ -86,7 +85,7 @@ def sanitize_state_name(name: str, node_id: str) -> str:
     # Sanitize the state name to ensure it's valid for Step Functions
     # Remove special characters and spaces that might cause issues
     sanitized_state_name = "".join(c if c.isalnum() else "_" for c in unique_state_name)
-    
+
     # Ensure it starts with a letter or number
     if not sanitized_state_name[0].isalnum():
         sanitized_state_name = "state_" + sanitized_state_name

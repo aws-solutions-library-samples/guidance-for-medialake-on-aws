@@ -18,14 +18,16 @@ export const TokenRefreshManager: React.FC<{ children: React.ReactNode }> = ({ c
       if (!document.hidden) {
         console.log('Page became visible, refreshing auth status and checking token...');
         // When user returns to page, check auth status first, then token
-        checkAuthStatus().then(() => {
-          // Small delay to ensure auth status check completes
-          setTimeout(() => {
-            checkAndRefreshToken();
-          }, 500);
-        }).catch(error => {
-          console.error('Error checking auth status on visibility change:', error);
-        });
+        checkAuthStatus()
+          .then(() => {
+            // Small delay to ensure auth status check completes
+            setTimeout(() => {
+              checkAndRefreshToken();
+            }, 500);
+          })
+          .catch((error) => {
+            console.error('Error checking auth status on visibility change:', error);
+          });
       }
     };
 
@@ -37,4 +39,4 @@ export const TokenRefreshManager: React.FC<{ children: React.ReactNode }> = ({ c
   }, [isAuthenticated, checkAuthStatus, checkAndRefreshToken]);
 
   return <>{children}</>;
-}; 
+};

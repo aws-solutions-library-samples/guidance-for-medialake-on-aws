@@ -1,23 +1,15 @@
 import hashlib
 import time
-from pathlib import Path
 from dataclasses import dataclass, field
-from typing import Optional, List
+from pathlib import Path
+from typing import List, Optional
 
-from aws_cdk import (
-    Stack,
-    CustomResource,
-    CfnOutput,
-    Duration,
-    RemovalPolicy,
-    aws_iam as iam,
-    aws_lambda as lambda_,
-    aws_opensearchservice as opensearch,
-    aws_ec2 as ec2,
-    aws_logs as logs,
-    custom_resources as cr,
-)
-from aws_cdk.aws_lambda_python_alpha import PythonLayerVersion
+from aws_cdk import CfnOutput, CustomResource, RemovalPolicy, Stack
+from aws_cdk import aws_ec2 as ec2
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_logs as logs
+from aws_cdk import aws_opensearchservice as opensearch
+from aws_cdk import custom_resources as cr
 from constructs import Construct
 
 from config import config
@@ -33,11 +25,15 @@ class OpenSearchClusterProps:
     domain_name: str
 
     engine_version: str = "OpenSearch_2.15"
-    use_dedicated_master_nodes: bool = config.resolved_opensearch_cluster_settings.use_dedicated_master_nodes
+    use_dedicated_master_nodes: bool = (
+        config.resolved_opensearch_cluster_settings.use_dedicated_master_nodes
+    )
     master_node_instance_type: str = (
         config.resolved_opensearch_cluster_settings.master_node_instance_type
     )
-    master_node_count: int = config.resolved_opensearch_cluster_settings.master_node_count
+    master_node_count: int = (
+        config.resolved_opensearch_cluster_settings.master_node_count
+    )
     data_node_instance_type: str = (
         config.resolved_opensearch_cluster_settings.data_node_instance_type
     )
@@ -62,10 +58,14 @@ class OpenSearchClusterProps:
     off_peak_window_start: opensearch.WindowStartTime = field(
         default_factory=lambda: opensearch.WindowStartTime(
             hours=int(
-                config.resolved_opensearch_cluster_settings.off_peak_window_start.split(":")[0]
+                config.resolved_opensearch_cluster_settings.off_peak_window_start.split(
+                    ":"
+                )[0]
             ),
             minutes=int(
-                config.resolved_opensearch_cluster_settings.off_peak_window_start.split(":")[1]
+                config.resolved_opensearch_cluster_settings.off_peak_window_start.split(
+                    ":"
+                )[1]
             ),
         )
     )
@@ -207,11 +207,11 @@ class OpenSearchCluster(Construct):
                 "ImportedDomain",
                 config.resolved_opensearch_cluster_settings.domain_endpoint,
             )
-            collection_endpoint = config.resolved_opensearch_cluster_settings.domain_endpoint
+            collection_endpoint = (
+                config.resolved_opensearch_cluster_settings.domain_endpoint
+            )
         else:
-            ebs_options = opensearch.CfnDomain.EBSOptionsProperty(
-                    ebs_enabled=False
-                )
+            ebs_options = opensearch.CfnDomain.EBSOptionsProperty(ebs_enabled=False)
             if not props.data_node_instance_type.lower().startswith("r7gd"):
                 ebs_options = opensearch.CfnDomain.EBSOptionsProperty(
                     ebs_enabled=True,
@@ -219,7 +219,7 @@ class OpenSearchCluster(Construct):
                     volume_type=props.volume_type,
                     iops=props.volume_iops,
                 )
-            
+
             self.domain = opensearch.CfnDomain(
                 self,
                 "OpenSearchDomain",
@@ -229,12 +229,22 @@ class OpenSearchCluster(Construct):
                     instance_type=props.data_node_instance_type,
                     instance_count=props.data_node_count,
                     dedicated_master_enabled=props.use_dedicated_master_nodes,
-                    dedicated_master_type=props.master_node_instance_type if props.use_dedicated_master_nodes else None,
-                    dedicated_master_count=props.master_node_count if props.use_dedicated_master_nodes else None,
+                    dedicated_master_type=(
+                        props.master_node_instance_type
+                        if props.use_dedicated_master_nodes
+                        else None
+                    ),
+                    dedicated_master_count=(
+                        props.master_node_count
+                        if props.use_dedicated_master_nodes
+                        else None
+                    ),
                     zone_awareness_enabled=True,
                     zone_awareness_config=opensearch.CfnDomain.ZoneAwarenessConfigProperty(
                         # Ensure availability_zone_count doesn't exceed the number of data nodes
-                        availability_zone_count=min(props.availability_zone_count, props.data_node_count)
+                        availability_zone_count=min(
+                            props.availability_zone_count, props.data_node_count
+                        )
                     ),
                     multi_az_with_standby_enabled=props.multi_az_with_standby_enabled,
                 ),
@@ -299,7 +309,9 @@ class OpenSearchCluster(Construct):
             else self.domain.domain_arn
         )
 
-        should_create_index = not config.resolved_opensearch_cluster_settings.domain_endpoint
+        should_create_index = (
+            not config.resolved_opensearch_cluster_settings.domain_endpoint
+        )
 
         if should_create_index:
             # Create Lambda function for index creation

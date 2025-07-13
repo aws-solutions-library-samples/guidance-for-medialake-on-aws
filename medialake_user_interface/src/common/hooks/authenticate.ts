@@ -1,4 +1,8 @@
-import { CognitoRefreshToken, AuthenticationDetails, CognitoUser } from 'amazon-cognito-identity-js';
+import {
+  CognitoRefreshToken,
+  AuthenticationDetails,
+  CognitoUser,
+} from 'amazon-cognito-identity-js';
 import { signInWithRedirect } from 'aws-amplify/auth';
 import { useUserPool } from './userpool';
 import { StorageHelper } from '../helpers/storage-helper';
@@ -15,14 +19,14 @@ export const useAuthenticate = () => {
 
     // Find SAML provider if configured
     const samlProvider = awsConfig.Auth.identity_providers.find(
-      provider => provider.identity_provider_method === 'saml'
+      (provider) => provider.identity_provider_method === 'saml'
     );
 
     // If SAML is configured, redirect to SAML login
     if (samlProvider) {
       try {
         await signInWithRedirect({
-          provider: { custom: samlProvider.identity_provider_name || '' }
+          provider: { custom: samlProvider.identity_provider_name || '' },
         });
         return { type: 'SAML_REDIRECT' };
       } catch (error) {
@@ -45,17 +49,17 @@ export const useAuthenticate = () => {
     return new Promise((resolve, reject) => {
       const user = new CognitoUser({
         Username: Email,
-        Pool: userPool
+        Pool: userPool,
       });
 
       const authDetails = new AuthenticationDetails({
         Username: Email,
-        Password
+        Password,
       });
 
       user.authenticateUser(authDetails, {
         onSuccess: (result) => {
-          console.log(result)
+          console.log(result);
           StorageHelper.setToken(result.getIdToken().getJwtToken());
           StorageHelper.setUsername(result.getIdToken().payload.email);
           StorageHelper.setRefreshToken(result.getRefreshToken().getToken());
@@ -65,7 +69,7 @@ export const useAuthenticate = () => {
           resolve({ type: 'NEW_PASSWORD_REQUIRED', user, userAttributes });
         },
         onFailure: (err) => {
-          console.log("login failed", err);
+          console.log('login failed', err);
           StorageHelper.clearToken();
           StorageHelper.clearUsername();
           reject({ error: err, user }); // Include the user object in the rejection
@@ -74,7 +78,11 @@ export const useAuthenticate = () => {
     });
   };
 
-  const changePassword = async (user: CognitoUser, newPassword: string, userAttributes: any): Promise<any> => {
+  const changePassword = async (
+    user: CognitoUser,
+    newPassword: string,
+    userAttributes: any
+  ): Promise<any> => {
     return new Promise((resolve, reject) => {
       user.completeNewPasswordChallenge(newPassword, userAttributes, {
         onSuccess: (result) => {
@@ -85,7 +93,7 @@ export const useAuthenticate = () => {
           resolve(result);
         },
         onFailure: (err) => {
-          console.log("Change password failed", err);
+          console.log('Change password failed', err);
           reject(err);
         },
       });

@@ -1,22 +1,23 @@
 import os
+from typing import Any, Dict
+
 import boto3
-from typing import Dict, Any
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
-from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import MetricUnit
+from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
 
 from lambdas.api.environments.utils import (
-    logger,
-    metrics,
-    tracer,
-    setup_logging,
     create_error_response,
     create_success_response,
-    handle_dynamodb_error,
     get_environment_pk,
     get_environment_sk,
+    handle_dynamodb_error,
+    logger,
+    metrics,
+    setup_logging,
+    tracer,
 )
 
 app = APIGatewayRestResolver()
@@ -39,7 +40,7 @@ def delete_environment(environment_id: str):
             ReturnValues="ALL_OLD",
         )
 
-        deleted_item = response.get("Attributes", {})
+        response.get("Attributes", {})
 
         metrics.add_metric(name="DeleteEnvironment", unit=MetricUnit.Count, value=1)
         logger.info(f"Deleted environment {environment_id}")

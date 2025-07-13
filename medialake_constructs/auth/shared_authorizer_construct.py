@@ -4,17 +4,13 @@ Shared Custom Authorizer Construct for Media Lake.
 This construct creates a single custom authorizer that can be shared across multiple API Gateway stacks.
 """
 
-from aws_cdk import (
-    aws_lambda as lambda_,
-    aws_iam as iam,
-    aws_apigateway as apigateway,
-    Duration,
-    CfnOutput,
-)
-import aws_cdk as cdk
-
-from constructs import Construct
 from dataclasses import dataclass
+
+import aws_cdk as cdk
+from aws_cdk import CfnOutput
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_lambda as lambda_
+from constructs import Construct
 
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
@@ -22,6 +18,7 @@ from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaCon
 @dataclass
 class SharedAuthorizerConstructProps:
     """Configuration for Shared Authorizer Construct."""
+
     auth_table_name: str
     avp_policy_store_id: str
     avp_policy_store_arn: str
@@ -31,7 +28,7 @@ class SharedAuthorizerConstructProps:
 class SharedAuthorizerConstruct(Construct):
     """
     Construct for creating a shared custom authorizer.
-    
+
     This construct creates a single custom authorizer Lambda that can be used
     across multiple API Gateway stacks and resources.
     """
@@ -105,4 +102,4 @@ class SharedAuthorizerConstruct(Construct):
     @property
     def authorizer_lambda(self) -> lambda_.Function:
         """Return the shared authorizer Lambda function"""
-        return self._authorizer_lambda.function 
+        return self._authorizer_lambda.function

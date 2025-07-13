@@ -36,16 +36,16 @@ const JobStatusNode: React.FC<NodeProps<JobStatusNodeData>> = ({ id, data, isCon
         const handleRect = handleElement.getBoundingClientRect();
         const handleX = handleRect.left + handleRect.width / 2;
         const handleY = handleRect.top + handleRect.height / 2;
-        
-        const distance = Math.sqrt(
-          Math.pow(clickX - handleX, 2) + Math.pow(clickY - handleY, 2)
-        );
-        
+
+        const distance = Math.sqrt(Math.pow(clickX - handleX, 2) + Math.pow(clickY - handleY, 2));
+
         return distance <= HANDLE_CONNECT_RADIUS;
       };
 
       // Find the closest handle
-      const handles = Array.from(document.querySelectorAll(`[data-nodeid="${id}"] .react-flow__handle-source`));
+      const handles = Array.from(
+        document.querySelectorAll(`[data-nodeid="${id}"] .react-flow__handle-source`)
+      );
       for (const handle of handles) {
         if (isNearHandle(handle)) {
           const event = new MouseEvent('mousedown', {
@@ -93,7 +93,14 @@ const JobStatusNode: React.FC<NodeProps<JobStatusNodeData>> = ({ id, data, isCon
         }}
       />
 
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, position: 'relative' }}>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 1,
+          position: 'relative',
+        }}
+      >
         {data.icon}
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography
@@ -134,9 +141,27 @@ const JobStatusNode: React.FC<NodeProps<JobStatusNodeData>> = ({ id, data, isCon
       </Box>
 
       {/* Multiple outputs for the different job statuses */}
-      <Box sx={{ position: 'absolute', right: 0, top: '25%', height: '75%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+      <Box
+        sx={{
+          position: 'absolute',
+          right: 0,
+          top: '25%',
+          height: '75%',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+        }}
+      >
         {/* Completed output */}
-        <Box sx={{ position: 'relative', height: '24px', display: 'flex', alignItems: 'center', mr: '-6px' }}>
+        <Box
+          sx={{
+            position: 'relative',
+            height: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            mr: '-6px',
+          }}
+        >
           <Typography variant="caption" sx={{ mr: 1, fontSize: '0.7rem' }}>
             Completed
           </Typography>
@@ -156,7 +181,15 @@ const JobStatusNode: React.FC<NodeProps<JobStatusNodeData>> = ({ id, data, isCon
         </Box>
 
         {/* In Progress output */}
-        <Box sx={{ position: 'relative', height: '24px', display: 'flex', alignItems: 'center', mr: '-6px' }}>
+        <Box
+          sx={{
+            position: 'relative',
+            height: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            mr: '-6px',
+          }}
+        >
           <Typography variant="caption" sx={{ mr: 1, fontSize: '0.7rem' }}>
             In Progress
           </Typography>
@@ -176,7 +209,15 @@ const JobStatusNode: React.FC<NodeProps<JobStatusNodeData>> = ({ id, data, isCon
         </Box>
 
         {/* Fail output */}
-        <Box sx={{ position: 'relative', height: '24px', display: 'flex', alignItems: 'center', mr: '-6px' }}>
+        <Box
+          sx={{
+            position: 'relative',
+            height: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            mr: '-6px',
+          }}
+        >
           <Typography variant="caption" sx={{ mr: 1, fontSize: '0.7rem' }}>
             Fail
           </Typography>
@@ -199,4 +240,4 @@ const JobStatusNode: React.FC<NodeProps<JobStatusNodeData>> = ({ id, data, isCon
   );
 };
 
-export default JobStatusNode; 
+export default JobStatusNode;

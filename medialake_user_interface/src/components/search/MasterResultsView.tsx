@@ -23,7 +23,7 @@ interface MasterResultsViewProps {
   searchTerm: string;
   error?: { status: string; message: string } | null;
   isLoading?: boolean;
-  
+
   // Search fields
   selectedFields: string[];
   availableFields: Array<{
@@ -34,7 +34,7 @@ interface MasterResultsViewProps {
     isDefault: boolean;
   }>;
   onFieldsChange: (event: any) => void;
-  
+
   // View preferences
   viewMode: 'card' | 'table';
   cardSize: 'small' | 'medium' | 'large';
@@ -43,11 +43,14 @@ interface MasterResultsViewProps {
   showMetadata: boolean;
   groupByType: boolean;
   sorting: SortingState;
-  cardFields: { id: string; label: string; visible: boolean; }[];
+  cardFields: { id: string; label: string; visible: boolean }[];
   columns: AssetTableColumn<AssetItem>[];
-  
+
   // Event handlers for view preferences
-  onViewModeChange: (event: React.MouseEvent<HTMLElement>, newMode: 'card' | 'table' | null) => void;
+  onViewModeChange: (
+    event: React.MouseEvent<HTMLElement>,
+    newMode: 'card' | 'table' | null
+  ) => void;
   onCardSizeChange: (size: 'small' | 'medium' | 'large') => void;
   onAspectRatioChange: (ratio: 'vertical' | 'square' | 'horizontal') => void;
   onThumbnailScaleChange: (scale: 'fit' | 'fill') => void;
@@ -58,12 +61,12 @@ interface MasterResultsViewProps {
   onColumnToggle: (columnId: string) => void;
   onPageChange: (page: number) => void;
   onPageSizeChange: (newPageSize: number) => void;
-  
+
   // Asset state
   selectedAssets?: string[];
   editingAssetId?: string;
   editedName?: string;
-  
+
   // Asset action handlers
   onAssetClick: (asset: AssetItem) => void;
   onDeleteClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
@@ -73,15 +76,15 @@ interface MasterResultsViewProps {
   onEditNameComplete: (asset: AssetItem, save: boolean, value?: string) => void;
   onSelectToggle?: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onFavoriteToggle?: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
-  
+
   // Select all functionality
   hasSelectedAssets?: boolean;
   selectAllState?: 'none' | 'some' | 'all';
   onSelectAllToggle?: () => void;
-  
+
   // Asset state accessors
   isAssetFavorited?: (assetId: string) => boolean;
-  
+
   // Loading states
   isRenaming?: boolean;
   renamingAssetId?: string;
@@ -93,12 +96,12 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   searchTerm,
   error,
   isLoading,
-  
+
   // Search fields
   selectedFields,
   availableFields,
   onFieldsChange,
-  
+
   // View preferences
   viewMode,
   cardSize,
@@ -109,7 +112,7 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   sorting,
   cardFields,
   columns,
-  
+
   // Event handlers for view preferences
   onViewModeChange,
   onCardSizeChange,
@@ -122,12 +125,12 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   onColumnToggle,
   onPageChange,
   onPageSizeChange,
-  
+
   // Asset state
   selectedAssets,
   editingAssetId,
   editedName,
-  
+
   // Asset action handlers
   onAssetClick,
   onDeleteClick,
@@ -137,15 +140,15 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   onEditNameComplete,
   onSelectToggle,
   onFavoriteToggle,
-  
+
   // Select all functionality
   hasSelectedAssets,
   selectAllState,
   onSelectAllToggle,
-  
+
   // Asset state accessors
   isAssetFavorited,
-  
+
   // Loading states
   isRenaming = false,
   renamingAssetId,
@@ -153,23 +156,28 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   // Function to render card fields
   const renderCardField = (fieldId: string, asset: AssetItem): React.ReactNode => {
     // console.log('Rendering field:', fieldId, 'for asset:', asset.InventoryID);
-    
+
     switch (fieldId) {
       case 'name':
-        return asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name;
+        return asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey
+          .Name;
       case 'type':
         return asset.DigitalSourceAsset.Type;
       case 'format':
         return asset.DigitalSourceAsset.MainRepresentation.Format;
       case 'size':
-        const sizeInBytes = asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size;
+        const sizeInBytes =
+          asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size;
         return formatFileSize(sizeInBytes);
       case 'createdAt':
         return formatDate(asset.DigitalSourceAsset.CreateDate);
       case 'modifiedAt':
-        return formatDate(asset.DigitalSourceAsset.ModifiedDate || asset.DigitalSourceAsset.CreateDate);
+        return formatDate(
+          asset.DigitalSourceAsset.ModifiedDate || asset.DigitalSourceAsset.CreateDate
+        );
       case 'fullPath':
-        return asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath;
+        return asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey
+          .FullPath;
       default:
         console.log('Unknown field ID:', fieldId);
         return '';
@@ -177,9 +185,10 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   };
 
   // Function to check if an asset is selected
-  const isAssetSelected = selectedAssets && selectedAssets.length > 0
-    ? (assetId: string) => selectedAssets.includes(assetId)
-    : undefined;
+  const isAssetSelected =
+    selectedAssets && selectedAssets.length > 0
+      ? (assetId: string) => selectedAssets.includes(assetId)
+      : undefined;
 
   return (
     <AssetResultsView
@@ -230,7 +239,9 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       isRenaming={isRenaming}
       renamingAssetId={renamingAssetId}
       getAssetId={(asset) => asset.InventoryID}
-      getAssetName={(asset) => asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}
+      getAssetName={(asset) =>
+        asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name
+      }
       getAssetType={(asset) => asset.DigitalSourceAsset.Type}
       getAssetThumbnail={(asset) => asset.thumbnailUrl || ''}
       getAssetProxy={(asset) => asset.proxyUrl || ''}

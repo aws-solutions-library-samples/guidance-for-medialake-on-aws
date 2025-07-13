@@ -5,7 +5,15 @@ import '@uppy/core/dist/style.min.css';
 import '@uppy/dashboard/dist/style.min.css';
 import '@uppy/status-bar/dist/style.min.css';
 import '@uppy/progress-bar/dist/style.min.css';
-import { Box, FormControl, InputLabel, MenuItem, Select, SelectChangeEvent, Typography } from '@mui/material';
+import {
+  Box,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+  SelectChangeEvent,
+  Typography,
+} from '@mui/material';
 import { useGetConnectors } from '@/api/hooks/useConnectors';
 import useS3Upload from '../hooks/useS3Upload';
 
@@ -22,11 +30,11 @@ function getUppy() {
     restrictions: {
       maxFileSize: 10 * 1024 * 1024 * 1024, // 10GB max file size
       allowedFileTypes: [
-        'audio/*', 
+        'audio/*',
         'video/*',
         'image/*',
-        'application/x-mpegURL',  // HLS
-        'application/dash+xml',   // MPEG-DASH
+        'application/x-mpegURL', // HLS
+        'application/dash+xml', // MPEG-DASH
       ],
       maxNumberOfFiles: 10,
     },
@@ -58,8 +66,8 @@ interface FileUploaderProps {
   path?: string;
 }
 
-const FileUploader: React.FC<FileUploaderProps> = ({ 
-  onUploadComplete, 
+const FileUploader: React.FC<FileUploaderProps> = ({
+  onUploadComplete,
   onUploadError,
   path = '',
 }) => {
@@ -67,16 +75,17 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   const [selectedConnector, setSelectedConnector] = useState<string>('');
   const { data: connectorsResponse, isLoading: isLoadingConnectors } = useGetConnectors();
   const { getPresignedUrl } = useS3Upload();
-  
+
   // Filter only S3 connectors that are active
-  const connectors = connectorsResponse?.data?.connectors.filter(
-    connector => connector.type === 's3' && connector.status === 'active'
-  ) || [];
+  const connectors =
+    connectorsResponse?.data?.connectors.filter(
+      (connector) => connector.type === 's3' && connector.status === 'active'
+    ) || [];
 
   // Initialize Uppy when the component mounts
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    
+
     // Create Uppy instance
     const uppyInstance = getUppy();
 
@@ -100,19 +109,19 @@ const FileUploader: React.FC<FileUploaderProps> = ({
         uppyInstance.use(ProgressBar, {
           id: 'S3ProgressBar',
           fixed: false,
-          hideAfterFinish: false
+          hideAfterFinish: false,
         });
       }
-      
+
       const AwsS3 = getAwsS3Plugin();
       if (AwsS3) {
         // @ts-ignore - Intentionally ignoring type issues with plugins
         uppyInstance.use(AwsS3, {
           id: 'S3Uploader',
-          limit: 5 // concurrent uploads (as per requirements)
+          limit: 5, // concurrent uploads (as per requirements)
         });
       }
-      
+
       const AwsS3Multipart = getAwsS3MultipartPlugin();
       if (AwsS3Multipart) {
         // @ts-ignore - Intentionally ignoring type issues with plugins
@@ -124,26 +133,26 @@ const FileUploader: React.FC<FileUploaderProps> = ({
           listParts: async () => [],
           prepareUploadParts: async () => [],
           abortMultipartUpload: async () => {},
-          completeMultipartUpload: async () => ({ location: '' })
+          completeMultipartUpload: async () => ({ location: '' }),
         });
       }
     } catch (error) {
       console.error('Error initializing Uppy plugins:', error);
     }
-    
+
     setUppy(uppyInstance);
-    
+
     // Clean up function
     return () => {
       if (uppyInstance) {
         // Cancel any ongoing uploads
         uppyInstance.cancelAll();
-        
+
         // Remove all files from Uppy
         try {
           // This is the correct method to remove all files
           uppyInstance.cancelAll();
-          uppyInstance.getFiles().forEach(file => {
+          uppyInstance.getFiles().forEach((file) => {
             uppyInstance.removeFile(file.id);
           });
         } catch (e) {
@@ -152,11 +161,11 @@ const FileUploader: React.FC<FileUploaderProps> = ({
       }
     };
   }, []);
-  
+
   // Set up event handlers
   useEffect(() => {
     if (!uppy) return;
-    
+
     const handleUploadSuccess = (file: any, response: any) => {
       console.log('Upload complete:', file.name, response);
     };
@@ -199,7 +208,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     });
 
     // Find the selected connector
-    const connector = connectors.find(c => c.id === selectedConnector);
+    const connector = connectors.find((c) => c.id === selectedConnector);
     if (!connector) return;
 
     // Configure S3 upload parameters
@@ -235,7 +244,9 @@ const FileUploader: React.FC<FileUploaderProps> = ({
                     prepareUploadParts: async (partData: any) => {
                       const { partNumbers } = partData;
                       return partNumbers.map((partNumber: number) => {
-                        const partUrlData = result.part_urls?.find(p => p.part_number === partNumber);
+                        const partUrlData = result.part_urls?.find(
+                          (p) => p.part_number === partNumber
+                        );
                         return {
                           url: partUrlData?.presigned_url,
                           headers: {},
@@ -244,7 +255,9 @@ const FileUploader: React.FC<FileUploaderProps> = ({
                     },
                     abortMultipartUpload: async () => {},
                     completeMultipartUpload: async () => {
-                      return { location: `s3://${result.bucket}/${result.key}` };
+                      return {
+                        location: `s3://${result.bucket}/${result.key}`,
+                      };
                     },
                   });
                 }
@@ -284,7 +297,11 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   }
 
   if (connectors.length === 0) {
-    return <Typography color="error">No S3 connectors available. Please configure an S3 connector first.</Typography>;
+    return (
+      <Typography color="error">
+        No S3 connectors available. Please configure an S3 connector first.
+      </Typography>
+    );
   }
 
   return (
@@ -313,7 +330,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
       <Box sx={{ mt: 2 }}>
         {/* Progress bar container */}
         <Box sx={{ mb: 2 }} id="progress-bar-container"></Box>
-        
+
         {uppy && (
           <Dashboard
             uppy={uppy}
@@ -322,9 +339,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
             height={450}
             showProgressDetails
             note="Only audio, video, images, HLS (application/x-mpegURL), and MPEG-DASH (application/dash+xml) files are allowed"
-            metaFields={[
-              { id: 'name', name: 'Name', placeholder: 'File name' },
-            ]}
+            metaFields={[{ id: 'name', name: 'Name', placeholder: 'File name' }]}
             proudlyDisplayPoweredByUppy={false}
             disabled={!selectedConnector}
           />
@@ -334,4 +349,4 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   );
 };
 
-export default FileUploader; 
+export default FileUploader;

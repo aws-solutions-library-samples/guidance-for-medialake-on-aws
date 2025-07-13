@@ -29,7 +29,7 @@ required_env_vars = [
     NODE_TEMPLATES_BUCKET,
     OPENSEARCH_ENDPOINT,
     OPENSEARCH_VPC_SUBNET_IDS,
-    OPENSEARCH_SECURITY_GROUP_ID
+    OPENSEARCH_SECURITY_GROUP_ID,
 ]
 
 if not all(required_env_vars):

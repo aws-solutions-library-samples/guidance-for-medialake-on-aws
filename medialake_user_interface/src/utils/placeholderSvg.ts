@@ -19,7 +19,7 @@ export function createPlaceholderSvg(
   textColor: string = '#999999'
 ): string {
   const fontSize = Math.min(width, height) * 0.12; // Responsive font size
-  
+
   const svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
   <rect width="100%" height="100%" fill="${backgroundColor}"/>
   <text x="50%" y="50%" font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="bold" fill="${textColor}" text-anchor="middle" dominant-baseline="middle">${text}</text>

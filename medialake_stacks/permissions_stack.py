@@ -6,29 +6,29 @@ This stack defines the AWS resources for the permissions system, including:
 - Lambda functions for CRUD operations on permission sets
 - Integration with the authorization DynamoDB table
 """
-from aws_cdk import (
-    aws_dynamodb as dynamodb,
-    aws_cognito as cognito,
-    aws_apigateway as apigateway,
-    aws_secretsmanager as secrets_manager,
-    Duration,
-    Fn,
-)
-import aws_cdk as cdk
 
-from constructs import Construct
 from dataclasses import dataclass
 
-from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
-from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
-from medialake_constructs.auth.authorizer_utils import create_shared_custom_authorizer, ensure_shared_authorizer_permissions
+import aws_cdk as cdk
+from aws_cdk import Duration, Fn
+from aws_cdk import aws_apigateway as apigateway
+from aws_cdk import aws_cognito as cognito
+from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_secretsmanager as secrets_manager
+from constructs import Construct
 
-from config import config
+from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
+from medialake_constructs.auth.authorizer_utils import (
+    create_shared_custom_authorizer,
+    ensure_shared_authorizer_permissions,
+)
+from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 
 @dataclass
 class PermissionsStackProps:
     """Configuration for Permissions Stack."""
+
     api_resource: apigateway.IRestApi
     x_origin_verify_secret: secrets_manager.Secret
     cognito_user_pool: cognito.UserPool
@@ -38,7 +38,7 @@ class PermissionsStackProps:
 class PermissionsStack(cdk.NestedStack):
     """
     Stack for Permissions resources.
-    
+
     This stack creates API Gateway endpoints for managing permission sets under the /permissions path,
     along with the necessary Lambda functions for CRUD operations.
     """
@@ -50,27 +50,23 @@ class PermissionsStack(cdk.NestedStack):
 
         # Use the shared custom authorizer
         api_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
-        
+
         self._api_authorizer = create_shared_custom_authorizer(
-            self,
-            "PermissionsCustomApiAuthorizer",
-            api_gateway_id=api_id
+            self, "PermissionsCustomApiAuthorizer", api_gateway_id=api_id
         )
 
         root_resource_id = Fn.import_value("MediaLakeApiGatewayCore-RootResourceId")
-                
-        api = apigateway.RestApi.from_rest_api_attributes(self, "PermissionsImportedApi",
-            rest_api_id=api_id,
-            root_resource_id=root_resource_id
-        )
-        
-        # Ensure the shared authorizer has permissions for this API Gateway
-        ensure_shared_authorizer_permissions(
+
+        api = apigateway.RestApi.from_rest_api_attributes(
             self,
-            "Permissions",
-            api
+            "PermissionsImportedApi",
+            rest_api_id=api_id,
+            root_resource_id=root_resource_id,
         )
-        
+
+        # Ensure the shared authorizer has permissions for this API Gateway
+        ensure_shared_authorizer_permissions(self, "Permissions", api)
+
         # Create the base permissions resource
         permissions_resource = api.root.add_resource("permissions")
 
@@ -85,7 +81,13 @@ class PermissionsStack(cdk.NestedStack):
         cors_config = apigateway.CorsOptions(
             allow_origins=["http://localhost:5173"],
             allow_methods=["GET", "PUT", "OPTIONS", "DELETE", "POST"],
-            allow_headers=["Content-Type", "Authorization", "X-Amz-Date", "X-Api-Key", "X-Amz-Security-Token"],
+            allow_headers=[
+                "Content-Type",
+                "Authorization",
+                "X-Amz-Date",
+                "X-Api-Key",
+                "X-Amz-Security-Token",
+            ],
             allow_credentials=True,
             max_age=Duration.seconds(300),
         )
@@ -129,7 +131,9 @@ class PermissionsStack(cdk.NestedStack):
         )
 
         # Permission Set by ID resource
-        permission_set_id_resource = permissions_resource.add_resource("{permissionSetId}")
+        permission_set_id_resource = permissions_resource.add_resource(
+            "{permissionSetId}"
+        )
 
         # GET /permissions/{permissionSetId} - Get details of a specific Permission Set
         get_permission_set_lambda = Lambda(

@@ -1,19 +1,18 @@
+import datetime
 import os
-import json
+import traceback
+from decimal import Decimal
+from typing import Any, Dict
+
 import boto3
 import yaml
-import datetime
-from decimal import Decimal
-import traceback
-from typing import Dict, Any
-from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.utilities.data_classes import (
-    event_source,
     CloudFormationCustomResourceEvent,
 )
+from aws_lambda_powertools.utilities.typing import LambdaContext
 from crhelper import CfnResource
-from lambda_utils import lambda_handler_decorator, logger, metrics, tracer, handle_error
- 
+from lambda_utils import logger, metrics
+
 helper = CfnResource(json_logging=True, log_level="DEBUG", boto_level="CRITICAL")
 s3_client = boto3.client("s3")
 dynamodb = boto3.resource("dynamodb")
@@ -491,7 +490,10 @@ def process_standard_node(node_data: dict) -> Dict[str, list]:
                 items.append(outgoing_item)
 
         # Process Lambda layers if they exist in the node configuration
-        if "integration" in node_data.get("node", {}) and "config" in node_data["node"]["integration"]:
+        if (
+            "integration" in node_data.get("node", {})
+            and "config" in node_data["node"]["integration"]
+        ):
             lambda_config = node_data["node"]["integration"]["config"].get("lambda", {})
             if "layers" in lambda_config and isinstance(lambda_config["layers"], list):
                 # Create a layers item to store the layer ARNs
@@ -502,21 +504,27 @@ def process_standard_node(node_data: dict) -> Dict[str, list]:
                     "entityType": "NODE",
                     "nodeId": f"NODE#{node_id}",
                 }
-                
+
                 # For each layer in the YAML, get the ARN from environment variables
                 for layer_name in lambda_config["layers"]:
                     env_var_name = f"{layer_name.upper()}_LAYER_ARN"
                     layer_arn = os.environ.get(env_var_name)
                     if layer_arn:
                         layers_item["layers"][layer_name] = layer_arn
-                        logger.info(f"Adding layer {layer_name} with ARN {layer_arn} to node {node_id}")
+                        logger.info(
+                            f"Adding layer {layer_name} with ARN {layer_arn} to node {node_id}"
+                        )
                     else:
-                        logger.warning(f"Layer {layer_name} specified in YAML but environment variable {env_var_name} not found")
-                
+                        logger.warning(
+                            f"Layer {layer_name} specified in YAML but environment variable {env_var_name} not found"
+                        )
+
                 # Only add the layers item if we found at least one layer ARN
                 if layers_item["layers"]:
                     items.append(layers_item)
-                    logger.info(f"Added layers item for node {node_id} with {len(layers_item['layers'])} layers")
+                    logger.info(
+                        f"Added layers item for node {node_id} with {len(layers_item['layers'])} layers"
+                    )
 
         return {"items": items}
 
@@ -572,7 +580,6 @@ def handle_delete(
 ) -> None:
     """Handle Delete events from CloudFormation"""
     logger.info("Delete event received - no cleanup required")
-    pass
 
 
 @logger.inject_lambda_context

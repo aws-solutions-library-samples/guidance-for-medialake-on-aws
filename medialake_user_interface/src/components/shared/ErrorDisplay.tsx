@@ -17,7 +17,7 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({ title, message, detailedMes
           p: 4,
           borderRadius: 2,
           bgcolor: 'background.paper',
-          border: theme => `1px solid ${theme.palette.divider}`,
+          border: (theme) => `1px solid ${theme.palette.divider}`,
         }}
       >
         <Box
@@ -29,10 +29,7 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({ title, message, detailedMes
             mb: 3,
           }}
         >
-          <ErrorOutlineIcon
-            color="error"
-            sx={{ fontSize: 64, mb: 2 }}
-          />
+          <ErrorOutlineIcon color="error" sx={{ fontSize: 64, mb: 2 }} />
           <Typography variant="h5" gutterBottom>
             {title}
           </Typography>

@@ -44,17 +44,18 @@ const useS3Upload = (): UseS3UploadReturn => {
   const getPresignedUrl = useCallback(async (request: UploadRequest): Promise<S3UploadResponse> => {
     setIsLoading(true);
     setError(null);
-    
+
     try {
-      const response = await apiClient.post<{ status: string; message: string; data: S3UploadResponse }>(
-        API_ENDPOINTS.ASSETS.UPLOAD,
-        request
-      );
-      
+      const response = await apiClient.post<{
+        status: string;
+        message: string;
+        data: S3UploadResponse;
+      }>(API_ENDPOINTS.ASSETS.UPLOAD, request);
+
       if (response.data.status === 'success' && response.data.data) {
         return response.data.data;
       }
-      
+
       throw new Error(response.data.message || 'Failed to generate presigned URL');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
@@ -69,8 +70,8 @@ const useS3Upload = (): UseS3UploadReturn => {
   return {
     getPresignedUrl,
     isLoading,
-    error
+    error,
   };
 };
 
-export default useS3Upload; 
+export default useS3Upload;

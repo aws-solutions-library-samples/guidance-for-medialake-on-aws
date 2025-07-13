@@ -1,9 +1,10 @@
+from typing import Any, Dict
+
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
-from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import Metrics
-from typing import Dict, Any
+from aws_lambda_powertools.utilities.typing import LambdaContext
 
 # Initialize Powertools
 logger = Logger()

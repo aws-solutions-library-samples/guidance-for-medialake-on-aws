@@ -6,9 +6,8 @@ import queryClient from '@/api/queryClient';
 import App from './App';
 
 ReactDOM.render(
-
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>,
+  <QueryClientProvider client={queryClient}>
+    <App />
+  </QueryClientProvider>,
   document.getElementById('root') as HTMLElement
 );

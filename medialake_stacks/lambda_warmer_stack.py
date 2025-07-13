@@ -1,14 +1,8 @@
-from aws_cdk import (
-    Stack,
-    aws_dynamodb as dynamodb,
-    aws_lambda as lambda_,
-    aws_iam as iam,
-    RemovalPolicy,
-    Duration,
-    CfnOutput,
-)
+from aws_cdk import CfnOutput, RemovalPolicy, Stack
+from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_lambda as lambda_
 from constructs import Construct
-from typing import Optional
 
 
 class LambdaWarmerStack(Stack):

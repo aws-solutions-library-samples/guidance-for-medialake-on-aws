@@ -11,21 +11,21 @@ It implements AWS best practices including:
 - Performance optimization through batch operations
 """
 
-from typing import Dict, Any, List
-from aws_lambda_powertools import Logger, Tracer, Metrics
-from aws_lambda_powertools.logging import correlation_paths
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
-from aws_lambda_powertools.metrics import MetricUnit
-from aws_lambda_powertools.utilities.parser import event_parser
-from pydantic import BaseModel, Field
-from botocore.exceptions import ClientError
-import boto3
-import os
 import json
-from http import HTTPStatus
+import os
 import re
 from decimal import Decimal
+from http import HTTPStatus
+from typing import Any, Dict, List
+
+import boto3
+from aws_lambda_powertools import Logger, Metrics, Tracer
+from aws_lambda_powertools.logging import correlation_paths
+from aws_lambda_powertools.metrics import MetricUnit
+from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
+from aws_lambda_powertools.utilities.typing import LambdaContext
+from botocore.exceptions import ClientError
+from pydantic import BaseModel, Field
 
 # Initialize AWS Lambda Powertools
 logger = Logger(service="asset-rename-service")
@@ -517,7 +517,7 @@ def handler(event: APIGatewayProxyEvent, context: LambdaContext) -> Dict[str, An
         asset = get_asset(inventory_id)
 
         # Copy all objects with new names
-        successful_copies = copy_s3_objects(asset, rename_request.newName)
+        copy_s3_objects(asset, rename_request.newName)
 
         # Delete original objects
         delete_original_objects(asset)

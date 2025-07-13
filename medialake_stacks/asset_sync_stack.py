@@ -1,32 +1,25 @@
 from dataclasses import dataclass
-from typing import Optional, Dict, Any
-import aws_cdk as cdk
 
-from aws_cdk import (
-    Duration,
-    Stack,
-    CfnOutput,
-    aws_dynamodb as dynamodb,
-    aws_lambda as lambda_,
-    aws_lambda_event_sources as lambda_events,
-    aws_lambda_event_sources as lambda_event_sources,
-    aws_logs as logs,
-    aws_events as events,
-    aws_events_targets as events_targets,
-    aws_sqs as sqs,
-    aws_sns as sns,
-    aws_sns_subscriptions as sns_subs,
-    aws_s3 as s3,
-    aws_stepfunctions as sfn,
-    aws_iam as iam,
-    RemovalPolicy,
-)
+import aws_cdk as cdk
+from aws_cdk import CfnOutput, Duration, RemovalPolicy
+from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_events as events
+from aws_cdk import aws_events_targets as events_targets
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_lambda as lambda_
+from aws_cdk import aws_lambda_event_sources as lambda_event_sources
+from aws_cdk import aws_s3 as s3
+from aws_cdk import aws_sqs as sqs
 from constructs import Construct
-from medialake_constructs.shared_constructs.dynamodb import DynamoDB as DynamoDBConstruct, DynamoDBProps
-from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
-from constants import DynamoDB as DynamoDBConstants, EnvVars, SNS, DynamoDBPermissions
-from dataclasses import dataclass
+
 from config import config
+from constants import DynamoDB as DynamoDBConstants
+from constants import DynamoDBPermissions, EnvVars
+from medialake_constructs.shared_constructs.dynamodb import (
+    DynamoDB as DynamoDBConstruct,
+)
+from medialake_constructs.shared_constructs.dynamodb import DynamoDBProps
+from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 
 @dataclass
@@ -81,7 +74,7 @@ class AssetSyncStack(cdk.NestedStack):
         # queues = self._create_queues()
         # self.processor_queue = queues["processor_queue"]
         # self.dlq = queues["dlq"]
-        
+
         # SNS topic for status notifications
         # self.status_topic = self._create_status_topic()
 
@@ -91,12 +84,12 @@ class AssetSyncStack(cdk.NestedStack):
             "AssetSyncBatchOperationsRole",
             assumed_by=iam.ServicePrincipal("batchoperations.s3.amazonaws.com"),
         )
-        
+
         # Add S3 Full Access managed policy
         self.batch_operations_role.add_managed_policy(
             iam.ManagedPolicy.from_aws_managed_policy_name("AmazonS3FullAccess")
         )
-        
+
         # Grant necessary permissions to the batch operations role
         self.batch_operations_role.add_to_policy(
             iam.PolicyStatement(
@@ -116,12 +109,12 @@ class AssetSyncStack(cdk.NestedStack):
                     "s3:GetJob",
                     "s3:GetJobStatus",
                     "s3:GetJobOutput",
-                    "s3:GetJobOutputLocation",                    
+                    "s3:GetJobOutputLocation",
                 ],
                 resources=["*"],
             )
         )
-        
+
         # Lambda invocation permissions for batch operations
         self.batch_operations_role.add_to_policy(
             iam.PolicyStatement(
@@ -203,8 +196,8 @@ class AssetSyncStack(cdk.NestedStack):
 
         # Update the engine with the processor ARN
         self._asset_sync_engine_lambda.function.add_environment(
-            EnvVars.PROCESSOR_FUNCTION_ARN, 
-            self._asset_sync_processor_lambda.function.function_arn
+            EnvVars.PROCESSOR_FUNCTION_ARN,
+            self._asset_sync_processor_lambda.function.function_arn,
         )
 
         # Add SQS event source to processor lambda
@@ -216,7 +209,7 @@ class AssetSyncStack(cdk.NestedStack):
         #         report_batch_item_failures=True,
         #     )
         # )
-        
+
         # Add permission for S3 batch operations to invoke processor
         self._asset_sync_processor_lambda.function.add_permission(
             "AllowS3BatchOperations",
@@ -231,7 +224,7 @@ class AssetSyncStack(cdk.NestedStack):
                 resources=[self._asset_sync_processor_lambda.function.function_arn],
             )
         )
-        
+
         # Add S3 inventory configuration permission to batch operations role
         # Using "*" for resources because asset sync needs permission to set inventory configuration
         # on the source bucket, which can be any S3 bucket that users want to sync from
@@ -256,28 +249,28 @@ class AssetSyncStack(cdk.NestedStack):
             value=self._asset_sync_job_table.table.table_name,
             description="Asset Sync Job Table",
         )
-        
+
         CfnOutput(
             self,
             "AssetSyncResultsBucketName",
             value=self.results_bucket.bucket_name,
             description="Asset Sync Results Bucket",
         )
-        
+
         # CfnOutput(
         #     self,
         #     "AssetSyncProcessorQueueUrl",
         #     value=self.processor_queue.queue_url,
         #     description="Asset Sync Processor Queue URL",
         # )
-        
+
         CfnOutput(
             self,
             "AssetSyncEngineLambdaArn",
             value=self._asset_sync_engine_lambda.function.function_arn,
             description="Asset Sync Engine Lambda ARN",
         )
-        
+
         CfnOutput(
             self,
             "AssetSyncProcessorLambdaArn",
@@ -301,40 +294,46 @@ class AssetSyncStack(cdk.NestedStack):
                     "AssetSyncEventsDLQ",
                     retention_period=Duration.days(14),
                     encryption=sqs.QueueEncryption.SQS_MANAGED,
-                )
+                ),
             ),
         )
-        
+
         # Create EventBridge rule on default event bus for S3 CloudTrail events
         s3_job_events_rule = events.Rule(
             self,
             "S3JobEventsRule",
-            event_bus=events.EventBus.from_event_bus_name(self, "DefaultEventBus", "default"),
+            event_bus=events.EventBus.from_event_bus_name(
+                self, "DefaultEventBus", "default"
+            ),
             event_pattern=events.EventPattern(
                 source=["aws.s3"],
                 detail_type=["AWS Service Event via CloudTrail"],
                 detail={
                     "eventSource": ["s3.amazonaws.com"],
-                    "eventName": ["JobCreated", "JobStatusChanged"]
-                }
+                    "eventName": ["JobCreated", "JobStatusChanged"],
+                },
             ),
         )
-        
+
         # Send S3 job events to SQS queue
         s3_job_events_rule.add_target(
             events_targets.SqsQueue(
                 self.asset_sync_events_queue,
-                message=events.RuleTargetInput.from_object({
-                    "source": events.RuleTargetInput.from_event_path("$.source"),
-                    "detail-type": events.RuleTargetInput.from_event_path("$.detail-type"),
-                    "detail": events.RuleTargetInput.from_event_path("$.detail"),
-                    "time": events.RuleTargetInput.from_event_path("$.time"),
-                    "region": events.RuleTargetInput.from_event_path("$.region"),
-                    "account": events.RuleTargetInput.from_event_path("$.account")
-                })
+                message=events.RuleTargetInput.from_object(
+                    {
+                        "source": events.RuleTargetInput.from_event_path("$.source"),
+                        "detail-type": events.RuleTargetInput.from_event_path(
+                            "$.detail-type"
+                        ),
+                        "detail": events.RuleTargetInput.from_event_path("$.detail"),
+                        "time": events.RuleTargetInput.from_event_path("$.time"),
+                        "region": events.RuleTargetInput.from_event_path("$.region"),
+                        "account": events.RuleTargetInput.from_event_path("$.account"),
+                    }
+                ),
             )
         )
-        
+
         # Add SQS event source to job event processor lambda
         self._asset_sync_job_event_processor_lambda.function.add_event_source(
             lambda_event_sources.SqsEventSource(
@@ -348,7 +347,7 @@ class AssetSyncStack(cdk.NestedStack):
     def _grant_permissions(self, props: AssetSyncStackProps) -> None:
         """Grant necessary permissions to Lambda functions"""
         # Job table permissions
-        
+
         self._asset_sync_job_table.table.grant_read_write_data(
             self._asset_sync_engine_lambda.function
         )
@@ -368,10 +367,11 @@ class AssetSyncStack(cdk.NestedStack):
         self.results_bucket.grant_read_write(self._asset_sync_engine_lambda.function)
         self.results_bucket.grant_read_write(self._asset_sync_processor_lambda.function)
 
-
         # Asset table permissions
         props.asset_table.grant_read_data(self._asset_sync_engine_lambda.function)
-        props.asset_table.grant_read_write_data(self._asset_sync_processor_lambda.function)
+        props.asset_table.grant_read_write_data(
+            self._asset_sync_processor_lambda.function
+        )
 
         # Connector table permissions - using table ARN from constants
         # This grants the Asset Sync Engine Lambda read-only access to the Connector table
@@ -380,12 +380,16 @@ class AssetSyncStack(cdk.NestedStack):
         self._asset_sync_engine_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=DynamoDBPermissions.READ_ONLY,
-                resources=[DynamoDBConstants.connector_table_arn(self.region, self.account)],
+                resources=[
+                    DynamoDBConstants.connector_table_arn(self.region, self.account)
+                ],
             )
         )
 
         # Pipelines event bus permissions
-        props.pipelines_event_bus.grant_put_events_to(self._asset_sync_processor_lambda.function)
+        props.pipelines_event_bus.grant_put_events_to(
+            self._asset_sync_processor_lambda.function
+        )
 
         # S3 cross-region permissions for engine
         self._asset_sync_engine_lambda.function.add_to_role_policy(
@@ -411,11 +415,11 @@ class AssetSyncStack(cdk.NestedStack):
                     "s3:GetJobReportOutput",
                     "s3:GetJobReportOutputLocation",
                 ],
-                    resources=["*"],
-                )
+                resources=["*"],
             )
+        )
 
-            # Add S3 control permissions for batch operations
+        # Add S3 control permissions for batch operations
         self._asset_sync_engine_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
@@ -439,7 +443,6 @@ class AssetSyncStack(cdk.NestedStack):
                     "s3control:GetJobReportStatus",
                     "s3control:GetJobReportOutput",
                     "s3control:GetJobReportOutputLocation",
-                    
                 ],
                 resources=["*"],
             )
@@ -489,7 +492,7 @@ class AssetSyncStack(cdk.NestedStack):
                 resources=["*"],
             )
         )
-        
+
         # Add KMS permissions for processor to access SSE-KMS encrypted S3 buckets
         self._asset_sync_processor_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -498,7 +501,7 @@ class AssetSyncStack(cdk.NestedStack):
                     "kms:DescribeKey",
                     "kms:GenerateDataKey",
                 ],
-                resources=["*"], 
+                resources=["*"],
             )
         )
 
@@ -518,7 +521,7 @@ class AssetSyncStack(cdk.NestedStack):
         self._asset_sync_job_table.table.grant_read_write_data(
             self._asset_sync_job_event_processor_lambda.function
         )
-        
+
         # SQS queue permissions for job event processor
         self.asset_sync_events_queue.grant_consume_messages(
             self._asset_sync_job_event_processor_lambda.function
@@ -532,22 +535,10 @@ class AssetSyncStack(cdk.NestedStack):
             removal_policy=RemovalPolicy.DESTROY,
             auto_delete_objects=True,
             lifecycle_rules=[
-                s3.LifecycleRule(
-                    expiration=Duration.days(7),
-                    prefix="job-results/"
-                ),
-                s3.LifecycleRule(
-                    expiration=Duration.days(7),
-                    prefix="job-manifests/"
-                ),
-                s3.LifecycleRule(
-                    expiration=Duration.days(7),
-                    prefix="job-chunks/"
-                ),
-                s3.LifecycleRule(
-                    expiration=Duration.days(30),
-                    prefix="job-reports/"
-                ),
+                s3.LifecycleRule(expiration=Duration.days(7), prefix="job-results/"),
+                s3.LifecycleRule(expiration=Duration.days(7), prefix="job-manifests/"),
+                s3.LifecycleRule(expiration=Duration.days(7), prefix="job-chunks/"),
+                s3.LifecycleRule(expiration=Duration.days(30), prefix="job-reports/"),
             ],
             encryption=s3.BucketEncryption.S3_MANAGED,
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
@@ -558,18 +549,22 @@ class AssetSyncStack(cdk.NestedStack):
     @property
     def asset_sync_job_table(self) -> dynamodb.TableV2:
         return self._asset_sync_job_table.table
+
     # @property
     # def asset_sync_chunk_table(self) -> dynamodb.TableV2:
     #     return self._asset_sync_chunk_table.table
     @property
     def asset_sync_error_table(self) -> dynamodb.TableV2:
         return self._asset_sync_error_table.table
+
     @property
     def asset_sync_engine_lambda(self) -> lambda_.Function:
         return self._asset_sync_engine_lambda.function
+
     @property
     def asset_sync_processor_lambda(self) -> lambda_.Function:
         return self._asset_sync_processor_lambda.function
+
     @property
     def asset_sync_job_event_processor_lambda(self) -> lambda_.Function:
         return self._asset_sync_job_event_processor_lambda.function

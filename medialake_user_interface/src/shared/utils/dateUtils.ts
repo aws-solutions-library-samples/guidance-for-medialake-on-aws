@@ -21,7 +21,12 @@ const parseDate = (input: string | number): Date => {
   const inputStr = String(input);
 
   //  If the string doesn't have timezone info, force it to be UTC
-  if (inputStr.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$/) && !inputStr.includes('Z') && !inputStr.includes('+') && !inputStr.includes('-', 10)) {
+  if (
+    inputStr.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$/) &&
+    !inputStr.includes('Z') &&
+    !inputStr.includes('+') &&
+    !inputStr.includes('-', 10)
+  ) {
     // This is a datetime string without timezone info - treat as local time
     return new Date(inputStr + 'Z');
   }
@@ -71,7 +76,7 @@ export const formatLocalDateTime = (
     minute: '2-digit',
     ...(showSeconds && { second: '2-digit' }),
     hour12: true,
-    timeZoneName: 'short'
+    timeZoneName: 'short',
   });
 
   return formatter.format(date);
@@ -81,9 +86,7 @@ export const formatLocalDateTime = (
  * "x minutes ago" style. Same passthrough for no-digits labels.
  * Nullish input → empty string.
  */
-export const formatRelativeTime = (
-  input?: string | number | null
-): string => {
+export const formatRelativeTime = (input?: string | number | null): string => {
   if (input == null) {
     return '';
   }
@@ -101,9 +104,7 @@ export const formatRelativeTime = (
 };
 
 /** Quick ISO-validity check */
-export const isValidISOString = (
-  input?: string | number | null
-): boolean => {
+export const isValidISOString = (input?: string | number | null): boolean => {
   if (input == null || isStatusLabel(input)) {
     return false;
   }
@@ -118,7 +119,7 @@ export const getTimezoneAbbreviation = (timezone?: string): string => {
     const parts = new Date()
       .toLocaleTimeString('en-US', {
         timeZone: targetTimezone,
-        timeZoneName: 'short'
+        timeZoneName: 'short',
       })
       .split(' ');
     return parts[2] || targetTimezone;

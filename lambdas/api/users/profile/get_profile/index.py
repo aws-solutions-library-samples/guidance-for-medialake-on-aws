@@ -1,15 +1,14 @@
-from typing import Dict, Any, Optional
+import os
+from typing import Any, Dict
+
+import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.utilities.parser import parse
-from aws_lambda_powertools.utilities.parser.models import APIGatewayProxyEventModel
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import MetricUnit
-from pydantic import BaseModel, Field
-import boto3
-import os
+from aws_lambda_powertools.utilities.parser.models import APIGatewayProxyEventModel
+from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
-import json
+from pydantic import BaseModel, Field
 
 # Initialize AWS PowerTools
 logger = Logger(service="user-profile-service", level=os.getenv("LOG_LEVEL", "WARNING"))
@@ -47,10 +46,10 @@ def lambda_handler(
         request_context = event.get("requestContext", {})
         authorizer = request_context.get("authorizer", {})
         claims = authorizer.get("claims", {})
-        
+
         # Get the user ID from the Cognito claims
         user_id = claims.get("sub")
-        
+
         if not user_id:
             logger.error("Missing user_id in Cognito claims")
             metrics.add_metric(
@@ -78,7 +77,9 @@ def lambda_handler(
         )
 
         logger.info("Successfully retrieved user profile", extra={"user_id": user_id})
-        metrics.add_metric(name="SuccessfulProfileLookup", unit=MetricUnit.Count, value=1)
+        metrics.add_metric(
+            name="SuccessfulProfileLookup", unit=MetricUnit.Count, value=1
+        )
 
         return {
             "statusCode": 200,
@@ -101,20 +102,17 @@ def _get_user_profile(table_name: str, user_id: str) -> Dict[str, Any]:
         # Format the userId and itemKey according to the schema
         formatted_user_id = f"USER#{user_id}"
         item_key = "PROFILE"
-        
+
         table = dynamodb.Table(table_name)
         response = table.get_item(
-            Key={
-                "userId": formatted_user_id,
-                "itemKey": item_key
-            }
+            Key={"userId": formatted_user_id, "itemKey": item_key}
         )
-        
+
         # Check if the item exists
         if "Item" not in response:
             logger.warning(f"User profile not found", extra={"user_id": user_id})
             metrics.add_metric(name="ProfileNotFound", unit=MetricUnit.Count, value=1)
-            
+
             # Return an empty profile if not found
             return {
                 "userId": user_id,
@@ -122,21 +120,21 @@ def _get_user_profile(table_name: str, user_id: str) -> Dict[str, Any]:
                 "email": "",
                 "createdAt": "",
                 "updatedAt": "",
-                "preferences": {}
+                "preferences": {},
             }
-        
+
         # Return the profile data
         item = response["Item"]
-        
+
         # Remove the PK and SK from the returned data
         if "userId" in item:
             del item["userId"]
         if "itemKey" in item:
             del item["itemKey"]
-            
+
         # Add the user ID without the prefix
         item["userId"] = user_id
-        
+
         return item
 
     except ClientError as e:

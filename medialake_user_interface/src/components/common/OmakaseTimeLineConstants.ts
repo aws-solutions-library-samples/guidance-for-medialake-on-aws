@@ -1,9 +1,14 @@
 import { Triangle } from 'lucide-react';
-import {ScrubberLaneStyle, TimelineLaneStyle, TimelineStyle, PeriodMarkerStyle} from '@byomakase/omakase-player';
-import {randomHexColor} from './utils'
+import {
+  ScrubberLaneStyle,
+  TimelineLaneStyle,
+  TimelineStyle,
+  PeriodMarkerStyle,
+} from '@byomakase/omakase-player';
+import { randomHexColor } from './utils';
 
 export const TIMELINE_STYLE: Partial<TimelineStyle> = {
-  stageMinHeight:100,
+  stageMinHeight: 100,
   rightPaneMarginLeft: 10,
   rightPaneMarginRight: 10,
   rightPaneClipPadding: 10,
@@ -29,7 +34,7 @@ export const TIMELINE_STYLE: Partial<TimelineStyle> = {
   playheadVisible: true,
   playheadFill: '#000',
   playheadLineWidth: 2,
-  playheadSymbolHeight:10,
+  playheadSymbolHeight: 10,
   playheadScrubberHeight: 10,
   playheadTextFill: 'rgb(0,0,0, 0)', // opacity 0
   playheadTextYOffset: -15,
@@ -50,18 +55,18 @@ export const TIMELINE_STYLE: Partial<TimelineStyle> = {
   scrubberSouthLineOpacity: 0.2,
   scrubberTextFill: 'rgb(0,0,0,0)',
   scrubberTextYOffset: -15,
-}
+};
 
 export const TIMELINE_LANE_STYLE: Partial<TimelineLaneStyle> = {
   marginBottom: 0,
   backgroundFill: '#edefee',
-}
+};
 
 export const SCRUBBER_LANE_STYLE: Partial<ScrubberLaneStyle> = {
   ...TIMELINE_LANE_STYLE,
   tickFill: '#5f6070',
-  timecodeFill: '#5f6070'
-}
+  timecodeFill: '#5f6070',
+};
 
 export const TIMELINE_STYLE_DARK: Partial<TimelineStyle> = {
   ...TIMELINE_STYLE,
@@ -75,21 +80,21 @@ export const TIMELINE_STYLE_DARK: Partial<TimelineStyle> = {
 
   scrubberFill: '#B2BAD6',
   scrubberSnappedFill: '#9ED78D',
-}
+};
 
 export const TIMELINE_LANE_STYLE_DARK: Partial<TimelineLaneStyle> = {
   ...TIMELINE_LANE_STYLE,
   backgroundFill: '#292D43',
-}
+};
 
 export const SCRUBBER_LANE_STYLE_DARK: Partial<ScrubberLaneStyle> = {
   ...TIMELINE_LANE_STYLE_DARK,
   tickFill: '#FFFFFF',
-  timecodeFill: '#FFFFFF'
-}
+  timecodeFill: '#FFFFFF',
+};
 
 export const PERIOD_MARKER_STYLE: Partial<PeriodMarkerStyle> = {
   color: randomHexColor(),
   symbolSize: 10,
-  symbolType: 'circle'
+  symbolType: 'circle',
 };

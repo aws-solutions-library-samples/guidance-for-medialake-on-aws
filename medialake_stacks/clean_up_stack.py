@@ -1,16 +1,12 @@
 from dataclasses import dataclass
-from constructs import Construct
-import aws_cdk as cdk
 
-from aws_cdk import (
-    Stack,
-    CustomResource,
-    RemovalPolicy,
-    aws_iam as iam,
-    aws_events as events,
-    aws_dynamodb as dynamodb,
-    custom_resources as cr,
-)
+from aws_cdk import CustomResource, RemovalPolicy, Stack
+from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_events as events
+from aws_cdk import aws_iam as iam
+from aws_cdk import custom_resources as cr
+from constructs import Construct
+
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 
@@ -45,7 +41,6 @@ class CleanupStack(Stack):
         props.connector_table.grant_read_write_data(self._clean_up_lambda.function)
         props.pipeline_table.grant_read_write_data(self._clean_up_lambda.function)
 
-
         # Add EventBridge Pipes permissions
         # ListPipes requires * resource - AWS API limitation for list operations
         self._clean_up_lambda.lambda_role.add_to_policy(
@@ -53,10 +48,12 @@ class CleanupStack(Stack):
                 actions=[
                     "pipes:ListPipes",
                 ],
-                resources=["*"],  # Required by AWS API - cannot be scoped to specific pipes
+                resources=[
+                    "*"
+                ],  # Required by AWS API - cannot be scoped to specific pipes
             )
         )
-        
+
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 actions=[
@@ -64,9 +61,11 @@ class CleanupStack(Stack):
                     "pipes:DescribePipe",
                     "pipes:StopPipe",
                     "pipes:UntagResource",
-                    "pipes:ListTagsForResource"
+                    "pipes:ListTagsForResource",
                 ],
-                resources=[f"arn:aws:pipes:{Stack.of(self).region}:{Stack.of(self).account}:pipe/*"],
+                resources=[
+                    f"arn:aws:pipes:{Stack.of(self).region}:{Stack.of(self).account}:pipe/*"
+                ],
             )
         )
 
@@ -94,7 +93,9 @@ class CleanupStack(Stack):
                 actions=[
                     "lambda:ListEventSourceMappings",
                 ],
-                resources=["*"],  # Required by AWS API - cannot be scoped to specific resources
+                resources=[
+                    "*"
+                ],  # Required by AWS API - cannot be scoped to specific resources
             )
         )
 
@@ -182,10 +183,12 @@ class CleanupStack(Stack):
                 actions=[
                     "secretsmanager:ListSecrets",
                 ],
-                resources=["*"],  # Required by AWS API - cannot be scoped to specific secrets
+                resources=[
+                    "*"
+                ],  # Required by AWS API - cannot be scoped to specific secrets
             )
         )
-        
+
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
@@ -195,7 +198,7 @@ class CleanupStack(Stack):
                 ],
                 resources=[
                     f"arn:aws:secretsmanager:{Stack.of(self).region}:{Stack.of(self).account}:secret:integration/*",
-                    f"arn:aws:secretsmanager:{Stack.of(self).region}:{Stack.of(self).account}:secret:medialake/search/provider/*"
+                    f"arn:aws:secretsmanager:{Stack.of(self).region}:{Stack.of(self).account}:secret:medialake/search/provider/*",
                 ],
             )
         )
@@ -210,7 +213,7 @@ class CleanupStack(Stack):
                 ],
                 resources=[
                     f"arn:aws:states:{Stack.of(self).region}:{Stack.of(self).account}:stateMachine:*",
-                    f"arn:aws:states:{Stack.of(self).region}:{Stack.of(self).account}:execution:*"
+                    f"arn:aws:states:{Stack.of(self).region}:{Stack.of(self).account}:execution:*",
                 ],
             )
         )

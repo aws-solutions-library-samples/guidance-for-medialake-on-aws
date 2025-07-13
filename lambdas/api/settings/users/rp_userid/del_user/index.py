@@ -1,13 +1,14 @@
-from aws_lambda_powertools import Logger, Tracer, Metrics
+import json
+import os
+from typing import Any, Dict
+
+import boto3
+from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.typing import LambdaContext
-import boto3
 from botocore.exceptions import ClientError
-import os
-from typing import Dict, Any
-import json
 
 # Initialize Powertools
 logger = Logger(service="delete_user_service")
@@ -98,7 +99,7 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
     """
     try:
         return app.resolve(event, context)
-    except Exception as e:
+    except Exception:
         logger.exception("Unhandled exception occurred")
         metrics.add_metric(name="UnhandledExceptions", unit=MetricUnit.Count, value=1)
         return {

@@ -1,21 +1,19 @@
-from aws_cdk import (
-    Stack,
-    aws_iam as iam,
-    aws_dynamodb as dynamodb,
-    CustomResource,
-    custom_resources as cr,
-    RemovalPolicy,
-)
-from datetime import datetime
-from constructs import Construct
 from dataclasses import dataclass
-from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
+from datetime import datetime
+
+from aws_cdk import CustomResource, RemovalPolicy
+from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import custom_resources as cr
+from constructs import Construct
+
 from config import config
+from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 
 @dataclass
 class DefaultEnvironmentProps:
     """Properties for the DefaultEnvironment construct."""
+
     environments_table: dynamodb.TableV2
 
 
@@ -70,4 +68,4 @@ class DefaultEnvironment(Construct):
         )
 
         # Ensure the custom resource depends on the environments table
-        default_env_resource.node.add_dependency(props.environments_table) 
+        default_env_resource.node.add_dependency(props.environments_table)

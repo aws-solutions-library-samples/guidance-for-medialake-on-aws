@@ -6,4 +6,4 @@ export { default as S3UploaderModal } from './components/S3UploaderModal';
 export { default as useS3Upload } from './hooks/useS3Upload';
 
 // Export types
-export * from './types/upload.types'; 
+export * from './types/upload.types';

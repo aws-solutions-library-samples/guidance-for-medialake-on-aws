@@ -1,8 +1,11 @@
 # medialake_constructs/shared_constructs/cloudfront_logging.py
 
-from constructs import Construct
-from aws_cdk import aws_s3 as s3, aws_cloudfront as cloudfront, aws_iam as iam
 from dataclasses import dataclass
+
+from aws_cdk import aws_cloudfront as cloudfront
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_s3 as s3
+from constructs import Construct
 
 
 @dataclass

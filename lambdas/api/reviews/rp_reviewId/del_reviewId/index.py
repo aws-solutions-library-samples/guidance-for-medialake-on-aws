@@ -1,8 +1,9 @@
+from typing import Any, Dict
+
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from typing import Dict, Any
 
 # Initialize Powertools
 logger = Logger()
@@ -31,7 +32,7 @@ def delete_review(review_id: str) -> Dict[str, Any]:
                 "reviewId": review_id,
             },
         }
-    except Exception as e:
+    except Exception:
         logger.exception("Error processing delete review request")
         raise
 

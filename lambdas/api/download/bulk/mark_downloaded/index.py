@@ -15,21 +15,23 @@ The function implements AWS best practices including:
 
 import json
 import os
-from typing import Dict, Any
 from datetime import datetime
+from typing import Any, Dict
 
 import boto3
-from aws_lambda_powertools import Logger, Tracer, Metrics
+from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.logging import correlation_paths
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
 from aws_lambda_powertools.metrics import MetricUnit
+from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
+from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
 
 # Initialize AWS Lambda Powertools
 logger = Logger(service="bulk-download-mark-downloaded")
 tracer = Tracer(service="bulk-download-mark-downloaded")
-metrics = Metrics(namespace="BulkDownloadService", service="bulk-download-mark-downloaded")
+metrics = Metrics(
+    namespace="BulkDownloadService", service="bulk-download-mark-downloaded"
+)
 
 # Initialize AWS clients
 dynamodb = boto3.resource("dynamodb")
@@ -43,6 +45,7 @@ bulk_download_table = dynamodb.Table(BULK_DOWNLOAD_TABLE)
 
 class BulkDownloadError(Exception):
     """Custom exception for bulk download errors"""
+
     def __init__(self, message: str, status_code: int = 400):
         super().__init__(message)
         self.status_code = status_code
@@ -53,13 +56,13 @@ class BulkDownloadError(Exception):
 def get_job_details(job_id: str) -> Dict[str, Any]:
     """
     Retrieve job details from DynamoDB.
-    
+
     Args:
         job_id: ID of the job to retrieve
-        
+
     Returns:
         Job details
-        
+
     Raises:
         BulkDownloadError: If job retrieval fails or job not found
     """
@@ -68,12 +71,12 @@ def get_job_details(job_id: str) -> Dict[str, Any]:
             Key={"jobId": job_id},
             ConsistentRead=True,
         )
-        
+
         if "Item" not in response:
             raise BulkDownloadError(f"Job {job_id} not found", 404)
-        
+
         return response["Item"]
-    
+
     except ClientError as e:
         logger.error(
             "Failed to retrieve job details",
@@ -89,13 +92,13 @@ def get_job_details(job_id: str) -> Dict[str, Any]:
 def mark_job_downloaded(job_id: str) -> Dict[str, Any]:
     """
     Mark a job as downloaded in DynamoDB.
-    
+
     Args:
         job_id: ID of the job to update
-        
+
     Returns:
         Updated job details
-        
+
     Raises:
         BulkDownloadError: If job update fails
     """
@@ -115,21 +118,21 @@ def mark_job_downloaded(job_id: str) -> Dict[str, Any]:
             },
             ReturnValues="ALL_NEW",
         )
-        
+
         if "Attributes" not in response:
             raise BulkDownloadError(f"Failed to update job {job_id}", 500)
-        
+
         logger.info(
             "Marked job as downloaded",
             extra={
                 "jobId": job_id,
             },
         )
-        
+
         metrics.add_metric(name="JobsMarkedDownloaded", unit=MetricUnit.Count, value=1)
-        
+
         return response["Attributes"]
-    
+
     except ClientError as e:
         logger.error(
             "Failed to mark job as downloaded",
@@ -157,54 +160,60 @@ def create_response(status_code: int, body: Dict[str, Any]) -> Dict[str, Any]:
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
 @tracer.capture_lambda_handler
 @metrics.log_metrics(capture_cold_start_metric=True)
-def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext) -> Dict[str, Any]:
+def lambda_handler(
+    event: APIGatewayProxyEvent, context: LambdaContext
+) -> Dict[str, Any]:
     """
     Lambda handler for marking a bulk download job as downloaded.
-    
+
     Args:
         event: API Gateway event
         context: Lambda context
-        
+
     Returns:
         API Gateway response
     """
     try:
         # Get user ID from Cognito identity
-        user_id = event.get("requestContext", {}).get("authorizer", {}).get("claims", {}).get("sub")
+        user_id = (
+            event.get("requestContext", {})
+            .get("authorizer", {})
+            .get("claims", {})
+            .get("sub")
+        )
         if not user_id:
             raise BulkDownloadError("User ID not found in request", 401)
-        
+
         # Get job ID from path parameters
         job_id = event.get("pathParameters", {}).get("jobId")
         if not job_id:
             raise BulkDownloadError("Missing job ID", 400)
-        
+
         # Get job details
         job = get_job_details(job_id)
-        
+
         # Verify that the job belongs to the user
         if job.get("userId") != user_id:
             raise BulkDownloadError("Access denied", 403)
-        
+
         # Verify that the job is in a valid state to be marked as downloaded
         if job.get("status") != "COMPLETED":
             raise BulkDownloadError(
-                f"Job cannot be marked as downloaded. Current status: {job.get('status')}", 
-                400
+                f"Job cannot be marked as downloaded. Current status: {job.get('status')}",
+                400,
             )
-        
+
         # Parse request body
-        body = {}
         if event.get("body"):
             try:
-                body = json.loads(event["body"])
+                json.loads(event["body"])
             except json.JSONDecodeError:
                 logger.warning("Invalid JSON in request body")
                 # Continue with empty body
-        
+
         # Mark job as downloaded
         updated_job = mark_job_downloaded(job_id)
-        
+
         # Return success response
         return create_response(
             200,
@@ -218,7 +227,7 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext) -> Dict[
                 },
             },
         )
-    
+
     except BulkDownloadError as e:
         logger.warning(
             f"Bulk download error: {e.message}",
@@ -232,7 +241,7 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext) -> Dict[
                 "data": {},
             },
         )
-    
+
     except Exception as e:
         logger.error(
             f"Unexpected error: {str(e)}",

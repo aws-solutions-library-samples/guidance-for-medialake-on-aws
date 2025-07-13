@@ -1,11 +1,9 @@
-import os
 import json
-import logging
+import os
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
 from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools.logging import correlation_paths
-from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.event_handler.api_gateway import Response
 from botocore.exceptions import ClientError
 

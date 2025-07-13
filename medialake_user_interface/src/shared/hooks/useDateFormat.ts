@@ -9,15 +9,12 @@ interface DateFormatOptions {
   updateInterval?: number;
 }
 
-export const useDateFormat = (
-  isoString: string | undefined,
-  options: DateFormatOptions = {}
-) => {
+export const useDateFormat = (isoString: string | undefined, options: DateFormatOptions = {}) => {
   const {
     showRelative = true,
     showSeconds: initialShowSeconds = false,
     allowSecondsToggle = true,
-    updateInterval = 60000
+    updateInterval = 60000,
   } = options;
 
   // Get timezone from context if available, fallback to browser timezone
@@ -62,7 +59,7 @@ export const useDateFormat = (
 
   const toggleSeconds = () => {
     if (allowSecondsToggle) {
-      setShowSeconds(prev => !prev);
+      setShowSeconds((prev) => !prev);
     }
   };
 
@@ -72,6 +69,6 @@ export const useDateFormat = (
     relativeDate: isoString ? formatRelativeTime(isoString) : 'Invalid date',
     showSeconds,
     toggleSeconds,
-    canToggleSeconds: allowSecondsToggle
+    canToggleSeconds: allowSecondsToggle,
   };
-}; 
+};

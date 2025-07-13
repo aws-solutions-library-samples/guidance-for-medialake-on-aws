@@ -1,15 +1,8 @@
-from aws_cdk import (
-    aws_cloudwatch as cloudwatch,
-    Duration,
-    Stack,
-    aws_cloudwatch_actions as cloudwatch_actions,
-    aws_sns as sns,
-    aws_sns_subscriptions as subscriptions,
-    aws_iam as iam,
-    CfnOutput,
-)
+from typing import List
+
+from aws_cdk import CfnOutput, Duration
+from aws_cdk import aws_cloudwatch as cloudwatch
 from constructs import Construct
-from typing import Optional, Dict, List
 
 
 class CloudWatchDashboard(Construct):
@@ -26,20 +19,20 @@ class CloudWatchDashboard(Construct):
         self.dashboard = cloudwatch.Dashboard(
             self, "Dashboard", dashboard_name=dashboard_name
         )
-        
+
         # Export the dashboard ARN and name
         CfnOutput(
-            self, 
-            "DashboardArn", 
+            self,
+            "DashboardArn",
             value=self.dashboard.dashboard_arn,
-            description="ARN of the CloudWatch Dashboard"
+            description="ARN of the CloudWatch Dashboard",
         )
-        
+
         CfnOutput(
-            self, 
-            "DashboardName", 
+            self,
+            "DashboardName",
             value=self.dashboard.dashboard_name,
-            description="Name of the CloudWatch Dashboard"
+            description="Name of the CloudWatch Dashboard",
         )
 
     def create_opensearch_metric(
@@ -52,7 +45,7 @@ class CloudWatchDashboard(Construct):
         statistic: str = "Average",
     ) -> cloudwatch.Metric:
         """Create an OpenSearch metric.
-        
+
         Args:
             metric_name: The name of the metric
             label: Human-readable label for the metric
@@ -60,7 +53,7 @@ class CloudWatchDashboard(Construct):
             domain_name: The OpenSearch domain name
             period: The period for the metric (default: 5 minutes)
             statistic: The statistic to use (default: Average)
-            
+
         Returns:
             A CloudWatch metric for OpenSearch
         """
@@ -84,7 +77,7 @@ class CloudWatchDashboard(Construct):
         statistic: str = "Sum",
     ) -> cloudwatch.Metric:
         """Create a DynamoDB metric.
-        
+
         Args:
             metric_name: The name of the metric
             label: Human-readable label for the metric
@@ -92,7 +85,7 @@ class CloudWatchDashboard(Construct):
             table_name: The DynamoDB table name
             period: The period for the metric (default: 5 minutes)
             statistic: The statistic to use (default: Sum)
-            
+
         Returns:
             A CloudWatch metric for DynamoDB
         """
@@ -105,7 +98,7 @@ class CloudWatchDashboard(Construct):
             label=label,
             unit=self._get_cloudwatch_unit(unit),
         )
-    
+
     def create_lambda_metric(
         self,
         metric_name: str,
@@ -116,7 +109,7 @@ class CloudWatchDashboard(Construct):
         statistic: str = "Sum",
     ) -> cloudwatch.Metric:
         """Create a Lambda metric.
-        
+
         Args:
             metric_name: The name of the metric
             label: Human-readable label for the metric
@@ -124,7 +117,7 @@ class CloudWatchDashboard(Construct):
             function_name: The Lambda function name
             period: The period for the metric (default: 5 minutes)
             statistic: The statistic to use (default: Sum)
-            
+
         Returns:
             A CloudWatch metric for Lambda
         """
@@ -137,7 +130,7 @@ class CloudWatchDashboard(Construct):
             label=label,
             unit=self._get_cloudwatch_unit(unit),
         )
-    
+
     def add_graph_widget(
         self,
         title: str,
@@ -147,7 +140,7 @@ class CloudWatchDashboard(Construct):
         height: int = 6,
     ) -> None:
         """Add a graph widget to the dashboard.
-        
+
         Args:
             title: The title of the widget
             left_metrics: Metrics to display on the left Y-axis
@@ -164,7 +157,7 @@ class CloudWatchDashboard(Construct):
                 height=height,
             )
         )
-    
+
     def add_log_widget(
         self,
         title: str,
@@ -174,7 +167,7 @@ class CloudWatchDashboard(Construct):
         height: int = 6,
     ) -> None:
         """Add a log query widget to the dashboard.
-        
+
         Args:
             title: The title of the widget
             log_group_names: List of log group names to query
@@ -191,7 +184,7 @@ class CloudWatchDashboard(Construct):
                 height=height,
             )
         )
-    
+
     def add_alarm_widget(
         self,
         title: str,
@@ -200,7 +193,7 @@ class CloudWatchDashboard(Construct):
         height: int = 6,
     ) -> None:
         """Add an alarm status widget to the dashboard.
-        
+
         Args:
             title: The title of the widget
             alarms: List of CloudWatch alarms to display
@@ -215,13 +208,13 @@ class CloudWatchDashboard(Construct):
                 height=height,
             )
         )
-    
+
     def _get_cloudwatch_unit(self, unit: str) -> cloudwatch.Unit:
         """Convert a string unit to a CloudWatch Unit.
-        
+
         Args:
             unit: The unit as a string (e.g., 'Count', 'Bytes', 'Percent')
-            
+
         Returns:
             The corresponding CloudWatch Unit
         """

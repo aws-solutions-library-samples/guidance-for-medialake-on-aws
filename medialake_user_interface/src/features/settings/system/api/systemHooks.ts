@@ -7,7 +7,7 @@ import {
   SystemSettingsResponse,
   SystemSettingsError,
   SearchProviderCreate,
-  SearchProviderUpdate
+  SearchProviderUpdate,
 } from '../types/system.types';
 import { SYSTEM_API } from './system.endpoints';
 
@@ -83,8 +83,12 @@ export const useCreateSearchProvider = () => {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SYSTEM_SETTINGS.all });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SYSTEM_SETTINGS.search() });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.SYSTEM_SETTINGS.all,
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.SYSTEM_SETTINGS.search(),
+      });
     },
   });
 };
@@ -109,8 +113,12 @@ export const useUpdateSearchProvider = () => {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SYSTEM_SETTINGS.all });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SYSTEM_SETTINGS.search() });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.SYSTEM_SETTINGS.all,
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.SYSTEM_SETTINGS.search(),
+      });
     },
   });
 };

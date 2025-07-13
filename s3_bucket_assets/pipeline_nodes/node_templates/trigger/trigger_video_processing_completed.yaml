@@ -21,7 +21,6 @@ actions:
     description: This step will trigger after video processing is completed
     operationId: triggerVideoProcessingCompleted
     parameters:
-
       - in: body
         name: Prefix
         required: false

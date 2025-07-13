@@ -1,18 +1,15 @@
-from aws_cdk import (
-    aws_ec2 as ec2,
-    aws_iam as iam,
-    CfnOutput,
-    Stack,
-    RemovalPolicy,
-)
+from typing import List, Optional
+
+from aws_cdk import CfnOutput
+from aws_cdk import aws_ec2 as ec2
+from aws_cdk import aws_iam as iam
 from constructs import Construct
-from typing import Dict, List, Optional, Any
 
 
 class S3VpcGateway(Construct):
     """
     A CDK construct that creates an S3 Gateway VPC Endpoint.
-    
+
     This allows resources within the VPC to access S3 without going through the public internet,
     which provides better security, lower latency, and no bandwidth charges for data transfer
     between the VPC and S3.
@@ -39,7 +36,7 @@ class S3VpcGateway(Construct):
         vpc: ec2.IVpc
             The VPC to create the gateway endpoint in
         subnet_selection: Optional[ec2.SubnetSelection]
-            Specific subnets to route to the gateway endpoint. 
+            Specific subnets to route to the gateway endpoint.
             If not specified, all subnets in the VPC will be routed.
         policy_statements: Optional[List[iam.PolicyStatement]]
             List of IAM policy statements to attach to the gateway endpoint
@@ -81,7 +78,7 @@ class S3VpcGateway(Construct):
 class S3AndDynamoDBVpcGateways(Construct):
     """
     A convenience construct that creates both S3 and DynamoDB Gateway VPC Endpoints.
-    
+
     This is commonly used together as these are the only two services that support
     Gateway VPC Endpoints.
     """
@@ -175,4 +172,4 @@ class S3AndDynamoDBVpcGateways(Construct):
             "DynamoDBGatewayEndpointId",
             description="ID of the DynamoDB Gateway VPC Endpoint",
             value=self.dynamodb_gateway.vpc_endpoint_id,
-        ) 
+        )

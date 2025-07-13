@@ -1,5 +1,6 @@
 import json
 
+
 def translate_event_to_request(event):
     """
     Extract input parameters for Bedrock content processing.
@@ -18,7 +19,9 @@ def translate_event_to_request(event):
     elif isinstance(payload.get("data"), dict) and "body" in payload["data"]:
         raw_body = payload["data"]["body"]
     else:
-        raise KeyError("Missing 'body' in payload; found neither payload.body nor payload.data.body")
+        raise KeyError(
+            "Missing 'body' in payload; found neither payload.body nor payload.data.body"
+        )
 
     # if the body is still a JSON string, parse it
     if isinstance(raw_body, str):
@@ -31,16 +34,18 @@ def translate_event_to_request(event):
 
     # pull out the two required identifiers
     inventory_id = body.get("inventory_id")
-    file_s3_uri  = body.get("file_s3_uri")
+    file_s3_uri = body.get("file_s3_uri")
 
     if not inventory_id and not file_s3_uri:
-        raise KeyError("Either 'inventory_id' or 'file_s3_uri' must be provided in payload body")
+        raise KeyError(
+            "Either 'inventory_id' or 'file_s3_uri' must be provided in payload body"
+        )
 
     return {
-        "asset_id":       inventory_id,
-        "file_s3_uri":    file_s3_uri,
-        "model_id":       body.get("model_id"),
-        "prompt_name":    body.get("prompt_name"),
-        "custom_prompt":  body.get("custom_prompt"),
+        "asset_id": inventory_id,
+        "file_s3_uri": file_s3_uri,
+        "model_id": body.get("model_id"),
+        "prompt_name": body.get("prompt_name"),
+        "custom_prompt": body.get("custom_prompt"),
         "content_source": body.get("content_source", "transcript"),
     }
