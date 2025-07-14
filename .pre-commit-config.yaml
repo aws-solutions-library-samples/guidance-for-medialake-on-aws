@@ -11,9 +11,6 @@ repos:
       - id: check-merge-conflict
       - id: detect-private-key
       - id: check-json
-      - id: pretty-format-json
-        args: ["--autofix", "--indent=2"]
-        exclude: '^(pipeline_library/|\.roo/|s3_bucket_assets/|lambdas/)'
 
   # Python - Auto-fixing
   - repo: https://github.com/PyCQA/autoflake

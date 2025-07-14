@@ -1685,13 +1685,16 @@ def process_records_in_parallel(
             else:
                 sample_str = "empty"
 
-            logger.info(
-                f"Full event format: {json_serialize({
-                    'type': type(records).__name__ if hasattr(type(records), '__name__') else str(type(records)),
-                    'length': len(records) if hasattr(records, '__len__') else 'unknown',
-                    'sample_structure': sample_str
-                })}"
-            )
+            event_format_data = {
+                "type": (
+                    type(records).__name__
+                    if hasattr(type(records), "__name__")
+                    else str(type(records))
+                ),
+                "length": len(records) if hasattr(records, "__len__") else "unknown",
+                "sample_structure": sample_str,
+            }
+            logger.info(f"Full event format: {json_serialize(event_format_data)}")
             return
 
         # Wait for all to complete

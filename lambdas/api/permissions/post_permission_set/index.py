@@ -28,21 +28,11 @@ class Permission(BaseModel):
 
     action: str = Field(
         ...,
-        description="The action to be performed "
-                                                     e.g.,
-                                                     'create',
-                                                     'read',
-                                                     'update',
-                                                     'delete'
-                                                 )",
+        description="The action to be performed (e.g., 'create', 'read', 'update', 'delete')",
     )
     resource: str = Field(
         ...,
-        description="The resource type the action applies to "
-                                                                  e.g.,
-                                                                  'Asset',
-                                                                  'Pipeline'
-                                                              )",
+        description="The resource type the action applies to (e.g., 'Asset', 'Pipeline')",
     )
     effect: str = Field(
         ..., description="Whether to allow or deny the permission ('Allow' or 'Deny')"

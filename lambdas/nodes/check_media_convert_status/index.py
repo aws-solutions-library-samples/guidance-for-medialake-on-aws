@@ -235,15 +235,8 @@ def lambda_handler(event: Dict[str, Any], _: LambdaContext):
         try:
             table.update_item(
                 Key={"InventoryID": clean_inv_id},
-                UpdateExpression="SET DerivedRepresentations = list_append(
-                                                                               if_not_exists(DerivedRepresentations,
-                                                                               :empty),
-                                                                               :r
-                                                                           )",
-                ConditionExpression="attribute_not_exists(
-                                                              DerivedRepresentations) OR NOT contains(DerivedRepresentations,
-                                                              :proxy_id
-                                                          )",
+                UpdateExpression="SET DerivedRepresentations = list_append(if_not_exists(DerivedRepresentations, :empty), :r)",
+                ConditionExpression="attribute_not_exists(DerivedRepresentations) OR NOT contains(DerivedRepresentations, :proxy_id)",
                 ExpressionAttributeValues={
                     ":r": reps,
                     ":empty": [],

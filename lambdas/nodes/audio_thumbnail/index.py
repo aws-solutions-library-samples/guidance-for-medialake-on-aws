@@ -130,11 +130,7 @@ def lambda_handler(event, context: LambdaContext):
             )
             response = table.update_item(
                 Key={"InventoryID": clean_inventory_id},
-                UpdateExpression="SET #dr = list_append(
-                                                            if_not_exists(#dr,
-                                                            :empty_list),
-                                                            :new_rep
-                                                        )",
+                UpdateExpression="SET #dr = list_append(if_not_exists(#dr, :empty_list), :new_rep)",
                 ExpressionAttributeNames={"#dr": "DerivedRepresentations"},
                 ExpressionAttributeValues={
                     ":new_rep": [new_representation],

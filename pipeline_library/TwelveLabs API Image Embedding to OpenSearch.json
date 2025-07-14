@@ -23,9 +23,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [
             {
               "name": "image",
@@ -67,9 +65,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [
             {
               "name": "presigned_url",
@@ -145,9 +141,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [],
           "type": "UTILITY",
           "configuration": {
