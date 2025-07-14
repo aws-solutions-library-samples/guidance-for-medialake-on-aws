@@ -1,6 +1,6 @@
 {
-  "name": "Twelve Labs API Video Embedding to OpenSearch",
-  "description": "Generate Twelve Labs API Video Embeddings to OpenSearch",
+  "name": "TwelveLabs API Video Embedding to OpenSearch",
+  "description": "Generate TwelveLabs API Video Embeddings to OpenSearch",
   "active": true,
   "configuration": {
     "nodes": [
@@ -23,9 +23,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [
             {
               "name": "video",
@@ -68,9 +66,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [
             {
               "name": "presigned_url",
@@ -100,7 +96,7 @@
         },
         "data": {
           "nodeId": "twelve_labs",
-          "label": "Twelve Labs (post)",
+          "label": "TwelveLabs (post)",
           "description": "Generate video embeddings",
           "icon": {
             "key": null,
@@ -138,7 +134,7 @@
         },
         "data": {
           "nodeId": "twelve_labs",
-          "label": "Twelve Labs (get)",
+          "label": "TwelveLabs (get)",
           "description": "Get the status of a video embedding task",
           "icon": {
             "key": null,
@@ -186,9 +182,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [
             {
               "name": "any",
@@ -220,7 +214,7 @@
         },
         "data": {
           "nodeId": "twelve_labs",
-          "label": "Twelve Labs (get)",
+          "label": "TwelveLabs (get)",
           "description": "Get the results of a video embedding task",
           "icon": {
             "key": null,
@@ -268,9 +262,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [
             {
               "name": "Processor",
@@ -315,9 +307,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [],
           "type": "FLOW",
           "configuration": {
@@ -348,9 +338,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [],
           "type": "UTILITY",
           "configuration": {
@@ -386,9 +374,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [
             {
               "name": "Completed",
@@ -433,9 +419,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [],
           "type": "FLOW",
           "configuration": {

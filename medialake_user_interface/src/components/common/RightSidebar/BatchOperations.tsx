@@ -10,7 +10,7 @@ import {
   Button,
   IconButton,
   Tooltip,
-  CircularProgress
+  CircularProgress,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
@@ -38,17 +38,21 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
   onBatchShare,
   onClearSelection,
   onRemoveItem,
-  isDownloadLoading = false
+  isDownloadLoading = false,
 }) => {
   const { setHasSelectedItems } = useRightSidebar();
-  
+
   // Check if multi-select feature is enabled
   const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
 
   // Update selected items state
   React.useEffect(() => {
     if (selectedAssets.length > 0) {
-      console.log('BatchOperations: Setting selected items state for', selectedAssets.length, 'selected assets');
+      console.log(
+        'BatchOperations: Setting selected items state for',
+        selectedAssets.length,
+        'selected assets'
+      );
       setHasSelectedItems(true);
     } else {
       setHasSelectedItems(false);
@@ -57,13 +61,16 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
 
   // Group assets by type
   const assetsByType = React.useMemo(() => {
-    return selectedAssets.reduce((acc, asset) => {
-      if (!acc[asset.type]) {
-        acc[asset.type] = [];
-      }
-      acc[asset.type].push(asset);
-      return acc;
-    }, {} as Record<string, typeof selectedAssets>);
+    return selectedAssets.reduce(
+      (acc, asset) => {
+        if (!acc[asset.type]) {
+          acc[asset.type] = [];
+        }
+        acc[asset.type].push(asset);
+        return acc;
+      },
+      {} as Record<string, typeof selectedAssets>
+    );
   }, [selectedAssets]);
 
   // Handle removing a single item
@@ -85,19 +92,19 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Action buttons */}
-      <Box 
-        sx={{ 
-          display: 'flex', 
-          gap: 1.5, 
+      <Box
+        sx={{
+          display: 'flex',
+          gap: 1.5,
           p: 2,
           borderBottom: '1px solid',
           borderColor: 'divider',
         }}
       >
         {/* <Tooltip title="Delete selected">
-          <Button 
-            variant="outlined" 
-            color="error" 
+          <Button
+            variant="outlined"
+            color="error"
             size="small"
             startIcon={<DeleteIcon />}
             onClick={onBatchDelete}
@@ -117,8 +124,8 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
           </Button>
         </Tooltip>
         {/* <Tooltip title="Share selected">
-          <Button 
-            variant="outlined" 
+          <Button
+            variant="outlined"
             size="small"
             startIcon={<ShareIcon />}
             onClick={onBatchShare}
@@ -132,25 +139,25 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
       <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
         {Object.entries(assetsByType).map(([type, assets]) => (
           <Box key={type}>
-            <Typography 
-              variant="subtitle2" 
-              sx={{ 
-                px: 2, 
-                py: 1, 
+            <Typography
+              variant="subtitle2"
+              sx={{
+                px: 2,
+                py: 1,
                 bgcolor: 'background.default',
-                fontWeight: 600
+                fontWeight: 600,
               }}
             >
               {type} ({assets.length})
             </Typography>
             <List dense disablePadding>
               {assets.map((asset) => (
-                <ListItem 
+                <ListItem
                   key={asset.id}
                   secondaryAction={
-                    <IconButton 
-                      edge="end" 
-                      size="small" 
+                    <IconButton
+                      edge="end"
+                      size="small"
                       onClick={() => handleRemoveItem(asset.id)}
                       title="Remove this item"
                     >
@@ -164,8 +171,8 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
                     },
                   }}
                 >
-                  <ListItemText 
-                    primary={asset.name} 
+                  <ListItemText
+                    primary={asset.name}
                     primaryTypographyProps={{
                       variant: 'body2',
                       noWrap: true,
@@ -180,12 +187,15 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
       </Box>
 
       {/* Clear selection button */}
-      <Box sx={{ p: 2, textAlign: 'center', borderTop: '1px solid', borderColor: 'divider' }}>
-        <Button 
-          variant="text" 
-          size="small"
-          onClick={onClearSelection}
-        >
+      <Box
+        sx={{
+          p: 2,
+          textAlign: 'center',
+          borderTop: '1px solid',
+          borderColor: 'divider',
+        }}
+      >
+        <Button variant="text" size="small" onClick={onClearSelection}>
           Clear Selection
         </Button>
       </Box>

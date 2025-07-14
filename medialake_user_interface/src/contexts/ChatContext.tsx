@@ -36,13 +36,13 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
 
   // Open the chat sidebar
   const openChat = () => setIsOpen(true);
-  
+
   // Close the chat sidebar
   const closeChat = () => setIsOpen(false);
-  
+
   // Toggle the chat sidebar open/closed state
-  const toggleChat = () => setIsOpen(prev => !prev);
-  
+  const toggleChat = () => setIsOpen((prev) => !prev);
+
   // Add a new message to the chat history
   const addMessage = (content: string, sender: 'user' | 'system', isThinking: boolean = false) => {
     const newMessage: ChatMessage = {
@@ -50,27 +50,27 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       content,
       sender,
       timestamp: new Date(),
-      isThinking
+      isThinking,
     };
-    
-    setMessages(prevMessages => [...prevMessages, newMessage]);
+
+    setMessages((prevMessages) => [...prevMessages, newMessage]);
   };
-  
+
   // Update the content of the last message (useful for replacing "thinking" messages)
   const updateLastMessage = (content: string) => {
-    setMessages(prevMessages => {
+    setMessages((prevMessages) => {
       if (prevMessages.length === 0) return prevMessages;
-      
+
       const updatedMessages = [...prevMessages];
       const lastMessage = { ...updatedMessages[updatedMessages.length - 1] };
       lastMessage.content = content;
       lastMessage.isThinking = false;
       updatedMessages[updatedMessages.length - 1] = lastMessage;
-      
+
       return updatedMessages;
     });
   };
-  
+
   // Clear all messages from the chat history
   const clearHistory = () => {
     setMessages([]);
@@ -78,16 +78,16 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
 
   // Provide the chat context to children components
   return (
-    <ChatContext.Provider 
-      value={{ 
-        isOpen, 
-        messages, 
-        openChat, 
-        closeChat, 
+    <ChatContext.Provider
+      value={{
+        isOpen,
+        messages,
+        openChat,
+        closeChat,
         toggleChat,
         addMessage,
         updateLastMessage,
-        clearHistory
+        clearHistory,
       }}
     >
       {children}

@@ -1,13 +1,11 @@
 import os
-from aws_cdk import (
-    aws_lambda as lambda_,
-)
-from constructs import Construct
-from aws_cdk.aws_lambda_python_alpha import PythonLayerVersion
 from dataclasses import dataclass, field
-from typing import Optional, List
+from typing import Optional
 
+from aws_cdk import aws_lambda as lambda_
+from aws_cdk.aws_lambda_python_alpha import PythonLayerVersion
 from aws_lambda_powertools import Logger
+from constructs import Construct
 
 from config import DIST_PATH
 
@@ -30,7 +28,10 @@ class LambdaLayerConfig:
     Attributes:
         entry (Optional[str]): Entry point for the Lambda function code
         compatible_runtimes (List[lambda_.Runtime]): Lambda runtime (default: PYTHON_3_13)
-        compatible_architectures (List[lambda_.Architecture]): CPU architecture (default: [X86_64, ARM_64])
+        compatible_architectures (
+                                      List[lambda_.Architecture]): CPU architecture (default: [X86_64,
+                                      ARM_64]
+                                  )
         description (Optional[str]): Layer description
     """
 

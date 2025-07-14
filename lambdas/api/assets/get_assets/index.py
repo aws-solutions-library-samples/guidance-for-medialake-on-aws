@@ -1,18 +1,17 @@
-from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools.event_handler import APIGatewayRestResolver
-from aws_lambda_powertools.logging import correlation_paths
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
-from aws_lambda_powertools.utilities.validation import validate_request_parameters
-from aws_lambda_powertools.utilities.parser import parse_qs
-from typing import Dict, Any, Optional
-from datetime import datetime
-import os
-import boto3
 import base64
 import json
+import os
+from typing import Any, Dict, Optional
+
+import boto3
+from aws_lambda_powertools import Logger, Metrics, Tracer
+from aws_lambda_powertools.logging import correlation_paths
+from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
+from aws_lambda_powertools.utilities.parser import parse_qs
+from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import Key
 from pydantic import BaseModel, Field, validator
+
 from config import global_prefix
 
 # Initialize AWS X-Ray, metrics, and logger

@@ -10,19 +10,22 @@ import React from 'react';
  * @param defaultValue The default value to return if the flag doesn't exist
  * @returns The value of the feature flag, or the default value if not found
  */
-export const getFeatureFlag = async (flagName: string, defaultValue: boolean = false): Promise<boolean> => {
+export const getFeatureFlag = async (
+  flagName: string,
+  defaultValue: boolean = false
+): Promise<boolean> => {
   try {
     const response = await fetch('/feature-flags.json');
     if (!response.ok) {
       console.warn(`Failed to fetch feature flags: ${response.status} ${response.statusText}`);
       return defaultValue;
     }
-    
+
     const flags = await response.json();
     if (flags[flagName] && typeof flags[flagName].value === 'boolean') {
       return flags[flagName].value;
     }
-    
+
     return defaultValue;
   } catch (error) {
     console.error('Error fetching feature flags:', error);

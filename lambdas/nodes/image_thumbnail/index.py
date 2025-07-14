@@ -1,19 +1,18 @@
 # thumbnail_step.py
-import boto3
 import io
-import os
 import json
+import os
+import shutil
 import subprocess
 import tempfile
-import shutil
 from decimal import Decimal
 
-from PIL import Image, ExifTags
-
-from botocore.exceptions import ClientError
+import boto3
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from botocore.exceptions import ClientError
 from lambda_middleware import lambda_middleware
+from PIL import ExifTags, Image
 
 logger = Logger()
 tracer = Tracer()
@@ -43,8 +42,10 @@ def convert_svg_to_png(svg_data: bytes) -> bytes:
     # verify resvg is present
     if shutil.which("resvg", path=env["PATH"]) is None:
         for p in (svg_path, png_path):
-            try: os.unlink(p)
-            except: pass
+            try:
+                os.unlink(p)
+            except:
+                pass
         raise RuntimeError("resvg CLI not found in /opt/bin")
 
     cmd = ["resvg", svg_path, png_path]
@@ -66,8 +67,12 @@ def convert_svg_to_png(svg_data: bytes) -> bytes:
     finally:
         # always clean up temp files
         for p in (svg_path, png_path):
-            try: os.unlink(p)
-            except: pass
+            try:
+                os.unlink(p)
+            except:
+                pass
+
+
 def get_image_rotation(image):
     try:
         exif = image._getexif() or {}
@@ -170,7 +175,9 @@ def lambda_handler(event, context: LambdaContext):
     inv_id = detail.get("InventoryID") or _raise("Missing InventoryID")
     asset_id = clean_asset_id(inv_id)
 
-    loc = detail["DigitalSourceAsset"]["MainRepresentation"]["StorageInfo"]["PrimaryLocation"]
+    loc = detail["DigitalSourceAsset"]["MainRepresentation"]["StorageInfo"][
+        "PrimaryLocation"
+    ]
     bucket = loc.get("Bucket") or _raise("Missing bucket")
     key = loc.get("ObjectKey", {}).get("FullPath") or _raise("Missing key")
 
@@ -189,21 +196,23 @@ def lambda_handler(event, context: LambdaContext):
     thumb.save(buf, format=fmt)
     data = buf.getvalue()
 
-    out_bucket = os.environ.get("MEDIA_ASSETS_BUCKET_NAME") or _raise("MEDIA_ASSETS_BUCKET_NAME env-var missing")
+    out_bucket = os.environ.get("MEDIA_ASSETS_BUCKET_NAME") or _raise(
+        "MEDIA_ASSETS_BUCKET_NAME env-var missing"
+    )
     out_key = f"{bucket}/{key.rsplit('.', 1)[0]}_thumbnail.{ext}"
 
     try:
         s3.delete_object(Bucket=out_bucket, Key=out_key)
-        logger.info("Deleted existing thumbnail", extra={"bucket": out_bucket, "key": out_key})
+        logger.info(
+            "Deleted existing thumbnail", extra={"bucket": out_bucket, "key": out_key}
+        )
     except ClientError as err:
-        logger.warning("No existing thumbnail to delete or delete failed", extra={"error": str(err)})
+        logger.warning(
+            "No existing thumbnail to delete or delete failed",
+            extra={"error": str(err)},
+        )
 
-    s3.put_object(
-        Bucket=out_bucket,
-        Key=out_key,
-        Body=data,
-        ContentType=f"image/{ext}"
-    )
+    s3.put_object(Bucket=out_bucket, Key=out_key, Body=data, ContentType=f"image/{ext}")
 
     # update DynamoDB record
     try:
@@ -245,11 +254,13 @@ def lambda_handler(event, context: LambdaContext):
 
     return {
         "statusCode": 200,
-        "body": json.dumps({
-            "bucket": out_bucket,
-            "key": out_key,
-            "mode": "thumbnail",
-            "format": fmt,
-        }),
+        "body": json.dumps(
+            {
+                "bucket": out_bucket,
+                "key": out_key,
+                "mode": "thumbnail",
+                "format": fmt,
+            }
+        ),
         "updatedAsset": updated_item,
     }

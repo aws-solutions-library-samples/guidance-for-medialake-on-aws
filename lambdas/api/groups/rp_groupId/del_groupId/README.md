@@ -29,14 +29,17 @@ The Lambda function performs the following operations:
 ## Request Format
 
 ### Path Parameters
+
 - `groupId` (string, required): The ID of the group to delete
 
 ### Headers
+
 - `Authorization`: Bearer token (handled by API Gateway Cognito authorizer)
 
 ## Response Format
 
 ### Success Response (200)
+
 ```json
 {
   "status": "200",
@@ -48,24 +51,27 @@ The Lambda function performs the following operations:
 ### Error Responses
 
 #### 400 - Bad Request
+
 ```json
 {
-  "status": "400", 
+  "status": "400",
   "message": "Missing group ID",
   "data": {}
 }
 ```
 
 #### 404 - Not Found
+
 ```json
 {
   "status": "404",
-  "message": "Group with ID 'groupId' not found", 
+  "message": "Group with ID 'groupId' not found",
   "data": {}
 }
 ```
 
 #### 500 - Internal Server Error
+
 ```json
 {
   "status": "500",
@@ -76,20 +82,22 @@ The Lambda function performs the following operations:
 
 ## Environment Variables
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `AUTH_TABLE_NAME` | DynamoDB table name for authorization data | Yes |
-| `COGNITO_USER_POOL_ID` | Cognito User Pool ID | Yes |
-| `LOG_LEVEL` | Logging level (INFO, WARNING, ERROR) | No (default: WARNING) |
+| Variable               | Description                                | Required              |
+| ---------------------- | ------------------------------------------ | --------------------- |
+| `AUTH_TABLE_NAME`      | DynamoDB table name for authorization data | Yes                   |
+| `COGNITO_USER_POOL_ID` | Cognito User Pool ID                       | Yes                   |
+| `LOG_LEVEL`            | Logging level (INFO, WARNING, ERROR)       | No (default: WARNING) |
 
 ## IAM Permissions Required
 
 ### DynamoDB Permissions
+
 - `dynamodb:GetItem` - Check if group exists
 - `dynamodb:Query` - Get all group-related items
 - `dynamodb:BatchWriteItem` - Delete group items in batches
 
-### Cognito Permissions  
+### Cognito Permissions
+
 - `cognito-idp:DeleteGroup` - Delete Cognito group
 - `cognito-idp:CreateGroup` - Restore group during rollback
 - `cognito-idp:GetGroup` - Verify group existence
@@ -99,14 +107,16 @@ The Lambda function performs the following operations:
 The function deletes the following items:
 
 ### Group Metadata
+
 ```
 PK: "GROUP#{groupId}"
 SK: "METADATA"
 ```
 
 ### Group Memberships
+
 ```
-PK: "GROUP#{groupId}" 
+PK: "GROUP#{groupId}"
 SK: "MEMBER#{userId}"
 ```
 
@@ -148,6 +158,7 @@ The function emits CloudWatch metrics:
 ## Usage Examples
 
 ### Delete a Group
+
 ```bash
 curl -X DELETE \
   'https://api.medialake.ai/groups/engineering-team' \
@@ -155,10 +166,11 @@ curl -X DELETE \
 ```
 
 ### Success Response
+
 ```json
 {
   "status": "200",
-  "message": "Group deleted successfully", 
+  "message": "Group deleted successfully",
   "data": {}
 }
 ```
@@ -166,6 +178,7 @@ curl -X DELETE \
 ## Integration with CDK
 
 The function is deployed via CDK with:
+
 - Entry point: `lambdas/api/groups/rp_groupId/del_groupId`
 - Method: DELETE on `/groups/{groupId}` resource
 - Authorizer: Cognito User Pool
@@ -182,6 +195,7 @@ The function is deployed via CDK with:
 ## Testing
 
 The function supports Lambda warmer for performance:
+
 ```json
 {
   "lambda_warmer": true
@@ -194,4 +208,4 @@ The function supports Lambda warmer for performance:
 2. **Input Validation**: All inputs validated with Pydantic schemas
 3. **Error Handling**: No sensitive information leaked in error messages
 4. **Audit Trail**: All operations logged with correlation IDs
-5. **Rollback Safety**: Failed operations don't leave system in inconsistent state 
+5. **Rollback Safety**: Failed operations don't leave system in inconsistent state

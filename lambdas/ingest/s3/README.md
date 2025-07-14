@@ -51,6 +51,7 @@ For the `python-magic` library to work correctly, the Lambda Layer should also i
 The Lambda is triggered by S3 events (ObjectCreated, ObjectRemoved) and processes the files accordingly.
 
 For file uploads, it:
+
 1. Extracts metadata from file headers
 2. Checks for duplicates
 3. Creates DynamoDB entries
@@ -58,5 +59,6 @@ For file uploads, it:
 5. Publishes events
 
 For file deletions, it:
+
 1. Removes DynamoDB entries
-2. Publishes deletion events 
+2. Publishes deletion events

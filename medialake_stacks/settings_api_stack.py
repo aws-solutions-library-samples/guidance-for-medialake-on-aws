@@ -1,14 +1,12 @@
-from aws_cdk import (
-    Stack,
-    aws_apigateway as apigateway,
-    aws_secretsmanager as secretsmanager,
-    aws_cognito as cognito,
-    aws_dynamodb as dynamodb,
-    Fn
-)
-import aws_cdk as cdk
-from constructs import Construct
 from dataclasses import dataclass
+
+import aws_cdk as cdk
+from aws_cdk import Fn
+from aws_cdk import aws_apigateway as apigateway
+from aws_cdk import aws_cognito as cognito
+from aws_cdk import aws_secretsmanager as secretsmanager
+from constructs import Construct
+
 from medialake_constructs.api_gateway.api_gateway_settings import (
     SettingsConstruct,
     SettingsConstructProps,
@@ -18,6 +16,7 @@ from medialake_constructs.api_gateway.api_gateway_settings import (
 @dataclass
 class SettingsApiStackProps:
     """Configuration for Settings API Stack."""
+
     cognito_user_pool: cognito.UserPool
     cognito_app_client: str
     x_origin_verify_secret: secretsmanager.Secret
@@ -33,20 +32,21 @@ class SettingsApiStack(cdk.NestedStack):
 
         api_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
         root_resource_id = Fn.import_value("MediaLakeApiGatewayCore-RootResourceId")
-        
-        api = apigateway.RestApi.from_rest_api_attributes(self, "SettingsImportedApi",
+
+        api = apigateway.RestApi.from_rest_api_attributes(
+            self,
+            "SettingsImportedApi",
             rest_api_id=api_id,
-            root_resource_id=root_resource_id
+            root_resource_id=root_resource_id,
         )
-        
+
         self._settings_api_authorizer = apigateway.CognitoUserPoolsAuthorizer(
-            self, 
+            self,
             "SettingsApiAuthorizer",
             identity_source="method.request.header.Authorization",
             cognito_user_pools=[props.cognito_user_pool],
         )
 
-        
         # Create Settings construct
         self._settings_construct = SettingsConstruct(
             self,
@@ -60,4 +60,4 @@ class SettingsApiStack(cdk.NestedStack):
                 system_settings_table_name=props.system_settings_table_name,
                 system_settings_table_arn=props.system_settings_table_arn,
             ),
-        ) 
+        )

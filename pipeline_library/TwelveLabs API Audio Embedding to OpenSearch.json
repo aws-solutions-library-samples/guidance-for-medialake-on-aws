@@ -1,6 +1,6 @@
 {
-  "name": "Twelve Labs API Audio Embedding to OpenSearch",
-  "description": "Generate Twelve Labs API Audio Embeddings to OpenSearch",
+  "name": "TwelveLabs API Audio Embedding to OpenSearch",
+  "description": "Generate TwelveLabs API Audio Embeddings to OpenSearch",
   "active": true,
   "configuration": {
     "nodes": [
@@ -23,9 +23,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [
             {
               "name": "Processor",
@@ -69,9 +67,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [
             {
               "name": "audio",
@@ -113,9 +109,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [],
           "type": "FLOW",
           "configuration": {
@@ -145,9 +139,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "audio"
-          ],
+          "inputTypes": ["audio"],
           "outputTypes": [
             {
               "name": "audio",
@@ -188,9 +180,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [
             {
               "name": "presigned_url",
@@ -221,7 +211,7 @@
         },
         "data": {
           "nodeId": "twelve_labs",
-          "label": "Twelve Labs (post)",
+          "label": "TwelveLabs (post)",
           "description": "Generate image or audio embeddings",
           "icon": {
             "key": null,
@@ -270,9 +260,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [],
           "type": "UTILITY",
           "configuration": {

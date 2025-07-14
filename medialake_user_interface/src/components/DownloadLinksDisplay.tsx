@@ -1,12 +1,5 @@
 import React from 'react';
-import {
-  Box,
-  Link,
-  Typography,
-  Chip,
-  Stack,
-  Divider,
-} from '@mui/material';
+import { Box, Link, Typography, Chip, Stack, Divider } from '@mui/material';
 import {
   Download as DownloadIcon,
   Archive as ArchiveIcon,
@@ -14,11 +7,13 @@ import {
 } from '@mui/icons-material';
 
 interface DownloadLinksDisplayProps {
-  downloadUrls: {
-    zippedFiles?: string;
-    files?: string[];
-    singleFiles?: string[];
-  } | string[];
+  downloadUrls:
+    | {
+        zippedFiles?: string;
+        files?: string[];
+        singleFiles?: string[];
+      }
+    | string[];
   expiresAt?: string;
   description?: string;
 }
@@ -31,13 +26,13 @@ export const DownloadLinksDisplay: React.FC<DownloadLinksDisplayProps> = ({
   // Check if links have expired
   const isExpired = React.useMemo(() => {
     if (!expiresAt) return false;
-    
+
     // Handle Unix timestamp (string of numbers) or ISO date string
     const timestamp = /^\d+$/.test(expiresAt) ? parseInt(expiresAt, 10) * 1000 : expiresAt;
     const expirationDate = new Date(timestamp);
-    
+
     if (isNaN(expirationDate.getTime())) return false;
-    
+
     return new Date() > expirationDate;
   }, [expiresAt]);
 
@@ -84,14 +79,15 @@ export const DownloadLinksDisplay: React.FC<DownloadLinksDisplayProps> = ({
         {expiresAt && (
           <Typography
             variant="caption"
-            color={isExpired ? "error.main" : "warning.main"}
+            color={isExpired ? 'error.main' : 'warning.main'}
             sx={{
               mt: 1,
               display: 'block',
               fontWeight: isExpired ? 'bold' : 'normal',
             }}
           >
-            {isExpired ? 'EXPIRED: ' : 'Expires: '}{formatExpirationDate(expiresAt)}
+            {isExpired ? 'EXPIRED: ' : 'Expires: '}
+            {formatExpirationDate(expiresAt)}
           </Typography>
         )}
       </Box>
@@ -221,8 +217,8 @@ export const DownloadLinksDisplay: React.FC<DownloadLinksDisplayProps> = ({
           <Chip
             label={`${isExpired ? 'EXPIRED: ' : 'Expires: '}${formatExpirationDate(expiresAt)}`}
             size="small"
-            color={isExpired ? "error" : "warning"}
-            variant={isExpired ? "filled" : "outlined"}
+            color={isExpired ? 'error' : 'warning'}
+            variant={isExpired ? 'filled' : 'outlined'}
             sx={{
               fontSize: '0.75rem',
               fontWeight: isExpired ? 'bold' : 'normal',

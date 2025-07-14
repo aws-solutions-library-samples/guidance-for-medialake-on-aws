@@ -1,5 +1,15 @@
 import React from 'react';
-import { Box, Typography, Paper, List, ListItem, ListItemIcon, ListItemText, Divider, Alert } from '@mui/material';
+import {
+  Box,
+  Typography,
+  Paper,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Divider,
+  Alert,
+} from '@mui/material';
 import { Can, usePermission } from '../../permissions';
 import SettingsIcon from '@mui/icons-material/Settings';
 import SecurityIcon from '@mui/icons-material/Security';
@@ -12,7 +22,7 @@ import { StorageHelper } from '../../common/helpers/storage-helper';
 
 /**
  * Example component demonstrating group-based access control
- * 
+ *
  * This component shows how to use the Can component to conditionally render
  * UI elements based on the user's group membership. In this case, system settings
  * are only visible to users in the "administrators" group.
@@ -21,10 +31,10 @@ const GroupBasedAccess: React.FC = () => {
   const { isAuthenticated } = useAuth();
   const [userInfo, setUserInfo] = React.useState<any>(null);
   const { can, loading, error } = usePermission();
-  
+
   // Check if the user can manage settings
   const canManageSettings = can('manage', 'settings');
-  
+
   // Log debugging information
   React.useEffect(() => {
     console.log('User Info:', userInfo);
@@ -44,7 +54,7 @@ const GroupBasedAccess: React.FC = () => {
           if (tokenParts.length === 3) {
             const payload = JSON.parse(atob(tokenParts[1]));
             setUserInfo(payload);
-            
+
             // Log the extracted user information
             console.log('JWT Payload:', payload);
             console.log('Groups from JWT:', payload['cognito:groups']);
@@ -63,15 +73,18 @@ const GroupBasedAccess: React.FC = () => {
       <Typography variant="h4" gutterBottom>
         Group-Based Access Control Example
       </Typography>
-      
+
       <Typography variant="body1" paragraph>
-        This component demonstrates how to use the Can component to conditionally render UI elements based on the user's group membership.
-        In this case, system settings are only visible to users in the "administrators" group.
+        This component demonstrates how to use the Can component to conditionally render UI elements
+        based on the user's group membership. In this case, system settings are only visible to
+        users in the "administrators" group.
       </Typography>
-      
+
       {userInfo && (
         <Paper sx={{ p: 2, mb: 3 }}>
-          <Typography variant="h6" gutterBottom>Current User Information</Typography>
+          <Typography variant="h6" gutterBottom>
+            Current User Information
+          </Typography>
           <Typography variant="body2">User ID: {userInfo.sub}</Typography>
           <Typography variant="body2">Username: {userInfo['cognito:username']}</Typography>
           <Typography variant="body2">Email: {userInfo.email}</Typography>
@@ -80,21 +93,32 @@ const GroupBasedAccess: React.FC = () => {
           </Typography>
         </Paper>
       )}
-      
-      <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' } }}>
+
+      <Box
+        sx={{
+          display: 'flex',
+          gap: 2,
+          flexDirection: { xs: 'column', md: 'row' },
+        }}
+      >
         {/* Regular settings - visible to all users */}
         <Paper sx={{ flex: 1, p: 2 }}>
-          <Typography variant="h6" gutterBottom>User Settings</Typography>
+          <Typography variant="h6" gutterBottom>
+            User Settings
+          </Typography>
           <Typography variant="body2" color="text.secondary" paragraph>
             These settings are available to all authenticated users.
           </Typography>
-          
+
           <List>
             <ListItem>
               <ListItemIcon>
                 <SettingsIcon />
               </ListItemIcon>
-              <ListItemText primary="Profile Settings" secondary="Update your personal information" />
+              <ListItemText
+                primary="Profile Settings"
+                secondary="Update your personal information"
+              />
             </ListItem>
             <Divider />
             <ListItem>
@@ -105,22 +129,42 @@ const GroupBasedAccess: React.FC = () => {
             </ListItem>
           </List>
         </Paper>
-        
+
         {/* System settings - only visible to administrators */}
         <Can I="manage" a="settings">
           {(allowed) => (
             <Paper sx={{ flex: 1, p: 2 }}>
-              <Typography variant="h6" gutterBottom>System Settings</Typography>
+              <Typography variant="h6" gutterBottom>
+                System Settings
+              </Typography>
               <Typography variant="body2" color="text.secondary" paragraph>
                 These settings are only available to users in the "administrators" group.
               </Typography>
-              
+
               {/* Debug information */}
-              <Box sx={{ mb: 2, p: 1, bgcolor: 'background.paper', border: '1px dashed grey' }}>
+              <Box
+                sx={{
+                  mb: 2,
+                  p: 1,
+                  bgcolor: 'background.paper',
+                  border: '1px dashed grey',
+                }}
+              >
                 <Typography variant="subtitle2">Debug Information:</Typography>
-                <Typography variant="body2">Can Manage Settings: {canManageSettings ? 'Yes' : 'No'}</Typography>
-                <Typography variant="body2">Allowed (from Can): {allowed ? 'Yes' : 'No'}</Typography>
-                <Typography variant="body2">Direct Group Check: {userInfo && userInfo['cognito:groups'] && userInfo['cognito:groups'].includes('administrators') ? 'Yes' : 'No'}</Typography>
+                <Typography variant="body2">
+                  Can Manage Settings: {canManageSettings ? 'Yes' : 'No'}
+                </Typography>
+                <Typography variant="body2">
+                  Allowed (from Can): {allowed ? 'Yes' : 'No'}
+                </Typography>
+                <Typography variant="body2">
+                  Direct Group Check:{' '}
+                  {userInfo &&
+                  userInfo['cognito:groups'] &&
+                  userInfo['cognito:groups'].includes('administrators')
+                    ? 'Yes'
+                    : 'No'}
+                </Typography>
                 <Typography variant="body2">Loading: {loading ? 'Yes' : 'No'}</Typography>
                 <Typography variant="body2">Error: {error ? error.message : 'None'}</Typography>
                 {userInfo && (
@@ -129,21 +173,27 @@ const GroupBasedAccess: React.FC = () => {
                   </Typography>
                 )}
               </Box>
-              
+
               {allowed ? (
                 <List>
                   <ListItem>
                     <ListItemIcon>
                       <GroupIcon />
                     </ListItemIcon>
-                    <ListItemText primary="User Management" secondary="Manage users and permissions" />
+                    <ListItemText
+                      primary="User Management"
+                      secondary="Manage users and permissions"
+                    />
                   </ListItem>
                   <Divider />
                   <ListItem>
                     <ListItemIcon>
                       <StorageIcon />
                     </ListItemIcon>
-                    <ListItemText primary="Storage Configuration" secondary="Configure storage settings" />
+                    <ListItemText
+                      primary="Storage Configuration"
+                      secondary="Configure storage settings"
+                    />
                   </ListItem>
                   <Divider />
                   <ListItem>
@@ -162,7 +212,8 @@ const GroupBasedAccess: React.FC = () => {
                 </List>
               ) : (
                 <Alert severity="warning">
-                  You don't have permission to access system settings. Only administrators can access these settings.
+                  You don't have permission to access system settings. Only administrators can
+                  access these settings.
                 </Alert>
               )}
             </Paper>

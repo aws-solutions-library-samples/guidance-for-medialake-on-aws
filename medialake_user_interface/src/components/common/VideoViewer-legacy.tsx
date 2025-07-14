@@ -48,7 +48,7 @@
 //         ompRef.current = new OmakasePlayer({
 //             playerHTMLElementId: 'omakase-player',
 //             mediaChrome: 'enabled',
-            
+
 //           });
 //           ompRef.current.loadVideo(videoSrc, 60)
 //           ompRef.current.createTimeline({

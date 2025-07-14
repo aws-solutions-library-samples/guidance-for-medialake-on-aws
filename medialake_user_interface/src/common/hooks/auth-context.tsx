@@ -25,16 +25,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const checkAuthStatus = useCallback(async () => {
     console.log('AuthContext: Starting auth status check...');
     setIsLoading(true);
-    
+
     try {
       // Check if this is a SAML redirect first
       const hasSamlProvider = awsConfig?.Auth?.identity_providers.some(
-        provider => provider.identity_provider_method === 'saml'
+        (provider) => provider.identity_provider_method === 'saml'
       );
 
-      if (hasSamlProvider &&
-        (window.location.hash.includes('id_token') ||
-          window.location.search.includes('code='))) {
+      if (
+        hasSamlProvider &&
+        (window.location.hash.includes('id_token') || window.location.search.includes('code='))
+      ) {
         console.log('Detected SAML redirect, waiting for session...');
         // Don't try to get current user yet, just wait for session
         try {
@@ -50,7 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               console.log('cognito:groups:', payload['cognito:groups']);
               console.log('custom:permissions:', payload['custom:permissions']);
             }
-       
+
             StorageHelper.setToken(token);
             setIsAuthenticated(true);
           } else {
@@ -135,14 +136,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkAuthStatus,
     refreshSession,
     isLoading,
-    isInitialized
+    isInitialized,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

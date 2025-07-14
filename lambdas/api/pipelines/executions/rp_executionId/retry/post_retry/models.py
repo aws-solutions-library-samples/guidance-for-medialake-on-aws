@@ -1,5 +1,6 @@
+from pynamodb.attributes import NumberAttribute, UnicodeAttribute
 from pynamodb.models import Model
-from pynamodb.attributes import UnicodeAttribute, NumberAttribute
+
 
 class PipelineExecution(Model):
     class Meta:

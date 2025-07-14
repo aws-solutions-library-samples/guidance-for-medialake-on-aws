@@ -1,12 +1,13 @@
-import json
-import uuid
 import decimal
+import json
 import re
-from typing import Dict, Any, Optional, Tuple, List
+import uuid
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
+
 import boto3
-from botocore.config import Config
 from aws_lambda_powertools import Logger
+from botocore.config import Config
 
 logger = Logger()
 
@@ -17,7 +18,8 @@ _SIGV4_CFG = Config(
 )
 
 _ENDPOINT_TMPL = "https://s3.{region}.amazonaws.com"
-_S3_CLIENT_CACHE: dict[str, boto3.client] = {}       # {region → client}
+_S3_CLIENT_CACHE: dict[str, boto3.client] = {}  # {region → client}
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 def _get_s3_client_for_bucket(bucket: str) -> boto3.client:
@@ -31,8 +33,10 @@ def _get_s3_client_for_bucket(bucket: str) -> boto3.client:
     )
 
     try:
-        region = (generic.get_bucket_location(Bucket=bucket)
-                        .get("LocationConstraint") or "us-east-1")
+        region = (
+            generic.get_bucket_location(Bucket=bucket).get("LocationConstraint")
+            or "us-east-1"
+        )
     except generic.exceptions.NoSuchBucket:
         raise ValueError(f"S3 bucket {bucket!r} does not exist")
 
@@ -45,84 +49,73 @@ def _get_s3_client_for_bucket(bucket: str) -> boto3.client:
         )
     return _S3_CLIENT_CACHE[region]
 
+
 # Supported special keywords for search
 KEYWORDS = {
-    'type': r'type:(\w+)',
-    'asset_size_gte': r'asset_size_gte:([<>]=?\d+(?:\.\d+)?(?:KB|MB|GB|TB))',
-    'asset_size_lte': r'asset_size_lte:([<>]=?\d+(?:\.\d+)?(?:KB|MB|GB|TB))',
-    'extension': r'extension:([a-zA-Z0-9._\-*/]+)',
-    'ingested_date_gte': r'ingested_date_gte:([<>]=?\d{4}-\d{2}-\d{2})',
-    'ingested_date_lte': r'ingested_date_lte:([<>]=?\d{4}-\d{2}-\d{2})'
+    "type": r"type:(\w+)",
+    "asset_size_gte": r"asset_size_gte:([<>]=?\d+(?:\.\d+)?(?:KB|MB|GB|TB))",
+    "asset_size_lte": r"asset_size_lte:([<>]=?\d+(?:\.\d+)?(?:KB|MB|GB|TB))",
+    "extension": r"extension:([a-zA-Z0-9._\-*/]+)",
+    "ingested_date_gte": r"ingested_date_gte:([<>]=?\d{4}-\d{2}-\d{2})",
+    "ingested_date_lte": r"ingested_date_lte:([<>]=?\d{4}-\d{2}-\d{2})",
 }
 
-#KEYWORDS = {
+# KEYWORDS = {
 #    'content_type': r'type:(\w+)',
 #    'format': r'format:(\w+)',
 #    'size': r'size:([<>]=?\d+(?:\.\d+)?(?:KB|MB|GB|TB))',
 #    'date': r'date:([<>]=?\d{4}-\d{2}-\d{2})',
 #    'metadata': r'metadata:(\w+:\w+)',
-#	'storageIdentifier': r'storageIdentifier:([a-zA-Z0-9._\-*/]+)'
-#}
-
+# 	'storageIdentifier': r'storageIdentifier:([a-zA-Z0-9._\-*/]+)'
+# }
 
 
 def parse_size_value(size_str: str) -> Optional[Dict[str, Any]]:
     """Convert size string (e.g., '1GB', '500MB') to bytes"""
     try:
-        pattern = r'([<>]=?)(\d+(?:\.\d+)?)(KB|MB|GB|TB)'
+        pattern = r"([<>]=?)(\d+(?:\.\d+)?)(KB|MB|GB|TB)"
         match = re.match(pattern, size_str)
         if not match:
             return None
-            
+
         operator, value, unit = match.groups()
         value = float(value)
-        
-        multipliers = {
-            'KB': 1024,
-            'MB': 1024 ** 2,
-            'GB': 1024 ** 3,
-            'TB': 1024 ** 4
-        }
-        
+
+        multipliers = {"KB": 1024, "MB": 1024**2, "GB": 1024**3, "TB": 1024**4}
+
         bytes_value = int(value * multipliers[unit])
-        return {
-            'operator': operator,
-            'value': bytes_value
-        }
+        return {"operator": operator, "value": bytes_value}
     except Exception as e:
         logger.warning(f"Error parsing size value: {str(e)}")
         return None
 
+
 def parse_date_value(date_str: str) -> Optional[Dict]:
     """Parse date string with operator (e.g., '>2024-01-01')"""
     try:
-        pattern = r'([<>]=?)(\d{4}-\d{2}-\d{2})'
+        pattern = r"([<>]=?)(\d{4}-\d{2}-\d{2})"
         match = re.match(pattern, date_str)
         if not match:
             return None
-            
+
         operator, date = match.groups()
-        parsed_date = datetime.strptime(date, '%Y-%m-%d')
-        
-        return {
-            'operator': operator,
-            'value': parsed_date.isoformat()
-        }
+        parsed_date = datetime.strptime(date, "%Y-%m-%d")
+
+        return {"operator": operator, "value": parsed_date.isoformat()}
     except Exception as e:
         logger.warning(f"Error parsing date value: {str(e)}")
         return None
 
+
 def parse_metadata_value(metadata_str: str) -> Optional[Dict]:
     """Parse metadata filter (e.g., 'resolution:1080p')"""
     try:
-        key, value = metadata_str.split(':')
-        return {
-            'key': key,
-            'value': value
-        }
+        key, value = metadata_str.split(":")
+        return {"key": key, "value": value}
     except Exception as e:
         logger.warning(f"Error parsing metadata value: {str(e)}")
         return None
+
 
 def parse_search_query(query: str) -> Tuple[str, Dict[str, Any]]:
     """
@@ -136,37 +129,37 @@ def parse_search_query(query: str) -> Tuple[str, Dict[str, Any]]:
     for keyword, pattern in KEYWORDS.items():
         matches = re.finditer(pattern, query)
         keyword_values = []
-        
+
         for match in matches:
             value = match.group(1)
-            
+
             # Process value based on keyword type
-            if keyword == 'asset_size_gte':
+            if keyword == "asset_size_gte":
                 parsed_value = parse_size_value(value)
-            elif keyword == 'asset_size_lte':
+            elif keyword == "asset_size_lte":
                 parsed_value = parse_size_value(value)
-            elif keyword == 'ingested_date_gte':
+            elif keyword == "ingested_date_gte":
                 parsed_value = parse_date_value(value)
-            elif keyword == 'ingested_date_lte':
+            elif keyword == "ingested_date_lte":
                 parsed_value = parse_date_value(value)
-            elif keyword == 'extension':
+            elif keyword == "extension":
                 parsed_value = parse_metadata_value(value)
-            elif keyword == 'type':
+            elif keyword == "type":
                 parsed_value = parse_metadata_value(value)
             else:
                 parsed_value = value
-                
+
             if parsed_value:
                 keyword_values.append(parsed_value)
                 # Remove the keyword:value from the clean query
-                clean_query = clean_query.replace(match.group(0), '').strip()
-        
+                clean_query = clean_query.replace(match.group(0), "").strip()
+
         if keyword_values:
             filters[keyword] = keyword_values
 
     # Clean up extra spaces
-    clean_query = ' '.join(clean_query.split())
-    
+    clean_query = " ".join(clean_query.split())
+
     return clean_query, filters
 
 
@@ -218,12 +211,14 @@ def generate_presigned_url(
             },
             ExpiresIn=expiration,
         )
-        
+
         logger.debug(
             "Generated presigned URL for s3://%s/%s (region %s)",
-            bucket, key, s3_client.meta.region_name,
+            bucket,
+            key,
+            s3_client.meta.region_name,
         )
-        
+
         return url
     except Exception as e:
         logger.error(f"Error generating presigned URL: {str(e)}")
@@ -235,52 +230,57 @@ def generate_presigned_urls_batch(
 ) -> Dict[str, Optional[str]]:
     """
     Generate multiple presigned URLs in parallel for better performance.
-    
+
     Args:
         url_requests: List of dicts with 'bucket', 'key', and 'request_id' keys
         expiration: URL expiration time in seconds
-        
+
     Returns:
         Dict mapping request_id to presigned URL (or None if failed)
     """
     import concurrent.futures
     import time
-    
+
     start_time = time.time()
-    logger.info(f"[PERF] Starting batch presigned URL generation for {len(url_requests)} URLs")
-    
+    logger.info(
+        f"[PERF] Starting batch presigned URL generation for {len(url_requests)} URLs"
+    )
+
     def generate_single_url(request):
         try:
             return {
-                'request_id': request['request_id'],
-                'url': generate_presigned_url(request['bucket'], request['key'], expiration)
+                "request_id": request["request_id"],
+                "url": generate_presigned_url(
+                    request["bucket"], request["key"], expiration
+                ),
             }
         except Exception as e:
-            logger.warning(f"Failed to generate presigned URL for {request['request_id']}: {str(e)}")
-            return {
-                'request_id': request['request_id'],
-                'url': None
-            }
-    
+            logger.warning(
+                f"Failed to generate presigned URL for {request['request_id']}: {str(e)}"
+            )
+            return {"request_id": request["request_id"], "url": None}
+
     results = {}
-    
+
     # Use ThreadPoolExecutor for I/O-bound operations
     with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
         future_to_request = {
             executor.submit(generate_single_url, request): request
             for request in url_requests
         }
-        
+
         for future in concurrent.futures.as_completed(future_to_request):
             try:
                 result = future.result()
-                results[result['request_id']] = result['url']
+                results[result["request_id"]] = result["url"]
             except Exception as e:
                 request = future_to_request[future]
-                logger.warning(f"Exception generating presigned URL for {request['request_id']}: {str(e)}")
-                results[request['request_id']] = None
-    
+                logger.warning(
+                    f"Exception generating presigned URL for {request['request_id']}: {str(e)}"
+                )
+                results[request["request_id"]] = None
+
     batch_time = time.time() - start_time
     logger.info(f"[PERF] Batch presigned URL generation completed in {batch_time:.3f}s")
-    
+
     return results

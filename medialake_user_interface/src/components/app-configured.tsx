@@ -20,63 +20,67 @@ import { JobNotificationSync } from './JobNotificationSync';
 import { TokenRefreshManager } from './TokenRefreshManager';
 
 const LoadingFallback = () => (
-    <Box sx={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh'
-    }}>
-        <CircularProgress />
-    </Box>
+  <Box
+    sx={{
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      height: '100vh',
+    }}
+  >
+    <CircularProgress />
+  </Box>
 );
 
 const ErrorFallback = ({ error }: { error: Error }) => (
-    <Box sx={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh',
-        flexDirection: 'column',
-        gap: 2
-    }}>
-        <h2>Something went wrong:</h2>
-        <pre style={{ color: 'red' }}>{error.message}</pre>
-    </Box>
+  <Box
+    sx={{
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      height: '100vh',
+      flexDirection: 'column',
+      gap: 2,
+    }}
+  >
+    <h2>Something went wrong:</h2>
+    <pre style={{ color: 'red' }}>{error.message}</pre>
+  </Box>
 );
 
 const AppConfigured = () => {
-    return (
-        <ErrorBoundary FallbackComponent={ErrorFallback}>
-            <Suspense fallback={<LoadingFallback />}>
-                <QueryClientProvider client={queryClient}>
-                    <AwsConfigProvider>
-                        <AuthProvider>
-                            <TokenRefreshManager>
-                                <PermissionProvider>
-                                <TimezoneProvider>
-                                <ThemeProvider>
-                                    <DirectionProvider>
-                                        <TableDensityProvider>
-                                            <ThemeWrapper>
-                                                <ModalProvider>
-                                                    <NotificationProvider>
-                                                        <JobNotificationSync />
-                                                        <RouterProvider router={router} />
-                                                    </NotificationProvider>
-                                                </ModalProvider>
-                                                </ThemeWrapper>
-                                            </TableDensityProvider>
-                                        </DirectionProvider>
-                                    </ThemeProvider>
-                                </TimezoneProvider>
-                            </PermissionProvider>
-                        </TokenRefreshManager>
-                        </AuthProvider>
-                    </AwsConfigProvider>
-                </QueryClientProvider>
-            </Suspense>
-        </ErrorBoundary>
-    );
+  return (
+    <ErrorBoundary FallbackComponent={ErrorFallback}>
+      <Suspense fallback={<LoadingFallback />}>
+        <QueryClientProvider client={queryClient}>
+          <AwsConfigProvider>
+            <AuthProvider>
+              <TokenRefreshManager>
+                <PermissionProvider>
+                  <TimezoneProvider>
+                    <ThemeProvider>
+                      <DirectionProvider>
+                        <TableDensityProvider>
+                          <ThemeWrapper>
+                            <ModalProvider>
+                              <NotificationProvider>
+                                <JobNotificationSync />
+                                <RouterProvider router={router} />
+                              </NotificationProvider>
+                            </ModalProvider>
+                          </ThemeWrapper>
+                        </TableDensityProvider>
+                      </DirectionProvider>
+                    </ThemeProvider>
+                  </TimezoneProvider>
+                </PermissionProvider>
+              </TokenRefreshManager>
+            </AuthProvider>
+          </AwsConfigProvider>
+        </QueryClientProvider>
+      </Suspense>
+    </ErrorBoundary>
+  );
 };
 
 export default AppConfigured;

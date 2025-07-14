@@ -27,4 +27,3 @@ export const useUserPool = () => {
 
   return { userPool, reinitializeUserPool: initializeUserPool };
 };
-

@@ -10,12 +10,12 @@ export default {
     hebrew: 'العبرية',
     japanese: 'اليابانية',
     korean: 'الكورية',
-    spanish: 'الإسبانية'
+    spanish: 'الإسبانية',
   },
   assetsPage: {
     title: 'الأصول',
     connectors: 'الموصلات',
-    selectConnector: 'اختر موصل'
+    selectConnector: 'اختر موصل',
   },
   assetExplorer: {
     noConnectorSelected: 'اختر موصل لعرض الأصول',
@@ -25,14 +25,14 @@ export default {
     menu: {
       rename: 'إعادة التسمية',
       share: 'مشاركة',
-      download: 'تنزيل'
+      download: 'تنزيل',
     },
     deleteDialog: {
       title: 'تأكيد الحذف',
       description: 'هل أنت متأكد أنك تريد حذف هذا الأصل؟ لا يمكن التراجع عن هذا الإجراء.',
       cancel: 'إلغاء',
-      confirm: 'حذف'
-    }
+      confirm: 'حذف',
+    },
   },
   sidebar: {
     menu: {
@@ -40,7 +40,7 @@ export default {
       assets: 'الأصول',
       pipelines: 'خطوط الأنابيب',
       pipelineExecutions: 'تنفيذ خطوط الأنابيب',
-      settings: 'الإعدادات'
+      settings: 'الإعدادات',
     },
     submenu: {
       system: 'إعدادات النظام',
@@ -48,8 +48,8 @@ export default {
       userManagement: 'إدارة المستخدمين',
       roles: 'الأدوار',
       integrations: 'التكاملات',
-      environments: 'البيئات'
-    }
+      environments: 'البيئات',
+    },
   },
   profile: {
     title: 'الملف الشخصي',
@@ -63,22 +63,22 @@ export default {
     pushNotifications: 'إشعارات الدفع',
     changePassword: 'تغيير كلمة المرور',
     twoFactorAuth: 'المصادقة الثنائية',
-    appearance: 'المظهر'
+    appearance: 'المظهر',
   },
   app: {
     loading: 'جارٍ التحميل...',
     errors: {
       loadingConfig: 'خطأ في تحميل إعدادات AWS:',
       loadingUserAttributes: 'خطأ في تحميل سمات المستخدم:',
-      signingOut: 'خطأ في تسجيل الخروج:'
+      signingOut: 'خطأ في تسجيل الخروج:',
     },
     navigation: {
       preventedDuplicate: 'تم منع التنقل المكرر إلى',
-      navigating: 'جارٍ التنقل من'
+      navigating: 'جارٍ التنقل من',
     },
     branding: {
-              name: 'Media Lake'
-    }
+      name: 'Media Lake',
+    },
   },
   search: {
     semantic: 'البحث الدلالي',
@@ -86,30 +86,30 @@ export default {
       dateRange: 'نطاق التاريخ',
       contentType: 'نوع المحتوى',
       storageLocation: 'مكان التخزين',
-      comingSoon: 'المزيد من الفلاتر قادمة قريباً...'
-    }
+      comingSoon: 'المزيد من الفلاتر قادمة قريباً...',
+    },
   },
   admin: {
     metrics: {
       storageUsage: 'استخدام التخزين',
       apiUsage: 'استخدام API',
       activeUsers: 'المستخدمون النشطون',
-      systemLoad: 'عبء النظام'
+      systemLoad: 'عبء النظام',
     },
     errors: {
       userDeletionNotImplemented: 'لم يتم تنفيذ حذف المستخدم بعد.',
       userCreationNotImplemented: 'لم يتم تنفيذ إنشاء المستخدم بعد.',
       userEditingNotImplemented: 'لم يتم تنفيذ تعديل المستخدم بعد.',
       analyticsExportNotImplemented: 'لم يتم تنفيذ تصدير التحليلات بعد.',
-      systemResetNotImplemented: 'لم يتم تنفيذ إعادة تعيين النظام بعد.'
+      systemResetNotImplemented: 'لم يتم تنفيذ إعادة تعيين النظام بعد.',
     },
     columns: {
-      lastActive: 'آخر نشاط'
+      lastActive: 'آخر نشاط',
     },
     buttons: {
       exportAnalytics: 'تصدير التحليلات',
-      resetSystem: 'إعادة تعيين النظام'
-    }
+      resetSystem: 'إعادة تعيين النظام',
+    },
   },
   integrations: {
     title: 'التكاملات',
@@ -120,7 +120,7 @@ export default {
     addIntegration: 'إضافة تكامل',
     form: {
       search: {
-        placeholder: 'ابحث عن التكاملات'
+        placeholder: 'ابحث عن التكاملات',
       },
       title: 'إضافة تكامل',
       fields: {
@@ -128,30 +128,30 @@ export default {
           label: 'التكامل',
           tooltip: 'اختر مزود التكامل',
           errors: {
-            required: 'اختيار التكامل مطلوب'
-          }
+            required: 'اختيار التكامل مطلوب',
+          },
         },
         description: {
           label: 'الوصف',
           tooltip: 'قم بتوفير وصف لهذا التكامل',
           helper: 'وصف موجز لهذا التكامل',
           errors: {
-            required: 'الوصف مطلوب'
-          }
+            required: 'الوصف مطلوب',
+          },
         },
         environmentId: {
           label: 'البيئة',
           tooltip: 'اختر البيئة لهذا التكامل',
           errors: {
-            required: 'اختيار البيئة مطلوب'
-          }
+            required: 'اختيار البيئة مطلوب',
+          },
         },
         enabled: {
           label: 'مُفعل',
           tooltip: 'فعّل أو عطّل هذا التكامل',
           errors: {
-            required: 'التفعيل مطلوب'
-          }
+            required: 'التفعيل مطلوب',
+          },
         },
         auth: {
           type: {
@@ -159,11 +159,11 @@ export default {
             tooltip: 'اختر طريقة المصادقة',
             options: {
               awsIam: 'AWS IAM',
-              apiKey: 'مفتاح API'
+              apiKey: 'مفتاح API',
             },
             errors: {
-              required: 'نوع المصادقة مطلوب'
-            }
+              required: 'نوع المصادقة مطلوب',
+            },
           },
           credentials: {
             apiKey: {
@@ -171,26 +171,26 @@ export default {
               tooltip: 'أدخل مفتاح API الخاص بك',
               helper: 'مفتاح API للمصادقة مع الخدمة',
               errors: {
-                required: 'مفتاح API مطلوب'
-              }
+                required: 'مفتاح API مطلوب',
+              },
             },
             iamRole: {
               label: 'دور IAM',
               tooltip: 'أدخل ARN لدور IAM',
               errors: {
-                required: 'دور IAM مطلوب'
-              }
-            }
-          }
-        }
+                required: 'دور IAM مطلوب',
+              },
+            },
+          },
+        },
       },
       errors: {
         required: 'هذا الحقل مطلوب',
         nodeId: {
-          unrecognized_keys: 'اختيار التكامل غير صالح'
-        }
-      }
-    }
+          unrecognized_keys: 'اختيار التكامل غير صالح',
+        },
+      },
+    },
   },
   pipelines: {
     title: 'خطوط الأنابيب',
@@ -198,8 +198,8 @@ export default {
     searchPlaceholder: 'ابحث عن خطوط الأنابيب...',
     actions: {
       create: 'إضافة خط أنابيب جديد',
-      import: 'استيراد خط أنابيب'
-    }
+      import: 'استيراد خط أنابيب',
+    },
   },
   executions: {
     title: 'تنفيذ خطوط الأنابيب',
@@ -211,39 +211,39 @@ export default {
       startTime: 'وقت البدء',
       endTime: 'وقت الانتهاء',
       duration: 'المدة',
-      actions: 'الإجراءات'
+      actions: 'الإجراءات',
     },
     actions: {
       retryFromCurrent: 'أعد المحاولة من النقطة الحالية',
       retryFromStart: 'أعد المحاولة من البداية',
-      viewDetails: 'عرض التفاصيل'
-    }
+      viewDetails: 'عرض التفاصيل',
+    },
   },
   users: {
     title: 'إدارة المستخدمين',
     description: 'قم بإدارة مستخدمي النظام ووصولهم',
     actions: {
-      addUser: 'إضافة مستخدم'
+      addUser: 'إضافة مستخدم',
     },
     form: {
       title: {
-        add: 'إضافة مستخدم'
+        add: 'إضافة مستخدم',
       },
       fields: {
         given_name: {
           label: 'الاسم الأول',
           tooltip: 'أدخل الاسم الأول للمستخدم',
-          helper: ''
+          helper: '',
         },
         family_name: {
           label: 'اسم العائلة',
           tooltip: 'أدخل اسم العائلة للمستخدم',
-          helper: ''
+          helper: '',
         },
         email: {
           label: 'البريد الإلكتروني',
           tooltip: 'أدخل عنوان البريد الإلكتروني للمستخدم',
-          helper: ''
+          helper: '',
         },
         roles: {
           label: 'الأدوار',
@@ -251,31 +251,31 @@ export default {
           options: {
             Admin: 'المسؤول',
             Editor: 'المحرر',
-            Viewer: 'المشاهد'
-          }
+            Viewer: 'المشاهد',
+          },
         },
         email_verified: {
           label: 'تم التحقق من البريد الإلكتروني',
-          tooltip: 'أشر إلى ما إذا تم التحقق من بريد المستخدم الإلكتروني'
+          tooltip: 'أشر إلى ما إذا تم التحقق من بريد المستخدم الإلكتروني',
         },
         enabled: {
           label: 'مُفعل',
-          tooltip: 'فعّل أو عطّل المستخدم'
-        }
-      }
+          tooltip: 'فعّل أو عطّل المستخدم',
+        },
+      },
     },
     roles: {
       admin: 'المسؤول',
       editor: 'المحرر',
-      viewer: 'المشاهد'
-    }
+      viewer: 'المشاهد',
+    },
   },
   roles: {
     title: 'إدارة الأدوار',
     description: 'قم بإدارة أدوار النظام وأذوناتهم',
     actions: {
-      addRole: 'إضافة دور'
-    }
+      addRole: 'إضافة دور',
+    },
   },
   settings: {
     environments: {
@@ -290,11 +290,11 @@ export default {
         status: {
           name: 'الحالة',
           active: 'نشط',
-          disabled: 'معطل'
+          disabled: 'معطل',
         },
         costCenter: 'مركز التكلفة',
-        team: 'الفريق'
-      }
+        team: 'الفريق',
+      },
     },
     systemSettings: {
       title: 'إعدادات النظام',
@@ -302,7 +302,7 @@ export default {
         search: 'البحث',
         notifications: 'الإشعارات',
         security: 'الأمان',
-        performance: 'الأداء'
+        performance: 'الأداء',
       },
       search: {
         title: 'إعدادات البحث',
@@ -317,20 +317,20 @@ export default {
         endpoint: 'عنوان URL للنقطة النهاية (اختياري)',
         enabled: 'تمكين البحث',
         noProvider: 'لم يتم تكوين مزود بحث.',
-        configurePrompt: 'قم بتكوين Twelve Labs لتمكين قدرات البحث.'
+        configurePrompt: 'قم بتكوين Twelve Labs لتمكين قدرات البحث.',
       },
       notifications: {
         title: 'إعدادات الإشعارات',
-        comingSoon: 'الإعدادات ستتوفر قريباً.'
+        comingSoon: 'الإعدادات ستتوفر قريباً.',
       },
       security: {
         title: 'إعدادات الأمان',
-        comingSoon: 'الإعدادات ستتوفر قريباً.'
+        comingSoon: 'الإعدادات ستتوفر قريباً.',
       },
       performance: {
         title: 'إعدادات الأداء',
-        comingSoon: 'الإعدادات ستتوفر قريباً.'
-      }
+        comingSoon: 'الإعدادات ستتوفر قريباً.',
+      },
     },
     groups: {
       actions: {
@@ -338,17 +338,17 @@ export default {
         editGroup: 'تعديل المجموعة',
         deleteGroup: 'حذف المجموعة',
         createGroup: 'إنشاء مجموعة',
-        manageGroups: 'إدارة المجموعات'
-      }
+        manageGroups: 'إدارة المجموعات',
+      },
     },
     permissionSets: {
       noAssignments: 'لا توجد مجموعات أذونات',
       actions: {
         addPermissionSet: 'إضافة مجموعة أذونات',
         editPermissionSet: 'تعديل مجموعة الأذونات',
-        deletePermissionSet: 'حذف مجموعة الأذونات'
-      }
-    }
+        deletePermissionSet: 'حذف مجموعة الأذونات',
+      },
+    },
   },
   common: {
     select: 'اختر',
@@ -370,7 +370,7 @@ export default {
     delete: 'حذف',
     create: 'إنشاء',
     actions: {
-      add: 'إضافة'
+      add: 'إضافة',
     },
     columns: {
       username: 'اسم المستخدم',
@@ -381,12 +381,12 @@ export default {
       groups: 'المجموعات',
       created: 'تاريخ الإنشاء',
       modified: 'تاريخ التعديل',
-      actions: 'الإجراءات'
+      actions: 'الإجراءات',
     },
     status: {
       active: 'نشط',
-      inactive: 'غير نشط'
-    }
+      inactive: 'غير نشط',
+    },
   },
   translation: {
     common: {
@@ -396,7 +396,7 @@ export default {
         delete: 'حذف',
         activate: 'تفعيل',
         deactivate: 'تعطيل',
-        create: 'إنشاء'
+        create: 'إنشاء',
       },
       tableDensity: 'كثافة الجدول',
       theme: 'السمة',
@@ -426,7 +426,7 @@ export default {
       all: 'الكل',
       status: {
         active: 'نشط',
-        inactive: 'غير نشط'
+        inactive: 'غير نشط',
       },
       rename: 'إعادة التسمية',
       root: 'الجذر',
@@ -447,11 +447,11 @@ export default {
         groups: 'المجموعات',
         created: 'تاريخ الإنشاء',
         modified: 'تاريخ التعديل',
-        actions: 'الإجراءات'
+        actions: 'الإجراءات',
       },
       noGroups: 'لا توجد مجموعات',
       select: 'اختر',
-      moreInfo: 'مزيد من المعلومات'
+      moreInfo: 'مزيد من المعلومات',
     },
     users: {
       title: 'إدارة المستخدمين',
@@ -463,47 +463,47 @@ export default {
             label: 'الاسم الأول',
             tooltip: 'أدخل الاسم الأول للمستخدم',
             errors: {
-              required: 'الاسم الأول مطلوب'
-            }
+              required: 'الاسم الأول مطلوب',
+            },
           },
           family_name: {
             label: 'اسم العائلة',
             tooltip: 'أدخل اسم العائلة للمستخدم',
             errors: {
-              required: 'اسم العائلة مطلوب'
-            }
+              required: 'اسم العائلة مطلوب',
+            },
           },
           email: {
             label: 'البريد الإلكتروني',
             tooltip: 'أدخل عنوان البريد الإلكتروني للمستخدم',
             errors: {
               required: 'البريد الإلكتروني مطلوب',
-              invalid: 'عنوان البريد الإلكتروني غير صالح'
-            }
+              invalid: 'عنوان البريد الإلكتروني غير صالح',
+            },
           },
           enabled: {
             label: 'مُفعل',
             tooltip: 'فعّل أو عطّل المستخدم',
             errors: {
-              required: 'التفعيل مطلوب'
-            }
+              required: 'التفعيل مطلوب',
+            },
           },
           roles: {
             label: 'الأدوار',
             tooltip: 'اختر الأدوار للمستخدم',
             errors: {
-              required: 'الأدوار مطلوبة'
-            }
+              required: 'الأدوار مطلوبة',
+            },
           },
           email_verified: {
             label: 'تم التحقق من البريد الإلكتروني',
             tooltip: 'أشر إلى ما إذا تم التحقق من بريد المستخدم الإلكتروني',
             errors: {
-              required: 'التحقق من البريد الإلكتروني مطلوب'
-            }
-          }
-        }
-      }
+              required: 'التحقق من البريد الإلكتروني مطلوب',
+            },
+          },
+        },
+      },
     },
     roles: {
       title: 'إدارة الأدوار',
@@ -512,8 +512,8 @@ export default {
       editor: 'المحرر',
       viewer: 'المشاهد',
       actions: {
-        addRole: 'إضافة دور'
-      }
+        addRole: 'إضافة دور',
+      },
     },
     columns: {
       username: 'اسم المستخدم',
@@ -524,28 +524,28 @@ export default {
       groups: 'المجموعات',
       created: 'تاريخ الإنشاء',
       modified: 'تاريخ التعديل',
-      actions: 'الإجراءات'
+      actions: 'الإجراءات',
     },
     actions: {
       addUser: 'إضافة مستخدم',
       edit: 'تعديل المستخدم',
       delete: 'حذف المستخدم',
       activate: 'تفعيل المستخدم',
-      deactivate: 'تعطيل المستخدم'
+      deactivate: 'تعطيل المستخدم',
     },
     status: {
       active: 'نشط',
-      inactive: 'غير نشط'
+      inactive: 'غير نشط',
     },
     errors: {
       loadFailed: 'فشل تحميل المستخدمين',
       saveFailed: 'فشل في حفظ المستخدم',
-      deleteFailed: 'فشل في حذف المستخدم'
+      deleteFailed: 'فشل في حذف المستخدم',
     },
     navigation: {
       home: 'الرئيسية',
       collections: 'المجموعات',
-      settings: 'الإعدادات'
+      settings: 'الإعدادات',
     },
     home: {
       welcome: 'مرحبًا بكم في Media Lake',
@@ -557,7 +557,7 @@ export default {
       smartFolders: 'المجلدات الذكية',
       connectedStorage: 'التخزين المتصل',
       sharing: 'المشاركة',
-      comingSoon: 'قريبًا'
+      comingSoon: 'قريبًا',
     },
     notifications: {
       'Pipeline Complete': 'اكتمل خط الأنابيب',
@@ -565,13 +565,13 @@ export default {
       'Storage Warning': 'تحذير التخزين',
       'Storage capacity reaching 80%': 'سعة التخزين تقترب من 80%',
       'Pipeline Failed': 'فشل خط الأنابيب',
-      'Video processing pipeline failed': 'فشل خط معالجة الفيديو'
+      'Video processing pipeline failed': 'فشل خط معالجة الفيديو',
     },
     modal: {
       confirmDelete: 'هل أنت متأكد أنك تريد حذف هذا العنصر؟',
       confirmAction: 'هل أنت متأكد أنك تريد تنفيذ هذا الإجراء؟',
       error: 'حدث خطأ',
-      success: 'اكتملت العملية بنجاح'
+      success: 'اكتملت العملية بنجاح',
     },
     executions: {
       title: 'تنفيذ خطوط الأنابيب',
@@ -583,47 +583,47 @@ export default {
         startTime: 'وقت البدء',
         endTime: 'وقت الانتهاء',
         duration: 'المدة',
-        actions: 'الإجراءات'
+        actions: 'الإجراءات',
       },
       status: {
         succeeded: 'ناجح',
         failed: 'فشل',
         running: 'قيد التشغيل',
         timedOut: 'انتهى الوقت',
-        aborted: 'ألغيت'
+        aborted: 'ألغيت',
       },
       actions: {
         retryFromCurrent: 'أعد المحاولة من النقطة الحالية',
         retryFromStart: 'أعد المحاولة من البداية',
-        viewDetails: 'عرض التفاصيل'
+        viewDetails: 'عرض التفاصيل',
       },
       pagination: {
         page: 'الصفحة {{page}} من {{total}}',
-        showEntries: 'أظهر {{count}}'
-      }
+        showEntries: 'أظهر {{count}}',
+      },
     },
     s3Explorer: {
       filter: {
-        label: 'تصفية حسب الاسم'
+        label: 'تصفية حسب الاسم',
       },
       error: {
-        loading: 'خطأ في تحميل كائنات S3: {{message}}'
+        loading: 'خطأ في تحميل كائنات S3: {{message}}',
       },
       file: {
-        info: 'الحجم: {{size}} • فئة التخزين: {{storageClass}} • تم التعديل: {{modified}}'
+        info: 'الحجم: {{size}} • فئة التخزين: {{storageClass}} • تم التعديل: {{modified}}',
       },
       menu: {
         rename: 'إعادة التسمية',
-        delete: 'حذف'
-      }
+        delete: 'حذف',
+      },
     },
     assets: {
       title: 'الأصول',
-      connectedStorage: 'التخزين المتصل'
+      connectedStorage: 'التخزين المتصل',
     },
     metadata: {
       title: 'قريبًا',
-      description: 'نعمل على تقديم قدرات إدارة البيانات الوصفية. ترقب!'
+      description: 'نعمل على تقديم قدرات إدارة البيانات الوصفية. ترقب!',
     },
     pipelines: {
       title: 'خطوط الأنابيب',
@@ -633,7 +633,7 @@ export default {
         create: 'إضافة خط أنابيب جديد',
         deploy: 'نشر خط أنابيب الصور',
         addNew: 'إضافة خط أنابيب جديد',
-        viewAll: 'عرض جميع خطوط الأنابيب'
+        viewAll: 'عرض جميع خطوط الأنابيب',
       },
       search: 'ابحث عن خطوط الأنابيب',
       deploy: 'نشر خط أنابيب الصور',
@@ -643,7 +643,7 @@ export default {
         creationDate: 'تاريخ الإنشاء',
         system: 'النظام',
         type: 'النوع',
-        actions: 'الإجراءات'
+        actions: 'الإجراءات',
       },
       editor: {
         title: 'محرر خط الأنابيب',
@@ -653,29 +653,29 @@ export default {
           title: 'العقد',
           dragNodes: 'اسحب العقد إلى اللوحة',
           loading: 'جارٍ تحميل العقد...',
-          error: 'خطأ في تحميل العقد'
+          error: 'خطأ في تحميل العقد',
         },
         node: {
           configure: 'تكوين {{type}}',
           delete: 'حذف العقدة',
-          edit: 'تعديل العقدة'
+          edit: 'تعديل العقدة',
         },
         edge: {
           title: 'تحرير تسمية الاتصال',
           label: 'تسمية الاتصال',
-          delete: 'حذف الاتصال'
+          delete: 'حذف الاتصال',
         },
         modals: {
           error: {
             title: 'خطأ',
             incompatibleNodes: 'مخرجات العقدة السابقة غير متوافقة مع مدخلات العقدة الوجهة.',
-            validation: 'فشل التحقق من خط الأنابيب'
+            validation: 'فشل التحقق من خط الأنابيب',
           },
           delete: {
             title: 'حذف خط الأنابيب',
             message: 'هل أنت متأكد أنك تريد حذف هذا الخط؟ لا يمكن التراجع عن هذا الإجراء.',
-            confirm: 'اكتب اسم خط الأنابيب لتأكيد الحذف:'
-          }
+            confirm: 'اكتب اسم خط الأنابيب لتأكيد الحذف:',
+          },
         },
         controls: {
           undo: 'تراجع',
@@ -683,7 +683,7 @@ export default {
           zoomIn: 'تكبير',
           zoomOut: 'تصغير',
           fitView: 'تعديل العرض',
-          lockView: 'قفل العرض'
+          lockView: 'قفل العرض',
         },
         notifications: {
           saved: 'تم حفظ خط الأنابيب بنجاح',
@@ -691,10 +691,10 @@ export default {
           error: {
             save: 'فشل حفظ خط الأنابيب',
             validation: 'فشل التحقق من خط الأنابيب',
-            incompatibleNodes: 'الاتصال بين العقد غير متوافق'
-          }
-        }
-      }
+            incompatibleNodes: 'الاتصال بين العقد غير متوافق',
+          },
+        },
+      },
     },
     integrations: {
       title: 'التكاملات',
@@ -710,29 +710,29 @@ export default {
             label: 'التكامل',
             tooltip: 'اختر مزود التكامل',
             errors: {
-              required: 'اختيار التكامل مطلوب'
-            }
+              required: 'اختيار التكامل مطلوب',
+            },
           },
           description: {
             label: 'الوصف',
             tooltip: 'قم بتوفير وصف لهذا التكامل',
             errors: {
-              required: 'الوصف مطلوب'
-            }
+              required: 'الوصف مطلوب',
+            },
           },
           environmentId: {
             label: 'البيئة',
             tooltip: 'اختر البيئة لهذا التكامل',
             errors: {
-              required: 'اختيار البيئة مطلوب'
-            }
+              required: 'اختيار البيئة مطلوب',
+            },
           },
           enabled: {
             label: 'مُفعل',
             tooltip: 'فعّل أو عطّل هذا التكامل',
             errors: {
-              required: 'التفعيل مطلوب'
-            }
+              required: 'التفعيل مطلوب',
+            },
           },
           auth: {
             type: {
@@ -740,52 +740,52 @@ export default {
               tooltip: 'اختر طريقة المصادقة',
               options: {
                 awsIam: 'AWS IAM',
-                apiKey: 'مفتاح API'
+                apiKey: 'مفتاح API',
               },
               errors: {
-                required: 'نوع المصادقة مطلوب'
-              }
+                required: 'نوع المصادقة مطلوب',
+              },
             },
             credentials: {
               apiKey: {
                 label: 'مفتاح API',
                 tooltip: 'أدخل مفتاح API الخاص بك',
                 errors: {
-                  required: 'مفتاح API مطلوب'
-                }
+                  required: 'مفتاح API مطلوب',
+                },
               },
               iamRole: {
                 label: 'دور IAM',
                 tooltip: 'أدخل ARN لدور IAM',
                 errors: {
-                  required: 'دور IAM مطلوب'
-                }
-              }
-            }
-          }
+                  required: 'دور IAM مطلوب',
+                },
+              },
+            },
+          },
         },
         search: {
-          placeholder: 'ابحث عن التكاملات'
+          placeholder: 'ابحث عن التكاملات',
         },
         errors: {
           required: 'هذا الحقل مطلوب',
           nodeId: {
-            unrecognized_keys: 'اختيار التكامل غير صالح'
-          }
-        }
+            unrecognized_keys: 'اختيار التكامل غير صالح',
+          },
+        },
       },
       columns: {
         nodeName: 'اسم العقدة',
         environment: 'البيئة',
         createdDate: 'تاريخ الإنشاء',
         modifiedDate: 'تاريخ التعديل',
-        actions: 'الإجراءات'
+        actions: 'الإجراءات',
       },
       settings: {
         environments: {
-          title: 'البيئات'
-        }
-      }
-    }
-  }
-}
+          title: 'البيئات',
+        },
+      },
+    },
+  },
+};

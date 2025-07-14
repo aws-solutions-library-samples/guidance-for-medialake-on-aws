@@ -1,20 +1,20 @@
-from aws_cdk import (
-    aws_apigateway as apigateway,
-    aws_wafv2 as wafv2,
-    aws_logs as logs,
-    aws_iam as iam,
-    RemovalPolicy,
-    Fn,
-)
-from constructs import Construct
-from dataclasses import dataclass
-from config import config
 import time
+from dataclasses import dataclass
+
+from aws_cdk import Fn, RemovalPolicy
+from aws_cdk import aws_apigateway as apigateway
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_logs as logs
+from aws_cdk import aws_wafv2 as wafv2
+from constructs import Construct
+
+from config import config
 
 
 @dataclass
 class ApiGatewayDeploymentProps:
     """Properties for API Gateway Deployment Construct"""
+
     waf_acl_arn: str
     dependencies: list = None  # List of resources that deployment depends on
 
@@ -25,6 +25,7 @@ class ApiGatewayDeploymentConstruct(Construct):
     This allows separating the API definition from its deployment,
     which can help resolve circular dependencies between stacks.
     """
+
     def __init__(
         self,
         scope: Construct,
@@ -58,12 +59,12 @@ class ApiGatewayDeploymentConstruct(Construct):
         # Import the API Gateway from CloudFormation outputs
         api_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
         root_resource_id = Fn.import_value("MediaLakeApiGatewayCore-RootResourceId")
-        
+
         rest_api = apigateway.RestApi.from_rest_api_attributes(
-            self, 
+            self,
             "ImportedRestApi",
             rest_api_id=api_id,
-            root_resource_id=root_resource_id
+            root_resource_id=root_resource_id,
         )
 
         # Create a deployment for the RestApi
@@ -92,7 +93,9 @@ class ApiGatewayDeploymentConstruct(Construct):
             throttling_burst_limit=5000,
             data_trace_enabled=True,
             logging_level=apigateway.MethodLoggingLevel.INFO,
-            access_log_destination=apigateway.LogGroupLogDestination(rest_api_log_group),
+            access_log_destination=apigateway.LogGroupLogDestination(
+                rest_api_log_group
+            ),
             access_log_format=access_log_format,
         )
 
@@ -108,13 +111,13 @@ class ApiGatewayDeploymentConstruct(Construct):
         )
 
         self.api_gateway_waf_association.node.add_dependency(stage)
-        
+
         self._stage = stage
-    
+
     @property
     def stage(self) -> apigateway.Stage:
         return self._stage
-        
+
     @property
     def deployment(self) -> apigateway.Deployment:
         return self._deployment

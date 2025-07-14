@@ -1,12 +1,13 @@
-from aws_lambda_powertools import Logger, Tracer, Metrics
+import os
+from typing import Any, Dict
+
+import boto3
+from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.logging import correlation_paths
-from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.metrics import MetricUnit
-from typing import Dict, Any
-import boto3
+from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
-import os
 
 # Initialize Power Tools
 logger = Logger(service="delete-role-service")
@@ -69,7 +70,7 @@ def delete_role(role_id: str) -> Dict[str, Any]:
             "body": {"message": "Internal server error while deleting role"},
         }
 
-    except Exception as e:
+    except Exception:
         # Add error metrics
         metrics.add_metric(name="UnhandledErrors", unit=MetricUnit.Count, value=1)
 
@@ -89,6 +90,6 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
     """
     try:
         return app.resolve(event, context)
-    except Exception as e:
+    except Exception:
         logger.exception("Error processing request")
         return {"statusCode": 500, "body": {"message": "Internal server error"}}

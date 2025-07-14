@@ -21,4 +21,4 @@ export const useTableVirtualizer = <T extends HTMLElement>(
   });
 
   return virtualizer;
-}; 
+};

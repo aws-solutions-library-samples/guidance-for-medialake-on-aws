@@ -1,21 +1,15 @@
-from aws_cdk import (
-    aws_apigateway as apigateway,
-    aws_logs as logs,
-    aws_iam as iam,
-    aws_secretsmanager as secretsmanager,
-    aws_wafv2 as wafv2,
-    aws_ec2 as ec2,
-    Duration,
-    RemovalPolicy,
-    aws_cognito as cognito,
-    aws_s3 as s3,
-    aws_wafv2 as wafv2,
-    RemovalPolicy,
-    CfnOutput,
-)
 from dataclasses import dataclass
+
+from aws_cdk import CfnOutput, Duration, RemovalPolicy
+from aws_cdk import aws_apigateway as apigateway
+from aws_cdk import aws_cognito as cognito
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_logs as logs
+from aws_cdk import aws_s3 as s3
+from aws_cdk import aws_secretsmanager as secretsmanager
+from aws_cdk import aws_wafv2 as wafv2
 from constructs import Construct
-from typing import Optional, List
+
 from config import config
 
 
@@ -64,14 +58,12 @@ class ApiGatewayConstruct(Construct):
                         "managedRuleGroupStatement": {
                             "vendorName": "AWS",
                             "name": "AWSManagedRulesCommonRuleSet",
-                             "ruleActionOverrides": [
+                            "ruleActionOverrides": [
                                 {
                                     "name": "SizeRestrictions_BODY",
-                                    "actionToUse": {
-                                        "allow": {}
-                                    }
+                                    "actionToUse": {"allow": {}},
                                 }
-                            ]
+                            ],
                         }
                     },
                     "visibilityConfig": {
@@ -156,16 +148,16 @@ class ApiGatewayConstruct(Construct):
             access_log_format=access_log_format,
             logging_level=apigateway.MethodLoggingLevel.INFO,
         )
-        
+
         # # Create Cognito Authorizer first
         # self.cognito_user_pool_authorizer = apigateway.CognitoUserPoolsAuthorizer(
         #     self,
         #     "CognitoAuthorizer",
         #     identity_source="method.request.header.Authorization",
         #     cognito_user_pools=[self.props.user_pool],
-        #     # rest_api=self.api_gateway_rest_api 
+        #     # rest_api=self.api_gateway_rest_api
         # )
-        
+
         # Create the API without deploying it by default
         rest_api_props = {
             "endpoint_types": [apigateway.EndpointType.EDGE],
@@ -191,16 +183,13 @@ class ApiGatewayConstruct(Construct):
             #     authorizer=self.cognito_user_pool_authorizer,
             # ),
         }
-        
-        
+
         # Only include deploy_options when deploy is True
         if props.deploy_api:
             rest_api_props["deploy_options"] = self.deploy_options
-            
+
         self.api_gateway_rest_api = apigateway.RestApi(
-            self,
-            "MediaLakeApi",
-            **rest_api_props
+            self, "MediaLakeApi", **rest_api_props
         )
 
         # # Create Cognito Authorizer first
@@ -209,7 +198,7 @@ class ApiGatewayConstruct(Construct):
         #     "CognitoAuthorizer",
         #     identity_source="method.request.header.Authorization",
         #     cognito_user_pools=[self.props.user_pool],
-        #     # rest_api=self.api_gateway_rest_api 
+        #     # rest_api=self.api_gateway_rest_api
         # )
 
         # Set the default method options after creating the authorizer
@@ -218,8 +207,8 @@ class ApiGatewayConstruct(Construct):
             type=apigateway.ResponseType.DEFAULT_4_XX,
             response_headers={
                 "Access-Control-Allow-Origin": "'*'",
-                "Access-Control-Allow-Headers": "'*'"
-            }
+                "Access-Control-Allow-Headers": "'*'",
+            },
         )
 
         self.api_gateway_rest_api.add_gateway_response(
@@ -227,8 +216,8 @@ class ApiGatewayConstruct(Construct):
             type=apigateway.ResponseType.DEFAULT_5_XX,
             response_headers={
                 "Access-Control-Allow-Origin": "'*'",
-                "Access-Control-Allow-Headers": "'*'"
-            }
+                "Access-Control-Allow-Headers": "'*'",
+            },
         )
 
         # Add proxy resource, but let the recursive function handle adding the OPTIONS method
@@ -238,15 +227,15 @@ class ApiGatewayConstruct(Construct):
         # except Exception as e:
         #     # Resource already exists, just log and continue
         #     print(f"Note: {e} - This is expected if the proxy resource already exists")
-        
+
         # Output the RestApi ID for reference
         CfnOutput(self, "RestApiId", value=self.api_gateway_rest_api.rest_api_id)
-        
+
         # Add a utility method to add CORS OPTIONS methods to all resources
         # Do this before accessing other resources to avoid dependency issues
         # Commenting out because this conflicts with default_cors_preflight_options at the API level
         # self._add_cors_options_to_all_resources(self.api_gateway_rest_api.root)
-        
+
         rest_api_log_group.grant_write(iam.ServicePrincipal("apigateway.amazonaws.com"))
 
         self.api_gateway_x_origin_verify_secret = secretsmanager.Secret(
@@ -291,25 +280,29 @@ class ApiGatewayConstruct(Construct):
             resource.add_method(
                 "OPTIONS",
                 apigateway.MockIntegration(
-                    integration_responses=[{
-                        'statusCode': '200',
-                        'responseParameters': {
-                            'method.response.header.Access-Control-Allow-Headers': "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Origin-Verify'",
-                            'method.response.header.Access-Control-Allow-Origin': "'*'",
-                            'method.response.header.Access-Control-Allow-Methods': "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+                    integration_responses=[
+                        {
+                            "statusCode": "200",
+                            "responseParameters": {
+                                "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Origin-Verify'",
+                                "method.response.header.Access-Control-Allow-Origin": "'*'",
+                                "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'",
+                            },
                         }
-                    }],
+                    ],
                     passthrough_behavior=apigateway.PassthroughBehavior.NEVER,
-                    request_templates={"application/json": '{"statusCode": 200}'}
+                    request_templates={"application/json": '{"statusCode": 200}'},
                 ),
-                method_responses=[{
-                    'statusCode': '200',
-                    'responseParameters': {
-                        'method.response.header.Access-Control-Allow-Headers': True,
-                        'method.response.header.Access-Control-Allow-Methods': True,
-                        'method.response.header.Access-Control-Allow-Origin': True,
+                method_responses=[
+                    {
+                        "statusCode": "200",
+                        "responseParameters": {
+                            "method.response.header.Access-Control-Allow-Headers": True,
+                            "method.response.header.Access-Control-Allow-Methods": True,
+                            "method.response.header.Access-Control-Allow-Origin": True,
+                        },
                     }
-                }],
+                ],
                 authorization_type=apigateway.AuthorizationType.NONE,
             )
             return True
@@ -328,33 +321,37 @@ class ApiGatewayConstruct(Construct):
             resource.add_method(
                 "OPTIONS",
                 apigateway.MockIntegration(
-                    integration_responses=[{
-                        'statusCode': '200',
-                        'responseParameters': {
-                            'method.response.header.Access-Control-Allow-Headers': "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Origin-Verify'",
-                            'method.response.header.Access-Control-Allow-Origin': "'*'",
-                            'method.response.header.Access-Control-Allow-Methods': "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+                    integration_responses=[
+                        {
+                            "statusCode": "200",
+                            "responseParameters": {
+                                "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Origin-Verify'",
+                                "method.response.header.Access-Control-Allow-Origin": "'*'",
+                                "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'",
+                            },
                         }
-                    }],
+                    ],
                     passthrough_behavior=apigateway.PassthroughBehavior.NEVER,
-                    request_templates={"application/json": '{"statusCode": 200}'}
+                    request_templates={"application/json": '{"statusCode": 200}'},
                 ),
-                method_responses=[{
-                    'statusCode': '200',
-                    'responseParameters': {
-                        'method.response.header.Access-Control-Allow-Headers': True,
-                        'method.response.header.Access-Control-Allow-Methods': True,
-                        'method.response.header.Access-Control-Allow-Origin': True,
+                method_responses=[
+                    {
+                        "statusCode": "200",
+                        "responseParameters": {
+                            "method.response.header.Access-Control-Allow-Headers": True,
+                            "method.response.header.Access-Control-Allow-Methods": True,
+                            "method.response.header.Access-Control-Allow-Origin": True,
+                        },
                     }
-                }],
+                ],
                 authorization_type=apigateway.AuthorizationType.NONE,
             )
         except Exception as e:
             # Method may already exist, just log and continue
             print(f"Note: Could not add OPTIONS method to resource: {e}")
-            
+
         # Recursively process all child resources if they exist
         # Some resources (like imported ones) may not have children attribute
-        if hasattr(resource, 'children') and resource.children:
+        if hasattr(resource, "children") and resource.children:
             for child_resource in resource.children.values():
                 self._add_cors_options_to_all_resources(child_resource)

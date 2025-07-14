@@ -10,7 +10,7 @@ import {
   Typography,
   CircularProgress,
   Snackbar,
-  Alert
+  Alert,
 } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { useCreateGroup } from '@/api/hooks/useGroups';
@@ -28,7 +28,7 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ open, onClose }) =>
     id: '',
     description: '',
     department: '',
-    assignedPermissionSets: []
+    assignedPermissionSets: [],
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [snackbar, setSnackbar] = useState<{
@@ -38,49 +38,55 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ open, onClose }) =>
   }>({
     open: false,
     message: '',
-    severity: 'success'
+    severity: 'success',
   });
 
   const createGroupMutation = useCreateGroup();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    
+    setFormData((prev) => ({ ...prev, [name]: value }));
+
     // Clear error when user types
     if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
+      setErrors((prev) => ({ ...prev, [name]: '' }));
     }
   };
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
-    
+
     if (!formData.name.trim()) {
       newErrors.name = t('validation.required');
     }
-    
+
     if (!formData.id.trim()) {
       newErrors.id = t('validation.required');
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async () => {
     if (!validate()) return;
-    
+
     try {
       await createGroupMutation.mutateAsync(formData);
       setSnackbar({
         open: true,
         message: t('groups.messages.createSuccess'),
-        severity: 'success'
+        severity: 'success',
       });
-      
+
       // Reset form and close modal after successful creation
-      setFormData({ name: '', id: '', description: '', department: '', assignedPermissionSets: [] });
+      setFormData({
+        name: '',
+        id: '',
+        description: '',
+        department: '',
+        assignedPermissionSets: [],
+      });
       setTimeout(() => {
         onClose();
       }, 1000);
@@ -89,13 +95,13 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ open, onClose }) =>
       setSnackbar({
         open: true,
         message: t('groups.messages.createError'),
-        severity: 'error'
+        severity: 'error',
       });
     }
   };
 
   const handleCloseSnackbar = () => {
-    setSnackbar(prev => ({ ...prev, open: false }));
+    setSnackbar((prev) => ({ ...prev, open: false }));
   };
 
   return (
@@ -164,7 +170,7 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ open, onClose }) =>
           </Button>
         </DialogActions>
       </Dialog>
-      
+
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}

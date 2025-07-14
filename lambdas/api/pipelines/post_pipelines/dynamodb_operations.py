@@ -1,12 +1,12 @@
-import uuid
 import os
+import uuid
 from datetime import datetime
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, Optional
 
 import boto3
 from aws_lambda_powertools import Logger
 
-from config import PIPELINES_TABLE, ACCOUNT_ID, NODE_TABLE
+from config import NODE_TABLE, PIPELINES_TABLE
 
 # Initialize logger
 logger = Logger()
@@ -279,17 +279,17 @@ def get_integration_secret_arn(integration_id: str) -> Optional[str]:
 def get_pipeline_by_id(pipeline_id: str) -> Optional[Dict[str, Any]]:
     """
     Get pipeline record from DynamoDB by ID.
-    
+
     Args:
         pipeline_id: ID of the pipeline to look up
-        
+
     Returns:
         Pipeline record if found, None otherwise
     """
     logger.info(f"Looking up pipeline with ID: {pipeline_id}")
     dynamodb = boto3.resource("dynamodb")
     table = dynamodb.Table(PIPELINES_TABLE)
-    
+
     try:
         response = table.get_item(Key={"id": pipeline_id})
         pipeline = response.get("Item")
@@ -302,31 +302,34 @@ def get_pipeline_by_id(pipeline_id: str) -> Optional[Dict[str, Any]]:
         logger.error(f"Error looking up pipeline: {e}")
         return None
 
+
 def create_pipeline_record(
     pipeline: Any,
     execution_arn: Optional[str] = None,
     deployment_status: str = "CREATING",
-    active: bool = True  # Default to active
+    active: bool = True,  # Default to active
 ) -> str:
     """
     Create a new pipeline record in DynamoDB with initial status.
-    
+
     Args:
         pipeline: Pipeline definition object
         execution_arn: Optional ARN of the Step Function execution
         deployment_status: Initial deployment status
         active: Whether the pipeline is active
-        
+
     Returns:
         ID of the created pipeline record
     """
-    logger.info(f"Creating pipeline record with status: {deployment_status}, active: {active}")
+    logger.info(
+        f"Creating pipeline record with status: {deployment_status}, active: {active}"
+    )
     dynamodb = boto3.resource("dynamodb")
     table = dynamodb.Table(PIPELINES_TABLE)
-    
+
     pipeline_id = str(uuid.uuid4())
     now_iso = datetime.utcnow().isoformat()
-    
+
     item = {
         "id": pipeline_id,
         "createdAt": now_iso,
@@ -338,12 +341,12 @@ def create_pipeline_record(
         "type": "Event Triggered",
         "system": False,
         "deploymentStatus": deployment_status,
-        "active": active  # Add active field
+        "active": active,  # Add active field
     }
-    
+
     if execution_arn:
         item["executionArn"] = execution_arn
-    
+
     try:
         table.put_item(Item=item)
         logger.info(f"Successfully created pipeline record with id {pipeline_id}")
@@ -371,11 +374,11 @@ def update_pipeline_status(
     trigger_lambda_arns: Optional[Dict[str, str]] = None,
     sqs_queue_arns: Optional[Dict[str, str]] = None,
     event_source_mapping_uuids: Optional[Dict[str, str]] = None,
-    service_role_arns: Optional[Dict[str, Dict[str, str]]] = None
+    service_role_arns: Optional[Dict[str, Dict[str, str]]] = None,
 ) -> None:
     """
     Update the deployment status and optionally resources of a pipeline.
-    
+
     Args:
         pipeline_id: ID of the pipeline to update
         deployment_status: New deployment status
@@ -394,58 +397,58 @@ def update_pipeline_status(
     logger.info(f"Updating pipeline {pipeline_id} status to {deployment_status}")
     dynamodb = boto3.resource("dynamodb")
     table = dynamodb.Table(PIPELINES_TABLE)
-    
+
     now_iso = datetime.utcnow().isoformat()
-    
+
     update_expr = "SET #status = :status, #up = :updated"
-    expr_values = {
-        ":status": deployment_status,
-        ":updated": now_iso
-    }
-    expr_names = {
-        "#status": "deploymentStatus",
-        "#up": "updatedAt"
-    }
-    
+    expr_values = {":status": deployment_status, ":updated": now_iso}
+    expr_names = {"#status": "deploymentStatus", "#up": "updatedAt"}
+
     # Add active state if provided
     if active is not None:
         update_expr += ", #active = :active"
         expr_values[":active"] = active
         expr_names["#active"] = "active"
-    
+
     # Add resources if provided
     dependent_resources = []
     if lambda_arns:
         for node_id, arn in lambda_arns.items():
             if arn:
                 dependent_resources.append(["lambda", arn])
-                
+
                 # Add Lambda IAM role if available
                 if lambda_role_arns and node_id in lambda_role_arns:
                     role_arn = lambda_role_arns[node_id]
                     dependent_resources.append(["iam_role", role_arn])
-                    logger.info(f"Added Lambda IAM role {role_arn} to dependent resources")
-        
+                    logger.info(
+                        f"Added Lambda IAM role {role_arn} to dependent resources"
+                    )
+
         # Add service roles if available
         if service_role_arns:
             for node_id, roles in service_role_arns.items():
                 for role_name, role_arn in roles.items():
                     dependent_resources.append(["service_role", role_arn])
-                    logger.info(f"Added service role {role_name} ({role_arn}) to dependent resources")
-        
+                    logger.info(
+                        f"Added service role {role_name} ({role_arn}) to dependent resources"
+                    )
+
         update_expr += ", #res = :res"
         expr_values[":res"] = dependent_resources
         expr_names["#res"] = "dependentResources"
-    
+
     if state_machine_arn:
         if lambda_arns:
             # Already added dependentResources, just append to it
             dependent_resources.append(["step_function", state_machine_arn])
-            
+
             # Add Step Functions IAM role if available
             if sfn_role_arn:
                 dependent_resources.append(["iam_role", sfn_role_arn])
-                logger.info(f"Added Step Functions IAM role {sfn_role_arn} to dependent resources")
+                logger.info(
+                    f"Added Step Functions IAM role {sfn_role_arn} to dependent resources"
+                )
         else:
             # Need to get existing dependentResources first
             pipeline = get_pipeline_by_id(pipeline_id)
@@ -460,38 +463,40 @@ def update_pipeline_status(
                 update_expr += ", #res = :res"
                 expr_values[":res"] = dependent_resources
                 expr_names["#res"] = "dependentResources"
-        
+
         update_expr += ", #arn = :arn"
         expr_values[":arn"] = state_machine_arn
         expr_names["#arn"] = "stateMachineArn"
-    
+
     # Handle service roles separately if lambda_arns is not provided
     elif service_role_arns:
         # Need to get existing dependentResources first
         pipeline = get_pipeline_by_id(pipeline_id)
         if pipeline and "dependentResources" in pipeline:
             dependent_resources = pipeline["dependentResources"]
-        
+
         # Add service roles
         for node_id, roles in service_role_arns.items():
             for role_name, role_arn in roles.items():
                 dependent_resources.append(["service_role", role_arn])
-                logger.info(f"Added service role {role_name} ({role_arn}) to dependent resources")
-        
+                logger.info(
+                    f"Added service role {role_name} ({role_arn}) to dependent resources"
+                )
+
         update_expr += ", #res = :res"
         expr_values[":res"] = dependent_resources
         expr_names["#res"] = "dependentResources"
-    
+
     if eventbridge_rule_arns and not lambda_arns and not service_role_arns:
         # Need to get existing dependentResources first if lambda_arns not provided
         pipeline = get_pipeline_by_id(pipeline_id)
         if pipeline and "dependentResources" in pipeline:
             dependent_resources = pipeline["dependentResources"]
-        
+
         for node_id, arn in eventbridge_rule_arns.items():
             if arn:
                 dependent_resources.append(["eventbridge_rule", arn])
-        
+
         update_expr += ", #res = :res"
         expr_values[":res"] = dependent_resources
         expr_names["#res"] = "dependentResources"
@@ -500,39 +505,47 @@ def update_pipeline_status(
         for node_id, arn in eventbridge_rule_arns.items():
             if arn:
                 dependent_resources.append(["eventbridge_rule", arn])
-                
+
                 # Add EventBridge IAM role if available
                 if eventbridge_role_arns and node_id in eventbridge_role_arns:
                     role_arn = eventbridge_role_arns[node_id]
                     dependent_resources.append(["iam_role", role_arn])
-                    logger.info(f"Added EventBridge IAM role {role_arn} to dependent resources")
-                
+                    logger.info(
+                        f"Added EventBridge IAM role {role_arn} to dependent resources"
+                    )
+
                 # Add trigger Lambda if available
                 if trigger_lambda_arns and node_id in trigger_lambda_arns:
                     trigger_lambda_arn = trigger_lambda_arns[node_id]
                     dependent_resources.append(["trigger_lambda", trigger_lambda_arn])
-                    logger.info(f"Added trigger Lambda {trigger_lambda_arn} to dependent resources")
-                
+                    logger.info(
+                        f"Added trigger Lambda {trigger_lambda_arn} to dependent resources"
+                    )
+
                 # Add SQS queue if available
                 if sqs_queue_arns and node_id in sqs_queue_arns:
                     queue_arn = sqs_queue_arns[node_id]
                     dependent_resources.append(["sqs_queue", queue_arn])
                     logger.info(f"Added SQS queue {queue_arn} to dependent resources")
-                
+
                 # Add event source mapping if available
                 if event_source_mapping_uuids and node_id in event_source_mapping_uuids:
                     mapping_uuid = event_source_mapping_uuids[node_id]
                     dependent_resources.append(["event_source_mapping", mapping_uuid])
-                    logger.info(f"Added event source mapping {mapping_uuid} to dependent resources")
-    
+                    logger.info(
+                        f"Added event source mapping {mapping_uuid} to dependent resources"
+                    )
+
     try:
         table.update_item(
             Key={"id": pipeline_id},
             UpdateExpression=update_expr,
             ExpressionAttributeValues=expr_values,
-            ExpressionAttributeNames=expr_names
+            ExpressionAttributeNames=expr_names,
         )
-        logger.info(f"Successfully updated pipeline {pipeline_id} status to {deployment_status}")
+        logger.info(
+            f"Successfully updated pipeline {pipeline_id} status to {deployment_status}"
+        )
     except Exception as e:
         logger.exception(f"Failed to update pipeline status: {e}")
         raise
@@ -551,7 +564,7 @@ def store_pipeline_info(
     trigger_lambda_arns: Optional[Dict[str, str]] = None,
     sqs_queue_arns: Optional[Dict[str, str]] = None,
     event_source_mapping_uuids: Optional[Dict[str, str]] = None,
-    service_role_arns: Optional[Dict[str, Dict[str, str]]] = None
+    service_role_arns: Optional[Dict[str, Dict[str, str]]] = None,
 ) -> str:
     """
     Store or update pipeline information in DynamoDB.
@@ -570,21 +583,21 @@ def store_pipeline_info(
         sqs_queue_arns: Optional dictionary mapping node IDs to SQS queue ARNs
         event_source_mapping_uuids: Optional dictionary mapping node IDs to event source mapping UUIDs
         service_role_arns: Optional dictionary mapping node IDs to dictionaries of service role names and ARNs
-        
+
     Returns:
         ID of the created or updated pipeline
     """
     logger.info("Storing/updating pipeline information in DynamoDB")
-    
+
     if pipeline_id:
         # Update existing pipeline with DEPLOYED status and new definition
         logger.info(f"Updating existing pipeline with ID: {pipeline_id}")
-        
+
         # Update the pipeline definition
         dynamodb = boto3.resource("dynamodb")
         table = dynamodb.Table(PIPELINES_TABLE)
         now_iso = datetime.utcnow().isoformat()
-        
+
         try:
             # Update the definition and name fields
             table.update_item(
@@ -594,20 +607,20 @@ def store_pipeline_info(
                     "#def": "definition",
                     "#name": "name",
                     "#desc": "description",
-                    "#up": "updatedAt"
+                    "#up": "updatedAt",
                 },
                 ExpressionAttributeValues={
                     ":def": pipeline.dict(),
                     ":name": pipeline.name,
                     ":desc": pipeline.description,
-                    ":updated": now_iso
-                }
+                    ":updated": now_iso,
+                },
             )
             logger.info(f"Successfully updated definition for pipeline {pipeline_id}")
         except Exception as e:
             logger.exception(f"Failed to update pipeline definition: {e}")
             raise
-        
+
         # Update the pipeline status and resources
         update_pipeline_status(
             pipeline_id,
@@ -622,7 +635,7 @@ def store_pipeline_info(
             trigger_lambda_arns=trigger_lambda_arns,
             sqs_queue_arns=sqs_queue_arns,
             event_source_mapping_uuids=event_source_mapping_uuids,
-            service_role_arns=service_role_arns
+            service_role_arns=service_role_arns,
         )
         return pipeline_id
     else:
@@ -643,12 +656,14 @@ def store_pipeline_info(
                 trigger_lambda_arns=trigger_lambda_arns,
                 sqs_queue_arns=sqs_queue_arns,
                 event_source_mapping_uuids=event_source_mapping_uuids,
-                service_role_arns=service_role_arns
+                service_role_arns=service_role_arns,
             )
             return pipeline_id
         else:
             # Create new pipeline with DEPLOYED status
-            pipeline_id = create_pipeline_record(pipeline, None, "DEPLOYED", active=active)
+            pipeline_id = create_pipeline_record(
+                pipeline, None, "DEPLOYED", active=active
+            )
             update_pipeline_status(
                 pipeline_id,
                 "DEPLOYED",
@@ -661,6 +676,6 @@ def store_pipeline_info(
                 trigger_lambda_arns=trigger_lambda_arns,
                 sqs_queue_arns=sqs_queue_arns,
                 event_source_mapping_uuids=event_source_mapping_uuids,
-                service_role_arns=service_role_arns
+                service_role_arns=service_role_arns,
             )
             return pipeline_id

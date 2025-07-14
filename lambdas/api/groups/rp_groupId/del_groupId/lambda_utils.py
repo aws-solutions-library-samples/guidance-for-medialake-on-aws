@@ -1,15 +1,15 @@
-from typing import Any, Dict, Union, Callable, TypeVar, cast
+import os
+import time
+from functools import wraps
+from typing import Any, Callable, Dict, TypeVar, Union, cast
+
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import MetricUnit
+from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.utilities.validation import validate
-from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
-from functools import wraps
-import time
-import os
 from typing_extensions import Concatenate, ParamSpec
-from logging import getLevelName, WARNING
 
 # Type variables for better type hinting
 P = ParamSpec("P")
@@ -69,7 +69,7 @@ def validate_input(schema: Dict[str, Any]) -> Callable:
     """
 
     def decorator(
-        func: Callable[Concatenate[Dict[str, Any], LambdaContext, P], R]
+        func: Callable[Concatenate[Dict[str, Any], LambdaContext, P], R],
     ) -> Callable[Concatenate[Dict[str, Any], LambdaContext, P], R]:
         @wraps(func)
         def wrapper(
@@ -87,6 +87,7 @@ def validate_input(schema: Dict[str, Any]) -> Callable:
         return wrapper
 
     return decorator
+
 
 def _truncate_floats(obj, max_items=15):
     """
@@ -119,7 +120,7 @@ def lambda_handler_decorator(cors: bool = True) -> Callable:
     """
 
     def decorator(
-        func: Callable[Concatenate[Dict[str, Any], LambdaContext, P], R]
+        func: Callable[Concatenate[Dict[str, Any], LambdaContext, P], R],
     ) -> Callable[Concatenate[Dict[str, Any], LambdaContext, P], R]:
         @wraps(func)
         @tracer.capture_lambda_handler

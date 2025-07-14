@@ -10,12 +10,12 @@ export default {
     hebrew: 'עברית',
     japanese: 'יפנית',
     korean: 'קוריאנית',
-    spanish: 'ספרדית'
+    spanish: 'ספרדית',
   },
   assetsPage: {
     title: 'נכסים',
     connectors: 'מחברים',
-    selectConnector: 'בחר מחבר'
+    selectConnector: 'בחר מחבר',
   },
   assetExplorer: {
     noConnectorSelected: 'בחר מחבר כדי לצפות בנכסים',
@@ -25,14 +25,14 @@ export default {
     menu: {
       rename: 'שנה שם',
       share: 'שתף',
-      download: 'הורד'
+      download: 'הורד',
     },
     deleteDialog: {
       title: 'אישור מחיקה',
       description: 'האם אתה בטוח שברצונך למחוק נכס זה? פעולה זו אינה ניתנת לביטול.',
       cancel: 'ביטול',
-      confirm: 'מחק'
-    }
+      confirm: 'מחק',
+    },
   },
   sidebar: {
     menu: {
@@ -40,7 +40,7 @@ export default {
       assets: 'נכסים',
       pipelines: 'צינורות',
       pipelineExecutions: 'הרצת צינורות',
-      settings: 'הגדרות'
+      settings: 'הגדרות',
     },
     submenu: {
       system: 'הגדרות מערכת',
@@ -48,8 +48,8 @@ export default {
       userManagement: 'ניהול משתמשים',
       roles: 'תפקידים',
       integrations: 'אינטגרציות',
-      environments: 'סביבות'
-    }
+      environments: 'סביבות',
+    },
   },
   profile: {
     title: 'פרופיל',
@@ -63,22 +63,22 @@ export default {
     pushNotifications: 'התראות דחיפה',
     changePassword: 'שנה סיסמה',
     twoFactorAuth: 'אימות דו-גורמי',
-    appearance: 'מראה'
+    appearance: 'מראה',
   },
   app: {
     loading: 'טוען...',
     errors: {
       loadingConfig: 'שגיאה בטעינת תצורת AWS:',
       loadingUserAttributes: 'שגיאה בטעינת מאפייני המשתמש:',
-      signingOut: 'שגיאה ביציאה:'
+      signingOut: 'שגיאה ביציאה:',
     },
     navigation: {
       preventedDuplicate: 'מניעת ניווט כפול ל',
-      navigating: 'ניווט מ'
+      navigating: 'ניווט מ',
     },
     branding: {
-              name: 'Media Lake'
-    }
+      name: 'Media Lake',
+    },
   },
   search: {
     semantic: 'חיפוש סמנטי',
@@ -86,30 +86,30 @@ export default {
       dateRange: 'טווח תאריכים',
       contentType: 'סוג תוכן',
       storageLocation: 'מיקום אחסון',
-      comingSoon: 'סינונים נוספים בקרוב...'
-    }
+      comingSoon: 'סינונים נוספים בקרוב...',
+    },
   },
   admin: {
     metrics: {
       storageUsage: 'שימוש באחסון',
       apiUsage: 'שימוש ב-API',
       activeUsers: 'משתמשים פעילים',
-      systemLoad: 'עומס מערכת'
+      systemLoad: 'עומס מערכת',
     },
     errors: {
       userDeletionNotImplemented: 'מחיקת משתמש אינה מיושמת עדיין.',
       userCreationNotImplemented: 'יצירת משתמש אינה מיושמת עדיין.',
       userEditingNotImplemented: 'עריכת משתמש אינה מיושמת עדיין.',
       analyticsExportNotImplemented: 'ייצוא נתוני אנליטיקה אינו מיושם עדיין.',
-      systemResetNotImplemented: 'איפוס מערכת אינו מיושם עדיין.'
+      systemResetNotImplemented: 'איפוס מערכת אינו מיושם עדיין.',
     },
     columns: {
-      lastActive: 'פעילות אחרונה'
+      lastActive: 'פעילות אחרונה',
     },
     buttons: {
       exportAnalytics: 'ייצוא אנליטיקה',
-      resetSystem: 'אפס מערכת'
-    }
+      resetSystem: 'אפס מערכת',
+    },
   },
   integrations: {
     title: 'אינטגרציות',
@@ -120,7 +120,7 @@ export default {
     addIntegration: 'הוסף אינטגרציה',
     form: {
       search: {
-        placeholder: 'חפש אינטגרציות'
+        placeholder: 'חפש אינטגרציות',
       },
       title: 'הוסף אינטגרציה',
       fields: {
@@ -128,30 +128,30 @@ export default {
           label: 'אינטגרציה',
           tooltip: 'בחר ספק אינטגרציה',
           errors: {
-            required: 'בחירת אינטגרציה הינה חובה'
-          }
+            required: 'בחירת אינטגרציה הינה חובה',
+          },
         },
         description: {
           label: 'תיאור',
           tooltip: 'ספק תיאור לאינטגרציה זו',
           helper: 'תיאור קצר של אינטגרציה זו',
           errors: {
-            required: 'תיאור הינו חובה'
-          }
+            required: 'תיאור הינו חובה',
+          },
         },
         environmentId: {
           label: 'סביבה',
           tooltip: 'בחר את הסביבה לאינטגרציה זו',
           errors: {
-            required: 'בחירת סביבה הינה חובה'
-          }
+            required: 'בחירת סביבה הינה חובה',
+          },
         },
         enabled: {
           label: 'מאופשר',
           tooltip: 'הפעל או השבת אינטגרציה זו',
           errors: {
-            required: 'אופציית הפעלה הינה חובה'
-          }
+            required: 'אופציית הפעלה הינה חובה',
+          },
         },
         auth: {
           type: {
@@ -159,11 +159,11 @@ export default {
             tooltip: 'בחר את שיטת האימות',
             options: {
               awsIam: 'AWS IAM',
-              apiKey: 'מפתח API'
+              apiKey: 'מפתח API',
             },
             errors: {
-              required: 'סוג אימות הינו חובה'
-            }
+              required: 'סוג אימות הינו חובה',
+            },
           },
           credentials: {
             apiKey: {
@@ -171,26 +171,26 @@ export default {
               tooltip: 'הזן את מפתח ה-API שלך',
               helper: 'מפתח API לאימות עם השירות',
               errors: {
-                required: 'מפתח API הינו חובה'
-              }
+                required: 'מפתח API הינו חובה',
+              },
             },
             iamRole: {
               label: 'תפקיד IAM',
               tooltip: 'הזן את ARN של תפקיד ה-IAM',
               errors: {
-                required: 'תפקיד IAM הינו חובה'
-              }
-            }
-          }
-        }
+                required: 'תפקיד IAM הינו חובה',
+              },
+            },
+          },
+        },
       },
       errors: {
         required: 'שדה זה הינו חובה',
         nodeId: {
-          unrecognized_keys: 'בחירת אינטגרציה לא תקינה'
-        }
-      }
-    }
+          unrecognized_keys: 'בחירת אינטגרציה לא תקינה',
+        },
+      },
+    },
   },
   pipelines: {
     title: 'צינורות',
@@ -198,8 +198,8 @@ export default {
     searchPlaceholder: 'חפש צינורות...',
     actions: {
       create: 'הוסף צינור חדש',
-      import: 'ייבא צינור'
-    }
+      import: 'ייבא צינור',
+    },
   },
   executions: {
     title: 'הרצת צינורות',
@@ -211,39 +211,39 @@ export default {
       startTime: 'זמן התחלה',
       endTime: 'זמן סיום',
       duration: 'משך',
-      actions: 'פעולות'
+      actions: 'פעולות',
     },
     actions: {
       retryFromCurrent: 'נסה שוב מהמצב הנוכחי',
       retryFromStart: 'נסה שוב מההתחלה',
-      viewDetails: 'צפה בפרטים'
-    }
+      viewDetails: 'צפה בפרטים',
+    },
   },
   users: {
     title: 'ניהול משתמשים',
     description: 'נהל את משתמשי המערכת וההרשאות שלהם',
     actions: {
-      addUser: 'הוסף משתמש'
+      addUser: 'הוסף משתמש',
     },
     form: {
       title: {
-        add: 'הוסף משתמש'
+        add: 'הוסף משתמש',
       },
       fields: {
         given_name: {
           label: 'שם פרטי',
           tooltip: 'הזן את השם הפרטי של המשתמש',
-          helper: ''
+          helper: '',
         },
         family_name: {
           label: 'שם משפחה',
           tooltip: 'הזן את שם המשפחה של המשתמש',
-          helper: ''
+          helper: '',
         },
         email: {
           label: 'אימייל',
           tooltip: 'הזן את כתובת האימייל של המשתמש',
-          helper: ''
+          helper: '',
         },
         roles: {
           label: 'תפקידים',
@@ -251,31 +251,31 @@ export default {
           options: {
             Admin: 'מנהל',
             Editor: 'עורך',
-            Viewer: 'צופה'
-          }
+            Viewer: 'צופה',
+          },
         },
         email_verified: {
           label: 'אימות אימייל',
-          tooltip: 'סמן אם כתובת האימייל של המשתמש אומתה'
+          tooltip: 'סמן אם כתובת האימייל של המשתמש אומתה',
         },
         enabled: {
           label: 'מאופשר',
-          tooltip: 'הפעל או השבת את המשתמש'
-        }
-      }
+          tooltip: 'הפעל או השבת את המשתמש',
+        },
+      },
     },
     roles: {
       admin: 'מנהל',
       editor: 'עורך',
-      viewer: 'צופה'
-    }
+      viewer: 'צופה',
+    },
   },
   roles: {
     title: 'ניהול תפקידים',
     description: 'נהל את התפקידים במערכת ואת ההרשאות שלהם',
     actions: {
-      addRole: 'הוסף תפקיד'
-    }
+      addRole: 'הוסף תפקיד',
+    },
   },
   settings: {
     environments: {
@@ -290,11 +290,11 @@ export default {
         status: {
           name: 'מצב',
           active: 'פעיל',
-          disabled: 'מבוטל'
+          disabled: 'מבוטל',
         },
         costCenter: 'מרכז עלויות',
-        team: 'צוות'
-      }
+        team: 'צוות',
+      },
     },
     systemSettings: {
       title: 'הגדרות מערכת',
@@ -302,7 +302,7 @@ export default {
         search: 'חיפוש',
         notifications: 'התראות',
         security: 'אבטחה',
-        performance: 'ביצועים'
+        performance: 'ביצועים',
       },
       search: {
         title: 'תצורת חיפוש',
@@ -317,20 +317,20 @@ export default {
         endpoint: 'כתובת URL של נקודת הקצה (אופציונלי)',
         enabled: 'חיפוש מאופשר',
         noProvider: 'לא הוגדר ספק חיפוש.',
-        configurePrompt: 'הגדר את Twelve Labs כדי להפעיל את יכולות החיפוש.'
+        configurePrompt: 'הגדר את Twelve Labs כדי להפעיל את יכולות החיפוש.',
       },
       notifications: {
         title: 'הגדרות התראות',
-        comingSoon: 'הגדרות התראות יגיעו בקרוב.'
+        comingSoon: 'הגדרות התראות יגיעו בקרוב.',
       },
       security: {
         title: 'הגדרות אבטחה',
-        comingSoon: 'הגדרות אבטחה יגיעו בקרוב.'
+        comingSoon: 'הגדרות אבטחה יגיעו בקרוב.',
       },
       performance: {
         title: 'הגדרות ביצועים',
-        comingSoon: 'הגדרות ביצועים יגיעו בקרוב.'
-      }
+        comingSoon: 'הגדרות ביצועים יגיעו בקרוב.',
+      },
     },
     groups: {
       actions: {
@@ -338,17 +338,17 @@ export default {
         editGroup: 'ערוך קבוצה',
         deleteGroup: 'מחק קבוצה',
         createGroup: 'צור קבוצה',
-        manageGroups: 'נהל קבוצות'
-      }
+        manageGroups: 'נהל קבוצות',
+      },
     },
     permissionSets: {
       noAssignments: 'אין סטי הרשאות',
       actions: {
         addPermissionSet: 'הוסף סט הרשאות',
         editPermissionSet: 'ערוך סט הרשאות',
-        deletePermissionSet: 'מחק סט הרשאות'
-      }
-    }
+        deletePermissionSet: 'מחק סט הרשאות',
+      },
+    },
   },
   common: {
     select: 'בחר',
@@ -370,7 +370,7 @@ export default {
     delete: 'מחק',
     create: 'צור',
     actions: {
-      add: 'הוסף'
+      add: 'הוסף',
     },
     columns: {
       username: 'שם משתמש',
@@ -381,12 +381,12 @@ export default {
       groups: 'קבוצות',
       created: 'נוצר',
       modified: 'עודכן',
-      actions: 'פעולות'
+      actions: 'פעולות',
     },
     status: {
       active: 'פעיל',
-      inactive: 'לא פעיל'
-    }
+      inactive: 'לא פעיל',
+    },
   },
   translation: {
     common: {
@@ -396,7 +396,7 @@ export default {
         delete: 'מחק',
         activate: 'הפעל',
         deactivate: 'השבת',
-        create: 'צור'
+        create: 'צור',
       },
       tableDensity: 'צפיפות טבלה',
       theme: 'ערכת נושא',
@@ -426,7 +426,7 @@ export default {
       all: 'הכל',
       status: {
         active: 'פעיל',
-        inactive: 'לא פעיל'
+        inactive: 'לא פעיל',
       },
       rename: 'שנה שם',
       root: 'שורש',
@@ -447,11 +447,11 @@ export default {
         groups: 'קבוצות',
         created: 'נוצר',
         modified: 'עודכן',
-        actions: 'פעולות'
+        actions: 'פעולות',
       },
       noGroups: 'אין קבוצות',
       select: 'בחר',
-      moreInfo: 'מידע נוסף'
+      moreInfo: 'מידע נוסף',
     },
     users: {
       title: 'ניהול משתמשים',
@@ -463,47 +463,47 @@ export default {
             label: 'שם פרטי',
             tooltip: 'הזן את השם הפרטי של המשתמש',
             errors: {
-              required: 'שם פרטי הוא חובה'
-            }
+              required: 'שם פרטי הוא חובה',
+            },
           },
           family_name: {
             label: 'שם משפחה',
             tooltip: 'הזן את שם המשפחה של המשתמש',
             errors: {
-              required: 'שם משפחה הוא חובה'
-            }
+              required: 'שם משפחה הוא חובה',
+            },
           },
           email: {
             label: 'אימייל',
             tooltip: 'הזן את כתובת האימייל של המשתמש',
             errors: {
               required: 'אימייל הוא חובה',
-              invalid: 'כתובת אימייל לא חוקית'
-            }
+              invalid: 'כתובת אימייל לא חוקית',
+            },
           },
           enabled: {
             label: 'מאופשר',
             tooltip: 'הפעל או השבת את המשתמש',
             errors: {
-              required: 'יש לאפשר את המשתמש'
-            }
+              required: 'יש לאפשר את המשתמש',
+            },
           },
           roles: {
             label: 'תפקידים',
             tooltip: 'בחר את התפקידים למשתמש',
             errors: {
-              required: 'תפקידים הם חובה'
-            }
+              required: 'תפקידים הם חובה',
+            },
           },
           email_verified: {
             label: 'אימות אימייל',
             tooltip: 'סמן אם כתובת האימייל של המשתמש אומתה',
             errors: {
-              required: 'אימות אימייל הוא חובה'
-            }
-          }
-        }
-      }
+              required: 'אימות אימייל הוא חובה',
+            },
+          },
+        },
+      },
     },
     roles: {
       title: 'ניהול תפקידים',
@@ -512,8 +512,8 @@ export default {
       editor: 'עורך',
       viewer: 'צופה',
       actions: {
-        addRole: 'הוסף תפקיד'
-      }
+        addRole: 'הוסף תפקיד',
+      },
     },
     columns: {
       username: 'שם משתמש',
@@ -524,31 +524,31 @@ export default {
       groups: 'קבוצות',
       created: 'נוצר',
       modified: 'עודכן',
-      actions: 'פעולות'
+      actions: 'פעולות',
     },
     actions: {
       addUser: 'הוסף משתמש',
       edit: 'ערוך משתמש',
       delete: 'מחק משתמש',
       activate: 'הפעל משתמש',
-      deactivate: 'השבת משתמש'
+      deactivate: 'השבת משתמש',
     },
     status: {
       active: 'פעיל',
-      inactive: 'לא פעיל'
+      inactive: 'לא פעיל',
     },
     errors: {
       loadFailed: 'טעינת המשתמשים נכשלה',
       saveFailed: 'שמירת המשתמש נכשלה',
-      deleteFailed: 'מחיקת המשתמש נכשלה'
+      deleteFailed: 'מחיקת המשתמש נכשלה',
     },
     navigation: {
       home: 'בית',
       collections: 'אוספים',
-      settings: 'הגדרות'
+      settings: 'הגדרות',
     },
     home: {
-                  welcome: 'ברוכים הבאים ל-Media Lake',
+      welcome: 'ברוכים הבאים ל-Media Lake',
       description: 'נהל את קבצי המדיה שלך ביעילות',
       statistics: 'סטטיסטיקות',
       collections: 'אוספים',
@@ -557,7 +557,7 @@ export default {
       smartFolders: 'תיקיות חכמות',
       connectedStorage: 'אחסון מחובר',
       sharing: 'שיתוף',
-      comingSoon: 'בקרוב'
+      comingSoon: 'בקרוב',
     },
     notifications: {
       'Pipeline Complete': 'צינור הושלם',
@@ -565,13 +565,13 @@ export default {
       'Storage Warning': 'אזהרת אחסון',
       'Storage capacity reaching 80%': 'קיבולת האחסון מתקרבת ל-80%',
       'Pipeline Failed': 'הצינור נכשל',
-      'Video processing pipeline failed': 'צינור עיבוד הווידאו נכשל'
+      'Video processing pipeline failed': 'צינור עיבוד הווידאו נכשל',
     },
     modal: {
       confirmDelete: 'האם אתה בטוח שברצונך למחוק פריט זה?',
       confirmAction: 'האם אתה בטוח שברצונך לבצע פעולה זו?',
       error: 'אירעה שגיאה',
-      success: 'הפעולה הושלמה בהצלחה'
+      success: 'הפעולה הושלמה בהצלחה',
     },
     executions: {
       title: 'הרצת צינורות',
@@ -583,47 +583,47 @@ export default {
         startTime: 'זמן התחלה',
         endTime: 'זמן סיום',
         duration: 'משך',
-        actions: 'פעולות'
+        actions: 'פעולות',
       },
       status: {
         succeeded: 'הצליח',
         failed: 'נכשל',
         running: 'רץ',
         timedOut: 'פג תוקף',
-        aborted: 'בוטל'
+        aborted: 'בוטל',
       },
       actions: {
         retryFromCurrent: 'נסה שוב מהמצב הנוכחי',
         retryFromStart: 'נסה שוב מההתחלה',
-        viewDetails: 'צפה בפרטים'
+        viewDetails: 'צפה בפרטים',
       },
       pagination: {
         page: 'עמוד {{page}} מתוך {{total}}',
-        showEntries: 'הצג {{count}}'
-      }
+        showEntries: 'הצג {{count}}',
+      },
     },
     s3Explorer: {
       filter: {
-        label: 'סנן לפי שם'
+        label: 'סנן לפי שם',
       },
       error: {
-        loading: 'שגיאה בטעינת עצמים מ-S3: {{message}}'
+        loading: 'שגיאה בטעינת עצמים מ-S3: {{message}}',
       },
       file: {
-        info: 'גודל: {{size}} • מחלקת אחסון: {{storageClass}} • עודכן: {{modified}}'
+        info: 'גודל: {{size}} • מחלקת אחסון: {{storageClass}} • עודכן: {{modified}}',
       },
       menu: {
         rename: 'שנה שם',
-        delete: 'מחק'
-      }
+        delete: 'מחק',
+      },
     },
     assets: {
       title: 'נכסים',
-      connectedStorage: 'אחסון מחובר'
+      connectedStorage: 'אחסון מחובר',
     },
     metadata: {
       title: 'בקרוב',
-      description: 'אנחנו עובדים כדי להביא לך יכולות ניהול מטא-דאטה. הישאר מעודכן!'
+      description: 'אנחנו עובדים כדי להביא לך יכולות ניהול מטא-דאטה. הישאר מעודכן!',
     },
     pipelines: {
       title: 'צינורות',
@@ -633,7 +633,7 @@ export default {
         create: 'הוסף צינור חדש',
         deploy: 'פרוס צינור תמונות',
         addNew: 'הוסף צינור חדש',
-        viewAll: 'הצג את כל הצינורות'
+        viewAll: 'הצג את כל הצינורות',
       },
       search: 'חפש צינורות',
       deploy: 'פרוס צינור תמונות',
@@ -643,7 +643,7 @@ export default {
         creationDate: 'תאריך יצירה',
         system: 'מערכת',
         type: 'סוג',
-        actions: 'פעולות'
+        actions: 'פעולות',
       },
       editor: {
         title: 'עורך צינורות',
@@ -653,29 +653,29 @@ export default {
           title: 'צמתים',
           dragNodes: 'גרור צמתים אל הקנבס',
           loading: 'טוען צמתים...',
-          error: 'שגיאה בטעינת צמתים'
+          error: 'שגיאה בטעינת צמתים',
         },
         node: {
           configure: 'הגדר {{type}}',
           delete: 'מחק צומת',
-          edit: 'ערוך צומת'
+          edit: 'ערוך צומת',
         },
         edge: {
           title: 'ערוך תווית קו',
           label: 'תווית קו',
-          delete: 'מחק חיבור'
+          delete: 'מחק חיבור',
         },
         modals: {
           error: {
             title: 'שגיאה',
             incompatibleNodes: 'פלט הצומת הקודם אינו תואם לקלט הצומת היעד.',
-            validation: 'אימות הצינור נכשל'
+            validation: 'אימות הצינור נכשל',
           },
           delete: {
             title: 'מחק צינור',
             message: 'האם אתה בטוח שברצונך למחוק צינור זה? פעולה זו אינה ניתנת לביטול.',
-            confirm: 'הקלד את שם הצינור לאישור המחיקה:'
-          }
+            confirm: 'הקלד את שם הצינור לאישור המחיקה:',
+          },
         },
         controls: {
           undo: 'ביטול',
@@ -683,7 +683,7 @@ export default {
           zoomIn: 'הגדל',
           zoomOut: 'הקטן',
           fitView: 'התאם תצוגה',
-          lockView: 'נעל תצוגה'
+          lockView: 'נעל תצוגה',
         },
         notifications: {
           saved: 'הצינור נשמר בהצלחה',
@@ -691,10 +691,10 @@ export default {
           error: {
             save: 'שמירת הצינור נכשלה',
             validation: 'אימות הצינור נכשל',
-            incompatibleNodes: 'חיבור צמתים אינו תואם'
-          }
-        }
-      }
+            incompatibleNodes: 'חיבור צמתים אינו תואם',
+          },
+        },
+      },
     },
     integrations: {
       title: 'אינטגרציות',
@@ -710,29 +710,29 @@ export default {
             label: 'אינטגרציה',
             tooltip: 'בחר ספק אינטגרציה',
             errors: {
-              required: 'בחירת אינטגרציה הינה חובה'
-            }
+              required: 'בחירת אינטגרציה הינה חובה',
+            },
           },
           description: {
             label: 'תיאור',
             tooltip: 'ספק תיאור לאינטגרציה זו',
             errors: {
-              required: 'תיאור הינו חובה'
-            }
+              required: 'תיאור הינו חובה',
+            },
           },
           environmentId: {
             label: 'סביבה',
             tooltip: 'בחר את הסביבה לאינטגרציה זו',
             errors: {
-              required: 'בחירת סביבה הינה חובה'
-            }
+              required: 'בחירת סביבה הינה חובה',
+            },
           },
           enabled: {
             label: 'מאופשר',
             tooltip: 'הפעל או השבת אינטגרציה זו',
             errors: {
-              required: 'אופציית הפעלה הינה חובה'
-            }
+              required: 'אופציית הפעלה הינה חובה',
+            },
           },
           auth: {
             type: {
@@ -740,52 +740,52 @@ export default {
               tooltip: 'בחר את שיטת האימות',
               options: {
                 awsIam: 'AWS IAM',
-                apiKey: 'מפתח API'
+                apiKey: 'מפתח API',
               },
               errors: {
-                required: 'סוג אימות הינו חובה'
-              }
+                required: 'סוג אימות הינו חובה',
+              },
             },
             credentials: {
               apiKey: {
                 label: 'מפתח API',
                 tooltip: 'הזן את מפתח ה-API שלך',
                 errors: {
-                  required: 'מפתח API הינו חובה'
-                }
+                  required: 'מפתח API הינו חובה',
+                },
               },
               iamRole: {
                 label: 'תפקיד IAM',
                 tooltip: 'הזן את ARN של תפקיד ה-IAM',
                 errors: {
-                  required: 'תפקיד IAM הינו חובה'
-                }
-              }
-            }
-          }
+                  required: 'תפקיד IAM הינו חובה',
+                },
+              },
+            },
+          },
         },
         search: {
-          placeholder: 'חפש אינטגרציות'
+          placeholder: 'חפש אינטגרציות',
         },
         errors: {
           required: 'שדה זה הינו חובה',
           nodeId: {
-            unrecognized_keys: 'בחירת אינטגרציה לא תקינה'
-          }
-        }
+            unrecognized_keys: 'בחירת אינטגרציה לא תקינה',
+          },
+        },
       },
       columns: {
         nodeName: 'שם הצומת',
         environment: 'סביבה',
         createdDate: 'תאריך יצירה',
         modifiedDate: 'תאריך עדכון',
-        actions: 'פעולות'
+        actions: 'פעולות',
       },
       settings: {
         environments: {
-          title: 'סביבות'
-        }
-      }
+          title: 'סביבות',
+        },
+      },
     },
     groups: {
       actions: {
@@ -793,16 +793,16 @@ export default {
         editGroup: 'ערוך קבוצה',
         deleteGroup: 'מחק קבוצה',
         createGroup: 'צור קבוצה',
-        manageGroups: 'נהל קבוצות'
-      }
+        manageGroups: 'נהל קבוצות',
+      },
     },
     permissionSets: {
       noAssignments: 'אין סטי הרשאות',
       actions: {
         addPermissionSet: 'הוסף סט הרשאות',
         editPermissionSet: 'ערוך סט הרשאות',
-        deletePermissionSet: 'מחק סט הרשאות'
-      }
-    }
-  }
-}
+        deletePermissionSet: 'מחק סט הרשאות',
+      },
+    },
+  },
+};

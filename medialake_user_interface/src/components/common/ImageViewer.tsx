@@ -78,10 +78,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     ctx.scale(dpr, dpr);
 
     // background fill
-    const bgColor =
-      theme.palette.mode === 'dark'
-        ? theme.palette.background.paper
-        : '#ffffff';
+    const bgColor = theme.palette.mode === 'dark' ? theme.palette.background.paper : '#ffffff';
     ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
 
@@ -174,11 +171,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
       e.preventDefault();
       isZoomingRef.current = true;
       const dir = e.deltaY > 0 ? -1 : 1;
-      const newZoom = _.clamp(
-        zoom * Math.pow(ZOOM_FACTOR, dir),
-        MIN_ZOOM,
-        MAX_ZOOM
-      );
+      const newZoom = _.clamp(zoom * Math.pow(ZOOM_FACTOR, dir), MIN_ZOOM, MAX_ZOOM);
       setZoom(newZoom);
       setTimeout(() => {
         isZoomingRef.current = false;
@@ -202,7 +195,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     if (isCanvasLocked || !dragging) return;
     const dx = (e.clientX - touch.current.x) / zoom;
     const dy = (e.clientY - touch.current.y) / zoom;
-    setOffset(o => ({ x: o.x - dx, y: o.y - dy }));
+    setOffset((o) => ({ x: o.x - dx, y: o.y - dy }));
     touch.current = { x: e.clientX, y: e.clientY };
   };
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -219,7 +212,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     fitAndCenter();
     setRotate(0);
   };
-  const toggleCanvasLock = () => setIsCanvasLocked(l => !l);
+  const toggleCanvasLock = () => setIsCanvasLocked((l) => !l);
 
   const handleCanvasDownload = () => {
     const c = canvasRef.current;
@@ -240,8 +233,12 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
   };
 
   const toolButtons = [
-    { tip: 'Download Canvas', icon: <GetAppIcon />, onClick: handleCanvasDownload },
-    { tip: 'Reset',          icon: <HomeIcon />,   onClick: resetImage },
+    {
+      tip: 'Download Canvas',
+      icon: <GetAppIcon />,
+      onClick: handleCanvasDownload,
+    },
+    { tip: 'Reset', icon: <HomeIcon />, onClick: resetImage },
     {
       tip: isCanvasLocked ? 'Unlock canvas' : 'Lock canvas',
       icon: isCanvasLocked ? <LockIcon /> : <LockOpenIcon />,
@@ -250,7 +247,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     {
       tip: 'Rotate',
       icon: <Rotate90DegreesCwIcon />,
-      onClick: () => setRotate(r => (r + 90) % 360),
+      onClick: () => setRotate((r) => (r + 90) % 360),
       style: { transform: 'rotate(90deg)' },
     },
   ];

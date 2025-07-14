@@ -1,4 +1,5 @@
 stages:
+  - lint
   - deploy
   - test
 
@@ -99,3 +100,34 @@ job_deploy:
     - bash .cicd/build_resvg.sh
     - cdk bootstrap
     - cdk deploy --all --require-approval never
+
+# Pre-commit hooks job for merge requests to main (excluding ESLint)
+pre_commit_checks:
+  stage: lint
+  <<: *echo_versions
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+  script:
+    - echo "Running pre-commit checks for merge request to main"
+    - python3 -m venv .venv
+    - source .venv/bin/activate
+    - pip install pre-commit
+    - npm install
+    # Install additional dependencies for pre-commit hooks
+    - pip install autoflake isort black flake8
+    - npm install -g prettier
+    # Run pre-commit hooks excluding ESLint
+    - pre-commit run --all-files --hook-stage manual trailing-whitespace
+    - pre-commit run --all-files --hook-stage manual end-of-file-fixer
+    - pre-commit run --all-files --hook-stage manual check-yaml
+    - pre-commit run --all-files --hook-stage manual check-added-large-files
+    - pre-commit run --all-files --hook-stage manual check-merge-conflict
+    - pre-commit run --all-files --hook-stage manual detect-private-key
+    - pre-commit run --all-files --hook-stage manual check-json
+    - pre-commit run --all-files --hook-stage manual autoflake
+    - pre-commit run --all-files --hook-stage manual isort
+    - pre-commit run --all-files --hook-stage manual black
+    - pre-commit run --all-files --hook-stage manual flake8
+    - pre-commit run --all-files --hook-stage manual prettier
+    - pre-commit run --all-files --hook-stage manual cdk-synth-check
+    - pre-commit run --all-files --hook-stage manual remove-ds-store

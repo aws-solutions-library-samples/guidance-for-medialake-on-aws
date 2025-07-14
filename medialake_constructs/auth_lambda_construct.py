@@ -4,23 +4,15 @@ Auth Lambda Construct for Media Lake.
 This construct creates the Custom API Gateway Lambda Authorizer that can be used by multiple stacks.
 """
 
-from aws_cdk import (
-    aws_lambda as lambda_,
-    aws_iam as iam,
-)
-import aws_cdk as cdk
-
-from constructs import Construct
 from dataclasses import dataclass
 
-from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
-
-from config import config
+from constructs import Construct
 
 
 @dataclass
 class AuthLambdaConstructProps:
     """Configuration for Auth Lambda Construct."""
+
     auth_table_name: str
     avp_policy_store_id: str
     avp_policy_store_arn: str
@@ -29,7 +21,7 @@ class AuthLambdaConstructProps:
 class AuthLambdaConstruct(Construct):
     """
     Construct for Auth Lambda resources.
-    
+
     This construct creates the Custom API Gateway Lambda Authorizer that can be used by multiple stacks.
     """
 

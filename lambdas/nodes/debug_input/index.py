@@ -1,6 +1,6 @@
 import json
+
 from aws_lambda_powertools import Logger, Tracer
-from aws_lambda_powertools.utilities.typing import LambdaContext
 
 # Initialize Powertools
 logger = Logger()

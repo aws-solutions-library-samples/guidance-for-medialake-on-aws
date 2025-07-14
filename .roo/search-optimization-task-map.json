@@ -1,6 +1,4 @@
 {
-  "project": "Search Query Parameter Optimization",
-  "description": "Optimize query parameter flow from frontend → API Gateway → Lambda for performance, implementing comma-separated field lists and following frontend best practices",
   "Phase_1_Analysis": {
     "1.1_current_state_analysis": {
       "agent": "Research",
@@ -10,138 +8,146 @@
         "parameter-mapping-documentation.md",
         "performance-bottlenecks.md"
       ],
-      "validation": "Complete understanding of current parameter flow",
-      "priority": "critical"
+      "priority": "critical",
+      "validation": "Complete understanding of current parameter flow"
     },
     "1.2_frontend_patterns_review": {
-      "agent": "Research", 
-      "description": "Deep dive into frontEndSystemPatterns.md and current frontend implementation",
+      "agent": "Research",
       "dependencies": ["1.1_current_state_analysis"],
+      "description": "Deep dive into frontEndSystemPatterns.md and current frontend implementation",
       "outputs": [
         "frontend-patterns-compliance.md",
         "state-management-analysis.md"
       ],
-      "validation": "Frontend patterns documented and gaps identified",
-      "priority": "high"
+      "priority": "high",
+      "validation": "Frontend patterns documented and gaps identified"
     }
   },
   "Phase_2_Architecture": {
     "2.1_parameter_optimization_design": {
       "agent": "Architect",
+      "dependencies": [
+        "1.1_current_state_analysis",
+        "1.2_frontend_patterns_review"
+      ],
       "description": "Design optimized parameter structure with comma-separated fields",
-      "dependencies": ["1.1_current_state_analysis", "1.2_frontend_patterns_review"],
       "outputs": [
         "optimized-parameter-schema.md",
         "api-contract-specification.md",
         "performance-improvement-plan.md"
       ],
-      "validation": "Clear parameter optimization strategy defined",
-      "priority": "critical"
+      "priority": "critical",
+      "validation": "Clear parameter optimization strategy defined"
     },
     "2.2_frontend_state_architecture": {
       "agent": "Architect",
-      "description": "Design frontend state management following established patterns",
       "dependencies": ["1.2_frontend_patterns_review"],
+      "description": "Design frontend state management following established patterns",
       "outputs": [
         "search-state-architecture.md",
         "zustand-store-design.md",
         "react-query-integration-plan.md"
       ],
-      "validation": "Frontend architecture aligns with system patterns",
-      "priority": "high"
+      "priority": "high",
+      "validation": "Frontend architecture aligns with system patterns"
     }
   },
   "Phase_3_Backend_Implementation": {
     "3.1_lambda_parameter_processing": {
       "agent": "Code",
-      "description": "Optimize Lambda search functions for comma-separated field processing",
       "dependencies": ["2.1_parameter_optimization_design"],
-      "scope": "✓ Comma-separated field parsing ✓ Parameter validation ✓ Performance optimization ✗ Frontend changes",
+      "description": "Optimize Lambda search functions for comma-separated field processing",
       "outputs": [
         "lambdas/api/search/get_search/index.py",
         "lambdas/api/search/get_search/search_utils.py",
         "lambdas/api/search/fields/get_fields/index.py"
       ],
-      "validation": "Lambda functions handle optimized parameters efficiently",
-      "priority": "critical"
+      "priority": "critical",
+      "scope": "\u2713 Comma-separated field parsing \u2713 Parameter validation \u2713 Performance optimization \u2717 Frontend changes",
+      "validation": "Lambda functions handle optimized parameters efficiently"
     },
     "3.2_api_gateway_optimization": {
-      "agent": "Code", 
-      "description": "Optimize API Gateway parameter handling and validation",
+      "agent": "Code",
       "dependencies": ["2.1_parameter_optimization_design"],
+      "description": "Optimize API Gateway parameter handling and validation",
       "outputs": [
         "api-gateway-parameter-mapping.json",
         "request-validation-rules.json"
       ],
-      "validation": "API Gateway efficiently processes optimized parameters",
-      "priority": "high"
+      "priority": "high",
+      "validation": "API Gateway efficiently processes optimized parameters"
     }
   },
   "Phase_4_Frontend_Implementation": {
     "4.1_search_state_optimization": {
       "agent": "Code",
+      "dependencies": [
+        "2.2_frontend_state_architecture",
+        "3.1_lambda_parameter_processing"
+      ],
       "description": "Implement optimized search state management following frontend patterns",
-      "dependencies": ["2.2_frontend_state_architecture", "3.1_lambda_parameter_processing"],
-      "scope": "✓ Zustand store optimization ✓ React Query integration ✓ URL synchronization ✓ Comma-separated field handling ✗ Backend changes",
       "outputs": [
         "medialake_user_interface/src/stores/searchStore.ts",
         "medialake_user_interface/src/hooks/useSearchState.ts",
         "medialake_user_interface/src/api/hooks/useSearch.ts",
         "medialake_user_interface/src/api/hooks/useSearchFields.ts"
       ],
-      "validation": "Search state follows established patterns and handles optimized parameters",
-      "priority": "critical"
+      "priority": "critical",
+      "scope": "\u2713 Zustand store optimization \u2713 React Query integration \u2713 URL synchronization \u2713 Comma-separated field handling \u2717 Backend changes",
+      "validation": "Search state follows established patterns and handles optimized parameters"
     },
     "4.2_search_components_update": {
       "agent": "Code",
-      "description": "Update search components to use optimized parameter handling",
       "dependencies": ["4.1_search_state_optimization"],
+      "description": "Update search components to use optimized parameter handling",
       "outputs": [
         "medialake_user_interface/src/pages/SearchPage.tsx",
         "medialake_user_interface/src/components/search/SearchFilters.tsx",
         "medialake_user_interface/src/components/search/MasterResultsView.tsx"
       ],
-      "validation": "Search components use optimized parameter flow",
-      "priority": "high"
+      "priority": "high",
+      "validation": "Search components use optimized parameter flow"
     }
   },
   "Phase_5_Integration_Testing": {
     "5.1_end_to_end_testing": {
       "agent": "Debug",
-      "description": "Test complete search parameter flow from frontend to backend",
       "dependencies": ["4.2_search_components_update"],
+      "description": "Test complete search parameter flow from frontend to backend",
       "outputs": [
         "search-parameter-test-results.md",
         "performance-benchmarks.md",
         "integration-test-suite.md"
       ],
-      "validation": "All search functionality works with optimized parameters",
-      "priority": "critical"
+      "priority": "critical",
+      "validation": "All search functionality works with optimized parameters"
     },
     "5.2_performance_validation": {
       "agent": "Debug",
-      "description": "Validate performance improvements and identify any remaining bottlenecks",
       "dependencies": ["5.1_end_to_end_testing"],
+      "description": "Validate performance improvements and identify any remaining bottlenecks",
       "outputs": [
         "performance-comparison-report.md",
         "optimization-recommendations.md"
       ],
-      "validation": "Performance improvements documented and verified",
-      "priority": "high"
+      "priority": "high",
+      "validation": "Performance improvements documented and verified"
     }
   },
   "Phase_6_Documentation": {
     "6.1_implementation_documentation": {
       "agent": "Research",
-      "description": "Document the optimized search parameter implementation",
       "dependencies": ["5.2_performance_validation"],
+      "description": "Document the optimized search parameter implementation",
       "outputs": [
         "search-optimization-guide.md",
         "api-parameter-reference.md",
         "frontend-integration-guide.md"
       ],
-      "validation": "Complete documentation for optimized search implementation",
-      "priority": "medium"
+      "priority": "medium",
+      "validation": "Complete documentation for optimized search implementation"
     }
-  }
+  },
+  "description": "Optimize query parameter flow from frontend \u2192 API Gateway \u2192 Lambda for performance, implementing comma-separated field lists and following frontend best practices",
+  "project": "Search Query Parameter Optimization"
 }

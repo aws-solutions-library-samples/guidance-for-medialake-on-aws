@@ -16,7 +16,7 @@ import {
   Paper,
   ToggleButtonGroup,
   ToggleButton,
-  Tooltip
+  Tooltip,
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
@@ -47,12 +47,12 @@ const EditPermissionMatrixModal: React.FC<EditPermissionMatrixModalProps> = ({
   onClose,
   onSave,
   permissions: initialPermissions,
-  title = "Edit Permissions",
-  resourceName
+  title = 'Edit Permissions',
+  resourceName,
 }) => {
   // State to track the edited permissions
   const [permissions, setPermissions] = useState<any>(initialPermissions || {});
-  
+
   // Reset permissions when modal opens with new data
   useEffect(() => {
     if (open) {
@@ -61,8 +61,14 @@ const EditPermissionMatrixModal: React.FC<EditPermissionMatrixModalProps> = ({
   }, [open, initialPermissions]);
 
   // Define the resources and actions to display in the matrix
-  const resources: ResourceType[] = ['assets', 'collections', 'pipelines', 'integrations', 'settings'];
-  
+  const resources: ResourceType[] = [
+    'assets',
+    'collections',
+    'pipelines',
+    'integrations',
+    'settings',
+  ];
+
   // Define actions based on resource type
   const getActionsForResource = (resource: ResourceType): ActionType[] => {
     switch (resource) {
@@ -72,14 +78,14 @@ const EditPermissionMatrixModal: React.FC<EditPermissionMatrixModalProps> = ({
         return ['view', 'create', 'edit', 'delete', 'admin'];
     }
   };
-  
+
   // Resource display names
   const resourceDisplayNames: Record<ResourceType, string> = {
     assets: 'Assets',
     collections: 'Collections',
     pipelines: 'Pipelines',
     integrations: 'Integrations',
-    settings: 'Settings'
+    settings: 'Settings',
   };
 
   // Action display names
@@ -88,35 +94,35 @@ const EditPermissionMatrixModal: React.FC<EditPermissionMatrixModalProps> = ({
     create: 'CREATE',
     edit: 'EDIT',
     delete: 'DELETE',
-    admin: 'ADMIN'
+    admin: 'ADMIN',
   };
 
   // Helper function to get permission status
   const getPermissionStatus = (resource: string, action: string): PermissionStatus => {
     if (!permissions) return 'Not Set';
-    
+
     // Handle array of permission objects
     if (Array.isArray(permissions)) {
-      const permission = permissions.find(p => p.resource === resource && p.action === action);
+      const permission = permissions.find((p) => p.resource === resource && p.action === action);
       if (permission) {
         return permission.effect === 'Allow' ? 'Allow' : 'Deny';
       }
       return 'Not Set';
     }
-    
+
     // Handle nested structure
     if (permissions[resource] && typeof permissions[resource] === 'object') {
       if (permissions[resource][action] === true) return 'Allow';
       if (permissions[resource][action] === false) return 'Deny';
       return 'Not Set';
     }
-    
+
     // Handle flat structure with dot notation
     const key = `${resource}.${action}`;
     if (key in permissions) {
       return permissions[key] ? 'Allow' : 'Deny';
     }
-    
+
     return 'Not Set';
   };
 
@@ -124,12 +130,14 @@ const EditPermissionMatrixModal: React.FC<EditPermissionMatrixModalProps> = ({
   const updatePermissionStatus = (resource: string, action: string, status: PermissionStatus) => {
     // Create a copy of the permissions to modify
     let updatedPermissions;
-    
+
     // Handle array of permission objects
     if (Array.isArray(permissions)) {
       updatedPermissions = [...permissions];
-      const existingIndex = updatedPermissions.findIndex(p => p.resource === resource && p.action === action);
-      
+      const existingIndex = updatedPermissions.findIndex(
+        (p) => p.resource === resource && p.action === action
+      );
+
       if (status === 'Not Set') {
         // Remove the permission if it exists
         if (existingIndex !== -1) {
@@ -140,25 +148,25 @@ const EditPermissionMatrixModal: React.FC<EditPermissionMatrixModalProps> = ({
         if (existingIndex !== -1) {
           updatedPermissions[existingIndex] = {
             ...updatedPermissions[existingIndex],
-            effect: status
+            effect: status,
           };
         } else {
           updatedPermissions.push({
             resource,
             action,
-            effect: status
+            effect: status,
           });
         }
       }
     } else {
       // Handle object structure
       updatedPermissions = { ...permissions };
-      
+
       // Ensure the resource object exists
       if (!updatedPermissions[resource]) {
         updatedPermissions[resource] = {};
       }
-      
+
       // Update the permission
       if (status === 'Not Set') {
         // Remove the permission
@@ -171,11 +179,11 @@ const EditPermissionMatrixModal: React.FC<EditPermissionMatrixModalProps> = ({
         // Set the permission
         updatedPermissions[resource] = {
           ...updatedPermissions[resource],
-          [action]: status === 'Allow'
+          [action]: status === 'Allow',
         };
       }
     }
-    
+
     setPermissions(updatedPermissions);
   };
 
@@ -233,38 +241,45 @@ const EditPermissionMatrixModal: React.FC<EditPermissionMatrixModalProps> = ({
               {resourceName}
             </Typography>
           )}
-          
+
           <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
             <Table aria-label="permission matrix table">
               <TableHead>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold', width: '200px' }}>RESOURCE</TableCell>
                   {/* Get all unique actions across all resources */}
-                  {Array.from(new Set(resources.flatMap(r => getActionsForResource(r)))).map(action => (
-                    <TableCell key={action} align="center" sx={{ fontWeight: 'bold' }}>
-                      {actionDisplayNames[action]}
-                    </TableCell>
-                  ))}
+                  {Array.from(new Set(resources.flatMap((r) => getActionsForResource(r)))).map(
+                    (action) => (
+                      <TableCell key={action} align="center" sx={{ fontWeight: 'bold' }}>
+                        {actionDisplayNames[action]}
+                      </TableCell>
+                    )
+                  )}
                 </TableRow>
               </TableHead>
               <TableBody>
-                {resources.map(resource => (
-                  <TableRow key={resource} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+                {resources.map((resource) => (
+                  <TableRow
+                    key={resource}
+                    sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                  >
                     <TableCell component="th" scope="row">
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Typography>{resourceDisplayNames[resource]}</Typography>
                       </Box>
                     </TableCell>
-                    {getActionsForResource(resource).map(action => {
+                    {getActionsForResource(resource).map((action) => {
                       const status = getPermissionStatus(resource, action);
-                      
+
                       return (
                         <TableCell key={`${resource}-${action}`} align="center">
                           <PermissionStatusToggle
                             resource={resource}
                             action={action}
                             status={status}
-                            onChange={(newStatus) => updatePermissionStatus(resource, action, newStatus)}
+                            onChange={(newStatus) =>
+                              updatePermissionStatus(resource, action, newStatus)
+                            }
                           />
                         </TableCell>
                       );

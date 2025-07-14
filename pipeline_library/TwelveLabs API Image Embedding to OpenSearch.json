@@ -1,6 +1,6 @@
 {
-  "name": "Twelve Labs API Image Embedding to OpenSearch",
-  "description": "Generate Twelve Labs API Image Embeddings to OpenSearch",
+  "name": "TwelveLabs API Image Embedding to OpenSearch",
+  "description": "Generate TwelveLabs API Image Embeddings to OpenSearch",
   "active": true,
   "configuration": {
     "nodes": [
@@ -23,9 +23,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [
             {
               "name": "image",
@@ -67,9 +65,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [
             {
               "name": "presigned_url",
@@ -98,7 +94,7 @@
         },
         "data": {
           "nodeId": "twelve_labs",
-          "label": "Twelve Labs (post)",
+          "label": "TwelveLabs (post)",
           "description": "Generate image or audio embeddings",
           "icon": {
             "key": null,
@@ -145,9 +141,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [],
           "type": "UTILITY",
           "configuration": {

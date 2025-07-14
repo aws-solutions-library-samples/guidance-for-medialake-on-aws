@@ -9,17 +9,17 @@ Parameters:
     AllowedValues:
       - Git
       - S3PresignedURL
-  
+
   GitRepositoryUrl:
     Description: URL of the public Git repository (e.g., https://github.com/username/repository.git)
     Type: String
     Default: 'https://github.com/aws-solutions-library-samples/guidance-for-medialake'
-  
+
   S3PresignedURL:
     Description: Presigned URL for downloading the CDK code ZIP (if S3PresignedURL source type is selected)
     Type: String
     Default: ''
-  
+
   InitialUserEmail:
     Description: Initial Media Lake administrator user email
     Type: String
@@ -31,22 +31,22 @@ Parameters:
     MinLength: 1
     MaxLength: 50
     AllowedPattern: '^[a-zA-Z\s\-\.]+$'
-  
+
   InitialUserLastName:
     Description: Initial Media Lake administrator last name
     Type: String
     MinLength: 1
     MaxLength: 50
     AllowedPattern: '^[a-zA-Z\s\-\.]+$'
-  
+
   MediaLakeEnvironmentName:
-    Description: Media Lake environment name (dev, prod, ...)
+    Description: Media Lake environment name (dev, prd, ...)
     Type: String
     MinLength: 1
     MaxLength: 10
     AllowedPattern: ^[a-zA-Z0-9]*$
     Default: dev
-  
+
   OpenSearchDeploymentSize:
     Description: OpenSearch deployment size
     Type: String
@@ -116,15 +116,15 @@ Resources:
           import boto3
           import cfnresponse
           import logging
-          
+
           logger = logging.getLogger()
           logger.setLevel(logging.INFO)
-          
+
           def check_and_create_role(service_name):
               """Check if service-linked role exists and create if it doesn't"""
               iam = boto3.client('iam')
               role_name = f"AWSServiceRoleFor{service_name.split('.')[0].upper()}"
-              
+
               try:
                   # Check if role exists
                   iam.get_role(RoleName=role_name)
@@ -146,19 +146,19 @@ Resources:
               except Exception as e:
                   logger.error(f"Error checking role {role_name}: {str(e)}")
                   return False
-          
+
           def handler(event, context):
               logger.info(f"Received event: {event}")
-              
+
               # List of services that need service-linked roles
               services = [
                   'es.amazonaws.com',
                   'opensearchservice.amazonaws.com',
                   'osis.amazonaws.com'
               ]
-              
+
               response_data = {}
-              
+
               if event['RequestType'] in ['Create', 'Update']:
                   success = True
                   for service in services:
@@ -166,7 +166,7 @@ Resources:
                           success = False
                           response_data['Error'] = f"Failed to create role for {service}"
                           break
-                  
+
                   status = cfnresponse.SUCCESS if success else cfnresponse.FAILED
                   cfnresponse.send(event, context, status, response_data)
               else:
@@ -232,7 +232,7 @@ Resources:
                   - 's3:GetObject'
                   - 's3:PutObject'
                   - 's3:GetObjectVersion'
-                Resource: 
+                Resource:
                   - !Sub 'arn:aws:s3:::${ArtifactBucket}/*'
               - Effect: Allow
                 Action:
@@ -289,7 +289,7 @@ Resources:
                   - 's3:GetObjectVersion'
                   - 's3:GetBucketVersioning'
                   - 's3:ListBucket'
-                Resource: 
+                Resource:
                   - !Sub 'arn:aws:s3:::${ArtifactBucket}'
                   - !Sub 'arn:aws:s3:::${ArtifactBucket}/*'
 
@@ -342,7 +342,7 @@ Resources:
           import io
           import zipfile
           import time
-          
+
           def handler(event, context):
               if event['RequestType'] in ['Create', 'Update']:
                   try:
@@ -350,7 +350,7 @@ Resources:
                       bucket_name = event['ResourceProperties']['BucketName']
                       source_key = event['ResourceProperties']['SourceKey']
                       content = event['ResourceProperties']['Content']
-                      
+
                       # Create a simple ZIP file in memory
                       buffer = io.BytesIO()
                       with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as z:
@@ -358,16 +358,16 @@ Resources:
                           z.writestr('README.md', content)
                           # Add a timestamp file
                           z.writestr('timestamp.txt', str(time.time()))
-                      
+
                       buffer.seek(0)
-                      
+
                       # Upload the ZIP file to S3
                       s3.put_object(
                           Bucket=bucket_name,
                           Key=source_key,
                           Body=buffer.getvalue()
                       )
-                      
+
                       response_data = {'Message': 'Initial source package created'}
                       cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
                   except Exception as e:
@@ -405,7 +405,7 @@ Resources:
   GitCloneProject:
     Type: 'AWS::CodeBuild::Project'
     Condition: IsGitSource
-    DependsOn: 
+    DependsOn:
       - ServiceLinkedRoleManager
       - InitialSourcePackage
     Properties:
@@ -644,7 +644,7 @@ Resources:
   GitSourcePipeline:
     Type: 'AWS::CodePipeline::Pipeline'
     Condition: IsGitSource
-    DependsOn: 
+    DependsOn:
       - InitialSourcePackage
       - GitCloneProject
       - BuildProject
@@ -670,7 +670,7 @@ Resources:
                 PollForSourceChanges: true
               OutputArtifacts:
                 - Name: PlaceholderSource
-        
+
         - Name: Clone
           Actions:
             - Name: CloneFromGitHub
@@ -685,7 +685,7 @@ Resources:
                 - Name: PlaceholderSource
               OutputArtifacts:
                 - Name: SourceCode
-        
+
         - Name: Build
           Actions:
             - Name: BuildCode
@@ -700,7 +700,7 @@ Resources:
                 - Name: SourceCode
               OutputArtifacts:
                 - Name: BuildOutput
-        
+
         - Name: Deploy
           Actions:
             - Name: DeployCDK
@@ -744,7 +744,7 @@ Resources:
                 PollForSourceChanges: true
               OutputArtifacts:
                 - Name: PlaceholderSource
-        
+
         - Name: Download
           Actions:
             - Name: DownloadFromPresignedURL
@@ -759,7 +759,7 @@ Resources:
                 - Name: PlaceholderSource
               OutputArtifacts:
                 - Name: SourceCode
-        
+
         - Name: Build
           Actions:
             - Name: BuildCode
@@ -774,7 +774,7 @@ Resources:
                 - Name: SourceCode
               OutputArtifacts:
                 - Name: BuildOutput
-        
+
         - Name: Deploy
           Actions:
             - Name: DeployCDK
@@ -809,40 +809,40 @@ Resources:
           import boto3
           import cfnresponse
           import logging
-          
+
           logger = logging.getLogger()
           logger.setLevel(logging.INFO)
-          
+
           def delete_bucket_contents(bucket_name):
               """Delete all objects and object versions from the bucket"""
               try:
                   s3 = boto3.resource('s3')
                   bucket = s3.Bucket(bucket_name)
-                  
+
                   # Delete all object versions
                   logger.info(f"Deleting all object versions from {bucket_name}")
                   bucket.object_versions.all().delete()
-                  
+
                   # Delete all objects (in case versioning is not enabled)
                   logger.info(f"Deleting all objects from {bucket_name}")
                   bucket.objects.all().delete()
-                  
+
                   return True
               except Exception as e:
                   logger.error(f"Error emptying bucket {bucket_name}: {str(e)}")
                   return False
-          
+
           def handler(event, context):
               logger.info(f"Received event: {json.dumps(event)}")
-              
+
               # Extract the bucket name from the event
               bucket_name = event['ResourceProperties']['BucketName']
               response_data = {}
-              
+
               if event['RequestType'] == 'Delete':
                   logger.info(f"Emptying bucket {bucket_name}")
                   success = delete_bucket_contents(bucket_name)
-                  
+
                   if success:
                       logger.info(f"Successfully emptied bucket {bucket_name}")
                       cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
@@ -887,11 +887,11 @@ Resources:
 Outputs:
   PipelineUrl:
     Description: URL to the CodePipeline console
-    Value: !If 
+    Value: !If
       - IsGitSource
       - !Sub https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${GitSourcePipeline}
       - !Sub https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${S3SourcePipeline}
-  
+
   ArtifactBucketName:
     Description: Name of the S3 bucket used to store pipeline artifacts
     Value: !Ref ArtifactBucket

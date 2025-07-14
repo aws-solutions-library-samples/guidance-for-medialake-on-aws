@@ -10,19 +10,20 @@ It implements best practices for AWS Lambda including:
 - Security best practices
 """
 
-from typing import Dict, Any, Optional
-from aws_lambda_powertools import Logger, Tracer, Metrics
+import json
+import os
+from decimal import Decimal
+from http import HTTPStatus
+from typing import Any, Dict
+
+import boto3
+from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.logging import correlation_paths
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
 from aws_lambda_powertools.metrics import MetricUnit
+from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
+from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
 from pydantic import BaseModel, Field
-import boto3
-import os
-import json
-from http import HTTPStatus
-from decimal import Decimal
 
 # Initialize AWS Lambda Powertools
 logger = Logger(service="asset-deletion-service")

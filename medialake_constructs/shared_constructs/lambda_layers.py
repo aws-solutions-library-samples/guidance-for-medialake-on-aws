@@ -1,23 +1,18 @@
 import os
-from aws_cdk import (
-    Stack,
-    aws_lambda as lambda_,
-    BundlingOptions,
-    BundlingOptions,
-    DockerImage,
-)
-
-from constructs import Construct
 from dataclasses import dataclass
 
-from .layer_base import LambdaLayer, LambdaLayerConfig
+from aws_cdk import BundlingOptions, DockerImage, Stack
+from aws_cdk import aws_lambda as lambda_
+from constructs import Construct
 
+from .layer_base import LambdaLayer, LambdaLayerConfig
 
 
 @dataclass
 class PowertoolsLayerConfig:
     architecture: str = lambda_.Architecture.X86_64
     layer_version: str = "68"
+
 
 class PowertoolsLayer(Construct):
     def __init__(
@@ -38,6 +33,7 @@ class PowertoolsLayer(Construct):
         )
         # f"arn:{stack.partition}:lambda:{stack.region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-{'Arm64' if config.architecture == lambda_.Architecture.ARM_64 else ''}:{config.layer_version}",
 
+
 class JinjaLambdaLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
         super().__init__(scope, id, **kwargs)
@@ -51,6 +47,7 @@ class JinjaLambdaLayer(Construct):
                 description="A Lambda layer with Jinja2 library",
             ),
         )
+
 
 class ZipmergeLayer(Construct):
     def __init__(
@@ -76,7 +73,9 @@ class ZipmergeLayer(Construct):
                 path=".",  # dummy; all work happens in the container
                 bundling=BundlingOptions(
                     user="root",
-                    image=DockerImage.from_registry("public.ecr.aws/amazonlinux/amazonlinux:2023"),
+                    image=DockerImage.from_registry(
+                        "public.ecr.aws/amazonlinux/amazonlinux:2023"
+                    ),
                     command=[
                         "/bin/bash",
                         "-c",
@@ -98,19 +97,18 @@ class ZipmergeLayer(Construct):
                             # Try alternate path
                             BIN_PATH="$GOPATH/bin/zipmerge"
                         fi
-                        
+
                         mkdir -p /asset-output/bin
                         cp "$BIN_PATH" /asset-output/bin/zipmerge
-                        
+
                         # 3. Ensure the binary is executable
                         chmod 755 /asset-output/bin/zipmerge
-                        """
+                        """,
                     ],
-
-
                 ),
             ),
         )
+
 
 class OpenSearchPyLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
@@ -126,6 +124,7 @@ class OpenSearchPyLayer(Construct):
             ),
         )
 
+
 class PynamoDbLambdaLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
         super().__init__(scope, id, **kwargs)
@@ -139,6 +138,7 @@ class PynamoDbLambdaLayer(Construct):
                 description="A Lambda layer with pynamodb library",
             ),
         )
+
 
 class PyMediaInfo(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
@@ -158,6 +158,7 @@ class PyMediaInfo(Construct):
     def layer(self) -> lambda_.LayerVersion:
         return self.layer_version.layer
 
+
 class ResvgCliLayer(Construct):
     """
     A Lambda layer shipping the `resvg` CLI compiled from source for Amazon Linux 2023.
@@ -175,10 +176,14 @@ class ResvgCliLayer(Construct):
             code = lambda_.Code.from_asset(
                 path=".",
                 bundling=BundlingOptions(
-                    image=DockerImage.from_registry("public.ecr.aws/amazonlinux/amazonlinux:2.0.20250305.0-amd64"),
+                    image=DockerImage.from_registry(
+                        "public.ecr.aws/amazonlinux/amazonlinux:2.0.20250305.0-amd64"
+                    ),
                     user="root",
                     command=[
-                        "/bin/bash", "-c", """
+                        "/bin/bash",
+                        "-c",
+                        """
                         set -euo pipefail
                         # 1) Install build tools & deps
                         yum -y update
@@ -191,7 +196,7 @@ class ResvgCliLayer(Construct):
                         mkdir -p /asset-output/bin
                         cp ~/.cargo/bin/resvg /asset-output/bin/
                         chmod +x /asset-output/bin/resvg
-                        """
+                        """,
                     ],
                 ),
             )
@@ -207,8 +212,8 @@ class ResvgCliLayer(Construct):
                 lambda_.Architecture.ARM_64,
             ],
             code=code,
-            
         )
+
 
 class FFProbeLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
@@ -267,6 +272,7 @@ class FFProbeLayer(Construct):
                 ),
             )
 
+
 class FFmpegLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
         """
@@ -315,13 +321,16 @@ class FFmpegLayer(Construct):
                             cp $TEMP_DIR/ffmpeg.zip /asset-output/
                             cd /
                             rm -rf $TEMP_DIR
-                            """
+                            """,
                         ],
                         user="root",
-                        image=DockerImage.from_registry("public.ecr.aws/amazonlinux/amazonlinux:latest"),
+                        image=DockerImage.from_registry(
+                            "public.ecr.aws/amazonlinux/amazonlinux:latest"
+                        ),
                     ),
                 ),
             )
+
 
 class GoogleCloudStorageLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
@@ -337,6 +346,7 @@ class GoogleCloudStorageLayer(Construct):
             ),
         )
 
+
 class IngestMediaProcessorLayer(Construct):
     def __init__(self, scope: Construct, construct_id: str, **kwargs):
         super().__init__(scope, construct_id, **kwargs)
@@ -350,6 +360,7 @@ class IngestMediaProcessorLayer(Construct):
                 description="A Lambda layer for analyzing media container media info",
             ),
         )
+
 
 class SearchLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
@@ -368,6 +379,7 @@ class SearchLayer(Construct):
     def layer(self) -> lambda_.LayerVersion:
         return self.layer_version.layer
 
+
 class PyamlLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
         super().__init__(scope, id, **kwargs)
@@ -384,6 +396,7 @@ class PyamlLayer(Construct):
     @property
     def layer(self) -> lambda_.LayerVersion:
         return self.layer_version.layer
+
 
 class ShortuuidLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):

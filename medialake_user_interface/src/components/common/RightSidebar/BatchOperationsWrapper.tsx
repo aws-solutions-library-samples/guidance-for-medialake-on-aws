@@ -23,7 +23,7 @@ const BatchOperationsWrapper: React.FC<BatchOperationsWrapperProps> = ({
   onBatchShare,
   isDownloadLoading,
   onClearSelection,
-  onRemoveItem
+  onRemoveItem,
 }) => {
   return (
     <Box sx={{ height: '100%' }}>
