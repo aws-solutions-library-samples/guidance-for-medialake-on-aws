@@ -293,7 +293,7 @@ def build_semantic_query(params: SearchParams) -> Dict:
                     )
                 except ValueError:
                     logger.warning(
-                        f"Invalid values for asset size: {params.asset_size_gte,params.asset_size_lte}"
+                        f"Invalid values for asset size: {params.asset_size_gte, params.asset_size_lte}"
                     )
 
             if (
@@ -313,7 +313,7 @@ def build_semantic_query(params: SearchParams) -> Dict:
                     )
                 except ValueError:
                     logger.warning(
-                        f"Invalid values for asset size: {params.asset_size_gte,params.asset_size_lte}"
+                        f"Invalid values for asset size: {params.asset_size_gte, params.asset_size_lte}"
                     )
 
             logger.info(

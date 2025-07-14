@@ -89,9 +89,9 @@ repos:
     hooks:
       - id: cdk-synth-check
         name: CDK Synth Check (Fast)
-        entry: bash -c 'cd cdk && CDK_SKIP_BUNDLING=true npx cdk synth --quiet -c skip-bundling=true'
+        entry: bash -c 'CDK_SKIP_BUNDLING=true npx cdk synth -c skip-bundling=true'
         language: system
-        files: cdk/.*\.(py|ts)$
+        files: (app\.py|medialake_stacks/.*\.py|medialake_constructs/.*\.py)$
         pass_filenames: false
 
       # Clean up
