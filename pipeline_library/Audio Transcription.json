@@ -1,370 +1,372 @@
 {
+  "name": "Audio Transcription",
+  "description": "",
   "active": true,
   "configuration": {
-    "edges": [
-      {
-        "data": {
-          "id": "dndnode_0-dndnode_1",
-          "text": "Connected",
-          "type": "custom"
-        },
-        "id": "dndnode_0-dndnode_1",
-        "source": "dndnode_0",
-        "sourceHandle": "audio",
-        "target": "dndnode_1",
-        "targetHandle": "input-audio",
-        "type": "custom"
-      },
-      {
-        "data": {
-          "id": "dndnode_1-dndnode_2",
-          "text": "Connected",
-          "type": "custom"
-        },
-        "id": "dndnode_1-dndnode_2",
-        "source": "dndnode_1",
-        "sourceHandle": "metadata",
-        "target": "dndnode_2",
-        "targetHandle": "input-any",
-        "type": "custom"
-      },
-      {
-        "data": {
-          "id": "dndnode_2-dndnode_3",
-          "text": "Connected",
-          "type": "custom"
-        },
-        "id": "dndnode_2-dndnode_3",
-        "source": "dndnode_2",
-        "sourceHandle": "metadata",
-        "target": "dndnode_3",
-        "targetHandle": "input-any",
-        "type": "custom"
-      },
-      {
-        "data": {
-          "id": "dndnode_3-dndnode_4",
-          "text": "Connected",
-          "type": "custom"
-        },
-        "id": "dndnode_3-dndnode_4",
-        "source": "dndnode_6",
-        "sourceHandle": "any",
-        "target": "dndnode_4",
-        "targetHandle": "input-any",
-        "type": "custom"
-      },
-      {
-        "data": {
-          "id": "dndnode_3-dndnode_5",
-          "text": "Connected",
-          "type": "custom"
-        },
-        "id": "dndnode_3-dndnode_5",
-        "source": "dndnode_3",
-        "sourceHandle": "In Progress",
-        "target": "dndnode_5",
-        "targetHandle": "input-any",
-        "type": "custom"
-      },
-      {
-        "data": {
-          "id": "dndnode_5-dndnode_2",
-          "text": "Connected",
-          "type": "custom"
-        },
-        "id": "dndnode_5-dndnode_2",
-        "source": "dndnode_5",
-        "sourceHandle": "any",
-        "target": "dndnode_2",
-        "targetHandle": "input-any",
-        "type": "custom"
-      },
-      {
-        "data": {
-          "text": "Connected"
-        },
-        "id": "dndnode_3-dndnode_6",
-        "source": "dndnode_3",
-        "sourceHandle": "Completed",
-        "target": "dndnode_6",
-        "targetHandle": "input-any",
-        "type": "custom"
-      }
-    ],
     "nodes": [
       {
-        "data": {
-          "configuration": {
-            "method": "trigger",
-            "operationId": "",
-            "parameters": {
-              "Audio Type": "",
-              "Prefix": ""
-            },
-            "path": "",
-            "requestMapping": null,
-            "responseMapping": null
-          },
-          "description": "This step will trigger after audio processing is completed",
-          "icon": {
-            "_owner": null,
-            "key": null,
-            "props": {
-              "size": 20
-            },
-            "ref": null
-          },
-          "inputTypes": ["any"],
-          "label": "Audio Processing Completed (trigger)",
-          "nodeId": "trigger_audio_processing_completed",
-          "outputTypes": [
-            {
-              "description": "Output type: audio",
-              "name": "audio"
-            }
-          ],
-          "type": "TRIGGER"
-        },
-        "height": 113,
         "id": "dndnode_0",
+        "type": "custom",
         "position": {
           "x": 160,
           "y": 272
         },
-        "type": "custom",
-        "width": 200
-      },
-      {
         "data": {
-          "configuration": {
-            "method": "transcribe",
-            "parameters": {}
-          },
-          "description": "Create an audio transcription using Amazon Transcribe",
+          "nodeId": "trigger_audio_processing_completed",
+          "label": "Audio Processing Completed (trigger)",
+          "description": "This step will trigger after audio processing is completed",
           "icon": {
-            "_owner": null,
             "key": null,
+            "ref": null,
             "props": {
               "size": 20
             },
-            "ref": null
+            "_owner": null
           },
-          "inputTypes": ["audio", "video"],
-          "label": "Transcribe Audio using Amazon Transcribe",
-          "nodeId": "audio_transcription_transcribe",
+          "inputTypes": ["any"],
           "outputTypes": [
             {
-              "description": "Output type: metadata",
-              "name": "metadata"
+              "name": "audio",
+              "description": "Output type: audio"
             }
           ],
-          "type": "UTILITY"
+          "type": "TRIGGER",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "trigger",
+            "parameters": {
+              "Audio Type": "",
+              "Prefix": ""
+            },
+            "requestMapping": null,
+            "responseMapping": null
+          }
         },
-        "dragging": false,
-        "height": 113,
+        "width": 200,
+        "height": 113
+      },
+      {
         "id": "dndnode_1",
+        "type": "custom",
         "position": {
           "x": 400,
           "y": 272
         },
-        "selected": false,
-        "type": "custom",
-        "width": 200
-      },
-      {
         "data": {
-          "configuration": {
-            "method": "transcribe_status",
-            "parameters": {}
-          },
-          "description": "Get the status of a transcription job",
+          "nodeId": "audio_transcription_transcribe",
+          "label": "Transcribe Audio using Amazon Transcribe",
+          "description": "Create an audio transcription using Amazon Transcribe",
           "icon": {
-            "_owner": null,
             "key": null,
+            "ref": null,
             "props": {
               "size": 20
             },
-            "ref": null
+            "_owner": null
           },
-          "inputTypes": ["any"],
-          "label": "Transcription Job Status",
-          "nodeId": "audio_transcription_transcribe_status",
+          "inputTypes": ["audio", "video"],
           "outputTypes": [
             {
-              "description": "Output type: metadata",
-              "name": "metadata"
+              "name": "metadata",
+              "description": "Output type: metadata"
             }
           ],
-          "type": "UTILITY"
+          "type": "UTILITY",
+          "configuration": {
+            "method": "transcribe",
+            "parameters": {}
+          }
         },
-        "dragging": false,
-        "height": 100,
+        "width": 200,
+        "height": 113,
+        "selected": false,
+        "dragging": false
+      },
+      {
         "id": "dndnode_2",
+        "type": "custom",
         "position": {
           "x": 624,
           "y": 272
         },
-        "selected": false,
-        "type": "custom",
-        "width": 200
-      },
-      {
         "data": {
-          "configuration": {
-            "method": "choice",
-            "parameters": {}
-          },
-          "description": "This step will branch the workflow based on a condition",
+          "nodeId": "audio_transcription_transcribe_status",
+          "label": "Transcription Job Status",
+          "description": "Get the status of a transcription job",
           "icon": {
-            "_owner": null,
             "key": null,
+            "ref": null,
             "props": {
               "size": 20
             },
-            "ref": null
+            "_owner": null
           },
           "inputTypes": ["any"],
-          "label": "Choice",
-          "nodeId": "choice",
           "outputTypes": [
             {
-              "description": "Path taken when condition evaluates to true",
-              "name": "Completed"
-            },
-            {
-              "description": "Path taken when condition evaluates to false",
-              "name": "In Progress"
+              "name": "metadata",
+              "description": "Output type: metadata"
             }
           ],
-          "type": "FLOW"
+          "type": "UTILITY",
+          "configuration": {
+            "method": "transcribe_status",
+            "parameters": {}
+          }
         },
-        "dragging": false,
-        "height": 113,
+        "width": 200,
+        "height": 100,
+        "selected": false,
+        "dragging": false
+      },
+      {
         "id": "dndnode_3",
+        "type": "custom",
         "position": {
           "x": 848,
           "y": 272
         },
-        "selected": false,
-        "type": "custom",
-        "width": 200
-      },
-      {
         "data": {
-          "configuration": {
-            "method": "success",
-            "parameters": {}
-          },
-          "description": "This step will end the execution with a success status",
+          "nodeId": "choice",
+          "label": "Choice",
+          "description": "This step will branch the workflow based on a condition",
           "icon": {
-            "_owner": null,
             "key": null,
+            "ref": null,
             "props": {
               "size": 20
             },
-            "ref": null
+            "_owner": null
           },
           "inputTypes": ["any"],
-          "label": "Success",
-          "nodeId": "success",
-          "outputTypes": [],
-          "type": "FLOW"
+          "outputTypes": [
+            {
+              "name": "Completed",
+              "description": "Path taken when condition evaluates to true"
+            },
+            {
+              "name": "In Progress",
+              "description": "Path taken when condition evaluates to false"
+            }
+          ],
+          "type": "FLOW",
+          "configuration": {
+            "method": "choice",
+            "parameters": {}
+          }
         },
-        "dragging": false,
+        "width": 200,
         "height": 113,
+        "selected": false,
+        "dragging": false
+      },
+      {
         "id": "dndnode_4",
+        "type": "custom",
         "position": {
           "x": 1312,
           "y": 272
         },
-        "selected": true,
-        "type": "custom",
-        "width": 200
-      },
-      {
         "data": {
-          "configuration": {
-            "method": "wait",
-            "operationId": "",
-            "parameters": {
-              "Duration": 30
-            },
-            "path": ""
-          },
-          "description": "This step will wait for a specific duration before moving to the next step",
+          "nodeId": "success",
+          "label": "Success",
+          "description": "This step will end the execution with a success status",
           "icon": {
-            "_owner": null,
             "key": null,
+            "ref": null,
             "props": {
               "size": 20
             },
-            "ref": null
+            "_owner": null
           },
           "inputTypes": ["any"],
-          "label": "Wait (wait)",
-          "nodeId": "wait",
-          "outputTypes": [
-            {
-              "description": "Output type: any",
-              "name": "any"
-            }
-          ],
-          "type": "FLOW"
+          "outputTypes": [],
+          "type": "FLOW",
+          "configuration": {
+            "method": "success",
+            "parameters": {}
+          }
         },
-        "dragging": false,
+        "width": 200,
         "height": 113,
+        "selected": true,
+        "dragging": false
+      },
+      {
         "id": "dndnode_5",
+        "type": "custom",
         "position": {
           "x": 624,
           "y": 448
         },
-        "selected": false,
-        "type": "custom",
-        "width": 200
-      },
-      {
         "data": {
-          "configuration": {
-            "method": "process_content",
-            "operationId": "",
-            "parameters": {
-              "content_source": "transcript",
-              "model_id": "amazon.nova-lite-v1:0",
-              "prompt_name": "summary_100"
-            },
-            "path": ""
-          },
-          "description": "Process any content using Amazon Bedrock models with customizable prompts",
+          "nodeId": "wait",
+          "label": "Wait (wait)",
+          "description": "This step will wait for a specific duration before moving to the next step",
           "icon": {
-            "_owner": null,
             "key": null,
+            "ref": null,
             "props": {
               "size": 20
             },
-            "ref": null
+            "_owner": null
           },
           "inputTypes": ["any"],
-          "label": "Bedrock Content Processor (process_content)",
-          "nodeId": "bedrock_content_processor",
           "outputTypes": [
             {
-              "description": "Output type: any",
-              "name": "any"
+              "name": "any",
+              "description": "Output type: any"
             }
           ],
-          "type": "UTILITY"
+          "type": "FLOW",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "wait",
+            "parameters": {
+              "Duration": 30
+            }
+          }
         },
-        "dragging": false,
+        "width": 200,
         "height": 113,
+        "selected": false,
+        "dragging": false
+      },
+      {
         "id": "dndnode_6",
+        "type": "custom",
         "position": {
           "x": 1088,
           "y": 272
         },
+        "data": {
+          "nodeId": "bedrock_content_processor",
+          "label": "Bedrock Content Processor (process_content)",
+          "description": "Process any content using Amazon Bedrock models with customizable prompts",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [
+            {
+              "name": "any",
+              "description": "Output type: any"
+            }
+          ],
+          "type": "UTILITY",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "process_content",
+            "parameters": {
+              "content_source": "transcript",
+              "model_id": "amazon.nova-lite-v1:0",
+              "prompt_name": "summary_100"
+            }
+          }
+        },
+        "width": 200,
+        "height": 113,
         "selected": false,
+        "dragging": false
+      }
+    ],
+    "edges": [
+      {
+        "id": "dndnode_0-dndnode_1",
+        "source": "dndnode_0",
+        "target": "dndnode_1",
         "type": "custom",
-        "width": 200
+        "data": {
+          "type": "custom",
+          "text": "Connected",
+          "id": "dndnode_0-dndnode_1"
+        },
+        "sourceHandle": "audio",
+        "targetHandle": "input-audio"
+      },
+      {
+        "id": "dndnode_1-dndnode_2",
+        "source": "dndnode_1",
+        "target": "dndnode_2",
+        "type": "custom",
+        "data": {
+          "type": "custom",
+          "text": "Connected",
+          "id": "dndnode_1-dndnode_2"
+        },
+        "sourceHandle": "metadata",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_2-dndnode_3",
+        "source": "dndnode_2",
+        "target": "dndnode_3",
+        "type": "custom",
+        "data": {
+          "type": "custom",
+          "text": "Connected",
+          "id": "dndnode_2-dndnode_3"
+        },
+        "sourceHandle": "metadata",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_3-dndnode_4",
+        "source": "dndnode_6",
+        "target": "dndnode_4",
+        "type": "custom",
+        "data": {
+          "type": "custom",
+          "text": "Connected",
+          "id": "dndnode_3-dndnode_4"
+        },
+        "sourceHandle": "any",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_3-dndnode_5",
+        "source": "dndnode_3",
+        "target": "dndnode_5",
+        "type": "custom",
+        "data": {
+          "type": "custom",
+          "text": "Connected",
+          "id": "dndnode_3-dndnode_5"
+        },
+        "sourceHandle": "In Progress",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_5-dndnode_2",
+        "source": "dndnode_5",
+        "target": "dndnode_2",
+        "type": "custom",
+        "data": {
+          "type": "custom",
+          "text": "Connected",
+          "id": "dndnode_5-dndnode_2"
+        },
+        "sourceHandle": "any",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_3-dndnode_6",
+        "source": "dndnode_3",
+        "target": "dndnode_6",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "Completed",
+        "targetHandle": "input-any"
       }
     ],
     "settings": {
@@ -372,7 +374,5 @@
       "retryAttempts": 3,
       "timeout": 3600
     }
-  },
-  "description": "",
-  "name": "Audio Transcription"
+  }
 }

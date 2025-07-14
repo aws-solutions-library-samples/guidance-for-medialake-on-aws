@@ -22,6 +22,7 @@ from medialake_constructs.shared_constructs.default_environment import (
     DefaultEnvironment,
     DefaultEnvironmentProps,
 )
+from medialake_constructs.shared_constructs.lambda_base import Lambda
 
 
 @dataclass
@@ -33,7 +34,7 @@ class IntegrationsEnvironmentStackProps:
     x_origin_verify_secret: secretsmanager.Secret
     cognito_user_pool: cognito.UserPool
     pipelines_nodes_table: dynamodb.TableV2
-    post_pipelines_lambda: lambda_.Function
+    post_pipelines_lambda: Lambda
 
 
 class IntegrationsEnvironmentStack(cdk.NestedStack):
@@ -101,16 +102,17 @@ class IntegrationsEnvironmentStack(cdk.NestedStack):
             ),
         )
 
-        self._props.post_pipelines_lambda.add_to_role_policy(
+        self._props.post_pipelines_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["dynamodb:GetItem", "dynamodb:Query"],
                 resources=[self._integrations_stack.integrations_table.table_arn],
             )
         )
 
-        self._props.post_pipelines_lambda.add_environment(
-            "INTEGRATIONS_TABLE",
-            self._integrations_stack.integrations_table.table_arn,
+        self._props.post_pipelines_lambda.add_environment_variables(
+            {
+                "INTEGRATIONS_TABLE": self._integrations_stack.integrations_table.table_arn,
+            }
         )
 
     @property

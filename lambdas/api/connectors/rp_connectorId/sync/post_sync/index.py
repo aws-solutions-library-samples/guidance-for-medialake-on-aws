@@ -48,10 +48,7 @@ def get_bucket_name_for_connector(connector_id: str) -> Optional[str]:
     try:
         # Log environment variables for debugging
         logger.info(
-            f"Environment variables: MEDIALAKE_CONNECTOR_TABLE={variable}"
-                                                                                   'MEDIALAKE_CONNECTOR_TABLE',
-                                                                                   'NOT_SET'
-                                                                               )}"
+            f"Environment variables: MEDIALAKE_CONNECTOR_TABLE={os.environ.get('MEDIALAKE_CONNECTOR_TABLE', 'NOT_SET')}"
         )
 
         # Use DynamoDB to look up the connector details
@@ -96,10 +93,7 @@ def get_connector_details(connector_id: str) -> Optional[Dict[str, Any]]:
     try:
         # Log environment variables for debugging
         logger.info(
-            f"Environment variables: MEDIALAKE_CONNECTOR_TABLE={variable}"
-                                                                                   'MEDIALAKE_CONNECTOR_TABLE',
-                                                                                   'NOT_SET'
-                                                                               )}"
+            f"Environment variables: MEDIALAKE_CONNECTOR_TABLE={os.environ.get('MEDIALAKE_CONNECTOR_TABLE', 'NOT_SET')}"
         )
 
         # Use DynamoDB to look up the connector details
@@ -204,10 +198,7 @@ def initialize_job(
 
     # Log environment variables for debugging
     logger.info(
-        f"Environment variables: JOB_TABLE_NAME={variable}"
-                                                                    'JOB_TABLE_NAME',
-                                                                    'NOT_SET'
-                                                                )}"
+        f"Environment variables: JOB_TABLE_NAME={os.environ.get('JOB_TABLE_NAME', 'NOT_SET')}"
     )
 
     # Save job record to DynamoDB

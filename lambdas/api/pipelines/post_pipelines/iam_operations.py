@@ -81,10 +81,7 @@ def wait_for_role_propagation(role_name: str, max_attempts: int = 20) -> None:
 
             # If we can get the role and its policies, wait a bit more to ensure propagation
             logger.info(
-                f"Role {role_name} exists with {variable}"
-                                                        attached_policies.get('AttachedPolicies',
-                                                        [])
-                                                    )} policies attached"
+                f"Role {role_name} exists with {len(attached_policies.get('AttachedPolicies', []))} policies attached"
             )
 
             # Exponential backoff with a cap
@@ -435,10 +432,7 @@ def create_lambda_execution_policy(role_name: str, yaml_data: Dict[str, Any]) ->
                 "Effect": "Allow",
                 "Action": ["dynamodb:GetItem", "dynamodb:PutItem"],
                 "Resource": [
-                    f"arn:aws:dynamodb:{variable}"
-                                                           'AWS_REGION',
-                                                           'us-east-1'
-                                                       )}:{os.environ['ACCOUNT_ID']}:table/{os.environ['NODE_TABLE']}",
+                    f"arn:aws:dynamodb:{os.environ.get('AWS_REGION', 'us-east-1')}:{os.environ['ACCOUNT_ID']}:table/{os.environ['NODE_TABLE']}",
                 ],
             },
             {
@@ -452,10 +446,7 @@ def create_lambda_execution_policy(role_name: str, yaml_data: Dict[str, Any]) ->
                 "Effect": "Allow",
                 "Action": ["events:PutEvents"],
                 "Resource": [
-                    f"arn:aws:events:{variable}"
-                                                         'AWS_REGION',
-                                                         'us-east-1'
-                                                     )}:{os.environ['ACCOUNT_ID']}:event-bus/{PIPELINES_EVENT_BUS_NAME}",
+                    f"arn:aws:events:{os.environ.get('AWS_REGION', 'us-east-1')}:{os.environ['ACCOUNT_ID']}:event-bus/{PIPELINES_EVENT_BUS_NAME}",
                 ],
             },
             {

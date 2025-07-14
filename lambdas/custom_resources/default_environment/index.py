@@ -64,10 +64,7 @@ def create_handler(event: Dict[str, Any], context: Any) -> None:
     try:
         response = table.scan(
             ConsistentRead=False,
-            FilterExpression="begins_with(
-                                              PK,
-                                              :pk_prefix
-                                          ) AND SK = :sk AND #name = :env_name",
+            FilterExpression="begins_with(PK, :pk_prefix) AND SK = :sk AND #name = :env_name",
             ExpressionAttributeValues={
                 ":pk_prefix": "ENV#",
                 ":sk": "METADATA",

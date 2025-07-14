@@ -47,7 +47,7 @@ class SearchConstruct(Construct):
             self,
             "SearchGetLambda",
             config=LambdaConfig(
-                name="get_search",
+                name="search_get",
                 vpc=props.vpc,
                 security_groups=[props.security_group],
                 entry="lambdas/api/search/get_search",

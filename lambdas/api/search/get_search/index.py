@@ -890,12 +890,10 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
                 standalone_hits.append(hit)
 
     logger.info(
-        f"Found {variable}"
-                         parent_assets)} parent assets,
-                         clips for {len(clips_by_asset)} assets,
-                         {len(standalone_hits)} standalone hits,
-                         {len(orphaned_clip_assets
-                     )} orphaned clip assets"
+        f"Found {len(parent_assets)} parent assets, "
+        f"clips for {len(clips_by_asset)} assets, "
+        f"{len(standalone_hits)} standalone hits, "
+        f"{len(orphaned_clip_assets)} orphaned clip assets"
     )
 
     # Batch fetch orphaned parents if any exist

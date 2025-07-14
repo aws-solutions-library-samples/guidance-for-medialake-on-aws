@@ -258,10 +258,7 @@ def update_pipeline_status(
         # Verify the update
         updated_pipeline = get_pipeline_by_id(pipeline_id)
         logger.info(
-            f"Verified pipeline status after update: {variable}"
-                                                                               'deploymentStatus',
-                                                                               'unknown'
-                                                                           )}"
+            f"Verified pipeline status after update: {updated_pipeline.get('deploymentStatus', 'unknown')}"
         )
     except Exception as e:
         logger.exception(f"Failed to update pipeline status: {e}")

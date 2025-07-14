@@ -148,10 +148,7 @@ class OpenSearchClient:
                     )
                     deletion_results.append(result)
                     logger.info(
-                        f"Delete result for doc {doc_id}: {variable}"
-                                                                          result,
-                                                                          default=str
-                                                                      )}"
+                        f"Delete result for doc {doc_id}: {json.dumps(result, default=str)}"
                     )
 
                 return {

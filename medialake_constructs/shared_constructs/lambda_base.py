@@ -677,14 +677,10 @@ class Lambda(Construct):
         logger = Logger()
         logger.debug(f"Adding/updating environment variables: {new_variables}")
 
-        # Get current environment variables
-        current_env = dict(self._function.get_environment() or {})
-
-        # Merge new variables with existing ones
-        updated_env = {**current_env, **new_variables}
-
-        # Update the function's environment
-        self._function.add_environment_variables(updated_env)
+        # Add environment variables one by one using the add_environment method
+        # This works for both PythonFunction and regular Function classes
+        for key, value in new_variables.items():
+            self._function.add_environment(key, value)
 
         logger.info(
             f"Successfully updated environment variables for function: {self.function_name}"

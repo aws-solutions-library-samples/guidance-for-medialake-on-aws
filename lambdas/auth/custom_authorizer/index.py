@@ -147,10 +147,7 @@ def get_cognito_jwks() -> Dict[str, Any]:
                 )
 
                 logger.info(
-                    f"Successfully fetched JWKS with {variable}"
-                                                              jwks.get('keys',
-                                                              [])
-                                                          )} keys in {fetch_time:.2f}ms"
+                    f"Successfully fetched JWKS with {len(jwks.get('keys', []))} keys in {fetch_time:.2f}ms"
                 )
                 return jwks
 

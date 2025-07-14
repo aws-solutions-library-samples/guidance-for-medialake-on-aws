@@ -311,11 +311,7 @@ class AssetSyncEngine:
 
         # Log the exact job creation parameters
         logger.info(
-            f"S3 Batch Operations create_job parameters: {variable}"
-                                                                         job_params,
-                                                                         indent=2,
-                                                                         default=str
-                                                                     )}"
+            f"S3 Batch Operations create_job parameters: {json.dumps(job_params, indent=2, default=str)}"
         )
 
         response = s3control.create_job(**job_params)

@@ -1686,11 +1686,11 @@ def process_records_in_parallel(
                 sample_str = "empty"
 
             logger.info(
-                f"Full event format: {json_serialize({variable}"
-                'type': type(records).__name__ if hasattr(type(records), '__name__') else str(type(records)),
-                'length': len(records) if hasattr(records, '__len__') else 'unknown',
-                'sample_structure': sample_str
-            })}"
+                f"Full event format: {json_serialize({
+                    'type': type(records).__name__ if hasattr(type(records), '__name__') else str(type(records)),
+                    'length': len(records) if hasattr(records, '__len__') else 'unknown',
+                    'sample_structure': sample_str
+                })}"
             )
             return
 
@@ -1765,10 +1765,8 @@ def handler(event: Dict, context: LambdaContext) -> Dict:
 
     # Log environment variables at debug level
     logger.debug(
-        f"Environment variables: ASSETS_TABLE={variable}"
-                                                                  'ASSETS_TABLE')},
-                                                                  EVENT_BUS_NAME={os.environ.get('EVENT_BUS_NAME'
-                                                              )}"
+        f"Environment variables: ASSETS_TABLE={os.environ.get('ASSETS_TABLE')}, "
+        f"EVENT_BUS_NAME={os.environ.get('EVENT_BUS_NAME')}"
     )
 
     # Initialize global clients
@@ -1780,10 +1778,7 @@ def handler(event: Dict, context: LambdaContext) -> Dict:
             TableName=os.environ["ASSETS_TABLE"]
         )
         logger.debug(
-            f"DynamoDB table info available - Table Status: {variable}"
-                                                                                'Table',
-                                                                                {}).get('TableStatus'
-                                                                            )}"
+            f"DynamoDB table info available - Table Status: {dynamo_client.describe_table(TableName=table_name).get('Table', {}).get('TableStatus')}"
         )
     except Exception as e:
         logger.error(f"Error accessing DynamoDB table: {str(e)}")
@@ -2038,11 +2033,7 @@ def process_s3_event(
                 )
                 # Log exact key for debugging to see if there are encoding issues
                 logger.error(
-                    f"Failed key details - length: {variable}"
-                                                            key)},
-                                                            contains '+': {'+' in key},
-                                                            raw key: {repr(key
-                                                        )}"
+                    f"Failed key details - length: {len(key)}, contains '+': {'+' in key}, raw key: {repr(key)}"
                 )
 
                 # Try alternative key encodings to help diagnose the issue
@@ -2116,11 +2107,7 @@ def process_s3_event(
         logger.exception(f"Error in process_s3_event for {bucket}/{key}: {str(e)}")
         # Log key details for troubleshooting
         logger.error(
-            f"Key details - length: {variable}"
-                                             key)},
-                                             contains '+': {'+' in key},
-                                             raw key: {repr(key
-                                         )}"
+            f"Key details - length: {len(key)}, contains '+': {'+' in key}, raw key: {repr(key)}"
         )
         metrics.add_metric(name="ProcessingErrors", unit=MetricUnit.Count, value=1)
         # Track error duration too
