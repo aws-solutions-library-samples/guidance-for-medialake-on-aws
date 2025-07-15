@@ -15,7 +15,7 @@ def vector_bucket_exists(s3_vector_client, bucket_name: str) -> bool:
     Check if S3 Vector bucket already exists using GetVectorBucket API.
     """
     try:
-        response = s3_vector_client.get_vector_bucket(bucketName=bucket_name)
+        response = s3_vector_client.get_vector_bucket(vectorBucketName=bucket_name)
         logger.info(
             "Vector bucket exists",
             extra={"bucket_name": bucket_name, "response": response}
@@ -42,7 +42,7 @@ def index_exists(s3_vector_client, bucket_name: str, index_name: str) -> bool:
     """
     try:
         response = s3_vector_client.get_index(
-            bucketName=bucket_name,
+            vectorBucketName=bucket_name,
             indexName=index_name
         )
         logger.info(
@@ -79,7 +79,7 @@ def delete_index(s3_vector_client, bucket_name: str, index_name: str) -> None:
     """
     try:
         s3_vector_client.delete_index(
-            bucketName=bucket_name,
+            vectorBucketName=bucket_name,
             indexName=index_name
         )
         logger.info(
@@ -147,7 +147,7 @@ def create_vector_bucket(s3_vector_client, bucket_name: str, region: str) -> boo
         }
 
         response = s3_vector_client.create_vector_bucket(
-            bucketName=bucket_name,
+            vectorBucketName=bucket_name,
             encryptionConfiguration=encryption_config
         )
 
@@ -202,10 +202,11 @@ def create_vector_index_with_retry(
         try:
             # Create the vector index
             response = s3_vector_client.create_index(
-                bucketName=bucket_name,
+                vectorBucketName=bucket_name,
                 indexName=index_name,
                 dimension=dimension,
-                dataType="float32"  # Using float32 for embeddings
+                dataType="float32",  # Using float32 for embeddings
+                distanceMetric="cosine"  # Default distance metric
             )
 
             logger.info(
