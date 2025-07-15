@@ -13,6 +13,9 @@ from aws_cdk import custom_resources as cr
 from constructs import Construct
 
 from config import config
+from medialake_constructs.shared_constructs.lambda_layers import (
+    PowertoolsLayer, PowertoolsLayerConfig, CommonLibrariesLayer
+)
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 

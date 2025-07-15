@@ -1488,10 +1488,20 @@ def create_connector(createconnector: S3Connector) -> dict:
                 "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
             )
 
+            # Get common libraries layer ARN from environment
+            common_libraries_layer_arn = os.environ.get("COMMON_LIBRARIES_LAYER_ARN")
+            
             # Construct AWS SDK Python layer ARN using current account
             aws_sdk_layer_arn = f"arn:aws:lambda:{bucket_region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-x86_64:2"
+            
             # Get any existing layers
             layers = [layer_arn] if layer_arn else []
+            
+            # Add common libraries layer if available
+            if common_libraries_layer_arn:
+                layers.append(common_libraries_layer_arn)
+                logger.info(f"Adding common libraries layer to S3 connector Lambda: {common_libraries_layer_arn}")
+            
             # Add AWS SDK layer
             layers.append(aws_sdk_layer_arn)
             # Ultra-fast propagation checks - minimal waits for API Gateway timeout

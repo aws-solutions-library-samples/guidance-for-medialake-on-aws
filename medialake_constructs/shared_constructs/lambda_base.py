@@ -34,6 +34,8 @@ from config import config as env_config
 from medialake_constructs.shared_constructs.lambda_layers import (
     PowertoolsLayer,
     PowertoolsLayerConfig,
+    PynamoDbLambdaLayer,
+    CommonLibrariesLayer,
 )
 
 # Constants
@@ -226,6 +228,9 @@ class Lambda(Construct):
         lambda_function = Lambda(self, "MyFunction", config)
         ```
     """
+    
+    # Class-level shared layer instances per stack to avoid duplicate layer creation
+    _shared_common_libraries_layers = {}
 
     def __init__(
         self, scope: Construct, construct_id: str, config: LambdaConfig, **kwargs
@@ -286,7 +291,21 @@ class Lambda(Construct):
         powertools_layer = PowertoolsLayer(
             self, "PowertoolsLayer", config=power_tools_layer_config
         )
-        layer_objects = [powertools_layer.layer]
+
+        # Create or reuse common libraries layer (per-stack singleton pattern)
+        stack_id = stack.stack_name
+        if stack_id not in Lambda._shared_common_libraries_layers:
+            logger.debug(f"Creating shared Common Libraries layer for stack: {stack_id}")
+            # Use the stack variable that was already created above
+            Lambda._shared_common_libraries_layers[stack_id] = CommonLibrariesLayer(
+                stack, "CommonLibsLayer"
+            )
+        else:
+            logger.debug(f"Reusing existing Common Libraries layer for stack: {stack_id}")
+        
+        common_libraries_layer = Lambda._shared_common_libraries_layers[stack_id]
+
+        layer_objects = [powertools_layer.layer, common_libraries_layer.layer]
 
         # Add layers from config
         if config.layers:
@@ -473,11 +492,8 @@ class Lambda(Construct):
 
         try:
             if config.runtime.family == lambda_.RuntimeFamily.NODEJS:
-                # For Node.js, we still collect common libraries for local copying since
                 # the Node.js bundling process is different
-                common_libs = self._collect_common_libraries(entry_path)
-                logger.debug(f"Found common libraries for Node.js: {common_libs}")
-                self._create_nodejs_function(common_lambda_props, common_libs)
+                self._create_nodejs_function(common_lambda_props)
             else:
                 # Python bundling now handles common libraries via Docker - no local copying needed
                 logger.debug(
@@ -498,75 +514,15 @@ class Lambda(Construct):
             logger.error(f"Failed to create Lambda function: {str(e)}", exc_info=True)
             raise
 
-    def _collect_common_libraries(self, entry_path: Path) -> Dict[str, str]:
-        """
-        Collect common libraries from parent directories.
-        Returns a dictionary mapping file names to their full paths,
-        with more specific (closer to lambda) libraries taking precedence.
+   
 
-        Note: This method is now only used for Node.js functions. Python functions
-        handle common libraries through enhanced Docker bundling during the build process.
-        """
-        common_libs = {}
-        current_path = entry_path
-
-        # Walk up the directory tree until we reach the lambdas directory
-        while "lambdas" in str(current_path):
-            common_lib_path = current_path / "common_libraries"
-            if common_lib_path.exists():
-                # Collect all files in the common_libraries directory
-                for file_path in common_lib_path.rglob("*"):
-                    if file_path.is_file():
-                        # Use the relative path from common_libraries as the key
-                        rel_path = file_path.relative_to(common_lib_path)
-                        # Only add if we haven't seen this file before (more specific ones take precedence)
-                        if str(rel_path) not in common_libs:
-                            common_libs[str(rel_path)] = str(file_path)
-            current_path = current_path.parent
-
-        return common_libs
-
-    def _copy_common_libraries(
-        self, common_libs: Dict[str, str], target_dir: Path
-    ) -> None:
-        """
-        Copy common libraries to the target directory, flattening the structure.
-
-        Note: This method is now only used for Node.js functions. Python functions
-        handle common libraries through enhanced Docker bundling to avoid local file copying.
-        """
-        import shutil
-
-        logger = Logger()
-
-        logger.debug(f"Ensuring target directory exists: {target_dir}")
-        target_dir.mkdir(parents=True, exist_ok=True)
-
-        # Copy each file
-        for rel_path, source_path in common_libs.items():
-            target_file = Path(rel_path).name
-            target_path = target_dir / target_file
-            logger.debug(
-                f"Copying common library file from {source_path} to {target_path}"
-            )
-            try:
-                shutil.copy2(source_path, target_path)
-                logger.debug(f"Successfully copied {source_path} to {target_path}")
-            except Exception as e:
-                logger.error(f"Error copying {source_path} to {target_path}: {e}")
-                raise
-
-    def _create_nodejs_function(self, props: dict, common_libs: dict):
+    def _create_nodejs_function(self, props: dict):
         logger = Logger()
 
         # Corrected Node.js specific paths
         props["runtime"] = lambda_.Runtime.NODEJS_20_X
         props["project_root"] = props["entry"]
         props["deps_lock_file_path"] = os.path.join(props["entry"], "lock.json")
-
-        # Copy common libraries to entry directory
-        if common_libs:
-            self._copy_common_libraries(common_libs, Path(props["project_root"]))
 
         # If the deployment is part of a CI/CD pipeline, avoid using PythonFunction as it's relying on DnD
         # CI env var is exposed by Gitlab. TODO: add Github specific env var
@@ -627,54 +583,7 @@ class Lambda(Construct):
                 # Copy lambda source files
                 echo "Copying Lambda source files..."
                 cp -au . /asset-output
-
-                # Copy common libraries from various possible locations
-                COMMON_LIBS_COPIED=false
-
-                # Try different possible paths for common_libraries based on Lambda location depth
-                # For lambdas at root level: ../common_libraries
-                # For lambdas in api/: ../../common_libraries
-                # For lambdas in api/category/: ../../../common_libraries
-                # For lambdas in api/category/function/: ../../../../common_libraries
-                for path in "/asset-input/../common_libraries" "/asset-input/../../common_libraries" "/asset-input/../../../common_libraries" "/asset-input/../../../../common_libraries" "/asset-input/../../../../../common_libraries"; do
-                    if [ -d "$path" ]; then
-                        echo "Found common libraries at: $path"
-                        echo "Copying common libraries to Lambda bundle..."
-
-                        # List files being copied for debugging
-                        echo "Files in common_libraries:"
-                        ls -la "$path"
-
-                        # Copy files individually to avoid issues with globbing
-                        for file in "$path"/*; do
-                            if [ -f "$file" ]; then
-                                filename=$(basename "$file")
-                                echo "Copying: $filename"
-                                cp -u "$file" /asset-output/ || echo "Warning: Could not copy $filename"
-                            fi
-                        done
-                        COMMON_LIBS_COPIED=true
-                        break
-                    else
-                        echo "Path not found: $path"
-                    fi
-                done
-
-                if [ "$COMMON_LIBS_COPIED" = false ]; then
-                    echo "Warning: No common_libraries directory found. Searched paths:"
-                    echo "  - /asset-input/../common_libraries"
-                    echo "  - /asset-input/../../common_libraries"
-                    echo "  - /asset-input/../../../common_libraries"
-                    echo "  - /asset-input/../../../../common_libraries"
-                    echo "  - /asset-input/../../../../../common_libraries"
-                    echo "Current working directory during build:"
-                    pwd
-                    echo "Directory structure:"
-                    find /asset-input -name "common_libraries" -type d 2>/dev/null || echo "No common_libraries found in asset-input tree"
-                else
-                    echo "Successfully copied common libraries"
-                fi
-
+                
                 echo "Bundling process completed successfully"
                 """,
             ],

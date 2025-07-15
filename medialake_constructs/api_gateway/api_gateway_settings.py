@@ -344,7 +344,7 @@ class SettingsConstruct(Construct):
             "SettingsUsersUserDelLambda",
             config=LambdaConfig(
                 name="settings_users_user_del_lambda",
-                iam_role_name="settings_users_user_del_lambda_role",
+                # iam_role_name="settings_users_user_del_lambda_role",
                 entry="lambdas/api/settings/users/rp_userid/del_user",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": (
@@ -377,7 +377,7 @@ class SettingsConstruct(Construct):
             "SettingsUserPutLambda",
             config=LambdaConfig(
                 name="settings_users_user_put_lambda",
-                iam_role_name="settings_users_user_put_lambda_role",
+                # iam_role_name="settings_users_user_put_lambda_role",
                 entry="lambdas/api/settings/users/rp_userid/put_user",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": (
@@ -414,7 +414,7 @@ class SettingsConstruct(Construct):
             "SettingsUsersUserUseridGetLambda",
             config=LambdaConfig(
                 name="user_put",
-                iam_role_name="user_put",
+                # iam_role_name="user_put",
                 entry="lambdas/api/settings/users/user/rp_userid/get_userid",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": (
