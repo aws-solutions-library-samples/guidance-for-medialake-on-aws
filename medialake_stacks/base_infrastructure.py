@@ -219,11 +219,24 @@ class BaseInfrastructureStack(Stack):
                 ]
             ]
 
+        # Create a shorter domain name to comply with OpenSearch 28-character limit
+        # Original format: {resource_prefix}-os-{region}-{environment}
+        # New format: {resource_prefix}-{region_short}-{env_short}
+        region_short = region.replace("-", "")[:8]  # Remove hyphens and limit to 8 chars
+        env_short = config.environment[:3]  # Limit environment to 3 chars
+        domain_name = f"{config.resource_prefix}-{region_short}-{env_short}"
+        
+        # Ensure domain name doesn't exceed 28 characters
+        if len(domain_name) > 28:
+            # Further truncate if needed
+            max_prefix_length = 28 - len(region_short) - len(env_short) - 2  # 2 for hyphens
+            domain_name = f"{config.resource_prefix[:max_prefix_length]}-{region_short}-{env_short}"
+        
         self._opensearch_cluster = OpenSearchCluster(
             self,
             "MediaLakeOpenSearch",
             props=OpenSearchClusterProps(
-                domain_name=f"{config.resource_prefix}-os-{region}-{config.environment}",
+                domain_name=domain_name,
                 vpc=self._vpc.vpc,
                 subnet_ids=selected_subnet_ids,
                 collection_indexes=[opensearch_index_name],
