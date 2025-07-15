@@ -25,6 +25,24 @@ export interface SearchProviderUpdate {
   isEnabled?: boolean;
 }
 
+// New types for the three-part settings structure
+export interface SemanticSearchSettings {
+  isEnabled: boolean;
+  provider: {
+    type: 'twelvelabs-api' | 'twelvelabs-bedrock';
+    config: SearchProvider | null;
+  };
+  embeddingStore: {
+    type: 'opensearch' | 's3-vector';
+  };
+}
+
+export interface SystemSettingsState {
+  current: SemanticSearchSettings;
+  original: SemanticSearchSettings;
+  hasChanges: boolean;
+}
+
 export interface SystemSettingsResponse {
   status: string;
   message: string;

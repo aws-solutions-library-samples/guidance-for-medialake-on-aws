@@ -316,6 +316,16 @@ class LambdaMiddleware:
         now = time.time()
         data = result
 
+<<<<<<< HEAD
+        if isinstance(data, dict):
+            ext_id = data.get("externalJobId")    or orig.get("metadata", {}).get("externalJobId", "")
+            ext_st = data.get("externalJobStatus")or orig.get("metadata", {}).get("externalJobStatus", "")
+            ext_rs = data.get("externalJobResult")or orig.get("metadata", {}).get("externalJobResult", "")
+        else:
+            ext_id = orig.get("metadata", {}).get("externalJobId", "")
+            ext_st = orig.get("metadata", {}).get("externalJobStatus", "")
+            ext_rs = orig.get("metadata", {}).get("externalJobResult", "")
+=======
         # Extract external job fields
         ext_id = safe_pop(data, "externalJobId") or orig.get("metadata", {}).get(
             "externalJobId", ""
@@ -326,6 +336,7 @@ class LambdaMiddleware:
         ext_rs = safe_pop(data, "externalJobResult") or orig.get("metadata", {}).get(
             "externalJobResult", ""
         )
+>>>>>>> fdf331aac393632ee74f65e04736b719d966405f
 
         prev_meta = orig.get("metadata", {})
         status_is_complete = self.is_last and (
