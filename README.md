@@ -6,18 +6,16 @@
 > - [Cost](#cost)
 >   - [Base Services Cost Table](#base-services-cost-table)
 >   - [Usage Based Cost Example Table](#usage-based-cost-example-table)
-
-> - [Cost Table](#cost-table)
-> - [Development](#development)
->   - [Prerequisites](#prerequisites)
->   - [Operating System](#operating-system)
-> - [Deployment Steps](#deployment-steps)
+> - [Quick Deployment (CloudFormation)](#quick-deployment-cloudformation)
+> - [Development Environment Setup and CDK Deployment](#development-environment-setup-and-cdk-deployment)
 >   - [Clone the repository](#1-clone-the-repository)
 >   - [Prepare the environment](#2-prepare-the-environment)
 >   - [Configure AWS account and region](#3-configure-aws-account-and-region)
 >   - [Configuration Setup](#4-configuration-setup)
->   - [Deploy using CloudFormation Template (Recommended)](#5-deploy-using-cloudformation-template-recommended)
->   - [Alternative: Deploy using AWS CDK](#6-alternative-deploy-using-aws-cdk)
+>   - [Deploy using AWS CDK](#5-deploy-using-aws-cdk)
+> - [Development](#development)
+>   - [Prerequisites](#prerequisites)
+>   - [Operating System](#operating-system)
 > - [Deployment Validation](#deployment-validation)
 > - [Running the Guidance](#running-the-guidance)
 >   - [Login](#1-login)
@@ -85,7 +83,7 @@ As of July 2025, the cost for running this Guidance with the **small deployment 
 **Variable Workload Costs:**
 Additional costs will be incurred based on actual usage:
 
-- Media processing and enrichment services (Twelve Labs, Transcription)
+- Media processing and enrichment services (TwelveLabs, Transcription)
 - S3 storage and data transfer
 - Lambda execution time
 - OpenSearch queries and indexing
@@ -204,9 +202,73 @@ npm install -g aws-cdk
 
 ---
 
-## Deployment Steps
+## Quick Deployment (CloudFormation)
 
-You can deploy media lake using either the CloudFormation template (recommended) or AWS CDK.
+**Recommended for most users** - Deploy media lake quickly using the pre-built CloudFormation template without setting up a development environment.
+
+### Prerequisites
+
+- An AWS account with appropriate permissions to create and manage resources
+- Access to the AWS Console
+
+### Deployment Steps
+
+1. **Download the CloudFormation template**
+
+   - Download `medialake.template` from the GitHub repository
+
+2. **Deploy using AWS Console**
+
+   - Go to the AWS Console > CloudFormation > "Create Stack" > "With new resources (standard)"
+   - Choose **Upload a template file**, select `medialake.template`
+   - Set stack name to `medialake-cf`
+
+3. **Configure template parameters:**
+
+   #### Initial Media Lake User
+
+   - **InitialUserEmail**: Email address for the initial administrator account (required)
+   - **InitialUserFirstName**: First name of the initial administrator (1-50 characters, letters/spaces/hyphens/periods only)
+   - **InitialUserLastName**: Last name of the initial administrator (1-50 characters, letters/spaces/hyphens/periods only)
+
+   #### Media Lake Configuration
+
+   - **MediaLakeEnvironmentName**: Environment identifier (1-10 alphanumeric characters, default: `dev`)
+   - **OpenSearchDeploymentSize**: Controls the size of your OpenSearch cluster
+     - `small`: Suitable for development and testing environments
+     - `medium`: Recommended for moderate production workloads
+     - `large`: Designed for high-volume production environments
+
+   #### Media Lake Deployment Configuration
+
+   - **SourceType**: Deployment source method
+     - `Git`: Deploy directly from a public Git repository
+     - `S3PresignedURL`: Deploy from a ZIP file via presigned URL
+   - **GitRepositoryUrl**: Public Git repository URL (default: AWS Solutions Library media lake repository)
+   - **S3PresignedURL**: Presigned URL for ZIP file download (required when using S3PresignedURL source type)
+
+4. **Complete deployment**
+   - Accept the required IAM capabilities and deploy
+   - Monitor the stack creation progress in the CloudFormation console
+
+See the [`MediaLake-Installation-Guide.md`](assets/docs/MediaLake-Installation-Guide.md) for a complete CloudFormation deployment guide.
+
+---
+
+## Development Environment Setup and CDK Deployment
+
+**For developers** who want to customize the solution, contribute to the project, or deploy using AWS CDK.
+
+### Prerequisites
+
+- An AWS account with appropriate permissions to create and manage resources
+- **AWS CLI** configured with your account credentials
+- **AWS CDK CLI** (`npm install -g aws-cdk`)
+- **Node.js** (v20.x or later)
+- **Python** (3.12)
+- **Docker** (for local development)
+- **Git** for cloning the repository
+- Optional: Third-party services (such as Twelve Labs) require separate setup and API credentials for integration
 
 ### 1. **Clone the repository**
 
@@ -223,7 +285,7 @@ cd guidance-for-medialake
 python3 -m venv .venv
 source .venv/bin/activate      # Mac
 # OR for Windows
-.venv\Scriptsctivate.bat     # Windows
+.venv\Scripts\activate.bat     # Windows
 ```
 
 #### (b) **Install dependencies:**
@@ -241,7 +303,7 @@ pip install -r requirements-dev.txt
 
 ### 3. **Configure AWS account and region**
 
-Ensure AWS credentials are configured (`aws configure`), and bootstrap your account for CDK (if using CDK):
+Ensure AWS credentials are configured (`aws configure`), and bootstrap your account for CDK:
 
 ```bash
 cdk bootstrap --profile <profile> --region <region>
@@ -268,48 +330,9 @@ Key configuration parameters include:
 
 See the [`config-example.json`](config-example.json) for a complete configuration example.
 
----
+### 5. **Deploy using AWS CDK**
 
-### 5. **Deploy using CloudFormation Template (Recommended)**
-
-Deploy directly using the CloudFormation template from GitHub:
-
-1. Go to the AWS Console > CloudFormation > "Create Stack" > "With new resources (standard)".
-2. Choose **Upload a template file**, select `medialake.template`.
-3. Set stack name to `medialake-cf`.
-4. Configure the CloudFormation template parameters:
-
-   ### Initial Media Lake User
-
-   - **InitialUserEmail**: Email address for the initial administrator account (required)
-   - **InitialUserFirstName**: First name of the initial administrator (1-50 characters, letters/spaces/hyphens/periods only)
-   - **InitialUserLastName**: Last name of the initial administrator (1-50 characters, letters/spaces/hyphens/periods only)
-
-   ### Media Lake Configuration
-
-   - **MediaLakeEnvironmentName**: Environment identifier (1-10 alphanumeric characters, default: `dev`)
-   - **OpenSearchDeploymentSize**: Controls the size of your OpenSearch cluster
-     - `small`: Suitable for development and testing environments
-     - `medium`: Recommended for moderate production workloads
-     - `large`: Designed for high-volume production environments
-
-   ### Media Lake Deployment Configuration
-
-   - **SourceType**: Deployment source method
-     - `Git`: Deploy directly from a public Git repository
-     - `S3PresignedURL`: Deploy from a ZIP file via presigned URL
-   - **GitRepositoryUrl**: Public Git repository URL (default: AWS Solutions Library media lake repository)
-   - **S3PresignedURL**: Presigned URL for ZIP file download (required when using S3PresignedURL source type)
-
-5. Accept the required IAM capabilities and deploy.
-
-See the [`MediaLake-Installation-Guide.md`](assets/docs/MediaLake-Installation-Guide.md) for a complete CloudFormation deployment guide.
-
----
-
-### 6. **Alternative: Deploy using AWS CDK**
-
-For advanced users who prefer CDK deployment:
+Deploy all stacks using CDK:
 
 ```bash
 cdk deploy --all --profile <profile> --region <region>
