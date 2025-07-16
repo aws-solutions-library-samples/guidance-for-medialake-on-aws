@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   Box,
   Typography,
@@ -19,6 +19,7 @@ import {
   CircularProgress,
   Alert,
   Snackbar,
+<<<<<<< HEAD
 } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { Add as AddIcon, Edit as EditIcon } from '@mui/icons-material';
@@ -33,6 +34,27 @@ const useNotificationWithFallback = () => {
   const [message, setMessage] = useState('');
   const [severity, setSeverity] = useState<'success' | 'info' | 'warning' | 'error'>('info');
 
+=======
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Card,
+  CardContent,
+  Chip
+} from '@mui/material';
+import { useTranslation } from 'react-i18next';
+import { Edit as EditIcon, CheckCircle as CheckCircleIcon, Cancel as CancelIcon } from '@mui/icons-material';
+import { useSemanticSearchSettings } from '@/features/settings/system/hooks/useSystemSettings';
+import { SYSTEM_SETTINGS_CONFIG } from '@/features/settings/system/config';
+
+// Create a custom hook that falls back to a local notification if the global one isn't available
+const useNotificationWithFallback = () => {
+  const [open, setOpen] = React.useState(false);
+  const [message, setMessage] = React.useState('');
+  const [severity, setSeverity] = React.useState<'success' | 'info' | 'warning' | 'error'>('info');
+  
+>>>>>>> feat/s3SearchVectorEmbeddingStore
   // Try to use the global notification context, but don't throw if it's not available
   let globalNotification;
   try {
@@ -97,15 +119,25 @@ function TabPanel(props: TabPanelProps) {
 const SystemSettingsPage: React.FC = () => {
   const { t } = useTranslation();
   const theme = useTheme();
+<<<<<<< HEAD
   const [tabValue, setTabValue] = useState(0);
   const {
     showNotification,
     hideNotification,
     open: notificationOpen,
     message: notificationMessage,
+=======
+  const [tabValue, setTabValue] = React.useState(0);
+  const { 
+    showNotification, 
+    hideNotification, 
+    open: notificationOpen, 
+    message: notificationMessage, 
+>>>>>>> feat/s3SearchVectorEmbeddingStore
     severity: notificationSeverity,
     usingFallback,
   } = useNotificationWithFallback();
+<<<<<<< HEAD
 
   // Use our custom hooks for system settings management
   const semanticSearchStatus = useSemanticSearchStatus();
@@ -142,11 +174,35 @@ const SystemSettingsPage: React.FC = () => {
       });
     }
   }, [semanticSearchStatus.providerData, isProviderLoading, providerError, setProvider]);
+=======
+  
+  // Use the new semantic search settings hook
+  const {
+    settings,
+    hasChanges,
+    isLoading,
+    error,
+    isApiKeyDialogOpen,
+    apiKeyInput,
+    isEditingApiKey,
+    handleToggleChange,
+    handleProviderTypeChange,
+    handleEmbeddingStoreChange,
+    handleOpenApiKeyDialog,
+    handleCloseApiKeyDialog,
+    handleSaveApiKey,
+    handleSave,
+    handleCancel,
+    isSaving,
+    setApiKeyInput
+  } = useSemanticSearchSettings();
+>>>>>>> feat/s3SearchVectorEmbeddingStore
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
 
+<<<<<<< HEAD
   // Add a handler for the semantic search toggle
   const handleSearchToggleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const isEnabled = event.target.checked;
@@ -174,7 +230,29 @@ const SystemSettingsPage: React.FC = () => {
         ...provider,
         isEnabled: isEnabled,
       });
+=======
+  const handleSaveSettings = async () => {
+    const success = await handleSave();
+    if (success) {
+      showNotification(
+        t('settings.systemSettings.search.saveSuccess', 'Settings saved successfully'),
+        'success'
+      );
+    } else {
+      showNotification(
+        t('settings.systemSettings.search.saveError', 'Failed to save settings'),
+        'error'
+      );
+>>>>>>> feat/s3SearchVectorEmbeddingStore
     }
+  };
+
+  const handleCancelSettings = () => {
+    handleCancel();
+    showNotification(
+      t('settings.systemSettings.search.cancelSuccess', 'Changes cancelled'),
+      'info'
+    );
   };
 
   return (
@@ -257,12 +335,17 @@ const SystemSettingsPage: React.FC = () => {
             </Typography>
 
             <Divider sx={{ my: 3 }} />
+<<<<<<< HEAD
 
             {isProviderLoading ? (
+=======
+            
+            {isLoading ? (
+>>>>>>> feat/s3SearchVectorEmbeddingStore
               <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
                 <CircularProgress />
               </Box>
-            ) : providerError ? (
+            ) : error ? (
               <Alert severity="error" sx={{ my: 2 }}>
                 {t(
                   'settings.systemSettings.search.errorLoading',
@@ -270,6 +353,7 @@ const SystemSettingsPage: React.FC = () => {
                 )}
               </Alert>
             ) : (
+<<<<<<< HEAD
               <>
                 {/* Semantic Search Enabled Toggle */}
                 <Box
@@ -412,10 +496,157 @@ const SystemSettingsPage: React.FC = () => {
                   </Box>
                 )}
               </>
+=======
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {/* Part 1: Semantic Search Enabled Toggle */}
+                <Card elevation={0} sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 2 }}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Box>
+                        <Typography variant="h6" sx={{ mb: 1 }}>
+                          {t('settings.systemSettings.search.semanticEnabled', 'Semantic Search Enabled')}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {t('settings.systemSettings.search.semanticEnabledDesc', 'Enable or disable semantic search functionality')}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Chip 
+                          label={settings.isEnabled ? 'ON' : 'OFF'} 
+                          color={settings.isEnabled ? 'success' : 'error'}
+                          variant="filled"
+                          size="small"
+                        />
+                        <Switch
+                          checked={settings.isEnabled}
+                          onChange={(e) => handleToggleChange(e.target.checked)}
+                          color="success"
+                          size="medium"
+                        />
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </Card>
+
+                {/* Part 2: Semantic Search Provider */}
+                <Card elevation={0} sx={{ 
+                  border: `1px solid ${theme.palette.divider}`, 
+                  borderRadius: 2,
+                  opacity: settings.isEnabled ? 1 : 0.5
+                }}>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ mb: 2 }}>
+                      {t('settings.systemSettings.search.provider', 'Semantic Search Provider')}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                      {t('settings.systemSettings.search.providerDesc', 'Select the AI provider for semantic search capabilities')}
+                    </Typography>
+                    
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <FormControl sx={{ minWidth: 200 }} disabled={!settings.isEnabled}>
+                        <InputLabel>{t('settings.systemSettings.search.selectProvider', 'Select Provider')}</InputLabel>
+                        <Select
+                          value={settings.provider.type}
+                          label="Select Provider"
+                          onChange={(e) => handleProviderTypeChange(e.target.value as 'twelvelabs-api' | 'twelvelabs-bedrock')}
+                        >
+                          <MenuItem value="twelvelabs-api">
+                            {SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.name}
+                          </MenuItem>
+                          <MenuItem value="twelvelabs-bedrock">
+                            {SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_BEDROCK.name}
+                          </MenuItem>
+                        </Select>
+                      </FormControl>
+                      
+                      {settings.provider.type === 'twelvelabs-api' && settings.provider.config?.isConfigured && (
+                        <Button
+                          variant="outlined"
+                          startIcon={<EditIcon />}
+                          onClick={() => handleOpenApiKeyDialog(true)}
+                          disabled={!settings.isEnabled}
+                        >
+                          {t('settings.systemSettings.search.editApiKey', 'Edit')}
+                        </Button>
+                      )}
+                      
+                      {settings.provider.config?.isConfigured && (
+                        <Chip
+                          icon={<CheckCircleIcon />}
+                          label={t('settings.systemSettings.search.configured', 'Configured')}
+                          color="success"
+                          variant="outlined"
+                        />
+                      )}
+                    </Box>
+                  </CardContent>
+                </Card>
+
+                {/* Part 3: Semantic Search Embedding Store */}
+                <Card elevation={0} sx={{ 
+                  border: `1px solid ${theme.palette.divider}`, 
+                  borderRadius: 2,
+                  opacity: settings.isEnabled ? 1 : 0.5
+                }}>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ mb: 2 }}>
+                      {t('settings.systemSettings.search.embeddingStore', 'Semantic Search Embedding Store')}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                      {t('settings.systemSettings.search.embeddingStoreDesc', 'Choose where to store and search vector embeddings')}
+                    </Typography>
+                    
+                    <FormControl sx={{ minWidth: 200 }} disabled={!settings.isEnabled}>
+                      <InputLabel>{t('settings.systemSettings.search.selectStore', 'Select Store')}</InputLabel>
+                      <Select
+                        value={settings.embeddingStore.type}
+                        label="Select Store"
+                        onChange={(e) => handleEmbeddingStoreChange(e.target.value as 'opensearch' | 's3-vector')}
+                      >
+                        <MenuItem value="opensearch">
+                          {SYSTEM_SETTINGS_CONFIG.EMBEDDING_STORES.OPENSEARCH.name}
+                        </MenuItem>
+                        <MenuItem value="s3-vector">
+                          {SYSTEM_SETTINGS_CONFIG.EMBEDDING_STORES.S3_VECTOR.name}
+                        </MenuItem>
+                      </Select>
+                    </FormControl>
+                  </CardContent>
+                </Card>
+
+                {/* Save and Cancel Buttons */}
+                <Box sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'flex-end', 
+                  gap: 2, 
+                  mt: 4, 
+                  pt: 3, 
+                  borderTop: `1px solid ${theme.palette.divider}` 
+                }}>
+                  <Button
+                    variant="outlined"
+                    onClick={handleCancelSettings}
+                    disabled={!hasChanges || isSaving}
+                    startIcon={<CancelIcon />}
+                  >
+                    {t('common.cancel', 'Cancel')}
+                  </Button>
+                  <Button
+                    variant="contained"
+                    onClick={handleSaveSettings}
+                    disabled={!hasChanges || isSaving}
+                    startIcon={isSaving ? <CircularProgress size={20} /> : <CheckCircleIcon />}
+                  >
+                    {isSaving ? t('common.saving', 'Saving...') : t('common.save', 'Save')}
+                  </Button>
+                </Box>
+              </Box>
+>>>>>>> feat/s3SearchVectorEmbeddingStore
             )}
           </TabPanel>
         </Box>
       </Paper>
+<<<<<<< HEAD
 
       {/* Configure/Edit Provider Dialog */}
       <Dialog open={isProviderDialogOpen} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
@@ -423,44 +654,54 @@ const SystemSettingsPage: React.FC = () => {
           {isEditMode
             ? t('settings.systemSettings.search.editProvider', 'Edit Search Provider')
             : t('settings.systemSettings.search.configureProvider', 'Configure Search Provider')}
+=======
+      
+      {/* API Key Configuration Dialog */}
+      <Dialog open={isApiKeyDialogOpen} onClose={handleCloseApiKeyDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          {isEditingApiKey 
+            ? t('settings.systemSettings.search.editApiKey', 'Edit API Key') 
+            : t('settings.systemSettings.search.configureApiKey', 'Configure API Key')}
+>>>>>>> feat/s3SearchVectorEmbeddingStore
         </DialogTitle>
         <DialogContent>
-          <TextField
-            label={t('settings.systemSettings.search.providerName', 'Provider Name')}
-            value={provider.name}
-            fullWidth
-            margin="normal"
-            disabled
-          />
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            {t('settings.systemSettings.search.apiKeyDesc', 
+              'Enter your Twelve Labs API key to enable semantic search functionality.')}
+          </Typography>
           <TextField
             label={t('settings.systemSettings.search.apiKey', 'API Key')}
-            value={newProviderDetails.apiKey}
-            onChange={handleTextFieldChange('apiKey')}
+            value={apiKeyInput}
+            onChange={(e) => setApiKeyInput(e.target.value)}
             fullWidth
             margin="normal"
-            type="password"
+            type={isEditingApiKey && apiKeyInput === '••••••••••••••••' ? 'password' : 'text'}
             required
-          />
-          <TextField
-            label={t('settings.systemSettings.search.endpoint', 'Endpoint URL (Optional)')}
-            value={newProviderDetails.endpoint}
-            onChange={handleTextFieldChange('endpoint')}
-            fullWidth
-            margin="normal"
-            placeholder="https://api.twelvelabs.io/v1"
+            placeholder="Enter your API key"
+            autoFocus
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog} disabled={isSubmitting}>
+          <Button onClick={handleCloseApiKeyDialog}>
             {t('common.cancel', 'Cancel')}
           </Button>
+<<<<<<< HEAD
           <Button
             onClick={handleConfigureProvider}
             variant="contained"
+=======
+          <Button 
+            onClick={handleSaveApiKey} 
+            variant="contained" 
+>>>>>>> feat/s3SearchVectorEmbeddingStore
             color="primary"
-            disabled={!newProviderDetails.apiKey || isSubmitting}
+            disabled={!apiKeyInput || apiKeyInput === '••••••••••••••••'}
           >
+<<<<<<< HEAD
             {isSubmitting ? <CircularProgress size={24} /> : t('common.save', 'Save')}
+=======
+            {t('common.save', 'Save')}
+>>>>>>> feat/s3SearchVectorEmbeddingStore
           </Button>
         </DialogActions>
       </Dialog>

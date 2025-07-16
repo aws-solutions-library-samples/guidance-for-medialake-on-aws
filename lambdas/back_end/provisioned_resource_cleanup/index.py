@@ -7,7 +7,7 @@ import cfnresponse
 from botocore.exceptions import ClientError
 from lambda_utils import logger, tracer
 
-# Initialize AWS clients
+# Initialize AWS clients using regular boto3
 dynamodb = boto3.resource("dynamodb")
 lambda_client = boto3.client("lambda")
 iam = boto3.client("iam")
@@ -20,6 +20,86 @@ secrets_manager = boto3.client("secretsmanager")
 
 # Define log groups to clean up
 LOG_GROUPS_TO_CLEAN = ["/aws/apigateway/medialake-access-logs"]
+
+
+def get_s3_vector_client():
+    """Initialize S3 Vector Store client with custom boto3 SDK."""
+    try:
+        # Import custom boto3 from the layer for S3 Vector operations only
+        # The custom boto3 layer will override the regular boto3 import within this function scope
+        import boto3 as custom_boto3
+        session = custom_boto3.Session()
+        client = session.client('s3vectors', region_name=os.environ.get('AWS_REGION', 'us-east-1'))
+        return client
+    except Exception as e:
+        logger.error(f"Failed to initialize S3 Vector client: {str(e)}")
+        return None
+
+
+def delete_s3_vector_indexes(client, bucket_name: str):
+    """Delete all vector indexes in a bucket."""
+    try:
+        # List all indexes in the bucket
+        response = client.list_indexes(vectorBucketName=bucket_name)
+        indexes = response.get('indexes', [])
+        
+        for index in indexes:
+            index_name = index.get('indexName')
+            if index_name:
+                try:
+                    client.delete_index(
+                        vectorBucketName=bucket_name,
+                        indexName=index_name
+                    )
+                    logger.info(f"Deleted S3 Vector index {index_name} from bucket {bucket_name}")
+                except Exception as e:
+                    logger.error(f"Failed to delete S3 Vector index {index_name}: {str(e)}")
+                    
+    except Exception as e:
+        logger.error(f"Failed to list/delete S3 Vector indexes in bucket {bucket_name}: {str(e)}")
+
+
+def delete_s3_vector_bucket(client, bucket_name: str):
+    """Delete S3 Vector bucket and all its indexes."""
+    try:
+        # First delete all indexes in the bucket
+        delete_s3_vector_indexes(client, bucket_name)
+        
+        # Then delete the bucket
+        client.delete_vector_bucket(vectorBucketName=bucket_name)
+        logger.info(f"Deleted S3 Vector bucket {bucket_name}")
+        
+    except Exception as e:
+        if "NotFoundException" in str(e) or "NoSuchBucket" in str(e):
+            logger.warning(f"S3 Vector bucket {bucket_name} not found or already deleted")
+        else:
+            logger.error(f"Failed to delete S3 Vector bucket {bucket_name}: {str(e)}")
+            raise
+
+
+def cleanup_s3_vector_resources():
+    """Clean up S3 Vector Store resources."""
+    try:
+        # Get S3 Vector client
+        s3_vector_client = get_s3_vector_client()
+        if not s3_vector_client:
+            logger.warning("Could not initialize S3 Vector client, skipping S3 Vector cleanup")
+            return
+            
+        # Get bucket name from environment or use default pattern
+        vector_bucket_name = os.environ.get("VECTOR_BUCKET_NAME")
+        if not vector_bucket_name:
+            # Try to construct bucket name from environment
+            environment = os.environ.get("ENVIRONMENT", "dev")
+            region = os.environ.get("AWS_REGION", "us-east-1")
+            vector_bucket_name = f"medialake-vectors-{region}-{environment}"
+            
+        logger.info(f"Cleaning up S3 Vector bucket: {vector_bucket_name}")
+        delete_s3_vector_bucket(s3_vector_client, vector_bucket_name)
+        
+    except Exception as e:
+        logger.error(f"Error during S3 Vector cleanup: {str(e)}")
+        # Don't raise the exception to avoid failing the entire cleanup process
 
 
 def delete_lambda_function(function_arn: str):
@@ -683,6 +763,10 @@ def lambda_handler(event, context):
             # Clean up Secrets Manager secrets
             logger.info("Starting cleanup of Secrets Manager secrets")
             delete_secrets_manager_secrets()
+
+            # Clean up S3 Vector Store resources
+            logger.info("Starting cleanup of S3 Vector Store resources")
+            cleanup_s3_vector_resources()
 
             # Additional cleanup for any orphaned resources
             try:

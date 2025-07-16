@@ -231,6 +231,7 @@ class NodesStack(cdk.NestedStack):
             code_path=["lambdas", "nodes", "s3_vector_store"],
         )
 
+
         # Create DynamoDB table for nodes
         self._pipelines_nodes_table = DynamoDB(
             self,
