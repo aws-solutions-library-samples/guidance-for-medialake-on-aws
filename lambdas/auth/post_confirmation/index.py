@@ -1,7 +1,8 @@
+from typing import Any, Dict
+
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.utilities.validation import validate_input
-from typing import Dict, Any
 
 logger = Logger()
 tracer = Tracer()

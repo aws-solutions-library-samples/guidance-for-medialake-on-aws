@@ -5,15 +5,11 @@ This stack creates the Cognito User Pool and related resources that can be share
 across multiple stacks without creating circular dependencies.
 """
 
-from aws_cdk import (
-    Stack,
-    aws_cognito as cognito,
-    RemovalPolicy,
-    CfnOutput
-)
-
-from constructs import Construct
 from dataclasses import dataclass
+
+from aws_cdk import CfnOutput, RemovalPolicy, Stack
+from aws_cdk import aws_cognito as cognito
+from constructs import Construct
 
 from medialake_constructs.cognito import CognitoConstruct, CognitoProps
 
@@ -21,13 +17,12 @@ from medialake_constructs.cognito import CognitoConstruct, CognitoProps
 @dataclass
 class CognitoStackProps:
     """Configuration for Cognito Stack."""
-    pass
 
 
 class CognitoStack(Stack):
     """
     Stack for Cognito resources.
-    
+
     This stack creates the Cognito User Pool, Identity Pool, and related resources
     that can be shared across multiple stacks.
     """
@@ -104,12 +99,12 @@ class CognitoStack(Stack):
     def user_pool_arn(self):
         """Return the Cognito User Pool ARN."""
         return self._cognito_construct.user_pool_arn
-    
+
     @property
     def identity_pool(self):
         """Return the Cognito Identity Pool."""
         return self._cognito_construct.identity_pool
-    
+
     @property
     def user_pool_client(self) -> cognito.UserPoolClient:
         """Return the Cognito User Pool Client."""
@@ -119,18 +114,18 @@ class CognitoStack(Stack):
     def user_pool_client_id(self):
         """Return the Cognito User Pool Client ID."""
         return self._cognito_construct.user_pool_client_id
-    
+
     @property
     def user_pool_id(self):
         """Return the Cognito User Pool ID."""
         return self._cognito_construct.user_pool_id
-        
+
     @property
     def cognito_domain_prefix(self):
         """Return the Cognito Domain Prefix."""
         return self._cognito_construct.cognito_domain_prefix
-        
+
     @property
     def pre_token_generation_lambda(self):
         """Return the Pre-Token Generation Lambda."""
-        return self._cognito_construct._pre_token_generation_lambda 
+        return self._cognito_construct._pre_token_generation_lambda

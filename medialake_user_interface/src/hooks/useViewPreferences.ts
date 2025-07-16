@@ -19,12 +19,14 @@ export function useViewPreferences<T>({
   initialThumbnailScale = 'fit',
   initialShowMetadata = true,
   initialGroupByType = false,
-  initialSorting = []
+  initialSorting = [],
 }: ViewPreferencesOptions = {}) {
   // View mode state
   const [viewMode, setViewMode] = useState<'card' | 'table'>(initialViewMode);
   const [cardSize, setCardSize] = useState<'small' | 'medium' | 'large'>(initialCardSize);
-  const [aspectRatio, setAspectRatio] = useState<'vertical' | 'square' | 'horizontal'>(initialAspectRatio);
+  const [aspectRatio, setAspectRatio] = useState<'vertical' | 'square' | 'horizontal'>(
+    initialAspectRatio
+  );
   const [thumbnailScale, setThumbnailScale] = useState<'fit' | 'fill'>(initialThumbnailScale);
   const [showMetadata, setShowMetadata] = useState(initialShowMetadata);
   const [groupByType, setGroupByType] = useState(initialGroupByType);
@@ -41,9 +43,12 @@ export function useViewPreferences<T>({
   ]);
 
   // Handle view mode change
-  const handleViewModeChange = useCallback((_: React.MouseEvent<HTMLElement>, newMode: 'card' | 'table' | null) => {
-    if (newMode) setViewMode(newMode);
-  }, []);
+  const handleViewModeChange = useCallback(
+    (_: React.MouseEvent<HTMLElement>, newMode: 'card' | 'table' | null) => {
+      if (newMode) setViewMode(newMode);
+    },
+    []
+  );
 
   // Handle card size change
   const handleCardSizeChange = useCallback((size: 'small' | 'medium' | 'large') => {
@@ -77,9 +82,9 @@ export function useViewPreferences<T>({
 
   // Handle card field toggle
   const handleCardFieldToggle = useCallback((fieldId: string) => {
-    setCardFields(prev => prev.map(field =>
-      field.id === fieldId ? { ...field, visible: !field.visible } : field
-    ));
+    setCardFields((prev) =>
+      prev.map((field) => (field.id === fieldId ? { ...field, visible: !field.visible } : field))
+    );
   }, []);
 
   // Handle column toggle
@@ -98,7 +103,7 @@ export function useViewPreferences<T>({
     groupByType,
     sorting,
     cardFields,
-    
+
     // Handlers
     handleViewModeChange,
     handleCardSizeChange,
@@ -109,7 +114,7 @@ export function useViewPreferences<T>({
     handleSortChange,
     handleCardFieldToggle,
     handleColumnToggle,
-    
+
     // Setters (for direct state updates if needed)
     setViewMode,
     setCardSize,

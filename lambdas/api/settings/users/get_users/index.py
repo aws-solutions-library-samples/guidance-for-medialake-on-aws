@@ -1,16 +1,15 @@
-import boto3
-from typing import Dict, Any, Optional, List
-import os
 import json
+import os
+import time
+from typing import Any, Dict, List
+
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
+from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import MetricUnit
+from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.session import Session
-import time
-
 
 # Initialize PowerTools
 logger = Logger(level=os.getenv("LOG_LEVEL", "WARNING"))
@@ -65,24 +64,23 @@ def get_user_groups(username: str) -> List[str]:
     """Get groups for a specific user."""
     try:
         logger.info(f"Fetching groups for user: {username}")
-        
+
         response = cognito.admin_list_groups_for_user(
-            UserPoolId=USER_POOL_ID, 
-            Username=username
+            UserPoolId=USER_POOL_ID, Username=username
         )
-        
+
         logger.debug(f"Raw groups response for user {username}: {response}")
-        
+
         groups = []
         for group in response.get("Groups", []):
             group_name = group.get("GroupName")
             if group_name:
                 groups.append(group_name)
                 logger.debug(f"Added group '{group_name}' for user {username}")
-        
+
         logger.info(f"Found {len(groups)} groups for user {username}: {groups}")
         return groups
-        
+
     except cognito.exceptions.UserNotFoundException:
         logger.warning(f"User {username} not found when fetching groups")
         return []
@@ -92,7 +90,9 @@ def get_user_groups(username: str) -> List[str]:
         metrics.add_metric(name="GroupsFetchAuthError", unit=MetricUnit.Count, value=1)
         return []
     except cognito.exceptions.InvalidParameterException as e:
-        logger.error(f"Invalid parameter when getting groups for user {username}: {str(e)}")
+        logger.error(
+            f"Invalid parameter when getting groups for user {username}: {str(e)}"
+        )
         return []
     except Exception as e:
         logger.error(
@@ -101,7 +101,7 @@ def get_user_groups(username: str) -> List[str]:
                 "error_type": type(e).__name__,
                 "user_pool_id": USER_POOL_ID,
                 "username": username,
-            }
+            },
         )
         # Add metric for general errors
         metrics.add_metric(name="GroupsFetchError", unit=MetricUnit.Count, value=1)
@@ -123,14 +123,14 @@ def get_detailed_user_info(username: str) -> Dict[str, Any]:
         start_time = time.time()
         user_groups = get_user_groups(username)
         groups_fetch_time = (time.time() - start_time) * 1000
-        
+
         # Add metric for groups fetch time
         metrics.add_metric(
             name="GroupsFetchTime",
             unit=MetricUnit.Milliseconds,
-            value=groups_fetch_time
+            value=groups_fetch_time,
         )
-        
+
         logger.debug(f"Groups fetch took {groups_fetch_time:.2f}ms for user {username}")
 
         return {
@@ -228,8 +228,10 @@ def get_users():
                     groups_count = len(detailed_user.get("groups", []))
                     total_groups_found += groups_count
                     logger.debug(f"User {username} has {groups_count} groups")
-        
-        logger.info(f"Processed {len(users)} users with total of {total_groups_found} group memberships")
+
+        logger.info(
+            f"Processed {len(users)} users with total of {total_groups_found} group memberships"
+        )
 
         # Prepare search metadata
         search_metadata = {

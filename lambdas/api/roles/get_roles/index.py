@@ -1,11 +1,12 @@
-from aws_lambda_powertools import Logger, Tracer, Metrics
+import os
+from typing import Dict, List
+
+import boto3
+from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.logging import correlation_paths
-from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.metrics import MetricUnit
-from typing import Dict, List
-import boto3
-import os
+from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
 
 # Initialize PowerTools
@@ -42,7 +43,7 @@ def get_cognito_roles(user_pool_id: str) -> List[Dict]:
         )
         return roles
 
-    except ClientError as e:
+    except ClientError:
         logger.exception("Failed to fetch Cognito roles")
         metrics.add_metric(name="FailedRolesFetch", unit=MetricUnit.Count, value=1)
         raise
@@ -60,7 +61,7 @@ def get_roles():
 
         return {"statusCode": 200, "body": {"roles": roles}}
 
-    except Exception as e:
+    except Exception:
         logger.exception("Error processing request")
         return {"statusCode": 500, "body": {"message": "Internal server error"}}
 

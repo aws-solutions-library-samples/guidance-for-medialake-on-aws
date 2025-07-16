@@ -1,7 +1,8 @@
 import json
-import boto3
 import os
 import time
+
+import boto3
 from botocore.exceptions import ClientError
 
 
@@ -32,7 +33,7 @@ def generate_body_config():
             region: "{region}"
       routes:
         - {index_name}_route: '1 == 1'
-      
+
       sink:
         - opensearch:
             hosts: ["{collection_endpoint}"]

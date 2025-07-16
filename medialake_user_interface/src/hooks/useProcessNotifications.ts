@@ -53,7 +53,9 @@ export const useProcessNotifications = ({
         case 'bulk-download':
           return {
             pending: 'Preparing your bulk download...',
-            inProgress: `Creating download archive${status.progress ? ` (${Math.round(status.progress)}%)` : ''}...`,
+            inProgress: `Creating download archive${
+              status.progress ? ` (${Math.round(status.progress)}%)` : ''
+            }...`,
             completed: 'Your download is ready!',
             failed: `Download failed: ${status.error || 'Unknown error'}`,
             actionText: 'Download',
@@ -61,7 +63,9 @@ export const useProcessNotifications = ({
         case 'upload':
           return {
             pending: 'Preparing upload...',
-            inProgress: `Uploading files${status.progress ? ` (${Math.round(status.progress)}%)` : ''}...`,
+            inProgress: `Uploading files${
+              status.progress ? ` (${Math.round(status.progress)}%)` : ''
+            }...`,
             completed: 'Upload completed successfully!',
             failed: `Upload failed: ${status.error || 'Unknown error'}`,
             actionText: 'View',
@@ -69,7 +73,9 @@ export const useProcessNotifications = ({
         case 'processing':
           return {
             pending: 'Processing started...',
-            inProgress: `Processing${status.progress ? ` (${Math.round(status.progress)}%)` : ''}...`,
+            inProgress: `Processing${
+              status.progress ? ` (${Math.round(status.progress)}%)` : ''
+            }...`,
             completed: 'Processing completed!',
             failed: `Processing failed: ${status.error || 'Unknown error'}`,
             actionText: 'View Results',
@@ -77,7 +83,9 @@ export const useProcessNotifications = ({
         default:
           return {
             pending: `${processType} started...`,
-            inProgress: `${processType} in progress${status.progress ? ` (${Math.round(status.progress)}%)` : ''}...`,
+            inProgress: `${processType} in progress${
+              status.progress ? ` (${Math.round(status.progress)}%)` : ''
+            }...`,
             completed: `${processType} completed!`,
             failed: `${processType} failed: ${status.error || 'Unknown error'}`,
             actionText: 'View',
@@ -119,7 +127,7 @@ export const useProcessNotifications = ({
               link.click();
               document.body.removeChild(link);
             }
-            
+
             // Dismiss the notification after action
             if (notificationIdRef.current && dismissNotification) {
               dismissNotification(notificationIdRef.current);
@@ -149,6 +157,7 @@ export const useProcessNotifications = ({
   }, [processId, dismissNotification]);
 
   return {
-    isProcessInProgress: !!processId && status?.status !== 'COMPLETED' && status?.status !== 'FAILED',
+    isProcessInProgress:
+      !!processId && status?.status !== 'COMPLETED' && status?.status !== 'FAILED',
   };
 };

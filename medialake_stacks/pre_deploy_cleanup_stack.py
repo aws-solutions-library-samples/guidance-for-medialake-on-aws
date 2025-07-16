@@ -1,14 +1,10 @@
 from dataclasses import dataclass
-from constructs import Construct
-import aws_cdk as cdk
 
-from aws_cdk import (
-    Stack,
-    CustomResource,
-    RemovalPolicy,
-    aws_iam as iam,
-    custom_resources as cr,
-)
+from aws_cdk import CustomResource, RemovalPolicy, Stack
+from aws_cdk import aws_iam as iam
+from aws_cdk import custom_resources as cr
+from constructs import Construct
+
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 
@@ -20,7 +16,11 @@ class PreDeployCleanUpStackProps:
 
 class PreDeployCleanUpStack(Stack):
     def __init__(
-        self, scope: Construct, construct_id: str, props: PreDeployCleanUpStackProps = None, **kwargs
+        self,
+        scope: Construct,
+        construct_id: str,
+        props: PreDeployCleanUpStackProps = None,
+        **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
@@ -41,7 +41,9 @@ class PreDeployCleanUpStack(Stack):
 
         # Create custom resource provider
         provider = cr.Provider(
-            self, "PreDeployCleanUpProvider", on_event_handler=self._clean_up_lambda.function
+            self,
+            "PreDeployCleanUpProvider",
+            on_event_handler=self._clean_up_lambda.function,
         )
 
         # Create custom resource
@@ -81,7 +83,9 @@ class PreDeployCleanUpStack(Stack):
                     "pipes:ListPipes",
                     "pipes:StopPipe",
                 ],
-                resources=[f"arn:aws:pipes:{Stack.of(self).region}:{Stack.of(self).account}:pipe/*"],
+                resources=[
+                    f"arn:aws:pipes:{Stack.of(self).region}:{Stack.of(self).account}:pipe/*"
+                ],
             )
         )
 

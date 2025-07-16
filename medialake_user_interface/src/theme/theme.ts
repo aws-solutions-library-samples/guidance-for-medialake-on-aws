@@ -7,12 +7,17 @@ export const createUnifiedTheme = (mode: 'light' | 'dark'): Theme => {
     palette: {
       mode,
       background: {
-        default: mode === 'light' ? colorTokens.background.default.light : colorTokens.background.default.dark,
-        paper: mode === 'light' ? colorTokens.background.paper.light : colorTokens.background.paper.dark,
+        default:
+          mode === 'light'
+            ? colorTokens.background.default.light
+            : colorTokens.background.default.dark,
+        paper:
+          mode === 'light' ? colorTokens.background.paper.light : colorTokens.background.paper.dark,
       },
       text: {
         primary: mode === 'light' ? colorTokens.text.primary.light : colorTokens.text.primary.dark,
-        secondary: mode === 'light' ? colorTokens.text.secondary.light : colorTokens.text.secondary.dark,
+        secondary:
+          mode === 'light' ? colorTokens.text.secondary.light : colorTokens.text.secondary.dark,
       },
       primary: colorTokens.primary,
       secondary: colorTokens.secondary,
@@ -92,9 +97,10 @@ export const createUnifiedTheme = (mode: 'light' | 'dark'): Theme => {
             borderColor: alpha(theme.palette.divider, 0.1),
           }),
           head: ({ theme }) => ({
-            backgroundColor: mode === 'dark'
-              ? alpha(colorTokens.background.default.dark, 0.3)
-              : alpha(colorTokens.background.default.light, 0.6),
+            backgroundColor:
+              mode === 'dark'
+                ? alpha(colorTokens.background.default.dark, 0.3)
+                : alpha(colorTokens.background.default.light, 0.6),
             fontWeight: 600,
           }),
         },

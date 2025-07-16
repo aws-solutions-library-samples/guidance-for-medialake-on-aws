@@ -3,8 +3,8 @@ export const SYSTEM_SETTINGS_CONFIG = {
     TWELVE_LABS: {
       name: 'Twelve Labs',
       type: 'twelvelabs',
-      defaultEndpoint: 'https://api.twelvelabs.io/v1'
-    }
+      defaultEndpoint: 'https://api.twelvelabs.io/v1',
+    },
   },
-  DEFAULT_PROVIDER: 'twelvelabs'
-}; 
+  DEFAULT_PROVIDER: 'twelvelabs',
+};

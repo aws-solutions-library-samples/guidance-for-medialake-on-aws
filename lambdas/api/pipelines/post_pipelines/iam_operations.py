@@ -3,17 +3,12 @@ import os
 import re
 import time
 import traceback
-from typing import Dict, Any, List
-import boto3
+from typing import Any, Dict, List
 
+import boto3
 from aws_lambda_powertools import Logger
 
-from config import (
-    MEDIA_ASSETS_BUCKET_NAME,
-    OPENSEARCH_ENDPOINT,
-    MEDIALAKE_ASSET_TABLE,
-    PIPELINES_EVENT_BUS_NAME,
-)
+from config import MEDIALAKE_ASSET_TABLE, PIPELINES_EVENT_BUS_NAME
 
 # Initialize logger
 logger = Logger()
@@ -32,8 +27,6 @@ def sanitize_role_name(name: str) -> str:
 
     # Truncate to 64 characters if necessary (IAM role name limit)
     return sanitized[:64]
-
-
 
 
 def wait_for_role_deletion(role_name: str, max_attempts: int = 40) -> None:
@@ -79,7 +72,7 @@ def wait_for_role_propagation(role_name: str, max_attempts: int = 20) -> None:
         try:
             # Get the role ARN
             response = iam_client.get_role(RoleName=role_name)
-            role_arn = response["Role"]["Arn"]
+            response["Role"]["Arn"]
 
             # Check if the role exists and has the basic execution policy attached
             attached_policies = iam_client.list_attached_role_policies(
@@ -265,36 +258,40 @@ def standardize_policy_statement(statement: Dict[str, Any]) -> Dict[str, Any]:
 
     return standardized
 
-def deduplicate_policy_statements(statements: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+
+def deduplicate_policy_statements(
+    statements: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
     """
     Deduplicate policy statements to avoid redundancy.
-    
+
     This function identifies and removes duplicate statements based on their
     Effect, Action, and Resource values.
     """
+
     # Helper function to create a hashable representation of a statement
     def statement_key(stmt):
         # Convert lists to tuples for hashability
         effect = stmt.get("Effect", "")
-        
+
         # Sort and convert actions to a tuple
         actions = stmt.get("Action", [])
         if isinstance(actions, str):
             actions = [actions]
         actions = tuple(sorted(actions))
-        
+
         # Sort and convert resources to a tuple
         resources = stmt.get("Resource", [])
         if isinstance(resources, str):
             resources = [resources]
         resources = tuple(sorted(resources))
-        
+
         # Handle conditions if present (simplified)
         conditions = stmt.get("Condition", {})
         condition_str = json.dumps(conditions, sort_keys=True) if conditions else ""
-        
+
         return (effect, actions, resources, condition_str)
-    
+
     # Use a dictionary to track unique statements
     unique_statements = {}
     for stmt in statements:
@@ -302,8 +299,10 @@ def deduplicate_policy_statements(statements: List[Dict[str, Any]]) -> List[Dict
         # Only keep the first occurrence of each unique statement
         if key not in unique_statements:
             unique_statements[key] = stmt
-    
-    logger.info(f"Deduplicated {len(statements)} statements to {len(unique_statements)} unique statements")
+
+    logger.info(
+        f"Deduplicated {len(statements)} statements to {len(unique_statements)} unique statements"
+    )
     return list(unique_statements.values())
 
 
@@ -337,19 +336,23 @@ def process_policy_template(template_str: str) -> str:
     result = template_str
     for match in matches:
         var_name = match.group(1)
-        
+
         # Handle CloudFormation parameters
         if var_name == "AWS::Region":
             # Get the current AWS region
             region = boto3.session.Session().region_name
             result = result.replace(f"${{{var_name}}}", region)
-            logger.info(f"Replaced CloudFormation parameter ${{{var_name}}} with region: {region}")
+            logger.info(
+                f"Replaced CloudFormation parameter ${{{var_name}}} with region: {region}"
+            )
         elif var_name == "AWS::AccountId":
             # Get the current AWS account ID
-            sts_client = boto3.client('sts')
+            sts_client = boto3.client("sts")
             account_id = sts_client.get_caller_identity()["Account"]
             result = result.replace(f"${{{var_name}}}", account_id)
-            logger.info(f"Replaced CloudFormation parameter ${{{var_name}}} with account ID: {account_id}")
+            logger.info(
+                f"Replaced CloudFormation parameter ${{{var_name}}} with account ID: {account_id}"
+            )
         else:
             # Handle regular environment variables
             var_value = os.environ.get(var_name, "")
@@ -360,28 +363,40 @@ def process_policy_template(template_str: str) -> str:
                     result = result.replace(f"${{{var_name}}}", var_value)
                 elif var_name == "MEDIA_ASSETS_BUCKET_ARN_KMS_KEY":
                     # Special handling for KMS key ARN - use "*" as fallback
-                    logger.warning(f"Environment variable {var_name} not set, using '*' as fallback")
+                    logger.warning(
+                        f"Environment variable {var_name} not set, using '*' as fallback"
+                    )
                     result = result.replace(f"${{{var_name}}}", "*")
                 else:
                     # For other variables, try to construct them from other environment variables
-                    if var_name.endswith("_ARN_KMS_KEY") and var_name.startswith("MEDIA_"):
+                    if var_name.endswith("_ARN_KMS_KEY") and var_name.startswith(
+                        "MEDIA_"
+                    ):
                         # Try to construct KMS key ARN from bucket name
                         bucket_name_var = var_name.replace("_ARN_KMS_KEY", "_NAME")
                         bucket_name = os.environ.get(bucket_name_var, "")
                         if bucket_name:
                             # Construct a generic KMS key ARN pattern for the bucket
                             region = boto3.session.Session().region_name
-                            account_id = boto3.client('sts').get_caller_identity()["Account"]
+                            account_id = boto3.client("sts").get_caller_identity()[
+                                "Account"
+                            ]
                             constructed_arn = f"arn:aws:kms:{region}:{account_id}:key/*"
-                            logger.info(f"Constructed KMS key ARN pattern for {var_name}: {constructed_arn}")
+                            logger.info(
+                                f"Constructed KMS key ARN pattern for {var_name}: {constructed_arn}"
+                            )
                             result = result.replace(f"${{{var_name}}}", constructed_arn)
                         else:
                             # If we can't construct it, use "*"
-                            logger.warning(f"Could not construct ARN for {var_name}, using '*' as fallback")
+                            logger.warning(
+                                f"Could not construct ARN for {var_name}, using '*' as fallback"
+                            )
                             result = result.replace(f"${{{var_name}}}", "*")
                     else:
                         # For other variables, raise an error
-                        raise ValueError(f"Required environment variable {var_name} not set")
+                        raise ValueError(
+                            f"Required environment variable {var_name} not set"
+                        )
             else:
                 result = result.replace(f"${{{var_name}}}", var_value)
 
@@ -511,11 +526,15 @@ def create_lambda_execution_policy(role_name: str, yaml_data: Dict[str, Any]) ->
 
                 # Add the processed YAML statements to the default policy statements
                 policy_statements.extend(processed_statements)
-                logger.info(f"Combined {len(processed_statements)} YAML statements with default policy")
-                
+                logger.info(
+                    f"Combined {len(processed_statements)} YAML statements with default policy"
+                )
+
                 # Deduplicate the combined statements
-                deduplicated_statements = deduplicate_policy_statements(policy_statements)
-                
+                deduplicated_statements = deduplicate_policy_statements(
+                    policy_statements
+                )
+
                 # Create the combined policy document
                 policy_document = {
                     "Version": "2012-10-17",
@@ -574,25 +593,29 @@ def create_lambda_role(
 ) -> str:
     """Create a Lambda execution role."""
     iam = boto3.client("iam")
-    
+
     # Create a base role name without the operation_id
-    base_role_name = f"{resource_prefix}_{pipeline_name}_{node_id}_lambda_execution_role"
-    
+    base_role_name = (
+        f"{resource_prefix}_{pipeline_name}_{node_id}_lambda_execution_role"
+    )
+
     # If we have an operation_id, we need to ensure we don't exceed the 64-character limit
     if operation_id:
         # Calculate how much space we have left for the operation_id
         # We need to account for the underscore that will be added before the operation_id
-        max_base_length = 63 - len(operation_id) - 1  # 63 to leave room for the underscore
-        
+        max_base_length = (
+            63 - len(operation_id) - 1
+        )  # 63 to leave room for the underscore
+
         if len(base_role_name) > max_base_length:
             # Truncate the base_role_name to make room for the operation_id
             base_role_name = base_role_name[:max_base_length]
-        
+
         # Now add the operation_id
         role_name = sanitize_role_name(f"{base_role_name}_{operation_id}")
     else:
         role_name = sanitize_role_name(base_role_name)
-    
+
     # Ensure the final role name is within the 64-character limit
     if len(role_name) > 64:
         role_name = role_name[:64]
@@ -645,15 +668,17 @@ def create_lambda_role(
                     RoleName=role_name,
                     PolicyArn="arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
                 )
-                
+
                 # For embedding_store utility node, also attach VPC access policy and OpenSearch permissions
-                if node_id == 'embedding_store':
-                    logger.info(f"Attaching AWSLambdaVPCAccessExecutionRole to {role_name} for embedding_store")
+                if node_id == "embedding_store":
+                    logger.info(
+                        f"Attaching AWSLambdaVPCAccessExecutionRole to {role_name} for embedding_store"
+                    )
                     iam.attach_role_policy(
                         RoleName=role_name,
                         PolicyArn="arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole",
                     )
-                    
+
                     # Add managed OpenSearch permissions
                     opensearch_policy = {
                         "Version": "2012-10-17",
@@ -665,18 +690,20 @@ def create_lambda_role(
                                     "es:ESHttpPut",
                                     "es:ESHttpPost",
                                     "es:ESHttpHead",
-                                    "es:ESHttpDelete"
+                                    "es:ESHttpDelete",
                                 ],
-                                "Resource": "*"
+                                "Resource": "*",
                             }
-                        ]
+                        ],
                     }
-                    
-                    logger.info(f"Adding OpenSearch permissions to {role_name} for embedding_store")
+
+                    logger.info(
+                        f"Adding OpenSearch permissions to {role_name} for embedding_store"
+                    )
                     iam.put_role_policy(
                         RoleName=role_name,
                         PolicyName="OpenSearchAccess",
-                        PolicyDocument=json.dumps(opensearch_policy)
+                        PolicyDocument=json.dumps(opensearch_policy),
                     )
 
                 # Create and attach our custom execution policy
@@ -731,71 +758,90 @@ def create_lambda_role(
         raise
 
 
-def create_service_roles_from_yaml(pipeline_name: str, node_id: str, yaml_data: Dict[str, Any]) -> Dict[str, str]:
+def create_service_roles_from_yaml(
+    pipeline_name: str, node_id: str, yaml_data: Dict[str, Any]
+) -> Dict[str, str]:
     """
     Create service roles defined in the YAML file.
-    
+
     Args:
         pipeline_name: Name of the pipeline
         node_id: ID of the node
         yaml_data: YAML data containing service role definitions
-        
+
     Returns:
         Dictionary mapping role names to role ARNs
     """
     logger.info(f"Creating service roles for node {node_id} from YAML")
-    
+
     service_roles = {}
-    
+
     # Check if the YAML has service_roles section
-    if "node" in yaml_data and "integration" in yaml_data["node"] and "config" in yaml_data["node"]["integration"] and "service_roles" in yaml_data["node"]["integration"]["config"]:
-        service_roles_config = yaml_data["node"]["integration"]["config"]["service_roles"]
-        
+    if (
+        "node" in yaml_data
+        and "integration" in yaml_data["node"]
+        and "config" in yaml_data["node"]["integration"]
+        and "service_roles" in yaml_data["node"]["integration"]["config"]
+    ):
+        service_roles_config = yaml_data["node"]["integration"]["config"][
+            "service_roles"
+        ]
+
         for role_config in service_roles_config:
             try:
                 # Get the role name
                 role_name = role_config.get("name")
                 if not role_name:
-                    logger.warning(f"No name defined for role in node {node_id}, skipping")
+                    logger.warning(
+                        f"No name defined for role in node {node_id}, skipping"
+                    )
                     continue
-                
+
                 # Get the service principal
                 service_principal = role_config.get("service")
                 if not service_principal:
-                    logger.warning(f"No service principal defined for role {role_name}, skipping")
+                    logger.warning(
+                        f"No service principal defined for role {role_name}, skipping"
+                    )
                     continue
-                
+
                 # Get the policy statements
                 policy_statements = []
                 for policy in role_config.get("policies", []):
                     policy_statements.extend(policy.get("statements", []))
-                
+
                 if not policy_statements:
-                    logger.warning(f"No policy statements defined for role {role_name}, using default")
+                    logger.warning(
+                        f"No policy statements defined for role {role_name}, using default"
+                    )
                     policy_statements = [
                         {
                             "Effect": "Allow",
                             "Action": ["s3:GetObject", "s3:PutObject", "s3:ListBucket"],
-                            "Resource": ["*"]
+                            "Resource": ["*"],
                         }
                     ]
-                
+
                 # Create a unique role name
                 sanitized_pipeline_name = sanitize_role_name(pipeline_name)
-                sanitized_role_name = f"{resource_prefix}_{sanitized_pipeline_name}_{node_id}_{role_name}"
-                
+                sanitized_role_name = (
+                    f"{resource_prefix}_{sanitized_pipeline_name}_{node_id}_{role_name}"
+                )
+
                 # Create the role
                 iam_client = boto3.client("iam")
-                
+
                 # Check if role exists
                 try:
                     iam_client.get_role(RoleName=sanitized_role_name)
-                    logger.info(f"Found existing role {sanitized_role_name}, deleting it")
+                    logger.info(
+                        f"Found existing role {sanitized_role_name}, deleting it"
+                    )
                     delete_role(sanitized_role_name)
                     wait_for_role_deletion(sanitized_role_name)
                 except iam_client.exceptions.NoSuchEntityException:
                     pass
-                
+
                 # Create the trust policy
                 trust_policy = {
                     "Version": "2012-10-17",
@@ -803,67 +849,80 @@ def create_service_roles_from_yaml(pipeline_name: str, node_id: str, yaml_data: 
                         {
                             "Effect": "Allow",
                             "Principal": {"Service": service_principal},
-                            "Action": "sts:AssumeRole"
+                            "Action": "sts:AssumeRole",
                         }
-                    ]
+                    ],
                 }
-                
+
                 # Create the role
                 response = iam_client.create_role(
                     RoleName=sanitized_role_name,
                     AssumeRolePolicyDocument=json.dumps(trust_policy),
-                    Description=f"Service role for {node_id} in pipeline {pipeline_name}"
+                    Description=f"Service role for {node_id} in pipeline {pipeline_name}",
                 )
-                
+
                 role_arn = response["Role"]["Arn"]
-                logger.info(f"Created service role {sanitized_role_name} with ARN: {role_arn}")
-                
+                logger.info(
+                    f"Created service role {sanitized_role_name} with ARN: {role_arn}"
+                )
+
                 # Create the policy document
                 policy_document = {
                     "Version": "2012-10-17",
-                    "Statement": policy_statements
+                    "Statement": policy_statements,
                 }
-                
+
                 # Attach the policy
                 policy_name = f"{sanitized_role_name}_policy"
-                
+
                 # Process the policy document to replace any environment variables
                 policy_document_str = json.dumps(policy_document)
                 try:
                     policy_document_str = process_policy_template(policy_document_str)
                     processed_policy_document = json.loads(policy_document_str)
-                    
+
                     # Log the final processed policy document
-                    logger.info(f"Final processed policy document for {role_name}: {json.dumps(processed_policy_document)}")
-                    
+                    logger.info(
+                        f"Final processed policy document for {role_name}: {json.dumps(processed_policy_document)}"
+                    )
+
                     iam_client.put_role_policy(
                         RoleName=sanitized_role_name,
                         PolicyName=policy_name,
-                        PolicyDocument=json.dumps(processed_policy_document)
+                        PolicyDocument=json.dumps(processed_policy_document),
                     )
                 except Exception as process_err:
-                    logger.error(f"Error processing policy document for {role_name}: {process_err}")
+                    logger.error(
+                        f"Error processing policy document for {role_name}: {process_err}"
+                    )
                     # If there's an error processing the policy, try with a fallback approach
                     # Replace any remaining ${VAR} with "*" to avoid MalformedPolicyDocument errors
-                    policy_document_str = re.sub(r'\${[^}]+}', '"*"', policy_document_str)
-                    logger.info(f"Using fallback policy document with wildcards for {role_name}: {policy_document_str}")
-                    
+                    policy_document_str = re.sub(
+                        r"\${[^}]+}", '"*"', policy_document_str
+                    )
+                    logger.info(
+                        f"Using fallback policy document with wildcards for {role_name}: {policy_document_str}"
+                    )
+
                     iam_client.put_role_policy(
                         RoleName=sanitized_role_name,
                         PolicyName=policy_name,
-                        PolicyDocument=policy_document_str
+                        PolicyDocument=policy_document_str,
                     )
-                
-                logger.info(f"Attached policy {policy_name} to role {sanitized_role_name}")
-                
+
+                logger.info(
+                    f"Attached policy {policy_name} to role {sanitized_role_name}"
+                )
+
                 # Add the role to the result
                 service_roles[role_name] = role_arn
-                
+
             except Exception as e:
                 logger.error(f"Failed to create service role {role_name}: {e}")
                 logger.error(traceback.format_exc())
-    
+
     return service_roles
+
 
 def get_events_role_arn(pipeline_name: str) -> str:
     """Get or create an IAM role for EventBridge to invoke Step Functions."""
@@ -915,36 +974,37 @@ def get_events_role_arn(pipeline_name: str) -> str:
 
         return response["Role"]["Arn"]
 
+
 def create_service_role(
     pipeline_name: str,
     node_id: str,
     service_principal: str,
     policy_statements: List[Dict[str, Any]],
-    role_name_suffix: str = "service_role"
+    role_name_suffix: str = "service_role",
 ) -> str:
     """
     Create a service role for AWS services like Transcribe, MediaConvert, etc.
-    
+
     Args:
         pipeline_name: Name of the pipeline
         node_id: ID of the node
         service_principal: AWS service principal (e.g., "transcribe.amazonaws.com")
         policy_statements: List of policy statements for the role
         role_name_suffix: Suffix to add to the role name
-        
+
     Returns:
         ARN of the created role
     """
     iam_client = boto3.client("iam")
-    
+
     # Create a base role name
     base_role_name = f"{resource_prefix}_{pipeline_name}_{node_id}_{role_name_suffix}"
     role_name = sanitize_role_name(base_role_name)
-    
+
     # Ensure the final role name is within the 64-character limit
     if len(role_name) > 64:
         role_name = role_name[:64]
-    
+
     # Create trust relationship policy
     trust_policy = {
         "Version": "2012-10-17",
@@ -956,7 +1016,7 @@ def create_service_role(
             }
         ],
     }
-    
+
     try:
         # Check if role exists
         try:
@@ -966,72 +1026,77 @@ def create_service_role(
             wait_for_role_deletion(role_name)
         except iam_client.exceptions.NoSuchEntityException:
             logger.info(f"Service role {role_name} does not exist, creating new role")
-        
+
         # Create the IAM role
         logger.info(f"Creating new service role: {role_name}")
         response = iam_client.create_role(
-            RoleName=role_name,
-            AssumeRolePolicyDocument=json.dumps(trust_policy)
+            RoleName=role_name, AssumeRolePolicyDocument=json.dumps(trust_policy)
         )
-        
+
         role_arn = response["Role"]["Arn"]
         logger.info(f"Service role created with ARN: {role_arn}")
-        
+
         # Wait for role to be available
         waiter = iam_client.get_waiter("role_exists")
         waiter.wait(RoleName=role_name, WaiterConfig={"Delay": 2, "MaxAttempts": 15})
         logger.info(f"Service role {role_name} is now available")
-        
+
         # Create and attach inline policy with the provided statements
         if policy_statements:
             # Standardize and deduplicate policy statements
             standardized_statements = []
             for statement in policy_statements:
                 standardized_statements.append(standardize_policy_statement(statement))
-            
-            deduplicated_statements = deduplicate_policy_statements(standardized_statements)
-            
+
+            deduplicated_statements = deduplicate_policy_statements(
+                standardized_statements
+            )
+
             policy_document = {
                 "Version": "2012-10-17",
-                "Statement": deduplicated_statements
+                "Statement": deduplicated_statements,
             }
-            
+
             policy_name = f"{role_name}Policy"
-            
+
             # Process the policy document to replace any remaining environment variables
             policy_document_str = json.dumps(policy_document)
             try:
                 policy_document_str = process_policy_template(policy_document_str)
                 processed_policy_document = json.loads(policy_document_str)
-                
+
                 # Log the final processed policy document
-                logger.info(f"Final processed policy document: {json.dumps(processed_policy_document)}")
-                
+                logger.info(
+                    f"Final processed policy document: {json.dumps(processed_policy_document)}"
+                )
+
                 iam_client.put_role_policy(
                     RoleName=role_name,
                     PolicyName=policy_name,
-                    PolicyDocument=json.dumps(processed_policy_document)
+                    PolicyDocument=json.dumps(processed_policy_document),
                 )
             except Exception as process_err:
                 logger.error(f"Error processing policy document: {process_err}")
                 # If there's an error processing the policy, try with a fallback approach
                 # Replace any remaining ${VAR} with "*" to avoid MalformedPolicyDocument errors
-                policy_document_str = re.sub(r'\${[^}]+}', '"*"', policy_document_str)
-                logger.info(f"Using fallback policy document with wildcards: {policy_document_str}")
-                
+                policy_document_str = re.sub(r"\${[^}]+}", '"*"', policy_document_str)
+                logger.info(
+                    f"Using fallback policy document with wildcards: {policy_document_str}"
+                )
+
                 iam_client.put_role_policy(
                     RoleName=role_name,
                     PolicyName=policy_name,
-                    PolicyDocument=policy_document_str
+                    PolicyDocument=policy_document_str,
                 )
-            
+
             logger.info(f"Attached policy {policy_name} to service role {role_name}")
-        
+
         # Add a small delay after role creation to allow for propagation
         time.sleep(2)
-        
+
         return role_arn
-        
+
     except Exception as e:
         logger.error(f"Error creating service role: {str(e)}")
         logger.error(f"Exception type: {type(e).__name__}")

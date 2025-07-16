@@ -1,0 +1,3 @@
+[flake8]
+max-complexity = 60
+extend-ignore = C901

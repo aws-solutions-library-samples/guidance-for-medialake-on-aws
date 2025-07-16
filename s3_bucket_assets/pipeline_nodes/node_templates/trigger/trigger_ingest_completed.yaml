@@ -32,7 +32,12 @@ actions:
         required: false
         schema:
           type: select
-          options: ["TIF, JPG, JPEG, PNG, WEBP, GIF, SVG", "MP4, MOV, AVI, MKV, WEBM, MXF", "WAV, AIFF, AIF, MP3, PCM, M4A"]
+          options:
+            [
+              "TIF, JPG, JPEG, PNG, WEBP, GIF, SVG",
+              "MP4, MOV, AVI, MKV, WEBM, MXF",
+              "WAV, AIFF, AIF, MP3, PCM, M4A",
+            ]
     connections:
       incoming:
         type: [any]

@@ -1,17 +1,13 @@
-from aws_cdk import (
-    Stack,
-    aws_iam as iam,
-    aws_kms as kms,
-    aws_s3 as s3,
-    aws_dynamodb as dynamodb,
-    custom_resources as cr,
-    RemovalPolicy,
-)
-
-from constructs import Construct
-
 from dataclasses import dataclass
 from typing import Optional
+
+from aws_cdk import RemovalPolicy, Stack
+from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_kms as kms
+from aws_cdk import aws_s3 as s3
+from constructs import Construct
+
 from config import config
 
 
@@ -84,7 +80,7 @@ class DynamoDB(Construct):
                 "encryption": dynamodb.TableEncryptionV2.dynamo_owned_key(),
                 "billing": props.billing_mode or dynamodb.Billing.on_demand(),
             }
-            
+
             # Add TTL attribute if provided
             if props.ttl_attribute:
                 table_props["time_to_live_attribute"] = props.ttl_attribute

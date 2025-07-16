@@ -1,11 +1,9 @@
-import json
 import os
+
 import boto3
-from aws_lambda_powertools import Logger, Tracer, Metrics
+from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
-from aws_lambda_powertools.utilities.parameters import get_secret
 
 # Initialize powertools
 logger = Logger()
@@ -19,6 +17,7 @@ system_settings_table = dynamodb.Table(os.environ.get("SYSTEM_SETTINGS_TABLE"))
 # Initialize API Gateway resolver
 app = APIGatewayRestResolver()
 
+
 @app.get("/settings/system")
 @tracer.capture_method
 def get_system_settings():
@@ -28,36 +27,32 @@ def get_system_settings():
     try:
         # Get search provider settings
         search_provider_response = system_settings_table.get_item(
-            Key={
-                "PK": "SYSTEM_SETTINGS",
-                "SK": "SEARCH_PROVIDER"
-            }
+            Key={"PK": "SYSTEM_SETTINGS", "SK": "SEARCH_PROVIDER"}
         )
-        
+
         search_provider = search_provider_response.get("Item", {})
-        
+
         # Remove DynamoDB specific attributes
         if search_provider:
             search_provider.pop("PK", None)
             search_provider.pop("SK", None)
-        
+
         # Prepare response
         response = {
             "status": "success",
             "message": "System settings retrieved successfully",
-            "data": {
-                "searchProvider": search_provider if search_provider else None
-            }
+            "data": {"searchProvider": search_provider if search_provider else None},
         }
-        
+
         return response
     except Exception as e:
         logger.exception("Error retrieving system settings")
         return {
             "status": "error",
             "message": f"Error retrieving system settings: {str(e)}",
-            "data": {}
+            "data": {},
         }
+
 
 @logger.inject_lambda_context(correlation_id_path="requestContext.requestId")
 @tracer.capture_lambda_handler
@@ -68,5 +63,5 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
     """
     # Verify origin if needed
     # secret_value = get_secret(os.environ.get("X_ORIGIN_VERIFY_SECRET_ARN"))
-    
-    return app.resolve(event, context) 
+
+    return app.resolve(event, context)

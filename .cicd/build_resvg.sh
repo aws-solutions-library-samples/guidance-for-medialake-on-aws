@@ -13,23 +13,23 @@ docker run --rm \
   public.ecr.aws/amazonlinux/amazonlinux:2.0.20250305.0-amd64 \
   /bin/bash -c "
     set -euo pipefail
-    
+
     # 1) Install build tools & deps
     yum -y update
     yum -y groupinstall \"Development Tools\"
     yum -y install rust cargo cairo-devel fontconfig fontconfig-devel git
-    
+
     # 2) Clone & build resvg
     TMP=\$(mktemp -d)
     git clone https://github.com/linebender/resvg.git \"\$TMP/resvg\"
     cd \"\$TMP/resvg\"
     cargo build --release --bin resvg
-    
+
     # 3) Package the binary into a layer structure
     mkdir -p /asset-output/bin
     cp target/release/resvg /asset-output/bin/
     chmod +x /asset-output/bin/resvg
-    
+
     # 4) Copy any required native libraries (if needed)
     # Note: resvg is statically linked, so this may not be necessary
     # but we'll include some common dependencies just in case

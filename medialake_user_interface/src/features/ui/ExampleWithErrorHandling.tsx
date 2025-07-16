@@ -5,7 +5,7 @@ import { ErrorBoundary } from '@/shared/ui/errors';
 // Example of a component that might throw an error
 const BuggyCounter: React.FC = () => {
   const [counter, setCounter] = useState(0);
-  
+
   const handleIncrement = () => {
     // This will throw when counter reaches 5
     if (counter === 5) {
@@ -13,10 +13,12 @@ const BuggyCounter: React.FC = () => {
     }
     setCounter(counter + 1);
   };
-  
+
   return (
     <Box textAlign="center">
-      <Typography variant="h6" mb={2}>Counter Value: {counter}</Typography>
+      <Typography variant="h6" mb={2}>
+        Counter Value: {counter}
+      </Typography>
       <Button variant="contained" color="primary" onClick={handleIncrement}>
         Increment
       </Button>
@@ -30,24 +32,25 @@ const BuggyCounter: React.FC = () => {
 // Example of how to use the ErrorBoundary component
 const ExampleWithErrorHandling: React.FC = () => {
   const [key, setKey] = useState(0);
-  
+
   // This will be passed to the ErrorBoundary to reset its state
   const handleReset = () => {
-    setKey(prevKey => prevKey + 1);
+    setKey((prevKey) => prevKey + 1);
   };
-  
+
   return (
     <Card sx={{ maxWidth: 500, mx: 'auto', mt: 4 }}>
       <CardContent>
         <Typography variant="h5" gutterBottom>
           Error Boundary Example
         </Typography>
-        
+
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          This example demonstrates how to use the ErrorBoundary component to capture and display errors.
+          This example demonstrates how to use the ErrorBoundary component to capture and display
+          errors.
         </Typography>
-        
-        {/* 
+
+        {/*
           The key prop ensures the component is re-mounted when reset
           onReset is called by the error boundary when the "Try Again" button is clicked
         */}
@@ -66,4 +69,4 @@ const ExampleWithErrorHandling: React.FC = () => {
   );
 };
 
-export default ExampleWithErrorHandling; 
+export default ExampleWithErrorHandling;

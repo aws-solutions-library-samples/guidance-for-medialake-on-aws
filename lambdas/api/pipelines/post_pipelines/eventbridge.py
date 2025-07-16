@@ -1,4 +1,5 @@
 import json
+import os
 import time
 import re
 import shortuuid
@@ -754,16 +755,25 @@ def create_eventbridge_rule(
                 # Wait for role to propagate
                 time.sleep(10)
                 
+                # Get common libraries layer ARN from environment
+                common_libraries_layer_arn = os.environ.get("COMMON_LIBRARIES_LAYER_ARN")
+                
+                # Prepare layers list
+                layers = []
+                if common_libraries_layer_arn:
+                    layers.append(common_libraries_layer_arn)
+                    logger.info(f"Adding common libraries layer to EventBridge trigger Lambda: {common_libraries_layer_arn}")
+                
                 # Create the Lambda function
-                response = lambda_client.create_function(
-                    FunctionName=trigger_lambda_name,
-                    Runtime="python3.12",
-                    Role=role_arn,
-                    Handler="index.lambda_handler",
-                    Code={"S3Bucket": IAC_ASSETS_BUCKET, "S3Key": zip_file_key},
-                    Timeout=300,
-                    MemorySize=1024,
-                    Environment={
+                create_function_params = {
+                    "FunctionName": trigger_lambda_name,
+                    "Runtime": "python3.12",
+                    "Role": role_arn,
+                    "Handler": "index.lambda_handler",
+                    "Code": {"S3Bucket": IAC_ASSETS_BUCKET, "S3Key": zip_file_key},
+                    "Timeout": 300,
+                    "MemorySize": 1024,
+                    "Environment": {
                         "Variables": {
                             "MAX_CONCURRENT_EXECUTIONS": "1000",
                             "PIPELINE_NAME": pipeline_name,
@@ -772,7 +782,13 @@ def create_eventbridge_rule(
                             "DEFAULT_STATE_MACHINE_ARN": state_machine_arn  # Add default state machine ARN
                         }
                     }
-                )
+                }
+                
+                # Add layers if available
+                if layers:
+                    create_function_params["Layers"] = layers
+                
+                response = lambda_client.create_function(**create_function_params)
                 
                 trigger_lambda_arn = response["FunctionArn"]
                 logger.info(f"Created trigger lambda with ARN: {trigger_lambda_arn}")

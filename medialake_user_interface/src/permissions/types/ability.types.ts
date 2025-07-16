@@ -16,7 +16,7 @@ export type Actions =
   | 'disable';
 
 // Define the possible subjects
-export type Subjects = 
+export type Subjects =
   | 'asset'
   | 'pipeline'
   | 'connector'

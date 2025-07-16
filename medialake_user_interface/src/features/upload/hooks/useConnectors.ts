@@ -18,14 +18,14 @@ const useConnectors = () => {
   const fetchConnectors = useCallback(async (): Promise<Connector[]> => {
     try {
       const response = await apiClient.get<ConnectorsResponse>(API_ENDPOINTS.CONNECTORS);
-      
+
       if (response.data.status === '200' && response.data.data?.connectors) {
         // Filter only S3 connectors that are active
         return response.data.data.connectors.filter(
           (connector: Connector) => connector.type === 's3' && connector.status === 'active'
         );
       }
-      
+
       return [];
     } catch (error) {
       console.error('Error fetching connectors:', error);
@@ -33,11 +33,11 @@ const useConnectors = () => {
     }
   }, []);
 
-  const { 
-    data: connectors = [], 
-    isLoading, 
-    error, 
-    refetch
+  const {
+    data: connectors = [],
+    isLoading,
+    error,
+    refetch,
   } = useQuery({
     queryKey: ['connectors', 's3'],
     queryFn: fetchConnectors,
@@ -48,8 +48,8 @@ const useConnectors = () => {
     connectors,
     isLoading,
     error,
-    refetch
+    refetch,
   };
 };
 
-export default useConnectors; 
+export default useConnectors;

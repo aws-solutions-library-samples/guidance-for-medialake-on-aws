@@ -5,4 +5,4 @@ export const SYSTEM_API = {
     CREATE_SEARCH_PROVIDER: '/settings/system/search',
     UPDATE_SEARCH_PROVIDER: '/settings/system/search',
   },
-} as const; 
+} as const;

@@ -1,34 +1,29 @@
-from datetime import datetime
-from aws_cdk import (
-    Stack,
-    aws_dynamodb as dynamodb,
-    aws_s3 as s3,
-    aws_s3_deployment as s3deploy,
-    custom_resources as cr,
-    aws_iam as iam,
-    RemovalPolicy,
-    CustomResource,
-    aws_lambda as lambda_,
-)
-
-from constructs import Construct
 from dataclasses import dataclass
-from medialake_constructs.shared_constructs.lam_deployment import LambdaDeployment
-from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
+from datetime import datetime
+
+import aws_cdk as cdk
+from aws_cdk import CustomResource, RemovalPolicy
+from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_s3 as s3
+from aws_cdk import aws_s3_deployment as s3deploy
+from aws_cdk import custom_resources as cr
+from constructs import Construct
+
+from config import config
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
+from medialake_constructs.shared_constructs.lam_deployment import LambdaDeployment
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 from medialake_constructs.shared_constructs.lambda_layers import (
     PowertoolsLayer, PowertoolsLayerConfig,
     PyMediaInfo,ResvgCliLayer,FFProbeLayer, FFmpegLayer,
-    PyamlLayer, ShortuuidLayer, CustomBoto3Layer
+    PyamlLayer, ShortuuidLayer, CustomBoto3Layer, CommonLibrariesLayer
 )
 from medialake_constructs.shared_constructs.mediaconvert import (
     MediaConvert,
     MediaConvertProps,
 )
-import aws_cdk as cdk
-
-from config import config
+from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
 
 
 @dataclass
@@ -62,6 +57,7 @@ class NodesStack(cdk.NestedStack):
 
         # Create Lambda Layers
         self.powertools_layer = PowertoolsLayer(self, "PowertoolsLayer", PowertoolsLayerConfig())
+        self.common_libraries_layer = CommonLibrariesLayer(self, "CommonLibrariesLayer")
         self.ffmpeg_layer = FFmpegLayer(self, "FFmpegLayer")
         self.pymediainfo_layer = PyMediaInfo(self, "PyMediaInfoLayer")
         self.shortuuid_layer = ShortuuidLayer(self, "ShortuuidLayer")
@@ -69,10 +65,7 @@ class NodesStack(cdk.NestedStack):
         self.ffprobe_layer = FFProbeLayer(self, "FFProbeLayer")
         self.resvgcli_layer = ResvgCliLayer(self, "ResvgCliLayer")
         self.custom_boto3_layer = CustomBoto3Layer(self, "CustomBoto3Layer")
-        
-        
-        
-        
+
         # Node Lambda Deployments
 
         self.check_media_convert_status_lambda_deployment = LambdaDeployment(
@@ -83,7 +76,6 @@ class NodesStack(cdk.NestedStack):
             code_path=["lambdas", "nodes", "check_media_convert_status"],
         )
 
-
         self.image_proxy_lambda_deployment = LambdaDeployment(
             self,
             "ImageProxyLambdaDeployment",
@@ -91,7 +83,7 @@ class NodesStack(cdk.NestedStack):
             parent_folder="nodes/utility",
             code_path=["lambdas", "nodes", "image_proxy"],
         )
-        
+
         self.image_thumbnail_lambda_deployment = LambdaDeployment(
             self,
             "ImageThumbnailLambdaDeployment",
@@ -115,7 +107,7 @@ class NodesStack(cdk.NestedStack):
             parent_folder="nodes/utility",
             code_path=["lambdas", "nodes", "audio_proxy"],
         )
-        
+
         self.audio_thumbnail_lambda_deployment = LambdaDeployment(
             self,
             "AudioThumbnailLambdaDeployment",
@@ -132,7 +124,7 @@ class NodesStack(cdk.NestedStack):
             runtime="nodejs18.x",
             code_path=["lambdas", "nodes", "image_metadata_extractor"],
         )
-        
+
         self.video_metadata_extractor_lambda_deployment = LambdaDeployment(
             self,
             "VideoMetadataExtractorLambdaDeployment",
@@ -154,7 +146,7 @@ class NodesStack(cdk.NestedStack):
             "AudioTranscriptionTranscribeLambdaDeployment",
             destination_bucket=props.iac_bucket.bucket,
             parent_folder="nodes/utility",
-            code_path=["lambdas", "nodes", "audio_transcription_transcribe"],   
+            code_path=["lambdas", "nodes", "audio_transcription_transcribe"],
         )
 
         self.audio_transcription_transcribe_status_lambda_deployment = LambdaDeployment(
@@ -162,7 +154,7 @@ class NodesStack(cdk.NestedStack):
             "AudioTranscriptionTranscribeStatusLambdaDeployment",
             destination_bucket=props.iac_bucket.bucket,
             parent_folder="nodes/utility",
-            code_path=["lambdas", "nodes", "audio_transcription_transcribe_status"],   
+            code_path=["lambdas", "nodes", "audio_transcription_transcribe_status"],
         )
 
         self.bedrock_content_processor_lambda_deployment = LambdaDeployment(
@@ -212,7 +204,7 @@ class NodesStack(cdk.NestedStack):
             parent_folder="nodes/utility",
             code_path=["lambdas", "nodes", "publish_event"],
         )
-      
+
         self.pipeline_trigger_lambda_deployment = LambdaDeployment(
             self,
             "PipelineTriggerLambdaDeployment",
@@ -220,7 +212,7 @@ class NodesStack(cdk.NestedStack):
             parent_folder="nodes/utility",
             code_path=["lambdas", "pipelines", "pipeline_trigger"],
         )
-        
+
         # Add FFmpeg layer to the audio splitter Lambda
         self.audio_splitter_lambda_deployment = LambdaDeployment(
             self,
@@ -324,6 +316,7 @@ class NodesStack(cdk.NestedStack):
                     "SERVICE_NAME": "pipeline-nodes-deployer",
                     # Layer ARNs for automatic layer attachment
                     "POWERTOOLS_LAYER_ARN":  self.powertools_layer.layer.layer_version_arn,
+                    "COMMON_LIBRARIES_LAYER_ARN": self.common_libraries_layer.layer.layer_version_arn,
                     "FFMPEG_LAYER_ARN": self.ffmpeg_layer.layer.layer_version_arn,
                     "PYMEDIAINFO_LAYER_ARN": self.pymediainfo_layer.layer.layer_version_arn,
                     # "JINJA_LAYER_ARN": self.jinja_layer.layer.layer_version_arn,
@@ -333,8 +326,6 @@ class NodesStack(cdk.NestedStack):
                     "FFPROBE_LAYER_ARN": self.ffprobe_layer.layer.layer_version_arn,
                     "RESVGCLI_LAYER_ARN": self.resvgcli_layer.layer.layer_version_arn,
                     "CUSTOMBOTO3_LAYER_ARN": self.custom_boto3_layer.layer.layer_version_arn,
-                    
-                    
                 },
             ),
         )
@@ -365,10 +356,10 @@ class NodesStack(cdk.NestedStack):
         )
 
         self.resource.node.add_dependency(bucket_deployment)
-        
+
         # Create MediaConvert role and queue
         self.mediaconvert_role = self.create_mediaconvert_role()
-        
+
         self.proxy_queue = MediaConvert.create_queue(
             self,
             "MediaLakeProxyMediaConvertQueue",
@@ -436,11 +427,11 @@ class NodesStack(cdk.NestedStack):
     @property
     def pipelines_nodes_templates_bucket(self) -> S3Bucket:
         return self._pipelines_nodes_bucket.bucket
-        
+
     @property
     def mediaconvert_role_arn(self) -> str:
         return self.mediaconvert_role.role_arn
-        
+
     @property
     def mediaconvert_queue_arn(self) -> str:
         return self.proxy_queue.queue_arn

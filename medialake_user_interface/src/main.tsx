@@ -30,13 +30,13 @@ const App = () => {
         setIsLoading(false);
       }
     };
-    
+
     const initializeAWS = async () => {
       try {
         // Fetch AWS configuration
         const awsResponse = await fetch('/aws-exports.json');
         const awsConfig = await awsResponse.json();
-        
+
         // Configure Amplify
         Amplify.configure({
           Auth: {
@@ -44,11 +44,11 @@ const App = () => {
               userPoolId: awsConfig.Auth.Cognito.userPoolId,
               userPoolClientId: awsConfig.Auth.Cognito.userPoolClientId,
               identityPoolId: awsConfig.Auth.Cognito.identityPoolId,
-            }
+            },
           },
-          API: awsConfig.API
+          API: awsConfig.API,
         });
-        
+
         return true;
       } catch (error) {
         console.error('Error loading AWS configuration:', error);

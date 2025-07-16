@@ -29,11 +29,7 @@ export const TableFiltersProvider: React.FC<TableFiltersProviderProps> = ({
   children,
   ...value
 }) => {
-  return (
-    <TableFiltersContext.Provider value={value}>
-      {children}
-    </TableFiltersContext.Provider>
-  );
+  return <TableFiltersContext.Provider value={value}>{children}</TableFiltersContext.Provider>;
 };
 
 export const useTableFilters = () => {

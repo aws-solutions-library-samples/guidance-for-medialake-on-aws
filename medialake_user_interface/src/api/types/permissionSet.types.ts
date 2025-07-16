@@ -36,7 +36,7 @@ export interface PermissionSetListResponse {
   message: string;
   data: {
     permissionSets: PermissionSet[];
-  }
+  };
 }
 
 export interface PermissionSetResponse {

@@ -1,9 +1,7 @@
-from typing import Optional, List, Union
-import aws_cdk as cdk
-from aws_cdk import (
-    aws_mediaconvert as mediaconvert,
-    CfnTag,
-)
+from typing import List, Optional, Union
+
+from aws_cdk import CfnTag
+from aws_cdk import aws_mediaconvert as mediaconvert
 from constructs import Construct
 
 

@@ -40,7 +40,9 @@ export const useSearchFields = () => {
 
         // Check if the response status is not a success (2xx)
         if (response.data?.status && !response.data.status.startsWith('2')) {
-          const error = new Error(response.data.message || 'Search fields request failed') as SearchFieldsError;
+          const error = new Error(
+            response.data.message || 'Search fields request failed'
+          ) as SearchFieldsError;
           error.apiResponse = response.data;
           throw error;
         }
@@ -52,7 +54,7 @@ export const useSearchFields = () => {
         return response.data;
       } catch (error) {
         logger.error('Search fields error:', error);
-        
+
         // Handle axios errors
         if (axios.isAxiosError(error) && error.response?.data) {
           const apiError = new Error(
@@ -61,12 +63,12 @@ export const useSearchFields = () => {
           apiError.apiResponse = error.response.data;
           throw apiError;
         }
-        
+
         // Rethrow the error to be handled by the component
         throw error;
       }
     },
     staleTime: 1000 * 60 * 5, // Cache for 5 minutes
-    gcTime: 1000 * 60 * 10 // Keep unused data for 10 minutes
+    gcTime: 1000 * 60 * 10, // Keep unused data for 10 minutes
   });
 };

@@ -8,19 +8,15 @@ for managing reviews, including:
 """
 
 from dataclasses import dataclass
-from aws_cdk import (
-    aws_apigateway as apigateway,
-    aws_secretsmanager as secretsmanager,
-    aws_dynamodb as dynamodb,
-)
-from aws_cdk import Fn, Stack
+
+from aws_cdk import aws_apigateway as apigateway
+from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_secretsmanager as secretsmanager
 from constructs import Construct
-from medialake_constructs.shared_constructs.lambda_base import (
-    Lambda,
-    LambdaConfig,
-)
-from medialake_constructs.shared_constructs.lambda_layers import SearchLayer
+
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
+from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
+from medialake_constructs.shared_constructs.lambda_layers import SearchLayer
 
 
 @dataclass

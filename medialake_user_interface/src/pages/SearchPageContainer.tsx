@@ -13,7 +13,7 @@ import {
   useSemanticSearch,
   useSearchFilters,
   useDomainActions,
-  useUIActions
+  useUIActions,
 } from '@/stores/searchStore';
 import SearchPagePresentation from './SearchPagePresentation';
 import { type AssetItem, type LocationState } from './types';
@@ -21,23 +21,23 @@ import { type AssetItem, type LocationState } from './types';
 const SearchPageContainer: React.FC = () => {
   const location = useLocation();
   const locationState = location.state as LocationState;
-  
+
   // Initialize search state with URL sync
   const searchState = useSearchState({
     initialQuery: locationState?.query || '',
     initialSemantic: false,
-    initialFilters: {}
+    initialFilters: {},
   });
-  
+
   // Core search state
   const query = useSearchQuery();
   const semantic = useSemanticSearch();
   const filters = useSearchFilters();
-  
+
   // Actions
   const { setQuery, setIsSemantic, setFilters, updateFilter } = useDomainActions();
   const { openFilterModal, closeFilterModal, setLoading, setError } = useUIActions();
-  
+
   // Convert filters to legacy format for useSearch
   const legacyParams = {
     page: 1,
@@ -58,20 +58,16 @@ const SearchPageContainer: React.FC = () => {
     data: searchData,
     isLoading: isSearchLoading,
     isFetching: isSearchFetching,
-    error: searchError
+    error: searchError,
   } = useSearch(query, legacyParams);
-  
-  const {
-    data: fieldsData,
-    isLoading: isFieldsLoading,
-    error: fieldsError
-  } = useSearchFields();
-  
+
+  const { data: fieldsData, isLoading: isFieldsLoading, error: fieldsError } = useSearchFields();
+
   // Sync loading state
   useEffect(() => {
     setLoading(isSearchLoading || isSearchFetching);
   }, [isSearchLoading, isSearchFetching, setLoading]);
-  
+
   // Sync error state
   useEffect(() => {
     if (searchError) {
@@ -80,23 +76,23 @@ const SearchPageContainer: React.FC = () => {
       setError(undefined);
     }
   }, [searchError, setError]);
-  
+
   // Extract search results
   const searchResults = searchData?.data?.results || [];
   const searchMetadata = searchData?.data?.searchMetadata;
-  
+
   // Extract fields data
   const defaultFields = fieldsData?.data?.defaultFields || [];
   const availableFields = fieldsData?.data?.availableFields || [];
   const selectedFields: string[] = []; // Default empty for now
-  
+
   // Asset accessors for hooks
   const getAssetId = (asset: AssetItem) => asset.InventoryID;
-  const getAssetName = (asset: AssetItem) => 
+  const getAssetName = (asset: AssetItem) =>
     asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name;
   const getAssetType = (asset: AssetItem) => asset.DigitalSourceAsset.Type;
   const getAssetThumbnail = (asset: AssetItem) => asset.thumbnailUrl || '';
-  
+
   // View preferences
   const viewPreferences = useViewPreferences({
     initialViewMode: locationState?.preserveSearch ? locationState.viewMode : 'card',
@@ -106,14 +102,14 @@ const SearchPageContainer: React.FC = () => {
     initialShowMetadata: locationState?.preserveSearch ? locationState.showMetadata : true,
     initialGroupByType: locationState?.preserveSearch ? locationState.groupByType : false,
   });
-  
+
   // Asset selection
   const assetSelection = useAssetSelection({
     getAssetId,
     getAssetName,
     getAssetType,
   });
-  
+
   // Asset favorites
   const assetFavorites = useAssetFavorites({
     getAssetId,
@@ -121,13 +117,13 @@ const SearchPageContainer: React.FC = () => {
     getAssetType,
     getAssetThumbnail,
   });
-  
+
   // Asset operations
   const assetOperations = useAssetOperations<AssetItem>();
-  
+
   // Feature flags
   const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
-  
+
   // Filter state for legacy components
   const typeArray = filters.type ? filters.type.split(',') : [];
   const legacyFilters = {
@@ -141,15 +137,15 @@ const SearchPageContainer: React.FC = () => {
       lastWeek: false,
       lastMonth: false,
       lastYear: false,
-    }
+    },
   };
-  
+
   const expandedSections = {
     mediaTypes: true,
     time: true,
     status: true,
   };
-  
+
   // Event handlers
   const handleFilterChange = (section: string, filter: string) => {
     if (section === 'mediaTypes') {
@@ -157,9 +153,9 @@ const SearchPageContainer: React.FC = () => {
       const typeMap: Record<string, string> = {
         videos: 'Video',
         images: 'Image',
-        audio: 'Audio'
+        audio: 'Audio',
       };
-      
+
       const actualType = typeMap[filter];
       if (actualType) {
         const index = currentTypes.indexOf(actualType);
@@ -172,20 +168,19 @@ const SearchPageContainer: React.FC = () => {
       }
     }
   };
-  
+
   const handleSectionToggle = (section: string) => {
     // Legacy implementation - could be enhanced with UI store
   };
-  
+
   const handleFieldsChange = (event: any) => {
-    const newFields = typeof event.target.value === 'string' 
-      ? event.target.value.split(',') 
-      : event.target.value;
-    
+    const newFields =
+      typeof event.target.value === 'string' ? event.target.value.split(',') : event.target.value;
+
     // This will be handled by the field actions in the store
     // For now, maintain compatibility
   };
-  
+
   return (
     <SearchPagePresentation
       // Search data
@@ -194,34 +189,27 @@ const SearchPageContainer: React.FC = () => {
       query={query}
       semantic={semantic}
       selectedFields={selectedFields}
-      
       // Fields data
       defaultFields={defaultFields}
       availableFields={availableFields}
       onFieldsChange={handleFieldsChange}
-      
       // Filter state
       filters={legacyFilters}
       expandedSections={expandedSections}
       onFilterChange={handleFilterChange}
       onSectionToggle={handleSectionToggle}
-      
       // View preferences
       viewPreferences={viewPreferences}
-      
       // Asset state
       assetSelection={assetSelection}
       assetFavorites={assetFavorites}
       assetOperations={assetOperations}
-      
       // Feature flags
       multiSelectEnabled={multiSelectFeature.value}
-      
       // Loading states
       isLoading={isSearchLoading}
       isFetching={isSearchFetching}
       isFieldsLoading={isFieldsLoading}
-      
       // Error states
       error={searchError}
       fieldsError={fieldsError}

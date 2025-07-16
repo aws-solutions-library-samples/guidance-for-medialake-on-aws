@@ -1,20 +1,21 @@
-from typing import Dict, Any, Optional, List
+import json
+import os
+import time
+from typing import Any, Dict
+
+import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.utilities.parser import parse
-from aws_lambda_powertools.utilities.parser.models import APIGatewayProxyEventModel
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import MetricUnit
-from pydantic import BaseModel, Field
-import boto3
-import os
-import json
-import time
+from aws_lambda_powertools.utilities.parser.models import APIGatewayProxyEventModel
+from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
-import uuid
+from pydantic import BaseModel, Field
 
 # Initialize AWS PowerTools
-logger = Logger(service="user-favorites-service", level=os.getenv("LOG_LEVEL", "WARNING"))
+logger = Logger(
+    service="user-favorites-service", level=os.getenv("LOG_LEVEL", "WARNING")
+)
 tracer = Tracer(service="user-favorites-service")
 metrics = Metrics(namespace="medialake", service="users-favorites-post")
 
@@ -47,10 +48,10 @@ def lambda_handler(
         # Extract user ID from Cognito authorizer context
         request_context = event.get("requestContext", {})
         authorizer = request_context.get("authorizer", {})
-        
+
         # Get the user ID directly from the authorizer context
         user_id = authorizer.get("userId")
-        
+
         if not user_id:
             logger.error("Missing user_id in authorizer context")
             metrics.add_metric(
@@ -106,15 +107,17 @@ def lambda_handler(
             metrics.add_metric(
                 name="InvalidRequestError", unit=MetricUnit.Count, value=1
             )
-            return _create_error_response(400, f"Invalid itemType. Must be one of: {', '.join(valid_item_types)}")
+            return _create_error_response(
+                400, f"Invalid itemType. Must be one of: {', '.join(valid_item_types)}"
+            )
 
         # Add the favorite to DynamoDB
         added_favorite = _add_favorite(
-            user_table_name, 
-            user_id, 
-            favorite_data["itemId"], 
+            user_table_name,
+            user_id,
+            favorite_data["itemId"],
             favorite_data["itemType"],
-            favorite_data.get("metadata", {})
+            favorite_data.get("metadata", {}),
         )
 
         # Create success response
@@ -124,18 +127,27 @@ def lambda_handler(
             data=added_favorite,
         )
 
-        logger.info("Successfully added favorite", 
-                   extra={"user_id": user_id, "item_id": favorite_data["itemId"], "item_type": favorite_data["itemType"]})
+        logger.info(
+            "Successfully added favorite",
+            extra={
+                "user_id": user_id,
+                "item_id": favorite_data["itemId"],
+                "item_type": favorite_data["itemType"],
+            },
+        )
         metrics.add_metric(name="SuccessfulFavoriteAdd", unit=MetricUnit.Count, value=1)
 
         # TODO: Generate audit event for favorite addition
-        logger.info("Audit: User favorite added", extra={
-            "user_id": user_id,
-            "action": "ADD_FAVORITE",
-            "item_id": favorite_data["itemId"],
-            "item_type": favorite_data["itemType"],
-            "timestamp": time.time()
-        })
+        logger.info(
+            "Audit: User favorite added",
+            extra={
+                "user_id": user_id,
+                "action": "ADD_FAVORITE",
+                "item_id": favorite_data["itemId"],
+                "item_type": favorite_data["itemType"],
+                "timestamp": time.time(),
+            },
+        )
 
         return {
             "statusCode": 201,
@@ -151,7 +163,11 @@ def lambda_handler(
 
 @tracer.capture_method
 def _add_favorite(
-    table_name: str, user_id: str, item_id: str, item_type: str, metadata: Dict[str, Any] = None
+    table_name: str,
+    user_id: str,
+    item_id: str,
+    item_type: str,
+    metadata: Dict[str, Any] = None,
 ) -> Dict[str, Any]:
     """
     Add a favorite item for a user in DynamoDB
@@ -159,23 +175,23 @@ def _add_favorite(
     try:
         # Format the userId according to the schema
         formatted_user_id = f"USER#{user_id}"
-        
+
         # Generate a reverse timestamp for sorting (newest first)
         # 9999999999999 - current_time_ms ensures newest items appear first when sorted
         current_time_ms = int(time.time() * 1000)
         reverse_timestamp = str(9999999999999 - current_time_ms)
-        
+
         # Format the itemKey according to the schema
         item_key = f"FAV#{item_type}#{reverse_timestamp}"
-        
+
         # Format GSI keys
         gsi1_sk = f"ITEM_TYPE#{item_type}#{reverse_timestamp}"
         gsi2_pk = f"ITEM_TYPE#{item_type}"
         gsi2_sk = f"USER#{user_id}#{reverse_timestamp}"
-        
+
         table = dynamodb.Table(table_name)
         added_at = int(time.time())
-        
+
         # Create the item to be saved
         item = {
             "userId": formatted_user_id,
@@ -185,28 +201,28 @@ def _add_favorite(
             "addedAt": added_at,
             "gsi1Sk": gsi1_sk,
             "gsi2Pk": gsi2_pk,
-            "gsi2Sk": gsi2_sk
+            "gsi2Sk": gsi2_sk,
         }
-        
+
         # Add metadata if provided
         if metadata:
             item["metadata"] = metadata
-        
+
         # Save the item
         table.put_item(Item=item)
-        
+
         # Return the favorite data without the DynamoDB keys
         result = {
             "userId": user_id,
             "itemId": item_id,
             "itemType": item_type,
             "addedAt": added_at,
-            "favoriteId": reverse_timestamp  # Use the reverse timestamp as the favorite ID
+            "favoriteId": reverse_timestamp,  # Use the reverse timestamp as the favorite ID
         }
-        
+
         if metadata:
             result["metadata"] = metadata
-            
+
         return result
 
     except ClientError as e:

@@ -36,4 +36,4 @@ export interface SystemSettingsResponse {
 export interface SystemSettingsError {
   status?: number;
   message: string;
-} 
+}

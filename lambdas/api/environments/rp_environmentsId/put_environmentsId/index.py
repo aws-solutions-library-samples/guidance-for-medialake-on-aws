@@ -1,28 +1,28 @@
 import os
-import json
+from typing import Any, Dict
+
 import boto3
-from typing import Dict, Any
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
-from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import MetricUnit
+from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
 from pydantic import ValidationError
 
+from lambdas.api.environments.models import EnvironmentUpdate
 from lambdas.api.environments.utils import (
-    logger,
-    metrics,
-    tracer,
-    setup_logging,
-    format_environment,
     create_error_response,
     create_success_response,
-    handle_dynamodb_error,
+    format_environment,
+    get_current_time,
     get_environment_pk,
     get_environment_sk,
-    get_current_time,
+    handle_dynamodb_error,
+    logger,
+    metrics,
+    setup_logging,
+    tracer,
 )
-from lambdas.api.environments.models import EnvironmentUpdate
 
 app = APIGatewayRestResolver()
 dynamodb = boto3.resource("dynamodb")

@@ -1,13 +1,14 @@
-from typing import Dict, Any
 import os
+from typing import Any, Dict
+
+import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
+from aws_lambda_powertools.event_handler.api_gateway import APIGatewayProxyEvent
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import MetricUnit
-from aws_lambda_powertools.event_handler.api_gateway import APIGatewayProxyEvent
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from pydantic import BaseModel, Field
-import boto3
 from botocore.exceptions import ClientError
+from pydantic import BaseModel, Field
 
 # Initialize AWS PowerTools
 logger = Logger(service="user-management", level=os.getenv("LOG_LEVEL", "INFO"))

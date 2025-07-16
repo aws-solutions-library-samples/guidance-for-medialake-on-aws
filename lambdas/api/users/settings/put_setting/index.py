@@ -1,19 +1,21 @@
-from typing import Dict, Any, Optional
+import json
+import os
+import time
+from typing import Any, Dict
+
+import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.utilities.parser import parse
-from aws_lambda_powertools.utilities.parser.models import APIGatewayProxyEventModel
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import MetricUnit
-from pydantic import BaseModel, Field
-import boto3
-import os
-import json
-import time
+from aws_lambda_powertools.utilities.parser.models import APIGatewayProxyEventModel
+from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
+from pydantic import BaseModel, Field
 
 # Initialize AWS PowerTools
-logger = Logger(service="user-settings-service", level=os.getenv("LOG_LEVEL", "WARNING"))
+logger = Logger(
+    service="user-settings-service", level=os.getenv("LOG_LEVEL", "WARNING")
+)
 tracer = Tracer(service="user-settings-service")
 metrics = Metrics(namespace="medialake", service="users-settings-put")
 
@@ -47,10 +49,10 @@ def lambda_handler(
         request_context = event.get("requestContext", {})
         authorizer = request_context.get("authorizer", {})
         claims = authorizer.get("claims", {})
-        
+
         # Get the user ID from the Cognito claims
         user_id = claims.get("sub")
-        
+
         if not user_id:
             logger.error("Missing user_id in Cognito claims")
             metrics.add_metric(
@@ -71,7 +73,7 @@ def lambda_handler(
         path_params = event.get("pathParameters", {}) or {}
         namespace = path_params.get("namespace")
         key = path_params.get("key")
-        
+
         if not namespace or not key:
             logger.error("Missing namespace or key in path parameters")
             metrics.add_metric(
@@ -99,7 +101,9 @@ def lambda_handler(
             metrics.add_metric(
                 name="InvalidRequestError", unit=MetricUnit.Count, value=1
             )
-            return _create_error_response(400, "Request body must contain a 'value' field")
+            return _create_error_response(
+                400, "Request body must contain a 'value' field"
+            )
 
         # Update the user setting in DynamoDB
         updated_setting = _update_user_setting(
@@ -113,18 +117,25 @@ def lambda_handler(
             data=updated_setting,
         )
 
-        logger.info("Successfully updated user setting", 
-                   extra={"user_id": user_id, "namespace": namespace, "key": key})
-        metrics.add_metric(name="SuccessfulSettingUpdate", unit=MetricUnit.Count, value=1)
+        logger.info(
+            "Successfully updated user setting",
+            extra={"user_id": user_id, "namespace": namespace, "key": key},
+        )
+        metrics.add_metric(
+            name="SuccessfulSettingUpdate", unit=MetricUnit.Count, value=1
+        )
 
         # TODO: Generate audit event for setting update
-        logger.info("Audit: User setting updated", extra={
-            "user_id": user_id,
-            "action": "UPDATE_SETTING",
-            "namespace": namespace,
-            "key": key,
-            "timestamp": time.time()
-        })
+        logger.info(
+            "Audit: User setting updated",
+            extra={
+                "user_id": user_id,
+                "action": "UPDATE_SETTING",
+                "namespace": namespace,
+                "key": key,
+                "timestamp": time.time(),
+            },
+        )
 
         return {
             "statusCode": 200,
@@ -149,10 +160,10 @@ def _update_user_setting(
         # Format the userId and itemKey according to the schema
         formatted_user_id = f"USER#{user_id}"
         item_key = f"SETTING#{namespace}#{key}"
-        
+
         table = dynamodb.Table(table_name)
         current_time = int(time.time())
-        
+
         # Create the item to be saved
         item = {
             "userId": formatted_user_id,
@@ -160,19 +171,19 @@ def _update_user_setting(
             "namespace": namespace,
             "key": key,
             "value": value,
-            "updatedAt": current_time
+            "updatedAt": current_time,
         }
-        
+
         # Save the item
         table.put_item(Item=item)
-        
+
         # Return the setting data without the DynamoDB keys
         return {
             "userId": user_id,
             "namespace": namespace,
             "key": key,
             "value": value,
-            "updatedAt": current_time
+            "updatedAt": current_time,
         }
 
     except ClientError as e:

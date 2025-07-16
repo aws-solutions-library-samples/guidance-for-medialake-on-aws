@@ -150,21 +150,27 @@ Manages S3 buckets for testing file upload functionality.
 ### Common Issues
 
 1. **AWS CLI Not Found**
+
    ```
    Error: aws command not found
    ```
+
    Solution: Install AWS CLI and ensure it's in your PATH
 
 2. **Invalid Profile**
+
    ```
    Error: The config profile (profile-name) could not be found
    ```
+
    Solution: Check your AWS profile configuration with `aws configure list-profiles`
 
 3. **Insufficient Permissions**
+
    ```
    Error: User is not authorized to perform: cognito-idp:ListUserPools
    ```
+
    Solution: Add the required Cognito permissions to your AWS profile
 
 4. **User Pool Not Found**
@@ -191,4 +197,4 @@ aws cognito-idp list-users --user-pool-id YOUR_POOL_ID --filter "username ^= \"e
 
 # Delete specific user
 aws cognito-idp admin-delete-user --user-pool-id YOUR_POOL_ID --username e2etest-0-12345678
-``` 
+```

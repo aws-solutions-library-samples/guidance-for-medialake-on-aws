@@ -1,20 +1,21 @@
-from typing import Dict, Any, Optional, List
-from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.utilities.parser import parse
-from aws_lambda_powertools.utilities.parser.models import APIGatewayProxyEventModel
-from aws_lambda_powertools.logging import correlation_paths
-from aws_lambda_powertools.metrics import MetricUnit
-from pydantic import BaseModel, Field, validator
-import boto3
-import os
-from botocore.exceptions import ClientError
 import json
+import os
 import uuid
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import boto3
+from aws_lambda_powertools import Logger, Metrics, Tracer
+from aws_lambda_powertools.logging import correlation_paths
+from aws_lambda_powertools.metrics import MetricUnit
+from aws_lambda_powertools.utilities.typing import LambdaContext
+from botocore.exceptions import ClientError
+from pydantic import BaseModel, Field, validator
 
 # Initialize AWS PowerTools
-logger = Logger(service="authorization-service", level=os.getenv("LOG_LEVEL", "WARNING"))
+logger = Logger(
+    service="authorization-service", level=os.getenv("LOG_LEVEL", "WARNING")
+)
 tracer = Tracer(service="authorization-service")
 metrics = Metrics(namespace="medialake", service="permission-sets-create")
 
@@ -24,22 +25,36 @@ dynamodb = boto3.resource("dynamodb")
 
 class Permission(BaseModel):
     """Model for a permission within a permission set"""
-    action: str = Field(..., description="The action to be performed (e.g., 'create', 'read', 'update', 'delete')")
-    resource: str = Field(..., description="The resource type the action applies to (e.g., 'Asset', 'Pipeline')")
-    effect: str = Field(..., description="Whether to allow or deny the permission ('Allow' or 'Deny')")
-    conditions: Optional[Dict[str, Any]] = Field(default=None, description="Optional conditions for the permission")
+
+    action: str = Field(
+        ...,
+        description="The action to be performed (e.g., 'create', 'read', 'update', 'delete')",
+    )
+    resource: str = Field(
+        ...,
+        description="The resource type the action applies to (e.g., 'Asset', 'Pipeline')",
+    )
+    effect: str = Field(
+        ..., description="Whether to allow or deny the permission ('Allow' or 'Deny')"
+    )
+    conditions: Optional[Dict[str, Any]] = Field(
+        default=None, description="Optional conditions for the permission"
+    )
 
 
 class PermissionSetRequest(BaseModel):
     """Model for permission set creation request"""
+
     name: str = Field(..., description="Name of the permission set")
     description: str = Field(..., description="Description of the permission set")
-    permissions: List[Permission] = Field(..., description="List of permissions in this set")
-    
-    @validator('name')
+    permissions: List[Permission] = Field(
+        ..., description="List of permissions in this set"
+    )
+
+    @validator("name")
     def name_not_empty(cls, v):
         if not v.strip():
-            raise ValueError('name cannot be empty')
+            raise ValueError("name cannot be empty")
         return v
 
 
@@ -58,9 +73,7 @@ class PermissionSetResponse(BaseModel):
 @tracer.capture_lambda_handler
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
 @metrics.log_metrics(capture_cold_start_metric=True)
-def lambda_handler(
-    event: Dict[str, Any], context: LambdaContext
-) -> Dict[str, Any]:
+def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
     """
     Lambda handler to create a new permission set in DynamoDB
     """
@@ -69,10 +82,10 @@ def lambda_handler(
         request_context = event.get("requestContext", {})
         authorizer = request_context.get("authorizer", {})
         claims = authorizer.get("claims", {})
-        
+
         # Get the user ID from the Cognito claims
         user_id = claims.get("sub")
-        
+
         if not user_id:
             logger.error("Missing user_id in Cognito claims")
             metrics.add_metric(
@@ -106,9 +119,7 @@ def lambda_handler(
 
         # Create the permission set in DynamoDB
         permission_set = _create_permission_set(
-            auth_table_name, 
-            permission_set_request, 
-            user_id
+            auth_table_name, permission_set_request, user_id
         )
 
         # Create success response
@@ -118,9 +129,13 @@ def lambda_handler(
             data=permission_set,
         )
 
-        logger.info("Successfully created permission set", 
-                   extra={"permission_set_id": permission_set["id"]})
-        metrics.add_metric(name="SuccessfulPermissionSetCreation", unit=MetricUnit.Count, value=1)
+        logger.info(
+            "Successfully created permission set",
+            extra={"permission_set_id": permission_set["id"]},
+        )
+        metrics.add_metric(
+            name="SuccessfulPermissionSetCreation", unit=MetricUnit.Count, value=1
+        )
 
         return {
             "statusCode": 201,
@@ -136,9 +151,7 @@ def lambda_handler(
 
 @tracer.capture_method
 def _create_permission_set(
-    table_name: str, 
-    permission_set_request: PermissionSetRequest, 
-    created_by: str
+    table_name: str, permission_set_request: PermissionSetRequest, created_by: str
 ) -> Dict[str, Any]:
     """
     Create a new permission set in DynamoDB
@@ -146,10 +159,10 @@ def _create_permission_set(
     try:
         # Generate a unique ID for the permission set
         permission_set_id = str(uuid.uuid4())
-        
+
         # Get the current timestamp
         current_time = datetime.utcnow().isoformat()
-        
+
         # Create the DynamoDB item
         permission_set_item = {
             "PK": f"PS#{permission_set_id}",
@@ -162,17 +175,17 @@ def _create_permission_set(
             "createdBy": created_by,
             "createdAt": current_time,
             "updatedAt": current_time,
-            "type": "PERMISSION_SET"
+            "type": "PERMISSION_SET",
         }
-        
+
         # Add GSI1 keys for querying permission sets
         permission_set_item["GSI1PK"] = "PERMISSION_SETS"
         permission_set_item["GSI1SK"] = f"PS#{permission_set_id}"
-        
+
         # Write to DynamoDB
         table = dynamodb.Table(table_name)
         table.put_item(Item=permission_set_item)
-        
+
         # Return the created permission set (without the DynamoDB-specific keys)
         result = {
             "id": permission_set_id,
@@ -182,9 +195,9 @@ def _create_permission_set(
             "isSystem": False,
             "createdBy": created_by,
             "createdAt": current_time,
-            "updatedAt": current_time
+            "updatedAt": current_time,
         }
-        
+
         return result
 
     except ClientError as e:

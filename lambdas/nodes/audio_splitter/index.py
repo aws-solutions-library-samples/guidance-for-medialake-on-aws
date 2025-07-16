@@ -71,22 +71,26 @@ def encode_audio_segment(
     Encode one segment with the given ffmpeg args (bit-rate, mono, etc.)
     Returns (success, actual_duration).
     """
-    cmd = [
-        "/opt/bin/ffmpeg",
-        "-hide_banner",
-        "-loglevel",
-        "error",
-        "-ss",
-        str(start_time),
-        "-i",
-        input_path,
-        "-t",
-        str(duration),
-        "-f",
-        "mp3",
-        "-c:a",
-        "libmp3lame",
-    ] + extra_args + ["-y", output_path]
+    cmd = (
+        [
+            "/opt/bin/ffmpeg",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-ss",
+            str(start_time),
+            "-i",
+            input_path,
+            "-t",
+            str(duration),
+            "-f",
+            "mp3",
+            "-c:a",
+            "libmp3lame",
+        ]
+        + extra_args
+        + ["-y", output_path]
+    )
 
     try:
         subprocess.check_call(cmd)
@@ -222,8 +226,10 @@ def lambda_handler(event: Dict[str, Any], context) -> Any:  # noqa: C901 (long f
         # ── Download ─────────────────────────────────────────────────────
         input_path = os.path.join(tempfile.gettempdir(), os.path.basename(source_key))
         if use_s3_direct:
-            logger.info("Downloading proxy asset from S3",
-                        extra={"bucket": source_bucket, "key": source_key})
+            logger.info(
+                "Downloading proxy asset from S3",
+                extra={"bucket": source_bucket, "key": source_key},
+            )
             s3_client.download_file(source_bucket, source_key, input_path)
         else:
             logger.info("Downloading via presigned URL")

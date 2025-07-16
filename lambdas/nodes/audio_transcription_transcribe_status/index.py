@@ -1,28 +1,25 @@
-import boto3
-import os
-import json
-import time
 import datetime
-import ast
 import importlib.util
+import json
+import os
 import re
-from botocore.exceptions import ClientError
-from typing import Dict, Any, Optional
-from jinja2 import Environment, FileSystemLoader
-from aws_lambda_powertools import Logger, Tracer
-from lambda_middleware import lambda_middleware
-from nodes_utils import format_duration
 from decimal import Decimal
+
+import boto3
+from aws_lambda_powertools import Logger, Tracer
+from botocore.exceptions import ClientError
+from jinja2 import Environment, FileSystemLoader
+from lambda_middleware import lambda_middleware
 
 # Initialize Powertools
 logger = Logger()
 tracer = Tracer()
 
 # Initialize AWS clients
-s3 = boto3.resource('s3')
+s3 = boto3.resource("s3")
 s3_client = boto3.client("s3")
-dynamodb = boto3.resource('dynamodb')
-transcribe_client = boto3.client('transcribe')
+dynamodb = boto3.resource("dynamodb")
+transcribe_client = boto3.client("transcribe")
 
 
 def _strip_decimals(obj):
@@ -43,7 +40,9 @@ class CustomJSONEncoder(json.JSONEncoder):
 
 
 def http_to_s3_comps(url: str):
-    regex = r"^https:\/\/s3\.(?:[a-z0-9-]{4,})\.amazonaws\.com\/([a-z0-9-\.]{1,})\/(.*)$"
+    regex = (
+        r"^https:\/\/s3\.(?:[a-z0-9-]{4,})\.amazonaws\.com\/([a-z0-9-\.]{1,})\/(.*)$"
+    )
     matches = re.finditer(regex, url, re.MULTILINE)
     for match in matches:
         return match.group(1), match.group(2)
@@ -52,10 +51,12 @@ def http_to_s3_comps(url: str):
 
 def read_json_from_s3(bucket, key):
     obj = s3.Object(bucket, key)
-    return json.loads(obj.get()['Body'].read().decode('utf-8'))
+    return json.loads(obj.get()["Body"].read().decode("utf-8"))
 
 
-def load_and_execute_function_from_s3(bucket: str, key: str, function_name: str, event: dict):
+def load_and_execute_function_from_s3(
+    bucket: str, key: str, function_name: str, event: dict
+):
     try:
         response = s3_client.get_object(Bucket=bucket, Key=f"api_templates/{key}")
         file_content = response["Body"].read().decode("utf-8")
@@ -63,7 +64,9 @@ def load_and_execute_function_from_s3(bucket: str, key: str, function_name: str,
         module = importlib.util.module_from_spec(spec)
         exec(file_content, module.__dict__)
         if not hasattr(module, function_name):
-            raise AttributeError(f"Function '{function_name}' not found in the downloaded file.")
+            raise AttributeError(
+                f"Function '{function_name}' not found in the downloaded file."
+            )
         return getattr(module, function_name)(event)
     except ClientError as e:
         logger.error(f"S3 error occurred: {e}", exc_info=True)
@@ -88,7 +91,9 @@ def create_request_body(s3_templates, api_template_bucket, event):
     request_template_path = f"api_templates/{s3_templates['request_template']}"
     mapping_path = s3_templates["mapping_file"]
     request_template = download_s3_object(api_template_bucket, request_template_path)
-    mapping = load_and_execute_function_from_s3(api_template_bucket, mapping_path, function_name, event)
+    mapping = load_and_execute_function_from_s3(
+        api_template_bucket, mapping_path, function_name, event
+    )
     env = Environment(loader=FileSystemLoader("/tmp/"))
     env.filters["jsonify"] = json.dumps
     query_template = env.from_string(request_template)
@@ -96,7 +101,9 @@ def create_request_body(s3_templates, api_template_bucket, event):
     return json.loads(request_body), mapping
 
 
-def create_response_output(s3_templates, api_template_bucket, response_body, event, mapping=None):
+def create_response_output(
+    s3_templates, api_template_bucket, response_body, event, mapping=None
+):
     function_name = "translate_event_to_request"
     response_template_path = f"api_templates/{s3_templates['response_template']}"
     response_mapping_path = s3_templates["response_mapping_file"]
@@ -137,13 +144,15 @@ def lambda_handler(event, context):
     api_template_bucket = os.environ.get("API_TEMPLATE_BUCKET", "medialake-assets")
 
     s3_templates = build_s3_templates_path(
-        service_name="transcribe",
-        resource="transcribe_status",
-        method="get"
+        service_name="transcribe", resource="transcribe_status", method="get"
     )
 
-    request_params, mapping = create_request_body(s3_templates, api_template_bucket, event)
-    logger.info("Successfully created request params", extra={"request_params": request_params})
+    request_params, mapping = create_request_body(
+        s3_templates, api_template_bucket, event
+    )
+    logger.info(
+        "Successfully created request params", extra={"request_params": request_params}
+    )
 
     job_name = request_params.get("TranscriptionJobName")
     if not job_name:
@@ -151,12 +160,15 @@ def lambda_handler(event, context):
 
     logger.info(f"Getting transcription job status for job: {job_name}")
     status = transcribe_client.get_transcription_job(TranscriptionJobName=job_name)
-    logger.info("Retrieved transcription job status", extra={"job_status": status['TranscriptionJob']['TranscriptionJobStatus']})
+    logger.info(
+        "Retrieved transcription job status",
+        extra={"job_status": status["TranscriptionJob"]["TranscriptionJobStatus"]},
+    )
 
-    status_value = status['TranscriptionJob']['TranscriptionJobStatus']
+    status_value = status["TranscriptionJob"]["TranscriptionJobStatus"]
     updated_item = {}
 
-    if status_value == 'COMPLETED':
+    if status_value == "COMPLETED":
         data_block = event.get("payload", {}).get("data", {})
         body = data_block.get("body", {})
         if isinstance(body, str):
@@ -165,23 +177,27 @@ def lambda_handler(event, context):
         if not inventory_id:
             raise ValueError("Missing inventory_id in event payload")
 
-        transcript_uri = status['TranscriptionJob']['Transcript']['TranscriptFileUri']
+        transcript_uri = status["TranscriptionJob"]["Transcript"]["TranscriptFileUri"]
         bucket, s3_key = http_to_s3_comps(transcript_uri)
 
         table = dynamodb.Table(os.getenv("MEDIALAKE_ASSET_TABLE"))
         table.update_item(
             Key={"InventoryID": inventory_id},
             UpdateExpression="SET TranscriptionS3Uri = :val",
-            ExpressionAttributeValues={":val": f"s3://{bucket}/{s3_key}"}
+            ExpressionAttributeValues={":val": f"s3://{bucket}/{s3_key}"},
         )
 
         json_content = read_json_from_s3(bucket, s3_key)
-        status['transcript_content'] = json_content['results']['transcripts'][0]['transcript']
+        status["transcript_content"] = json_content["results"]["transcripts"][0][
+            "transcript"
+        ]
 
         updated_item = table.get_item(Key={"InventoryID": inventory_id}).get("Item", {})
 
     logger.info("Creating response output")
-    result = create_response_output(s3_templates, api_template_bucket, status, event, mapping)
+    result = create_response_output(
+        s3_templates, api_template_bucket, status, event, mapping
+    )
 
     if updated_item:
         result["updatedAsset"] = _strip_decimals(updated_item)

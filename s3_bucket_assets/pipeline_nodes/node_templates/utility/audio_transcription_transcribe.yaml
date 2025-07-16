@@ -22,7 +22,7 @@ node:
                 - iam:PassRole
               resources:
                 - arn:aws:iam::${AWS::AccountId}:role/*_audio_transcription_transcribe_*
-            
+
       service_roles:
         - name: transcribe_service_role
           service: transcribe.amazonaws.com
@@ -46,7 +46,7 @@ node:
                     - kms:GenerateDataKey
                   resources:
                     - ${MEDIA_ASSETS_BUCKET_ARN_KMS_KEY}
-            
+
 actions:
   transcribe:
     summary: Transcribe Audio using Amazon Transcribe
