@@ -247,9 +247,26 @@ npm install -g aws-cdk
    - **GitRepositoryUrl**: Public Git repository URL (default: AWS Solutions Library media lake repository)
    - **S3PresignedURL**: Presigned URL for ZIP file download (required when using S3PresignedURL source type)
 
+   > **Note:** You can use the default deployment configuration settings without making any changes. The defaults are configured to deploy from the official AWS Solutions Library repository.
+
 4. **Complete deployment**
+
    - Accept the required IAM capabilities and deploy
    - Monitor the stack creation progress in the CloudFormation console
+
+5. **Initiate deployment**
+
+   - Click "Create stack" to begin the deployment process
+   - The initial CloudFormation stack will be created first
+
+6. **Monitor CodePipeline deployment**
+   - A CodePipeline will be automatically created to deploy the CDK code
+   - This deployment process will take approximately 1 hour to complete
+   - You will receive a welcome email at the address you provided once deployment is finished
+   - To monitor deployment progress:
+     - Go to the CloudFormation console
+     - Navigate to your stack's "Outputs" tab
+     - Click on the CodePipeline link to view the deployment status
 
 See the [`MediaLake-Installation-Guide.md`](assets/docs/MediaLake-Installation-Guide.md) for a complete CloudFormation deployment guide.
 
