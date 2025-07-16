@@ -4,7 +4,11 @@
 >
 > - [Overview](#overview)
 > - [Cost](#cost)
->   - [Cost Table](#cost-table)
+
+    - [Base Cost Table] (#base-cost-table)
+    - [Usage Based Example Table] (#usage-based-example-table)
+
+> - [Cost Table](#cost-table)
 > - [Development](#development)
 >   - [Prerequisites](#prerequisites)
 >   - [Operating System](#operating-system)
