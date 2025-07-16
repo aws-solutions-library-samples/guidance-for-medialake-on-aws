@@ -4,9 +4,8 @@
 >
 > - [Overview](#overview)
 > - [Cost](#cost)
-
-    - [Base Cost Table] (#base-cost-table)
-    - [Usage Based Example Table] (#usage-based-example-table)
+>   - [Base Services Cost Table](#base-services-cost-table)
+>   - [Usage Based Cost Example Table](#usage-based-cost-example-table)
 
 > - [Cost Table](#cost-table)
 > - [Development](#development)
