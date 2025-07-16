@@ -37,6 +37,7 @@ class ApiGatewayPipelinesProps:
     connector_table: dynamodb.TableV2
     node_table: dynamodb.TableV2
     pipeline_table: dynamodb.TableV2
+    integrations_table: dynamodb.TableV2
     iac_assets_bucket: s3.IBucket
     external_payload_bucket: s3.IBucket
     pipelines_nodes_templates_bucket: s3.IBucket
@@ -254,6 +255,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "MEDIA_ASSETS_BUCKET_ARN_KMS_KEY": props.media_assets_bucket.key_arn,
                 "PIPELINES_TABLE": props.pipeline_table.table_arn,
                 "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
+                "INTEGRATIONS_TABLE": props.integrations_table.table_arn,
                 "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
                 "EXTERNAL_PAYLOAD_BUCKET": props.external_payload_bucket.bucket_name,
                 "NODE_TEMPLATES_BUCKET": props.pipelines_nodes_templates_bucket.bucket_name,
@@ -388,6 +390,13 @@ class ApiGatewayPipelinesConstruct(Construct):
             iam.PolicyStatement(
                 actions=["dynamodb:Scan"],
                 resources=[props.connector_table.table_arn],
+            )
+        )
+
+        self._post_pipelines_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:GetItem", "dynamodb:Query"],
+                resources=[props.integrations_table.table_arn],
             )
         )
 

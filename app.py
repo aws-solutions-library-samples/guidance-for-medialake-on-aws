@@ -218,6 +218,20 @@ class MediaLakeStack(cdk.Stack):
             ),
         )
 
+        # Create integrations stack first so we can pass its table to pipeline stack
+        integrations_stack = IntegrationsEnvironmentStack(
+            self,
+            "MediaLakeIntegrationsEnvironment",
+            props=IntegrationsEnvironmentStackProps(
+                api_resource=props.api_gateway_core_stack.rest_api,
+                cognito_user_pool=props.cognito_stack.user_pool,
+                x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
+                pipelines_nodes_table=nodes_stack.pipelines_nodes_table,
+                # We'll need to update this after pipeline_stack is created
+                post_pipelines_lambda=None,
+            ),
+        )
+
         pipeline_stack = PipelineStack(
             self,
             "MediaLakePipeline",
@@ -229,6 +243,7 @@ class MediaLakeStack(cdk.Stack):
                 connector_table=api_gateway_stack.connector_table,
                 node_table=nodes_stack.pipelines_nodes_table,
                 pipeline_table=props.base_infrastructure.pipeline_table,
+                integrations_table=integrations_stack.integrations_table,
                 external_payload_bucket=props.base_infrastructure.external_payload_bucket,
                 pipelines_nodes_templates_bucket=nodes_stack.pipelines_nodes_templates_bucket,
                 open_search_endpoint=props.base_infrastructure.collection_endpoint,
@@ -242,6 +257,9 @@ class MediaLakeStack(cdk.Stack):
                 mediaconvert_role_arn=nodes_stack.mediaconvert_role_arn,
             ),
         )
+
+        # Now that pipeline_stack is created, configure the integrations stack with the pipeline lambda
+        integrations_stack.set_post_pipelines_lambda(pipeline_stack.post_pipelines_async_handler)
 
         _ = SettingsApiStack(
             self,
@@ -267,17 +285,9 @@ class MediaLakeStack(cdk.Stack):
             ),
         )
 
-        _ = IntegrationsEnvironmentStack(
-            self,
-            "MediaLakeIntegrationsEnvironment",
-            props=IntegrationsEnvironmentStackProps(
-                api_resource=props.api_gateway_core_stack.rest_api,
-                cognito_user_pool=props.cognito_stack.user_pool,
-                x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
-                pipelines_nodes_table=nodes_stack.pipelines_nodes_table,
-                post_pipelines_lambda=pipeline_stack.post_pipelines_async_handler,
-            ),
-        )
+        # Update the integrations stack with the pipeline lambda reference
+        # Note: This is a workaround for the circular dependency
+        # In a real implementation, you might want to restructure to avoid this
 
         self._api_gateway_stack = api_gateway_stack
 

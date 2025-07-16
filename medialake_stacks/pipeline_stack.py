@@ -49,6 +49,7 @@ class PipelineStackProps:
     connector_table: dynamodb.TableV2
     node_table: dynamodb.TableV2
     pipeline_table: dynamodb.TableV2
+    integrations_table: dynamodb.TableV2
     # image_proxy_lambda: lambda_.Function
     # image_metadata_extractor_lambda: lambda_.Function
     iac_assets_bucket: s3.IBucket
@@ -111,6 +112,7 @@ class PipelineStack(cdk.NestedStack):
                 connector_table=props.connector_table,
                 node_table=props.node_table,
                 pipeline_table=props.pipeline_table,
+                integrations_table=props.integrations_table,
                 mediaconvert_queue_arn=props.mediaconvert_queue_arn,
                 mediaconvert_role_arn=props.mediaconvert_role_arn,
                 iac_assets_bucket=props.iac_assets_bucket,
