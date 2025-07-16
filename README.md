@@ -92,11 +92,21 @@ The total monthly cost will vary significantly based on the volume of media proc
 
 We recommend creating a **Budget through AWS Cost Explorer** to help manage costs. Prices are subject to change. For full details, refer to the pricing webpage for each AWS service used in this Guidance.
 
-### Cost Table
+### Base Services Cost Table
+
+| **Service & Usage**                | **How It Relates to Your Team’s Usage**                    | **Estimated Monthly Cost (USD)**                        |
+| ---------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------- |
+| **Cognito (Users)**                | 50 active users signing in and using the system each month | \$2.00                                                  |
+| **OpenSearch Service (Search)**    | Search and index storage and compute                       | t3.small: \$28.72 (1 instance)<br>Storage: \$2.44 (gp3) |
+| **OpenSearch Ingestion (OSI)**     | Data ingestion processing units                            | \$350.40 (2 OCUs)                                       |
+| **NAT Gateway (VPC)**              | Outbound internet access from VPC                          | \$33.30                                                 |
+| **WAF (Web Application Firewall)** | API & web protection (rules + ACLs + requests)             | WebACL: \$5.00<br>Rules: \$2.00                         |
+| **TOTAL**                          | **Monthly cost estimate for small deployment**             | **\$423.60**                                            |
+
+### Usage Based Cost Example Table
 
 | **Service & Usage**                           | **How It Relates to Your Team’s Usage**                                                                           | **Estimated Monthly Cost (USD)**                                                        |
 | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| **Cognito (Users)**                           | 50 active users signing in and using the system each month                                                        | \$2.00                                                                                  |
 | **S3 + Step Functions (Uploads)**             | 1,000 new media files uploaded/month, each triggering a workflow                                                  | S3 storage: \$23.55<br>Step Functions: \$2.40                                           |
 | **S3/CloudFront (Images, Audio, Video)**      | All users viewing/downloading images, audio, and video each month (aggregate, served via S3 and CloudFront)       | S3 requests: \$0.05 + \$0.40<br>CloudFront data: \$29.75<br>CloudFront requests: \$0.03 |
 | **Total Media Downloaded (S3/CloudFront)**    | About 350GB of media files viewed/downloaded per month                                                            | S3 data transfer out: \$45.00                                                           |
@@ -106,15 +116,11 @@ We recommend creating a **Budget through AWS Cost Explorer** to help manage cost
 | **Database Usage (DynamoDB)**                 | 200,000 new or updated records per month (write/read/storage)                                                     | Writes: \$18.75<br>Reads: \$7.50<br>Storage: \$25.00                                    |
 | **Message Queues (SQS)**                      | 10,000 standard and 1,000 FIFO auto-messages per month                                                            | Standard: \$0.002<br>FIFO: \$0.0005                                                     |
 | **Workflow Automations (Step Functions)**     | 1,000 automated workflows (pipelines), 20 steps each every month                                                  | \$2.40                                                                                  |
-| **Encryption (KMS)**                          | 30 keys, 311,000 encryption/decryption actions per month                                                          | \$30.00 (CMK/month) + \$15.00 (requests) = \$45.00                                      |
+| **WAF (Web Application Firewall)**            | API & web protection (rules + ACLs + requests)                                                                    | Requests: \$0.30                                                                        |
+| **Encryption (KMS)**                          | 311,000 encryption/decryption actions per month                                                                   | \$30.00 (CMK/month) + \$15.00 (requests) = \$15.00                                      |
 | **Monitoring/Logging (CloudWatch)**           | Storage, metrics, logs for all services                                                                           | Data: \$7.50<br>Storage: \$0.07                                                         |
-| **OpenSearch Service (Search)**               | Search and index storage and compute                                                                              | t3.small: \$28.72 (1 instance)<br>Storage: \$2.44 (gp3)                                 |
-| **OpenSearch Ingestion (OSI)**                | Data ingestion processing units                                                                                   | \$350.40 (2 OCUs)                                                                       |
-| **NAT Gateway (VPC)**                         | Outbound internet access from VPC                                                                                 | \$33.30                                                                                 |
-| **WAF (Web Application Firewall)**            | API & web protection (rules + ACLs + requests)                                                                    | WebACL: \$5.00<br>Rules: \$2.00<br>Requests: \$0.30                                     |
 | **EventBridge**                               | Event-driven triggers                                                                                             | \$0.01                                                                                  |
 | **X-Ray (Tracing)**                           | Distributed trace monitoring                                                                                      | \$5.00                                                                                  |
-| **TOTAL**                                     | **Monthly cost estimate for small deployment**                                                                    | **\$379.12**                                                                            |
 
 ## Development
 
@@ -337,7 +343,7 @@ Use the emailed credentials to log in to the media lake UI.
 
 ### 4. **Enable Semantic Search and Integrations**
 
-- Enable and configure semantic search providers (e.g., Twelve Labs) as described in the UI and [MediaLake-Instructions.md](assets/docs/MediaLake-Instructions.md).
+- Enable and configure semantic search providers (e.g., Twelve Labs) as described in the UI and [MediaLake-Instructions.md](assets/docs/MediaLake-Installation-Guide.md).
 - Import pipelines for enrichment and transcription.
 
 ### 5. **Process and Retrieve Assets**
@@ -491,7 +497,7 @@ To remove all media lake resources:
 - For feedback, questions, or suggestions, please use the [GitHub Issues page](https://github.com/aws-solutions-library-samples/guidance-for-medialake/issues).
 - Known issues and deployment tips will be tracked in the Issues section.
 - Service quotas: media lake relies on OpenSearch, DynamoDB, Lambda, and S3 limits; monitor and request increases if needed for large-scale deployments.
-- For SAML integration and advanced identity provider setup, refer to the SAML instructions in [MediaLake-Instructions.docx](assets/docs/MediaLake-Instructions.docx).
+- For SAML integration and advanced identity provider setup, refer to the SAML instructions in [MediaLake-Installation-Guide.md](assets/docs/MediaLake-Installation-Guide.md).
 
 ---
 
