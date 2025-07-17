@@ -114,6 +114,7 @@ We recommend creating a **Budget through AWS Cost Explorer** to help manage cost
 | **Monitoring/Logging (CloudWatch)**           | Storage, metrics, logs for all services                                                                           | Data: \$7.50<br>Storage: \$0.07                                                         |
 | **EventBridge**                               | Event-driven triggers                                                                                             | \$0.01                                                                                  |
 | **X-Ray (Tracing)**                           | Distributed trace monitoring                                                                                      | \$5.00                                                                                  |
+| **TOTAL**                                     | **Monthly cost estimate for usage-based services**                                                                | **\$197.50**                                                                            |
 
 ## Quick Deployment (CloudFormation)
 
