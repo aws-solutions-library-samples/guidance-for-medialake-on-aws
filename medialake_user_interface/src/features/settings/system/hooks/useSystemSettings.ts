@@ -75,6 +75,7 @@ export const useSemanticSearchSettings = () => {
   useEffect(() => {
     if (providerData?.data?.searchProvider) {
       const fetchedProvider = providerData.data.searchProvider;
+      const fetchedEmbeddingStore = providerData.data.embeddingStore;
       const providerType = fetchedProvider.type === 'twelvelabs-bedrock' ? 'twelvelabs-bedrock' : 'twelvelabs-api';
       
       const initialSettings: SemanticSearchSettings = {
@@ -87,7 +88,7 @@ export const useSemanticSearchSettings = () => {
           }
         },
         embeddingStore: {
-          type: 'opensearch' // Default for now, will be extended later
+          type: fetchedEmbeddingStore?.type || 'opensearch'
         }
       };
 
@@ -161,6 +162,42 @@ export const useSemanticSearchSettings = () => {
     }));
   };
 
+  // Handle saving only embedding store changes
+  const handleSaveEmbeddingStore = async () => {
+    try {
+      const { current } = settings;
+      
+      // Build embedding store payload
+      const embeddingStorePayload = {
+        type: current.embeddingStore.type,
+        isEnabled: current.isEnabled
+      };
+      
+      // Always use updateProvider to save embedding store settings
+      await updateProvider.mutateAsync({
+        embeddingStore: embeddingStorePayload
+      });
+
+      // Update original embedding store to match current (changes saved)
+      setSettings(prev => ({
+        ...prev,
+        original: {
+          ...prev.original,
+          embeddingStore: prev.current.embeddingStore
+        },
+        hasChanges: JSON.stringify(prev.current) !== JSON.stringify({
+          ...prev.original,
+          embeddingStore: prev.current.embeddingStore
+        })
+      }));
+
+      return true;
+    } catch (error) {
+      console.error('Error saving embedding store settings:', error);
+      return false;
+    }
+  };
+
   // Handle API key dialog
   const handleOpenApiKeyDialog = (isEdit = false) => {
     setIsEditingApiKey(isEdit);
@@ -204,13 +241,20 @@ export const useSemanticSearchSettings = () => {
     try {
       const { current } = settings;
       
+      // Build embedding store payload
+      const embeddingStorePayload = {
+        type: current.embeddingStore.type,
+        isEnabled: current.isEnabled
+      };
+      
       if (current.provider.config && current.provider.type === 'twelvelabs-api') {
         if (isEditingApiKey && current.provider.config.id) {
           // Update existing provider
           await updateProvider.mutateAsync({
             apiKey: current.provider.config.apiKey,
             endpoint: current.provider.config.endpoint,
-            isEnabled: current.isEnabled
+            isEnabled: current.isEnabled,
+            embeddingStore: embeddingStorePayload
           });
         } else {
           // Create new provider
@@ -219,9 +263,16 @@ export const useSemanticSearchSettings = () => {
             type: current.provider.config.type,
             apiKey: current.provider.config.apiKey,
             endpoint: current.provider.config.endpoint,
-            isEnabled: current.isEnabled
+            isEnabled: current.isEnabled,
+            embeddingStore: embeddingStorePayload
           });
         }
+      } else if (current.provider.type === 'twelvelabs-bedrock') {
+        // For Bedrock, we still need to save embedding store settings
+        await updateProvider.mutateAsync({
+          isEnabled: current.isEnabled,
+          embeddingStore: embeddingStorePayload
+        });
       }
 
       // Update original to match current (changes saved)
@@ -263,6 +314,7 @@ export const useSemanticSearchSettings = () => {
     handleToggleChange,
     handleProviderTypeChange,
     handleEmbeddingStoreChange,
+    handleSaveEmbeddingStore,
     handleOpenApiKeyDialog,
     handleCloseApiKeyDialog,
     handleSaveApiKey,

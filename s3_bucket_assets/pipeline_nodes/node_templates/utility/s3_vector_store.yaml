@@ -42,7 +42,6 @@ actions:
     description: Store vector embeddings in S3 with metadata
     operationId: storeVectorEmbeddings
     parameters:
-      - in: body
         name: S3 Location
         required: true
         schema:
@@ -78,7 +77,6 @@ actions:
     description: Retrieve vector embeddings from S3
     operationId: retrieveVectorEmbeddings
     parameters:
-      - in: body
         name: S3 Location
         required: true
         schema:
@@ -104,7 +102,6 @@ actions:
     description: Search for similar vectors using cosine similarity
     operationId: searchSimilarVectors
     parameters:
-      - in: body
         name: Search Parameters
         required: true
         schema:
