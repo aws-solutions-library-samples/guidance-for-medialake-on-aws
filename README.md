@@ -45,13 +45,7 @@
 
 ## Overview
 
-**Guidance for a Media Lake on AWS** provides a comprehensive, serverless, and scalable platform for media ingestion, processing, management, and workflow orchestration on AWS. Media lake enables you to connect various storage sources, ingest and organize media at scale, run customizable processing pipelines (such as proxy/thumbnail generation and AI enrichment), and integrate with both AWS native and partner services.
-
-Media lake is designed for:
-
-- Media organizations and content creators needing automated processing and enrichment of large media libraries.
-- Use cases such as media asset management, automated compliance, and media AI/ML workflows.
-- Organizations requiring secure, event-driven, and highly available media workflows.
+**Guidance for a Media Lake on AWS** provides a comprehensive, serverless, and scalable platform for media ingestion, processing, management, metadata management, and workflow orchestration on AWS. Media lake enables you to connect multiple storage sources, known as connectors, ingest and organize media at scale, creating a unified search space for your media. Workflows, knows as pipelines, run customizable processing workflows (such as proxy/thumbnail generation and AI enrichment), and integrate with both AWS native and partner services.
 
 ### High-Level Overview
 
