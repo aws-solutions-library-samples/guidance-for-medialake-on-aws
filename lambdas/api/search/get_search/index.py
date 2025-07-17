@@ -331,14 +331,28 @@ def build_semantic_query(params: SearchParams) -> Dict:
 
 
 def build_search_query(params: SearchParams) -> Dict:
-    """Build OpenSearch query from search parameters"""
+    """Build search query from search parameters"""
     start_time = time.time()
     logger.info(
         f"[PERF] Starting search query build - semantic: {params.semantic}, query: {params.q}"
     )
 
     if params.semantic:
-        result = build_semantic_query(params)
+        # Use embedding store factory for semantic search
+        from embedding_store_factory import EmbeddingStoreFactory
+        
+        factory = EmbeddingStoreFactory(logger, metrics)
+        embedding_store = factory.create_embedding_store()
+        
+        # Get the search result from the embedding store
+        search_result = embedding_store.search(params)
+        
+        # Return the result in a format that can be processed by perform_search
+        result = {
+            "embedding_store_result": search_result,
+            "store_type": factory.get_embedding_store_setting()
+        }
+        
         logger.info(
             f"[PERF] Total search query build time (semantic): {time.time() - start_time:.3f}s"
         )
@@ -1046,17 +1060,37 @@ def perform_search(params: SearchParams) -> Dict:
             f"[PERF] Search query building took: {time.time() - query_build_start:.3f}s"
         )
 
-        logger.info("Executing OpenSearch query", extra={"semantic": params.semantic})
-        opensearch_start = time.time()
-        response = client.search(body=search_body, index=index_name)
-        opensearch_time = time.time() - opensearch_start
-        logger.info(f"[PERF] OpenSearch query execution took: {opensearch_time:.3f}s")
+        # Handle semantic search with embedding stores
+        if params.semantic and "embedding_store_result" in search_body:
+            embedding_result = search_body["embedding_store_result"]
+            store_type = search_body["store_type"]
+            
+            logger.info(f"Using {store_type} embedding store for semantic search")
+            
+            hits = embedding_result.hits
+            total_results = embedding_result.total_results
+            aggregations = embedding_result.aggregations
+            suggestions = embedding_result.suggestions
+            
+            logger.info(
+                f"{store_type} returned {len(hits)} hits from {total_results} total"
+            )
+        else:
+            # Regular OpenSearch query
+            logger.info("Executing OpenSearch query", extra={"semantic": params.semantic})
+            opensearch_start = time.time()
+            response = client.search(body=search_body, index=index_name)
+            opensearch_time = time.time() - opensearch_start
+            logger.info(f"[PERF] OpenSearch query execution took: {opensearch_time:.3f}s")
 
-        hits = response.get("hits", {}).get("hits", [])
+            hits = response.get("hits", {}).get("hits", [])
+            total_results = response["hits"]["total"]["value"]
+            aggregations = response.get("aggregations")
+            suggestions = response.get("suggest")
 
-        logger.info(
-            f"OpenSearch returned {len(hits)} hits from {response['hits']['total']['value']} total"
-        )
+            logger.info(
+                f"OpenSearch returned {len(hits)} hits from {total_results} total"
+            )
 
         if params.semantic:
             if CLIP_LOGIC_ENABLED:
@@ -1099,8 +1133,8 @@ def perform_search(params: SearchParams) -> Dict:
                 search_metadata = create_search_metadata(
                     total_count,
                     params,
-                    response.get("aggregations"),
-                    response.get("suggest"),
+                    aggregations,
+                    suggestions,
                 )
 
                 logger.info(
@@ -1177,8 +1211,8 @@ def perform_search(params: SearchParams) -> Dict:
                 search_metadata = create_search_metadata(
                     total_results,
                     params,
-                    response.get("aggregations"),
-                    response.get("suggest"),
+                    aggregations,
+                    suggestions,
                 )
 
                 return {
@@ -1236,10 +1270,10 @@ def perform_search(params: SearchParams) -> Dict:
             logger.info(f"Regular search completed: {len(results)} results processed")
 
             search_metadata = create_search_metadata(
-                response["hits"]["total"]["value"],
+                total_results,
                 params,
-                response.get("aggregations"),
-                response.get("suggest"),
+                aggregations,
+                suggestions,
             )
 
             return {

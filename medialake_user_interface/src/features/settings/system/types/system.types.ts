@@ -16,6 +16,23 @@ export interface SearchProviderCreate {
   apiKey: string;
   endpoint?: string;
   isEnabled?: boolean;
+  embeddingStore?: {
+    type: 'opensearch' | 's3-vector';
+    isEnabled?: boolean;
+    config?: object;
+  };
+}
+
+export interface EmbeddingStore {
+  type: 'opensearch' | 's3-vector';
+  isEnabled: boolean;
+  config?: {
+    opensearchEndpoint?: string;
+    s3Bucket?: string;
+    indexName?: string;
+  };
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface SearchProviderUpdate {
@@ -23,6 +40,11 @@ export interface SearchProviderUpdate {
   apiKey?: string;
   endpoint?: string;
   isEnabled?: boolean;
+  embeddingStore?: {
+    type: 'opensearch' | 's3-vector';
+    isEnabled?: boolean;
+    config?: object;
+  };
 }
 
 // New types for the three-part settings structure
@@ -48,6 +70,7 @@ export interface SystemSettingsResponse {
   message: string;
   data: {
     searchProvider?: SearchProvider;
+    embeddingStore?: EmbeddingStore;
   };
 }
 

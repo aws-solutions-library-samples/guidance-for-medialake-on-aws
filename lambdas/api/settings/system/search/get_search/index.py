@@ -22,15 +22,15 @@ app = APIGatewayRestResolver()
 @tracer.capture_method
 def get_search_provider():
     """
-    Get search provider configuration
+    Get search provider and embedding store configuration
     """
     try:
         # Get search provider settings
-        response = system_settings_table.get_item(
+        provider_response = system_settings_table.get_item(
             Key={"PK": "SYSTEM_SETTINGS", "SK": "SEARCH_PROVIDER"}
         )
 
-        search_provider = response.get("Item", {})
+        search_provider = provider_response.get("Item", {})
 
         # Remove DynamoDB specific attributes
         if search_provider:
@@ -41,12 +41,30 @@ def get_search_provider():
             search_provider.pop("secretArn", None)
 
             # Add isConfigured flag if secretArn exists in the original item
-            search_provider["isConfigured"] = "secretArn" in response.get("Item", {})
+            search_provider["isConfigured"] = "secretArn" in provider_response.get("Item", {})
+
+        # Get embedding store settings
+        embedding_response = system_settings_table.get_item(
+            Key={"PK": "SYSTEM_SETTINGS", "SK": "EMBEDDING_STORE"}
+        )
+
+        embedding_store = embedding_response.get("Item", {})
+
+        # Remove DynamoDB specific attributes and prepare embedding store data
+        if embedding_store:
+            embedding_store.pop("PK", None)
+            embedding_store.pop("SK", None)
+        else:
+            # Default embedding store configuration
+            embedding_store = {
+                "type": "opensearch",
+                "isEnabled": True
+            }
 
         # Prepare response
         return {
             "status": "success",
-            "message": "Search provider retrieved successfully",
+            "message": "Search settings retrieved successfully",
             "data": {
                 "searchProvider": (
                     search_provider
@@ -57,7 +75,8 @@ def get_search_provider():
                         "isConfigured": False,
                         "isEnabled": False,
                     }
-                )
+                ),
+                "embeddingStore": embedding_store
             },
         }
     except Exception as e:

@@ -25,7 +25,13 @@ import {
   CircularProgress,
   Alert,
   Snackbar,
-  Chip,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Card,
+  CardContent,
+  Chip
 } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { Edit as EditIcon, CheckCircle as CheckCircleIcon, Cancel as CancelIcon } from '@mui/icons-material';
@@ -111,6 +117,7 @@ const SystemSettingsPage: React.FC = () => {
     handleToggleChange,
     handleProviderTypeChange,
     handleEmbeddingStoreChange,
+    handleSaveEmbeddingStore,
     handleOpenApiKeyDialog,
     handleCloseApiKeyDialog,
     handleSaveApiKey,
@@ -136,7 +143,25 @@ const SystemSettingsPage: React.FC = () => {
 
   const handleCancelSettings = () => {
     handleCancel();
-    showNotification(t('settings.systemSettings.search.cancelSuccess', 'Changes cancelled'), 'info');
+    showNotification(
+      t('settings.systemSettings.search.cancelSuccess', 'Changes cancelled'),
+      'info'
+    );
+  };
+
+  const handleSaveEmbeddingStoreSettings = async () => {
+    const success = await handleSaveEmbeddingStore();
+    if (success) {
+      showNotification(
+        t('settings.systemSettings.search.embeddingStoreSaveSuccess', 'Embedding store settings saved successfully'),
+        'success'
+      );
+    } else {
+      showNotification(
+        t('settings.systemSettings.search.embeddingStoreSaveError', 'Failed to save embedding store settings'),
+        'error'
+      );
+    }
   };
 
   return (
@@ -337,23 +362,34 @@ const SystemSettingsPage: React.FC = () => {
                         'Choose where to store and search vector embeddings'
                       )}
                     </Typography>
-                    <FormControl sx={{ minWidth: 200 }} disabled={!settings.isEnabled}>
-                      <InputLabel>
-                        {t('settings.systemSettings.search.selectStore', 'Select Store')}
-                      </InputLabel>
-                      <Select
-                        value={settings.embeddingStore.type}
-                        label={t('settings.systemSettings.search.selectStore', 'Select Store')}
-                        onChange={(e) => handleEmbeddingStoreChange(e.target.value as any)}
+                    
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <FormControl sx={{ minWidth: 200 }} disabled={!settings.isEnabled}>
+                        <InputLabel>{t('settings.systemSettings.search.selectStore', 'Select Store')}</InputLabel>
+                        <Select
+                          value={settings.embeddingStore.type}
+                          label="Select Store"
+                          onChange={(e) => handleEmbeddingStoreChange(e.target.value as 'opensearch' | 's3-vector')}
+                        >
+                          <MenuItem value="opensearch">
+                            {SYSTEM_SETTINGS_CONFIG.EMBEDDING_STORES.OPENSEARCH.name}
+                          </MenuItem>
+                          <MenuItem value="s3-vector">
+                            {SYSTEM_SETTINGS_CONFIG.EMBEDDING_STORES.S3_VECTOR.name}
+                          </MenuItem>
+                        </Select>
+                      </FormControl>
+                      
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={handleSaveEmbeddingStoreSettings}
+                        disabled={!settings.isEnabled || isSaving}
+                        startIcon={isSaving ? <CircularProgress size={16} /> : <CheckCircleIcon />}
                       >
-                        <MenuItem value="opensearch">
-                          {SYSTEM_SETTINGS_CONFIG.EMBEDDING_STORES.OPENSEARCH.name}
-                        </MenuItem>
-                        <MenuItem value="s3-vector">
-                          {SYSTEM_SETTINGS_CONFIG.EMBEDDING_STORES.S3_VECTOR.name}
-                        </MenuItem>
-                      </Select>
-                    </FormControl>
+                        {isSaving ? t('common.saving', 'Saving...') : t('common.save', 'Save')}
+                      </Button>
+                    </Box>
                   </CardContent>
                 </Card>
 
@@ -390,7 +426,7 @@ const SystemSettingsPage: React.FC = () => {
           </TabPanel>
         </Box>
       </Paper>
-
+      
       {/* API Key Configuration Dialog */}
       <Dialog open={isApiKeyDialogOpen} onClose={handleCloseApiKeyDialog} maxWidth="sm" fullWidth>
         <DialogTitle>
@@ -418,10 +454,12 @@ const SystemSettingsPage: React.FC = () => {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseApiKeyDialog}>{t('common.cancel', 'Cancel')}</Button>
-          <Button
-            onClick={handleSaveApiKey}
-            variant="contained"
+          <Button onClick={handleCloseApiKeyDialog}>
+            {t('common.cancel', 'Cancel')}
+          </Button>
+          <Button 
+            onClick={handleSaveApiKey} 
+            variant="contained" 
             color="primary"
             disabled={!apiKeyInput || apiKeyInput === '••••••••••••••••'}
           >
