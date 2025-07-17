@@ -36,6 +36,15 @@ node:
                 - kms:GenerateDataKey
               resources:
                 - "*"
+            - effect: Allow
+              actions:
+                - s3vectors:GetVectorBucket
+                - s3vectors:CreateVectorBucket
+                - s3vectors:GetIndex
+                - s3vectors:CreateIndex
+                - s3vectors:PutVectors
+              resources:
+                - "*"
 actions:
   store:
     summary: Store Vector Embeddings
