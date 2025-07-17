@@ -294,14 +294,14 @@ Use the emailed credentials to log in to the media lake UI.
 - Add a connector, choosing Amazon S3 and providing your bucket details.
 - **Note**: If you create new S3 buckets through media lake, remember that these will need to be manually emptied and deleted during cleanup as they are not automatically removed when the media lake stack is deleted.
 
-### 3. **Ingest Media**
-
-- Upload media to your configured S3 bucket.
-
-### 4. **Enable Semantic Search and Integrations**
+### 3. **Enable Semantic Search and Integrations**
 
 - Enable and configure semantic search providers (e.g., TwelveLabs) as described in the UI and [MediaLake-Instructions.md](assets/docs/MediaLake-Installation-Guide.md).
 - Import pipelines for enrichment and transcription.
+
+### 4. **Ingest Media**
+
+- Upload media to your configured S3 bucket.
 
 ### 5. **Process and Retrieve Assets**
 
