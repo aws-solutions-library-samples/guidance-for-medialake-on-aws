@@ -110,89 +110,10 @@ We recommend creating a **Budget through AWS Cost Explorer** to help manage cost
 | **Message Queues (SQS)**                      | 10,000 standard and 1,000 FIFO auto-messages per month                                                            | Standard: \$0.002<br>FIFO: \$0.0005                                                     |
 | **Workflow Automations (Step Functions)**     | 1,000 automated workflows (pipelines), 20 steps each every month                                                  | \$2.40                                                                                  |
 | **WAF (Web Application Firewall)**            | API & web protection (rules + ACLs + requests)                                                                    | Requests: \$0.30                                                                        |
-| **Encryption (KMS)**                          | 311,000 encryption/decryption actions per month                                                                   | \$30.00 (CMK/month) + \$15.00 (requests) = \$15.00                                      |
+| **Encryption (KMS)**                          | 311,000 encryption/decryption actions per month                                                                   | \$15.00.00                                                                              |
 | **Monitoring/Logging (CloudWatch)**           | Storage, metrics, logs for all services                                                                           | Data: \$7.50<br>Storage: \$0.07                                                         |
 | **EventBridge**                               | Event-driven triggers                                                                                             | \$0.01                                                                                  |
 | **X-Ray (Tracing)**                           | Distributed trace monitoring                                                                                      | \$5.00                                                                                  |
-
-## Development
-
-### Prerequisites
-
-- An AWS account with appropriate permissions to create and manage resources.
-- **AWS CLI** configured with your account credentials.
-- **AWS CDK CLI** (`npm install -g aws-cdk`).
-- **Node.js** (v20.x or later).
-- **Python** (3.12).
-- **Docker** (for local development).
-- **Git** for cloning the repository.
-- Optional: Third-party services (such as Twelve Labs) require separate setup and API credentials for integration.
-
-### Operating System
-
-Development and deployment instructions are validated for **MacOS** and **Windows**.
-Deployment to AWS services is fully managed through the AWS CLI and Console and does not depend on local OS beyond the tools above.
-
-> These deployment instructions are optimized for modern developer environments (MacOS/Windows). Deployment to AWS services (e.g., Lambda, CloudFormation, CDK) runs on AWS-managed infrastructure.
-
-**Required Packages:**
-
-- Python 3.12 (`python3 --version`)
-- Node.js 20+ (`node --version`)
-- Docker Desktop (`docker --version`)
-- AWS CLI (`aws --version`)
-- AWS CDK (`cdk --version`)
-
-**Install Python 3.12 specifically:**
-
-**MacOS:**
-
-```bash
-# Download and install Python 3.12 directly from python.org
-# Visit https://www.python.org/downloads/release/python-3120/
-
-# Alternative: Use pyenv without brew
-curl https://pyenv.run | bash
-pyenv install 3.12.0
-pyenv global 3.12.0
-```
-
-**Windows:**
-
-```powershell
-# Download Python 3.12 from python.org
-# Visit https://www.python.org/downloads/release/python-3120/
-```
-
-**Install other dependencies:**
-
-**MacOS:**
-
-```bash
-# Install Docker Desktop from https://www.docker.com/products/docker-desktop
-
-# Install Node.js from https://nodejs.org/
-# Download and install the LTS version
-
-# Install AWS CLI
-curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"
-sudo installer -pkg AWSCLIV2.pkg -target /
-
-# Install AWS CDK
-npm install -g aws-cdk
-```
-
-**Windows:**
-
-```powershell
-# Install Docker Desktop from https://www.docker.com/products/docker-desktop
-# Install Node.js from https://nodejs.org/
-# Install AWS CLI
-winget install Amazon.AWSCLI
-npm install -g aws-cdk
-```
-
----
 
 ## Quick Deployment (CloudFormation)
 
@@ -225,7 +146,7 @@ npm install -g aws-cdk
 
    #### Media Lake Configuration
 
-   - **MediaLakeEnvironmentName**: Environment identifier (1-10 alphanumeric characters, default: `dev`)
+   - **MediaLakeEnvironmentName**: Environment identifier (1-4 alphanumeric characters, default: `dev`)
    - **OpenSearchDeploymentSize**: Controls the size of your OpenSearch cluster
      - `small`: Suitable for development and testing environments
      - `medium`: Recommended for moderate production workloads
@@ -328,11 +249,11 @@ touch config.json
 
 Key configuration parameters include:
 
-- **environment**: Choose between "dev" or "prd"
+- **environment**: Choose between 1-4 letters that are alphanumeric that represent an environment name
 - **deployment_size**: OpenSearch deployment size ("small", "medium", "large")
 - **resource_prefix**: Prefix for all AWS resources created
 - **account_id**: AWS Account ID for deployment
-- **primary_region**: Primary region for deployment (tested in us-east-1)
+- **primary_region**: Primary region for deployment
 - **initial_user**: Initial user configuration with email and name
 - **vpc**: VPC configuration for using existing or creating new VPC
 - **authZ**: Identity provider configuration (Cognito, SAML)
@@ -351,7 +272,7 @@ cdk deploy --all --profile <profile> --region <region>
 
 ## Deployment Validation
 
-1. In the AWS CloudFormation console, check that the stack `medialake-cf` (and related media lake stacks) are in **CREATE_COMPLETE** status.
+1. In the AWS CloudFormation console, check that the related media lake stacks are in **CREATE_COMPLETE** status.
 2. After deployment, you will receive a welcome email at the address you provided, containing:
    - The media lake application URL
    - Username (your email)
@@ -374,11 +295,11 @@ Use the emailed credentials to log in to the media lake UI.
 
 ### 3. **Ingest Media**
 
-- Upload media to your configured S3 bucket or use the UI’s manual upload feature.
+- Upload media to your configured S3 bucket.
 
 ### 4. **Enable Semantic Search and Integrations**
 
-- Enable and configure semantic search providers (e.g., Twelve Labs) as described in the UI and [MediaLake-Instructions.md](assets/docs/MediaLake-Installation-Guide.md).
+- Enable and configure semantic search providers (e.g., TwelveLabs) as described in the UI and [MediaLake-Instructions.md](assets/docs/MediaLake-Installation-Guide.md).
 - Import pipelines for enrichment and transcription.
 
 ### 5. **Process and Retrieve Assets**
@@ -397,29 +318,48 @@ Use the emailed credentials to log in to the media lake UI.
 ## Project Structure
 
 ```
-medialake/
-├── assets/                   # Documentation, images, and scripts
-│   ├── docs/                 # Documentation files
-│   ├── images/               # Architecture diagrams
-│   └── scripts/              # Deployment and utility scripts
-├── medialake_constructs/     # CDK construct definitions
-│   ├── shared_constructs/    # Shared AWS constructs
-│   └── api_gateway_connectors.py
-├── medialake_stacks/         # CDK stack definitions
-│   ├── base_infrastructure.py # Base infrastructure stack
-│   └── api_gateway.py         # API Gateway stack
-├── lambdas/                  # Lambda functions
-│   ├── api/                  # API handlers
-│   └── pipelines/           # Pipeline processors
-├── medialake_user_interface/ # React-based user interface
-├── pipeline_library/         # Pipeline templates and configurations
-├── s3_bucket_assets/         # S3 deployment assets
-├── app.py                    # Main CDK app
-├── requirements.txt          # Python dependencies
-├── cdk.json                 # CDK configuration
-├── config.py                # Configuration interpreter and validator
-├── config.json              # Configuration file
-└── README.md                # This file
+guidance-for-medialake-on-aws/
+├── assets/                          # Documentation, images, and scripts
+│   ├── docs/                        # Installation and configuration guides
+│   └── images/                      # Architecture diagrams and screenshots
+├── medialake_constructs/            # CDK construct definitions
+│   ├── api_gateway/                 # API Gateway constructs
+│   ├── auth/                        # Authentication constructs
+│   └── shared_constructs/           # Shared AWS constructs
+├── medialake_stacks/                # CDK stack definitions
+│   ├── api_gateway_core_stack.py    # Core API Gateway stack
+│   ├── api_gateway_deployment_stack.py # API deployment stack
+│   ├── api_gateway_stack.py         # Main API Gateway stack
+│   └── [additional stack files]     # Infrastructure and service stacks
+├── medialake_user_interface/        # React TypeScript frontend
+│   ├── src/                         # Source code
+│   │   ├── api/                     # API service layer
+│   │   ├── features/                # Feature-based modules
+│   │   ├── pages/                   # Page components
+│   │   ├── shared/                  # Common utilities and types
+│   │   └── [additional folders]     # Components, hooks, contexts
+│   ├── tests/                       # End-to-end tests
+│   ├── package.json                 # Node.js dependencies
+│   └── playwright.config.ts         # Testing configuration
+├── lambdas/                         # Lambda function source code
+│   ├── api/                         # API endpoint handlers
+│   ├── auth/                        # Authentication functions
+│   ├── back_end/                    # Backend processing functions
+│   ├── nodes/                       # Pipeline processing nodes
+│   ├── pipelines/                   # Pipeline orchestration
+│   └── common_libraries/            # Shared Lambda utilities
+├── pipeline_library/               # Default pipeline templates
+├── s3_bucket_assets/               # S3 deployment assets
+│   ├── pipeline_library/           # Pipeline definitions
+│   └── pipeline_nodes/             # Node templates and specs
+├── app.py                          # Main CDK application entry point
+├── cdk.json                        # CDK configuration and settings
+├── config_utils.py                 # Configuration utilities
+├── config-dev.json                 # Development configuration example
+├── requirements.txt                # Python dependencies
+├── requirements-dev.txt            # Development Python dependencies
+├── package.json                    # Node.js dependencies for CDK
+└── README.md                       # This documentation file
 ```
 
 ---
@@ -451,7 +391,8 @@ medialake/
 - **Amazon API Gateway** - REST API endpoint management
 - **Amazon DynamoDB** - Asset metadata and configuration storage
 - **AWS MediaConvert** - Media transcoding and format conversion service
-- **Amazon Transcribe** - Speech-to-text transcription service (only when pipeline is imported and enabled)
+- **Amazon CloudWatch** - Metrics, logging, and alerting
+- **Amazon OpenSearch** - Search and analytics engine
 
 **Security & Authentication:**
 
@@ -459,18 +400,12 @@ medialake/
 - **AWS KMS** - Encryption key management
 - **AWS IAM** - Resource access control
 
-**Monitoring & Search:**
-
-- **Amazon CloudWatch** - Metrics, logging, and alerting
-- **Amazon OpenSearch** - Search and analytics engine
-
 ---
 
 ## Security Features
 
 - AWS Cognito authentication and authorization including support for local username/password and federated authentication via SAML
 - KMS encryption for sensitive data
-- IAM role-based access control
 - CORS-enabled API endpoints
 - VPC deployment options for network isolation
 
@@ -554,5 +489,3 @@ Customers are responsible for making their own independent assessment of the inf
 - Joao Seike
 - Lior Berezinski
 - Robert Raver
-
-# test
