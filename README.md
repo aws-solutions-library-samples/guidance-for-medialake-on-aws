@@ -72,20 +72,18 @@
 You are responsible for the cost of the AWS services used while running this Guidance.
 
 **Base Infrastructure Cost (without variable workloads):**
-As of July 2025, the cost for running this Guidance with the **small deployment configuration** in the **US East (N. Virginia)** region is approximately **$379.12 per month** for the core infrastructure only.
+As of July 2025, the cost for running this Guidance with the **small deployment configuration** in the **US East (N. Virginia)** region is approximately **$423.62 per month** for the baseline services only.
 
 **Variable Workload Costs:**
 Additional costs will be incurred based on actual usage:
 
-- Media processing and enrichment services (TwelveLabs, Transcription)
-- S3 storage and data transfer
-- Lambda execution time
-- OpenSearch queries and indexing
-- Step Functions executions
+- Media processing and enrichment services (Lambda, Step Functions, MediaConvert, TwelveLabs, Transcription)
+- Media and Metadata storage (OpenSearch, DynamoDB, S3)
+- Interfactions with the user interface and viewing media(CloudFront, Data Transfer Out, Step Functions, Lambda, OpenSearch and DynamoDB queries)
 
-The total monthly cost will vary significantly based on the volume of media processed, storage requirements, and usage patterns.
+The total monthly cost will vary based on the volume of media processed, storage requirements, and usage patterns.
 
-We recommend creating a **Budget through AWS Cost Explorer** to help manage costs. Prices are subject to change. For full details, refer to the pricing webpage for each AWS service used in this Guidance.
+We recommend creating a **Budget through AWS Cost Explorer** to help manage costs. Prices are subject to change. For full details, refer to the pricing webpage for each AWS service used in this guidance.
 
 ### Base Services Cost Table
 
