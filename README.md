@@ -85,9 +85,9 @@ The total monthly cost will vary based on the volume of media processed, storage
 
 We recommend creating a **Budget through AWS Cost Explorer** to help manage costs. Prices are subject to change. For full details, refer to the pricing webpage for each AWS service used in this guidance.
 
-### Base Services Cost Table
+### Base Services Cost Table - OpenSearch Deployment
 
-| **Service & Usage**                | **How It Relates to Your Team’s Usage**                    | **Estimated Monthly Cost (USD)**                        |
+| **Service & Usage**                | **How It Relates to Your Team's Usage**                    | **Estimated Monthly Cost (USD)**                        |
 | ---------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------- |
 | **Cognito (Users)**                | 50 active users signing in and using the system each month | \$2.00                                                  |
 | **OpenSearch Service (Search)**    | Search and index storage and compute                       | t3.small: \$28.72 (1 instance)<br>Storage: \$2.44 (gp3) |
@@ -95,6 +95,14 @@ We recommend creating a **Budget through AWS Cost Explorer** to help manage cost
 | **NAT Gateway (VPC)**              | Outbound internet access from VPC                          | \$33.30                                                 |
 | **WAF (Web Application Firewall)** | API & web protection (rules + ACLs + requests)             | WebACL: \$5.00<br>Rules: \$2.00                         |
 | **TOTAL**                          | **Monthly cost estimate for small deployment**             | **\$423.60**                                            |
+
+### Base Services Cost Table - S3 Vectors Deployment
+
+| **Service & Usage**                | **How It Relates to Your Team's Usage**                    | **Estimated Monthly Cost (USD)**                        |
+| ---------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------- |
+| **Cognito (Users)**                | 50 active users signing in and using the system each month | \$2.00                                                  |
+| **WAF (Web Application Firewall)** | API & web protection (rules + ACLs + requests)             | WebACL: \$5.00<br>Rules: \$2.00                         |
+| **TOTAL**                          | **Monthly cost estimate for small deployment**             | **\$9.00**                                             |
 
 ### Usage Based Cost Example Table
 
@@ -481,7 +489,7 @@ To remove all media lake resources:
 
 ## Notices
 
-Customers are responsible for making their own independent assessment of the information in this Guidance. This Guidance: (a) is for informational purposes only, (b) represents AWS current product offerings and practices, which are subject to change without notice, and (c) does not create any commitments or assurances from AWS and its affiliates, suppliers or licensors. AWS products or services are provided “as is” without warranties, representations, or conditions of any kind, whether express or implied. AWS responsibilities and liabilities to its customers are controlled by AWS agreements, and this Guidance is not part of, nor does it modify, any agreement between AWS and its customers.
+Customers are responsible for making their own independent assessment of the information in this Guidance. This Guidance: (a) is for informational purposes only, (b) represents AWS current product offerings and practices, which are subject to change without notice, and (c) does not create any commitments or assurances from AWS and its affiliates, suppliers or licensors. AWS products or services are provided "as is" without warranties, representations, or conditions of any kind, whether express or implied. AWS responsibilities and liabilities to its customers are controlled by AWS agreements, and this Guidance is not part of, nor does it modify, any agreement between AWS and its customers.
 
 ---
 
