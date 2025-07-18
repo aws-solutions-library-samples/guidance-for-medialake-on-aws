@@ -68,15 +68,19 @@ class EmbeddingStoreFactory:
         else:
             raise ValueError(f"Unsupported embedding store type: {store_type}")
         
-        # Verify the store is available
+        # Verify the store is available with detailed logging
         if not store.is_available():
+            self.logger.error(f"Embedding store '{store_type}' is not available or properly configured")
+            # Log available stores for debugging
+            available_stores = self.get_available_stores()
+            self.logger.info(f"Available embedding stores: {available_stores}")
             raise Exception(f"Embedding store '{store_type}' is not available or properly configured")
         
         # Cache the store
         self._cached_setting = store_type
         self._cached_store = store
         
-        self.logger.info(f"Created embedding store: {store_type}")
+        self.logger.info("Initialized embedding store client: %s", store_type)
         return store
     
     def get_available_stores(self) -> dict:

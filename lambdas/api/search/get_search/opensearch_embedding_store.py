@@ -13,7 +13,6 @@ from opensearchpy import (
     RequestsHttpConnection,
 )
 from base_embedding_store import BaseEmbeddingStore, SearchResult
-from api_utils import get_api_key
 
 
 class OpenSearchEmbeddingStore(BaseEmbeddingStore):
@@ -60,81 +59,39 @@ class OpenSearchEmbeddingStore(BaseEmbeddingStore):
     
     def build_semantic_query(self, params) -> Dict[str, Any]:
         """Build OpenSearch semantic query using Twelve Labs embeddings"""
-        from twelvelabs import TwelveLabs
-
         start_time = time.time()
         self.logger.info(f"[PERF] Starting OpenSearch semantic query build for: {params.q}")
 
-        # Get the API key from Secrets Manager
-        api_key_start = time.time()
-        api_key = get_api_key()
-        self.logger.info(f"[PERF] API key retrieval took: {time.time() - api_key_start:.3f}s")
+        # Use centralized embedding generation
+        embedding = self.generate_text_embedding(params.q)
 
-        if not api_key:
-            raise Exception(
-                "Search provider API key not configured or provider not enabled"
-            )
-
-        # Initialize the Twelve Labs client
-        client_init_start = time.time()
-        twelve_labs_client = TwelveLabs(api_key=api_key)
-        self.logger.info(
-            f"[PERF] TwelveLabs client initialization took: {time.time() - client_init_start:.3f}s"
-        )
-
-        try:
-            # Create embedding for the search query
-            embedding_start = time.time()
-            self.logger.info(f"[PERF] Starting embedding creation for query: {params.q}")
-            res = twelve_labs_client.embed.create(
-                model_name="Marengo-retrieval-2.7",
-                text=params.q,
-            )
-            self.logger.info(
-                f"[PERF] Embedding creation took: {time.time() - embedding_start:.3f}s"
-            )
-
-            if res.text_embedding is not None and res.text_embedding.segments is not None:
-                embedding = list(res.text_embedding.segments[0].embeddings_float)
-                if not all(isinstance(x, (int, float)) for x in embedding):
-                    raise Exception("Invalid embedding format")
-
-                self.logger.info(
-                    f"Generated embedding for query: {params.q} (length: {len(embedding)})"
-                )
-
-                query = {
-                    "size": params.pageSize * 20,
-                    "query": {
-                        "bool": {
-                            "filter": {"bool": {"must": []}},
-                            "must": [
-                                {
-                                    "knn": {
-                                        "embedding": {
-                                            "vector": embedding,
-                                            "k": params.pageSize * 20,
-                                        }
-                                    }
+        query = {
+            "size": params.pageSize * 20,
+            "query": {
+                "bool": {
+                    "filter": {"bool": {"must": []}},
+                    "must": [
+                        {
+                            "knn": {
+                                "embedding": {
+                                    "vector": embedding,
+                                    "k": params.pageSize * 20,
                                 }
-                            ],
+                            }
                         }
-                    },
-                    "_source": {"excludes": ["embedding"]},
+                    ],
                 }
-                
-                # Add filters based on parameters
-                self._add_filters_to_query(query, params)
-                
-                self.logger.info(
-                    f"[PERF] Total OpenSearch semantic query build time: {time.time() - start_time:.3f}s"
-                )
-                return query
-            else:
-                raise Exception("Failed to generate embedding for search term")
-        except Exception as e:
-            self.logger.exception("Error generating embedding for search term")
-            raise Exception(f"Error generating embedding: {str(e)}")
+            },
+            "_source": {"excludes": ["embedding"]},
+        }
+        
+        # Add filters based on parameters
+        self._add_filters_to_query(query, params)
+        
+        self.logger.info(
+            f"[PERF] Total OpenSearch semantic query build time: {time.time() - start_time:.3f}s"
+        )
+        return query
     
     def _add_filters_to_query(self, query: Dict, params):
         """Add filters to OpenSearch query based on parameters"""

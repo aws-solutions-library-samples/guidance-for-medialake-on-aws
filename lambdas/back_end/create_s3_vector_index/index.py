@@ -174,20 +174,29 @@ def create_vector_index_with_retry(
     bucket_name: str,
     index_name: str,
     dimension: int,
-    max_retries: int = 5
+    max_retries: int = 5,
+    recreate_if_exists: bool = True
 ) -> bool:
     """
     Create S3 Vector index with retry logic and exponential backoff.
-    If the index already exists, delete it and wait for deletion before creating.
+    If recreate_if_exists is True and the index already exists, delete it and wait for deletion before creating.
+    If recreate_if_exists is False and the index already exists, return True without recreating.
     """
-    # If it already exists, drop & recreate
+    # Check if index already exists
     if index_exists(s3_vector_client, bucket_name, index_name):
-        logger.info(
-            "Index exists – deleting before recreation",
-            extra={"bucket_name": bucket_name, "index_name": index_name}
-        )
-        delete_index(s3_vector_client, bucket_name, index_name)
-        wait_for_index_deletion(s3_vector_client, bucket_name, index_name)
+        if recreate_if_exists:
+            logger.info(
+                "Index exists – deleting before recreation",
+                extra={"bucket_name": bucket_name, "index_name": index_name}
+            )
+            delete_index(s3_vector_client, bucket_name, index_name)
+            wait_for_index_deletion(s3_vector_client, bucket_name, index_name)
+        else:
+            logger.info(
+                "Index already exists – skipping creation",
+                extra={"bucket_name": bucket_name, "index_name": index_name}
+            )
+            return True
 
     logger.info(
         "Creating S3 Vector index",
@@ -279,9 +288,16 @@ def handler(event, context):
     logger.info("Received event", extra={"event": event})
 
     req_type = event.get("RequestType")
-    if req_type != "Create":
-        logger.info("Skipping non-Create request", extra={"RequestType": req_type})
+    if req_type not in ["Create", "Update"]:
+        logger.info("Skipping non-Create/Update request", extra={"RequestType": req_type})
         return {"statusCode": 200, "body": f"Skipped {req_type} request"}
+
+    # Determine if we should recreate existing resources
+    recreate_if_exists = req_type == "Create"
+    logger.info(
+        "Processing request",
+        extra={"RequestType": req_type, "recreate_if_exists": recreate_if_exists}
+    )
 
     # Environment variables
     bucket_name = os.environ["VECTOR_BUCKET_NAME"]
@@ -353,7 +369,8 @@ def handler(event, context):
             s3_vector_client,
             bucket_name,
             index_name,
-            vector_dimension
+            vector_dimension,
+            recreate_if_exists=recreate_if_exists
         )
 
         if not success:

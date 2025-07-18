@@ -62,6 +62,7 @@ class ApiGatewayStackProps:
     user_pool_client: str
     waf_acl_arn: str
     user_table: dynamodb.TableV2
+    s3_vector_bucket_name: str
 
 
 class ApiGatewayStack(cdk.NestedStack):
@@ -133,6 +134,7 @@ class ApiGatewayStack(cdk.NestedStack):
                 vpc=props.vpc,
                 security_group=props.security_group,
                 system_settings_table=props.system_settings_table,
+                s3_vector_bucket_name=props.s3_vector_bucket_name,
             ),
         )
 

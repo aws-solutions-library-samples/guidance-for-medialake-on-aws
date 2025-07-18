@@ -27,7 +27,7 @@ tracer = Tracer(disabled=False)
 
 # Environment
 VECTOR_BUCKET_NAME = os.getenv("VECTOR_BUCKET_NAME", "media-vectors")
-INDEX_NAME = os.getenv("INDEX_NAME", "media")
+INDEX_NAME = os.getenv("INDEX_NAME", "media-vectors")
 CONTENT_TYPE = os.getenv("CONTENT_TYPE", "video").lower()
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 EVENT_BUS_NAME = os.getenv("EVENT_BUS_NAME", "default-event-bus")
@@ -155,6 +155,32 @@ def get_s3_vector_client():
         raise
 
 
+def extract_inventory_id(container: Dict[str, Any]) -> Optional[str]:
+    """Extract inventory ID from various payload structures."""
+    # Check if data is an array (batch processing) - get from first item
+    if isinstance(container.get("data"), list) and container["data"]:
+        first_item = container["data"][0]
+        if isinstance(first_item, dict) and first_item.get("inventory_id"):
+            return first_item["inventory_id"]
+
+    itm = _item(container)
+    if itm and itm.get("inventory_id"):
+        return itm["inventory_id"]
+
+    m_itm = _map_item(container)
+    if m_itm and m_itm.get("inventory_id"):
+        return m_itm["inventory_id"]
+
+    # Check assets array for InventoryID
+    for asset in container.get("assets", []):
+        inventory_id = asset.get("InventoryID")
+        if inventory_id:
+            return inventory_id
+
+    # Check direct InventoryID field
+    return container.get("InventoryID")
+
+
 def extract_asset_id(container: Dict[str, Any]) -> Optional[str]:
     """Extract asset ID from various payload structures."""
     # Check if data is an array (batch processing) - get from first item
@@ -206,10 +232,10 @@ def extract_metadata(container: Dict[str, Any]) -> Dict[str, Any]:
     """Extract metadata for the vector."""
     metadata = {}
     
-    # Extract asset_id
-    asset_id = extract_asset_id(container)
-    if asset_id:
-        metadata["asset_id"] = asset_id
+    # Extract inventory_id
+    inventory_id = extract_inventory_id(container)
+    if inventory_id:
+        metadata["inventory_id"] = inventory_id
     
     # Extract content type
     metadata["content_type"] = CONTENT_TYPE
@@ -243,13 +269,13 @@ def _bad_request(msg: str):
     return {"statusCode": 400, "body": json.dumps({"error": msg})}
 
 
-def _ok_no_op(vector_len: int, asset_id: Optional[str]):
+def _ok_no_op(vector_len: int, inventory_id: Optional[str]):
     return {
         "statusCode": 200,
         "body": json.dumps(
             {
                 "message": "Embedding processed (S3 Vector Store not available)",
-                "asset_id": asset_id,
+                "inventory_id": inventory_id,
                 "vector_length": vector_len,
             }
         ),
@@ -259,7 +285,7 @@ def _ok_no_op(vector_len: int, asset_id: Optional[str]):
 # ─────────────────────────────────────────────────────────────────────────────
 # Single embedding processing function
 def process_single_embedding(
-    payload: Dict[str, Any], embedding_data: Dict[str, Any], client, asset_id: str
+    payload: Dict[str, Any], embedding_data: Dict[str, Any], client, inventory_id: str
 ) -> Dict[str, Any]:
     """Process a single embedding object."""
     embedding_vector = embedding_data.get("float")
@@ -282,7 +308,7 @@ def process_single_embedding(
     # For S3 Vector Store, we don't need FPS calculation like OpenSearch
     # We'll store the raw seconds in metadata
     metadata = {
-        "asset_id": asset_id,
+        "inventory_id": inventory_id,
         "content_type": CONTENT_TYPE,
         "embedding_scope": "clip" if IS_AUDIO_CONTENT else scope,
         "timestamp": datetime.utcnow().isoformat(),
@@ -316,7 +342,7 @@ def process_single_embedding(
         result = store_vectors(client, bucket_name, index_name, vectors_data)
         
         return {
-            "document_id": f"{asset_id}_{int(datetime.utcnow().timestamp())}",
+            "document_id": f"{inventory_id}_{int(datetime.utcnow().timestamp())}",
             "start_sec": start_sec,
             "end_sec": end_sec,
         }
@@ -324,10 +350,10 @@ def process_single_embedding(
     except Exception as e:
         logger.error(
             "Failed to store vector in S3 Vector Store",
-            extra={"asset_id": asset_id, "error": str(e), "bucket": VECTOR_BUCKET_NAME},
+            extra={"inventory_id": inventory_id, "error": str(e), "bucket": VECTOR_BUCKET_NAME},
         )
         raise RuntimeError(
-            f"Failed to store vector for asset {asset_id}: {str(e)}"
+            f"Failed to store vector for inventory {inventory_id}: {str(e)}"
         ) from e
 
 
@@ -391,7 +417,7 @@ def store_vectors(client, bucket_name: str, index_name: str, vectors_data: List[
         # Prepare vectors for PutVectors API
         vectors = []
         for i, vector_data in enumerate(vectors_data):
-            vector_key = f"{vector_data['metadata']['asset_id']}_{i}_{int(datetime.utcnow().timestamp())}"
+            vector_key = f"{vector_data['metadata']['inventory_id']}"
             
             vector_entry = {
                 'key': vector_key,
@@ -442,10 +468,10 @@ def process_store_action(payload: Dict[str, Any]) -> Dict[str, Any]:
     bucket_name = payload.get("vector_bucket_name", VECTOR_BUCKET_NAME)
     index_name = payload.get("index_name", INDEX_NAME)
     
-    # Extract asset_id
-    asset_id = extract_asset_id(payload)
-    if not asset_id:
-        return _bad_request("Unable to determine asset_id – aborting")
+    # Extract inventory_id
+    inventory_id = extract_inventory_id(payload)
+    if not inventory_id:
+        return _bad_request("Unable to determine inventory_id – aborting")
     
     # Check if this is batch processing (array of embeddings)
     if isinstance(payload.get("data"), list):
@@ -473,7 +499,7 @@ def process_store_action(payload: Dict[str, Any]) -> Dict[str, Any]:
                 # Process clip/audio embeddings
                 try:
                     result = process_single_embedding(
-                        payload, embedding_data, client, asset_id
+                        payload, embedding_data, client, inventory_id
                     )
                     results.append(result)
                     logger.info(
@@ -515,7 +541,7 @@ def process_store_action(payload: Dict[str, Any]) -> Dict[str, Any]:
 
                 # For video scope, we store as a separate vector with video scope metadata
                 metadata = {
-                    "asset_id": asset_id,
+                    "inventory_id": inventory_id,
                     "content_type": CONTENT_TYPE,
                     "embedding_scope": scope,
                     "timestamp": datetime.utcnow().isoformat(),
@@ -542,7 +568,7 @@ def process_store_action(payload: Dict[str, Any]) -> Dict[str, Any]:
                 
                 results.append(
                     {
-                        "document_id": f"{asset_id}_video_{i}_{int(datetime.utcnow().timestamp())}",
+                        "document_id": f"{inventory_id}_video_{i}_{int(datetime.utcnow().timestamp())}",
                         "type": "video_scope",
                         "scope": scope,
                     }
@@ -568,7 +594,7 @@ def process_store_action(payload: Dict[str, Any]) -> Dict[str, Any]:
                     "message": f"Batch processed: {len(results)} embeddings stored successfully",
                     "bucket_name": bucket_name,
                     "index_name": index_name,
-                    "asset_id": asset_id,
+                    "inventory_id": inventory_id,
                     "processed_count": len(results),
                     "total_count": len(payload["data"]),
                 }
@@ -595,7 +621,7 @@ def process_store_action(payload: Dict[str, Any]) -> Dict[str, Any]:
         start_sec, end_sec = _get_segment_bounds(payload)
 
         metadata = {
-            "asset_id": asset_id,
+            "inventory_id": inventory_id,
             "content_type": CONTENT_TYPE,
             "embedding_scope": "clip" if IS_AUDIO_CONTENT else scope,
             "timestamp": datetime.utcnow().isoformat(),
@@ -629,14 +655,14 @@ def process_store_action(payload: Dict[str, Any]) -> Dict[str, Any]:
                     "message": "Embedding stored successfully",
                     "bucket_name": bucket_name,
                     "index_name": index_name,
-                    "asset_id": asset_id,
+                    "inventory_id": inventory_id,
                 }
             ),
         }
 
     # For video scope (master document equivalent), store as video scope vector
     metadata = {
-        "asset_id": asset_id,
+        "inventory_id": inventory_id,
         "content_type": CONTENT_TYPE,
         "embedding_scope": scope,
         "timestamp": datetime.utcnow().isoformat(),
@@ -668,7 +694,7 @@ def process_store_action(payload: Dict[str, Any]) -> Dict[str, Any]:
                 "message": "Embedding stored successfully",
                 "bucket_name": bucket_name,
                 "index_name": index_name,
-                "asset_id": asset_id,
+                "inventory_id": inventory_id,
             }
         ),
     }

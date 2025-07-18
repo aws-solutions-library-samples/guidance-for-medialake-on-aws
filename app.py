@@ -215,6 +215,7 @@ class MediaLakeStack(cdk.Stack):
                 user_pool_client=props.cognito_stack.user_pool_client,
                 waf_acl_arn=props.api_gateway_core_stack.waf_acl_arn,
                 user_table=users_groups_roles_stack.user_table,
+                s3_vector_bucket_name=props.base_infrastructure.s3_vector_bucket_name,
             ),
         )
 
@@ -255,6 +256,10 @@ class MediaLakeStack(cdk.Stack):
                 collection_endpoint=props.base_infrastructure.collection_endpoint,
                 mediaconvert_queue_arn=nodes_stack.mediaconvert_queue_arn,
                 mediaconvert_role_arn=nodes_stack.mediaconvert_role_arn,
+                # S3 Vector configuration
+                s3_vector_bucket_name=props.base_infrastructure.s3_vector_bucket_name,
+                s3_vector_index_name=props.base_infrastructure.s3_vector_index_name,
+                s3_vector_dimension=props.base_infrastructure.s3_vector_dimension,
             ),
         )
 

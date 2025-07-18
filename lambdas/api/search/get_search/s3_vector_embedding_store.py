@@ -6,7 +6,6 @@ import time
 import boto3
 from typing import Dict, List, Any
 from base_embedding_store import BaseEmbeddingStore, SearchResult
-from api_utils import get_api_key
 from opensearchpy import (
     NotFoundError,
     OpenSearch,
@@ -59,80 +58,44 @@ class S3VectorEmbeddingStore(BaseEmbeddingStore):
     def is_available(self) -> bool:
         """Check if S3 Vector and OpenSearch are available and properly configured."""
         try:
-            # S3 Vector requirements
+            # S3 Vector requirements - using actual environment variable names
             s3_vector_vars = ["S3_VECTOR_BUCKET_NAME", "AWS_REGION"]
             # OpenSearch requirements for metadata filtering
             opensearch_vars = ["OPENSEARCH_ENDPOINT", "SCOPE", "OPENSEARCH_INDEX"]
             
             required_env_vars = s3_vector_vars + opensearch_vars
-            return all(os.environ.get(var) for var in required_env_vars)
+            missing_vars = [var for var in required_env_vars if not os.environ.get(var)]
+            
+            if missing_vars:
+                self.logger.warning(f"S3 Vector missing required environment variables: {missing_vars}")
+                return False
+            
+            return True
         except Exception as e:
             self.logger.warning(f"S3 Vector availability check failed: {str(e)}")
             return False
     
     def build_semantic_query(self, params) -> Dict[str, Any]:
         """Build S3 Vector semantic query using Twelve Labs embeddings"""
-        from twelvelabs import TwelveLabs
-
         start_time = time.time()
         self.logger.info(f"[PERF] Starting S3 Vector semantic query build for: {params.q}")
 
-        # Get the API key from Secrets Manager
-        api_key_start = time.time()
-        api_key = get_api_key()
-        self.logger.info(f"[PERF] API key retrieval took: {time.time() - api_key_start:.3f}s")
+        # Use centralized embedding generation
+        embedding = self.generate_text_embedding(params.q)
 
-        if not api_key:
-            raise Exception(
-                "Search provider API key not configured or provider not enabled"
-            )
-
-        # Initialize the Twelve Labs client
-        client_init_start = time.time()
-        twelve_labs_client = TwelveLabs(api_key=api_key)
+        # Return S3 Vector query parameters - using actual environment variable names
+        query = {
+            "embedding": embedding,
+            "topK": params.pageSize * 20,
+            "params": params,
+            "bucket_name": os.environ.get("S3_VECTOR_BUCKET_NAME"),
+            "index_name": os.environ.get("S3_VECTOR_INDEX_NAME", "media-vectors")
+        }
+        
         self.logger.info(
-            f"[PERF] TwelveLabs client initialization took: {time.time() - client_init_start:.3f}s"
+            f"[PERF] Total S3 Vector semantic query build time: {time.time() - start_time:.3f}s"
         )
-
-        try:
-            # Create embedding for the search query
-            embedding_start = time.time()
-            self.logger.info(f"[PERF] Starting embedding creation for query: {params.q}")
-            res = twelve_labs_client.embed.create(
-                model_name="Marengo-retrieval-2.7",
-                text=params.q,
-            )
-            self.logger.info(
-                f"[PERF] Embedding creation took: {time.time() - embedding_start:.3f}s"
-            )
-
-            if res.text_embedding is not None and res.text_embedding.segments is not None:
-                embedding = list(res.text_embedding.segments[0].embeddings_float)
-                if not all(isinstance(x, (int, float)) for x in embedding):
-                    raise Exception("Invalid embedding format")
-
-                self.logger.info(
-                    f"Generated embedding for query: {params.q} (length: {len(embedding)})"
-                )
-
-                # Return S3 Vector query parameters
-                query = {
-                    "embedding": embedding,
-                    "topK": params.pageSize * 20,
-                    "params": params,
-                    "bucket_name": os.environ.get("S3_VECTOR_BUCKET_NAME"),
-                    "index_name": os.environ.get("S3_VECTOR_INDEX_NAME", "media-vec")
-                }
-                
-                self.logger.info(
-                    f"[PERF] Total S3 Vector semantic query build time: {time.time() - start_time:.3f}s"
-                )
-                return query
-            else:
-                raise Exception("Failed to generate embedding for search term")
-        except Exception as e:
-            self.logger.exception("Error generating embedding for search term")
-            raise Exception(f"Error generating embedding: {str(e)}")
+        return query
     
     def execute_search(self, query: Dict[str, Any], params) -> SearchResult:
         """Execute hybrid search: S3 Vector for similarity + OpenSearch for filtering"""
@@ -149,7 +112,7 @@ class S3VectorEmbeddingStore(BaseEmbeddingStore):
             s3_vector_start = time.time()
             
             # Get more results from S3 Vector to account for filtering
-            vector_topK = max(query["topK"] * 3, 1000)  # Get 3x more results for filtering
+            vector_topK = 30 
             
             response = s3_vector_client.query_vectors(
                 vectorBucketName=bucket_name,
@@ -157,23 +120,26 @@ class S3VectorEmbeddingStore(BaseEmbeddingStore):
                 queryVector={"float32": query["embedding"]},
                 topK=vector_topK
             )
+ 
             
             s3_vector_time = time.time() - s3_vector_start
             self.logger.info(f"[PERF] S3 Vector query execution took: {s3_vector_time:.3f}s")
             
-            # Step 2: Extract asset IDs and scores from S3 Vector results
-            vector_results = response.get("results", [])
+            # Step 2: Extract asset IDs from S3 Vector results
+            vector_results = response.get("vectors", [])
             if not vector_results:
                 self.logger.info("S3 Vector returned no results")
                 return SearchResult(hits=[], total_results=0)
             
-            # Create mapping of asset ID to vector score
+            # Create mapping of asset ID to vector score (S3 Vector doesn't return scores, use ranking order)
             asset_scores = {}
             asset_ids = []
-            for result in vector_results:
+            for idx, result in enumerate(vector_results):
                 asset_id = result.get("key", "")
                 if asset_id:
-                    asset_scores[asset_id] = result.get("score", 0.0)
+                    # Use inverse ranking as score since S3 Vector doesn't return actual scores
+                    # Higher rank (lower index) gets higher score
+                    asset_scores[asset_id] = 1.0 - (idx / len(vector_results))
                     asset_ids.append(asset_id)
             
             self.logger.info(f"S3 Vector returned {len(asset_ids)} asset IDs")
@@ -280,11 +246,14 @@ class S3VectorEmbeddingStore(BaseEmbeddingStore):
             index_name = os.environ["OPENSEARCH_INDEX"]
             
             # Build OpenSearch query for specific asset IDs with filters
+            # Use should clauses with match queries since InventoryID is a text field
+            should_clauses = [{"match": {"InventoryID": asset_id}} for asset_id in asset_ids]
+            
             query = {
                 "query": {
                     "bool": {
                         "must": [
-                            {"terms": {"InventoryID": asset_ids}},
+                            {"bool": {"should": should_clauses, "minimum_should_match": 1}},
                             {"exists": {"field": "InventoryID"}},
                             {"bool": {"must_not": {"term": {"InventoryID": ""}}}},
                         ],

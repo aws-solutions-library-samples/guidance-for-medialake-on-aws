@@ -26,6 +26,7 @@ class SearchProps:
     open_search_arn: str
     open_search_index: str
     system_settings_table: str
+    s3_vector_bucket_name: str
     vpc: Optional[ec2.IVpc] = None
     security_group: Optional[ec2.SecurityGroup] = None
 
@@ -64,6 +65,8 @@ class SearchConstruct(Construct):
                     "SCOPE": "es",
                     "MEDIA_ASSETS_BUCKET": props.media_assets_bucket.bucket_name,
                     "SYSTEM_SETTINGS_TABLE": props.system_settings_table,
+                    "S3_VECTOR_BUCKET_NAME": props.s3_vector_bucket_name,
+                    "S3_VECTOR_INDEX_NAME": "media-vectors",
                 },
             ),
         )
@@ -138,6 +141,25 @@ class SearchConstruct(Construct):
                 ],
                 resources=[
                     f"arn:aws:dynamodb:{Stack.of(self).region}:{Stack.of(self).account}:table/{props.system_settings_table}"
+                ],
+            )
+        )
+
+        # Add S3 Vector permissions
+        search_get_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "s3vectors:GetVectorBucket",
+                    "s3vectors:ListVectorBuckets",
+                    "s3vectors:GetIndex",
+                    "s3vectors:ListIndexes",
+                    "s3vectors:GetVectors",
+                    "s3vectors:QueryVectors",
+                ],
+                resources=[
+                    f"arn:aws:s3vectors:{Stack.of(self).region}:{Stack.of(self).account}:bucket/{props.s3_vector_bucket_name}",
+                    f"arn:aws:s3vectors:{Stack.of(self).region}:{Stack.of(self).account}:bucket/{props.s3_vector_bucket_name}/*",
                 ],
             )
         )

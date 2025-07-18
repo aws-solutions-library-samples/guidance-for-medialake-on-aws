@@ -17,6 +17,11 @@ OPENSEARCH_SECURITY_GROUP_ID = os.environ.get("OPENSEARCH_SECURITY_GROUP_ID")
 MEDIACONVERT_QUEUE_ARN = os.environ.get("MEDIACONVERT_QUEUE_ARN")
 MEDIACONVERT_ROLE_ARN = os.environ.get("MEDIACONVERT_ROLE_ARN")
 
+# S3 Vector configuration
+VECTOR_BUCKET_NAME = os.environ.get("VECTOR_BUCKET_NAME")
+INDEX_NAME = os.environ.get("INDEX_NAME", "media-vectors")
+VECTOR_DIMENSION = os.environ.get("VECTOR_DIMENSION", "1024")
+
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 resource_prefix = os.environ.get("RESOURCE_PREFIX")
 

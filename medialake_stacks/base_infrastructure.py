@@ -236,8 +236,8 @@ class BaseInfrastructureStack(Stack):
             self,
             "MediaLakeS3Vector",
             props=S3VectorClusterProps(
-                bucket_name=f"{config.resource_prefix}-vectors-{region}-{config.environment}",
-                vector_dimension=1024,  # Twelve Labs embeddings dimension
+                bucket_name=f"{config.resource_prefix}-vectors-{self.account}-{region}-{config.environment}",
+                vector_dimension=1024, 
                 collection_indexes=[s3_vector_index_name],
                 vpc=self._vpc.vpc,
                 security_group=self._security_group,
@@ -940,3 +940,14 @@ class BaseInfrastructureStack(Stack):
             list: List of S3 Vector index names
         """
         return self._s3_vector_cluster.indexes
+
+    @property
+    def s3_vector_index_name(self) -> str:
+        """
+        Returns the primary S3 Vector index name.
+
+        Returns:
+            str: Primary S3 Vector index name
+        """
+        indexes = self._s3_vector_cluster.indexes
+        return indexes[0] if indexes else "media-vectors"

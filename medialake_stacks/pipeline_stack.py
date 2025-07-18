@@ -64,6 +64,10 @@ class PipelineStackProps:
     collection_endpoint: str
     mediaconvert_queue_arn: str
     mediaconvert_role_arn: str
+    # S3 Vector configuration
+    s3_vector_bucket_name: str
+    s3_vector_index_name: str = "media-vectors"
+    s3_vector_dimension: int = 1024
 
 
 class PipelineStack(cdk.NestedStack):
@@ -125,6 +129,10 @@ class PipelineStack(cdk.NestedStack):
                 media_assets_bucket=props.media_assets_bucket,
                 get_pipelines_executions_lambda=self._pipelines_executions_stack.get_pipelines_executions_lambda,
                 post_retry_pipelines_executions_lambda=self._pipelines_executions_stack.post_retry_pipelines_executions_lambda,
+                # S3 Vector configuration
+                s3_vector_bucket_name=props.s3_vector_bucket_name,
+                s3_vector_index_name=props.s3_vector_index_name,
+                s3_vector_dimension=props.s3_vector_dimension,
             ),
         )
 
