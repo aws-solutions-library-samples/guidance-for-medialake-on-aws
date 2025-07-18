@@ -98,9 +98,9 @@ class S3VectorEmbeddingStore(BaseEmbeddingStore):
         return query
     
     def execute_search(self, query: Dict[str, Any], params) -> SearchResult:
-        """Execute hybrid search: S3 Vector for similarity + OpenSearch for filtering"""
+        """Execute search using S3 Vector Store with metadata filtering"""
         try:
-            # Step 1: Perform S3 Vector similarity search
+            # Step 1: Get initial results from S3 Vector Store
             s3_vector_client = self._get_s3_vector_client()
             bucket_name = query["bucket_name"]
             index_name = query["index_name"]
@@ -111,60 +111,96 @@ class S3VectorEmbeddingStore(BaseEmbeddingStore):
             self.logger.info("Executing S3 Vector semantic query")
             s3_vector_start = time.time()
             
-            # Get more results from S3 Vector to account for filtering
-            vector_topK = 30 
+            # S3 Vector has a max topK of 30
+            vector_topK = 30
             
-            response = s3_vector_client.query_vectors(
+            # First query: Get all results without filtering to identify unique inventory_ids
+            initial_response = s3_vector_client.query_vectors(
                 vectorBucketName=bucket_name,
                 indexName=index_name,
                 queryVector={"float32": query["embedding"]},
-                topK=vector_topK
+                topK=vector_topK,
+                returnMetadata=True
             )
- 
+            
+            initial_results = initial_response.get("vectors", [])
+            if not initial_results:
+                self.logger.info("S3 Vector returned no results")
+                return SearchResult(hits=[], total_results=0)
+            
+            # Extract unique inventory_ids from initial results
+            inventory_ids = set()
+            for result in initial_results:
+                metadata = result.get("metadata", {})
+                inventory_id = metadata.get("inventory_id")
+                if inventory_id:
+                    inventory_ids.add(inventory_id)
+            
+            if not inventory_ids:
+                self.logger.info("No inventory_ids found in S3 Vector results")
+                return SearchResult(hits=[], total_results=0)
+            
+            self.logger.info(f"Found {len(inventory_ids)} unique inventory_ids")
+            
+            # Step 2: Query OpenSearch for metadata filtering to get valid inventory_ids
+            opensearch_hits = self._query_opensearch_for_assets(list(inventory_ids), params)
+            valid_inventory_ids = {hit["_source"].get("InventoryID") for hit in opensearch_hits}
+            
+            if not valid_inventory_ids:
+                self.logger.info("No valid inventory_ids after OpenSearch filtering")
+                return SearchResult(hits=[], total_results=0)
+            
+            # Step 3: Query S3 Vector Store for each valid inventory_id to get clips and parent assets
+            all_results = []
+            for inventory_id in valid_inventory_ids:
+                # Query for this specific inventory_id
+                filtered_response = s3_vector_client.query_vectors(
+                    vectorBucketName=bucket_name,
+                    indexName=index_name,
+                    queryVector={"float32": query["embedding"]},
+                    topK=vector_topK,
+                    filter={"inventory_id": {"$eq": inventory_id}},
+                    returnMetadata=True,
+                    returnDistance=True
+                )
+                
+                filtered_results = filtered_response.get("vectors", [])
+                self.logger.info(f"S3 Vector returned {len(filtered_results)} results for inventory_id: {inventory_id}")
+                for result in filtered_results:
+                    metadata = result.get("metadata", {})
+                    key = result.get("key", "")
+                    embedding_scope = metadata.get("embedding_scope", "unknown")
+                    self.logger.info(f"S3 Vector result - key: {key}, embedding_scope: {embedding_scope}")
+                all_results.extend(filtered_results)
             
             s3_vector_time = time.time() - s3_vector_start
             self.logger.info(f"[PERF] S3 Vector query execution took: {s3_vector_time:.3f}s")
             
-            # Step 2: Extract asset IDs from S3 Vector results
-            vector_results = response.get("vectors", [])
-            if not vector_results:
-                self.logger.info("S3 Vector returned no results")
-                return SearchResult(hits=[], total_results=0)
+            # Step 4: Process results with clip logic
+            final_hits = self._process_s3_vector_results_with_clips(all_results, opensearch_hits)
             
-            # Create mapping of asset ID to vector score (S3 Vector doesn't return scores, use ranking order)
-            asset_scores = {}
-            asset_ids = []
-            for idx, result in enumerate(vector_results):
-                asset_id = result.get("key", "")
-                if asset_id:
-                    # Use inverse ranking as score since S3 Vector doesn't return actual scores
-                    # Higher rank (lower index) gets higher score
-                    asset_scores[asset_id] = 1.0 - (idx / len(vector_results))
-                    asset_ids.append(asset_id)
+            self.logger.info(f"S3 Vector search returned {len(final_hits)} results")
             
-            self.logger.info(f"S3 Vector returned {len(asset_ids)} asset IDs")
+            # Debug the final structure being returned
+            for i, hit in enumerate(final_hits):
+                clips_count = len(hit.get("clips", []))
+                self.logger.info(f"Final hit {i}: score={hit.get('_score')}, clips_count={clips_count}")
+                if clips_count > 0:
+                    self.logger.info(f"First clip sample: {hit['clips'][0]}")
             
-            # Step 3: Query OpenSearch for metadata filtering
-            if asset_ids:
-                opensearch_hits = self._query_opensearch_for_assets(asset_ids, params)
-                
-                # Step 4: Merge results maintaining vector similarity ranking
-                final_hits = self._merge_vector_and_metadata_results(opensearch_hits, asset_scores)
-                
-                self.logger.info(f"Hybrid search returned {len(final_hits)} filtered results")
-                
-                return SearchResult(
-                    hits=final_hits,
-                    total_results=len(final_hits),
-                    aggregations=None,  # Could be added by querying OpenSearch aggregations
-                    suggestions=None
-                )
-            else:
-                return SearchResult(hits=[], total_results=0)
+            search_result = SearchResult(
+                hits=final_hits,
+                total_results=len(final_hits),
+                aggregations=None,
+                suggestions=None
+            )
+            
+            self.logger.info(f"Returning SearchResult with {len(search_result.hits)} hits")
+            return search_result
             
         except Exception as e:
-            self.logger.exception("Error performing hybrid S3 Vector + OpenSearch search")
-            raise Exception(f"Hybrid search error: {str(e)}")
+            self.logger.exception("Error performing S3 Vector search")
+            raise Exception(f"S3 Vector search error: {str(e)}")
     
     def _convert_s3_vector_results(self, results: List[Dict]) -> List[Dict]:
         """Convert S3 Vector results to OpenSearch-like format for compatibility"""
@@ -176,11 +212,14 @@ class S3VectorEmbeddingStore(BaseEmbeddingStore):
             score = result.get("score", 0.0)
             key = result.get("key", "")
             
+            # Extract inventory_id from the key
+            inventory_id = self._extract_inventory_id_from_key(key)
+            
             # Create a hit structure similar to OpenSearch
             hit = {
                 "_score": score,
                 "_source": {
-                    "InventoryID": key,
+                    "InventoryID": inventory_id,
                 }
             }
             
@@ -363,3 +402,162 @@ class S3VectorEmbeddingStore(BaseEmbeddingStore):
         merged_results.sort(key=lambda x: x["_score"], reverse=True)
         
         return merged_results
+    
+    def _extract_inventory_id_from_key(self, key: str) -> str:
+        """
+        Extract inventory_id from the new key format.
+        
+        Key formats:
+        - Non-clip: {inventory_id}_{embedding_option}
+        - Clip: {inventory_id}_{embedding_option}_clip_{start_sec}_{end_sec}
+        
+        Returns the inventory_id part.
+        """
+        if not key:
+            return ""
+        
+        # Split the key by underscores
+        parts = key.split("_")
+        
+        if len(parts) < 2:
+            # Fallback: if key doesn't match expected format, return as-is
+            self.logger.warning(f"Unexpected key format: {key}")
+            return key
+        
+        # For both formats, the inventory_id is everything before the last embedding_option part
+        # We need to handle the case where inventory_id itself might contain underscores
+        
+        # Check if this is a clip key (contains "_clip_" pattern)
+        if "_clip_" in key:
+            # Format: {inventory_id}_{embedding_option}_clip_{start_sec}_{end_sec}
+            # Find the last occurrence of "_clip_" and work backwards
+            clip_index = key.rfind("_clip_")
+            if clip_index > 0:
+                # Everything before "_clip_" should be {inventory_id}_{embedding_option}
+                before_clip = key[:clip_index]
+                # Now split this and take everything except the last part (embedding_option)
+                before_clip_parts = before_clip.split("_")
+                if len(before_clip_parts) >= 2:
+                    # Join all parts except the last one (which is embedding_option)
+                    return "_".join(before_clip_parts[:-1])
+        else:
+            # Format: {inventory_id}_{embedding_option}
+            # Take everything except the last part
+            if len(parts) >= 2:
+                return "_".join(parts[:-1])
+        
+        # Fallback
+        self.logger.warning(f"Could not extract inventory_id from key: {key}")
+        return key
+    
+    def _process_s3_vector_results_with_clips(self, s3_vector_results: List[Dict], opensearch_hits: List[Dict]) -> List[Dict]:
+        """
+        Process S3 Vector results with clip logic similar to OpenSearch implementation.
+        Groups clips with their parent assets and returns results with clips arrays.
+        """
+        # Create mapping of inventory_id to opensearch hit for metadata
+        asset_hit_map = {}
+        for hit in opensearch_hits:
+            inventory_id = hit["_source"].get("InventoryID", "")
+            if inventory_id:
+                asset_hit_map[inventory_id] = hit
+        
+        # Separate clip results from parent asset results and group by inventory_id
+        clips_by_asset = {}
+        parent_asset_scores = {}
+        
+        for idx, result in enumerate(s3_vector_results):
+            metadata = result.get("metadata", {})
+            inventory_id = metadata.get("inventory_id")
+            if not inventory_id:
+                continue
+                
+            # S3 Vector returns distance, convert to similarity score
+            distance = result.get("distance", 0.0)
+            # Convert distance to similarity score (lower distance = higher similarity)
+            score = max(0.0, 1.0 - distance) if distance <= 1.0 else 1.0 / (1.0 + distance)
+            
+            # Check if this is a clip result using metadata
+            embedding_scope = metadata.get("embedding_scope", "")
+            self.logger.info(f"Processing result for {inventory_id}: embedding_scope={embedding_scope}, score={score}")
+            
+            if embedding_scope == "clip":
+                # This is a clip result
+                self.logger.info(f"Found clip for {inventory_id}: {metadata}")
+                if inventory_id not in clips_by_asset:
+                    clips_by_asset[inventory_id] = []
+                clips_by_asset[inventory_id].append({
+                    "score": score,
+                    "metadata": metadata
+                })
+            else:
+                # This is a parent asset result (video scope)
+                self.logger.info(f"Found parent asset for {inventory_id}: embedding_scope={embedding_scope}")
+                if inventory_id not in parent_asset_scores or score > parent_asset_scores[inventory_id]:
+                    parent_asset_scores[inventory_id] = score
+        
+        # Process results
+        final_results = []
+        processed_assets = set()
+        
+        self.logger.info(f"Processing clips_by_asset: {len(clips_by_asset)} assets with clips")
+        self.logger.info(f"Processing parent_asset_scores: {len(parent_asset_scores)} parent assets")
+        
+        # Process assets that have clips
+        for inventory_id, clips in clips_by_asset.items():
+            self.logger.info(f"Processing clips for {inventory_id}: {len(clips)} clips found")
+            if inventory_id in asset_hit_map and inventory_id not in processed_assets:
+                hit = asset_hit_map[inventory_id]
+                
+                # Get the highest clip score for this asset
+                highest_clip_score = max(clip["score"] for clip in clips)
+                
+                # Use the higher of parent asset score or highest clip score
+                final_score = max(parent_asset_scores.get(inventory_id, 0), highest_clip_score)
+                
+                # Create result with clips
+                result = {
+                    "_score": final_score,
+                    "_source": hit["_source"]
+                }
+                
+                # Add clips array - sort clips by score descending
+                sorted_clips = sorted(clips, key=lambda x: x["score"], reverse=True)
+                result["clips"] = []
+                
+                for clip in sorted_clips:
+                    metadata = clip["metadata"]
+                    clip_data = {
+                        "score": clip["score"],
+                        "embedding_scope": metadata.get("embedding_scope", "clip"),
+                        "start_offset_sec": metadata.get("start_offset_sec"),
+                        "end_offset_sec": metadata.get("end_offset_sec"),
+                        "start_timecode": metadata.get("start_timecode"),
+                        "end_timecode": metadata.get("end_timecode"),
+                        "embedding_option": metadata.get("embedding_option"),
+                        "timestamp": metadata.get("timestamp"),
+                        "content_type": metadata.get("content_type"),
+                    }
+                    # Only include S3 Vector metadata, not the full OpenSearch record
+                    result["clips"].append(clip_data)
+                
+                self.logger.info(f"Adding result with {len(result['clips'])} clips: {result}")
+                final_results.append(result)
+                processed_assets.add(inventory_id)
+        
+        # Process assets that don't have clips but were found in parent results
+        for inventory_id, score in parent_asset_scores.items():
+            if inventory_id in asset_hit_map and inventory_id not in processed_assets:
+                hit = asset_hit_map[inventory_id]
+                result = {
+                    "_score": score,
+                    "_source": hit["_source"],
+                    "clips": []  # Empty clips array
+                }
+                final_results.append(result)
+                processed_assets.add(inventory_id)
+        
+        # Sort results by score descending
+        final_results.sort(key=lambda x: x["_score"], reverse=True)
+        
+        return final_results

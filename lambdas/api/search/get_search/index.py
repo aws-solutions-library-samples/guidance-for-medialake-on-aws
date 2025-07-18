@@ -960,11 +960,30 @@ def perform_search(params: SearchParams) -> Dict:
 
         if params.semantic:
             if CLIP_LOGIC_ENABLED:
-                semantic_processing_start = time.time()
-                processed_results = process_semantic_results_parallel(hits)
-                logger.info(
-                    f"[PERF] Semantic results processing took: {time.time() - semantic_processing_start:.3f}s"
-                )
+                # Check if we're using S3 Vector Store which already processes clips
+                store_type = search_body.get("store_type", "")
+                if store_type == "s3-vector":
+                    logger.info("Using S3 Vector Store - clips already processed, processing individual hits for UI format")
+                    semantic_processing_start = time.time()
+                    # S3 Vector Store already has clips grouped, just process each hit for UI format while preserving clips
+                    processed_results = []
+                    for hit in hits:
+                        # Preserve the clips array before processing
+                        clips = hit.get("clips", None)
+                        processed_hit = process_search_hit(hit)
+                        # Restore the clips array after processing
+                        processed_hit["clips"] = clips
+                        processed_results.append(processed_hit)
+                    logger.info(
+                        f"[PERF] S3 Vector results processing took: {time.time() - semantic_processing_start:.3f}s"
+                    )
+                else:
+                    logger.info("Using OpenSearch - processing clips with process_semantic_results_parallel")
+                    semantic_processing_start = time.time()
+                    processed_results = process_semantic_results_parallel(hits)
+                    logger.info(
+                        f"[PERF] Semantic results processing took: {time.time() - semantic_processing_start:.3f}s"
+                    )
 
                 # Add common fields to each result and clips
                 common_fields_start = time.time()
