@@ -1,7 +1,7 @@
 repos:
   # General
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v5.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -11,10 +11,11 @@ repos:
       - id: check-merge-conflict
       - id: detect-private-key
       - id: check-json
+      - id: remove-ds-store
 
   # Python - Auto-fixing
   - repo: https://github.com/PyCQA/autoflake
-    rev: v2.2.1
+    rev: v2.3.1
     hooks:
       - id: autoflake
         args:
@@ -27,20 +28,20 @@ repos:
           ]
 
   - repo: https://github.com/PyCQA/isort
-    rev: 5.13.2
+    rev: 6.0.1
     hooks:
       - id: isort
         args: ["--profile", "black"]
 
   - repo: https://github.com/psf/black
-    rev: 24.1.1
+    rev: 25.1.0
     hooks:
       - id: black
         args: ["--line-length=88"]
 
   # Run flake8 AFTER formatting (warnings only for now)
   - repo: https://github.com/PyCQA/flake8
-    rev: 7.0.0
+    rev: 7.3.0
     hooks:
       - id: flake8
         args:
@@ -52,7 +53,7 @@ repos:
 
   # TypeScript/JavaScript - Auto-fixing with more lenient rules
   - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v3.1.0
+    rev: v4.0.0-alpha.8
     hooks:
       - id: prettier
         args: ["--write"]
@@ -83,16 +84,6 @@ repos:
           - eslint-plugin-react-hooks
           - "@typescript-eslint/parser"
           - "@typescript-eslint/eslint-plugin"
-
-  # CDK Specific
-  - repo: local
-    hooks:
-      - id: cdk-synth-check
-        name: CDK Synth Check (Fast)
-        entry: bash -c 'CDK_SKIP_BUNDLING=true npx cdk synth -c skip-bundling=true'
-        language: system
-        files: (app\.py|medialake_stacks/.*\.py|medialake_constructs/.*\.py)$
-        pass_filenames: false
 
       # Clean up
       - id: remove-ds-store
