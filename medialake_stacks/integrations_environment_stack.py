@@ -34,7 +34,7 @@ class IntegrationsEnvironmentStackProps:
     x_origin_verify_secret: secretsmanager.Secret
     cognito_user_pool: cognito.UserPool
     pipelines_nodes_table: dynamodb.TableV2
-    post_pipelines_lambda: Lambda
+    post_pipelines_lambda: Lambda = None
 
 
 class IntegrationsEnvironmentStack(cdk.NestedStack):
@@ -102,18 +102,29 @@ class IntegrationsEnvironmentStack(cdk.NestedStack):
             ),
         )
 
-        self._props.post_pipelines_lambda.function.add_to_role_policy(
+        # Configure post_pipelines_lambda if provided
+        if self._props.post_pipelines_lambda:
+            self._configure_post_pipelines_lambda(self._props.post_pipelines_lambda)
+
+    def _configure_post_pipelines_lambda(self, post_pipelines_lambda: Lambda):
+        """Configure the post pipelines lambda with integrations table permissions."""
+        post_pipelines_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["dynamodb:GetItem", "dynamodb:Query"],
                 resources=[self._integrations_stack.integrations_table.table_arn],
             )
         )
 
-        self._props.post_pipelines_lambda.add_environment_variables(
+        post_pipelines_lambda.add_environment_variables(
             {
                 "INTEGRATIONS_TABLE": self._integrations_stack.integrations_table.table_arn,
             }
         )
+
+    def set_post_pipelines_lambda(self, post_pipelines_lambda: Lambda):
+        """Set the post pipelines lambda after stack creation."""
+        self._props.post_pipelines_lambda = post_pipelines_lambda
+        self._configure_post_pipelines_lambda(post_pipelines_lambda)
 
     @property
     def integrations_table(self) -> dynamodb.TableV2:
