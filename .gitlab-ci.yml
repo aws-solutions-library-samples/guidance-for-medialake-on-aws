@@ -154,7 +154,9 @@ sync-to-github:
     - echo "$GITHUB_SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
     - ssh-keyscan github.com >> ~/.ssh/known_hosts
-    # (Optional: Add your GitLab host as well if needed)
+    # Configure git identity
+    - git config --global user.email "ci@medialake.aws"
+    - git config --global user.name "MediaLake CI"
     # Clone, clean, and push
     - git clone --branch main $CI_REPOSITORY_URL repo-copy
     - cd repo-copy
@@ -163,5 +165,5 @@ sync-to-github:
     - rm -rf docs/
     - git add -A
     - git commit -m "Prepare biweekly public release" || echo "No changes to commit"
-    - git remote add github git@github.com:robert-f-coder/aws-solutions-library-samples/guidance-for-medialake-on-aws.git
+    - git remote add github git@github.com:aws-solutions-library-samples/guidance-for-medialake-on-aws.git
     - git push -f github main:main
