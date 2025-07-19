@@ -427,7 +427,7 @@ class CommonLibrariesLayer(Construct):
     def __init__(self, scope: Construct, id: str, *, entry: str = "lambdas/common_libraries", **kwargs):
         super().__init__(scope, id, **kwargs)
 
-        # We bundle the layer from your source directory (`entry`),
+        # We bundle the layer from the source directory (`entry`),
         # copying all `.py` files into `/asset-output/python/` so the ZIP
         # has the structure:
         #   python/
@@ -455,7 +455,7 @@ class CommonLibrariesLayer(Construct):
                 # Set the working directory inside the container to the source folder
                 working_directory="/asset-input",
                 # Map the host entry path into /asset-input
-                asset_hash_type=AssetHashType.SOURCE,
+        
             ),
         )
 
