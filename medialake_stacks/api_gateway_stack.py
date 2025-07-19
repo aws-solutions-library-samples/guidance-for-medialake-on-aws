@@ -115,6 +115,7 @@ class ApiGatewayStack(cdk.NestedStack):
                 security_group_id=props.security_group.security_group_id,
                 system_settings_table_name=props.system_settings_table,
                 system_settings_table_arn=f"arn:aws:dynamodb:{self.region}:{self.account}:table/{props.system_settings_table}",
+                s3_vector_bucket_name=props.s3_vector_bucket_name,
             ),
         )
 
@@ -152,6 +153,7 @@ class ApiGatewayStack(cdk.NestedStack):
                 security_group=props.security_group,
                 open_search_arn=props.collection_arn,
                 user_table=props.user_table,
+                s3_vector_bucket_name=props.s3_vector_bucket_name,
             ),
         )
 

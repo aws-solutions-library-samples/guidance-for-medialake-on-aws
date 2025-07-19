@@ -284,3 +284,11 @@ def generate_presigned_urls_batch(
     logger.info(f"[PERF] Batch presigned URL generation completed in {batch_time:.3f}s")
 
     return results
+
+
+def normalize_distance(dist: float) -> float:
+    """
+    Convert a raw embedding distance into a similarity on (0, 1],
+    monotonically decreasing as distance ↑.
+    """
+    return 1.0 / (1.0 + dist)

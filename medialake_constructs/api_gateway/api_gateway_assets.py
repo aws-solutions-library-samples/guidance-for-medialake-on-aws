@@ -48,9 +48,15 @@ class AssetsProps:
     user_table: (
         dynamodb.Table
     )  # User table for bulk download jobs (replaces dedicated bulk download table)
+    
+    # S3 Vector Store configuration
+    s3_vector_bucket_name: str
+    
+    # Optional fields (must come after required fields)
     vpc: Optional[ec2.IVpc] = None
     security_group: Optional[ec2.SecurityGroup] = None
     media_assets_bucket: Optional[s3.Bucket] = None
+    s3_vector_index_name: str = "media-vectors"
 
     # Bulk download parameters
     small_file_threshold_mb: int = 1024  # Max size for a file to be considered "small"
@@ -179,6 +185,8 @@ class AssetsConstruct(Construct):
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
                     "OPENSEARCH_ENDPOINT": props.open_search_endpoint,
                     "INDEX_NAME": props.opensearch_index,
+                    "VECTOR_BUCKET_NAME": props.s3_vector_bucket_name,
+                    "VECTOR_INDEX_NAME": props.s3_vector_index_name,
                 },
             ),
         )
@@ -194,6 +202,22 @@ class AssetsConstruct(Construct):
                 resources=[
                     "arn:aws:s3:::*/*",  # Access to all objects in all buckets
                     "arn:aws:s3:::*",  # Access to all buckets
+                ],
+            )
+        )
+
+        # Add S3 Vector Store permissions for delete asset Lambda
+        delete_asset_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3vectors:ListVectors",
+                    "s3vectors:GetVectors",  # Required when returnMetadata=True
+                    "s3vectors:DeleteVectors",
+                    "s3vectors:QueryVectors",
+                ],
+                resources=[
+                    f"arn:aws:s3vectors:{Stack.of(self).region}:{Stack.of(self).account}:bucket/{props.s3_vector_bucket_name}",
+                    f"arn:aws:s3vectors:{Stack.of(self).region}:{Stack.of(self).account}:bucket/{props.s3_vector_bucket_name}/*",
                 ],
             )
         )
