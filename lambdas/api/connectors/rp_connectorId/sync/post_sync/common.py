@@ -135,7 +135,6 @@ def get_dynamodb_client(region: Optional[str] = None) -> Any:
     Returns:
         DynamoDB client
     """
-    global _dynamodb_clients
     region_key = region or boto3.session.Session().region_name
 
     if region_key not in _dynamodb_clients:
