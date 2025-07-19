@@ -419,54 +419,44 @@ class ShortuuidLayer(Construct):
 
 class CommonLibrariesLayer(Construct):
     """
-    A Lambda layer that packages shared Python utility modules under the required `python/` dir
-    so that AWS Lambda automatically adds them to the PYTHONPATH at runtime.
+    A Lambda layer that bundles shared Python utility modules under the
+    required `python/` directory so that AWS Lambda automatically includes
+    them in PYTHONPATH at runtime.
 
-    This uses CDK bundling to wrap your flat .py files into the correct folder structure.
+    We use CDK bundling to wrap the flat `.py` files into the correct
+    directory structure by copying them into `/asset-output/python/`
+    inside a container matching the Lambda Python 3.12 environment.
     """
     def __init__(self, scope: Construct, id: str, *, entry: str = "lambdas/common_libraries", **kwargs):
         super().__init__(scope, id, **kwargs)
 
-        # We bundle the layer from the source directory (`entry`),
-        # copying all `.py` files into `/asset-output/python/` so the ZIP
-        # has the structure:
-        #   python/
-        #     lambda_utils.py
-        #     lambda_middleware.py
-        #     nodes_utils.py
-        #     lambda_error_handler.py
-        # which is what Lambda expects.
+        # Package the layer code from the source directory, hashing on
+        # the source files so updates are detected when any file changes.
         layer_code = lambda_.Code.from_asset(
             entry,
+            asset_hash_type=AssetHashType.SOURCE,
             bundling=BundlingOptions(
-                # Use the official AWS Lambda Python 3.12 image for a matching build environment
+                # Use Lambda-compatible Python 3.12 image for bundling
                 image=DockerImage.from_registry("public.ecr.aws/lambda/python:3.12"),
-                # Run as root so we can write into /asset-output
-                user="root",
-                # The bundling command:
-                # 1. Make the target python/ folder
-                # 2. Copy all Python files from the source into that folder
-                # 3. (Optional) Install any pip requirements if you add a requirements.txt
+                # Override entrypoint to run our custom commands
+                entrypoint=["bash", "-c"],
+                # 1) Create python/ in the output
+                # 2) Copy all Python modules into that folder
                 command=[
-                    "bash", "-c",
-                    "mkdir -p /asset-output/python \
-                     && cp $CODEDIR/*.py /asset-output/python/"
+                    "mkdir -p /asset-output/python && cp /asset-input/*.py /asset-output/python/"
                 ],
-                # Set the working directory inside the container to the source folder
+                # Run inside the input directory
                 working_directory="/asset-input",
-                # Map the host entry path into /asset-input
-        
+                # Run as root to avoid permission issues
+                user="root",
             ),
         )
 
-        # Define the Lambda layer with the bundled code
+        # Define the Lambda layer with the correctly structured code
         self.layer = lambda_.LayerVersion(
             self,
             "CommonLibrariesLayer",
             code=layer_code,
-            # Make sure it's compatible with your functions' runtime(s)
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
             description="Common utility libraries for all MediaLake Lambda functions",
         )
-
-
