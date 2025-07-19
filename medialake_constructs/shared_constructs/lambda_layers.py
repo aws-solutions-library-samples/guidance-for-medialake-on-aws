@@ -1,7 +1,7 @@
 import os
 from dataclasses import dataclass
 
-from aws_cdk import BundlingOptions, DockerImage, Stack
+from aws_cdk import BundlingOptions, DockerImage, Stack, AssetHashType
 from aws_cdk import aws_lambda as lambda_
 from constructs import Construct
 
@@ -455,7 +455,7 @@ class CommonLibrariesLayer(Construct):
                 # Set the working directory inside the container to the source folder
                 working_directory="/asset-input",
                 # Map the host entry path into /asset-input
-                asset_hash_type=lambda_.AssetHashType.SOURCE,
+                asset_hash_type=AssetHashType.SOURCE,
             ),
         )
 
