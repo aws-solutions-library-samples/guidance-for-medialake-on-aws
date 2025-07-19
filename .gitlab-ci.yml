@@ -157,21 +157,28 @@ sync-to-github:
     # Configure git identity
     - git config --global user.email "ci@medialake.aws"
     - git config --global user.name "MediaLake CI"
-    # Clone, clean, and push
-    - git clone --branch main $CI_REPOSITORY_URL repo-copy
+    # Clone the latest main branch specifically
+    - git clone --single-branch --branch main $CI_REPOSITORY_URL repo-copy
     - cd repo-copy
+    # Debug: show current state
+    - echo "Current commit:" && git log --oneline -1
+    - echo "Current branch:" && git branch -a
     - git remote add github git@github.com:aws-solutions-library-samples/guidance-for-medialake-on-aws.git
-    # Remove sensitive files if they exist
+    # Fetch GitHub state for comparison
+    - git fetch github main
+    - echo "GitHub main commit:" && git log --oneline -1 github/main
+    # Remove sensitive files and development-specific files
     - rm -f secrets.txt
     - rm -rf docs/
-    # Check if there are any changes and commit them
-    - |
-      if [ -n "$(git status --porcelain)" ]; then
-        git add -A
-        git commit -m "Prepare biweekly public release - removed sensitive files"
-        echo "Changes committed"
-      else
-        echo "No sensitive files to remove"
-      fi
-    # Push the current state to GitHub (force push to sync)
+    - rm -rf .roo/
+    - rm -f setup-dev.sh
+    - rm -f manage-hooks.sh
+    - rm -f fix.sh
+    - rm -f .roomodes
+    - rm -f .pre-commit-config.yaml
+    - rm -rf .githooks/
+    # Always create a sync commit with timestamp to ensure push
+    - git add -A
+    - git commit -m "Sync to GitHub - $(date -u '+%Y-%m-%d %H:%M:%S UTC')" --allow-empty
+    # Force push to GitHub
     - git push -f github main:main
