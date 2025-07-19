@@ -418,19 +418,55 @@ class ShortuuidLayer(Construct):
 
 
 class CommonLibrariesLayer(Construct):
-    def __init__(self, scope: Construct, id: str, **kwargs):
+    """
+    A Lambda layer that packages shared Python utility modules under the required `python/` dir
+    so that AWS Lambda automatically adds them to the PYTHONPATH at runtime.
+
+    This uses CDK bundling to wrap your flat .py files into the correct folder structure.
+    """
+    def __init__(self, scope: Construct, id: str, *, entry: str = "lambdas/common_libraries", **kwargs):
         super().__init__(scope, id, **kwargs)
 
-        # Define the Lambda layer
-        self.layer_version = LambdaLayer(
-            self,
-            "CommonLibrariesLayer",
-            config=LambdaLayerConfig(
-                entry="lambdas/common_libraries",
-                description="Common utility libraries for all MediaLake Lambda functions",
+        # We bundle the layer from your source directory (`entry`),
+        # copying all `.py` files into `/asset-output/python/` so the ZIP
+        # has the structure:
+        #   python/
+        #     lambda_utils.py
+        #     lambda_middleware.py
+        #     nodes_utils.py
+        #     lambda_error_handler.py
+        # which is what Lambda expects.
+        layer_code = lambda_.Code.from_asset(
+            entry,
+            bundling=BundlingOptions(
+                # Use the official AWS Lambda Python 3.12 image for a matching build environment
+                image=DockerImage.from_registry("public.ecr.aws/lambda/python:3.12"),
+                # Run as root so we can write into /asset-output
+                user="root",
+                # The bundling command:
+                # 1. Make the target python/ folder
+                # 2. Copy all Python files from the source into that folder
+                # 3. (Optional) Install any pip requirements if you add a requirements.txt
+                command=[
+                    "bash", "-c",
+                    "mkdir -p /asset-output/python \
+                     && cp $CODEDIR/*.py /asset-output/python/"
+                ],
+                # Set the working directory inside the container to the source folder
+                working_directory="/asset-input",
+                # Map the host entry path into /asset-input
+                asset_hash_type=lambda_.AssetHashType.SOURCE,
             ),
         )
 
-    @property
-    def layer(self) -> lambda_.LayerVersion:
-        return self.layer_version.layer
+        # Define the Lambda layer with the bundled code
+        self.layer = lambda_.LayerVersion(
+            self,
+            "CommonLibrariesLayer",
+            code=layer_code,
+            # Make sure it's compatible with your functions' runtime(s)
+            compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
+            description="Common utility libraries for all MediaLake Lambda functions",
+        )
+
+
