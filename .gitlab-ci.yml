@@ -160,10 +160,18 @@ sync-to-github:
     # Clone, clean, and push
     - git clone --branch main $CI_REPOSITORY_URL repo-copy
     - cd repo-copy
-    # Remove sensitive files
+    - git remote add github git@github.com:aws-solutions-library-samples/guidance-for-medialake-on-aws.git
+    # Remove sensitive files if they exist
     - rm -f secrets.txt
     - rm -rf docs/
-    - git add -A
-    - git commit -m "Prepare biweekly public release" || echo "No changes to commit"
-    - git remote add github git@github.com:aws-solutions-library-samples/guidance-for-medialake-on-aws.git
+    # Check if there are any changes and commit them
+    - |
+      if [ -n "$(git status --porcelain)" ]; then
+        git add -A
+        git commit -m "Prepare biweekly public release - removed sensitive files"
+        echo "Changes committed"
+      else
+        echo "No sensitive files to remove"
+      fi
+    # Push the current state to GitHub (force push to sync)
     - git push -f github main:main
