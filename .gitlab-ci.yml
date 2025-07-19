@@ -61,6 +61,8 @@ workflow:
         CDK_DEPLOY_REGION: $DEMO_AWS_REGION
         AWS_REGION: $DEMO_AWS_REGION
         AMAZON_REGION: $DEMO_AWS_REGION
+    # Allow merge requests to run
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - when: never
 
 # Cache modules in between jobs
@@ -131,3 +133,27 @@ pre_commit_checks:
     - pre-commit run --all-files --hook-stage manual prettier
     - pre-commit run --all-files --hook-stage manual cdk-synth-check
     - pre-commit run --all-files --hook-stage manual remove-ds-store
+
+sync-to-github:
+  image: alpine:latest
+  stage: deploy
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  script:
+    - apk add --no-cache git openssh
+    # Set up SSH key and config
+    - mkdir -p ~/.ssh
+    - echo "$GITHUB_SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - ssh-keyscan github.com >> ~/.ssh/known_hosts
+    # (Optional: Add your GitLab host as well if needed)
+    # Clone, clean, and push
+    - git clone --branch main $CI_REPOSITORY_URL repo-copy
+    - cd repo-copy
+    # Remove sensitive files
+    - rm -f secrets.txt
+    - rm -rf docs/
+    - git add -A
+    - git commit -m "Prepare biweekly public release" || echo "No changes to commit"
+    - git remote add github git@github.com:robert-f-coder/aws-solutions-library-samples/guidance-for-medialake-on-aws.git
+    - git push -f github main:main
