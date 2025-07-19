@@ -1,5 +1,4 @@
 stages:
-  - lint
   - deploy
   - test
 
