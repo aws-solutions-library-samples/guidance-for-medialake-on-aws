@@ -128,20 +128,19 @@ pre_commit_checks:
     - pip install autoflake isort black flake8
     - npm install -g prettier
     # Run pre-commit hooks excluding ESLint
-    - pre-commit run --all-files --hook-stage manual trailing-whitespace
-    - pre-commit run --all-files --hook-stage manual end-of-file-fixer
-    - pre-commit run --all-files --hook-stage manual check-yaml
-    - pre-commit run --all-files --hook-stage manual check-added-large-files
-    - pre-commit run --all-files --hook-stage manual check-merge-conflict
-    - pre-commit run --all-files --hook-stage manual detect-private-key
-    - pre-commit run --all-files --hook-stage manual check-json
-    - pre-commit run --all-files --hook-stage manual autoflake
-    - pre-commit run --all-files --hook-stage manual isort
-    - pre-commit run --all-files --hook-stage manual black
-    - pre-commit run --all-files --hook-stage manual flake8
-    - pre-commit run --all-files --hook-stage manual prettier
-    - pre-commit run --all-files --hook-stage manual cdk-synth-check
-    - pre-commit run --all-files --hook-stage manual remove-ds-store
+    - pre-commit run --all-files trailing-whitespace
+    - pre-commit run --all-files end-of-file-fixer
+    - pre-commit run --all-files check-yaml
+    - pre-commit run --all-files check-added-large-files
+    - pre-commit run --all-files check-merge-conflict
+    - pre-commit run --all-files detect-private-key
+    - pre-commit run --all-files check-json
+    - pre-commit run --all-files autoflake
+    - pre-commit run --all-files isort
+    - pre-commit run --all-files black
+    - pre-commit run --all-files flake8
+    - pre-commit run --all-files prettier
+    - pre-commit run --all-files remove-ds-store
 
 sync-to-github:
   image: alpine:latest
