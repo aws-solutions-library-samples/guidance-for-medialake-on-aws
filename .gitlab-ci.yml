@@ -146,7 +146,7 @@ sync-to-github:
   image: alpine:latest
   stage: deploy
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_REF_NAME == "release"
   script:
     - apk add --no-cache git openssh
     # Set up SSH key and config
@@ -155,11 +155,14 @@ sync-to-github:
     - chmod 600 ~/.ssh/id_rsa
     - ssh-keyscan github.com >> ~/.ssh/known_hosts
     # Configure git identity
-    - git config --global user.email "ci@medialake.aws"
+    - git config --global user.email "medialake@amazon.com"
     - git config --global user.name "MediaLake CI"
-    # Clone the latest main branch specifically
-    - git clone --single-branch --branch main $CI_REPOSITORY_URL repo-copy
+    # Clone the release branch specifically
+    - git clone --single-branch --branch release $CI_REPOSITORY_URL repo-copy
     - cd repo-copy
+    # Capture the latest commit message from release branch
+    - RELEASE_COMMIT_MESSAGE=$(git log -1 --pretty=format:"%s")
+    - echo "Release commit message: $RELEASE_COMMIT_MESSAGE"
     # Debug: show current state
     - echo "Current commit:" && git log --oneline -1
     - echo "Current branch:" && git branch -a
@@ -177,8 +180,8 @@ sync-to-github:
     - rm -f .roomodes
     - rm -f .pre-commit-config.yaml
     - rm -rf .githooks/
-    # Always create a sync commit with timestamp to ensure push
+    # Create commit with the original release branch commit message
     - git add -A
-    - git commit -m "Sync to GitHub - $(date -u '+%Y-%m-%d %H:%M:%S UTC')" --allow-empty
-    # Force push to GitHub
-    - git push -f github main:main
+    - git commit -m "$RELEASE_COMMIT_MESSAGE" --allow-empty
+    # Push to GitHub main branch (force push to sync)
+    - git push -f github HEAD:main
