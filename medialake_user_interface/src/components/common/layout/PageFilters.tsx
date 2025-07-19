@@ -1,6 +1,13 @@
-import React from 'react';
-import { Box, FormControl, InputLabel, Select, MenuItem, useTheme } from '@mui/material';
-import { useDirection } from '../../../contexts/DirectionContext';
+import React from "react";
+import {
+  Box,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  useTheme,
+} from "@mui/material";
+import { useDirection } from "../../../contexts/DirectionContext";
 
 export interface FilterOption {
   value: string;
@@ -18,10 +25,13 @@ interface PageFiltersProps {
   filters: FilterConfig[];
   onFilterChange: (key: string, value: string) => void;
 }
-const PageFilters: React.FC<PageFiltersProps> = ({ filters, onFilterChange }) => {
+const PageFilters: React.FC<PageFiltersProps> = ({
+  filters,
+  onFilterChange,
+}) => {
   const theme = useTheme();
   const { direction } = useDirection();
-  const isRTL = direction === 'rtl';
+  const isRTL = direction === "rtl";
 
   if (filters.length === 0) {
     return null;
@@ -31,11 +41,11 @@ const PageFilters: React.FC<PageFiltersProps> = ({ filters, onFilterChange }) =>
     <Box
       sx={{
         mb: 3,
-        display: 'flex',
-        alignItems: 'center',
+        display: "flex",
+        alignItems: "center",
         gap: 2,
-        flexDirection: isRTL ? 'row-reverse' : 'row',
-        justifyContent: isRTL ? 'flex-start' : 'flex-start',
+        flexDirection: isRTL ? "row-reverse" : "row",
+        justifyContent: isRTL ? "flex-start" : "flex-start",
       }}
     >
       {filters.map((filter) => (
@@ -44,8 +54,8 @@ const PageFilters: React.FC<PageFiltersProps> = ({ filters, onFilterChange }) =>
           size="small"
           sx={{
             minWidth: 120,
-            '& .MuiOutlinedInput-root': {
-              borderRadius: '8px',
+            "& .MuiOutlinedInput-root": {
+              borderRadius: "8px",
               backgroundColor: theme.palette.background.paper,
             },
           }}

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo } from "react";
 import {
   Table,
   TableBody,
@@ -10,13 +10,13 @@ import {
   Box,
   useTheme,
   alpha,
-} from '@mui/material';
-import { Table as TanStackTable, flexRender, Row } from '@tanstack/react-table';
-import { Virtualizer } from '@tanstack/react-virtual';
-import { TableHeader } from './TableHeader';
-import { TableCellContent } from './TableCellContent';
-import { useTableDensity } from '../../../contexts/TableDensityContext';
-import { Table as MUITable } from '@mui/material';
+} from "@mui/material";
+import { Table as TanStackTable, flexRender, Row } from "@tanstack/react-table";
+import { Virtualizer } from "@tanstack/react-virtual";
+import { TableHeader } from "./TableHeader";
+import { TableCellContent } from "./TableCellContent";
+import { useTableDensity } from "../../../contexts/TableDensityContext";
+import { Table as MUITable } from "@mui/material";
 
 interface ResizableTableProps<T> {
   table: TanStackTable<T>;
@@ -25,7 +25,10 @@ interface ResizableTableProps<T> {
   rows: Row<T>[];
   maxHeight?: string;
   onRowClick?: (row: Row<T>) => void;
-  onFilterClick?: (event: React.MouseEvent<HTMLElement>, columnId: string) => void;
+  onFilterClick?: (
+    event: React.MouseEvent<HTMLElement>,
+    columnId: string,
+  ) => void;
   activeFilters?: Array<{ columnId: string; value: string }>;
   activeSorting?: Array<{ columnId: string; desc: boolean }>;
   onRemoveFilter?: (columnId: string) => void;
@@ -39,130 +42,137 @@ type TableProps = React.ComponentProps<typeof MUITable>;
 
 const useTableStyles = (
   theme: any,
-  mode: 'compact' | 'normal',
+  mode: "compact" | "normal",
   hasRowClick: boolean,
-  rowCount: number
+  rowCount: number,
 ) => {
-  const isDark = theme.palette.mode === 'dark';
+  const isDark = theme.palette.mode === "dark";
 
   return useMemo(
     () => ({
       filterTag: {
-        display: 'inline-flex',
-        alignItems: 'center',
+        display: "inline-flex",
+        alignItems: "center",
         px: 2,
         py: 0.5,
-        borderRadius: '16px',
+        borderRadius: "16px",
         backgroundColor: alpha(theme.palette.primary.main, 0.1),
         color: theme.palette.primary.main,
       },
       closeButton: {
-        cursor: 'pointer',
-        fontSize: '1.2rem',
+        cursor: "pointer",
+        fontSize: "1.2rem",
         lineHeight: 1,
-        '&:hover': { opacity: 0.7 },
+        "&:hover": { opacity: 0.7 },
       },
       tableContainer: {
-        overflow: 'auto',
-        width: '100%',
-        flex: 'none',
-        display: 'flex',
-        flexDirection: 'column',
+        overflow: "auto",
+        width: "100%",
+        flex: "none",
+        display: "flex",
+        flexDirection: "column",
         minWidth: 0,
-        minHeight: rowCount > 0 ? 0 : 'auto',
-        maxHeight: rowCount > 0 ? '100%' : 'auto',
-        position: 'relative',
-        willChange: 'transform',
-        '&::-webkit-scrollbar': {
+        minHeight: rowCount > 0 ? 0 : "auto",
+        maxHeight: rowCount > 0 ? "100%" : "auto",
+        position: "relative",
+        willChange: "transform",
+        "&::-webkit-scrollbar": {
           width: 8,
           height: 8,
         },
-        '&::-webkit-scrollbar-track': {
+        "&::-webkit-scrollbar-track": {
           background: theme.palette.background.default,
         },
-        '&::-webkit-scrollbar-thumb': {
+        "&::-webkit-scrollbar-thumb": {
           background: theme.palette.divider,
           borderRadius: 4,
-          '&:hover': {
+          "&:hover": {
             background: alpha(theme.palette.primary.main, 0.2),
           },
         },
       },
       table: {
-        width: '100%',
-        minWidth: '100%',
-        tableLayout: 'fixed',
-        backgroundColor: 'inherit',
+        width: "100%",
+        minWidth: "100%",
+        tableLayout: "fixed",
+        backgroundColor: "inherit",
         borderSpacing: 0,
-        '& .MuiTableCell-root': {
+        "& .MuiTableCell-root": {
           borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-          py: mode === 'compact' ? 0.5 : 1.5, // Add padding for the table cells/rows
-          px: mode === 'compact' ? 1.5 : 2,
-          height: mode === 'compact' ? '40px' : '48px',
-          lineHeight: mode === 'compact' ? '38px' : '46px',
-          verticalAlign: 'middle',
-          whiteSpace: 'normal',
-          overflow: 'visible',
+          py: mode === "compact" ? 0.5 : 1.5, // Add padding for the table cells/rows
+          px: mode === "compact" ? 1.5 : 2,
+          height: mode === "compact" ? "40px" : "48px",
+          lineHeight: mode === "compact" ? "38px" : "46px",
+          verticalAlign: "middle",
+          whiteSpace: "normal",
+          overflow: "visible",
           color: theme.palette.text.secondary,
-          fontSize: mode === 'compact' ? '0.875rem' : '1rem',
-          backgroundColor: 'transparent',
-          '& > *': {
-            wordBreak: 'break-word',
-            whiteSpace: 'normal',
-            overflow: 'visible',
-            lineHeight: 'inherit',
-            cursor: 'text',
+          fontSize: mode === "compact" ? "0.875rem" : "1rem",
+          backgroundColor: "transparent",
+          "& > *": {
+            wordBreak: "break-word",
+            whiteSpace: "normal",
+            overflow: "visible",
+            lineHeight: "inherit",
+            cursor: "text",
           },
-          '& .MuiIconButton-root, & .MuiChip-root': {
-            cursor: 'pointer',
+          "& .MuiIconButton-root, & .MuiChip-root": {
+            cursor: "pointer",
           },
         },
-        '& .MuiTableHead-root .MuiTableCell-root': {
+        "& .MuiTableHead-root .MuiTableCell-root": {
           backgroundColor: isDark
             ? alpha(theme.palette.background.default, 0.95)
             : alpha(theme.palette.background.paper, 0.95),
           borderBottom: `2px solid ${alpha(theme.palette.divider, 0.1)}`,
           fontWeight: 600,
           color: theme.palette.text.primary,
-          height: mode === 'compact' ? '32px' : '40px',
-          position: 'sticky',
+          height: mode === "compact" ? "32px" : "40px",
+          position: "sticky",
           top: 0,
           zIndex: 2,
         },
       },
       tableRow: {
-        backgroundColor: 'inherit',
-        transition: 'all 0.2s ease',
-        cursor: hasRowClick ? 'pointer' : 'default',
-        '&:hover': hasRowClick
+        backgroundColor: "inherit",
+        transition: "all 0.2s ease",
+        cursor: hasRowClick ? "pointer" : "default",
+        "&:hover": hasRowClick
           ? {
-              bgcolor: 'action.hover',
+              bgcolor: "action.hover",
             }
           : {},
-        '& .MuiTableCell-root': {
-          position: 'relative',
-          userSelect: 'text',
-          '& .MuiIconButton-root': {
-            position: 'relative',
+        "& .MuiTableCell-root": {
+          position: "relative",
+          userSelect: "text",
+          "& .MuiIconButton-root": {
+            position: "relative",
             zIndex: 2,
-            pointerEvents: 'auto',
+            pointerEvents: "auto",
           },
         },
       },
       paper: {
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        width: '100%',
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        width: "100%",
         flex: 1,
         backgroundColor: isDark
           ? alpha(theme.palette.background.paper, 0.2)
           : theme.palette.background.paper,
         border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-        borderRadius: '12px',
+        borderRadius: "12px",
       },
     }),
-    [theme.palette.mode, theme.palette.primary.main, mode, isDark, hasRowClick, rowCount]
+    [
+      theme.palette.mode,
+      theme.palette.primary.main,
+      mode,
+      isDark,
+      hasRowClick,
+      rowCount,
+    ],
   );
 };
 
@@ -171,7 +181,7 @@ export function ResizableTable<T>({
   containerRef,
   virtualizer,
   rows,
-  maxHeight = '100%',
+  maxHeight = "100%",
   onRowClick,
   onFilterClick,
   activeFilters = [],
@@ -189,24 +199,24 @@ export function ResizableTable<T>({
     (row: Row<T>, event: React.MouseEvent<HTMLElement>) => {
       // Prevent row click when clicking on action buttons or checkboxes
       if (
-        !(event.target as HTMLElement).closest('.action-buttons') &&
-        !(event.target as HTMLElement).closest('.MuiCheckbox-root') &&
+        !(event.target as HTMLElement).closest(".action-buttons") &&
+        !(event.target as HTMLElement).closest(".MuiCheckbox-root") &&
         !(event.target as HTMLElement).closest('input[type="checkbox"]') &&
-        !(event.target as HTMLElement).closest('.checkbox-cell')
+        !(event.target as HTMLElement).closest(".checkbox-cell")
       ) {
         onRowClick?.(row);
       }
     },
-    [onRowClick]
+    [onRowClick],
   );
 
   return (
     <Box
       sx={{
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
       }}
       role="grid"
       aria-label="Data table"
@@ -215,32 +225,33 @@ export function ResizableTable<T>({
         elevation={0}
         sx={{
           ...styles.paper,
-          height: 'auto',
+          height: "auto",
           minHeight:
             rows.length > 0
-              ? `${rows.length * (mode === 'compact' ? 40 : 48) + (mode === 'compact' ? 32 : 40)}px`
+              ? `${rows.length * (mode === "compact" ? 40 : 48) + (mode === "compact" ? 32 : 40)}px`
               : 0,
-          flex: 'none',
-          display: 'flex',
-          flexDirection: 'column',
+          flex: "none",
+          display: "flex",
+          flexDirection: "column",
         }}
       >
         <TableContainer
           ref={containerRef}
           sx={{
             ...styles.tableContainer,
-            height: 'auto',
-            maxHeight: rows.length <= 3 ? undefined : '100%',
+            height: "auto",
+            maxHeight: rows.length <= 3 ? undefined : "100%",
             minHeight:
               rows.length > 0
                 ? `${
-                    rows.length * (mode === 'compact' ? 40 : 48) + (mode === 'compact' ? 32 : 40)
+                    rows.length * (mode === "compact" ? 40 : 48) +
+                    (mode === "compact" ? 32 : 40)
                   }px`
-                : 'auto',
-            overflow: rows.length <= 3 ? 'visible' : 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            flex: 'none',
+                : "auto",
+            overflow: rows.length <= 3 ? "visible" : "auto",
+            display: "flex",
+            flexDirection: "column",
+            flex: "none",
           }}
           component={Box}
         >
@@ -249,7 +260,11 @@ export function ResizableTable<T>({
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id} role="row">
                   {headerGroup.headers.map((header) => (
-                    <TableHeader key={header.id} header={header} onFilterClick={onFilterClick} />
+                    <TableHeader
+                      key={header.id}
+                      header={header}
+                      onFilterClick={onFilterClick}
+                    />
                   ))}
                 </TableRow>
               ))}
@@ -261,17 +276,20 @@ export function ResizableTable<T>({
                   key={row.id}
                   onClick={(e) => handleRowClick(row, e)}
                   sx={{
-                    cursor: 'pointer',
-                    '&:hover': {
+                    cursor: "pointer",
+                    "&:hover": {
                       backgroundColor: (theme) =>
-                        theme.palette.mode === 'light'
+                        theme.palette.mode === "light"
                           ? alpha(theme.palette.primary.main, 0.04)
                           : alpha(theme.palette.primary.main, 0.08),
                     },
                   }}
                 >
                   {row.getVisibleCells().map((cell) => {
-                    const content = flexRender(cell.column.columnDef.cell, cell.getContext());
+                    const content = flexRender(
+                      cell.column.columnDef.cell,
+                      cell.getContext(),
+                    );
 
                     return (
                       <TableCell
@@ -279,8 +297,8 @@ export function ResizableTable<T>({
                         sx={{
                           width: `${cell.column.getSize()}px`,
                           maxWidth: `${cell.column.getSize()}px`,
-                          position: 'relative',
-                          overflow: 'visible',
+                          position: "relative",
+                          overflow: "visible",
                         }}
                         role="gridcell"
                       >

@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   Dialog,
   DialogTitle,
@@ -6,7 +6,7 @@ import {
   DialogActions,
   Button,
   Typography,
-} from '@mui/material';
+} from "@mui/material";
 
 interface ErrorModalProps {
   open: boolean;
@@ -14,10 +14,14 @@ interface ErrorModalProps {
   message: string;
 }
 
-export const ErrorModal: React.FC<ErrorModalProps> = ({ open, onClose, message }) => {
+export const ErrorModal: React.FC<ErrorModalProps> = ({
+  open,
+  onClose,
+  message,
+}) => {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ color: 'error.main' }}>Error</DialogTitle>
+      <DialogTitle sx={{ color: "error.main" }}>Error</DialogTitle>
       <DialogContent>
         <Typography>{message}</Typography>
       </DialogContent>

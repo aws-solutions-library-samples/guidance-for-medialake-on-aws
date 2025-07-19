@@ -1,16 +1,23 @@
 import {
   useEnvironments,
   useEnvironment,
-} from '@/features/settings/environments/api/environmentsController';
+} from "@/features/settings/environments/api/environmentsController";
 import {
   Environment,
   EnvironmentError,
-} from '@/features/settings/environments/types/environments.types';
+} from "@/features/settings/environments/types/environments.types";
 
 export class IntegrationsEnvironmentsService {
   public static useEnvironments() {
-    const { data, isLoading, error, isError, isFetching, refetch, isRefetching } =
-      useEnvironments();
+    const {
+      data,
+      isLoading,
+      error,
+      isError,
+      isFetching,
+      refetch,
+      isRefetching,
+    } = useEnvironments();
 
     return {
       environments: data?.data?.environments ?? [],
@@ -25,8 +32,15 @@ export class IntegrationsEnvironmentsService {
   }
 
   public static useEnvironment(environmentId: string) {
-    const { data, isLoading, error, isError, isFetching, refetch, isRefetching } =
-      useEnvironment(environmentId);
+    const {
+      data,
+      isLoading,
+      error,
+      isError,
+      isFetching,
+      refetch,
+      isRefetching,
+    } = useEnvironment(environmentId);
 
     return {
       environment: data?.data,
@@ -42,7 +56,7 @@ export class IntegrationsEnvironmentsService {
 
   public static getEnvironmentById(
     environments: Environment[],
-    environmentId: string
+    environmentId: string,
   ): Environment | undefined {
     return environments.find((env) => env.environment_id === environmentId);
   }

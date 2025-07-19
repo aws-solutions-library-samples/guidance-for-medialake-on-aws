@@ -1,6 +1,10 @@
-import { type AssetBase } from '../search/searchResults';
-import { type SortingState, type ColumnDef, type CellContext } from '@tanstack/react-table';
-import type React from 'react';
+import { type AssetBase } from "../search/searchResults";
+import {
+  type SortingState,
+  type ColumnDef,
+  type CellContext,
+} from "@tanstack/react-table";
+import type React from "react";
 
 export interface AssetField {
   id: string;
@@ -8,7 +12,8 @@ export interface AssetField {
   visible: boolean;
 }
 
-export interface AssetTableColumn<T> extends Omit<ColumnDef<T>, 'accessorKey' | 'accessorFn'> {
+export interface AssetTableColumn<T>
+  extends Omit<ColumnDef<T>, "accessorKey" | "accessorFn"> {
   id: string;
   label: string;
   minWidth: number;
@@ -34,9 +39,9 @@ export interface AssetCardProps {
   editedName?: string;
   onEditNameChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onEditNameComplete?: (save: boolean) => void;
-  cardSize: 'small' | 'medium' | 'large';
-  aspectRatio: 'vertical' | 'square' | 'horizontal';
-  thumbnailScale: 'fit' | 'fill';
+  cardSize: "small" | "medium" | "large";
+  aspectRatio: "vertical" | "square" | "horizontal";
+  thumbnailScale: "fit" | "fill";
   showMetadata: boolean;
 }
 
@@ -58,15 +63,15 @@ export interface AssetTableProps<T> {
   onEditNameComplete?: (item: T) => void;
 }
 
-export type CardSize = 'small' | 'medium' | 'large';
-export type AspectRatio = 'vertical' | 'square' | 'horizontal';
-export type ThumbnailScale = 'fit' | 'fill';
+export type CardSize = "small" | "medium" | "large";
+export type AspectRatio = "vertical" | "square" | "horizontal";
+export type ThumbnailScale = "fit" | "fill";
 
 export interface AssetViewControlsProps {
-  viewMode: 'card' | 'table';
+  viewMode: "card" | "table";
   onViewModeChange: (
     event: React.MouseEvent<HTMLElement>,
-    newMode: 'card' | 'table' | null
+    newMode: "card" | "table" | null,
   ) => void;
   title: string;
   sorting: SortingState;
@@ -76,17 +81,17 @@ export interface AssetViewControlsProps {
   onFieldToggle: (fieldId: string) => void;
   groupByType: boolean;
   onGroupByTypeChange: (checked: boolean) => void;
-  cardSize: 'small' | 'medium' | 'large';
-  onCardSizeChange: (size: 'small' | 'medium' | 'large') => void;
-  aspectRatio: 'vertical' | 'square' | 'horizontal';
-  onAspectRatioChange: (ratio: 'vertical' | 'square' | 'horizontal') => void;
-  thumbnailScale: 'fit' | 'fill';
-  onThumbnailScaleChange: (scale: 'fit' | 'fill') => void;
+  cardSize: "small" | "medium" | "large";
+  onCardSizeChange: (size: "small" | "medium" | "large") => void;
+  aspectRatio: "vertical" | "square" | "horizontal";
+  onAspectRatioChange: (ratio: "vertical" | "square" | "horizontal") => void;
+  thumbnailScale: "fit" | "fill";
+  onThumbnailScaleChange: (scale: "fit" | "fill") => void;
   showMetadata: boolean;
   onShowMetadataChange: (show: boolean) => void;
   // Selection props
   hasSelectedAssets?: boolean;
-  selectAllState?: 'none' | 'some' | 'all';
+  selectAllState?: "none" | "some" | "all";
   onSelectAllToggle?: () => void;
 }
 

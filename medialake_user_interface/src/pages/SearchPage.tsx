@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useFeatureFlag } from '@/utils/featureFlags';
-import { formatDate } from '@/utils/dateFormat';
+import React, { useState, useEffect, useCallback } from "react";
+import { useFeatureFlag } from "@/utils/featureFlags";
+import { formatDate } from "@/utils/dateFormat";
 import {
   Box,
   Typography,
@@ -20,46 +20,53 @@ import {
   SelectChangeEvent,
   Snackbar,
   Alert,
-} from '@mui/material';
-import SearchOffIcon from '@mui/icons-material/SearchOff';
-import { RightSidebar, RightSidebarProvider } from '../components/common/RightSidebar';
-import SearchFilters from '../components/search/SearchFilters';
-import MasterResultsView from '../components/search/MasterResultsView';
-import { useSearch } from '../api/hooks/useSearch';
-import { useSearchFields, type FieldInfo } from '../api/hooks/useSearchFields';
-import { useAssetOperations } from '@/hooks/useAssetOperations';
+} from "@mui/material";
+import SearchOffIcon from "@mui/icons-material/SearchOff";
+import {
+  RightSidebar,
+  RightSidebarProvider,
+} from "../components/common/RightSidebar";
+import SearchFilters from "../components/search/SearchFilters";
+import MasterResultsView from "../components/search/MasterResultsView";
+import { useSearch } from "../api/hooks/useSearch";
+import { useSearchFields, type FieldInfo } from "../api/hooks/useSearchFields";
+import { useAssetOperations } from "@/hooks/useAssetOperations";
 import {
   type AssetBase,
   type ImageItem,
   type VideoItem,
   type AudioItem,
-} from '@/types/search/searchResults';
-import { type SortingState, type ColumnDef, type CellContext } from '@tanstack/react-table';
-import { type AssetTableColumn } from '@/types/shared/assetComponents';
-import { SearchError } from '@/api/hooks/useSearch';
-import TabbedSidebar from '../components/common/RightSidebar/TabbedSidebar';
-import { useLocation, useSearchParams, useNavigate } from 'react-router-dom';
-import ApiStatusModal from '../components/ApiStatusModal';
-import { useViewPreferences } from '@/hooks/useViewPreferences';
-import { useAssetSelection } from '@/hooks/useAssetSelection';
-import { useAssetFavorites } from '@/hooks/useAssetFavorites';
+} from "@/types/search/searchResults";
+import {
+  type SortingState,
+  type ColumnDef,
+  type CellContext,
+} from "@tanstack/react-table";
+import { type AssetTableColumn } from "@/types/shared/assetComponents";
+import { SearchError } from "@/api/hooks/useSearch";
+import TabbedSidebar from "../components/common/RightSidebar/TabbedSidebar";
+import { useLocation, useSearchParams, useNavigate } from "react-router-dom";
+import ApiStatusModal from "../components/ApiStatusModal";
+import { useViewPreferences } from "@/hooks/useViewPreferences";
+import { useAssetSelection } from "@/hooks/useAssetSelection";
+import { useAssetFavorites } from "@/hooks/useAssetFavorites";
 
 type AssetItem = (ImageItem | VideoItem | AudioItem) & {
   DigitalSourceAsset: {
     Type: string;
   };
 };
-import { useSearchState } from '../hooks/useSearchState';
-import { FacetFilters } from '../types/facetSearch';
+import { useSearchState } from "../hooks/useSearchState";
+import { FacetFilters } from "../types/facetSearch";
 
 interface LocationState {
   query?: string;
   isSemantic?: boolean;
   preserveSearch?: boolean;
-  viewMode?: 'card' | 'table';
-  cardSize?: 'small' | 'medium' | 'large';
-  aspectRatio?: 'vertical' | 'square' | 'horizontal';
-  thumbnailScale?: 'fit' | 'fill';
+  viewMode?: "card" | "table";
+  cardSize?: "small" | "medium" | "large";
+  aspectRatio?: "vertical" | "square" | "horizontal";
+  thumbnailScale?: "fit" | "fill";
   showMetadata?: boolean;
   groupByType?: boolean;
   type?: string;
@@ -110,30 +117,32 @@ const SearchPage: React.FC = () => {
     filename,
   } = (location.state as LocationState) || {};
   const [searchParams, setSearchParams] = useSearchParams();
-  const currentPage = parseInt(searchParams.get('page') || '1', 10);
+  const currentPage = parseInt(searchParams.get("page") || "1", 10);
   const navigate = useNavigate();
 
   const [pageSize, setPageSize] = useState<number>(
-    parseInt(searchParams.get('pageSize') || DEFAULT_PAGE_SIZE.toString(), 10)
+    parseInt(searchParams.get("pageSize") || DEFAULT_PAGE_SIZE.toString(), 10),
   );
 
   // Initialize facet filters from URL params first, then fall back to location state
   const initialFacetFilters: FacetFilters = {
     // Get values from URL params first, then fall back to location state
-    type: searchParams.get('type') || type,
-    extension: searchParams.get('extension') || extension,
-    LargerThan: searchParams.has('LargerThan')
-      ? parseInt(searchParams.get('LargerThan') || '0', 10)
+    type: searchParams.get("type") || type,
+    extension: searchParams.get("extension") || extension,
+    LargerThan: searchParams.has("LargerThan")
+      ? parseInt(searchParams.get("LargerThan") || "0", 10)
       : LargerThan,
-    asset_size_lte: searchParams.has('asset_size_lte')
-      ? parseInt(searchParams.get('asset_size_lte') || '0', 10)
+    asset_size_lte: searchParams.has("asset_size_lte")
+      ? parseInt(searchParams.get("asset_size_lte") || "0", 10)
       : asset_size_lte,
-    asset_size_gte: searchParams.has('asset_size_gte')
-      ? parseInt(searchParams.get('asset_size_gte') || '0', 10)
+    asset_size_gte: searchParams.has("asset_size_gte")
+      ? parseInt(searchParams.get("asset_size_gte") || "0", 10)
       : asset_size_gte,
-    ingested_date_lte: searchParams.get('ingested_date_lte') || ingested_date_lte,
-    ingested_date_gte: searchParams.get('ingested_date_gte') || ingested_date_gte,
-    filename: searchParams.get('filename') || filename,
+    ingested_date_lte:
+      searchParams.get("ingested_date_lte") || ingested_date_lte,
+    ingested_date_gte:
+      searchParams.get("ingested_date_gte") || ingested_date_gte,
+    filename: searchParams.get("filename") || filename,
   };
 
   // Remove undefined values
@@ -175,17 +184,21 @@ const SearchPage: React.FC = () => {
   useEffect(() => {
     if (searchResults) {
       try {
-        sessionStorage.setItem('searchResults', JSON.stringify(searchResults));
+        sessionStorage.setItem("searchResults", JSON.stringify(searchResults));
         // Trigger storage event for other components to detect the change
-        window.dispatchEvent(new Event('storage'));
+        window.dispatchEvent(new Event("storage"));
       } catch (e) {
-        console.error('Error storing search results in session storage', e);
+        console.error("Error storing search results in session storage", e);
       }
     }
   }, [searchResults]);
 
   // Fetch search fields
-  const { data: fieldsData, isLoading: isFieldsLoading, error: fieldsError } = useSearchFields();
+  const {
+    data: fieldsData,
+    isLoading: isFieldsLoading,
+    error: fieldsError,
+  } = useSearchFields();
 
   // Extract fields data
   const defaultFields = fieldsData?.data?.defaultFields || [];
@@ -199,14 +212,19 @@ const SearchPage: React.FC = () => {
   }, [defaultFields, selectedFields.length]);
 
   // Handle field selection change
-  const handleFieldsChange = (event: SelectChangeEvent<typeof selectedFields>) => {
+  const handleFieldsChange = (
+    event: SelectChangeEvent<typeof selectedFields>,
+  ) => {
     const {
       target: { value },
     } = event;
-    const newSelectedFields = typeof value === 'string' ? value.split(',') : value;
+    const newSelectedFields =
+      typeof value === "string" ? value.split(",") : value;
 
     // Check if fields were added or removed
-    const fieldsAdded = newSelectedFields.some((field) => !selectedFields.includes(field));
+    const fieldsAdded = newSelectedFields.some(
+      (field) => !selectedFields.includes(field),
+    );
 
     // Update the selected fields state
     setSelectedFields(newSelectedFields);
@@ -216,7 +234,7 @@ const SearchPage: React.FC = () => {
       // Reset to first page when adding fields
       setSearchParams((prev) => {
         const newParams = new URLSearchParams(prev);
-        newParams.set('page', '1');
+        newParams.set("page", "1");
         return newParams;
       });
     }
@@ -238,16 +256,31 @@ const SearchPage: React.FC = () => {
   });
 
   // Check if multi-select feature is enabled
-  const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
+  const multiSelectFeature = useFeatureFlag(
+    "search-multi-select-enabled",
+    false,
+  );
 
   // Use custom hooks for view preferences, asset selection, and favorites
   const viewPreferences = useViewPreferences({
-    initialViewMode: location.state?.preserveSearch ? location.state.viewMode : 'card',
-    initialCardSize: location.state?.preserveSearch ? location.state.cardSize : 'medium',
-    initialAspectRatio: location.state?.preserveSearch ? location.state.aspectRatio : 'square',
-    initialThumbnailScale: location.state?.preserveSearch ? location.state.thumbnailScale : 'fit',
-    initialShowMetadata: location.state?.preserveSearch ? location.state.showMetadata : true,
-    initialGroupByType: location.state?.preserveSearch ? location.state.groupByType : false,
+    initialViewMode: location.state?.preserveSearch
+      ? location.state.viewMode
+      : "card",
+    initialCardSize: location.state?.preserveSearch
+      ? location.state.cardSize
+      : "medium",
+    initialAspectRatio: location.state?.preserveSearch
+      ? location.state.aspectRatio
+      : "square",
+    initialThumbnailScale: location.state?.preserveSearch
+      ? location.state.thumbnailScale
+      : "fit",
+    initialShowMetadata: location.state?.preserveSearch
+      ? location.state.showMetadata
+      : true,
+    initialGroupByType: location.state?.preserveSearch
+      ? location.state.groupByType
+      : false,
   });
   const [editingAssetId, setEditingAssetId] = useState<string>();
   const [editedName, setEditedName] = useState<string>();
@@ -256,11 +289,18 @@ const SearchPage: React.FC = () => {
   const getAssetId = useCallback((asset: AssetItem) => asset.InventoryID, []);
   const getAssetName = useCallback(
     (asset: AssetItem) =>
-      asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
-    []
+      asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
+        .ObjectKey.Name,
+    [],
   );
-  const getAssetType = useCallback((asset: AssetItem) => asset.DigitalSourceAsset.Type, []);
-  const getAssetThumbnail = useCallback((asset: AssetItem) => asset.thumbnailUrl || '', []);
+  const getAssetType = useCallback(
+    (asset: AssetItem) => asset.DigitalSourceAsset.Type,
+    [],
+  );
+  const getAssetThumbnail = useCallback(
+    (asset: AssetItem) => asset.thumbnailUrl || "",
+    [],
+  );
 
   // Use custom hooks for asset selection and favorites
   const assetSelection = useAssetSelection({
@@ -299,7 +339,7 @@ const SearchPage: React.FC = () => {
     (asset: AssetItem) => {
       const assetType = asset.DigitalSourceAsset.Type.toLowerCase();
       // Special case for audio to use singular form
-      const pathPrefix = assetType === 'audio' ? '/audio/' : `/${assetType}s/`;
+      const pathPrefix = assetType === "audio" ? "/audio/" : `/${assetType}s/`;
       navigate(`${pathPrefix}${asset.InventoryID}`, {
         state: {
           assetType: asset.DigitalSourceAsset.Type,
@@ -308,7 +348,7 @@ const SearchPage: React.FC = () => {
         },
       });
     },
-    [navigate, currentQuery]
+    [navigate, currentQuery],
   );
 
   // Update local state from useAssetOperations
@@ -318,7 +358,7 @@ const SearchPage: React.FC = () => {
   }, [currentEditingAssetId, currentEditedName]);
 
   const formatFileSize = (sizeInBytes: number) => {
-    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const sizes = ["B", "KB", "MB", "GB"];
     let i = 0;
     let size = sizeInBytes;
     while (size >= 1024 && i < sizes.length - 1) {
@@ -330,64 +370,71 @@ const SearchPage: React.FC = () => {
 
   const [columns, setColumns] = useState<AssetTableColumn<AssetItem>[]>([
     {
-      id: 'name',
-      label: 'Name',
+      id: "name",
+      label: "Name",
       visible: true,
       minWidth: 200,
       accessorFn: (row: AssetItem) =>
-        row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
-      cell: (info: CellContext<AssetItem, unknown>) => info.getValue() as string,
+        row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
+          .ObjectKey.Name,
+      cell: (info: CellContext<AssetItem, unknown>) =>
+        info.getValue() as string,
       sortable: true,
       sortingFn: (rowA, rowB) =>
         rowA.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name.localeCompare(
-          rowB.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey
-            .Name
+          rowB.original.DigitalSourceAsset.MainRepresentation.StorageInfo
+            .PrimaryLocation.ObjectKey.Name,
         ),
     },
     {
-      id: 'type',
-      label: 'Type',
+      id: "type",
+      label: "Type",
       visible: true,
       minWidth: 100,
       accessorFn: (row: AssetItem) => row.DigitalSourceAsset.Type,
       sortable: true,
       sortingFn: (rowA, rowB) =>
-        rowA.original.DigitalSourceAsset.Type.localeCompare(rowB.original.DigitalSourceAsset.Type),
-    },
-    {
-      id: 'format',
-      label: 'Format',
-      visible: true,
-      minWidth: 100,
-      accessorFn: (row: AssetItem) => row.DigitalSourceAsset.MainRepresentation.Format,
-      sortable: true,
-      sortingFn: (rowA, rowB) =>
-        rowA.original.DigitalSourceAsset.MainRepresentation.Format.localeCompare(
-          rowB.original.DigitalSourceAsset.MainRepresentation.Format
+        rowA.original.DigitalSourceAsset.Type.localeCompare(
+          rowB.original.DigitalSourceAsset.Type,
         ),
     },
     {
-      id: 'size',
-      label: 'Size',
+      id: "format",
+      label: "Format",
       visible: true,
       minWidth: 100,
       accessorFn: (row: AssetItem) =>
-        row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
-      cell: (info: CellContext<AssetItem, unknown>) => formatFileSize(info.getValue() as number),
+        row.DigitalSourceAsset.MainRepresentation.Format,
+      sortable: true,
+      sortingFn: (rowA, rowB) =>
+        rowA.original.DigitalSourceAsset.MainRepresentation.Format.localeCompare(
+          rowB.original.DigitalSourceAsset.MainRepresentation.Format,
+        ),
+    },
+    {
+      id: "size",
+      label: "Size",
+      visible: true,
+      minWidth: 100,
+      accessorFn: (row: AssetItem) =>
+        row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
+          .FileInfo.Size,
+      cell: (info: CellContext<AssetItem, unknown>) =>
+        formatFileSize(info.getValue() as number),
       sortable: true,
       sortingFn: (rowA, rowB) => {
         const a =
-          rowA.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo
-            .Size;
+          rowA.original.DigitalSourceAsset.MainRepresentation.StorageInfo
+            .PrimaryLocation.FileInfo.Size;
         const b =
-          rowB.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo
-            .Size;
+          rowB.original.DigitalSourceAsset.MainRepresentation.StorageInfo
+            .PrimaryLocation.FileInfo.Size;
         return a - b;
       },
     },
     {
-      id: 'date',
-      label: 'Date Created',
+      id: "date",
+      label: "Date Created",
       visible: true,
       minWidth: 150,
       accessorFn: (row: AssetItem) => row.DigitalSourceAsset.CreateDate,
@@ -396,8 +443,12 @@ const SearchPage: React.FC = () => {
       },
       sortable: true,
       sortingFn: (rowA, rowB) => {
-        const a = new Date(rowA.original.DigitalSourceAsset.CreateDate).getTime();
-        const b = new Date(rowB.original.DigitalSourceAsset.CreateDate).getTime();
+        const a = new Date(
+          rowA.original.DigitalSourceAsset.CreateDate,
+        ).getTime();
+        const b = new Date(
+          rowB.original.DigitalSourceAsset.CreateDate,
+        ).getTime();
         return a - b;
       },
     },
@@ -406,25 +457,33 @@ const SearchPage: React.FC = () => {
   const handleColumnToggle = (columnId: string) => {
     setColumns((prev) =>
       prev.map((column) =>
-        column.id === columnId ? { ...column, visible: !column.visible } : column
-      )
+        column.id === columnId
+          ? { ...column, visible: !column.visible }
+          : column,
+      ),
     );
   };
 
   const filteredResults =
     searchResults?.filter((item) => {
-      const isImage = item.DigitalSourceAsset.Type === 'Image' && filters.mediaTypes.images;
-      const isVideo = item.DigitalSourceAsset.Type === 'Video' && filters.mediaTypes.videos;
-      const isAudio = item.DigitalSourceAsset.Type === 'Audio' && filters.mediaTypes.audio;
+      const isImage =
+        item.DigitalSourceAsset.Type === "Image" && filters.mediaTypes.images;
+      const isVideo =
+        item.DigitalSourceAsset.Type === "Video" && filters.mediaTypes.videos;
+      const isAudio =
+        item.DigitalSourceAsset.Type === "Audio" && filters.mediaTypes.audio;
 
       // Time-based filtering
       const createdAt = new Date(item.DigitalSourceAsset.CreateDate);
       const now = new Date();
       const timeDiff = now.getTime() - createdAt.getTime();
       const isRecent = filters.time.recent && timeDiff <= 24 * 60 * 60 * 1000;
-      const isLastWeek = filters.time.lastWeek && timeDiff <= 7 * 24 * 60 * 60 * 1000;
-      const isLastMonth = filters.time.lastMonth && timeDiff <= 30 * 24 * 60 * 60 * 1000;
-      const isLastYear = filters.time.lastYear && timeDiff <= 365 * 24 * 60 * 60 * 1000;
+      const isLastWeek =
+        filters.time.lastWeek && timeDiff <= 7 * 24 * 60 * 60 * 1000;
+      const isLastMonth =
+        filters.time.lastMonth && timeDiff <= 30 * 24 * 60 * 60 * 1000;
+      const isLastYear =
+        filters.time.lastYear && timeDiff <= 365 * 24 * 60 * 60 * 1000;
 
       const passesTimeFilter =
         (!filters.time.recent &&
@@ -439,9 +498,15 @@ const SearchPage: React.FC = () => {
       return (isImage || isVideo || isAudio) && passesTimeFilter;
     }) || [];
 
-  const imageResults = filteredResults.filter((item) => item.DigitalSourceAsset.Type === 'Image');
-  const videoResults = filteredResults.filter((item) => item.DigitalSourceAsset.Type === 'Video');
-  const audioResults = filteredResults.filter((item) => item.DigitalSourceAsset.Type === 'Audio');
+  const imageResults = filteredResults.filter(
+    (item) => item.DigitalSourceAsset.Type === "Image",
+  );
+  const videoResults = filteredResults.filter(
+    (item) => item.DigitalSourceAsset.Type === "Video",
+  );
+  const audioResults = filteredResults.filter(
+    (item) => item.DigitalSourceAsset.Type === "Audio",
+  );
 
   const [expandedSections, setExpandedSections] = useState({
     mediaTypes: true,
@@ -456,7 +521,7 @@ const SearchPage: React.FC = () => {
   const handleFilterChange = (section: keyof Filters, filter: string) => {
     setFilters((prev) => {
       const newFilters = { ...prev };
-      if (section === 'time') {
+      if (section === "time") {
         // Reset all time filters
         Object.keys(newFilters.time).forEach((key) => {
           newFilters.time[key as keyof typeof newFilters.time] = false;
@@ -475,23 +540,23 @@ const SearchPage: React.FC = () => {
   };
 
   const handleSearch = (params: { page: number }) => {
-    let timeFilter = '';
-    if (filters.time.recent) timeFilter = 'recent';
-    if (filters.time.lastWeek) timeFilter = 'lastWeek';
-    if (filters.time.lastMonth) timeFilter = 'lastMonth';
-    if (filters.time.lastYear) timeFilter = 'lastYear';
+    let timeFilter = "";
+    if (filters.time.recent) timeFilter = "recent";
+    if (filters.time.lastWeek) timeFilter = "lastWeek";
+    if (filters.time.lastMonth) timeFilter = "lastMonth";
+    if (filters.time.lastYear) timeFilter = "lastYear";
 
     setSearchParams((prev) => {
       const newParams = new URLSearchParams(prev);
-      newParams.set('page', params.page.toString());
+      newParams.set("page", params.page.toString());
       if (currentQuery) {
-        newParams.set('q', currentQuery);
+        newParams.set("q", currentQuery);
       }
       if (timeFilter) {
-        newParams.set('time', timeFilter);
+        newParams.set("time", timeFilter);
       }
       if (currentSemantic) {
-        newParams.set('semantic', 'true');
+        newParams.set("semantic", "true");
       }
       return newParams;
     });
@@ -501,8 +566,8 @@ const SearchPage: React.FC = () => {
     setPageSize(newPageSize);
     // Reset to first page when changing page size
     setSearchParams((prev) => {
-      prev.set('pageSize', newPageSize.toString());
-      prev.set('page', '1');
+      prev.set("pageSize", newPageSize.toString());
+      prev.set("page", "1");
       return prev;
     });
   };
@@ -514,17 +579,17 @@ const SearchPage: React.FC = () => {
       <>
         <Box
           sx={{
-            display: 'flex',
-            minHeight: '100%',
-            bgcolor: 'background.default',
-            position: 'relative',
-            overflow: 'auto',
+            display: "flex",
+            minHeight: "100%",
+            bgcolor: "background.default",
+            position: "relative",
+            overflow: "auto",
           }}
         >
           {isFetching && (
             <LinearProgress
               sx={{
-                position: 'fixed',
+                position: "fixed",
                 top: 0,
                 left: 0,
                 right: 0,
@@ -540,8 +605,8 @@ const SearchPage: React.FC = () => {
               px: 4,
               pt: 1,
               pb: 2,
-              display: 'flex',
-              flexDirection: 'column',
+              display: "flex",
+              flexDirection: "column",
               gap: 6,
               minHeight: 0,
               marginBottom: 4,
@@ -550,12 +615,12 @@ const SearchPage: React.FC = () => {
             {searchMetadata?.totalResults === 0 && currentQuery && (
               <Box
                 sx={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  minHeight: '50vh',
-                  textAlign: 'center',
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minHeight: "50vh",
+                  textAlign: "center",
                   gap: 2,
                 }}
               >
@@ -563,18 +628,18 @@ const SearchPage: React.FC = () => {
                   elevation={0}
                   sx={{
                     p: 4,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
                     gap: 2,
-                    bgcolor: 'background.paper',
+                    bgcolor: "background.paper",
                     borderRadius: 2,
                   }}
                 >
                   <SearchOffIcon
                     sx={{
                       fontSize: 64,
-                      color: 'text.secondary',
+                      color: "text.secondary",
                       mb: 2,
                     }}
                   />
@@ -584,14 +649,20 @@ const SearchPage: React.FC = () => {
                   <Typography variant="body1" color="text.secondary">
                     We couldn't find any matches for "{currentQuery}"
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    Try adjusting your search or filters to find what you're looking for
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mt: 1 }}
+                  >
+                    Try adjusting your search or filters to find what you're
+                    looking for
                   </Typography>
                 </Paper>
               </Box>
             )}
 
-            {(filteredResults.length > 0 && searchMetadata && !error) || error ? (
+            {(filteredResults.length > 0 && searchMetadata && !error) ||
+            error ? (
               <MasterResultsView
                 results={error ? [] : filteredResults}
                 searchMetadata={{
@@ -614,7 +685,9 @@ const SearchPage: React.FC = () => {
                 aspectRatio={viewPreferences.aspectRatio}
                 onAspectRatioChange={viewPreferences.handleAspectRatioChange}
                 thumbnailScale={viewPreferences.thumbnailScale}
-                onThumbnailScaleChange={viewPreferences.handleThumbnailScaleChange}
+                onThumbnailScaleChange={
+                  viewPreferences.handleThumbnailScaleChange
+                }
                 showMetadata={viewPreferences.showMetadata}
                 onShowMetadataChange={viewPreferences.handleShowMetadataChange}
                 sorting={viewPreferences.sorting}
@@ -634,17 +707,25 @@ const SearchPage: React.FC = () => {
                 isAssetFavorited={assetFavorites.isAssetFavorited}
                 onFavoriteToggle={assetFavorites.handleFavoriteToggle}
                 // Only pass selection props if multi-select feature is enabled
-                selectedAssets={multiSelectFeature.value ? assetSelection.selectedAssetIds : []}
+                selectedAssets={
+                  multiSelectFeature.value
+                    ? assetSelection.selectedAssetIds
+                    : []
+                }
                 onSelectToggle={
-                  multiSelectFeature.value ? assetSelection.handleSelectToggle : undefined
+                  multiSelectFeature.value
+                    ? assetSelection.handleSelectToggle
+                    : undefined
                 }
                 hasSelectedAssets={
-                  multiSelectFeature.value ? assetSelection.selectedAssets.length > 0 : false
+                  multiSelectFeature.value
+                    ? assetSelection.selectedAssets.length > 0
+                    : false
                 }
                 selectAllState={
                   multiSelectFeature.value
                     ? assetSelection.getSelectAllState(filteredResults)
-                    : 'none'
+                    : "none"
                 }
                 onSelectAllToggle={
                   multiSelectFeature.value
@@ -658,8 +739,12 @@ const SearchPage: React.FC = () => {
                 error={
                   error
                     ? {
-                        status: (error as SearchError).apiResponse?.status || error.name,
-                        message: (error as SearchError).apiResponse?.message || error.message,
+                        status:
+                          (error as SearchError).apiResponse?.status ||
+                          error.name,
+                        message:
+                          (error as SearchError).apiResponse?.message ||
+                          error.message,
                       }
                     : undefined
                 }
@@ -703,7 +788,8 @@ const SearchPage: React.FC = () => {
           <DialogTitle id="delete-dialog-title">Confirm Delete</DialogTitle>
           <DialogContent>
             <DialogContentText id="delete-dialog-description">
-              Are you sure you want to delete this asset? This action cannot be undone.
+              Are you sure you want to delete this asset? This action cannot be
+              undone.
             </DialogContentText>
           </DialogContent>
           <DialogActions>
@@ -727,9 +813,13 @@ const SearchPage: React.FC = () => {
           open={!!alert}
           autoHideDuration={6000}
           onClose={handleAlertClose}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         >
-          <Alert onClose={handleAlertClose} severity={alert?.severity} sx={{ width: '100%' }}>
+          <Alert
+            onClose={handleAlertClose}
+            severity={alert?.severity}
+            sx={{ width: "100%" }}
+          >
             {alert?.message}
           </Alert>
         </Snackbar>

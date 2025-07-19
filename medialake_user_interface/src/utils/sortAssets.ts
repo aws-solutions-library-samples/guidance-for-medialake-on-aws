@@ -1,12 +1,12 @@
-import { type SortingState } from '@tanstack/react-table';
-import { type AssetBase } from '../types/search/searchResults';
-import { type AssetTableColumn } from '../types/shared/assetComponents';
-import { formatFileSize } from './fileSize';
+import { type SortingState } from "@tanstack/react-table";
+import { type AssetBase } from "../types/search/searchResults";
+import { type AssetTableColumn } from "../types/shared/assetComponents";
+import { formatFileSize } from "./fileSize";
 
 export function sortAssets<T extends AssetBase>(
   assets: T[],
   sorting: SortingState,
-  columns?: AssetTableColumn<T>[]
+  columns?: AssetTableColumn<T>[],
 ): T[] {
   if (!sorting.length) return assets;
 
@@ -23,11 +23,11 @@ export function sortAssets<T extends AssetBase>(
       if (valueA === null || valueA === undefined) return 1;
       if (valueB === null || valueB === undefined) return -1;
 
-      if (typeof valueA === 'string' && typeof valueB === 'string') {
+      if (typeof valueA === "string" && typeof valueB === "string") {
         return valueA.localeCompare(valueB) * (desc ? -1 : 1);
       }
 
-      if (typeof valueA === 'number' && typeof valueB === 'number') {
+      if (typeof valueA === "number" && typeof valueB === "number") {
         return (valueA - valueB) * (desc ? -1 : 1);
       }
 
@@ -37,7 +37,7 @@ export function sortAssets<T extends AssetBase>(
       }
 
       // Try to convert to dates if they're date strings
-      if (typeof valueA === 'string' && typeof valueB === 'string') {
+      if (typeof valueA === "string" && typeof valueB === "string") {
         const dateA = new Date(valueA);
         const dateB = new Date(valueB);
         if (!isNaN(dateA.getTime()) && !isNaN(dateB.getTime())) {

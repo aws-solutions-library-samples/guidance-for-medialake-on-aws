@@ -1,7 +1,7 @@
-import React from 'react';
-import { type SortingState } from '@tanstack/react-table';
-import { AssetTable } from './AssetTable';
-import { useFeatureFlag } from '@/utils/featureFlags';
+import React from "react";
+import { type SortingState } from "@tanstack/react-table";
+import { AssetTable } from "./AssetTable";
+import { useFeatureFlag } from "@/utils/featureFlags";
 
 interface AssetTableViewProps<T> {
   results: T[];
@@ -57,8 +57,11 @@ function AssetTableView<T>({
   renamingAssetId,
 }: AssetTableViewProps<T>) {
   // Check if multi-select feature is enabled
-  const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
-  const favoritesFeature = useFeatureFlag('user-favorites-enabled', false);
+  const multiSelectFeature = useFeatureFlag(
+    "search-multi-select-enabled",
+    false,
+  );
+  const favoritesFeature = useFeatureFlag("user-favorites-enabled", false);
   // Group results by type if needed
   const groupedResults = React.useMemo(() => {
     if (!groupByType) return { all: results };
@@ -67,19 +70,19 @@ function AssetTableView<T>({
       (acc, item) => {
         const type = getAssetType(item).toLowerCase();
         const normalizedType =
-          type === 'image'
-            ? 'Image'
-            : type === 'video'
-              ? 'Video'
-              : type === 'audio'
-                ? 'Audio'
-                : 'Other';
+          type === "image"
+            ? "Image"
+            : type === "video"
+              ? "Video"
+              : type === "audio"
+                ? "Audio"
+                : "Other";
 
         if (!acc[normalizedType]) acc[normalizedType] = [];
         acc[normalizedType].push(item);
         return acc;
       },
-      {} as Record<string, T[]>
+      {} as Record<string, T[]>,
     );
   }, [results, groupByType, getAssetType]);
 
@@ -117,16 +120,18 @@ function AssetTableView<T>({
     <React.Fragment>
       {Object.entries(groupedResults)
         .filter(
-          ([type]) => ['Image', 'Video', 'Audio'].includes(type) && groupedResults[type].length > 0
+          ([type]) =>
+            ["Image", "Video", "Audio"].includes(type) &&
+            groupedResults[type].length > 0,
         )
         .map(([type, assets]) => (
-          <div key={type} style={{ marginBottom: '2rem' }}>
+          <div key={type} style={{ marginBottom: "2rem" }}>
             <h3
               style={{
-                marginBottom: '1rem',
-                background: 'linear-gradient(45deg, #1976d2, #9c27b0)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
+                marginBottom: "1rem",
+                background: "linear-gradient(45deg, #1976d2, #9c27b0)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
                 fontWeight: 600,
               }}
             >
@@ -150,9 +155,13 @@ function AssetTableView<T>({
               onEditNameChange={onEditNameChange}
               onEditNameComplete={onEditNameComplete}
               isSelected={multiSelectFeature.value ? isSelected : undefined}
-              onSelectToggle={multiSelectFeature.value ? onSelectToggle : undefined}
+              onSelectToggle={
+                multiSelectFeature.value ? onSelectToggle : undefined
+              }
               isFavorite={favoritesFeature.value ? isFavorite : undefined}
-              onFavoriteToggle={favoritesFeature.value ? onFavoriteToggle : undefined}
+              onFavoriteToggle={
+                favoritesFeature.value ? onFavoriteToggle : undefined
+              }
               selectedSearchFields={selectedSearchFields}
               isRenaming={isRenaming}
               renamingAssetId={renamingAssetId}

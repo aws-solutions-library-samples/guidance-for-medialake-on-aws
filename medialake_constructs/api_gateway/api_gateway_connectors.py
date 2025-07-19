@@ -29,7 +29,9 @@ from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_
 from medialake_constructs.shared_constructs.dynamodb import (
     DynamoDB as DynamoDBConstruct,
 )
-from medialake_constructs.shared_constructs.dynamodb import DynamoDBProps
+from medialake_constructs.shared_constructs.dynamodb import (
+    DynamoDBProps,
+)
 from medialake_constructs.shared_constructs.lam_deployment import LambdaDeployment
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 from medialake_constructs.shared_constructs.lambda_layers import (

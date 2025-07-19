@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   Box,
   Grid,
@@ -10,22 +10,22 @@ import {
   Button,
   useTheme,
   alpha,
-} from '@mui/material';
-import { formatFileSize } from '../../utils/imageUtils';
-import { formatLocalDateTime } from '../../shared/utils/dateUtils';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
-import CodeOutlinedIcon from '@mui/icons-material/CodeOutlined';
-import LinkOutlinedIcon from '@mui/icons-material/LinkOutlined';
-import { RelatedItem } from '../../api/types/asset.types';
+} from "@mui/material";
+import { formatFileSize } from "../../utils/imageUtils";
+import { formatLocalDateTime } from "../../shared/utils/dateUtils";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
+import CodeOutlinedIcon from "@mui/icons-material/CodeOutlined";
+import LinkOutlinedIcon from "@mui/icons-material/LinkOutlined";
+import { RelatedItem } from "../../api/types/asset.types";
 
 export interface RelatedItemsViewProps {
   items: RelatedItem[];
   isLoading: boolean;
   onLoadMore: () => void;
   hasMore: boolean;
-  viewMode?: 'grid' | 'list';
+  viewMode?: "grid" | "list";
   onItemClick?: (item: RelatedItem) => void;
 }
 
@@ -34,29 +34,47 @@ export const RelatedItemsView: React.FC<RelatedItemsViewProps> = ({
   isLoading,
   onLoadMore,
   hasMore,
-  viewMode = 'grid',
+  viewMode = "grid",
   onItemClick,
 }) => {
   const theme = useTheme();
 
   const getItemIcon = (type: string) => {
     switch (type.toLowerCase()) {
-      case 'image':
+      case "image":
         return (
-          <DescriptionOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
+          <DescriptionOutlinedIcon
+            fontSize="small"
+            sx={{ color: theme.palette.primary.main }}
+          />
         );
-      case 'video':
-        return <CodeOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />;
-      case 'audio':
-        return <InfoOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />;
+      case "video":
+        return (
+          <CodeOutlinedIcon
+            fontSize="small"
+            sx={{ color: theme.palette.primary.main }}
+          />
+        );
+      case "audio":
+        return (
+          <InfoOutlinedIcon
+            fontSize="small"
+            sx={{ color: theme.palette.primary.main }}
+          />
+        );
       default:
-        return <LinkOutlinedIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />;
+        return (
+          <LinkOutlinedIcon
+            fontSize="small"
+            sx={{ color: theme.palette.primary.main }}
+          />
+        );
     }
   };
 
   if (isLoading && items.length === 0) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+      <Box sx={{ display: "flex", justifyContent: "center", p: 3 }}>
         <CircularProgress />
       </Box>
     );
@@ -64,7 +82,7 @@ export const RelatedItemsView: React.FC<RelatedItemsViewProps> = ({
 
   if (items.length === 0) {
     return (
-      <Box sx={{ p: 3, textAlign: 'center' }}>
+      <Box sx={{ p: 3, textAlign: "center" }}>
         <Typography color="text.secondary">No related items found</Typography>
       </Box>
     );
@@ -85,17 +103,17 @@ export const RelatedItemsView: React.FC<RelatedItemsViewProps> = ({
               variant="outlined"
               onClick={() => onItemClick?.(item)}
               sx={{
-                height: '100%',
-                transition: 'all 0.2s ease-in-out',
-                cursor: 'pointer',
-                '&:hover': {
+                height: "100%",
+                transition: "all 0.2s ease-in-out",
+                cursor: "pointer",
+                "&:hover": {
                   boxShadow: `0 4px 8px ${alpha(theme.palette.common.black, 0.1)}`,
-                  transform: 'translateY(-2px)',
+                  transform: "translateY(-2px)",
                 },
               }}
             >
               <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                   {getItemIcon(item.type)}
                   <Typography
                     variant="subtitle1"
@@ -108,7 +126,7 @@ export const RelatedItemsView: React.FC<RelatedItemsViewProps> = ({
                     {item.title}
                   </Typography>
                 </Box>
-                <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+                <Box sx={{ display: "flex", gap: 1, mb: 1 }}>
                   <Chip
                     size="small"
                     label={item.type.toUpperCase()}
@@ -116,7 +134,7 @@ export const RelatedItemsView: React.FC<RelatedItemsViewProps> = ({
                       backgroundColor: alpha(theme.palette.primary.main, 0.1),
                       color: theme.palette.primary.main,
                       fontWeight: 500,
-                      fontSize: '0.75rem',
+                      fontSize: "0.75rem",
                     }}
                   />
                   <Chip
@@ -126,7 +144,7 @@ export const RelatedItemsView: React.FC<RelatedItemsViewProps> = ({
                       backgroundColor: alpha(theme.palette.secondary.main, 0.1),
                       color: theme.palette.secondary.main,
                       fontWeight: 500,
-                      fontSize: '0.75rem',
+                      fontSize: "0.75rem",
                     }}
                   />
                 </Box>
@@ -143,14 +161,14 @@ export const RelatedItemsView: React.FC<RelatedItemsViewProps> = ({
       </Grid>
 
       {hasMore && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+        <Box sx={{ display: "flex", justifyContent: "center", mt: 3 }}>
           <Button
             variant="outlined"
             onClick={onLoadMore}
             startIcon={<ExpandMoreIcon />}
             disabled={isLoading}
           >
-            {isLoading ? 'Loading...' : 'Load More'}
+            {isLoading ? "Loading..." : "Load More"}
           </Button>
         </Box>
       )}

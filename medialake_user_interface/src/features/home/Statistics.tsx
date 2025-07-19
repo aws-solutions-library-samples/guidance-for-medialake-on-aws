@@ -1,7 +1,7 @@
-import React from 'react';
-import { Grid } from '@mui/material';
-import { Assignment, AutoGraph, CloudUpload } from '@mui/icons-material';
-import { StatCard } from '@/components/common/StatCard';
+import React from "react";
+import { Grid } from "@mui/material";
+import { Assignment, AutoGraph, CloudUpload } from "@mui/icons-material";
+import { StatCard } from "@/components/common/StatCard";
 
 export const Statistics: React.FC = () => {
   // In a real app, these would come from an API

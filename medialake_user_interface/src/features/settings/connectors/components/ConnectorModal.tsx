@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -20,7 +20,7 @@ import {
   Popover,
   CircularProgress,
   Collapse,
-} from '@mui/material';
+} from "@mui/material";
 import {
   Close as CloseIcon,
   CloudUpload as CloudUploadIcon,
@@ -30,13 +30,16 @@ import {
   ExpandLess as ExpandLessIcon,
   Add as AddIcon,
   Delete as DeleteIcon,
-} from '@mui/icons-material';
-import { useTranslation } from 'react-i18next';
-import ApiStatusModal from '@/components/ApiStatusModal';
-import { useApiMutationHandler } from '@/shared/hooks/useApiMutationHandler';
-import { ConnectorResponse, CreateConnectorRequest } from '@/api/types/api.types';
-import { useGetS3Buckets } from '@/api/hooks/useConnectors';
-import { useGetAWSRegions } from '@/api/hooks/useAWSRegions';
+} from "@mui/icons-material";
+import { useTranslation } from "react-i18next";
+import ApiStatusModal from "@/components/ApiStatusModal";
+import { useApiMutationHandler } from "@/shared/hooks/useApiMutationHandler";
+import {
+  ConnectorResponse,
+  CreateConnectorRequest,
+} from "@/api/types/api.types";
+import { useGetS3Buckets } from "@/api/hooks/useConnectors";
+import { useGetAWSRegions } from "@/api/hooks/useAWSRegions";
 
 interface ConnectorModalProps {
   open: boolean;
@@ -48,62 +51,64 @@ interface ConnectorModalProps {
 
 const CONNECTOR_TYPES = [
   {
-    value: 's3',
-    label: 'Amazon S3',
+    value: "s3",
+    label: "Amazon S3",
     icon: CloudUploadIcon,
-    colorHex: '#FF9900',
+    colorHex: "#FF9900",
   },
   {
-    value: 'fsx',
-    label: 'Amazon FSx',
+    value: "fsx",
+    label: "Amazon FSx",
     icon: CloudUploadIcon,
-    colorHex: '#FF9900',
+    colorHex: "#FF9900",
   },
-  { value: 'empty', label: '', icon: CloudUploadIcon, colorHex: '#FF9900' },
+  { value: "empty", label: "", icon: CloudUploadIcon, colorHex: "#FF9900" },
 ];
 
 const S3_BUCKET_TYPES = [
   {
-    value: 'existing',
-    label: 'Existing S3 Bucket',
-    description: 'Connect to an existing S3 bucket',
+    value: "existing",
+    label: "Existing S3 Bucket",
+    description: "Connect to an existing S3 bucket",
   },
   {
-    value: 'new',
-    label: 'New S3 Bucket',
-    description: 'Create a new S3 bucket',
+    value: "new",
+    label: "New S3 Bucket",
+    description: "Create a new S3 bucket",
   },
 ];
 
-const S3_CONNECTOR_TYPES = [{ value: 'non-managed', label: 'MediaLake Non-Managed' }];
+const S3_CONNECTOR_TYPES = [
+  { value: "non-managed", label: "MediaLake Non-Managed" },
+];
 
 const S3_INTEGRATION_METHODS = [
-  { value: 'eventbridge' as const, label: 'S3 EventBridge Notifications' },
-  { value: 's3Notifications' as const, label: 'S3 Event Notifications' },
+  { value: "eventbridge" as const, label: "S3 EventBridge Notifications" },
+  { value: "s3Notifications" as const, label: "S3 Event Notifications" },
 ] as const;
 
 const AWS_REGIONS = [
-  { value: 'us-east-1', label: 'US East (N. Virginia)' },
-  { value: 'us-east-2', label: 'US East (Ohio)' },
-  { value: 'us-west-1', label: 'US West (N. California)' },
-  { value: 'us-west-2', label: 'US West (Oregon)' },
-  { value: 'af-south-1', label: 'Africa (Cape Town)' },
-  { value: 'ap-east-1', label: 'Asia Pacific (Hong Kong)' },
-  { value: 'ap-south-1', label: 'Asia Pacific (Mumbai)' },
-  { value: 'ap-northeast-3', label: 'Asia Pacific (Osaka)' },
-  { value: 'ap-northeast-2', label: 'Asia Pacific (Seoul)' },
-  { value: 'ap-southeast-1', label: 'Asia Pacific (Singapore)' },
-  { value: 'ap-southeast-2', label: 'Asia Pacific (Sydney)' },
-  { value: 'ap-northeast-1', label: 'Asia Pacific (Tokyo)' },
-  { value: 'ca-central-1', label: 'Canada (Central)' },
-  { value: 'eu-central-1', label: 'Europe (Frankfurt)' },
-  { value: 'eu-west-1', label: 'Europe (Ireland)' },
-  { value: 'eu-west-2', label: 'Europe (London)' },
-  { value: 'eu-south-1', label: 'Europe (Milan)' },
-  { value: 'eu-west-3', label: 'Europe (Paris)' },
-  { value: 'eu-north-1', label: 'Europe (Stockholm)' },
-  { value: 'me-south-1', label: 'Middle East (Bahrain)' },
-  { value: 'sa-east-1', label: 'South America (São Paulo)' },
+  { value: "us-east-1", label: "US East (N. Virginia)" },
+  { value: "us-east-2", label: "US East (Ohio)" },
+  { value: "us-west-1", label: "US West (N. California)" },
+  { value: "us-west-2", label: "US West (Oregon)" },
+  { value: "af-south-1", label: "Africa (Cape Town)" },
+  { value: "ap-east-1", label: "Asia Pacific (Hong Kong)" },
+  { value: "ap-south-1", label: "Asia Pacific (Mumbai)" },
+  { value: "ap-northeast-3", label: "Asia Pacific (Osaka)" },
+  { value: "ap-northeast-2", label: "Asia Pacific (Seoul)" },
+  { value: "ap-southeast-1", label: "Asia Pacific (Singapore)" },
+  { value: "ap-southeast-2", label: "Asia Pacific (Sydney)" },
+  { value: "ap-northeast-1", label: "Asia Pacific (Tokyo)" },
+  { value: "ca-central-1", label: "Canada (Central)" },
+  { value: "eu-central-1", label: "Europe (Frankfurt)" },
+  { value: "eu-west-1", label: "Europe (Ireland)" },
+  { value: "eu-west-2", label: "Europe (London)" },
+  { value: "eu-south-1", label: "Europe (Milan)" },
+  { value: "eu-west-3", label: "Europe (Paris)" },
+  { value: "eu-north-1", label: "Europe (Stockholm)" },
+  { value: "me-south-1", label: "Middle East (Bahrain)" },
+  { value: "sa-east-1", label: "South America (São Paulo)" },
 ];
 
 const ConnectorModal: React.FC<ConnectorModalProps> = ({
@@ -117,13 +122,13 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
   const { t } = useTranslation();
   const { apiStatus, handleMutation, closeApiStatus } = useApiMutationHandler();
   const [activeStep, setActiveStep] = useState(0);
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [type, setType] = useState('');
-  const [bucketType, setBucketType] = useState('');
-  const [s3ConnectorType, setS3ConnectorType] = useState('');
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [type, setType] = useState("");
+  const [bucketType, setBucketType] = useState("");
+  const [s3ConnectorType, setS3ConnectorType] = useState("");
   const [configuration, setConfiguration] = useState<Record<string, any>>({});
-  const [objectPrefixes, setObjectPrefixes] = useState<string[]>(['']);
+  const [objectPrefixes, setObjectPrefixes] = useState<string[]>([""]);
   const [infoAnchorEl, setInfoAnchorEl] = useState<HTMLElement | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const {
@@ -132,8 +137,8 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
     refetch: refetchBuckets,
   } = useGetS3Buckets();
   const buckets = s3BucketsResponse?.data?.buckets || [];
-  const [awsRegion, setAwsRegion] = useState('');
-  const [bucketNameError, setBucketNameError] = useState('');
+  const [awsRegion, setAwsRegion] = useState("");
+  const [bucketNameError, setBucketNameError] = useState("");
 
   useEffect(() => {
     if (editingConnector) {
@@ -144,35 +149,35 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
       // Handle object prefixes from existing configuration
       if (editingConnector.objectPrefix) {
         // Check if objectPrefix exists at the top level
-        if (typeof editingConnector.objectPrefix === 'string') {
+        if (typeof editingConnector.objectPrefix === "string") {
           // Convert legacy string format to array format
           setObjectPrefixes([editingConnector.objectPrefix]);
         } else if (Array.isArray(editingConnector.objectPrefix)) {
           // Use the array directly
           setObjectPrefixes(editingConnector.objectPrefix);
         } else {
-          setObjectPrefixes(['']);
+          setObjectPrefixes([""]);
         }
       } else {
-        setObjectPrefixes(['']);
+        setObjectPrefixes([""]);
       }
 
       setActiveStep(2);
-      setBucketType('');
+      setBucketType("");
       setConfiguration({});
-      setObjectPrefixes(['']);
+      setObjectPrefixes([""]);
       setActiveStep(0);
-      setAwsRegion('');
-      setBucketNameError('');
+      setAwsRegion("");
+      setBucketNameError("");
     } else {
-      setName('');
-      setType('');
-      setBucketType('');
+      setName("");
+      setType("");
+      setBucketType("");
       setConfiguration({});
-      setObjectPrefixes(['']);
+      setObjectPrefixes([""]);
       setActiveStep(0);
-      setAwsRegion('');
-      setBucketNameError('');
+      setAwsRegion("");
+      setBucketNameError("");
     }
   }, [editingConnector, open]);
 
@@ -185,14 +190,14 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
   };
 
   const handleAddPrefix = () => {
-    setObjectPrefixes([...objectPrefixes, '']);
+    setObjectPrefixes([...objectPrefixes, ""]);
   };
 
   const handleRemovePrefix = (index: number) => {
     const newPrefixes = [...objectPrefixes];
     newPrefixes.splice(index, 1);
     if (newPrefixes.length === 0) {
-      newPrefixes.push(''); // Always keep at least one field
+      newPrefixes.push(""); // Always keep at least one field
     }
     setObjectPrefixes(newPrefixes);
   };
@@ -213,29 +218,31 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
 
   // S3 Bucket Name Validation Logic
   const validateBucketName = (name: string): string => {
-    if (!name) return 'Bucket name is required.';
+    if (!name) return "Bucket name is required.";
     if (name.length < 3 || name.length > 63) {
-      return 'Bucket name must be between 3 and 63 characters long.';
+      return "Bucket name must be between 3 and 63 characters long.";
     }
     if (!/^[a-z0-9][a-z0-9.-]*[a-z0-9]$/.test(name)) {
-      return 'Bucket name can only contain lowercase letters, numbers, dots (.), and hyphens (-). Must start and end with a letter or number.';
+      return "Bucket name can only contain lowercase letters, numbers, dots (.), and hyphens (-). Must start and end with a letter or number.";
     }
-    if (name.includes('..') || name.includes('.-') || name.includes('-.')) {
-      return 'Bucket name cannot contain consecutive periods or periods adjacent to hyphens.';
+    if (name.includes("..") || name.includes(".-") || name.includes("-.")) {
+      return "Bucket name cannot contain consecutive periods or periods adjacent to hyphens.";
     }
     if (/^(\d{1,3}\.){3}\d{1,3}$/.test(name)) {
-      return 'Bucket name cannot be formatted as an IP address.';
+      return "Bucket name cannot be formatted as an IP address.";
     }
-    if (name.startsWith('xn--')) {
+    if (name.startsWith("xn--")) {
       return "Bucket name cannot start with 'xn--'.";
     }
-    if (name.endsWith('-s3alias')) {
+    if (name.endsWith("-s3alias")) {
       return "Bucket name cannot end with '-s3alias'.";
     }
-    return ''; // No error
+    return ""; // No error
   };
 
-  const handleBucketNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBucketNameChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const newName = event.target.value;
     setConfiguration({ ...configuration, bucket: newName });
     const errorMsg = validateBucketName(newName);
@@ -245,7 +252,9 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
   const handleSaveInternal = async () => {
     // Perform validation before attempting to save
     const bucketValidationError =
-      bucketType === 'new' ? validateBucketName(configuration.bucket || '') : '';
+      bucketType === "new"
+        ? validateBucketName(configuration.bucket || "")
+        : "";
     if (bucketValidationError) {
       setBucketNameError(bucketValidationError);
       return; // Stop submission if bucket name is invalid
@@ -261,18 +270,20 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
     if (
       !name ||
       !type ||
-      (type === 's3' &&
+      (type === "s3" &&
         (!s3ConnectorType ||
           !configuration.integrationMethod ||
-          (bucketType === 'existing' && !configuration.bucket) ||
-          (bucketType === 'new' && !configuration.bucket)))
+          (bucketType === "existing" && !configuration.bucket) ||
+          (bucketType === "new" && !configuration.bucket)))
     ) {
-      alert('Please fill in all required fields.');
+      alert("Please fill in all required fields.");
       return;
     }
 
     // Filter out empty prefixes
-    const filteredPrefixes = objectPrefixes.filter((prefix) => prefix.trim() !== '');
+    const filteredPrefixes = objectPrefixes.filter(
+      (prefix) => prefix.trim() !== "",
+    );
 
     const connectorData: CreateConnectorRequest = {
       name,
@@ -281,14 +292,16 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
       configuration: {
         ...configuration,
         connectorType: s3ConnectorType,
-        s3IntegrationMethod: configuration.integrationMethod as 'eventbridge' | 's3Notifications',
+        s3IntegrationMethod: configuration.integrationMethod as
+          | "eventbridge"
+          | "s3Notifications",
         objectPrefix: filteredPrefixes.length > 0 ? filteredPrefixes : [],
-        ...(bucketType === 'new' && {
-          bucketType: 'new',
+        ...(bucketType === "new" && {
+          bucketType: "new",
           region: awsRegion,
         }),
-        ...(bucketType === 'existing' && {
-          bucketType: 'existing',
+        ...(bucketType === "existing" && {
+          bucketType: "existing",
         }),
       },
     };
@@ -300,25 +313,25 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
         } as any,
         actionMessages: {
           loading: editingConnector
-            ? t('connectors.apiMessages.updating.loading')
-            : t('connectors.apiMessages.creating.loading'),
+            ? t("connectors.apiMessages.updating.loading")
+            : t("connectors.apiMessages.creating.loading"),
           success: editingConnector
-            ? t('connectors.apiMessages.updating.success')
-            : t('connectors.apiMessages.creating.success'),
+            ? t("connectors.apiMessages.updating.success")
+            : t("connectors.apiMessages.creating.success"),
           error: editingConnector
-            ? t('connectors.apiMessages.updating.error')
-            : t('connectors.apiMessages.creating.error'),
+            ? t("connectors.apiMessages.updating.error")
+            : t("connectors.apiMessages.creating.error"),
         },
         onSuccess: () => {
           onClose();
         },
       },
-      connectorData
+      connectorData,
     );
   };
 
   const renderS3BucketTypeSelection = () => (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
       {S3_BUCKET_TYPES.map((bucketType) => (
         <Box
           key={bucketType.value}
@@ -329,10 +342,10 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
           sx={{
             p: 3,
             border: `1px solid ${theme.palette.divider}`,
-            borderRadius: '8px',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            '&:hover': {
+            borderRadius: "8px",
+            cursor: "pointer",
+            transition: "all 0.2s",
+            "&:hover": {
               borderColor: theme.palette.primary.main,
               backgroundColor: `${theme.palette.primary.main}08`,
             },
@@ -350,7 +363,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
   );
 
   const renderS3Configuration = () => (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
       {editingConnector ? (
         <>
           <TextField
@@ -360,7 +373,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
             fullWidth
             slotProps={{
               input: {
-                sx: { bgcolor: 'action.disabledBackground' },
+                sx: { bgcolor: "action.disabledBackground" },
               },
             }}
             helperText="Connector name cannot be modified after creation"
@@ -390,13 +403,13 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
 
       {editingConnector ? (
         <>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <FormControl fullWidth disabled>
               <InputLabel>S3 Connector Type</InputLabel>
               <Select
                 value={s3ConnectorType}
                 label="S3 Connector Type"
-                sx={{ bgcolor: 'action.disabledBackground' }}
+                sx={{ bgcolor: "action.disabledBackground" }}
               >
                 {S3_CONNECTOR_TYPES.map((type) => (
                   <MenuItem key={type.value} value={type.value}>
@@ -412,9 +425,9 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
           <FormControl fullWidth disabled>
             <InputLabel>S3 Integration Method</InputLabel>
             <Select
-              value={configuration.integrationMethod || ''}
+              value={configuration.integrationMethod || ""}
               label="S3 Integration Method"
-              sx={{ bgcolor: 'action.disabledBackground' }}
+              sx={{ bgcolor: "action.disabledBackground" }}
             >
               {S3_INTEGRATION_METHODS.map((method) => (
                 <MenuItem key={method.value} value={method.value}>
@@ -426,17 +439,19 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
           <FormControl fullWidth disabled>
             <InputLabel>S3 Bucket</InputLabel>
             <Select
-              value={configuration.bucket || ''}
+              value={configuration.bucket || ""}
               label="S3 Bucket"
-              sx={{ bgcolor: 'action.disabledBackground' }}
+              sx={{ bgcolor: "action.disabledBackground" }}
             >
-              <MenuItem value={configuration.bucket}>{configuration.bucket}</MenuItem>
+              <MenuItem value={configuration.bucket}>
+                {configuration.bucket}
+              </MenuItem>
             </Select>
           </FormControl>
         </>
       ) : (
         <>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <FormControl fullWidth required>
               <InputLabel>S3 Connector Type</InputLabel>
               <Select
@@ -458,7 +473,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
           <FormControl fullWidth required>
             <InputLabel>S3 Integration Method</InputLabel>
             <Select
-              value={configuration.integrationMethod || ''}
+              value={configuration.integrationMethod || ""}
               label="S3 Integration Method"
               onChange={(e) =>
                 setConfiguration({
@@ -474,12 +489,12 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
               ))}
             </Select>
           </FormControl>
-          {bucketType === 'existing' && (
-            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+          {bucketType === "existing" && (
+            <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
               <FormControl fullWidth required>
                 <InputLabel>S3 Bucket</InputLabel>
                 <Select
-                  value={configuration.bucket || ''}
+                  value={configuration.bucket || ""}
                   label="S3 Bucket"
                   onChange={(e) =>
                     setConfiguration({
@@ -489,7 +504,9 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                   }
                   disabled={isLoadingBuckets}
                   startAdornment={
-                    isLoadingBuckets ? <CircularProgress size={20} sx={{ ml: 1 }} /> : null
+                    isLoadingBuckets ? (
+                      <CircularProgress size={20} sx={{ ml: 1 }} />
+                    ) : null
                   }
                 >
                   {buckets.map((bucket) => (
@@ -504,21 +521,26 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                 disabled={isLoadingBuckets}
                 sx={{ mt: 1 }}
               >
-                {isLoadingBuckets ? <CircularProgress size={24} /> : <RefreshIcon />}
+                {isLoadingBuckets ? (
+                  <CircularProgress size={24} />
+                ) : (
+                  <RefreshIcon />
+                )}
               </IconButton>
             </Box>
           )}
-          {bucketType === 'new' && (
+          {bucketType === "new" && (
             <>
               <TextField
                 label="New Bucket Name"
-                value={configuration.bucket || ''}
+                value={configuration.bucket || ""}
                 onChange={handleBucketNameChange}
                 fullWidth
                 required
                 error={!!bucketNameError}
                 helperText={
-                  bucketNameError || 'Bucket name must be globally unique, follow S3 naming rules.'
+                  bucketNameError ||
+                  "Bucket name must be globally unique, follow S3 naming rules."
                 }
               />
               {/* AWS Region FormControl hidden as requested */}
@@ -544,17 +566,20 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
       <Button
         onClick={() => setShowAdvanced(!showAdvanced)}
         startIcon={showAdvanced ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-        sx={{ alignSelf: 'flex-start', mt: 1 }}
+        sx={{ alignSelf: "flex-start", mt: 1 }}
       >
         Advanced configuration
       </Button>
 
       <Collapse in={showAdvanced}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}>
           {objectPrefixes.map((prefix, index) => (
-            <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box
+              key={index}
+              sx={{ display: "flex", alignItems: "center", gap: 1 }}
+            >
               <TextField
-                label={`Object Prefix ${objectPrefixes.length > 1 ? index + 1 : ''}`}
+                label={`Object Prefix ${objectPrefixes.length > 1 ? index + 1 : ""}`}
                 value={prefix}
                 onChange={(e) => handlePrefixChange(index, e.target.value)}
                 fullWidth
@@ -571,7 +596,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
           <Button
             startIcon={<AddIcon />}
             onClick={handleAddPrefix}
-            sx={{ alignSelf: 'flex-start', mt: 1 }}
+            sx={{ alignSelf: "flex-start", mt: 1 }}
           >
             Add Prefix
           </Button>
@@ -580,7 +605,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
     </Box>
   );
 
-  const steps = ['Select Type', 'Select S3 Type', 'Configuration'];
+  const steps = ["Select Type", "Select S3 Type", "Configuration"];
 
   const renderStepContent = (step: number) => {
     switch (step) {
@@ -588,45 +613,49 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
         return (
           <Box
             sx={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(2, 1fr)',
+              display: "grid",
+              gridTemplateColumns: "repeat(2, 1fr)",
               gap: 2,
             }}
           >
             {CONNECTOR_TYPES.map((connectorType) => {
               const Icon = connectorType.icon;
-              return connectorType.value === 'empty' ? (
-                <Box key="empty" sx={{ visibility: 'hidden' }} />
+              return connectorType.value === "empty" ? (
+                <Box key="empty" sx={{ visibility: "hidden" }} />
               ) : (
                 <Box
                   key={connectorType.value}
                   onClick={() => {
                     // Disable FSx for now
-                    if (connectorType.value !== 'fsx') {
+                    if (connectorType.value !== "fsx") {
                       setType(connectorType.value);
                       handleNext();
                     }
                   }}
                   sx={{
-                    height: '120px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center',
-                    alignItems: 'center',
+                    height: "120px",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "center",
+                    alignItems: "center",
                     border: `1px solid ${theme.palette.divider}`,
-                    borderRadius: '8px',
+                    borderRadius: "8px",
                     // Disable FSx styling and interaction
-                    cursor: connectorType.value === 'fsx' ? 'not-allowed' : 'pointer',
-                    opacity: connectorType.value === 'fsx' ? 0.5 : 1,
-                    pointerEvents: connectorType.value === 'fsx' ? 'none' : 'auto',
-                    transition: 'all 0.2s',
-                    '&:hover': {
+                    cursor:
+                      connectorType.value === "fsx" ? "not-allowed" : "pointer",
+                    opacity: connectorType.value === "fsx" ? 0.5 : 1,
+                    pointerEvents:
+                      connectorType.value === "fsx" ? "none" : "auto",
+                    transition: "all 0.2s",
+                    "&:hover": {
                       borderColor: connectorType.colorHex,
                       backgroundColor: `${connectorType.colorHex}08`,
                     },
                   }}
                 >
-                  <Icon sx={{ color: connectorType.colorHex, fontSize: 40, mb: 1 }} />
+                  <Icon
+                    sx={{ color: connectorType.colorHex, fontSize: 40, mb: 1 }}
+                  />
                   <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                     {connectorType.label}
                   </Typography>
@@ -636,9 +665,9 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
           </Box>
         );
       case 1:
-        return type === 's3' ? renderS3BucketTypeSelection() : null;
+        return type === "s3" ? renderS3BucketTypeSelection() : null;
       case 2:
-        return type === 's3' ? renderS3Configuration() : null;
+        return type === "s3" ? renderS3Configuration() : null;
       default:
         return null;
     }
@@ -653,7 +682,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
         fullWidth
         PaperProps={{
           sx: {
-            borderRadius: '12px',
+            borderRadius: "12px",
           },
         }}
       >
@@ -661,13 +690,13 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
           sx={{
             m: 0,
             p: 2,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
           }}
         >
           <Typography variant="h6">
-            {editingConnector ? 'Edit Connector' : 'Add New Connector'}
+            {editingConnector ? "Edit Connector" : "Add New Connector"}
           </Typography>
           <IconButton
             aria-label="close"
@@ -698,11 +727,18 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
 
         <DialogActions sx={{ p: 2, gap: 1 }}>
           {!editingConnector && activeStep > 0 && (
-            <Button onClick={handleBack} disabled={apiStatus.status === 'loading'}>
+            <Button
+              onClick={handleBack}
+              disabled={apiStatus.status === "loading"}
+            >
               Back
             </Button>
           )}
-          <Button onClick={onClose} color="inherit" disabled={apiStatus.status === 'loading'}>
+          <Button
+            onClick={onClose}
+            color="inherit"
+            disabled={apiStatus.status === "loading"}
+          >
             Cancel
           </Button>
           {activeStep === steps.length - 1 || editingConnector ? (
@@ -710,17 +746,22 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
               variant="contained"
               onClick={handleSaveInternal}
               disabled={
-                apiStatus.status === 'loading' || (bucketType === 'new' && !!bucketNameError)
+                apiStatus.status === "loading" ||
+                (bucketType === "new" && !!bucketNameError)
               }
-              startIcon={apiStatus.status === 'loading' ? <CircularProgress size={20} /> : null}
+              startIcon={
+                apiStatus.status === "loading" ? (
+                  <CircularProgress size={20} />
+                ) : null
+              }
               sx={{
                 backgroundColor: theme.palette.primary.main,
-                '&:hover': {
+                "&:hover": {
                   backgroundColor: theme.palette.primary.dark,
                 },
               }}
             >
-              {editingConnector ? 'Save Changes' : 'Add Connector'}
+              {editingConnector ? "Save Changes" : "Add Connector"}
             </Button>
           ) : (
             <Button
@@ -729,8 +770,8 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
               disabled={
                 !type ||
                 (activeStep === 1 && !bucketType) ||
-                apiStatus.status === 'loading' ||
-                (bucketType === 'new' && !!bucketNameError)
+                apiStatus.status === "loading" ||
+                (bucketType === "new" && !!bucketNameError)
               }
             >
               Next
@@ -743,32 +784,33 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
           anchorEl={infoAnchorEl}
           onClose={handleInfoClose}
           anchorOrigin={{
-            vertical: 'bottom',
-            horizontal: 'center',
+            vertical: "bottom",
+            horizontal: "center",
           }}
           transformOrigin={{
-            vertical: 'top',
-            horizontal: 'center',
+            vertical: "top",
+            horizontal: "center",
           }}
         >
           <Box sx={{ p: 2, maxWidth: 400 }}>
             <Typography variant="body2" sx={{ mb: 2 }}>
-              • MediaLake Non-Managed (If/when other remote storage systems are introduced this
-              would be that category)
+              • MediaLake Non-Managed (If/when other remote storage systems are
+              introduced this would be that category)
             </Typography>
             <Typography variant="body2" sx={{ mb: 2 }}>
-              • Original files are kept on bucket, folder structure is not modified
+              • Original files are kept on bucket, folder structure is not
+              modified
             </Typography>
             <Typography variant="body2">
-              • Representations of files created, such as proxies, will be put in a MediaLake
-              managed bucket with a shadow folder structure
+              • Representations of files created, such as proxies, will be put
+              in a MediaLake managed bucket with a shadow folder structure
             </Typography>
           </Box>
         </Popover>
       </Dialog>
 
       {/* Render the ApiStatusModal only when not idle */}
-      {apiStatus.status !== 'idle' && (
+      {apiStatus.status !== "idle" && (
         <ApiStatusModal
           open={apiStatus.show}
           // Status is now guaranteed not to be 'idle' here

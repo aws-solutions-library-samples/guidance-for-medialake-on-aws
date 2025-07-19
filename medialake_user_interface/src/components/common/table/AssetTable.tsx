@@ -1,7 +1,7 @@
-import React, { useRef, useState } from 'react';
-import { Box, IconButton, TextField, Button } from '@mui/material';
-import EditIcon from '@mui/icons-material/Edit';
-import DownloadIcon from '@mui/icons-material/Download';
+import React, { useRef, useState } from "react";
+import { Box, IconButton, TextField, Button } from "@mui/material";
+import EditIcon from "@mui/icons-material/Edit";
+import DownloadIcon from "@mui/icons-material/Download";
 import {
   useReactTable,
   getCoreRowModel,
@@ -13,13 +13,13 @@ import {
   ColumnSizingState,
   ColumnResizeMode,
   Row,
-} from '@tanstack/react-table';
-import { useVirtualizer } from '@tanstack/react-virtual';
-import { ResizableTable } from './ResizableTable';
-import { BaseTableToolbar } from './BaseTableToolbar';
-import { TableCellContent } from './TableCellContent';
-import { type AssetBase } from '@/types/search/searchResults';
-import { type AssetTableColumn } from '@/types/shared/assetComponents';
+} from "@tanstack/react-table";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { ResizableTable } from "./ResizableTable";
+import { BaseTableToolbar } from "./BaseTableToolbar";
+import { TableCellContent } from "./TableCellContent";
+import { type AssetBase } from "@/types/search/searchResults";
+import { type AssetTableColumn } from "@/types/shared/assetComponents";
 
 interface AssetTableProps<T> {
   data: T[];
@@ -49,38 +49,46 @@ export function AssetTable<T>({
   const containerRef = useRef<HTMLDivElement>(null);
   const [columnVisibility, setColumnVisibility] = useState({});
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
-  const [globalFilter, setGlobalFilter] = useState('');
-  const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(null);
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(
+    null,
+  );
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editedName, setEditedName] = useState('');
+  const [editedName, setEditedName] = useState("");
 
   // Create a mapping between API field IDs and column IDs
   const fieldMapping: Record<string, string> = {
     // Root level fields (new API structure)
-    id: 'id',
-    assetType: 'type',
-    format: 'format',
-    createdAt: 'date',
-    objectName: 'name',
-    fileSize: 'size',
-    fullPath: 'fullPath',
-    bucket: 'bucket',
-    FileHash: 'hash',
+    id: "id",
+    assetType: "type",
+    format: "format",
+    createdAt: "date",
+    objectName: "name",
+    fileSize: "size",
+    fullPath: "fullPath",
+    bucket: "bucket",
+    FileHash: "hash",
 
     // Legacy nested fields (for backward compatibility)
-    'DigitalSourceAsset.Type': 'type',
-    'DigitalSourceAsset.MainRepresentation.Format': 'format',
-    'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate': 'date',
-    'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate': 'date',
-    'DigitalSourceAsset.CreateDate': 'date',
-    'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name': 'name',
-    'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size': 'size',
-    'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize': 'size',
-    'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath':
-      'fullPath',
-    'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket': 'bucket',
-    'Metadata.Consolidated': 'metadata',
-    InventoryID: 'id',
+    "DigitalSourceAsset.Type": "type",
+    "DigitalSourceAsset.MainRepresentation.Format": "format",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate":
+      "date",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate":
+      "date",
+    "DigitalSourceAsset.CreateDate": "date",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name":
+      "name",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size":
+      "size",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize":
+      "size",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath":
+      "fullPath",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket":
+      "bucket",
+    "Metadata.Consolidated": "metadata",
+    InventoryID: "id",
   };
 
   // Create a reverse mapping for easier lookup
@@ -101,23 +109,26 @@ export function AssetTable<T>({
         const colId = column.id;
 
         // Special case for name field
-        if (colId === 'name') {
+        if (colId === "name") {
           const hasNameField = selectedSearchFields.some(
-            (field) => field.includes('Name') || field === 'objectName'
+            (field) => field.includes("Name") || field === "objectName",
           );
           newColumnVisibility[colId] = hasNameField;
         }
         // Special case for date field
-        else if (colId === 'date') {
+        else if (colId === "date") {
           const hasDateField = selectedSearchFields.some(
-            (field) => field.includes('CreateDate') || field === 'createdAt'
+            (field) => field.includes("CreateDate") || field === "createdAt",
           );
           newColumnVisibility[colId] = hasDateField;
         }
         // Special case for size field
-        else if (colId === 'size') {
+        else if (colId === "size") {
           const hasSizeField = selectedSearchFields.some(
-            (field) => field.includes('FileSize') || field.includes('Size') || field === 'fileSize'
+            (field) =>
+              field.includes("FileSize") ||
+              field.includes("Size") ||
+              field === "fileSize",
           );
           newColumnVisibility[colId] = hasSizeField;
         }
@@ -125,7 +136,7 @@ export function AssetTable<T>({
         else {
           const apiFieldIds = reverseFieldMapping[colId] || [];
           const isFieldSelected = apiFieldIds.some((apiFieldId) =>
-            selectedSearchFields.includes(apiFieldId)
+            selectedSearchFields.includes(apiFieldId),
           );
           newColumnVisibility[colId] = isFieldSelected;
         }
@@ -144,7 +155,7 @@ export function AssetTable<T>({
 
   const columns = React.useMemo(() => {
     return userColumns.map((col) => {
-      if (col.id === 'name') {
+      if (col.id === "name") {
         return {
           ...col,
           cell: (info: any) => {
@@ -154,15 +165,17 @@ export function AssetTable<T>({
 
             if (isEditing) {
               return (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1 }}>
+                <Box
+                  sx={{ display: "flex", alignItems: "center", gap: 1, p: 1 }}
+                >
                   <TextField
                     value={editedName}
                     onChange={(e) => setEditedName(e.target.value)}
                     onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
+                      if (e.key === "Enter") {
                         onEditName?.(asset, editedName);
                         setEditingId(null);
-                      } else if (e.key === 'Escape') {
+                      } else if (e.key === "Escape") {
                         setEditingId(null);
                       }
                     }}
@@ -171,7 +184,7 @@ export function AssetTable<T>({
                     size="small"
                     sx={{ flex: 1 }}
                   />
-                  <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Box sx={{ display: "flex", gap: 1 }}>
                     <Button
                       size="small"
                       onClick={(e) => {
@@ -198,8 +211,10 @@ export function AssetTable<T>({
             }
 
             return (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1 }}>
-                <TableCellContent variant="primary">{currentName}</TableCellContent>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, p: 1 }}>
+                <TableCellContent variant="primary">
+                  {currentName}
+                </TableCellContent>
                 {onEditName && (
                   <IconButton
                     size="small"
@@ -241,10 +256,10 @@ export function AssetTable<T>({
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    columnResizeMode: 'onChange' as ColumnResizeMode,
+    columnResizeMode: "onChange" as ColumnResizeMode,
     filterFns: {
       includesString: (row, columnId, filterValue) => {
-        const value = String(row.getValue(columnId) || '').toLowerCase();
+        const value = String(row.getValue(columnId) || "").toLowerCase();
         return value.includes(String(filterValue).toLowerCase());
       },
     },
@@ -267,10 +282,10 @@ export function AssetTable<T>({
   return (
     <Box
       sx={{
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
       }}
     >
       <BaseTableToolbar
@@ -283,7 +298,9 @@ export function AssetTable<T>({
         }))}
         activeSorting={sorting.map((s) => ({ columnId: s.id, desc: s.desc }))}
         onRemoveFilter={(columnId) => {
-          onColumnFiltersChange?.(columnFilters.filter((f) => f.id !== columnId));
+          onColumnFiltersChange?.(
+            columnFilters.filter((f) => f.id !== columnId),
+          );
         }}
         onRemoveSort={(columnId) => {
           onSortingChange?.(sorting.filter((s) => s.id !== columnId));

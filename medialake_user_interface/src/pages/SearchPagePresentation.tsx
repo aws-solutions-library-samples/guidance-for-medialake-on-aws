@@ -1,5 +1,5 @@
-import React, { useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Typography,
@@ -11,14 +11,17 @@ import {
   DialogContentText,
   DialogActions,
   Button,
-} from '@mui/material';
-import SearchOffIcon from '@mui/icons-material/SearchOff';
-import { RightSidebar, RightSidebarProvider } from '@/components/common/RightSidebar';
-import SearchFilters from '@/components/search/SearchFilters';
-import MasterResultsView from '@/components/search/MasterResultsView';
-import TabbedSidebar from '@/components/common/RightSidebar/TabbedSidebar';
-import ApiStatusModal from '@/components/ApiStatusModal';
-import { type AssetItem, type Filters, type ExpandedSections } from './types';
+} from "@mui/material";
+import SearchOffIcon from "@mui/icons-material/SearchOff";
+import {
+  RightSidebar,
+  RightSidebarProvider,
+} from "@/components/common/RightSidebar";
+import SearchFilters from "@/components/search/SearchFilters";
+import MasterResultsView from "@/components/search/MasterResultsView";
+import TabbedSidebar from "@/components/common/RightSidebar/TabbedSidebar";
+import ApiStatusModal from "@/components/ApiStatusModal";
+import { type AssetItem, type Filters, type ExpandedSections } from "./types";
 
 interface SearchPagePresentationProps {
   // Search data
@@ -57,21 +60,23 @@ interface SearchPagePresentationProps {
 
   // View preferences
   viewPreferences: {
-    viewMode: 'card' | 'table';
-    cardSize: 'small' | 'medium' | 'large';
-    aspectRatio: 'vertical' | 'square' | 'horizontal';
-    thumbnailScale: 'fit' | 'fill';
+    viewMode: "card" | "table";
+    cardSize: "small" | "medium" | "large";
+    aspectRatio: "vertical" | "square" | "horizontal";
+    thumbnailScale: "fit" | "fill";
     showMetadata: boolean;
     groupByType: boolean;
     sorting: any;
     cardFields: { id: string; label: string; visible: boolean }[];
     handleViewModeChange: (
       event: React.MouseEvent<HTMLElement>,
-      newMode: 'card' | 'table' | null
+      newMode: "card" | "table" | null,
     ) => void;
-    handleCardSizeChange: (size: 'small' | 'medium' | 'large') => void;
-    handleAspectRatioChange: (ratio: 'vertical' | 'square' | 'horizontal') => void;
-    handleThumbnailScaleChange: (scale: 'fit' | 'fill') => void;
+    handleCardSizeChange: (size: "small" | "medium" | "large") => void;
+    handleAspectRatioChange: (
+      ratio: "vertical" | "square" | "horizontal",
+    ) => void;
+    handleThumbnailScaleChange: (scale: "fit" | "fill") => void;
     handleShowMetadataChange: (show: boolean) => void;
     handleGroupByTypeChange: (checked: boolean) => void;
     handleSortChange: (sorting: any) => void;
@@ -82,9 +87,12 @@ interface SearchPagePresentationProps {
   assetSelection: {
     selectedAssets: any[];
     selectedAssetIds: string[];
-    handleSelectToggle: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
+    handleSelectToggle: (
+      asset: AssetItem,
+      event: React.MouseEvent<HTMLElement>,
+    ) => void;
     handleSelectAll: (assets: AssetItem[]) => void;
-    getSelectAllState: (assets: AssetItem[]) => 'none' | 'some' | 'all';
+    getSelectAllState: (assets: AssetItem[]) => "none" | "some" | "all";
     handleBatchDelete: () => void;
     handleBatchDownload: () => void;
     handleBatchShare: () => void;
@@ -102,18 +110,30 @@ interface SearchPagePresentationProps {
 
   assetFavorites: {
     isAssetFavorited: (assetId: string) => boolean;
-    handleFavoriteToggle: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
+    handleFavoriteToggle: (
+      asset: AssetItem,
+      event: React.MouseEvent<HTMLElement>,
+    ) => void;
   };
 
   assetOperations: {
-    handleDeleteClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
-    handleStartEditing: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
+    handleDeleteClick: (
+      asset: AssetItem,
+      event: React.MouseEvent<HTMLElement>,
+    ) => void;
+    handleStartEditing: (
+      asset: AssetItem,
+      event: React.MouseEvent<HTMLElement>,
+    ) => void;
     handleNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
     handleNameEditComplete: (asset: AssetItem, save: boolean) => void;
     handleAction: (action: string, asset: AssetItem) => void;
     handleDeleteConfirm: () => void;
     handleDeleteCancel: () => void;
-    handleDownloadClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
+    handleDownloadClick: (
+      asset: AssetItem,
+      event: React.MouseEvent<HTMLElement>,
+    ) => void;
     editingAssetId?: string;
     editedName?: string;
     isDeleteModalOpen: boolean;
@@ -163,7 +183,7 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
     (asset: AssetItem) => {
       const assetType = asset.DigitalSourceAsset.Type.toLowerCase();
       // Special case for audio to use singular form
-      const pathPrefix = assetType === 'audio' ? '/audio/' : `/${assetType}s/`;
+      const pathPrefix = assetType === "audio" ? "/audio/" : `/${assetType}s/`;
       navigate(`${pathPrefix}${asset.InventoryID}`, {
         state: {
           assetType: asset.DigitalSourceAsset.Type,
@@ -172,7 +192,7 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
         },
       });
     },
-    [navigate, query]
+    [navigate, query],
   );
 
   const handlePageChange = (newPage: number) => {
@@ -186,52 +206,57 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
   // Define columns for table view
   const columns = [
     {
-      id: 'name',
-      label: 'Name',
+      id: "name",
+      label: "Name",
       visible: true,
       minWidth: 200,
       accessorFn: (row: AssetItem) =>
-        row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+        row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
+          .ObjectKey.Name,
       cell: (info: any) => info.getValue() as string,
       sortable: true,
       sortingFn: (rowA: any, rowB: any) =>
         rowA.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name.localeCompare(
-          rowB.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey
-            .Name
+          rowB.original.DigitalSourceAsset.MainRepresentation.StorageInfo
+            .PrimaryLocation.ObjectKey.Name,
         ),
     },
     {
-      id: 'type',
-      label: 'Type',
+      id: "type",
+      label: "Type",
       visible: true,
       minWidth: 100,
       accessorFn: (row: AssetItem) => row.DigitalSourceAsset.Type,
       sortable: true,
       sortingFn: (rowA: any, rowB: any) =>
-        rowA.original.DigitalSourceAsset.Type.localeCompare(rowB.original.DigitalSourceAsset.Type),
-    },
-    {
-      id: 'format',
-      label: 'Format',
-      visible: true,
-      minWidth: 100,
-      accessorFn: (row: AssetItem) => row.DigitalSourceAsset.MainRepresentation.Format,
-      sortable: true,
-      sortingFn: (rowA: any, rowB: any) =>
-        rowA.original.DigitalSourceAsset.MainRepresentation.Format.localeCompare(
-          rowB.original.DigitalSourceAsset.MainRepresentation.Format
+        rowA.original.DigitalSourceAsset.Type.localeCompare(
+          rowB.original.DigitalSourceAsset.Type,
         ),
     },
     {
-      id: 'size',
-      label: 'Size',
+      id: "format",
+      label: "Format",
       visible: true,
       minWidth: 100,
       accessorFn: (row: AssetItem) =>
-        row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
+        row.DigitalSourceAsset.MainRepresentation.Format,
+      sortable: true,
+      sortingFn: (rowA: any, rowB: any) =>
+        rowA.original.DigitalSourceAsset.MainRepresentation.Format.localeCompare(
+          rowB.original.DigitalSourceAsset.MainRepresentation.Format,
+        ),
+    },
+    {
+      id: "size",
+      label: "Size",
+      visible: true,
+      minWidth: 100,
+      accessorFn: (row: AssetItem) =>
+        row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
+          .FileInfo.Size,
       cell: (info: any) => {
         const sizeInBytes = info.getValue() as number;
-        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const sizes = ["B", "KB", "MB", "GB"];
         let i = 0;
         let size = sizeInBytes;
         while (size >= 1024 && i < sizes.length - 1) {
@@ -243,17 +268,17 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
       sortable: true,
       sortingFn: (rowA: any, rowB: any) => {
         const a =
-          rowA.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo
-            .Size;
+          rowA.original.DigitalSourceAsset.MainRepresentation.StorageInfo
+            .PrimaryLocation.FileInfo.Size;
         const b =
-          rowB.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo
-            .Size;
+          rowB.original.DigitalSourceAsset.MainRepresentation.StorageInfo
+            .PrimaryLocation.FileInfo.Size;
         return a - b;
       },
     },
     {
-      id: 'date',
-      label: 'Date Created',
+      id: "date",
+      label: "Date Created",
       visible: true,
       minWidth: 150,
       accessorFn: (row: AssetItem) => row.DigitalSourceAsset.CreateDate,
@@ -263,8 +288,12 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
       },
       sortable: true,
       sortingFn: (rowA: any, rowB: any) => {
-        const a = new Date(rowA.original.DigitalSourceAsset.CreateDate).getTime();
-        const b = new Date(rowB.original.DigitalSourceAsset.CreateDate).getTime();
+        const a = new Date(
+          rowA.original.DigitalSourceAsset.CreateDate,
+        ).getTime();
+        const b = new Date(
+          rowB.original.DigitalSourceAsset.CreateDate,
+        ).getTime();
         return a - b;
       },
     },
@@ -277,18 +306,24 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
   // Filter results based on current filters
   const filteredResults =
     searchResults?.filter((item) => {
-      const isImage = item.DigitalSourceAsset.Type === 'Image' && filters.mediaTypes.images;
-      const isVideo = item.DigitalSourceAsset.Type === 'Video' && filters.mediaTypes.videos;
-      const isAudio = item.DigitalSourceAsset.Type === 'Audio' && filters.mediaTypes.audio;
+      const isImage =
+        item.DigitalSourceAsset.Type === "Image" && filters.mediaTypes.images;
+      const isVideo =
+        item.DigitalSourceAsset.Type === "Video" && filters.mediaTypes.videos;
+      const isAudio =
+        item.DigitalSourceAsset.Type === "Audio" && filters.mediaTypes.audio;
 
       // Time-based filtering
       const createdAt = new Date(item.DigitalSourceAsset.CreateDate);
       const now = new Date();
       const timeDiff = now.getTime() - createdAt.getTime();
       const isRecent = filters.time.recent && timeDiff <= 24 * 60 * 60 * 1000;
-      const isLastWeek = filters.time.lastWeek && timeDiff <= 7 * 24 * 60 * 60 * 1000;
-      const isLastMonth = filters.time.lastMonth && timeDiff <= 30 * 24 * 60 * 60 * 1000;
-      const isLastYear = filters.time.lastYear && timeDiff <= 365 * 24 * 60 * 60 * 1000;
+      const isLastWeek =
+        filters.time.lastWeek && timeDiff <= 7 * 24 * 60 * 60 * 1000;
+      const isLastMonth =
+        filters.time.lastMonth && timeDiff <= 30 * 24 * 60 * 60 * 1000;
+      const isLastYear =
+        filters.time.lastYear && timeDiff <= 365 * 24 * 60 * 60 * 1000;
 
       const passesTimeFilter =
         (!filters.time.recent &&
@@ -308,17 +343,17 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
       <>
         <Box
           sx={{
-            display: 'flex',
-            minHeight: '100%',
-            bgcolor: 'background.default',
-            position: 'relative',
-            overflow: 'auto',
+            display: "flex",
+            minHeight: "100%",
+            bgcolor: "background.default",
+            position: "relative",
+            overflow: "auto",
           }}
         >
           {isFetching && (
             <LinearProgress
               sx={{
-                position: 'fixed',
+                position: "fixed",
                 top: 0,
                 left: 0,
                 right: 0,
@@ -334,8 +369,8 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
               px: 4,
               pt: 1,
               pb: 2,
-              display: 'flex',
-              flexDirection: 'column',
+              display: "flex",
+              flexDirection: "column",
               gap: 6,
               minHeight: 0,
               marginBottom: 4,
@@ -344,12 +379,12 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
             {searchMetadata?.totalResults === 0 && query && (
               <Box
                 sx={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  minHeight: '50vh',
-                  textAlign: 'center',
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minHeight: "50vh",
+                  textAlign: "center",
                   gap: 2,
                 }}
               >
@@ -357,18 +392,18 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
                   elevation={0}
                   sx={{
                     p: 4,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
                     gap: 2,
-                    bgcolor: 'background.paper',
+                    bgcolor: "background.paper",
                     borderRadius: 2,
                   }}
                 >
                   <SearchOffIcon
                     sx={{
                       fontSize: 64,
-                      color: 'text.secondary',
+                      color: "text.secondary",
                       mb: 2,
                     }}
                   />
@@ -378,14 +413,20 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
                   <Typography variant="body1" color="text.secondary">
                     We couldn't find any matches for "{query}"
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    Try adjusting your search or filters to find what you're looking for
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mt: 1 }}
+                  >
+                    Try adjusting your search or filters to find what you're
+                    looking for
                   </Typography>
                 </Paper>
               </Box>
             )}
 
-            {(filteredResults.length > 0 && searchMetadata && !error) || error ? (
+            {(filteredResults.length > 0 && searchMetadata && !error) ||
+            error ? (
               <MasterResultsView
                 results={error ? [] : filteredResults}
                 searchMetadata={{
@@ -408,7 +449,9 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
                 aspectRatio={viewPreferences.aspectRatio}
                 onAspectRatioChange={viewPreferences.handleAspectRatioChange}
                 thumbnailScale={viewPreferences.thumbnailScale}
-                onThumbnailScaleChange={viewPreferences.handleThumbnailScaleChange}
+                onThumbnailScaleChange={
+                  viewPreferences.handleThumbnailScaleChange
+                }
                 showMetadata={viewPreferences.showMetadata}
                 onShowMetadataChange={viewPreferences.handleShowMetadataChange}
                 sorting={viewPreferences.sorting}
@@ -428,13 +471,23 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
                 isAssetFavorited={assetFavorites.isAssetFavorited}
                 onFavoriteToggle={assetFavorites.handleFavoriteToggle}
                 // Only pass selection props if multi-select feature is enabled
-                selectedAssets={multiSelectEnabled ? assetSelection.selectedAssetIds : []}
-                onSelectToggle={multiSelectEnabled ? assetSelection.handleSelectToggle : undefined}
+                selectedAssets={
+                  multiSelectEnabled ? assetSelection.selectedAssetIds : []
+                }
+                onSelectToggle={
+                  multiSelectEnabled
+                    ? assetSelection.handleSelectToggle
+                    : undefined
+                }
                 hasSelectedAssets={
-                  multiSelectEnabled ? assetSelection.selectedAssets.length > 0 : false
+                  multiSelectEnabled
+                    ? assetSelection.selectedAssets.length > 0
+                    : false
                 }
                 selectAllState={
-                  multiSelectEnabled ? assetSelection.getSelectAllState(filteredResults) : 'none'
+                  multiSelectEnabled
+                    ? assetSelection.getSelectAllState(filteredResults)
+                    : "none"
                 }
                 onSelectAllToggle={
                   multiSelectEnabled
@@ -489,12 +542,17 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
           <DialogTitle id="delete-dialog-title">Confirm Delete</DialogTitle>
           <DialogContent>
             <DialogContentText id="delete-dialog-description">
-              Are you sure you want to delete this asset? This action cannot be undone.
+              Are you sure you want to delete this asset? This action cannot be
+              undone.
             </DialogContentText>
           </DialogContent>
           <DialogActions>
             <Button onClick={assetOperations.handleDeleteCancel}>Cancel</Button>
-            <Button onClick={assetOperations.handleDeleteConfirm} color="error" autoFocus>
+            <Button
+              onClick={assetOperations.handleDeleteConfirm}
+              color="error"
+              autoFocus
+            >
               Delete
             </Button>
           </DialogActions>
@@ -504,7 +562,9 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
         <ApiStatusModal
           open={assetSelection.modalState.open}
           onClose={assetSelection.handleModalClose}
-          status={assetSelection.modalState.status as 'loading' | 'error' | 'success'}
+          status={
+            assetSelection.modalState.status as "loading" | "error" | "success"
+          }
           action={assetSelection.modalState.action}
           message={assetSelection.modalState.message}
         />

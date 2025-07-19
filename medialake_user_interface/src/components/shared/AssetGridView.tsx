@@ -1,13 +1,13 @@
-import React from 'react';
-import { Box, Grid, Typography } from '@mui/material';
-import AssetCard, { AssetField } from './AssetCard';
+import React from "react";
+import { Box, Grid, Typography } from "@mui/material";
+import AssetCard, { AssetField } from "./AssetCard";
 
 interface AssetGridViewProps<T> {
   results: T[];
   groupByType: boolean;
-  cardSize: 'small' | 'medium' | 'large';
-  aspectRatio: 'vertical' | 'square' | 'horizontal';
-  thumbnailScale: 'fit' | 'fill';
+  cardSize: "small" | "medium" | "large";
+  aspectRatio: "vertical" | "square" | "horizontal";
+  thumbnailScale: "fit" | "fill";
   showMetadata: boolean;
   cardFields: AssetField[];
   onAssetClick: (asset: T) => void;
@@ -75,27 +75,27 @@ function AssetGridView<T>({
       (acc, item) => {
         const type = getAssetType(item).toLowerCase();
         const normalizedType =
-          type === 'image'
-            ? 'Image'
-            : type === 'video'
-              ? 'Video'
-              : type === 'audio'
-                ? 'Audio'
-                : 'Other';
+          type === "image"
+            ? "Image"
+            : type === "video"
+              ? "Video"
+              : type === "audio"
+                ? "Audio"
+                : "Other";
 
         if (!acc[normalizedType]) acc[normalizedType] = [];
         acc[normalizedType].push(item);
         return acc;
       },
-      {} as Record<string, T[]>
+      {} as Record<string, T[]>,
     );
   }, [results, groupByType, getAssetType]);
 
   const getGridSizes = () => {
     switch (cardSize) {
-      case 'small':
+      case "small":
         return { xs: 12, sm: 6, md: 3, lg: 2 };
-      case 'large':
+      case "large":
         return { xs: 12, sm: 12, md: 6, lg: 4 };
       default: // medium
         return { xs: 12, sm: 6, md: 4, lg: 3 };
@@ -122,15 +122,25 @@ function AssetGridView<T>({
               isEditing={editingAssetId === getAssetId(asset)}
               editedName={editedName}
               onEditNameChange={onEditNameChange}
-              onEditNameComplete={(save, value) => onEditNameComplete(asset, save, value)}
+              onEditNameComplete={(save, value) =>
+                onEditNameComplete(asset, save, value)
+              }
               cardSize={cardSize}
               aspectRatio={aspectRatio}
               thumbnailScale={thumbnailScale}
               showMetadata={showMetadata}
-              isFavorite={isAssetFavorited ? isAssetFavorited(getAssetId(asset)) : false}
-              onFavoriteToggle={onFavoriteToggle ? (e) => onFavoriteToggle(asset, e) : undefined}
-              isSelected={isAssetSelected ? isAssetSelected(getAssetId(asset)) : false}
-              onSelectToggle={onSelectToggle ? (id, e) => onSelectToggle(asset, e) : undefined}
+              isFavorite={
+                isAssetFavorited ? isAssetFavorited(getAssetId(asset)) : false
+              }
+              onFavoriteToggle={
+                onFavoriteToggle ? (e) => onFavoriteToggle(asset, e) : undefined
+              }
+              isSelected={
+                isAssetSelected ? isAssetSelected(getAssetId(asset)) : false
+              }
+              onSelectToggle={
+                onSelectToggle ? (id, e) => onSelectToggle(asset, e) : undefined
+              }
               selectedSearchFields={selectedSearchFields}
               isRenaming={isRenaming && renamingAssetId === getAssetId(asset)}
             />
@@ -141,7 +151,7 @@ function AssetGridView<T>({
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 6 }}>
       {Object.entries(groupedResults).map(
         ([type, assets]) =>
           assets.length > 0 && (
@@ -153,9 +163,9 @@ function AssetGridView<T>({
                   px: 1,
                   background: (theme) =>
                     `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-                  backgroundClip: 'text',
-                  WebkitBackgroundClip: 'text',
-                  color: 'transparent',
+                  backgroundClip: "text",
+                  WebkitBackgroundClip: "text",
+                  color: "transparent",
                   fontWeight: 600,
                 }}
               >
@@ -168,7 +178,9 @@ function AssetGridView<T>({
                       id={getAssetId(asset)}
                       name={getAssetName(asset)}
                       thumbnailUrl={getAssetThumbnail(asset)}
-                      proxyUrl={getAssetProxy ? getAssetProxy(asset) : undefined}
+                      proxyUrl={
+                        getAssetProxy ? getAssetProxy(asset) : undefined
+                      }
                       assetType={getAssetType(asset)}
                       fields={cardFields}
                       renderField={(fieldId) => renderCardField(fieldId, asset)}
@@ -179,27 +191,43 @@ function AssetGridView<T>({
                       isEditing={editingAssetId === getAssetId(asset)}
                       editedName={editedName}
                       onEditNameChange={onEditNameChange}
-                      onEditNameComplete={(save, value) => onEditNameComplete(asset, save, value)}
+                      onEditNameComplete={(save, value) =>
+                        onEditNameComplete(asset, save, value)
+                      }
                       cardSize={cardSize}
                       aspectRatio={aspectRatio}
                       thumbnailScale={thumbnailScale}
                       showMetadata={showMetadata}
-                      isFavorite={isAssetFavorited ? isAssetFavorited(getAssetId(asset)) : false}
-                      onFavoriteToggle={
-                        onFavoriteToggle ? (e) => onFavoriteToggle(asset, e) : undefined
+                      isFavorite={
+                        isAssetFavorited
+                          ? isAssetFavorited(getAssetId(asset))
+                          : false
                       }
-                      isSelected={isAssetSelected ? isAssetSelected(getAssetId(asset)) : false}
+                      onFavoriteToggle={
+                        onFavoriteToggle
+                          ? (e) => onFavoriteToggle(asset, e)
+                          : undefined
+                      }
+                      isSelected={
+                        isAssetSelected
+                          ? isAssetSelected(getAssetId(asset))
+                          : false
+                      }
                       onSelectToggle={
-                        onSelectToggle ? (id, e) => onSelectToggle(asset, e) : undefined
+                        onSelectToggle
+                          ? (id, e) => onSelectToggle(asset, e)
+                          : undefined
                       }
                       selectedSearchFields={selectedSearchFields}
-                      isRenaming={isRenaming && renamingAssetId === getAssetId(asset)}
+                      isRenaming={
+                        isRenaming && renamingAssetId === getAssetId(asset)
+                      }
                     />
                   </Grid>
                 ))}
               </Grid>
             </Box>
-          )
+          ),
       )}
     </Box>
   );

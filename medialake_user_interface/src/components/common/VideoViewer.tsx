@@ -8,29 +8,41 @@ import React, {
   useMemo,
   forwardRef,
   useImperativeHandle,
-} from 'react';
-import { MarkerLane, OmakasePlayer, PeriodMarker } from '@byomakase/omakase-player';
+} from "react";
+import {
+  MarkerLane,
+  OmakasePlayer,
+  PeriodMarker,
+} from "@byomakase/omakase-player";
 import {
   SCRUBBER_LANE_STYLE_DARK,
   TIMELINE_STYLE_DARK,
   PERIOD_MARKER_STYLE,
-} from './OmakaseTimeLineConstants';
-import { Tooltip, IconButton, Stack, Slider, Box, Typography, Paper } from '@mui/material';
+} from "./OmakaseTimeLineConstants";
+import {
+  Tooltip,
+  IconButton,
+  Stack,
+  Slider,
+  Box,
+  Typography,
+  Paper,
+} from "@mui/material";
 
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import PauseIcon from '@mui/icons-material/Pause';
-import VolumeUpIcon from '@mui/icons-material/VolumeUp';
-import VolumeOffIcon from '@mui/icons-material/VolumeOff';
-import FullscreenIcon from '@mui/icons-material/Fullscreen';
-import './VideoViewer.css';
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import PauseIcon from "@mui/icons-material/Pause";
+import VolumeUpIcon from "@mui/icons-material/VolumeUp";
+import VolumeOffIcon from "@mui/icons-material/VolumeOff";
+import FullscreenIcon from "@mui/icons-material/Fullscreen";
+import "./VideoViewer.css";
 
-import addMakerDiv from '../asset/AssetSidebar';
-import { createTimecodePlaceholder } from '@/utils/placeholderSvg';
+import addMakerDiv from "../asset/AssetSidebar";
+import { createTimecodePlaceholder } from "@/utils/placeholderSvg";
 
-import { filter } from 'rxjs';
-import { randomHexColor } from './utils';
-import { start } from 'repl';
-import { Currency } from 'lucide-react';
+import { filter } from "rxjs";
+import { randomHexColor } from "./utils";
+import { start } from "repl";
+import { Currency } from "lucide-react";
 
 export interface VideoViewerProps {
   videoSrc: string;
@@ -76,7 +88,7 @@ const useOmakasePlayer = (
   videoSrc: string,
   containerRef: React.RefObject<HTMLDivElement>,
   callbacks: Partial<VideoViewerProps>,
-  markerLaneRef: React.MutableRefObject<any | null>
+  markerLaneRef: React.MutableRefObject<any | null>,
 ) => {
   const playerRef = useRef<OmakasePlayer | null>(null);
   const [playerVolume, setPlayerVolume] = useState(1);
@@ -98,12 +110,12 @@ const useOmakasePlayer = (
     playerRef.current = player;
     player
       .createTimeline({
-        timelineHTMLElementId: 'omakase-timeline',
+        timelineHTMLElementId: "omakase-timeline",
         style: { ...TIMELINE_STYLE_DARK },
         zoomWheelEnabled: false,
       })
       .subscribe((timelineApi) => {
-        console.log('Timeline created');
+        console.log("Timeline created");
         const scrubberLane = timelineApi.getScrubberLane();
         scrubberLane.style = { ...SCRUBBER_LANE_STYLE_DARK };
       });
@@ -115,11 +127,11 @@ const useOmakasePlayer = (
           setDuration(video.duration);
         },
         error: (error) => {
-          console.error('Error loading video:', error);
+          console.error("Error loading video:", error);
           callbacksRef.current.onError?.(error);
         },
         complete: () => {
-          console.log('Video loading completed');
+          console.log("Video loading completed");
         },
       }),
       player.video.onPlay$.subscribe({
@@ -131,7 +143,7 @@ const useOmakasePlayer = (
       player.video.onPause$.subscribe({
         next: (event) => {
           console.log(
-            `Video pause. Timestamp: ${playerRef.current.video.formatToTimecode(event.currentTime)}`
+            `Video pause. Timestamp: ${playerRef.current.video.formatToTimecode(event.currentTime)}`,
           );
           callbacksRef.current.onPause?.();
         },
@@ -144,13 +156,13 @@ const useOmakasePlayer = (
       }),
       player.video.onBuffering$.subscribe({
         next: () => {
-          console.log('Video buffering');
+          console.log("Video buffering");
           callbacksRef.current.onBuffering?.();
         },
       }),
       player.video.onEnded$.subscribe({
         next: () => {
-          console.log('Video ended');
+          console.log("Video ended");
           callbacksRef.current.onEnded?.();
         },
       }),
@@ -175,7 +187,7 @@ const useOmakasePlayer = (
       }),
       player.video.onVideoError$.subscribe({
         next: (error) => {
-          console.error('Video error:', error);
+          console.error("Video error:", error);
           callbacksRef.current.onError?.(error);
         },
       }),
@@ -217,7 +229,7 @@ const useOmakasePlayer = (
     },
     [
       /*initializePlayer*/
-    ]
+    ],
   ); //Not using UseEffect dependency array due to player inicializing everytime someone changes tabs
 
   // Responsive timeline: Listen for window resize events and trigger a timeline resize.
@@ -236,7 +248,7 @@ const useOmakasePlayer = (
   // }, []);
   useEffect(() => {
     // Select the timeline container element.
-    const timelineContainer = document.getElementById('omakase-timeline');
+    const timelineContainer = document.getElementById("omakase-timeline");
     if (!timelineContainer) return;
 
     const resizeObserver = new ResizeObserver((entries) => {
@@ -248,7 +260,7 @@ const useOmakasePlayer = (
         if (playerRef.current.timeline.getZoomPercent() !== 100) {
           playerRef.current.timeline.zoomTo(100);
         }
-        console.log('Timeline layout settled via ResizeObserver');
+        console.log("Timeline layout settled via ResizeObserver");
       }
     });
     resizeObserver.observe(timelineContainer);
@@ -295,11 +307,11 @@ const useOmakasePlayer = (
   const removeSafeZone = useCallback((id: string) => {
     playerRef.current?.video.removeSafeZone(id).subscribe({
       next: () => {
-        console.log('Safe zone removed:', id);
+        console.log("Safe zone removed:", id);
         callbacksRef.current.onRemoveSafeZone?.(id);
       },
       error: (error) => {
-        console.error('Error removing safe zone:', error);
+        console.error("Error removing safe zone:", error);
       },
     });
   }, []);
@@ -307,11 +319,11 @@ const useOmakasePlayer = (
   const clearSafeZones = useCallback(() => {
     playerRef.current?.video.clearSafeZones().subscribe({
       next: () => {
-        console.log('All safe zones cleared');
+        console.log("All safe zones cleared");
         callbacksRef.current.onClearSafeZones?.();
       },
       error: (error) => {
-        console.error('Error clearing safe zones:', error);
+        console.error("Error clearing safe zones:", error);
       },
     });
   }, []);
@@ -337,7 +349,9 @@ const useOmakasePlayer = (
 function ThumbLabel(props: any) {
   const { children, open, value, showThumbnails = true } = props;
   const lastValueRef = useRef(value);
-  const [thumbnailUrl, setThumbnailUrl] = useState(() => getThumbnailForTime(value));
+  const [thumbnailUrl, setThumbnailUrl] = useState(() =>
+    getThumbnailForTime(value),
+  );
   const timeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
@@ -365,7 +379,7 @@ function ThumbLabel(props: any) {
           <img
             src={thumbnailUrl}
             alt={`Thumbnail at ${value}`}
-            style={{ width: 100, display: 'block' }}
+            style={{ width: 100, display: "block" }}
           />
         ) : (
           value.toFixed(1)
@@ -383,11 +397,11 @@ function getThumbnailForTime(time: number): string {
   const minutes = Math.floor((time % 3600) / 60);
   const seconds = Math.floor(time % 60);
   const frames = Math.floor((time % 1) * 25);
-  const timeString = `${hours.toString().padStart(2, '0')}:${minutes
+  const timeString = `${hours.toString().padStart(2, "0")}:${minutes
     .toString()
-    .padStart(2, '0')}:${seconds.toString().padStart(2, '0')}:${frames
+    .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}:${frames
     .toString()
-    .padStart(2, '0')}`;
+    .padStart(2, "0")}`;
   return createTimecodePlaceholder(timeString);
 }
 
@@ -414,7 +428,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
       onMarkerAdd,
       playerRef,
     },
-    ref
+    ref,
   ) => {
     const playerContainerRef = useRef<HTMLDivElement>(null);
     const markerLaneRef = useRef<MarkerLane | null>(null);
@@ -460,7 +474,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
         onError,
         onTimeUpdate,
         onMarkerAdd,
-      ]
+      ],
     );
 
     const {
@@ -476,7 +490,12 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
       currentTime,
       duration,
       setCurrentTime,
-    } = useOmakasePlayer(videoSrc, playerContainerRef, customCallbacks, markerLaneRef);
+    } = useOmakasePlayer(
+      videoSrc,
+      playerContainerRef,
+      customCallbacks,
+      markerLaneRef,
+    );
 
     // Expose the "hello" method via the ref.
     useImperativeHandle(
@@ -495,7 +514,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
             markerLaneRef.current.addMarker(periodMarker);
             customCallbacks.onMarkerAdd(currentTime);
 
-            console.log('playeref', playerRef);
+            console.log("playeref", playerRef);
             return periodMarker;
           }
         },
@@ -506,15 +525,15 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
           const minutes = Math.floor((time % 3600) / 60);
           const seconds = Math.floor(time % 60);
           const frames = Math.floor((time % 1) * 24);
-          return `${hours.toString().padStart(2, '0')}:${minutes
+          return `${hours.toString().padStart(2, "0")}:${minutes
             .toString()
-            .padStart(2, '0')}:${seconds.toString().padStart(2, '0')}:${frames
+            .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}:${frames
             .toString()
-            .padStart(2, '0')}`;
+            .padStart(2, "0")}`;
         },
         seek: (time: number) => seek(time),
       }),
-      [currentTime, customCallbacks, playerRef]
+      [currentTime, customCallbacks, playerRef],
     );
 
     const handlePlayPause = () => {
@@ -526,19 +545,22 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
     };
 
     const handleSeekChange = (_: Event, newValue: number | number[]) => {
-      if (typeof newValue === 'number') {
+      if (typeof newValue === "number") {
         setCurrentTime(newValue);
       }
     };
 
-    const handleSeekCommitted = (_: Event | SyntheticEvent, newValue: number | number[]) => {
-      if (typeof newValue === 'number') {
+    const handleSeekCommitted = (
+      _: Event | SyntheticEvent,
+      newValue: number | number[],
+    ) => {
+      if (typeof newValue === "number") {
         seek(newValue);
       }
     };
 
     const handleVolumeChange = (event: Event, newValue: number | number[]) => {
-      if (typeof newValue === 'number') {
+      if (typeof newValue === "number") {
         setPlayerVolume(newValue);
         setVolumeState(newValue);
         setMuted(newValue === 0);
@@ -570,15 +592,15 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
       const seconds = Math.floor(time % 60);
       if (isSmtpeFormat) {
         const frames = Math.floor((time % 1) * 25);
-        return `${hours.toString().padStart(2, '0')}:${minutes
+        return `${hours.toString().padStart(2, "0")}:${minutes
           .toString()
-          .padStart(2, '0')}:${seconds.toString().padStart(2, '0')}:${frames
+          .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}:${frames
           .toString()
-          .padStart(2, '0')}`;
+          .padStart(2, "0")}`;
       } else {
-        return `${hours.toString().padStart(2, '0')}:${minutes
+        return `${hours.toString().padStart(2, "0")}:${minutes
           .toString()
-          .padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+          .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
       }
     };
 
@@ -590,10 +612,10 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
       <Stack
         spacing={0}
         sx={{
-          width: '100%',
-          height: '10%',
-          position: 'relative',
-          overflow: 'hidden',
+          width: "100%",
+          height: "10%",
+          position: "relative",
+          overflow: "hidden",
         }}
       >
         <Box
@@ -601,26 +623,26 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
           ref={playerContainerRef}
           id="omakase-player"
           sx={{
-            width: '100%',
-            height: 'calc(100% - 250px)',
-            position: 'relative',
-            bgcolor: 'black',
-            '& > *': {
-              position: 'absolute',
+            width: "100%",
+            height: "calc(100% - 250px)",
+            position: "relative",
+            bgcolor: "black",
+            "& > *": {
+              position: "absolute",
               top: 0,
               left: 0,
-              width: '100%',
-              height: '100%',
+              width: "100%",
+              height: "100%",
             },
           }}
         />
         <Paper
           elevation={0}
           sx={{
-            bgcolor: 'rgba(0, 0, 0, 0.85)',
-            height: '85px',
+            bgcolor: "rgba(0, 0, 0, 0.85)",
+            height: "85px",
             borderRadius: 0,
-            width: '100%',
+            width: "100%",
           }}
         >
           <Box sx={{ px: 2, pt: 1 }}>
@@ -637,23 +659,28 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
               }}
               size="small"
               sx={{
-                '& .MuiSlider-thumb': {
+                "& .MuiSlider-thumb": {
                   width: 12,
                   height: 12,
-                  transition: 'none',
+                  transition: "none",
                 },
-                '& .MuiSlider-rail': { opacity: 0.3 },
-                '& .MuiSlider-track': { border: 'none', transition: 'none' },
+                "& .MuiSlider-rail": { opacity: 0.3 },
+                "& .MuiSlider-track": { border: "none", transition: "none" },
               }}
             />
           </Box>
-          <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 2, pb: 1 }}>
+          <Stack
+            direction="row"
+            alignItems="center"
+            spacing={1}
+            sx={{ px: 2, pb: 1 }}
+          >
             <IconButton
               onClick={handlePlayPause}
               size="small"
               sx={{
-                color: 'white',
-                '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' },
+                color: "white",
+                "&:hover": { bgcolor: "rgba(255, 255, 255, 0.1)" },
               }}
             >
               {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
@@ -662,11 +689,11 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
               variant="caption"
               onClick={handleTimeFormatToggle}
               sx={{
-                color: 'white',
+                color: "white",
                 minWidth: 100,
-                userSelect: 'none',
-                cursor: 'pointer',
-                '&:hover': { opacity: 0.8 },
+                userSelect: "none",
+                cursor: "pointer",
+                "&:hover": { opacity: 0.8 },
               }}
             >
               {formatTime(currentTime)} / {formatTime(duration)}
@@ -674,8 +701,8 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
             <Box sx={{ flexGrow: 1 }} />
             <Box
               sx={{
-                position: 'relative',
-                '&:hover .volume-slider': { opacity: 1, visibility: 'visible' },
+                position: "relative",
+                "&:hover .volume-slider": { opacity: 1, visibility: "visible" },
               }}
               onMouseEnter={() => setIsVolumeHovered(true)}
               onMouseLeave={() => setIsVolumeHovered(false)}
@@ -684,8 +711,8 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
                 onClick={handleMuteToggle}
                 size="small"
                 sx={{
-                  color: 'white',
-                  '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' },
+                  color: "white",
+                  "&:hover": { bgcolor: "rgba(255, 255, 255, 0.1)" },
                 }}
               >
                 {muted || volume === 0 ? <VolumeOffIcon /> : <VolumeUpIcon />}
@@ -694,19 +721,24 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
                 className="volume-slider"
                 elevation={4}
                 sx={{
-                  position: 'absolute',
-                  bottom: '100%',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  visibility: 'hidden',
+                  position: "absolute",
+                  bottom: "100%",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  visibility: "hidden",
                   opacity: 0,
-                  transition: 'opacity 0.2s, visibility 0.2s',
+                  transition: "opacity 0.2s, visibility 0.2s",
                   p: 1,
-                  bgcolor: 'rgba(0, 0, 0, 0.9)',
+                  bgcolor: "rgba(0, 0, 0, 0.9)",
                   mb: 1,
                 }}
               >
-                <Tooltip open={isVolumeHovered} title={`${volume}%`} placement="top" arrow>
+                <Tooltip
+                  open={isVolumeHovered}
+                  title={`${volume}%`}
+                  placement="top"
+                  arrow
+                >
                   <Slider
                     orientation="vertical"
                     value={volume}
@@ -714,14 +746,14 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
                     max={100}
                     onChange={handleVolumeChange}
                     onChangeCommitted={(_, newValue) => {
-                      if (typeof newValue === 'number') {
+                      if (typeof newValue === "number") {
                         setPlayerVolume(newValue);
                       }
                     }}
                     sx={{
                       height: 100,
-                      '& .MuiSlider-rail': { opacity: 0.3 },
-                      '& .MuiSlider-track': { border: 'none' },
+                      "& .MuiSlider-rail": { opacity: 0.3 },
+                      "& .MuiSlider-track": { border: "none" },
                     }}
                   />
                 </Tooltip>
@@ -731,8 +763,8 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
               onClick={handleFullscreenToggle}
               size="small"
               sx={{
-                color: 'white',
-                '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' },
+                color: "white",
+                "&:hover": { bgcolor: "rgba(255, 255, 255, 0.1)" },
               }}
             >
               <FullscreenIcon />
@@ -740,11 +772,11 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
           </Stack>
         </Paper>
         {/* Responsive timeline container */}
-        <Box id="omakase-timeline" sx={{ width: '100%', height: 'auto' }} />
+        <Box id="omakase-timeline" sx={{ width: "100%", height: "auto" }} />
       </Stack>
     );
-  }
+  },
 );
 
-VideoViewer.displayName = 'VideoViewer';
+VideoViewer.displayName = "VideoViewer";
 export default VideoViewer;

@@ -1,2 +1,2 @@
-export { ErrorBoundary } from './ErrorBoundary';
-export { default as RouteErrorBoundary } from './RouteErrorBoundary';
+export { ErrorBoundary } from "./ErrorBoundary";
+export { default as RouteErrorBoundary } from "./RouteErrorBoundary";

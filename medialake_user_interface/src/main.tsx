@@ -1,17 +1,17 @@
-import React, { Suspense, useState, useEffect } from 'react';
-import ReactDOM from 'react-dom/client';
-import AppConfigured from './components/app-configured';
-import { Amplify } from 'aws-amplify';
-import { useTranslation } from 'react-i18next';
-import { FeatureFlagsProvider } from './contexts/FeatureFlagsContext';
+import React, { Suspense, useState, useEffect } from "react";
+import ReactDOM from "react-dom/client";
+import AppConfigured from "./components/app-configured";
+import { Amplify } from "aws-amplify";
+import { useTranslation } from "react-i18next";
+import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
 
 // Import and initialize i18next configuration
-import './i18n/i18n';
+import "./i18n/i18n";
 
 // Create a loading component that uses translations
 const LoadingFallback = () => {
   const { t } = useTranslation();
-  return <>{t('app.loading', 'Loading...')}</>;
+  return <>{t("app.loading", "Loading...")}</>;
 };
 
 // App component that initializes feature flags and renders AppConfigured
@@ -26,7 +26,10 @@ const App = () => {
         await initializeAWS();
         setIsLoading(false);
       } catch (error) {
-        console.error(t('app.errors.loadingConfig', 'Error loading configuration:'), error);
+        console.error(
+          t("app.errors.loadingConfig", "Error loading configuration:"),
+          error,
+        );
         setIsLoading(false);
       }
     };
@@ -34,7 +37,7 @@ const App = () => {
     const initializeAWS = async () => {
       try {
         // Fetch AWS configuration
-        const awsResponse = await fetch('/aws-exports.json');
+        const awsResponse = await fetch("/aws-exports.json");
         const awsConfig = await awsResponse.json();
 
         // Configure Amplify
@@ -51,7 +54,7 @@ const App = () => {
 
         return true;
       } catch (error) {
-        console.error('Error loading AWS configuration:', error);
+        console.error("Error loading AWS configuration:", error);
         throw error;
       }
     };
@@ -73,4 +76,4 @@ const App = () => {
 };
 
 // Render the app
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);

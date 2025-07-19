@@ -2,7 +2,7 @@ import {
   Environment as BaseEnvironment,
   EnvironmentCreate as BaseEnvironmentCreate,
   EnvironmentUpdate as BaseEnvironmentUpdate,
-} from '@/types/environment';
+} from "@/types/environment";
 
 export type Environment = BaseEnvironment;
 export type EnvironmentCreate = BaseEnvironmentCreate;

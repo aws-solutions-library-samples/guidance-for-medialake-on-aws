@@ -1,7 +1,10 @@
-import { useState } from 'react';
-import { type SortingState } from '@tanstack/react-table';
-import { type AssetBase } from '../types/search/searchResults';
-import { type AssetField, type AssetTableColumn } from '../types/shared/assetComponents';
+import { useState } from "react";
+import { type SortingState } from "@tanstack/react-table";
+import { type AssetBase } from "../types/search/searchResults";
+import {
+  type AssetField,
+  type AssetTableColumn,
+} from "../types/shared/assetComponents";
 
 interface UseAssetResultsProps<T extends AssetBase> {
   assets: T[];
@@ -17,7 +20,7 @@ interface UseAssetResultsProps<T extends AssetBase> {
 }
 
 interface UseAssetResultsReturn<T extends AssetBase> {
-  viewMode: 'card' | 'table';
+  viewMode: "card" | "table";
   sorting: SortingState;
   setSorting: (sorting: SortingState) => void;
   page: number;
@@ -26,13 +29,15 @@ interface UseAssetResultsReturn<T extends AssetBase> {
   failedAssets: Set<string>;
   handleViewModeChange: (
     event: React.MouseEvent<HTMLElement>,
-    newMode: 'card' | 'table' | null
+    newMode: "card" | "table" | null,
   ) => void;
   handleRequestSort: (columnId: string) => void;
   handlePageChange: (event: React.ChangeEvent<unknown>, value: number) => void;
   handleCardFieldToggle: (fieldId: string) => void;
   handleColumnToggle: (columnId: string) => void;
-  handleAssetError: (event: React.SyntheticEvent<HTMLImageElement, Event>) => void;
+  handleAssetError: (
+    event: React.SyntheticEvent<HTMLImageElement, Event>,
+  ) => void;
 }
 
 export function useAssetResults<T extends AssetBase>({
@@ -41,9 +46,9 @@ export function useAssetResults<T extends AssetBase>({
   onPageChange,
   defaultCardFields,
   defaultColumns,
-  defaultSorting = [{ id: 'createDate', desc: true }],
+  defaultSorting = [{ id: "createDate", desc: true }],
 }: UseAssetResultsProps<T>): UseAssetResultsReturn<T> {
-  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
+  const [viewMode, setViewMode] = useState<"card" | "table">("card");
   const [sorting, setSorting] = useState<SortingState>(defaultSorting);
   const [page, setPage] = useState(searchMetadata.page);
   const [cardFields, setCardFields] = useState(defaultCardFields);
@@ -52,7 +57,7 @@ export function useAssetResults<T extends AssetBase>({
 
   const handleViewModeChange = (
     event: React.MouseEvent<HTMLElement>,
-    newMode: 'card' | 'table' | null
+    newMode: "card" | "table" | null,
   ) => {
     if (newMode !== null) {
       setViewMode(newMode);
@@ -71,7 +76,10 @@ export function useAssetResults<T extends AssetBase>({
     setPage(1);
   };
 
-  const handlePageChange = (event: React.ChangeEvent<unknown>, value: number) => {
+  const handlePageChange = (
+    event: React.ChangeEvent<unknown>,
+    value: number,
+  ) => {
     setPage(value);
     onPageChange(value);
   };
@@ -79,23 +87,27 @@ export function useAssetResults<T extends AssetBase>({
   const handleCardFieldToggle = (fieldId: string) => {
     setCardFields(
       cardFields.map((field) =>
-        field.id === fieldId ? { ...field, visible: !field.visible } : field
-      )
+        field.id === fieldId ? { ...field, visible: !field.visible } : field,
+      ),
     );
   };
 
   const handleColumnToggle = (columnId: string) => {
     setColumns(
-      columns.map((col) => (col.id === columnId ? { ...col, visible: !col.visible } : col))
+      columns.map((col) =>
+        col.id === columnId ? { ...col, visible: !col.visible } : col,
+      ),
     );
   };
 
-  const handleAssetError = (event: React.SyntheticEvent<HTMLImageElement, Event>) => {
+  const handleAssetError = (
+    event: React.SyntheticEvent<HTMLImageElement, Event>,
+  ) => {
     const img = event.target as HTMLImageElement;
     const assetId =
-      img.getAttribute('data-image-id') ||
-      img.getAttribute('data-video-id') ||
-      img.getAttribute('data-audio-id');
+      img.getAttribute("data-image-id") ||
+      img.getAttribute("data-video-id") ||
+      img.getAttribute("data-audio-id");
     if (assetId) {
       setFailedAssets((prev) => new Set([...prev, assetId]));
     }

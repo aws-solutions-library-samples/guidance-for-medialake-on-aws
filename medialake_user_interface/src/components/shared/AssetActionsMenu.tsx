@@ -1,6 +1,6 @@
-import React from 'react';
-import { Menu, MenuItem, CircularProgress, Box } from '@mui/material';
-import { type AssetBase } from '../../types/search/searchResults';
+import React from "react";
+import { Menu, MenuItem, CircularProgress, Box } from "@mui/material";
+import { type AssetBase } from "../../types/search/searchResults";
 
 interface AssetActionsMenuProps<T extends AssetBase> {
   anchorEl: HTMLElement | null;
@@ -18,8 +18,8 @@ interface AssetActionsMenuProps<T extends AssetBase> {
 }
 
 const defaultActions = [
-  { id: 'rename', label: 'Rename' },
-  { id: 'download', label: 'Download' },
+  { id: "rename", label: "Rename" },
+  { id: "download", label: "Download" },
 ];
 
 function AssetActionsMenu<T extends AssetBase>({
@@ -37,23 +37,27 @@ function AssetActionsMenu<T extends AssetBase>({
       onClose={onClose}
       onClick={(e) => e.stopPropagation()}
       transformOrigin={{
-        vertical: 'top',
-        horizontal: 'right',
+        vertical: "top",
+        horizontal: "right",
       }}
       anchorOrigin={{
-        vertical: 'bottom',
-        horizontal: 'right',
+        vertical: "bottom",
+        horizontal: "right",
       }}
     >
       {actions.map((action) => (
         <MenuItem
           key={action.id}
           onClick={() => onAction(action.id)}
-          disabled={!selectedAsset || (action.id === 'download' && isLoading.download)}
+          disabled={
+            !selectedAsset || (action.id === "download" && isLoading.download)
+          }
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             {action.label}
-            {action.id === 'download' && isLoading.download && <CircularProgress size={16} />}
+            {action.id === "download" && isLoading.download && (
+              <CircularProgress size={16} />
+            )}
           </Box>
         </MenuItem>
       ))}

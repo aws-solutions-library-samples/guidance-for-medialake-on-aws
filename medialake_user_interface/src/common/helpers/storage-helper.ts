@@ -1,6 +1,6 @@
-import { NavigationPanelState } from '../types';
+import { NavigationPanelState } from "../types";
 
-const PREFIX = 'medialake';
+const PREFIX = "medialake";
 const THEME_STORAGE_NAME = `${PREFIX}-theme`;
 const NAVIGATION_PANEL_STATE_STORAGE_NAME = `${PREFIX}-navigation-panel-state`;
 const TOKEN_KEY = `${PREFIX}-auth-token`;
@@ -9,13 +9,13 @@ const USERNAME_KEY = `${PREFIX}-username`;
 const AWS_CONFIG_KEY = `${PREFIX}-aws-config`;
 
 export abstract class StorageHelper {
-  static getTheme(): 'light' | 'dark' {
-    const savedTheme = localStorage.getItem('theme');
-    return savedTheme === 'dark' ? 'dark' : 'light';
+  static getTheme(): "light" | "dark" {
+    const savedTheme = localStorage.getItem("theme");
+    return savedTheme === "dark" ? "dark" : "light";
   }
 
-  static setTheme(theme: 'light' | 'dark'): void {
-    localStorage.setItem('theme', theme);
+  static setTheme(theme: "light" | "dark"): void {
+    localStorage.setItem("theme", theme);
   }
 
   static getNavigationPanelState(): NavigationPanelState {

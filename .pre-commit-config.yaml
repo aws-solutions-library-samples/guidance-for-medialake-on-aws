@@ -63,27 +63,6 @@ repos:
             lambdas/layers/warmer/nodejs/.*
           )$
 
-  # ESLint with auto-fix and warnings-only mode
-  - repo: https://github.com/pre-commit/mirrors-eslint
-    rev: v8.56.0
-    hooks:
-      - id: eslint
-        args: ["--fix", "--max-warnings=1000"] # Allow warnings, only fail on errors
-        files: \.[jt]sx?$
-        types: [file]
-        exclude: |
-          (?x)^(
-            lambdas/nodes/image_metadata_extractor/.*|
-            lambdas/layers/warmer/nodejs/.*
-          )$
-        additional_dependencies:
-          - eslint@8.56.0
-          - eslint-config-prettier
-          - eslint-plugin-react
-          - eslint-plugin-react-hooks
-          - "@typescript-eslint/parser"
-          - "@typescript-eslint/eslint-plugin"
-
   # Custom hooks
   - repo: local
     hooks:

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Popover, Box, TextField, Button, Stack } from '@mui/material';
+import React from "react";
+import { Popover, Box, TextField, Button, Stack } from "@mui/material";
 
 interface PipelineFilterPopoverProps {
   anchorEl: HTMLElement | null;
@@ -14,7 +14,7 @@ export const PipelineFilterPopover: React.FC<PipelineFilterPopoverProps> = ({
   onClose,
   onFilterChange,
 }) => {
-  const [filterValue, setFilterValue] = React.useState('');
+  const [filterValue, setFilterValue] = React.useState("");
 
   const handleApplyFilter = () => {
     if (column) {
@@ -24,7 +24,7 @@ export const PipelineFilterPopover: React.FC<PipelineFilterPopoverProps> = ({
   };
 
   const handleClearFilter = () => {
-    setFilterValue('');
+    setFilterValue("");
     onFilterChange([]);
     onClose();
   };
@@ -35,12 +35,12 @@ export const PipelineFilterPopover: React.FC<PipelineFilterPopoverProps> = ({
       anchorEl={anchorEl}
       onClose={onClose}
       anchorOrigin={{
-        vertical: 'bottom',
-        horizontal: 'left',
+        vertical: "bottom",
+        horizontal: "left",
       }}
       transformOrigin={{
-        vertical: 'top',
-        horizontal: 'left',
+        vertical: "top",
+        horizontal: "left",
       }}
     >
       <Box sx={{ p: 2, width: 300 }}>
@@ -54,7 +54,11 @@ export const PipelineFilterPopover: React.FC<PipelineFilterPopoverProps> = ({
           />
           <Stack direction="row" spacing={1} justifyContent="flex-end">
             <Button onClick={handleClearFilter}>Clear</Button>
-            <Button variant="contained" onClick={handleApplyFilter} disabled={!filterValue}>
+            <Button
+              variant="contained"
+              onClick={handleApplyFilter}
+              disabled={!filterValue}
+            >
               Apply
             </Button>
           </Stack>

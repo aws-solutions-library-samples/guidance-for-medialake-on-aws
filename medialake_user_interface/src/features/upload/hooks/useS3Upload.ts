@@ -1,6 +1,6 @@
-import { useCallback, useState } from 'react';
-import { apiClient } from '@/api/apiClient';
-import { API_ENDPOINTS } from '@/api/endpoints';
+import { useCallback, useState } from "react";
+import { apiClient } from "@/api/apiClient";
+import { API_ENDPOINTS } from "@/api/endpoints";
 
 interface UploadRequest {
   connector_id: string;
@@ -41,31 +41,39 @@ const useS3Upload = (): UseS3UploadReturn => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const getPresignedUrl = useCallback(async (request: UploadRequest): Promise<S3UploadResponse> => {
-    setIsLoading(true);
-    setError(null);
+  const getPresignedUrl = useCallback(
+    async (request: UploadRequest): Promise<S3UploadResponse> => {
+      setIsLoading(true);
+      setError(null);
 
-    try {
-      const response = await apiClient.post<{
-        status: string;
-        message: string;
-        data: S3UploadResponse;
-      }>(API_ENDPOINTS.ASSETS.UPLOAD, request);
+      try {
+        const response = await apiClient.post<{
+          status: string;
+          message: string;
+          data: S3UploadResponse;
+        }>(API_ENDPOINTS.ASSETS.UPLOAD, request);
 
-      if (response.data.status === 'success' && response.data.data) {
-        return response.data.data;
+        if (response.data.status === "success" && response.data.data) {
+          return response.data.data;
+        }
+
+        throw new Error(
+          response.data.message || "Failed to generate presigned URL",
+        );
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Unknown error occurred";
+        const error = new Error(
+          `Error generating presigned URL: ${errorMessage}`,
+        );
+        setError(error);
+        throw error;
+      } finally {
+        setIsLoading(false);
       }
-
-      throw new Error(response.data.message || 'Failed to generate presigned URL');
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-      const error = new Error(`Error generating presigned URL: ${errorMessage}`);
-      setError(error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   return {
     getPresignedUrl,

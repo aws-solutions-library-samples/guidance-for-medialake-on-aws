@@ -1,12 +1,12 @@
-import React from 'react';
-import { Box, Typography, LinearProgress } from '@mui/material';
-import { type SortingState } from '@tanstack/react-table';
-import { type AssetTableColumn } from '@/types/shared/assetComponents';
-import AssetViewControls from './AssetViewControls';
-import AssetPagination from './AssetPagination';
-import AssetGridView from './AssetGridView';
-import AssetTableView from './AssetTableView';
-import ErrorDisplay from './ErrorDisplay';
+import React from "react";
+import { Box, Typography, LinearProgress } from "@mui/material";
+import { type SortingState } from "@tanstack/react-table";
+import { type AssetTableColumn } from "@/types/shared/assetComponents";
+import AssetViewControls from "./AssetViewControls";
+import AssetPagination from "./AssetPagination";
+import AssetGridView from "./AssetGridView";
+import AssetTableView from "./AssetTableView";
+import ErrorDisplay from "./ErrorDisplay";
 
 export interface AssetField {
   id: string;
@@ -39,17 +39,17 @@ export interface AssetResultsViewProps<T> {
 
   groupByType: boolean;
   onGroupByTypeChange: (checked: boolean) => void;
-  viewMode: 'card' | 'table';
+  viewMode: "card" | "table";
   onViewModeChange: (
     event: React.MouseEvent<HTMLElement>,
-    newMode: 'card' | 'table' | null
+    newMode: "card" | "table" | null,
   ) => void;
-  cardSize: 'small' | 'medium' | 'large';
-  onCardSizeChange: (size: 'small' | 'medium' | 'large') => void;
-  aspectRatio: 'vertical' | 'square' | 'horizontal';
-  onAspectRatioChange: (ratio: 'vertical' | 'square' | 'horizontal') => void;
-  thumbnailScale: 'fit' | 'fill';
-  onThumbnailScaleChange: (scale: 'fit' | 'fill') => void;
+  cardSize: "small" | "medium" | "large";
+  onCardSizeChange: (size: "small" | "medium" | "large") => void;
+  aspectRatio: "vertical" | "square" | "horizontal";
+  onAspectRatioChange: (ratio: "vertical" | "square" | "horizontal") => void;
+  thumbnailScale: "fit" | "fill";
+  onThumbnailScaleChange: (scale: "fit" | "fill") => void;
   showMetadata: boolean;
   onShowMetadataChange: (show: boolean) => void;
   sorting: SortingState;
@@ -75,7 +75,7 @@ export interface AssetResultsViewProps<T> {
   onSelectToggle?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   // Select all functionality
   hasSelectedAssets?: boolean;
-  selectAllState?: 'none' | 'some' | 'all';
+  selectAllState?: "none" | "some" | "all";
   onSelectAllToggle?: () => void;
   error?: { status: string; message: string } | null;
   isLoading?: boolean;
@@ -96,7 +96,7 @@ function AssetResultsView<T>({
   onPageChange,
   onPageSizeChange,
   searchTerm,
-  title = 'Results',
+  title = "Results",
   // Search fields
   selectedFields,
   availableFields,
@@ -159,9 +159,9 @@ function AssetResultsView<T>({
               mb: 1,
               background: (theme) =>
                 `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              color: 'transparent',
+              backgroundClip: "text",
+              WebkitBackgroundClip: "text",
+              color: "transparent",
             }}
           >
             {title}
@@ -181,11 +181,12 @@ function AssetResultsView<T>({
             }))}
           onSortChange={(columnId) => {
             const currentSort = sorting[0];
-            const desc = currentSort?.id === columnId ? !currentSort.desc : false;
+            const desc =
+              currentSort?.id === columnId ? !currentSort.desc : false;
             onSortChange([{ id: columnId, desc }]);
           }}
           fields={
-            viewMode === 'card'
+            viewMode === "card"
               ? cardFields
               : columns.map((col) => ({
                   id: col.id,
@@ -193,7 +194,9 @@ function AssetResultsView<T>({
                   visible: col.visible,
                 }))
           }
-          onFieldToggle={viewMode === 'card' ? onCardFieldToggle : onColumnToggle}
+          onFieldToggle={
+            viewMode === "card" ? onCardFieldToggle : onColumnToggle
+          }
           selectedFields={selectedFields}
           availableFields={availableFields}
           onFieldsChange={onFieldsChange}
@@ -223,12 +226,12 @@ function AssetResultsView<T>({
 
   return (
     <Box sx={{ mt: 1 }}>
-      {' '}
+      {" "}
       {/* Changed from -2 to 1 to move the view controller down */}
       {isLoading && (
         <LinearProgress
           sx={{
-            position: 'fixed',
+            position: "fixed",
             top: 0,
             left: 0,
             right: 0,
@@ -244,23 +247,23 @@ function AssetResultsView<T>({
             fontWeight: 700,
             background: (theme) =>
               `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-            backgroundClip: 'text',
-            WebkitBackgroundClip: 'text',
-            color: 'transparent',
-            display: 'block',
-            visibility: 'visible',
-            position: 'relative',
+            backgroundClip: "text",
+            WebkitBackgroundClip: "text",
+            color: "transparent",
+            display: "block",
+            visibility: "visible",
+            position: "relative",
             zIndex: 1,
           }}
         >
-          {title}{' '}
+          {title}{" "}
           {searchMetadata?.totalResults > 0 && searchTerm && (
             <Typography
               component="span"
               sx={{
                 fontWeight: 300,
-                fontSize: '0.5em',
-                color: 'text.secondary',
+                fontSize: "0.5em",
+                color: "text.secondary",
                 opacity: 0.75,
               }}
             >
@@ -286,7 +289,7 @@ function AssetResultsView<T>({
           onSortChange([{ id: columnId, desc }]);
         }}
         fields={
-          viewMode === 'card'
+          viewMode === "card"
             ? cardFields
             : columns.map((col) => ({
                 id: col.id,
@@ -294,7 +297,7 @@ function AssetResultsView<T>({
                 visible: col.visible,
               }))
         }
-        onFieldToggle={viewMode === 'card' ? onCardFieldToggle : onColumnToggle}
+        onFieldToggle={viewMode === "card" ? onCardFieldToggle : onColumnToggle}
         selectedFields={selectedFields}
         availableFields={availableFields}
         onFieldsChange={onFieldsChange}
@@ -323,26 +326,26 @@ function AssetResultsView<T>({
 
             // Get values based on field ID
             switch (sortField) {
-              case 'name':
+              case "name":
                 valueA = getAssetName(a);
                 valueB = getAssetName(b);
                 break;
-              case 'type':
+              case "type":
                 valueA = getAssetType(a);
                 valueB = getAssetType(b);
                 break;
-              case 'size':
+              case "size":
                 // Assuming there's a way to get size from the asset
                 const sizeFieldA = a as any;
                 const sizeFieldB = b as any;
                 valueA =
-                  sizeFieldA?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation
-                    ?.FileInfo?.Size || 0;
+                  sizeFieldA?.DigitalSourceAsset?.MainRepresentation
+                    ?.StorageInfo?.PrimaryLocation?.FileInfo?.Size || 0;
                 valueB =
-                  sizeFieldB?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation
-                    ?.FileInfo?.Size || 0;
+                  sizeFieldB?.DigitalSourceAsset?.MainRepresentation
+                    ?.StorageInfo?.PrimaryLocation?.FileInfo?.Size || 0;
                 break;
-              case 'date':
+              case "date":
                 // Assuming there's a way to get date from the asset
                 const dateFieldA = a as any;
                 const dateFieldB = b as any;
@@ -362,8 +365,10 @@ function AssetResultsView<T>({
             if (valueA === valueB) return 0;
 
             // Handle string comparison
-            if (typeof valueA === 'string' && typeof valueB === 'string') {
-              return desc ? valueB.localeCompare(valueA) : valueA.localeCompare(valueB);
+            if (typeof valueA === "string" && typeof valueB === "string") {
+              return desc
+                ? valueB.localeCompare(valueA)
+                : valueA.localeCompare(valueB);
             }
 
             // Handle number comparison
@@ -372,7 +377,7 @@ function AssetResultsView<T>({
         }
 
         // Return the appropriate view based on viewMode
-        return viewMode === 'card' ? (
+        return viewMode === "card" ? (
           <AssetGridView
             results={sortedResults}
             groupByType={groupByType}
@@ -422,10 +427,16 @@ function AssetResultsView<T>({
             getAssetName={getAssetName}
             getAssetType={getAssetType}
             getAssetThumbnail={getAssetThumbnail}
-            isSelected={isAssetSelected ? (asset) => isAssetSelected(getAssetId(asset)) : undefined}
+            isSelected={
+              isAssetSelected
+                ? (asset) => isAssetSelected(getAssetId(asset))
+                : undefined
+            }
             onSelectToggle={onSelectToggle}
             isFavorite={
-              isAssetFavorited ? (asset) => isAssetFavorited(getAssetId(asset)) : undefined
+              isAssetFavorited
+                ? (asset) => isAssetFavorited(getAssetId(asset))
+                : undefined
             }
             onFavoriteToggle={onFavoriteToggle}
             selectedSearchFields={selectedFields}

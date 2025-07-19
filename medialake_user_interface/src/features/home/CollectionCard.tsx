@@ -1,23 +1,33 @@
-import React from 'react';
-import { Card, CardContent, CardMedia, Typography, Box, IconButton } from '@mui/material';
-import { MoreVert, FolderOpen } from '@mui/icons-material';
-import type { Collection } from '../../types/collection';
+import React from "react";
+import {
+  Card,
+  CardContent,
+  CardMedia,
+  Typography,
+  Box,
+  IconButton,
+} from "@mui/material";
+import { MoreVert, FolderOpen } from "@mui/icons-material";
+import type { Collection } from "../../types/collection";
 
 interface CollectionCardProps {
   collection: Collection;
   onOpen?: (id: string) => void;
 }
 
-export const CollectionCard: React.FC<CollectionCardProps> = ({ collection, onOpen }) => {
+export const CollectionCard: React.FC<CollectionCardProps> = ({
+  collection,
+  onOpen,
+}) => {
   return (
     <Card
       sx={{
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
-        '&:hover': {
-          transform: 'translateY(-4px)',
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        transition: "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
+        "&:hover": {
+          transform: "translateY(-4px)",
           boxShadow: (theme) => theme.shadows[4],
         },
       }}
@@ -27,10 +37,10 @@ export const CollectionCard: React.FC<CollectionCardProps> = ({ collection, onOp
         sx={{
           height: 140,
           backgroundColor: (theme) =>
-            collection.thumbnailUrl ? 'transparent' : theme.palette.grey[200],
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+            collection.thumbnailUrl ? "transparent" : theme.palette.grey[200],
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         }}
       >
         {!collection.thumbnailUrl && (
@@ -45,16 +55,16 @@ export const CollectionCard: React.FC<CollectionCardProps> = ({ collection, onOp
           <img
             src={collection.thumbnailUrl}
             alt={collection.name}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
           />
         )}
       </CardMedia>
       <CardContent sx={{ flexGrow: 1, pb: 2 }}>
         <Box
           sx={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
           }}
         >
           <Box>
@@ -73,11 +83,11 @@ export const CollectionCard: React.FC<CollectionCardProps> = ({ collection, onOp
           variant="body2"
           color="text.secondary"
           sx={{
-            display: '-webkit-box',
+            display: "-webkit-box",
             WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
           }}
         >
           {collection.description}

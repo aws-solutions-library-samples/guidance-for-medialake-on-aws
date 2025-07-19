@@ -1,5 +1,5 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { VideoViewerRef } from '../components/common/VideoViewer';
+import { useState, useCallback, useRef, useEffect } from "react";
+import { VideoViewerRef } from "../components/common/VideoViewer";
 
 export interface MediaController {
   currentTime: number;
@@ -8,7 +8,9 @@ export interface MediaController {
   seekTo: (time: number) => void;
   onTimeUpdate: (callback: (time: number) => void) => () => void;
   registerAudioElement: (audioElement: HTMLAudioElement) => void;
-  registerVideoElement: (videoViewerRef: React.RefObject<VideoViewerRef>) => void;
+  registerVideoElement: (
+    videoViewerRef: React.RefObject<VideoViewerRef>,
+  ) => void;
   updateCurrentTime: (time: number) => void;
 }
 
@@ -37,18 +39,18 @@ export const useMediaController = (): MediaController => {
     const handlePause = () => setIsPlaying(false);
     const handleEnded = () => setIsPlaying(false);
 
-    audioElement.addEventListener('timeupdate', handleTimeUpdate);
-    audioElement.addEventListener('loadedmetadata', handleLoadedMetadata);
-    audioElement.addEventListener('play', handlePlay);
-    audioElement.addEventListener('pause', handlePause);
-    audioElement.addEventListener('ended', handleEnded);
+    audioElement.addEventListener("timeupdate", handleTimeUpdate);
+    audioElement.addEventListener("loadedmetadata", handleLoadedMetadata);
+    audioElement.addEventListener("play", handlePlay);
+    audioElement.addEventListener("pause", handlePause);
+    audioElement.addEventListener("ended", handleEnded);
 
     return () => {
-      audioElement.removeEventListener('timeupdate', handleTimeUpdate);
-      audioElement.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      audioElement.removeEventListener('play', handlePlay);
-      audioElement.removeEventListener('pause', handlePause);
-      audioElement.removeEventListener('ended', handleEnded);
+      audioElement.removeEventListener("timeupdate", handleTimeUpdate);
+      audioElement.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      audioElement.removeEventListener("play", handlePlay);
+      audioElement.removeEventListener("pause", handlePause);
+      audioElement.removeEventListener("ended", handleEnded);
     };
   }, []);
 
@@ -71,9 +73,12 @@ export const useMediaController = (): MediaController => {
     };
   }, []);
 
-  const registerVideoElement = useCallback((videoViewerRef: React.RefObject<VideoViewerRef>) => {
-    videoElementRef.current = videoViewerRef;
-  }, []);
+  const registerVideoElement = useCallback(
+    (videoViewerRef: React.RefObject<VideoViewerRef>) => {
+      videoElementRef.current = videoViewerRef;
+    },
+    [],
+  );
 
   const updateCurrentTime = useCallback((time: number) => {
     setCurrentTime(time);

@@ -1,15 +1,17 @@
-import React from 'react';
-import { Typography, Box, useTheme } from '@mui/material';
+import React from "react";
+import { Typography, Box, useTheme } from "@mui/material";
 
 interface MarkdownRendererProps {
   content: string;
 }
 
-export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
+export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
+  content,
+}) => {
   const theme = useTheme();
 
   const parseMarkdown = (text: string) => {
-    const lines = text.split('\n');
+    const lines = text.split("\n");
     const elements: React.ReactNode[] = [];
     const currentIndex = 0;
 
@@ -18,12 +20,12 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
 
       // Skip empty lines
       if (!trimmedLine) {
-        elements.push(<Box key={`empty-${index}`} sx={{ height: '0.5rem' }} />);
+        elements.push(<Box key={`empty-${index}`} sx={{ height: "0.5rem" }} />);
         return;
       }
 
       // Headers
-      if (trimmedLine.startsWith('###')) {
+      if (trimmedLine.startsWith("###")) {
         elements.push(
           <Typography
             key={`h3-${index}`}
@@ -35,10 +37,10 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
               color: theme.palette.primary.main,
             }}
           >
-            {trimmedLine.replace(/^###\s*/, '')}
-          </Typography>
+            {trimmedLine.replace(/^###\s*/, "")}
+          </Typography>,
         );
-      } else if (trimmedLine.startsWith('##')) {
+      } else if (trimmedLine.startsWith("##")) {
         elements.push(
           <Typography
             key={`h2-${index}`}
@@ -50,10 +52,10 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
               color: theme.palette.primary.main,
             }}
           >
-            {trimmedLine.replace(/^##\s*/, '')}
-          </Typography>
+            {trimmedLine.replace(/^##\s*/, "")}
+          </Typography>,
         );
-      } else if (trimmedLine.startsWith('#')) {
+      } else if (trimmedLine.startsWith("#")) {
         elements.push(
           <Typography
             key={`h1-${index}`}
@@ -65,45 +67,62 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
               color: theme.palette.primary.main,
             }}
           >
-            {trimmedLine.replace(/^#\s*/, '')}
-          </Typography>
+            {trimmedLine.replace(/^#\s*/, "")}
+          </Typography>,
         );
       }
       // Bold text with **
-      else if (trimmedLine.includes('**')) {
+      else if (trimmedLine.includes("**")) {
         const parts = trimmedLine.split(/(\*\*[^*]+\*\*)/g);
         const formattedParts = parts.map((part, partIndex) => {
-          if (part.startsWith('**') && part.endsWith('**')) {
-            return <strong key={`bold-${index}-${partIndex}`}>{part.replace(/\*\*/g, '')}</strong>;
+          if (part.startsWith("**") && part.endsWith("**")) {
+            return (
+              <strong key={`bold-${index}-${partIndex}`}>
+                {part.replace(/\*\*/g, "")}
+              </strong>
+            );
           }
           return part;
         });
 
         elements.push(
-          <Typography key={`text-${index}`} variant="body1" paragraph sx={{ mb: 1 }}>
+          <Typography
+            key={`text-${index}`}
+            variant="body1"
+            paragraph
+            sx={{ mb: 1 }}
+          >
             {formattedParts}
-          </Typography>
+          </Typography>,
         );
       }
       // List items
-      else if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ')) {
+      else if (trimmedLine.startsWith("- ") || trimmedLine.startsWith("* ")) {
         elements.push(
-          <Box key={`list-${index}`} sx={{ display: 'flex', mb: 0.5 }}>
-            <Typography variant="body1" sx={{ mr: 1, color: theme.palette.primary.main }}>
+          <Box key={`list-${index}`} sx={{ display: "flex", mb: 0.5 }}>
+            <Typography
+              variant="body1"
+              sx={{ mr: 1, color: theme.palette.primary.main }}
+            >
               •
             </Typography>
             <Typography variant="body1" sx={{ flex: 1 }}>
-              {trimmedLine.replace(/^[-*]\s*/, '')}
+              {trimmedLine.replace(/^[-*]\s*/, "")}
             </Typography>
-          </Box>
+          </Box>,
         );
       }
       // Regular paragraphs
       else {
         elements.push(
-          <Typography key={`text-${index}`} variant="body1" paragraph sx={{ mb: 1 }}>
+          <Typography
+            key={`text-${index}`}
+            variant="body1"
+            paragraph
+            sx={{ mb: 1 }}
+          >
             {trimmedLine}
-          </Typography>
+          </Typography>,
         );
       }
     });

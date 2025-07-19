@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { Button, Card, CardContent, Typography, Box } from '@mui/material';
-import { ErrorBoundary } from '@/shared/ui/errors';
+import React, { useState } from "react";
+import { Button, Card, CardContent, Typography, Box } from "@mui/material";
+import { ErrorBoundary } from "@/shared/ui/errors";
 
 // Example of a component that might throw an error
 const BuggyCounter: React.FC = () => {
@@ -9,7 +9,7 @@ const BuggyCounter: React.FC = () => {
   const handleIncrement = () => {
     // This will throw when counter reaches 5
     if (counter === 5) {
-      throw new Error('Counter reached 5!');
+      throw new Error("Counter reached 5!");
     }
     setCounter(counter + 1);
   };
@@ -39,15 +39,15 @@ const ExampleWithErrorHandling: React.FC = () => {
   };
 
   return (
-    <Card sx={{ maxWidth: 500, mx: 'auto', mt: 4 }}>
+    <Card sx={{ maxWidth: 500, mx: "auto", mt: 4 }}>
       <CardContent>
         <Typography variant="h5" gutterBottom>
           Error Boundary Example
         </Typography>
 
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          This example demonstrates how to use the ErrorBoundary component to capture and display
-          errors.
+          This example demonstrates how to use the ErrorBoundary component to
+          capture and display errors.
         </Typography>
 
         {/*
@@ -59,7 +59,7 @@ const ExampleWithErrorHandling: React.FC = () => {
           onReset={handleReset}
           onError={(error, info) => {
             // You could log errors to your error reporting service here
-            console.log('Captured error:', error, info);
+            console.log("Captured error:", error, info);
           }}
         >
           <BuggyCounter />

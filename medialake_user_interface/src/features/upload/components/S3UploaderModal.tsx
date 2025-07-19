@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Button,
   Dialog,
@@ -7,8 +7,8 @@ import {
   DialogContentText,
   DialogTitle,
   Box,
-} from '@mui/material';
-import FileUploader from './FileUploader';
+} from "@mui/material";
+import FileUploader from "./FileUploader";
 
 interface S3UploaderModalProps {
   open: boolean;
@@ -22,9 +22,9 @@ interface S3UploaderModalProps {
 const S3UploaderModal: React.FC<S3UploaderModalProps> = ({
   open,
   onClose,
-  title = 'Upload Files',
-  description = 'Select an S3 connector and upload your files',
-  path = '',
+  title = "Upload Files",
+  description = "Select an S3 connector and upload your files",
+  path = "",
   onUploadComplete,
 }) => {
   const [uploadedFiles, setUploadedFiles] = useState<any[]>([]);

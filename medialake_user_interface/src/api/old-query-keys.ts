@@ -1,91 +1,102 @@
-import { createQueryKeyStore } from '@lukemorales/query-key-factory';
+import { createQueryKeyStore } from "@lukemorales/query-key-factory";
 
 export const queryKeys = createQueryKeyStore({
   users: {
-    root: ['users'],
+    root: ["users"],
     lists: null,
     list: (filters: string) => ({
-      queryKey: ['users', 'list', { filters }],
+      queryKey: ["users", "list", { filters }],
     }),
     details: null,
     detail: (id: string) => ({
-      queryKey: ['users', 'detail', id],
+      queryKey: ["users", "detail", id],
     }),
   },
   connectors: {
-    root: ['connectors'],
+    root: ["connectors"],
     lists: null,
     list: (filters: string) => ({
-      queryKey: ['connectors', 'list', { filters }],
+      queryKey: ["connectors", "list", { filters }],
     }),
     details: null,
     detail: (id: string) => ({
-      queryKey: ['connectors', 'detail', id],
+      queryKey: ["connectors", "detail", id],
     }),
   },
   connectorS3: {
-    root: ['connectors', 's3'],
+    root: ["connectors", "s3"],
     buckets: null,
-    explorer: (connectorId: string, prefix: string, continuationToken: string | null) => ({
-      queryKey: ['connectors', 's3', 'explorer', connectorId, prefix, continuationToken],
+    explorer: (
+      connectorId: string,
+      prefix: string,
+      continuationToken: string | null,
+    ) => ({
+      queryKey: [
+        "connectors",
+        "s3",
+        "explorer",
+        connectorId,
+        prefix,
+        continuationToken,
+      ],
     }),
   },
   pipelines: {
-    root: ['pipelines'],
+    root: ["pipelines"],
     lists: null,
     list: (filters: string) => ({
-      queryKey: ['pipelines', 'list', { filters }],
+      queryKey: ["pipelines", "list", { filters }],
     }),
     details: null,
     detail: (id: string) => ({
-      queryKey: ['pipelines', 'detail', id],
+      queryKey: ["pipelines", "detail", id],
     }),
   },
   pipelineExecutions: {
-    root: ['pipeline-executions'],
+    root: ["pipeline-executions"],
     lists: null,
     list: (page: number, pageSize: number, filters?: Record<string, any>) => ({
-      queryKey: ['pipeline-executions', 'list', { page, pageSize, filters }],
+      queryKey: ["pipeline-executions", "list", { page, pageSize, filters }],
     }),
     details: null,
     detail: (id: string) => ({
-      queryKey: ['pipeline-executions', 'detail', id],
+      queryKey: ["pipeline-executions", "detail", id],
     }),
   },
   search: {
-    root: ['search'],
+    root: ["search"],
   },
   assets: {
-    root: ['assets'],
+    root: ["assets"],
     lists: null,
     list: (filters: string) => ({
-      queryKey: ['assets', 'list', { filters }],
+      queryKey: ["assets", "list", { filters }],
     }),
     details: null,
     detail: (id: string) => ({
-      queryKey: ['assets', 'detail', id],
+      queryKey: ["assets", "detail", id],
     }),
   },
   roles: {
-    root: ['roles'],
+    root: ["roles"],
     lists: null,
     list: (filters: string) => ({
-      queryKey: ['roles', 'list', { filters }],
+      queryKey: ["roles", "list", { filters }],
     }),
     details: null,
     detail: (id: string) => ({
-      queryKey: ['roles', 'detail', id],
+      queryKey: ["roles", "detail", id],
     }),
   },
   environments: {
-    root: ['environments'],
+    root: ["environments"],
     lists: null,
     list: (filters: string) => ({
-      queryKey: ['environments', 'list', { filters }],
+      queryKey: ["environments", "list", { filters }],
     }),
     details: null,
     detail: (id: string) => ({
-      queryKey: ['environments', 'detail', id],
+      queryKey: ["environments", "detail", id],
     }),
   },
 });

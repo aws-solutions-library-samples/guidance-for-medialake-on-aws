@@ -1,7 +1,7 @@
 // components/TopBar/Chat/ChatInput.tsx
-import React from 'react';
-import { Box, TextField, IconButton } from '@mui/material';
-import { Send as SendIcon, Close as CloseIcon } from '@mui/icons-material';
+import React from "react";
+import { Box, TextField, IconButton } from "@mui/material";
+import { Send as SendIcon, Close as CloseIcon } from "@mui/icons-material";
 
 interface ChatInputProps {
   value: string;
@@ -10,9 +10,14 @@ interface ChatInputProps {
   onClose: () => void;
 }
 
-const ChatInput: React.FC<ChatInputProps> = ({ value, onChange, onSubmit, onClose }) => (
-  <Box sx={{ p: 2, borderTop: '1px solid rgba(0, 0, 0, 0.12)' }}>
-    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+const ChatInput: React.FC<ChatInputProps> = ({
+  value,
+  onChange,
+  onSubmit,
+  onClose,
+}) => (
+  <Box sx={{ p: 2, borderTop: "1px solid rgba(0, 0, 0, 0.12)" }}>
+    <Box sx={{ display: "flex", alignItems: "center" }}>
       <TextField
         variant="outlined"
         size="small"
@@ -25,9 +30,9 @@ const ChatInput: React.FC<ChatInputProps> = ({ value, onChange, onSubmit, onClos
         onClick={onSubmit}
         sx={{
           mr: 1,
-          bgcolor: 'primary.main',
-          color: 'white',
-          '&:hover': { bgcolor: 'primary.dark' },
+          bgcolor: "primary.main",
+          color: "white",
+          "&:hover": { bgcolor: "primary.dark" },
         }}
       >
         <SendIcon />
@@ -35,9 +40,9 @@ const ChatInput: React.FC<ChatInputProps> = ({ value, onChange, onSubmit, onClos
       <IconButton
         onClick={onClose}
         sx={{
-          bgcolor: 'error.main',
-          color: 'white',
-          '&:hover': { bgcolor: 'error.dark' },
+          bgcolor: "error.main",
+          color: "white",
+          "&:hover": { bgcolor: "error.dark" },
         }}
       >
         <CloseIcon />

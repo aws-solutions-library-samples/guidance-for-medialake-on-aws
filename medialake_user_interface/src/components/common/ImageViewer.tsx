@@ -1,11 +1,17 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Box, IconButton, Tooltip, useTheme, CircularProgress } from '@mui/material';
-import Rotate90DegreesCwIcon from '@mui/icons-material/Rotate90DegreesCw';
-import HomeIcon from '@mui/icons-material/Home';
-import LockIcon from '@mui/icons-material/Lock';
-import GetAppIcon from '@mui/icons-material/GetApp';
-import LockOpenIcon from '@mui/icons-material/LockOpen';
-import _ from 'lodash';
+import React, { useRef, useState, useEffect, useCallback } from "react";
+import {
+  Box,
+  IconButton,
+  Tooltip,
+  useTheme,
+  CircularProgress,
+} from "@mui/material";
+import Rotate90DegreesCwIcon from "@mui/icons-material/Rotate90DegreesCw";
+import HomeIcon from "@mui/icons-material/Home";
+import LockIcon from "@mui/icons-material/Lock";
+import GetAppIcon from "@mui/icons-material/GetApp";
+import LockOpenIcon from "@mui/icons-material/LockOpen";
+import _ from "lodash";
 
 interface ImageViewerProps {
   imageSrc: string;
@@ -17,8 +23,8 @@ const ZOOM_FACTOR = 1.07;
 
 const ImageViewer: React.FC<ImageViewerProps> = ({
   imageSrc,
-  maxHeight = '70vh',
-  filename = 'image_download',
+  maxHeight = "70vh",
+  filename = "image_download",
 }) => {
   const theme = useTheme();
   const [zoom, setZoom] = useState(1);
@@ -42,7 +48,11 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
   const MAX_ZOOM = scaleSize * 5;
 
   /** Calculate scale to fit image (considering rotation) in the canvas */
-  const calculateFitScale = (imgW: number, imgH: number, rot: number): number => {
+  const calculateFitScale = (
+    imgW: number,
+    imgH: number,
+    rot: number,
+  ): number => {
     const canvas = canvasRef.current;
     if (!canvas) return 1;
     const cw = canvas.clientWidth;
@@ -66,7 +76,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     const canvas = canvasRef.current;
     if (!canvas || !background) return;
 
-    const ctx = canvas.getContext('2d', { alpha: false });
+    const ctx = canvas.getContext("2d", { alpha: false });
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
@@ -78,12 +88,15 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     ctx.scale(dpr, dpr);
 
     // background fill
-    const bgColor = theme.palette.mode === 'dark' ? theme.palette.background.paper : '#ffffff';
+    const bgColor =
+      theme.palette.mode === "dark"
+        ? theme.palette.background.paper
+        : "#ffffff";
     ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
 
     ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
+    ctx.imageSmoothingQuality = "high";
 
     ctx.save();
     ctx.translate(canvas.clientWidth / 2, canvas.clientHeight / 2);
@@ -171,23 +184,27 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
       e.preventDefault();
       isZoomingRef.current = true;
       const dir = e.deltaY > 0 ? -1 : 1;
-      const newZoom = _.clamp(zoom * Math.pow(ZOOM_FACTOR, dir), MIN_ZOOM, MAX_ZOOM);
+      const newZoom = _.clamp(
+        zoom * Math.pow(ZOOM_FACTOR, dir),
+        MIN_ZOOM,
+        MAX_ZOOM,
+      );
       setZoom(newZoom);
       setTimeout(() => {
         isZoomingRef.current = false;
       }, 300);
     },
-    [isCanvasLocked, zoom, MIN_ZOOM, MAX_ZOOM]
+    [isCanvasLocked, zoom, MIN_ZOOM, MAX_ZOOM],
   );
 
   useEffect(() => {
     const c = canvasRef.current;
     if (!c) return;
     if (!isCanvasLocked) {
-      c.addEventListener('wheel', handleWheel, { passive: false });
+      c.addEventListener("wheel", handleWheel, { passive: false });
     }
     return () => {
-      c.removeEventListener('wheel', handleWheel);
+      c.removeEventListener("wheel", handleWheel);
     };
   }, [handleWheel, isCanvasLocked]);
 
@@ -217,16 +234,16 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
   const handleCanvasDownload = () => {
     const c = canvasRef.current;
     if (!c) return;
-    const off = document.createElement('canvas');
+    const off = document.createElement("canvas");
     off.width = c.width;
     off.height = c.height;
-    const ctx = off.getContext('2d');
+    const ctx = off.getContext("2d");
     if (!ctx) return;
     ctx.drawImage(c, 0, 0);
-    const dataUrl = off.toDataURL('image/png');
-    const link = document.createElement('a');
+    const dataUrl = off.toDataURL("image/png");
+    const link = document.createElement("a");
     link.href = dataUrl;
-    link.download = `${filename || 'image'}_modified.png`;
+    link.download = `${filename || "image"}_modified.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -234,21 +251,21 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
 
   const toolButtons = [
     {
-      tip: 'Download Canvas',
+      tip: "Download Canvas",
       icon: <GetAppIcon />,
       onClick: handleCanvasDownload,
     },
-    { tip: 'Reset', icon: <HomeIcon />, onClick: resetImage },
+    { tip: "Reset", icon: <HomeIcon />, onClick: resetImage },
     {
-      tip: isCanvasLocked ? 'Unlock canvas' : 'Lock canvas',
+      tip: isCanvasLocked ? "Unlock canvas" : "Lock canvas",
       icon: isCanvasLocked ? <LockIcon /> : <LockOpenIcon />,
       onClick: toggleCanvasLock,
     },
     {
-      tip: 'Rotate',
+      tip: "Rotate",
       icon: <Rotate90DegreesCwIcon />,
       onClick: () => setRotate((r) => (r + 90) % 360),
-      style: { transform: 'rotate(90deg)' },
+      style: { transform: "rotate(90deg)" },
     },
   ];
 
@@ -257,12 +274,12 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
       sx={{
         height: maxHeight,
         maxHeight,
-        width: '100%',
-        display: 'grid',
-        gridTemplate: '1fr / 1fr',
-        position: 'relative',
-        overflow: 'hidden',
-        background: 'transparent',
+        width: "100%",
+        display: "grid",
+        gridTemplate: "1fr / 1fr",
+        position: "relative",
+        overflow: "hidden",
+        background: "transparent",
       }}
     >
       <canvas
@@ -272,31 +289,34 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
         onMouseOut={handleMouseUp}
         onMouseMove={handleMouseMove}
         style={{
-          width: '100%',
-          height: '100%',
-          cursor: isCanvasLocked ? 'default' : dragging ? 'grabbing' : 'grab',
+          width: "100%",
+          height: "100%",
+          cursor: isCanvasLocked ? "default" : dragging ? "grabbing" : "grab",
           opacity: isFirstDrawComplete ? 1 : 0,
-          transition: 'opacity 0.3s ease-in-out',
+          transition: "opacity 0.3s ease-in-out",
         }}
       />
       {!isImageReady && (
         <Box
           sx={{
-            gridArea: '1 / 1',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
+            gridArea: "1 / 1",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
           }}
         >
-          <CircularProgress size={48} sx={{ mb: 2, color: theme.palette.primary.main }} />
+          <CircularProgress
+            size={48}
+            sx={{ mb: 2, color: theme.palette.primary.main }}
+          />
         </Box>
       )}
       <Box
         sx={{
-          position: 'absolute',
+          position: "absolute",
           bottom: 8,
           right: 8,
-          display: 'flex',
+          display: "flex",
           gap: 1,
         }}
       >

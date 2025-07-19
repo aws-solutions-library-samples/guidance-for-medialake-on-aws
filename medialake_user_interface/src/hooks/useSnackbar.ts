@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { useSnackbar as useNotistack } from 'notistack';
+import { useState } from "react";
+import { useSnackbar as useNotistack } from "notistack";
 
-type SnackbarSeverity = 'success' | 'error' | 'warning' | 'info';
+type SnackbarSeverity = "success" | "error" | "warning" | "info";
 
 interface SnackbarOptions {
   message: string;
@@ -15,7 +15,7 @@ export const useSnackbar = () => {
 
   const showSnackbar = ({
     message,
-    severity = 'info',
+    severity = "info",
     autoHideDuration = 3000,
     action,
   }: SnackbarOptions) => {

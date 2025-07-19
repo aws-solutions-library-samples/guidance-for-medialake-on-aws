@@ -11,18 +11,15 @@
    ![Upload Template](../images/installation-guide/CF-Install-2.png)
    ![Upload Template2](../images/installation-guide/CF-Install-3.png)
 4. **Configure Stack and Media Lake Settings**:
-
    - **Stack Name**: Name the stack `medialake-cf`
      ![Stack Details](../images/installation-guide/CF-Install-4.png)
 
    - **Configure Initial Media Lake User**:
-
      - **Email** (`InitialUserEmail`): Enter your email address to receive a welcome email (required)
      - **First Name** (`InitialUserFirstName`): Enter the administrator's first name (1-50 characters, letters/spaces/hyphens/periods only)
      - **Last Name** (`InitialUserLastName`): Enter the administrator's last name (1-50 characters, letters/spaces/hyphens/periods only)
 
    - **Configure Media Lake Settings**:
-
      - **Media Lake Environment Name** (`MediaLakeEnvironmentName`): Set environment identifier (1-10 alphanumeric characters, default: `dev`)
      - **OpenSearch Deployment Size** (`OpenSearchDeploymentSize`): Choose deployment size:
        - `small` - Suitable for development and testing environments
@@ -56,7 +53,6 @@ After deployment, you'll need to configure storage connectors to connect media l
 ### 2.2 Configure S3 Storage Connectors
 
 1. **Navigate to Connectors**:
-
    - Log in to media lake
    - Go to **Settings** > **Connectors**
    - Click **Add Connector**
@@ -65,13 +61,11 @@ After deployment, you'll need to configure storage connectors to connect media l
 2. **Configure Connector Settings**:
 
    **Step 1: Select Type**
-
    - Choose **Amazon S3**
    - Click **Next** to proceed
      ![Select Amazon S3](../images/installation-guide/MediaLake-Configuration-3.png)
 
    **Step 2: Select S3 Type**
-
    - Choose your S3 bucket option:
      - **Existing S3 Bucket**: Connect to an existing S3 bucket
      - **New S3 Bucket**: Create a new S3 bucket
@@ -81,7 +75,6 @@ After deployment, you'll need to configure storage connectors to connect media l
    **Step 3: Configuration**
 
    **For Existing S3 Bucket:**
-
    - **Connector Name**: Enter a descriptive name for your connector
    - **Description**: Add an optional description for the connector
    - **S3 Connector Type**: Select from the dropdown options
@@ -94,7 +87,6 @@ After deployment, you'll need to configure storage connectors to connect media l
    > **Note**: If you have existing assets in the bucket, you can optionally use sync to ingest the content. After creating the connector, navigate back to the Connectors list, find your connector, and click the sync button to perform an initial scan of existing media files.
 
    **For New S3 Bucket:**
-
    - **Connector Name**: Enter a descriptive name for your connector
    - **Description**: Add an optional description for the connector
    - **S3 Connector Type**: Select from the dropdown options
@@ -128,24 +120,20 @@ After deployment, you'll need to configure storage connectors to connect media l
 ## 3. Semantic Search & Integrations
 
 - **Enable Semantic Search**:
-
   - Configure your semantic search provider in media lake.
   - Add and configure the **Twelve Labs** integration.
 
 - **Import Processing Pipelines**:
-
   - Navigate to the **Pipelines** menu and click the **Import pipelines** button.
     ![Configure Twelve Labs Integration 3](../images/installation-guide/MediaLake-Configuration-9.png)
   - In the file selection dialog, choose from the available pipelines in the [`pipeline_library`](../../pipeline_library/) directory:
 
     **Twelve Labs AI Enhancement Pipelines:**
-
     - [`Twelve Labs API Audio Embedding to OpenSearch.json`](../../pipeline_library/Twelve%20Labs%20API%20Audio%20Embedding%20to%20OpenSearch.json) - Generate audio embeddings for semantic search
     - [`Twelve Labs API Video Embedding to OpenSearch.json`](../../pipeline_library/Twelve%20Labs%20API%20Video%20Embedding%20to%20OpenSearch.json) - Generate video embeddings for semantic search
     - [`Twelve Labs API Image Embedding to OpenSearch.json`](../../pipeline_library/Twelve%20Labs%20API%20Image%20Embedding%20to%20OpenSearch.json) - Generate image embeddings for semantic search
 
     **Transcription Pipelines:**
-
     - [`Audio Transcription.json`](../../pipeline_library/Audio%20Transcription.json) - Audio transcription using Amazon Transcribe with Bedrock summarization
     - [`Video Transcription.json`](../../pipeline_library/Video%20Transcription.json) - Video transcription using Amazon Transcribe with Bedrock summarization
 

@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -7,8 +7,8 @@ import {
   TableContainer,
   Checkbox,
   CircularProgress,
-} from '@mui/material';
-import { InlineTextEditor } from '../common/InlineTextEditor';
+} from "@mui/material";
+import { InlineTextEditor } from "../common/InlineTextEditor";
 import {
   useReactTable,
   getCoreRowModel,
@@ -18,16 +18,16 @@ import {
   type SortingState,
   type ColumnFiltersState,
   type Row,
-} from '@tanstack/react-table';
-import { useVirtualizer } from '@tanstack/react-virtual';
-import { ResizableTable } from '../common/table';
-import DeleteIcon from '@mui/icons-material/Delete';
-import EditIcon from '@mui/icons-material/Edit';
-import DownloadIcon from '@mui/icons-material/Download';
-import FavoriteIcon from '@mui/icons-material/Favorite';
-import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
-import { type AssetTableColumn } from '@/types/shared/assetComponents';
-import { AssetAudio } from '../asset';
+} from "@tanstack/react-table";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { ResizableTable } from "../common/table";
+import DeleteIcon from "@mui/icons-material/Delete";
+import EditIcon from "@mui/icons-material/Edit";
+import DownloadIcon from "@mui/icons-material/Download";
+import FavoriteIcon from "@mui/icons-material/Favorite";
+import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
+import { type AssetTableColumn } from "@/types/shared/assetComponents";
+import { AssetAudio } from "../asset";
 
 export interface AssetTableProps<T> {
   data: T[];
@@ -46,7 +46,10 @@ export interface AssetTableProps<T> {
   editedName?: string;
   onEditNameChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onEditNameComplete?: (item: T, save: boolean, value?: string) => void;
-  onFilterClick?: (event: React.MouseEvent<HTMLElement>, columnId: string) => void;
+  onFilterClick?: (
+    event: React.MouseEvent<HTMLElement>,
+    columnId: string,
+  ) => void;
   activeFilters?: Array<{ columnId: string; value: string }>;
   onRemoveFilter?: (columnId: string) => void;
   isSelected?: (item: T) => boolean;
@@ -70,7 +73,7 @@ export function AssetTable<T>({
   getThumbnailUrl,
   getName,
   getId,
-  getAssetType = () => 'Image', // Default to Image if not provided
+  getAssetType = () => "Image", // Default to Image if not provided
   editingId,
   editedName,
   onEditNameChange,
@@ -97,30 +100,36 @@ export function AssetTable<T>({
   // Create a mapping between API field IDs and column IDs
   const fieldMapping: Record<string, string> = {
     // Root level fields (new API structure)
-    id: 'id',
-    assetType: 'type',
-    format: 'format',
-    createdAt: 'date',
-    objectName: 'name',
-    fileSize: 'size',
-    fullPath: 'fullPath',
-    bucket: 'bucket',
-    FileHash: 'hash',
+    id: "id",
+    assetType: "type",
+    format: "format",
+    createdAt: "date",
+    objectName: "name",
+    fileSize: "size",
+    fullPath: "fullPath",
+    bucket: "bucket",
+    FileHash: "hash",
 
     // Legacy nested fields (for backward compatibility)
-    'DigitalSourceAsset.Type': 'type',
-    'DigitalSourceAsset.MainRepresentation.Format': 'format',
-    'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate': 'date',
-    'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate': 'date',
-    'DigitalSourceAsset.CreateDate': 'date',
-    'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name': 'name',
-    'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size': 'size',
-    'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize': 'size',
-    'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath':
-      'fullPath',
-    'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket': 'bucket',
-    'Metadata.Consolidated': 'metadata',
-    InventoryID: 'id',
+    "DigitalSourceAsset.Type": "type",
+    "DigitalSourceAsset.MainRepresentation.Format": "format",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate":
+      "date",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate":
+      "date",
+    "DigitalSourceAsset.CreateDate": "date",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name":
+      "name",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size":
+      "size",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize":
+      "size",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath":
+      "fullPath",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket":
+      "bucket",
+    "Metadata.Consolidated": "metadata",
+    InventoryID: "id",
   };
 
   // Create a reverse mapping for easier lookup
@@ -150,7 +159,7 @@ export function AssetTable<T>({
         });
       }
     },
-    [data, onSelectToggle, isSelected]
+    [data, onSelectToggle, isSelected],
   );
 
   // Update allSelected and someSelected states when data or isSelected changes
@@ -173,29 +182,34 @@ export function AssetTable<T>({
     if (selectedSearchFields && selectedSearchFields.length > 0) {
       visibleColumns = visibleColumns.filter((col) => {
         // Special case for name field
-        if (col.id === 'name') {
+        if (col.id === "name") {
           return selectedSearchFields.some(
-            (field) => field.includes('Name') || field === 'objectName'
+            (field) => field.includes("Name") || field === "objectName",
           );
         }
 
         // Special case for date field
-        if (col.id === 'date') {
+        if (col.id === "date") {
           return selectedSearchFields.some(
-            (field) => field.includes('CreateDate') || field === 'createdAt'
+            (field) => field.includes("CreateDate") || field === "createdAt",
           );
         }
 
         // Special case for size field
-        if (col.id === 'size') {
+        if (col.id === "size") {
           return selectedSearchFields.some(
-            (field) => field.includes('FileSize') || field.includes('Size') || field === 'fileSize'
+            (field) =>
+              field.includes("FileSize") ||
+              field.includes("Size") ||
+              field === "fileSize",
           );
         }
 
         // For other fields, check if any of their mapped API field IDs are in the selectedSearchFields
         const apiFieldIds = reverseFieldMapping[col.id] || [];
-        return apiFieldIds.some((apiFieldId) => selectedSearchFields.includes(apiFieldId));
+        return apiFieldIds.some((apiFieldId) =>
+          selectedSearchFields.includes(apiFieldId),
+        );
       });
     }
 
@@ -207,10 +221,10 @@ export function AssetTable<T>({
         // Selection checkbox column
         // Custom header component for the select column
         columnHelper.display({
-          id: 'select',
+          id: "select",
           // Use a custom header component
           header: () => (
-            <Box sx={{ p: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ p: 1, display: "flex", alignItems: "center", gap: 1 }}>
               <Checkbox
                 size="small"
                 checked={allSelected}
@@ -221,18 +235,18 @@ export function AssetTable<T>({
                 }}
                 sx={{
                   padding: 0,
-                  '& .MuiSvgIcon-root': {
-                    fontSize: '1.2rem',
+                  "& .MuiSvgIcon-root": {
+                    fontSize: "1.2rem",
                   },
-                  '&.Mui-checked': {
-                    color: 'primary.main',
+                  "&.Mui-checked": {
+                    color: "primary.main",
                   },
-                  '&.MuiCheckbox-indeterminate': {
-                    color: 'primary.main',
+                  "&.MuiCheckbox-indeterminate": {
+                    color: "primary.main",
                   },
                 }}
               />
-              <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+              <Typography variant="body2" sx={{ fontWeight: "bold" }}>
                 Select All
               </Typography>
             </Box>
@@ -240,7 +254,10 @@ export function AssetTable<T>({
           enableSorting: false,
           size: 100,
           cell: (info) => (
-            <Box sx={{ p: 1, display: 'flex', justifyContent: 'center' }} className="checkbox-cell">
+            <Box
+              sx={{ p: 1, display: "flex", justifyContent: "center" }}
+              className="checkbox-cell"
+            >
               <Checkbox
                 size="small"
                 checked={isSelected(info.row.original)}
@@ -250,31 +267,31 @@ export function AssetTable<T>({
                 }}
                 sx={{
                   padding: 0,
-                  '& .MuiSvgIcon-root': {
-                    fontSize: '1.2rem',
+                  "& .MuiSvgIcon-root": {
+                    fontSize: "1.2rem",
                   },
-                  '&.Mui-checked': {
-                    color: 'primary.main',
+                  "&.Mui-checked": {
+                    color: "primary.main",
                   },
                 }}
               />
             </Box>
           ),
-        })
+        }),
       );
     }
 
     // Add the rest of the columns
     tableColumns.push(
       columnHelper.accessor((row) => getThumbnailUrl(row), {
-        id: 'preview',
-        header: 'Preview',
+        id: "preview",
+        header: "Preview",
         size: 100,
         enableSorting: false,
         cell: (info) => {
           const assetType = getAssetType(info.row.original);
 
-          if (assetType === 'Audio') {
+          if (assetType === "Audio") {
             return (
               <Box sx={{ p: 1 }}>
                 <Box
@@ -282,7 +299,7 @@ export function AssetTable<T>({
                     width: 60,
                     height: 60,
                     borderRadius: 1,
-                    overflow: 'hidden',
+                    overflow: "hidden",
                   }}
                 >
                   <AssetAudio
@@ -305,9 +322,9 @@ export function AssetTable<T>({
                 sx={{
                   width: 60,
                   height: 60,
-                  objectFit: 'cover',
+                  objectFit: "cover",
                   borderRadius: 1,
-                  display: 'block',
+                  display: "block",
                 }}
               />
             </Box>
@@ -316,7 +333,8 @@ export function AssetTable<T>({
       }),
       ...visibleColumns.map((col) =>
         columnHelper.accessor(
-          (row) => (col.accessorFn ? col.accessorFn(row) : (row as any)[col.id]),
+          (row) =>
+            col.accessorFn ? col.accessorFn(row) : (row as any)[col.id],
           {
             id: col.id,
             header: col.label,
@@ -324,32 +342,32 @@ export function AssetTable<T>({
             enableSorting: true,
             cell: (info) => {
               // 1) If this is the “name” column and we’re in edit mode, show the inline editor:
-              if (col.id === 'name' && onEditClick) {
+              if (col.id === "name" && onEditClick) {
                 const rowId = getId(info.row.original);
                 const isEditing = editingId === rowId;
 
                 return (
                   <Box
                     sx={{
-                      display: 'flex',
-                      alignItems: isEditing ? 'flex-start' : 'center',
+                      display: "flex",
+                      alignItems: isEditing ? "flex-start" : "center",
                       gap: 1,
                       p: 1,
-                      width: '100%',
+                      width: "100%",
                     }}
                   >
                     {isEditing ? (
                       <Box
                         sx={{
-                          display: 'flex',
-                          flexDirection: 'column',
+                          display: "flex",
+                          flexDirection: "column",
                           gap: 1,
-                          width: '100%',
+                          width: "100%",
                         }}
                       >
                         <InlineTextEditor
                           key={rowId}
-                          initialValue={editedName ?? ''}
+                          initialValue={editedName ?? ""}
                           editingCellId={rowId}
                           preventCommitRef={preventCommitRef}
                           commitRef={commitRef}
@@ -366,14 +384,14 @@ export function AssetTable<T>({
                           size="small"
                           sx={{
                             flex: 1,
-                            minWidth: '100%',
-                            '& .MuiInputBase-root': {
-                              width: '100%',
-                              minHeight: '2.5em',
+                            minWidth: "100%",
+                            "& .MuiInputBase-root": {
+                              width: "100%",
+                              minHeight: "2.5em",
                             },
-                            '& .MuiInputBase-input': {
-                              whiteSpace: 'normal',
-                              wordBreak: 'break-word',
+                            "& .MuiInputBase-input": {
+                              whiteSpace: "normal",
+                              wordBreak: "break-word",
                             },
                           }}
                           multiline
@@ -381,9 +399,9 @@ export function AssetTable<T>({
                         />
                         <Box
                           sx={{
-                            display: 'flex',
+                            display: "flex",
                             gap: 1,
-                            justifyContent: 'flex-end',
+                            justifyContent: "flex-end",
                             mt: 1,
                           }}
                         >
@@ -393,23 +411,30 @@ export function AssetTable<T>({
                             onMouseDown={(e) => {
                               e.stopPropagation();
                               e.preventDefault();
-                              console.log('💾 AssetTable Save mousedown');
+                              console.log("💾 AssetTable Save mousedown");
                               // Set flag to prevent blur from canceling
                               preventCommitRef.current = true;
                             }}
                             onClick={(e) => {
                               e.stopPropagation();
                               e.preventDefault();
-                              console.log('💾 AssetTable Save clicked');
-                              console.log('💾 AssetTable commitRef.current:', commitRef.current);
+                              console.log("💾 AssetTable Save clicked");
+                              console.log(
+                                "💾 AssetTable commitRef.current:",
+                                commitRef.current,
+                              );
                               // Reset the prevent flag
                               preventCommitRef.current = false;
                               // Call the commit function directly via ref
                               if (commitRef.current) {
-                                console.log('💾 AssetTable calling commitRef.current()');
+                                console.log(
+                                  "💾 AssetTable calling commitRef.current()",
+                                );
                                 commitRef.current();
                               } else {
-                                console.error('💾 AssetTable commitRef.current is null!');
+                                console.error(
+                                  "💾 AssetTable commitRef.current is null!",
+                                );
                               }
                             }}
                           >
@@ -419,14 +444,18 @@ export function AssetTable<T>({
                             size="small"
                             onMouseDown={(e) => {
                               e.stopPropagation();
-                              console.log('🚫 AssetTable Cancel clicked');
+                              console.log("🚫 AssetTable Cancel clicked");
                               // Set flag to prevent InlineTextEditor commit from being called
                               // Use onMouseDown instead of onClick to set the flag before onBlur
                               preventCommitRef.current = true;
                             }}
                             onClick={(e) => {
                               e.stopPropagation();
-                              onEditNameComplete?.(info.row.original, false, undefined);
+                              onEditNameComplete?.(
+                                info.row.original,
+                                false,
+                                undefined,
+                              );
                             }}
                           >
                             Cancel
@@ -459,15 +488,17 @@ export function AssetTable<T>({
               // 2) Default case for *every other* column:
               return <Box sx={{ p: 1 }}>{info.getValue()}</Box>;
             },
-          }
-        )
+          },
+        ),
       ),
       columnHelper.display({
-        id: 'actions',
-        header: 'Actions',
+        id: "actions",
+        header: "Actions",
         size: 150,
         cell: (info) => (
-          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', p: 1 }}>
+          <Box
+            sx={{ display: "flex", gap: 1, justifyContent: "flex-end", p: 1 }}
+          >
             <IconButton
               size="small"
               onClick={(e) => {
@@ -477,7 +508,7 @@ export function AssetTable<T>({
                 }
               }}
               sx={{
-                padding: '4px',
+                padding: "4px",
               }}
             >
               {isFavorite(info.row.original) ? (
@@ -486,7 +517,10 @@ export function AssetTable<T>({
                 <FavoriteBorderIcon fontSize="small" />
               )}
             </IconButton>
-            <IconButton size="small" onClick={(e) => onDeleteClick(info.row.original, e)}>
+            <IconButton
+              size="small"
+              onClick={(e) => onDeleteClick(info.row.original, e)}
+            >
               <DeleteIcon fontSize="small" />
             </IconButton>
             <IconButton
@@ -494,7 +528,7 @@ export function AssetTable<T>({
               onClick={(e) => onDownloadClick(info.row.original, e)}
               id={`asset-download-button-${getId(info.row.original)}`}
               sx={{
-                position: 'relative',
+                position: "relative",
                 zIndex: 1,
               }}
             >
@@ -502,7 +536,7 @@ export function AssetTable<T>({
             </IconButton>
           </Box>
         ),
-      })
+      }),
     );
 
     return tableColumns;
@@ -537,7 +571,7 @@ export function AssetTable<T>({
     getFilteredRowModel: getFilteredRowModel(),
     filterFns: {
       includesString: (row, columnId, filterValue) => {
-        const value = String(row.getValue(columnId) || '').toLowerCase();
+        const value = String(row.getValue(columnId) || "").toLowerCase();
         return value.includes(String(filterValue).toLowerCase());
       },
     },
@@ -562,12 +596,12 @@ export function AssetTable<T>({
   return (
     <TableContainer
       sx={{
-        maxHeight: '100%',
-        overflowY: 'visible',
-        width: '100%',
-        border: 'none',
-        '& .MuiTable-root': {
-          borderCollapse: 'separate',
+        maxHeight: "100%",
+        overflowY: "visible",
+        width: "100%",
+        border: "none",
+        "& .MuiTable-root": {
+          borderCollapse: "separate",
           borderSpacing: 0,
         },
       }}

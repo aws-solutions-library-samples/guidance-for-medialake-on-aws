@@ -1,9 +1,16 @@
-import React, { useState } from 'react';
-import { Box, Typography, IconButton, Menu, MenuItem, Divider } from '@mui/material';
-import { ChevronLeft, ChevronRight, History, Trash2 } from 'lucide-react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useRecentlyViewed } from '../../contexts/RecentlyViewedContext';
-import { formatDistanceToNow } from 'date-fns';
+import React, { useState } from "react";
+import {
+  Box,
+  Typography,
+  IconButton,
+  Menu,
+  MenuItem,
+  Divider,
+} from "@mui/material";
+import { ChevronLeft, ChevronRight, History, Trash2 } from "lucide-react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useRecentlyViewed } from "../../contexts/RecentlyViewedContext";
+import { formatDistanceToNow } from "date-fns";
 
 interface BreadcrumbNavigationProps {
   searchTerm: string;
@@ -58,35 +65,35 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
   return (
     <Box
       sx={{
-        position: 'sticky',
+        position: "sticky",
         top: 64,
         zIndex: 1100,
-        bgcolor: 'transparent',
+        bgcolor: "transparent",
         px: 0,
         py: 0,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
       }}
     >
       {/* Left Section */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
         <IconButton onClick={handleBackClick} size="small">
           <ChevronLeft />
         </IconButton>
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+        <Box sx={{ display: "flex", alignItems: "center" }}>
           <Box
             onClick={handleBackClick}
             sx={{
-              cursor: 'pointer',
-              '&:hover': { textDecoration: 'underline' },
+              cursor: "pointer",
+              "&:hover": { textDecoration: "underline" },
             }}
           >
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              Search{searchTerm ? `: "${searchTerm}"` : ''}
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              Search{searchTerm ? `: "${searchTerm}"` : ""}
             </Typography>
           </Box>
-          <Typography variant="body2" sx={{ color: 'text.secondary', mx: 1 }}>
+          <Typography variant="body2" sx={{ color: "text.secondary", mx: 1 }}>
             /
           </Typography>
           <Typography variant="body2">{assetName}</Typography>
@@ -94,8 +101,12 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
       </Box>
 
       {/* Right Section - Only History */}
-      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-        <IconButton onClick={handleHistoryClick} size="small" aria-label="show history">
+      <Box sx={{ display: "flex", alignItems: "center" }}>
+        <IconButton
+          onClick={handleHistoryClick}
+          size="small"
+          aria-label="show history"
+        >
           <History />
         </IconButton>
         <Menu
@@ -103,12 +114,12 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
           open={open}
           onClose={handleHistoryClose}
           anchorOrigin={{
-            vertical: 'bottom',
-            horizontal: 'right',
+            vertical: "bottom",
+            horizontal: "right",
           }}
           transformOrigin={{
-            vertical: 'top',
-            horizontal: 'right',
+            vertical: "top",
+            horizontal: "right",
           }}
           PaperProps={{
             sx: { minWidth: 280 },
@@ -118,22 +129,26 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
             sx={{
               px: 2,
               py: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
             }}
           >
-            <Typography variant="subtitle2" sx={{ color: 'text.secondary' }}>
+            <Typography variant="subtitle2" sx={{ color: "text.secondary" }}>
               Recently Viewed
             </Typography>
-            <IconButton size="small" onClick={clearAll} sx={{ color: 'text.secondary' }}>
+            <IconButton
+              size="small"
+              onClick={clearAll}
+              sx={{ color: "text.secondary" }}
+            >
               <Trash2 size={16} />
             </IconButton>
           </Box>
           <Divider />
           {items.length === 0 ? (
             <Box sx={{ p: 2 }}>
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
                 No recently viewed items
               </Typography>
             </Box>
@@ -145,8 +160,10 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
                   handleHistoryClose();
                   navigate(
                     `${item.path}${
-                      item.searchTerm ? `?searchTerm=${encodeURIComponent(item.searchTerm)}` : ''
-                    }`
+                      item.searchTerm
+                        ? `?searchTerm=${encodeURIComponent(item.searchTerm)}`
+                        : ""
+                    }`,
                   );
                 }}
                 sx={{
@@ -154,47 +171,59 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
                   px: 2,
                 }}
               >
-                <Box sx={{ width: '100%' }}>
+                <Box sx={{ width: "100%" }}>
                   <Box
                     sx={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'flex-start',
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
                       mb: 0.5,
                     }}
                   >
                     <Typography
                       sx={{
-                        fontSize: '0.875rem',
+                        fontSize: "0.875rem",
                         fontWeight: 500,
-                        maxWidth: '80%',
+                        maxWidth: "80%",
                       }}
                     >
                       {item.title}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                    <Typography
+                      variant="caption"
+                      sx={{ color: "text.secondary" }}
+                    >
                       {formatDistanceToNow(item.timestamp, { addSuffix: true })}
                     </Typography>
                   </Box>
                   <Box
                     sx={{
-                      display: 'flex',
+                      display: "flex",
                       gap: 2,
-                      alignItems: 'center',
+                      alignItems: "center",
                     }}
                   >
                     {item.metadata.duration && (
-                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      <Typography
+                        variant="caption"
+                        sx={{ color: "text.secondary" }}
+                      >
                         {item.metadata.duration}
                       </Typography>
                     )}
                     {item.metadata.dimensions && (
-                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      <Typography
+                        variant="caption"
+                        sx={{ color: "text.secondary" }}
+                      >
                         {item.metadata.dimensions}
                       </Typography>
                     )}
                     {item.metadata.fileSize && (
-                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      <Typography
+                        variant="caption"
+                        sx={{ color: "text.secondary" }}
+                      >
                         {item.metadata.fileSize}
                       </Typography>
                     )}

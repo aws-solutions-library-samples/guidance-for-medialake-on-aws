@@ -1,4 +1,4 @@
-import { Environment } from '@/types/environment';
+import { Environment } from "@/types/environment";
 
 export interface IntegrationNode {
   nodeId: string;
@@ -7,7 +7,7 @@ export interface IntegrationNode {
     description: string;
   };
   auth?: {
-    authMethod?: 'awsIam' | 'apiKey';
+    authMethod?: "awsIam" | "apiKey";
   };
 }
 
@@ -39,7 +39,7 @@ export interface IntegrationFormData {
   nodeId: string;
   description: string;
   auth: {
-    type: 'awsIam' | 'apiKey';
+    type: "awsIam" | "apiKey";
     credentials: {
       apiKey?: string;
       iamRole?: string;

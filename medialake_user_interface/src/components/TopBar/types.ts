@@ -1,6 +1,6 @@
 export interface ChatMessage {
   text: string;
-  sender: 'user' | 'assistant';
+  sender: "user" | "assistant";
 }
 
 export interface FilterSectionType {

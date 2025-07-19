@@ -1,6 +1,13 @@
-import React from 'react';
-import { Menu, MenuItem, Typography, FormControlLabel, Checkbox, useTheme } from '@mui/material';
-import { Column } from '@tanstack/react-table';
+import React from "react";
+import {
+  Menu,
+  MenuItem,
+  Typography,
+  FormControlLabel,
+  Checkbox,
+  useTheme,
+} from "@mui/material";
+import { Column } from "@tanstack/react-table";
 
 interface ColumnVisibilityMenuProps {
   anchorEl: HTMLElement | null;
@@ -13,7 +20,7 @@ export const ColumnVisibilityMenu: React.FC<ColumnVisibilityMenuProps> = ({
   anchorEl,
   columns,
   onClose,
-  excludeIds = ['actions'],
+  excludeIds = ["actions"],
 }) => {
   const theme = useTheme();
 
@@ -27,8 +34,8 @@ export const ColumnVisibilityMenu: React.FC<ColumnVisibilityMenuProps> = ({
         sx: {
           maxHeight: 300,
           width: 180,
-          borderRadius: '8px',
-          '& .MuiList-root': {
+          borderRadius: "8px",
+          "& .MuiList-root": {
             p: 0.5,
           },
         },
@@ -44,7 +51,7 @@ export const ColumnVisibilityMenu: React.FC<ColumnVisibilityMenuProps> = ({
               py: 0.25,
               px: 1,
               minHeight: 32,
-              borderRadius: '4px',
+              borderRadius: "4px",
             }}
           >
             <FormControlLabel
@@ -56,8 +63,8 @@ export const ColumnVisibilityMenu: React.FC<ColumnVisibilityMenuProps> = ({
                   sx={{
                     p: 0.5,
                     mr: 1,
-                    '& .MuiSvgIcon-root': {
-                      fontSize: '1.2rem',
+                    "& .MuiSvgIcon-root": {
+                      fontSize: "1.2rem",
                     },
                   }}
                 />
@@ -66,7 +73,7 @@ export const ColumnVisibilityMenu: React.FC<ColumnVisibilityMenuProps> = ({
                 <Typography
                   variant="body2"
                   sx={{
-                    fontSize: '0.875rem',
+                    fontSize: "0.875rem",
                     lineHeight: 1.2,
                   }}
                 >
@@ -75,8 +82,8 @@ export const ColumnVisibilityMenu: React.FC<ColumnVisibilityMenuProps> = ({
               }
               sx={{
                 m: 0,
-                '& .MuiFormControlLabel-label': {
-                  userSelect: 'none',
+                "& .MuiFormControlLabel-label": {
+                  userSelect: "none",
                 },
               }}
             />

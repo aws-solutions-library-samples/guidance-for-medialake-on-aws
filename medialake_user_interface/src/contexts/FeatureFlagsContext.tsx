@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
 
 // Define the shape of the feature flags in the JSON file
 interface FeatureFlagData {
@@ -30,7 +36,8 @@ const defaultContext: FeatureFlagsContextType = {
   refreshFlags: async () => {},
 };
 
-const FeatureFlagsContext = createContext<FeatureFlagsContextType>(defaultContext);
+const FeatureFlagsContext =
+  createContext<FeatureFlagsContextType>(defaultContext);
 
 // Configuration
 const MAX_RETRIES = 3;
@@ -38,7 +45,9 @@ const RETRY_DELAY = 1000; // ms
 const FETCH_TIMEOUT = 5000; // ms
 
 // Provider component
-export const FeatureFlagsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const FeatureFlagsProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [flags, setFlags] = useState<FeatureFlags>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -56,7 +65,7 @@ export const FeatureFlagsProvider: React.FC<{ children: React.ReactNode }> = ({ 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
 
-        const response = await fetch('/feature-flags.json', {
+        const response = await fetch("/feature-flags.json", {
           signal: controller.signal,
         });
 
@@ -76,7 +85,7 @@ export const FeatureFlagsProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
         setFlags(transformedFlags);
         setIsLoading(false);
-        console.log('FeatureFlagsContext: Successfully loaded feature flags');
+        console.log("FeatureFlagsContext: Successfully loaded feature flags");
         return; // Success, exit the retry loop
       } catch (err) {
         retries++;
@@ -85,7 +94,7 @@ export const FeatureFlagsProvider: React.FC<{ children: React.ReactNode }> = ({ 
         const errorMessage = err instanceof Error ? err.message : String(err);
         console.error(
           `FeatureFlagsContext: Error fetching feature flags (attempt ${retries}/${MAX_RETRIES}):`,
-          errorMessage
+          errorMessage,
         );
 
         // If we've reached max retries, set the error state
@@ -112,14 +121,19 @@ export const FeatureFlagsProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, [fetchFlags]);
 
   return (
-    <FeatureFlagsContext.Provider value={{ flags, isLoading, error, refreshFlags }}>
+    <FeatureFlagsContext.Provider
+      value={{ flags, isLoading, error, refreshFlags }}
+    >
       {children}
     </FeatureFlagsContext.Provider>
   );
 };
 
 // Hook for using the feature flags
-export const useFeatureFlag = (flagName: string, defaultValue: boolean = false): boolean => {
+export const useFeatureFlag = (
+  flagName: string,
+  defaultValue: boolean = false,
+): boolean => {
   const { flags, isLoading } = useContext(FeatureFlagsContext);
 
   // If still loading or flag doesn't exist, return the default value

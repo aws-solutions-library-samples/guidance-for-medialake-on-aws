@@ -19,7 +19,7 @@ export interface PipelineFilters {
   startDate?: string;
   endDate?: string;
   sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
+  sortOrder?: "asc" | "desc";
 }
 
 export interface StepFunctionDefinition {
@@ -49,7 +49,7 @@ export interface PipelineDetails {
   type: string;
   createdAt: string;
   updatedAt: string;
-  status: 'ACTIVE' | 'INACTIVE';
+  status: "ACTIVE" | "INACTIVE";
   definition: StepFunctionDefinition;
   roleArn: string;
   tags?: Record<string, string>;

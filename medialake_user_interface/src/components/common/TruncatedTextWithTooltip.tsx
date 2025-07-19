@@ -1,10 +1,10 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { Tooltip, Typography } from '@mui/material';
+import React, { useRef, useState, useEffect } from "react";
+import { Tooltip, Typography } from "@mui/material";
 
 export const TruncatedTextWithTooltip: React.FC<{
   text: string;
   maxWidth?: string;
-}> = ({ text, maxWidth = '100%' }) => {
+}> = ({ text, maxWidth = "100%" }) => {
   const textElementRef = useRef<HTMLSpanElement>(null);
   const [isTruncated, setIsTruncated] = useState(false);
 
@@ -17,10 +17,10 @@ export const TruncatedTextWithTooltip: React.FC<{
     };
 
     checkTruncation();
-    window.addEventListener('resize', checkTruncation);
+    window.addEventListener("resize", checkTruncation);
 
     return () => {
-      window.removeEventListener('resize', checkTruncation);
+      window.removeEventListener("resize", checkTruncation);
     };
   }, [text]);
 
@@ -31,9 +31,9 @@ export const TruncatedTextWithTooltip: React.FC<{
         ref={textElementRef}
         sx={{
           maxWidth: maxWidth,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
         }}
       >
         {text}

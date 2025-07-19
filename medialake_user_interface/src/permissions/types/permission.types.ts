@@ -1,14 +1,14 @@
 // src/permissions/types/permission.types.ts
-import { Actions, Subjects, Conditions } from './ability.types';
+import { Actions, Subjects, Conditions } from "./ability.types";
 
 // Define the Permission interface
 export interface Permission {
   id: string;
   principalId: string;
-  principalType: 'USER' | 'GROUP';
+  principalType: "USER" | "GROUP";
   action: Actions;
   resource: Subjects;
-  effect: 'Allow' | 'Deny';
+  effect: "Allow" | "Deny";
   conditions?: Conditions;
 }
 

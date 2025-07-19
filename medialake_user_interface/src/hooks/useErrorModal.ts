@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState } from "react";
 
 export const useErrorModal = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState("");
 
   const showError = (message: string) => {
     setErrorMessage(message);
@@ -11,7 +11,7 @@ export const useErrorModal = () => {
 
   const hideError = () => {
     setIsOpen(false);
-    setErrorMessage('');
+    setErrorMessage("");
   };
 
   return {

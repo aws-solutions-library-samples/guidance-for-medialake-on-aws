@@ -1,9 +1,15 @@
-import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
-import { StorageHelper } from '../helpers/storage-helper';
-import { Amplify } from 'aws-amplify';
+import React, {
+  createContext,
+  useState,
+  useEffect,
+  useContext,
+  ReactNode,
+} from "react";
+import { StorageHelper } from "../helpers/storage-helper";
+import { Amplify } from "aws-amplify";
 
 interface IdentityProvider {
-  identity_provider_method: 'cognito' | 'saml';
+  identity_provider_method: "cognito" | "saml";
   identity_provider_name?: string;
   identity_provider_metadata_url?: string;
   identity_provider_metadata_path?: string;
@@ -40,10 +46,10 @@ const configureAmplify = (config: AwsConfig) => {
           email: false,
           oauth: {
             domain: config.Auth.Cognito.domain,
-            scopes: ['email', 'openid', 'profile'],
-            responseType: 'code',
+            scopes: ["email", "openid", "profile"],
+            responseType: "code",
             redirectSignIn: window.location.origin,
-            redirectSignOut: window.location.origin + '/sign-in',
+            redirectSignOut: window.location.origin + "/sign-in",
           },
         },
       },
@@ -53,10 +59,10 @@ const configureAmplify = (config: AwsConfig) => {
 
   // Configure login methods based on identity providers
   const hasCognito = config.Auth.identity_providers.some(
-    (provider) => provider.identity_provider_method === 'cognito'
+    (provider) => provider.identity_provider_method === "cognito",
   );
   const samlProviders = config.Auth.identity_providers.filter(
-    (provider) => provider.identity_provider_method === 'saml'
+    (provider) => provider.identity_provider_method === "saml",
   );
 
   // Enable username/password login if Cognito is configured
@@ -68,23 +74,23 @@ const configureAmplify = (config: AwsConfig) => {
   // Add SAML configuration if any SAML providers are configured
   if (samlProviders.length > 0) {
     console.log(
-      'Configuring SAML providers:',
-      samlProviders.map((p) => p.identity_provider_name)
+      "Configuring SAML providers:",
+      samlProviders.map((p) => p.identity_provider_name),
     );
     amplifyConfig.Auth.Cognito.loginWith.oauth = {
       ...amplifyConfig.Auth.Cognito.loginWith.oauth,
-      providers: ['SAML'],
+      providers: ["SAML"],
       redirectSignIn: [
         window.location.origin,
-        window.location.origin + '/',
-        window.location.origin + '/sign-in',
+        window.location.origin + "/",
+        window.location.origin + "/sign-in",
         `https://${config.Auth.Cognito.domain}/oauth2/idpresponse`,
         `https://${config.Auth.Cognito.domain}/saml2/idpresponse`,
       ],
       redirectSignOut: [
         window.location.origin,
-        window.location.origin + '/',
-        window.location.origin + '/sign-in',
+        window.location.origin + "/",
+        window.location.origin + "/sign-in",
       ],
     };
   }
@@ -103,7 +109,7 @@ export const AwsConfigProvider = ({ children }: AwsConfigProviderProps) => {
       setAwsConfig(storedConfig);
       setIsLoading(false);
     } else {
-      fetch('/aws-exports.json')
+      fetch("/aws-exports.json")
         .then((response) => response.json())
         .then((data) => {
           configureAmplify(data);
@@ -112,7 +118,7 @@ export const AwsConfigProvider = ({ children }: AwsConfigProviderProps) => {
           setIsLoading(false);
         })
         .catch((error) => {
-          console.error('Error fetching AWS config:', error);
+          console.error("Error fetching AWS config:", error);
           setIsLoading(false);
         });
     }
@@ -122,13 +128,17 @@ export const AwsConfigProvider = ({ children }: AwsConfigProviderProps) => {
     return <div>Loading AWS configuration...</div>;
   }
 
-  return <AwsConfigContext.Provider value={awsConfig}>{children}</AwsConfigContext.Provider>;
+  return (
+    <AwsConfigContext.Provider value={awsConfig}>
+      {children}
+    </AwsConfigContext.Provider>
+  );
 };
 
 export const useAwsConfig = () => {
   const context = useContext(AwsConfigContext);
   if (context === undefined) {
-    throw new Error('useAwsConfig must be used within an AwsConfigProvider');
+    throw new Error("useAwsConfig must be used within an AwsConfigProvider");
   }
   return context;
 };

@@ -1,24 +1,24 @@
-import React from 'react';
-import { Box, Tab, Tabs } from '@mui/material';
-import { styled } from '@mui/material/styles';
+import React from "react";
+import { Box, Tab, Tabs } from "@mui/material";
+import { styled } from "@mui/material/styles";
 
 const StyledTabs = styled(Tabs)({
-  '& .MuiTabs-indicator': {
-    backgroundColor: '#2563eb',
-    height: '2px',
+  "& .MuiTabs-indicator": {
+    backgroundColor: "#2563eb",
+    height: "2px",
   },
 });
 
 const StyledTab = styled(Tab)({
-  textTransform: 'none',
-  fontSize: '16px',
+  textTransform: "none",
+  fontSize: "16px",
   fontWeight: 400,
-  color: '#6b7280',
-  padding: '12px 0',
-  marginRight: '32px',
-  minWidth: 'unset',
-  '&.Mui-selected': {
-    color: '#2563eb',
+  color: "#6b7280",
+  padding: "12px 0",
+  marginRight: "32px",
+  minWidth: "unset",
+  "&.Mui-selected": {
+    color: "#2563eb",
   },
 });
 
@@ -58,7 +58,11 @@ interface MetadataSectionProps {
   onTabChange?: (newValue: number) => void;
 }
 
-const MetadataSection: React.FC<MetadataSectionProps> = ({ tabs, defaultTab = 0, onTabChange }) => {
+const MetadataSection: React.FC<MetadataSectionProps> = ({
+  tabs,
+  defaultTab = 0,
+  onTabChange,
+}) => {
   const [value, setValue] = React.useState(defaultTab);
 
   const handleChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -70,8 +74,12 @@ const MetadataSection: React.FC<MetadataSectionProps> = ({ tabs, defaultTab = 0,
 
   return (
     <Box>
-      <Box sx={{ borderBottom: 1, borderColor: '#e5e7eb' }}>
-        <StyledTabs value={value} onChange={handleChange} aria-label="metadata tabs">
+      <Box sx={{ borderBottom: 1, borderColor: "#e5e7eb" }}>
+        <StyledTabs
+          value={value}
+          onChange={handleChange}
+          aria-label="metadata tabs"
+        >
           {tabs.map((tab, index) => (
             <StyledTab
               key={index}

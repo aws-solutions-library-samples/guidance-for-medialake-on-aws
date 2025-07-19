@@ -1,10 +1,14 @@
-import React from 'react';
-import { type ImageItem, type VideoItem, type AudioItem } from '@/types/search/searchResults';
-import { type SortingState } from '@tanstack/react-table';
-import { type AssetTableColumn } from '@/types/shared/assetComponents';
-import { formatFileSize } from '@/utils/fileSize';
-import { formatDate } from '@/utils/dateFormat';
-import AssetResultsView from '../shared/AssetResultsView';
+import React from "react";
+import {
+  type ImageItem,
+  type VideoItem,
+  type AudioItem,
+} from "@/types/search/searchResults";
+import { type SortingState } from "@tanstack/react-table";
+import { type AssetTableColumn } from "@/types/shared/assetComponents";
+import { formatFileSize } from "@/utils/fileSize";
+import { formatDate } from "@/utils/dateFormat";
+import AssetResultsView from "../shared/AssetResultsView";
 
 type AssetItem = (ImageItem | VideoItem | AudioItem) & {
   DigitalSourceAsset: {
@@ -36,10 +40,10 @@ interface MasterResultsViewProps {
   onFieldsChange: (event: any) => void;
 
   // View preferences
-  viewMode: 'card' | 'table';
-  cardSize: 'small' | 'medium' | 'large';
-  aspectRatio: 'vertical' | 'square' | 'horizontal';
-  thumbnailScale: 'fit' | 'fill';
+  viewMode: "card" | "table";
+  cardSize: "small" | "medium" | "large";
+  aspectRatio: "vertical" | "square" | "horizontal";
+  thumbnailScale: "fit" | "fill";
   showMetadata: boolean;
   groupByType: boolean;
   sorting: SortingState;
@@ -49,11 +53,11 @@ interface MasterResultsViewProps {
   // Event handlers for view preferences
   onViewModeChange: (
     event: React.MouseEvent<HTMLElement>,
-    newMode: 'card' | 'table' | null
+    newMode: "card" | "table" | null,
   ) => void;
-  onCardSizeChange: (size: 'small' | 'medium' | 'large') => void;
-  onAspectRatioChange: (ratio: 'vertical' | 'square' | 'horizontal') => void;
-  onThumbnailScaleChange: (scale: 'fit' | 'fill') => void;
+  onCardSizeChange: (size: "small" | "medium" | "large") => void;
+  onAspectRatioChange: (ratio: "vertical" | "square" | "horizontal") => void;
+  onThumbnailScaleChange: (scale: "fit" | "fill") => void;
   onShowMetadataChange: (show: boolean) => void;
   onGroupByTypeChange: (checked: boolean) => void;
   onSortChange: (sorting: SortingState) => void;
@@ -69,17 +73,26 @@ interface MasterResultsViewProps {
 
   // Asset action handlers
   onAssetClick: (asset: AssetItem) => void;
-  onDeleteClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
+  onDeleteClick: (
+    asset: AssetItem,
+    event: React.MouseEvent<HTMLElement>,
+  ) => void;
   onMenuClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onEditClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onEditNameComplete: (asset: AssetItem, save: boolean, value?: string) => void;
-  onSelectToggle?: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
-  onFavoriteToggle?: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
+  onSelectToggle?: (
+    asset: AssetItem,
+    event: React.MouseEvent<HTMLElement>,
+  ) => void;
+  onFavoriteToggle?: (
+    asset: AssetItem,
+    event: React.MouseEvent<HTMLElement>,
+  ) => void;
 
   // Select all functionality
   hasSelectedAssets?: boolean;
-  selectAllState?: 'none' | 'some' | 'all';
+  selectAllState?: "none" | "some" | "all";
   onSelectAllToggle?: () => void;
 
   // Asset state accessors
@@ -154,33 +167,38 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   renamingAssetId,
 }) => {
   // Function to render card fields
-  const renderCardField = (fieldId: string, asset: AssetItem): React.ReactNode => {
+  const renderCardField = (
+    fieldId: string,
+    asset: AssetItem,
+  ): React.ReactNode => {
     // console.log('Rendering field:', fieldId, 'for asset:', asset.InventoryID);
 
     switch (fieldId) {
-      case 'name':
-        return asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey
-          .Name;
-      case 'type':
+      case "name":
+        return asset.DigitalSourceAsset.MainRepresentation.StorageInfo
+          .PrimaryLocation.ObjectKey.Name;
+      case "type":
         return asset.DigitalSourceAsset.Type;
-      case 'format':
+      case "format":
         return asset.DigitalSourceAsset.MainRepresentation.Format;
-      case 'size':
+      case "size":
         const sizeInBytes =
-          asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size;
+          asset.DigitalSourceAsset.MainRepresentation.StorageInfo
+            .PrimaryLocation.FileInfo.Size;
         return formatFileSize(sizeInBytes);
-      case 'createdAt':
+      case "createdAt":
         return formatDate(asset.DigitalSourceAsset.CreateDate);
-      case 'modifiedAt':
+      case "modifiedAt":
         return formatDate(
-          asset.DigitalSourceAsset.ModifiedDate || asset.DigitalSourceAsset.CreateDate
+          asset.DigitalSourceAsset.ModifiedDate ||
+            asset.DigitalSourceAsset.CreateDate,
         );
-      case 'fullPath':
-        return asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey
-          .FullPath;
+      case "fullPath":
+        return asset.DigitalSourceAsset.MainRepresentation.StorageInfo
+          .PrimaryLocation.ObjectKey.FullPath;
       default:
-        console.log('Unknown field ID:', fieldId);
-        return '';
+        console.log("Unknown field ID:", fieldId);
+        return "";
     }
   };
 
@@ -240,11 +258,12 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       renamingAssetId={renamingAssetId}
       getAssetId={(asset) => asset.InventoryID}
       getAssetName={(asset) =>
-        asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name
+        asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
+          .ObjectKey.Name
       }
       getAssetType={(asset) => asset.DigitalSourceAsset.Type}
-      getAssetThumbnail={(asset) => asset.thumbnailUrl || ''}
-      getAssetProxy={(asset) => asset.proxyUrl || ''}
+      getAssetThumbnail={(asset) => asset.thumbnailUrl || ""}
+      getAssetProxy={(asset) => asset.proxyUrl || ""}
       renderCardField={renderCardField}
     />
   );

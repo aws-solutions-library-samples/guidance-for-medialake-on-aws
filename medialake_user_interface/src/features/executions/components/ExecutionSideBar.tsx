@@ -1,9 +1,18 @@
-import React from 'react';
-import { Box, Typography, IconButton, Divider, Paper, Stack, Slide, Link } from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
-import { Link as RouterLink } from 'react-router-dom';
-import { formatLocalDateTime } from '@/shared/utils/dateUtils';
-import type { PipelineExecution } from '../types/pipelineExecutions.types';
+import React from "react";
+import {
+  Box,
+  Typography,
+  IconButton,
+  Divider,
+  Paper,
+  Stack,
+  Slide,
+  Link,
+} from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
+import { Link as RouterLink } from "react-router-dom";
+import { formatLocalDateTime } from "@/shared/utils/dateUtils";
+import type { PipelineExecution } from "../types/pipelineExecutions.types";
 
 interface ExecutionSideBarProps {
   isOpen: boolean;
@@ -25,19 +34,19 @@ export const ExecutionSideBar: React.FC<ExecutionSideBarProps> = ({
           right: 16,
           top: 16,
           bottom: 16,
-          width: '500px',
-          height: '100%',
-          bgcolor: 'background.paper',
-          borderLeft: '1px solid',
-          borderColor: 'divider',
-          borderRadius: '8px !important', // Force border radius
+          width: "500px",
+          height: "100%",
+          bgcolor: "background.paper",
+          borderLeft: "1px solid",
+          borderColor: "divider",
+          borderRadius: "8px !important", // Force border radius
           zIndex: 1,
-          display: 'flex',
-          flexDirection: 'column',
+          display: "flex",
+          flexDirection: "column",
           boxShadow: (theme) => theme.shadows[1],
-          overflow: 'hidden',
-          '& .MuiPaper-root': {
-            borderRadius: '8px',
+          overflow: "hidden",
+          "& .MuiPaper-root": {
+            borderRadius: "8px",
           },
         }}
       >
@@ -45,12 +54,12 @@ export const ExecutionSideBar: React.FC<ExecutionSideBarProps> = ({
         <Box
           sx={{
             p: 2,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            borderBottom: '1px solid',
-            borderColor: 'divider',
-            bgcolor: 'background.paper',
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            borderBottom: "1px solid",
+            borderColor: "divider",
+            bgcolor: "background.paper",
           }}
         >
           <Typography variant="h6">Execution Details</Typography>
@@ -63,14 +72,18 @@ export const ExecutionSideBar: React.FC<ExecutionSideBarProps> = ({
         <Box
           sx={{
             flex: 1,
-            overflow: 'auto',
+            overflow: "auto",
             p: 2,
           }}
         >
           <Stack spacing={2}>
             {/* Basic Information */}
             <Paper variant="outlined" sx={{ p: 2 }}>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+              <Typography
+                variant="subtitle2"
+                color="text.secondary"
+                gutterBottom
+              >
                 Basic Information
               </Typography>
               <Divider sx={{ my: 1 }} />
@@ -98,7 +111,11 @@ export const ExecutionSideBar: React.FC<ExecutionSideBarProps> = ({
 
             {/* Timing Information */}
             <Paper variant="outlined" sx={{ p: 2 }}>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+              <Typography
+                variant="subtitle2"
+                color="text.secondary"
+                gutterBottom
+              >
                 Timing Information
               </Typography>
               <Divider sx={{ my: 1 }} />
@@ -122,7 +139,7 @@ export const ExecutionSideBar: React.FC<ExecutionSideBarProps> = ({
                       ? formatLocalDateTime(execution.end_time, {
                           showSeconds: true,
                         })
-                      : 'N/A'}
+                      : "N/A"}
                   </Typography>
                 </Box>
                 <Box>
@@ -130,7 +147,9 @@ export const ExecutionSideBar: React.FC<ExecutionSideBarProps> = ({
                     Duration
                   </Typography>
                   <Typography>
-                    {execution.duration_seconds ? `${execution.duration_seconds} seconds` : 'N/A'}
+                    {execution.duration_seconds
+                      ? `${execution.duration_seconds} seconds`
+                      : "N/A"}
                   </Typography>
                 </Box>
               </Stack>
@@ -142,7 +161,11 @@ export const ExecutionSideBar: React.FC<ExecutionSideBarProps> = ({
               execution.pipeline_trace_id ||
               execution.step_name) && (
               <Paper variant="outlined" sx={{ p: 2 }}>
-                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                <Typography
+                  variant="subtitle2"
+                  color="text.secondary"
+                  gutterBottom
+                >
                   Additional Information
                 </Typography>
                 <Divider sx={{ my: 1 }} />
@@ -152,7 +175,9 @@ export const ExecutionSideBar: React.FC<ExecutionSideBarProps> = ({
                       <Typography variant="caption" color="text.secondary">
                         Asset ID
                       </Typography>
-                      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.875rem' }}>
+                      <Typography
+                        sx={{ fontFamily: "monospace", fontSize: "0.875rem" }}
+                      >
                         {execution.inventory_id}
                       </Typography>
                     </Box>
@@ -164,7 +189,10 @@ export const ExecutionSideBar: React.FC<ExecutionSideBarProps> = ({
                       </Typography>
                       {execution.inventory_id ? (
                         <Typography>
-                          <Link component={RouterLink} to={`/images/${execution.inventory_id}`}>
+                          <Link
+                            component={RouterLink}
+                            to={`/images/${execution.inventory_id}`}
+                          >
                             {execution.object_key_name}
                           </Link>
                         </Typography>
@@ -178,7 +206,9 @@ export const ExecutionSideBar: React.FC<ExecutionSideBarProps> = ({
                       <Typography variant="caption" color="text.secondary">
                         Pipeline Trace ID
                       </Typography>
-                      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.875rem' }}>
+                      <Typography
+                        sx={{ fontFamily: "monospace", fontSize: "0.875rem" }}
+                      >
                         {execution.pipeline_trace_id}
                       </Typography>
                     </Box>
@@ -236,24 +266,24 @@ export const ExecutionSideBar: React.FC<ExecutionSideBarProps> = ({
                         sx={{
                           mt: 1,
                           p: 1.5,
-                          bgcolor: 'background.default',
+                          bgcolor: "background.default",
                           borderRadius: 1,
-                          border: '1px solid',
-                          borderColor: 'divider',
-                          maxHeight: '200px',
-                          overflow: 'auto',
+                          border: "1px solid",
+                          borderColor: "divider",
+                          maxHeight: "200px",
+                          overflow: "auto",
                         }}
                       >
                         <Typography
                           color="error"
                           sx={{
-                            whiteSpace: 'pre-wrap',
-                            fontFamily: 'monospace',
-                            fontSize: '0.75rem',
-                            wordBreak: 'break-word',
+                            whiteSpace: "pre-wrap",
+                            fontFamily: "monospace",
+                            fontSize: "0.75rem",
+                            wordBreak: "break-word",
                           }}
                         >
-                          {typeof execution.cause === 'string'
+                          {typeof execution.cause === "string"
                             ? execution.cause
                             : JSON.stringify(execution.cause, null, 2)}
                         </Typography>
@@ -267,34 +297,46 @@ export const ExecutionSideBar: React.FC<ExecutionSideBarProps> = ({
             {/* Metadata */}
             {execution.metadata && (
               <Paper variant="outlined" sx={{ p: 2 }}>
-                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                <Typography
+                  variant="subtitle2"
+                  color="text.secondary"
+                  gutterBottom
+                >
                   Execution Metadata
                 </Typography>
                 <Divider sx={{ my: 1 }} />
                 <Stack spacing={2}>
-                  {Object.entries(execution.metadata as Record<string, any>).map(([key, value]) => (
+                  {Object.entries(
+                    execution.metadata as Record<string, any>,
+                  ).map(([key, value]) => (
                     <Box key={key}>
                       <Typography variant="caption" color="text.secondary">
-                        {key.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase())}
+                        {key
+                          .replace(/([A-Z])/g, " $1")
+                          .replace(/^./, (str) => str.toUpperCase())}
                       </Typography>
                       <Typography
                         sx={{
                           fontFamily:
-                            typeof value === 'string' &&
-                            (key.includes('Id') || key.includes('Arn') || key.includes('Time'))
-                              ? 'monospace'
-                              : 'inherit',
+                            typeof value === "string" &&
+                            (key.includes("Id") ||
+                              key.includes("Arn") ||
+                              key.includes("Time"))
+                              ? "monospace"
+                              : "inherit",
                           fontSize:
-                            typeof value === 'string' &&
-                            (key.includes('Id') || key.includes('Arn') || key.includes('Time'))
-                              ? '0.875rem'
-                              : 'inherit',
-                          wordBreak: 'break-word',
+                            typeof value === "string" &&
+                            (key.includes("Id") ||
+                              key.includes("Arn") ||
+                              key.includes("Time"))
+                              ? "0.875rem"
+                              : "inherit",
+                          wordBreak: "break-word",
                         }}
                       >
-                        {typeof value === 'object' && value !== null
+                        {typeof value === "object" && value !== null
                           ? JSON.stringify(value, null, 2)
-                          : String(value || 'N/A')}
+                          : String(value || "N/A")}
                       </Typography>
                     </Box>
                   ))}

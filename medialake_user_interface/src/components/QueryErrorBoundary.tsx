@@ -1,7 +1,9 @@
-import { useQueryErrorResetBoundary } from '@tanstack/react-query';
-import { ErrorBoundary } from 'react-error-boundary';
+import { useQueryErrorResetBoundary } from "@tanstack/react-query";
+import { ErrorBoundary } from "react-error-boundary";
 
-export const QueryErrorBoundary: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const QueryErrorBoundary: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const { reset } = useQueryErrorResetBoundary();
 
   return (

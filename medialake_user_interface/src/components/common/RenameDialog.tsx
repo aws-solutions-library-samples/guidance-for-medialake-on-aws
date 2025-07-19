@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -8,9 +8,9 @@ import {
   IconButton,
   Box,
   Typography,
-} from '@mui/material';
-import { Close as CloseIcon } from '@mui/icons-material';
-import { ActionButton } from './button/ActionButton';
+} from "@mui/material";
+import { Close as CloseIcon } from "@mui/icons-material";
+import { ActionButton } from "./button/ActionButton";
 
 interface RenameDialogProps {
   open: boolean;
@@ -62,9 +62,9 @@ export const RenameDialog: React.FC<RenameDialogProps> = ({
     >
       <DialogTitle
         sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
           p: 2,
         }}
       >
@@ -74,7 +74,7 @@ export const RenameDialog: React.FC<RenameDialogProps> = ({
         </IconButton>
       </DialogTitle>
       <DialogContent sx={{ p: 2 }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}>
           {/* <TextField
                         label="Current Name"
                         value={currentName}
@@ -91,10 +91,18 @@ export const RenameDialog: React.FC<RenameDialogProps> = ({
         </Box>
       </DialogContent>
       <DialogActions sx={{ p: 2, pt: 0 }}>
-        <ActionButton variant="outlined" onClick={handleCancel} disabled={isLoading}>
+        <ActionButton
+          variant="outlined"
+          onClick={handleCancel}
+          disabled={isLoading}
+        >
           Cancel
         </ActionButton>
-        <ActionButton variant="contained" onClick={handleConfirm} loading={isLoading}>
+        <ActionButton
+          variant="contained"
+          onClick={handleConfirm}
+          loading={isLoading}
+        >
           Rename
         </ActionButton>
       </DialogActions>

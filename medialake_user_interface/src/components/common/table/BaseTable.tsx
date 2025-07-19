@@ -1,13 +1,13 @@
-import React, { useRef } from 'react';
-import { Box } from '@mui/material';
-import { ColumnDef, FilterFn } from '@tanstack/react-table';
-import { useVirtualizer } from '@tanstack/react-virtual';
-import { useTable } from '@/hooks/useTable';
-import { useTableDensity } from '@/contexts/TableDensityContext';
-import { ResizableTable } from './ResizableTable';
-import { ColumnVisibilityMenu } from './ColumnVisibilityMenu';
-import { BaseTableToolbar } from './BaseTableToolbar';
-import { BaseFilterPopover } from './BaseFilterPopover';
+import React, { useRef } from "react";
+import { Box } from "@mui/material";
+import { ColumnDef, FilterFn } from "@tanstack/react-table";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { useTable } from "@/hooks/useTable";
+import { useTableDensity } from "@/contexts/TableDensityContext";
+import { ResizableTable } from "./ResizableTable";
+import { ColumnVisibilityMenu } from "./ColumnVisibilityMenu";
+import { BaseTableToolbar } from "./BaseTableToolbar";
+import { BaseFilterPopover } from "./BaseFilterPopover";
 import {
   Table,
   TableBody,
@@ -17,7 +17,7 @@ import {
   TableRow,
   Paper,
   LinearProgress,
-} from '@mui/material';
+} from "@mui/material";
 import {
   type Table as TanStackTable,
   type ColumnSort,
@@ -26,8 +26,8 @@ import {
   type CellContext,
   type HeaderContext,
   flexRender,
-} from '@tanstack/react-table';
-import { Virtualizer } from '@tanstack/react-virtual';
+} from "@tanstack/react-table";
+import { Virtualizer } from "@tanstack/react-virtual";
 
 export interface BaseTableProps<T> {
   table: TanStackTable<T>;
@@ -54,12 +54,13 @@ export const BaseTable = <T extends object>({
   const paddingTop = virtualizer.getVirtualItems()[0]?.start || 0;
   const paddingBottom =
     virtualizer.getTotalSize() -
-    (virtualizer.getVirtualItems()[virtualizer.getVirtualItems().length - 1]?.end || 0);
+    (virtualizer.getVirtualItems()[virtualizer.getVirtualItems().length - 1]
+      ?.end || 0);
 
   return (
     <TableContainer component={Paper}>
       {isLoading && (
-        <Box sx={{ width: '100%' }}>
+        <Box sx={{ width: "100%" }}>
           <LinearProgress />
         </Box>
       )}
@@ -72,7 +73,7 @@ export const BaseTable = <T extends object>({
                   key={header.id}
                   onClick={header.column.getToggleSortingHandler()}
                   sx={{
-                    cursor: header.column.getCanSort() ? 'pointer' : 'default',
+                    cursor: header.column.getCanSort() ? "pointer" : "default",
                   }}
                 >
                   {header.isPlaceholder
@@ -81,7 +82,7 @@ export const BaseTable = <T extends object>({
                         header.column.columnDef.header as ColumnDefTemplate<
                           HeaderContext<T, unknown>
                         >,
-                        header.getContext()
+                        header.getContext(),
                       )}
                 </TableCell>
               ))}
@@ -101,8 +102,10 @@ export const BaseTable = <T extends object>({
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id}>
                     {flexRender(
-                      cell.column.columnDef.cell as ColumnDefTemplate<CellContext<T, unknown>>,
-                      cell.getContext()
+                      cell.column.columnDef.cell as ColumnDefTemplate<
+                        CellContext<T, unknown>
+                      >,
+                      cell.getContext(),
                     )}
                   </TableCell>
                 ))}

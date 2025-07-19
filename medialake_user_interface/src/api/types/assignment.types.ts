@@ -2,7 +2,7 @@
 
 export interface Assignment {
   principalId: string; // User ID or Group ID
-  principalType: 'USER' | 'GROUP';
+  principalType: "USER" | "GROUP";
   permissionSetId: string;
   assignedAt: string;
   assignedBy?: string;
@@ -43,7 +43,7 @@ export interface AssignmentResponse {
   message: string;
   data: {
     principalId: string;
-    principalType: 'USER' | 'GROUP';
+    principalType: "USER" | "GROUP";
     assignments: {
       permissionSetId: string;
       permissionSetName: string;

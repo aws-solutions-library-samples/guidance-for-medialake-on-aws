@@ -1,6 +1,13 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { useTranslation } from 'react-i18next';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Box } from '@mui/material';
+import React, { createContext, useContext, useState, ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Box,
+} from "@mui/material";
 
 interface ModalContextType {
   showModal: (content: ReactNode, options?: ModalOptions) => void;
@@ -48,7 +55,7 @@ export const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
         maxWidth="sm"
         PaperProps={{
           sx: {
-            width: '400px', // Set fixed width for configuration modal
+            width: "400px", // Set fixed width for configuration modal
             margin: 2,
           },
         }}
@@ -66,7 +73,7 @@ export const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
               }}
               variant="outlined"
             >
-              {modalOptions.cancelText || t('common.cancel')}
+              {modalOptions.cancelText || t("common.cancel")}
             </Button>
           )}
           {modalOptions.onConfirm && (
@@ -78,12 +85,12 @@ export const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
               variant="contained"
               color="primary"
             >
-              {modalOptions.confirmText || t('common.save')}
+              {modalOptions.confirmText || t("common.save")}
             </Button>
           )}
           {!modalOptions.onConfirm && !modalOptions.onCancel && (
             <Button onClick={hideModal} variant="contained" color="primary">
-              {t('common.close')}
+              {t("common.close")}
             </Button>
           )}
         </DialogActions>
@@ -95,7 +102,7 @@ export const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
 export const useModal = () => {
   const context = useContext(ModalContext);
   if (context === undefined) {
-    throw new Error('useModal must be used within a ModalProvider');
+    throw new Error("useModal must be used within a ModalProvider");
   }
   return context;
 };

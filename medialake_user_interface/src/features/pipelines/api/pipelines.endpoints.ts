@@ -1,9 +1,9 @@
 export const PIPELINES_API = {
-  BASE: '/pipelines',
+  BASE: "/pipelines",
   endpoints: {
-    GET_PIPELINES: '/pipelines',
+    GET_PIPELINES: "/pipelines",
     GET_PIPELINE: (id: string) => `/pipelines/${id}`,
-    CREATE_PIPELINE: '/pipelines',
+    CREATE_PIPELINE: "/pipelines",
     UPDATE_PIPELINE: (id: string) => `/pipelines/${id}`,
     DELETE_PIPELINE: (id: string) => `/pipelines/${id}`,
     UPDATE_STATUS: (id: string) => `/pipelines/${id}/status`,

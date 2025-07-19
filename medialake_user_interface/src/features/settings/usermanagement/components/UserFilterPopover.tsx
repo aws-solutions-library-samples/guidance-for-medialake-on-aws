@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   Box,
   TextField,
@@ -9,10 +9,10 @@ import {
   useTheme,
   Typography,
   Stack,
-} from '@mui/material';
-import { Column } from '@tanstack/react-table';
-import { User } from '@/api/types/api.types';
-import { useTranslation } from 'react-i18next';
+} from "@mui/material";
+import { Column } from "@tanstack/react-table";
+import { User } from "@/api/types/api.types";
+import { useTranslation } from "react-i18next";
 
 interface UserFilterPopoverProps {
   anchorEl: HTMLElement | null;
@@ -41,21 +41,21 @@ export const UserFilterPopover: React.FC<UserFilterPopoverProps> = ({
       const value = user[columnId as keyof User];
       if (value != null) {
         if (Array.isArray(value)) {
-          if (columnId === 'roles') {
+          if (columnId === "roles") {
             // For roles, only add the first role (primary role)
             if (value.length > 0) {
               values.add(String(value[0]));
             } else {
-              values.add('No Role');
+              values.add("No Role");
             }
           } else {
             // Handle other arrays (like groups)
             value.forEach((v) => values.add(String(v)));
           }
-        } else if (typeof value === 'boolean') {
+        } else if (typeof value === "boolean") {
           // Handle boolean values (like enabled)
-          values.add(value ? 'true' : 'false');
-        } else if (columnId === 'created' || columnId === 'modified') {
+          values.add(value ? "true" : "false");
+        } else if (columnId === "created" || columnId === "modified") {
           // Handle date columns
           values.add(formatDateOnly(String(value)));
         } else {
@@ -77,7 +77,7 @@ export const UserFilterPopover: React.FC<UserFilterPopoverProps> = ({
       // Clear select filter when typing
       column.setFilterValue(value);
     } else {
-      column.setFilterValue('');
+      column.setFilterValue("");
     }
   };
 
@@ -89,13 +89,13 @@ export const UserFilterPopover: React.FC<UserFilterPopoverProps> = ({
   };
 
   const handleTextFilterSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       onClose(); // Close popover on Enter
     }
   };
 
   const handleClearFilter = () => {
-    column.setFilterValue('');
+    column.setFilterValue("");
   };
 
   return (
@@ -104,64 +104,72 @@ export const UserFilterPopover: React.FC<UserFilterPopoverProps> = ({
       anchorEl={anchorEl}
       onClose={onClose}
       anchorOrigin={{
-        vertical: 'bottom',
-        horizontal: 'left',
+        vertical: "bottom",
+        horizontal: "left",
       }}
       transformOrigin={{
-        vertical: 'top',
-        horizontal: 'left',
+        vertical: "top",
+        horizontal: "left",
       }}
       PaperProps={{
         sx: {
           p: 2,
           width: 300,
-          borderRadius: '8px',
+          borderRadius: "8px",
         },
       }}
     >
       <Stack spacing={2}>
         <Box>
-          <Typography variant="caption" color="textSecondary" sx={{ mb: 1, display: 'block' }}>
-            {t('common.textFilter')}
+          <Typography
+            variant="caption"
+            color="textSecondary"
+            sx={{ mb: 1, display: "block" }}
+          >
+            {t("common.textFilter")}
           </Typography>
           <TextField
             fullWidth
             size="small"
-            placeholder={`${t('common.filter')} ${column.columnDef.header as string}`}
-            value={currentValue ?? ''}
+            placeholder={`${t("common.filter")} ${column.columnDef.header as string}`}
+            value={currentValue ?? ""}
             onChange={(e) => handleTextFilterChange(e.target.value)}
             onKeyDown={handleTextFilterSubmit}
             sx={{
-              '& .MuiOutlinedInput-root': {
-                borderRadius: '8px',
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "8px",
               },
             }}
           />
         </Box>
 
         <Box>
-          <Typography variant="caption" color="textSecondary" sx={{ mb: 1, display: 'block' }}>
-            {t('common.selectFilter')}
+          <Typography
+            variant="caption"
+            color="textSecondary"
+            sx={{ mb: 1, display: "block" }}
+          >
+            {t("common.selectFilter")}
           </Typography>
           <Select
             fullWidth
             size="small"
-            value={currentValue ?? ''}
+            value={currentValue ?? ""}
             onChange={(e) => handleSelectFilterChange(e.target.value)}
             displayEmpty
             sx={{
-              borderRadius: '8px',
+              borderRadius: "8px",
             }}
           >
             <MenuItem value="">
-              <em>{t('common.all')}</em>
+              <em>{t("common.all")}</em>
             </MenuItem>
             {uniqueValues.map((value) => (
               <MenuItem key={value} value={value}>
-                {column.id === 'enabled'
-                  ? value === 'true'
-                    ? t('users.status.active')
-                    : t('users.status.inactive')
+                {column.id === "enabled"
+                  ? value === "true"
+                    ? t("users.status.active")
+                    : t("users.status.inactive")
                   : value}
               </MenuItem>
             ))}
@@ -169,8 +177,12 @@ export const UserFilterPopover: React.FC<UserFilterPopoverProps> = ({
         </Box>
 
         {currentValue && (
-          <Button size="small" onClick={handleClearFilter} sx={{ alignSelf: 'flex-start' }}>
-            {t('common.clearFilter')}
+          <Button
+            size="small"
+            onClick={handleClearFilter}
+            sx={{ alignSelf: "flex-start" }}
+          >
+            {t("common.clearFilter")}
           </Button>
         )}
       </Stack>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -9,8 +9,8 @@ import {
   Box,
   useTheme,
   alpha,
-} from '@mui/material';
-import { ConnectorResponse } from '@/api/types/api.types';
+} from "@mui/material";
+import { ConnectorResponse } from "@/api/types/api.types";
 
 interface ConnectorEditModalProps {
   open: boolean;
@@ -26,7 +26,8 @@ const ConnectorEditModal: React.FC<ConnectorEditModalProps> = ({
   onSave,
 }) => {
   const theme = useTheme();
-  const [editedConnector, setEditedConnector] = useState<ConnectorResponse>(connector);
+  const [editedConnector, setEditedConnector] =
+    useState<ConnectorResponse>(connector);
 
   useEffect(() => {
     setEditedConnector(connector);
@@ -41,7 +42,7 @@ const ConnectorEditModal: React.FC<ConnectorEditModalProps> = ({
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ fontWeight: 600 }}>Edit Connector</DialogTitle>
       <DialogContent>
-        <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Box sx={{ mt: 2, display: "flex", flexDirection: "column", gap: 2 }}>
           <TextField
             label="Name"
             value={editedConnector.name}
@@ -55,7 +56,7 @@ const ConnectorEditModal: React.FC<ConnectorEditModalProps> = ({
           />
           <TextField
             label="Description"
-            value={editedConnector.description || ''}
+            value={editedConnector.description || ""}
             onChange={(e) =>
               setEditedConnector({
                 ...editedConnector,
@@ -68,12 +69,17 @@ const ConnectorEditModal: React.FC<ConnectorEditModalProps> = ({
           />
           <TextField
             label="Bucket"
-            value={editedConnector.storageIdentifier || ''}
+            value={editedConnector.storageIdentifier || ""}
             disabled
             fullWidth
           />
           {editedConnector.settings?.region && (
-            <TextField label="Region" value={editedConnector.region} disabled fullWidth />
+            <TextField
+              label="Region"
+              value={editedConnector.region}
+              disabled
+              fullWidth
+            />
           )}
           {editedConnector.settings?.path && (
             <TextField
@@ -98,7 +104,7 @@ const ConnectorEditModal: React.FC<ConnectorEditModalProps> = ({
           onClick={onClose}
           sx={{
             color: theme.palette.text.secondary,
-            '&:hover': {
+            "&:hover": {
               backgroundColor: alpha(theme.palette.primary.main, 0.1),
             },
           }}
@@ -110,7 +116,7 @@ const ConnectorEditModal: React.FC<ConnectorEditModalProps> = ({
           variant="contained"
           sx={{
             backgroundColor: theme.palette.primary.main,
-            '&:hover': {
+            "&:hover": {
               backgroundColor: theme.palette.primary.dark,
             },
           }}

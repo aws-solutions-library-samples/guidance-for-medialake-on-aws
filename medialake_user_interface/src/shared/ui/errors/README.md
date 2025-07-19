@@ -11,7 +11,7 @@ A component-level error boundary based on `react-error-boundary` that provides a
 #### Usage
 
 ```tsx
-import { ErrorBoundary } from '@/shared/ui/errors';
+import { ErrorBoundary } from "@/shared/ui/errors";
 
 const MyComponent = () => {
   return (
@@ -21,7 +21,7 @@ const MyComponent = () => {
       }}
       onError={(error, info) => {
         // Log errors to your error reporting service
-        console.error('Error caught by boundary:', error, info);
+        console.error("Error caught by boundary:", error, info);
       }}
     >
       <MyPotentiallyBuggyComponent />
@@ -44,17 +44,17 @@ A specialized error boundary for use with React Router's `errorElement` prop. It
 #### Usage in Router Configuration
 
 ```tsx
-import { createBrowserRouter } from 'react-router-dom';
-import { RouteErrorBoundary } from '@/shared/ui/errors';
+import { createBrowserRouter } from "react-router-dom";
+import { RouteErrorBoundary } from "@/shared/ui/errors";
 
 const router = createBrowserRouter([
   {
-    path: '/',
+    path: "/",
     element: <RootComponent />,
     errorElement: <RouteErrorBoundary />,
     children: [
       {
-        path: 'dashboard',
+        path: "dashboard",
         element: <Dashboard />,
         // You can also add an errorElement to individual routes
         errorElement: <RouteErrorBoundary />,
@@ -67,17 +67,14 @@ const router = createBrowserRouter([
 ## Best Practices
 
 1. **Component-Level Errors**:
-
    - Wrap complex components with `<ErrorBoundary>` to prevent the entire app from crashing
    - For key UI sections, always use an ErrorBoundary
 
 2. **Route-Level Errors**:
-
    - Use `errorElement: <RouteErrorBoundary />` on your routes to handle navigation and data loading errors
    - Consider adding more specific errorElements for important routes
 
 3. **Async Error Handling**:
-
    - Use React Query's error handling for data fetching errors
    - Consider wrapping async components with ErrorBoundary
 
