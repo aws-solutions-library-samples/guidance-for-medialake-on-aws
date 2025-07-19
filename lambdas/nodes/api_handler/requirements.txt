@@ -1,0 +1,5 @@
+requests
+aws-lambda-powertools
+jinja2
+requests-aws4auth
+aws-xray-sdk

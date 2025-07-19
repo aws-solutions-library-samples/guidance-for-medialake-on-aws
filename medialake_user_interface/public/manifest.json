@@ -1,0 +1,27 @@
+{
+  "short_name": "Media Lake",
+  "name": "Media Lake - Guidance for your media, metadata, and workflows",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "web-app-manifest-192x192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "web-app-manifest-512x512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#2B6CB0",
+  "background_color": "#ffffff"
+}
