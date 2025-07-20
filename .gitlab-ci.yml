@@ -149,28 +149,21 @@ sync-to-github:
     - if: $CI_COMMIT_REF_NAME == "release"
   script:
     - apk add --no-cache git openssh
-    # Set up SSH key and config
     - mkdir -p ~/.ssh
     - echo "$GITHUB_SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
     - ssh-keyscan github.com >> ~/.ssh/known_hosts
-    # Configure git identity
     - git config --global user.email "medialake@amazon.com"
     - git config --global user.name "MediaLake CI"
-    # Clone the release branch specifically
     - git clone --single-branch --branch release $CI_REPOSITORY_URL repo-copy
     - cd repo-copy
-    # Capture the latest commit message from release branch
     - RELEASE_COMMIT_MESSAGE=$(git log -1 --pretty=format:"%s")
-    - echo "Release commit message: $RELEASE_COMMIT_MESSAGE"
-    # Debug: show current state
-    - echo "Current commit:" && git log --oneline -1
-    - echo "Current branch:" && git branch -a
+    - echo "Release commit message $RELEASE_COMMIT_MESSAGE"
+    - echo "Current commit" && git log --oneline -1
+    - echo "Current branch" && git branch -a
     - git remote add github git@github.com:aws-solutions-library-samples/guidance-for-medialake-on-aws.git
-    # Fetch GitHub state for comparison
     - git fetch github main
-    - echo "GitHub main commit:" && git log --oneline -1 github/main
-    # Remove sensitive files and development-specific files
+    - echo "GitHub main commit" && git log --oneline -1 github/main
     - rm -f secrets.txt
     - rm -rf docs/
     - rm -rf .roo/
@@ -180,8 +173,6 @@ sync-to-github:
     - rm -f .roomodes
     - rm -f .pre-commit-config.yaml
     - rm -rf .githooks/
-    # Create commit with the original release branch commit message
     - git add -A
     - git commit -m "$RELEASE_COMMIT_MESSAGE" --allow-empty
-    # Push to GitHub main branch (force push to sync)
     - git push -f github HEAD:main
