@@ -8,8 +8,6 @@ from aws_cdk import custom_resources as cr
 from constructs import Construct
 
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
-from medialake_constructs.shared_constructs.lambda_layers import CustomBoto3Layer
-
 
 @dataclass
 class CleanupStackProps:
@@ -24,9 +22,6 @@ class CleanupStack(Stack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # Create the custom boto3 layer for S3 Vector support
-        custom_boto3_layer = CustomBoto3Layer(self, "CustomBoto3Layer")
-
         self._clean_up_lambda = Lambda(
             self,
             "MediaLakeCleanUp",
@@ -34,11 +29,11 @@ class CleanupStack(Stack):
                 name="MediaLakeCleanUp",
                 timeout_minutes=15,
                 entry="lambdas/back_end/provisioned_resource_cleanup",
-                layers=[custom_boto3_layer.layer],
-                # log_removal_policy=RemovalPolicy.RETAIN,  # Enable to debug
+                log_removal_policy=RemovalPolicy.RETAIN,  # Enable to debug
                 environment_variables={
                     "CONNECTOR_TABLE": props.connector_table.table_name,
                     "PIPELINE_TABLE": props.pipeline_table.table_name,
+                    "VECTOR_BUCKET_NAME": f"medialake-vectors-{Stack.of(self).region}-{Stack.of(self).node.try_get_context('environment') or 'dev'}",
                 },
             ),
         )
@@ -223,19 +218,32 @@ class CleanupStack(Stack):
             )
         )
 
-        # Add S3 Vector Store permissions for cleanup
+        # Add S3 Vector Store permissions for cleanup - List operations require * resource
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=[
                     "s3vectors:ListVectorBuckets",
+                    "s3vectors:ListIndexes",
+                ],
+                resources=["*"],  # List operations require * resource per AWS API limitations
+            )
+        )
+
+        # Add S3 Vector Store permissions for specific MediaLake resources
+        self._clean_up_lambda.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
                     "s3vectors:GetVectorBucket",
                     "s3vectors:DeleteVectorBucket",
-                    "s3vectors:ListIndexes",
                     "s3vectors:GetIndex",
                     "s3vectors:DeleteIndex",
                 ],
-                resources=["*"],  # S3 Vector Store operations require * resource
+                resources=[
+                    f"arn:aws:s3vectors:{Stack.of(self).region}:{Stack.of(self).account}:bucket/medialake-vectors-*",
+                    f"arn:aws:s3vectors:{Stack.of(self).region}:{Stack.of(self).account}:bucket/medialake-vectors-*/index/*",
+                ],
             )
         )
 

@@ -1,6 +1,6 @@
 // SystemSettingsPage.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -144,15 +144,39 @@ const SystemSettingsPage: React.FC = () => {
   };
 
   const handleSaveEmbeddingStoreSettings = async () => {
-    const success = await handleSaveEmbeddingStore();
-    if (success) {
+    try {
+      await handleSaveEmbeddingStore();
       showNotification(
         t('settings.systemSettings.search.embeddingStoreSaveSuccess', 'Embedding store settings saved successfully'),
         'success'
       );
-    } else {
+    } catch {
       showNotification(
         t('settings.systemSettings.search.embeddingStoreSaveError', 'Failed to save embedding store settings'),
+        'error'
+      );
+    }
+  };
+
+  useEffect(() => {
+    if (isApiKeyDialogOpen) {
+      setApiKeyInput(settings.provider.config?.apiKey ?? '');
+    }
+  }, [isApiKeyDialogOpen, settings.provider.config, setApiKeyInput]);
+
+  const onSaveApiKey = async () => {
+    try {
+      await handleSaveApiKey();
+      handleToggleChange(true);         // if this throws, we’ll catch below
+      handleCloseApiKeyDialog();
+      showNotification(
+        t('settings.systemSettings.search.apiKeySaveSuccess', 'API key saved'),
+        'success'
+      );
+      await handleSave();               // re‑persist the rest of your settings
+    } catch (err) {
+      showNotification(
+        t('settings.systemSettings.search.apiKeySaveError', 'Failed to save API key'),
         'error'
       );
     }
@@ -269,7 +293,8 @@ const SystemSettingsPage: React.FC = () => {
                         />
                         <Switch
                           checked={settings.isEnabled}
-                          onChange={(e) => handleToggleChange(e.target.checked)}
+                          onChange={(_evt, checked) => handleToggleChange(checked)}
+                          disabled={!settings.provider.config?.isConfigured}
                           color="success"
                           size="medium"
                         />
@@ -356,7 +381,7 @@ const SystemSettingsPage: React.FC = () => {
                         'Choose where to store and search vector embeddings'
                       )}
                     </Typography>
-                    
+
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                       <FormControl sx={{ minWidth: 200 }} disabled={!settings.isEnabled}>
                         <InputLabel>{t('settings.systemSettings.search.selectStore', 'Select Store')}</InputLabel>
@@ -373,10 +398,9 @@ const SystemSettingsPage: React.FC = () => {
                           </MenuItem>
                         </Select>
                       </FormControl>
-                      
+
                       <Button
                         variant="contained"
-                        size="small"
                         onClick={handleSaveEmbeddingStoreSettings}
                         disabled={!settings.isEnabled || isSaving}
                         startIcon={isSaving ? <CircularProgress size={16} /> : <CheckCircleIcon />}
@@ -420,7 +444,7 @@ const SystemSettingsPage: React.FC = () => {
           </TabPanel>
         </Box>
       </Paper>
-      
+
       {/* API Key Configuration Dialog */}
       <Dialog open={isApiKeyDialogOpen} onClose={handleCloseApiKeyDialog} maxWidth="sm" fullWidth>
         <DialogTitle>
@@ -451,11 +475,11 @@ const SystemSettingsPage: React.FC = () => {
           <Button onClick={handleCloseApiKeyDialog}>
             {t('common.cancel', 'Cancel')}
           </Button>
-          <Button 
-            onClick={handleSaveApiKey} 
-            variant="contained" 
+          <Button
+            onClick={onSaveApiKey}
+            variant="contained"
             color="primary"
-            disabled={!apiKeyInput || apiKeyInput === '••••••••••••••••'}
+            disabled={!apiKeyInput}
           >
             {t('common.save', 'Save')}
           </Button>

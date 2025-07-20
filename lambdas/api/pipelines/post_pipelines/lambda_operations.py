@@ -450,33 +450,12 @@ def create_lambda_function(
     zip_file_key = get_zip_file_key(IAC_ASSETS_BUCKET, zip_file_prefix)
 
     runtime = lambda_config["runtime"].lower()
-    role_arn = create_lambda_role(pipeline_name, node.data.id, yaml_data, operation_id)
+    role_arn = create_lambda_role(pipeline_name, node.data.id, yaml_data, operation_id, function_name)
 
     # Wait for the role to propagate before attempting to create the Lambda function
     try:
-        # Use the same role name construction logic as in create_lambda_role
-        base_role_name = (
-            f"{resource_prefix}_{pipeline_name}_{node.data.id}_lambda_execution_role"
-        )
-
-        if operation_id:
-            # Calculate how much space we have left for the operation_id
-            max_base_length = (
-                63 - len(operation_id) - 1
-            )  # 63 to leave room for the underscore
-
-            if len(base_role_name) > max_base_length:
-                # Truncate the base_role_name to make room for the operation_id
-                base_role_name = base_role_name[:max_base_length]
-
-            # Now add the operation_id
-            role_name = sanitize_role_name(f"{base_role_name}_{operation_id}")
-        else:
-            role_name = sanitize_role_name(base_role_name)
-
-        # Ensure the final role name is within the 64-character limit
-        if len(role_name) > 64:
-            role_name = role_name[:64]
+        # Use the function name as the role name (same as in create_lambda_role)
+        role_name = function_name
 
         wait_for_role_propagation(role_name)
     except Exception as e:

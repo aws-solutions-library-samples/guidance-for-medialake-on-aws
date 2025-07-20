@@ -17,7 +17,7 @@ from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaCon
 from medialake_constructs.shared_constructs.lambda_layers import (
     PowertoolsLayer, PowertoolsLayerConfig,
     PyMediaInfo,ResvgCliLayer,FFProbeLayer, FFmpegLayer,
-    PyamlLayer, ShortuuidLayer, CustomBoto3Layer, CommonLibrariesLayer
+    PyamlLayer, ShortuuidLayer, CommonLibrariesLayer
 )
 from medialake_constructs.shared_constructs.mediaconvert import (
     MediaConvert,
@@ -64,8 +64,7 @@ class NodesStack(cdk.NestedStack):
         self.pyaml_layer = PyamlLayer(self, "PyamlLayer")
         self.ffprobe_layer = FFProbeLayer(self, "FFProbeLayer")
         self.resvgcli_layer = ResvgCliLayer(self, "ResvgCliLayer")
-        self.custom_boto3_layer = CustomBoto3Layer(self, "CustomBoto3Layer")
-
+       
         # Node Lambda Deployments
 
         self.check_media_convert_status_lambda_deployment = LambdaDeployment(
@@ -326,7 +325,7 @@ class NodesStack(cdk.NestedStack):
                     "PYAML_LAYER_ARN": self.pyaml_layer.layer.layer_version_arn,
                     "FFPROBE_LAYER_ARN": self.ffprobe_layer.layer.layer_version_arn,
                     "RESVGCLI_LAYER_ARN": self.resvgcli_layer.layer.layer_version_arn,
-                    "CUSTOMBOTO3_LAYER_ARN": self.custom_boto3_layer.layer.layer_version_arn,
+                  
                 },
             ),
         )

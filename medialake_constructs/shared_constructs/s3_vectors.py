@@ -13,8 +13,6 @@ from constructs import Construct
 
 from config import config
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
-from medialake_constructs.shared_constructs.lambda_layers import CustomBoto3Layer
-
 
 @dataclass
 class S3VectorClusterProps:
@@ -40,9 +38,6 @@ class S3VectorCluster(Construct):
         if not props.vpc:
             raise ValueError("A VPC must be provided for the S3 Vector cluster.")
 
-        # Create the custom boto3 layer for S3 Vector support
-        custom_boto3_layer = CustomBoto3Layer(self, "CustomBoto3Layer")
-
         # Create Lambda function for S3 Vector bucket and index creation
         create_s3_vector_lambda = Lambda(
             self,
@@ -52,8 +47,7 @@ class S3VectorCluster(Construct):
                 lambda_handler="handler",
                 vpc=props.vpc,
                 security_groups=[props.security_group] if props.security_group else None,
-                timeout_minutes=5,  # S3 Vector operations might take longer
-                layers=[custom_boto3_layer.layer],
+                timeout_minutes=5, 
                 environment_variables={
                     "VECTOR_BUCKET_NAME": self._bucket_name,
                     "INDEX_NAMES": ",".join(props.collection_indexes),
