@@ -142,7 +142,8 @@ pre_commit_checks:
     - pre-commit run --all-files black
     - pre-commit run --all-files flake8
     - pre-commit run --all-files prettier
-    - pre-commit run --all-files remove-ds-store
+    # Remove .DS_Store files directly (since hook was removed from local config)
+    - find . -name .DS_Store -type f -delete
 
 sync-to-github:
   image: alpine:latest
