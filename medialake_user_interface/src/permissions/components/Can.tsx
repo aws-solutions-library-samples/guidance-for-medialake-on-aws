@@ -1,9 +1,9 @@
 // src/permissions/components/Can.tsx
-import React, { useState, useEffect } from 'react';
-import { usePermission } from '../hooks/usePermission';
-import { useAuth } from '../../common/hooks/auth-context';
-import { CanProps } from '../types/permission.types';
-import { Actions, Subjects } from '../types/ability.types';
+import React, { useState, useEffect } from "react";
+import { usePermission } from "../hooks/usePermission";
+import { useAuth } from "../../common/hooks/auth-context";
+import { CanProps } from "../types/permission.types";
+import { Actions, Subjects } from "../types/ability.types";
 
 /**
  * Component for conditional rendering based on permissions
@@ -11,7 +11,13 @@ import { Actions, Subjects } from '../types/ability.types';
  * @param props Component props
  * @returns React element or null
  */
-export function Can({ I: action, a: subject, field, passThrough = false, children }: CanProps) {
+export function Can({
+  I: action,
+  a: subject,
+  field,
+  passThrough = false,
+  children,
+}: CanProps) {
   const { can, loading } = usePermission();
   const { isAuthenticated, isInitialized } = useAuth();
   const [lastKnownResult, setLastKnownResult] = useState<boolean | null>(null);
@@ -35,7 +41,7 @@ export function Can({ I: action, a: subject, field, passThrough = false, childre
   // If loading and no previous result, hide content
   if (loading) {
     if (lastKnownResult !== null) {
-      if (typeof children === 'function') {
+      if (typeof children === "function") {
         return <>{children(lastKnownResult)}</>;
       }
       return lastKnownResult ? <>{children}</> : null;
@@ -45,7 +51,7 @@ export function Can({ I: action, a: subject, field, passThrough = false, childre
   }
 
   // If children is a function, call it with the allowed status
-  if (typeof children === 'function') {
+  if (typeof children === "function") {
     return <>{children(allowed)}</>;
   }
 
@@ -60,8 +66,8 @@ export function Can({ I: action, a: subject, field, passThrough = false, childre
       <div
         style={{
           opacity: 0.5,
-          pointerEvents: 'none',
-          cursor: 'not-allowed',
+          pointerEvents: "none",
+          cursor: "not-allowed",
         }}
       >
         {children}

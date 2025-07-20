@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -13,8 +13,8 @@ import {
   Checkbox,
   Box,
   Alert,
-} from '@mui/material';
-import { Role, CreateRoleRequest } from '../../../../api/types/api.types';
+} from "@mui/material";
+import { Role, CreateRoleRequest } from "../../../../api/types/api.types";
 
 interface RoleFormProps {
   open: boolean;
@@ -24,20 +24,20 @@ interface RoleFormProps {
 }
 
 const AVAILABLE_PERMISSIONS = [
-  'READ_ASSETS',
-  'WRITE_ASSETS',
-  'DELETE_ASSETS',
-  'MANAGE_USERS',
-  'MANAGE_ROLES',
-  'MANAGE_CONNECTORS',
-  'VIEW_ANALYTICS',
-  'MANAGE_SETTINGS',
+  "READ_ASSETS",
+  "WRITE_ASSETS",
+  "DELETE_ASSETS",
+  "MANAGE_USERS",
+  "MANAGE_ROLES",
+  "MANAGE_CONNECTORS",
+  "VIEW_ANALYTICS",
+  "MANAGE_SETTINGS",
 ];
 
 const RoleForm: React.FC<RoleFormProps> = ({ open, onClose, onSave, role }) => {
   const [formData, setFormData] = useState<CreateRoleRequest>({
-    name: role?.name || '',
-    description: role?.description || '',
+    name: role?.name || "",
+    description: role?.description || "",
     permissions: role?.permissions || [],
   });
 
@@ -49,7 +49,7 @@ const RoleForm: React.FC<RoleFormProps> = ({ open, onClose, onSave, role }) => {
       await onSave(formData);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setError(err instanceof Error ? err.message : "An error occurred");
     }
   };
 
@@ -65,9 +65,9 @@ const RoleForm: React.FC<RoleFormProps> = ({ open, onClose, onSave, role }) => {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <form onSubmit={handleSubmit}>
-        <DialogTitle>{role ? 'Edit Role' : 'Create New Role'}</DialogTitle>
+        <DialogTitle>{role ? "Edit Role" : "Create New Role"}</DialogTitle>
         <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}>
             {error && (
               <Alert severity="error" sx={{ mb: 2 }}>
                 {error}
@@ -77,7 +77,9 @@ const RoleForm: React.FC<RoleFormProps> = ({ open, onClose, onSave, role }) => {
             <TextField
               label="Role Name"
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, name: e.target.value })
+              }
               required
               fullWidth
             />
@@ -85,7 +87,9 @@ const RoleForm: React.FC<RoleFormProps> = ({ open, onClose, onSave, role }) => {
             <TextField
               label="Description"
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, description: e.target.value })
+              }
               multiline
               rows={2}
               fullWidth
@@ -104,9 +108,11 @@ const RoleForm: React.FC<RoleFormProps> = ({ open, onClose, onSave, role }) => {
                       />
                     }
                     label={permission
-                      .split('_')
-                      .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
-                      .join(' ')}
+                      .split("_")
+                      .map(
+                        (word) => word.charAt(0) + word.slice(1).toLowerCase(),
+                      )
+                      .join(" ")}
                   />
                 ))}
               </FormGroup>
@@ -116,7 +122,7 @@ const RoleForm: React.FC<RoleFormProps> = ({ open, onClose, onSave, role }) => {
         <DialogActions>
           <Button onClick={onClose}>Cancel</Button>
           <Button type="submit" variant="contained" color="primary">
-            {role ? 'Save Changes' : 'Create Role'}
+            {role ? "Save Changes" : "Create Role"}
           </Button>
         </DialogActions>
       </form>

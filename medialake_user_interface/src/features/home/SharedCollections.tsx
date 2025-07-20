@@ -1,24 +1,24 @@
-import React from 'react';
-import { Box, Typography, Grid } from '@mui/material';
-import { CollectionCard } from './CollectionCard';
-import type { Collection } from '../../types/collection';
+import React from "react";
+import { Box, Typography, Grid } from "@mui/material";
+import { CollectionCard } from "./CollectionCard";
+import type { Collection } from "../../types/collection";
 
 const sampleSharedCollections: Collection[] = [
   {
-    id: '5',
-    name: 'Marketing Assets 2024',
-    description: 'Shared marketing assets for the year 2024 campaigns.',
+    id: "5",
+    name: "Marketing Assets 2024",
+    description: "Shared marketing assets for the year 2024 campaigns.",
     itemCount: 89,
-    createdAt: '2024-01-01T00:00:00Z',
-    lastModified: '2024-03-15T14:30:00Z',
+    createdAt: "2024-01-01T00:00:00Z",
+    lastModified: "2024-03-15T14:30:00Z",
   },
   {
-    id: '6',
-    name: 'Client Deliverables',
-    description: 'Final deliverables for client projects.',
+    id: "6",
+    name: "Client Deliverables",
+    description: "Final deliverables for client projects.",
     itemCount: 34,
-    createdAt: '2024-02-15T10:00:00Z',
-    lastModified: '2024-03-16T09:00:00Z',
+    createdAt: "2024-02-15T10:00:00Z",
+    lastModified: "2024-03-16T09:00:00Z",
   },
 ];
 

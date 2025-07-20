@@ -1,7 +1,7 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from "react";
 
-type ThemeMode = 'light' | 'dark' | 'system';
-type Theme = 'light' | 'dark';
+type ThemeMode = "light" | "dark" | "system";
+type Theme = "light" | "dark";
 
 interface ThemeContextType {
   theme: Theme;
@@ -10,41 +10,43 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType>({
-  theme: 'light',
-  mode: 'system',
+  theme: "light",
+  mode: "system",
   setMode: () => {},
 });
 
-export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [mode, setMode] = useState<ThemeMode>(() => {
-    const savedMode = localStorage.getItem('theme-mode');
-    return (savedMode as ThemeMode) || 'system';
+    const savedMode = localStorage.getItem("theme-mode");
+    return (savedMode as ThemeMode) || "system";
   });
-  const [theme, setTheme] = useState<Theme>('light');
+  const [theme, setTheme] = useState<Theme>("light");
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
 
     const updateTheme = () => {
-      if (mode === 'system') {
-        setTheme(mediaQuery.matches ? 'dark' : 'light');
+      if (mode === "system") {
+        setTheme(mediaQuery.matches ? "dark" : "light");
       } else {
         setTheme(mode as Theme);
       }
     };
 
     updateTheme();
-    mediaQuery.addEventListener('change', updateTheme);
-    return () => mediaQuery.removeEventListener('change', updateTheme);
+    mediaQuery.addEventListener("change", updateTheme);
+    return () => mediaQuery.removeEventListener("change", updateTheme);
   }, [mode]);
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
 
   const handleSetMode = (newMode: ThemeMode) => {
     setMode(newMode);
-    localStorage.setItem('theme-mode', newMode);
+    localStorage.setItem("theme-mode", newMode);
   };
 
   return (
@@ -57,7 +59,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 export const useTheme = () => {
   const context = useContext(ThemeContext);
   if (!context) {
-    throw new Error('useTheme must be used within a ThemeProvider');
+    throw new Error("useTheme must be used within a ThemeProvider");
   }
   return context;
 };

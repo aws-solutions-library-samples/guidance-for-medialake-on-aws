@@ -1,7 +1,12 @@
 // src/shared/utils/dateUtils.ts
 
-import { format, formatDistanceToNow, parseISO, isValid as isValidDate } from 'date-fns';
-import { enUS } from 'date-fns/locale';
+import {
+  format,
+  formatDistanceToNow,
+  parseISO,
+  isValid as isValidDate,
+} from "date-fns";
+import { enUS } from "date-fns/locale";
 
 interface DateTimeFormatOptions {
   showSeconds?: boolean;
@@ -13,7 +18,7 @@ interface DateTimeFormatOptions {
  * otherwise parseISO.
  */
 const parseDate = (input: string | number): Date => {
-  if (typeof input === 'number' || /^\d+$/.test(String(input))) {
+  if (typeof input === "number" || /^\d+$/.test(String(input))) {
     const n = Number(input);
     return new Date(String(input).length === 10 ? n * 1000 : n);
   }
@@ -23,12 +28,12 @@ const parseDate = (input: string | number): Date => {
   //  If the string doesn't have timezone info, force it to be UTC
   if (
     inputStr.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$/) &&
-    !inputStr.includes('Z') &&
-    !inputStr.includes('+') &&
-    !inputStr.includes('-', 10)
+    !inputStr.includes("Z") &&
+    !inputStr.includes("+") &&
+    !inputStr.includes("-", 10)
   ) {
     // This is a datetime string without timezone info - treat as local time
-    return new Date(inputStr + 'Z');
+    return new Date(inputStr + "Z");
   }
 
   return parseISO(inputStr);
@@ -39,7 +44,7 @@ const parseDate = (input: string | number): Date => {
  * e.g. "In Progress", "Running".
  */
 const isStatusLabel = (input: string | number): input is string =>
-  typeof input === 'string' && !/\d/.test(input);
+  typeof input === "string" && !/\d/.test(input);
 
 /**
  * Format a timestamp/ISO string into something like:
@@ -50,10 +55,10 @@ const isStatusLabel = (input: string | number): input is string =>
  */
 export const formatLocalDateTime = (
   input?: string | number | null,
-  options: DateTimeFormatOptions = {}
+  options: DateTimeFormatOptions = {},
 ): string => {
   if (input == null) {
-    return '';
+    return "";
   }
 
   if (isStatusLabel(input)) {
@@ -62,21 +67,21 @@ export const formatLocalDateTime = (
 
   const date = parseDate(input);
   if (!isValidDate(date)) {
-    return 'Invalid date';
+    return "Invalid date";
   }
 
   const { showSeconds = false } = options;
 
   // Use Intl.DateTimeFormat for consistent local time formatting
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    ...(showSeconds && { second: '2-digit' }),
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    ...(showSeconds && { second: "2-digit" }),
     hour12: true,
-    timeZoneName: 'short',
+    timeZoneName: "short",
   });
 
   return formatter.format(date);
@@ -88,7 +93,7 @@ export const formatLocalDateTime = (
  */
 export const formatRelativeTime = (input?: string | number | null): string => {
   if (input == null) {
-    return '';
+    return "";
   }
 
   if (isStatusLabel(input)) {
@@ -97,7 +102,7 @@ export const formatRelativeTime = (input?: string | number | null): string => {
 
   const date = parseDate(input);
   if (!isValidDate(date)) {
-    return 'Invalid date';
+    return "Invalid date";
   }
 
   return formatDistanceToNow(date, { addSuffix: true, locale: enUS });
@@ -114,17 +119,18 @@ export const isValidISOString = (input?: string | number | null): boolean => {
 
 /** E.g. “PDT” or fallback “America/Los_Angeles” */
 export const getTimezoneAbbreviation = (timezone?: string): string => {
-  const targetTimezone = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const targetTimezone =
+    timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   try {
     const parts = new Date()
-      .toLocaleTimeString('en-US', {
+      .toLocaleTimeString("en-US", {
         timeZone: targetTimezone,
-        timeZoneName: 'short',
+        timeZoneName: "short",
       })
-      .split(' ');
+      .split(" ");
     return parts[2] || targetTimezone;
   } catch (error) {
-    console.error('Error getting timezone abbreviation:', error);
+    console.error("Error getting timezone abbreviation:", error);
     return targetTimezone;
   }
 };

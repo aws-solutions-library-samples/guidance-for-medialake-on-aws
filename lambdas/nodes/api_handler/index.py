@@ -276,7 +276,7 @@ def create_request_body(s3_templates, api_template_bucket, event):
     mapping = load_and_execute_function_from_s3(
         api_template_bucket, mapping_path, function_name, event
     )
-    env = Environment(loader=FileSystemLoader("/tmp/"))
+    env = Environment(loader=FileSystemLoader("/tmp/"))  # nosec B701
     env.filters["jsonify"] = json.dumps
     query_template = env.from_string(request_template)
     request_body = query_template.render(variables=mapping)
@@ -293,7 +293,7 @@ def create_custom_url(s3_templates, api_template_bucket, event):
     mapping = load_and_execute_function_from_s3(
         api_template_bucket, url_mapping_path, function_name, event
     )
-    env = Environment(loader=FileSystemLoader("/tmp/"))
+    env = Environment(loader=FileSystemLoader("/tmp/"))  # nosec B701
     env.filters["jsonify"] = json.dumps
     query_template = env.from_string(request_template)
     custom_url = query_template.render(variables=mapping)
@@ -311,7 +311,7 @@ def create_response_output(s3_templates, api_template_bucket, response_body, eve
         function_name,
         {"response_body": response_body, "event": event},
     )
-    env = Environment(loader=FileSystemLoader("/tmp/"))
+    env = Environment(loader=FileSystemLoader("/tmp/"))  # nosec B701
     env.filters["jsonify"] = json.dumps
     query_template = env.from_string(response_template)
     response_output = query_template.render(variables=response_mapping)

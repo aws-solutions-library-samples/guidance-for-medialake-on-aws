@@ -1,9 +1,9 @@
-import React from 'react';
-import { Chip } from '@mui/material';
-import { useTranslation } from 'react-i18next';
+import React from "react";
+import { Chip } from "@mui/material";
+import { useTranslation } from "react-i18next";
 
 interface StatusCellProps {
-  status: 'active' | 'disabled';
+  status: "active" | "disabled";
 }
 
 export const StatusCell: React.FC<StatusCellProps> = ({ status }) => {
@@ -12,11 +12,11 @@ export const StatusCell: React.FC<StatusCellProps> = ({ status }) => {
   return (
     <Chip
       label={t(`settings.environments.status.${status}`)}
-      color={status === 'active' ? 'success' : 'default'}
+      color={status === "active" ? "success" : "default"}
       size="small"
       sx={{
         fontWeight: 500,
-        textTransform: 'capitalize',
+        textTransform: "capitalize",
       }}
     />
   );

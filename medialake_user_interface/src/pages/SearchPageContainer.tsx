@@ -1,22 +1,22 @@
-import React, { useEffect, useMemo } from 'react';
-import { useLocation } from 'react-router-dom';
-import { useSearchState } from '@/hooks/useSearchState';
-import { useSearch } from '@/api/hooks/useSearch';
-import { useSearchFields } from '@/api/hooks/useSearchFields';
-import { useAssetOperations } from '@/hooks/useAssetOperations';
-import { useViewPreferences } from '@/hooks/useViewPreferences';
-import { useAssetSelection } from '@/hooks/useAssetSelection';
-import { useAssetFavorites } from '@/hooks/useAssetFavorites';
-import { useFeatureFlag } from '@/utils/featureFlags';
+import React, { useEffect, useMemo } from "react";
+import { useLocation } from "react-router-dom";
+import { useSearchState } from "@/hooks/useSearchState";
+import { useSearch } from "@/api/hooks/useSearch";
+import { useSearchFields } from "@/api/hooks/useSearchFields";
+import { useAssetOperations } from "@/hooks/useAssetOperations";
+import { useViewPreferences } from "@/hooks/useViewPreferences";
+import { useAssetSelection } from "@/hooks/useAssetSelection";
+import { useAssetFavorites } from "@/hooks/useAssetFavorites";
+import { useFeatureFlag } from "@/utils/featureFlags";
 import {
   useSearchQuery,
   useSemanticSearch,
   useSearchFilters,
   useDomainActions,
   useUIActions,
-} from '@/stores/searchStore';
-import SearchPagePresentation from './SearchPagePresentation';
-import { type AssetItem, type LocationState } from './types';
+} from "@/stores/searchStore";
+import SearchPagePresentation from "./SearchPagePresentation";
+import { type AssetItem, type LocationState } from "./types";
 
 const SearchPageContainer: React.FC = () => {
   const location = useLocation();
@@ -24,7 +24,7 @@ const SearchPageContainer: React.FC = () => {
 
   // Initialize search state with URL sync
   const searchState = useSearchState({
-    initialQuery: locationState?.query || '',
+    initialQuery: locationState?.query || "",
     initialSemantic: false,
     initialFilters: {},
   });
@@ -35,8 +35,10 @@ const SearchPageContainer: React.FC = () => {
   const filters = useSearchFilters();
 
   // Actions
-  const { setQuery, setIsSemantic, setFilters, updateFilter } = useDomainActions();
-  const { openFilterModal, closeFilterModal, setLoading, setError } = useUIActions();
+  const { setQuery, setIsSemantic, setFilters, updateFilter } =
+    useDomainActions();
+  const { openFilterModal, closeFilterModal, setLoading, setError } =
+    useUIActions();
 
   // Convert filters to legacy format for useSearch
   const legacyParams = {
@@ -61,7 +63,11 @@ const SearchPageContainer: React.FC = () => {
     error: searchError,
   } = useSearch(query, legacyParams);
 
-  const { data: fieldsData, isLoading: isFieldsLoading, error: fieldsError } = useSearchFields();
+  const {
+    data: fieldsData,
+    isLoading: isFieldsLoading,
+    error: fieldsError,
+  } = useSearchFields();
 
   // Sync loading state
   useEffect(() => {
@@ -89,18 +95,31 @@ const SearchPageContainer: React.FC = () => {
   // Asset accessors for hooks
   const getAssetId = (asset: AssetItem) => asset.InventoryID;
   const getAssetName = (asset: AssetItem) =>
-    asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name;
+    asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
+      .ObjectKey.Name;
   const getAssetType = (asset: AssetItem) => asset.DigitalSourceAsset.Type;
-  const getAssetThumbnail = (asset: AssetItem) => asset.thumbnailUrl || '';
+  const getAssetThumbnail = (asset: AssetItem) => asset.thumbnailUrl || "";
 
   // View preferences
   const viewPreferences = useViewPreferences({
-    initialViewMode: locationState?.preserveSearch ? locationState.viewMode : 'card',
-    initialCardSize: locationState?.preserveSearch ? locationState.cardSize : 'medium',
-    initialAspectRatio: locationState?.preserveSearch ? locationState.aspectRatio : 'square',
-    initialThumbnailScale: locationState?.preserveSearch ? locationState.thumbnailScale : 'fit',
-    initialShowMetadata: locationState?.preserveSearch ? locationState.showMetadata : true,
-    initialGroupByType: locationState?.preserveSearch ? locationState.groupByType : false,
+    initialViewMode: locationState?.preserveSearch
+      ? locationState.viewMode
+      : "card",
+    initialCardSize: locationState?.preserveSearch
+      ? locationState.cardSize
+      : "medium",
+    initialAspectRatio: locationState?.preserveSearch
+      ? locationState.aspectRatio
+      : "square",
+    initialThumbnailScale: locationState?.preserveSearch
+      ? locationState.thumbnailScale
+      : "fit",
+    initialShowMetadata: locationState?.preserveSearch
+      ? locationState.showMetadata
+      : true,
+    initialGroupByType: locationState?.preserveSearch
+      ? locationState.groupByType
+      : false,
   });
 
   // Asset selection
@@ -122,15 +141,18 @@ const SearchPageContainer: React.FC = () => {
   const assetOperations = useAssetOperations<AssetItem>();
 
   // Feature flags
-  const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
+  const multiSelectFeature = useFeatureFlag(
+    "search-multi-select-enabled",
+    false,
+  );
 
   // Filter state for legacy components
-  const typeArray = filters.type ? filters.type.split(',') : [];
+  const typeArray = filters.type ? filters.type.split(",") : [];
   const legacyFilters = {
     mediaTypes: {
-      videos: typeArray.includes('Video'),
-      images: typeArray.includes('Image'),
-      audio: typeArray.includes('Audio'),
+      videos: typeArray.includes("Video"),
+      images: typeArray.includes("Image"),
+      audio: typeArray.includes("Audio"),
     },
     time: {
       recent: false,
@@ -148,12 +170,12 @@ const SearchPageContainer: React.FC = () => {
 
   // Event handlers
   const handleFilterChange = (section: string, filter: string) => {
-    if (section === 'mediaTypes') {
-      const currentTypes = filters.type ? filters.type.split(',') : [];
+    if (section === "mediaTypes") {
+      const currentTypes = filters.type ? filters.type.split(",") : [];
       const typeMap: Record<string, string> = {
-        videos: 'Video',
-        images: 'Image',
-        audio: 'Audio',
+        videos: "Video",
+        images: "Image",
+        audio: "Audio",
       };
 
       const actualType = typeMap[filter];
@@ -164,7 +186,10 @@ const SearchPageContainer: React.FC = () => {
         } else {
           currentTypes.push(actualType);
         }
-        updateFilter('type', currentTypes.length > 0 ? currentTypes.join(',') : undefined);
+        updateFilter(
+          "type",
+          currentTypes.length > 0 ? currentTypes.join(",") : undefined,
+        );
       }
     }
   };
@@ -175,7 +200,9 @@ const SearchPageContainer: React.FC = () => {
 
   const handleFieldsChange = (event: any) => {
     const newFields =
-      typeof event.target.value === 'string' ? event.target.value.split(',') : event.target.value;
+      typeof event.target.value === "string"
+        ? event.target.value.split(",")
+        : event.target.value;
 
     // This will be handled by the field actions in the store
     // For now, maintain compatibility

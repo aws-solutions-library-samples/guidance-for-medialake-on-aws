@@ -1,17 +1,17 @@
-import React from 'react';
-import { Dialog, DialogTitle, DialogContent } from '@mui/material';
-import { useTranslation } from 'react-i18next';
-import { Environment, EnvironmentCreate } from '@/types/environment';
-import { Form } from '@/forms/components/Form';
-import { FormField } from '@/forms/components/FormField';
-import { FormSelect } from '@/forms/components/FormSelect';
-import { useFormWithValidation } from '@/forms/hooks/useFormWithValidation';
+import React from "react";
+import { Dialog, DialogTitle, DialogContent } from "@mui/material";
+import { useTranslation } from "react-i18next";
+import { Environment, EnvironmentCreate } from "@/types/environment";
+import { Form } from "@/forms/components/Form";
+import { FormField } from "@/forms/components/FormField";
+import { FormSelect } from "@/forms/components/FormSelect";
+import { useFormWithValidation } from "@/forms/hooks/useFormWithValidation";
 import {
   environmentFormSchema,
   EnvironmentFormData,
   defaultEnvironmentFormData,
   EnvironmentStatus,
-} from '../../schemas/environmentFormSchema';
+} from "../../schemas/environmentFormSchema";
 
 interface EnvironmentFormProps {
   open: boolean;
@@ -36,12 +36,12 @@ export const EnvironmentForm: React.FC<EnvironmentFormProps> = ({
           region: environment.region,
           status: environment.status,
           tags: {
-            'cost-center': environment.tags?.['cost-center'] || '',
-            team: environment.tags?.team || 'default',
+            "cost-center": environment.tags?.["cost-center"] || "",
+            team: environment.tags?.team || "default",
           },
         }
       : defaultEnvironmentFormData,
-    translationPrefix: 'settings.environments.form',
+    translationPrefix: "settings.environments.form",
   });
 
   const handleSubmit = async (data: EnvironmentFormData) => {
@@ -50,7 +50,7 @@ export const EnvironmentForm: React.FC<EnvironmentFormProps> = ({
       status: data.status,
       region: data.region,
       tags: {
-        'cost-center': data.tags['cost-center'],
+        "cost-center": data.tags["cost-center"],
         team: data.tags.team,
       },
     };
@@ -61,34 +61,39 @@ export const EnvironmentForm: React.FC<EnvironmentFormProps> = ({
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>
         {environment
-          ? t('settings.environments.editTitle')
-          : t('settings.environments.createTitle')}
+          ? t("settings.environments.editTitle")
+          : t("settings.environments.createTitle")}
       </DialogTitle>
       <DialogContent>
-        <Form form={form} onSubmit={handleSubmit} onCancel={onClose} submitLabel={t('common.save')}>
+        <Form
+          form={form}
+          onSubmit={handleSubmit}
+          onCancel={onClose}
+          submitLabel={t("common.save")}
+        >
           <FormField
             name="name"
             control={form.control}
-            label={t('settings.environments.form.name')}
+            label={t("settings.environments.form.name")}
             required
           />
           <FormField
             name="region"
             control={form.control}
-            label={t('settings.environments.form.region')}
+            label={t("settings.environments.form.region")}
             required
           />
           <FormSelect
             name="status"
             control={form.control}
-            label={t('settings.environments.form.status.name')}
+            label={t("settings.environments.form.status.name")}
             options={[
               {
-                label: t('settings.environments.form.status.active'),
+                label: t("settings.environments.form.status.active"),
                 value: EnvironmentStatus.Active,
               },
               {
-                label: t('settings.environments.form.status.disabled'),
+                label: t("settings.environments.form.status.disabled"),
                 value: EnvironmentStatus.Disabled,
               },
             ]}
@@ -97,13 +102,13 @@ export const EnvironmentForm: React.FC<EnvironmentFormProps> = ({
           <FormField
             name="tags.cost-center"
             control={form.control}
-            label={t('settings.environments.form.costCenter')}
+            label={t("settings.environments.form.costCenter")}
             required
           />
           <FormField
             name="tags.team"
             control={form.control}
-            label={t('settings.environments.form.team')}
+            label={t("settings.environments.form.team")}
             required
           />
         </Form>

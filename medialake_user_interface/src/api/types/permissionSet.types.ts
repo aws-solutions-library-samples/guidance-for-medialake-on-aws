@@ -3,7 +3,7 @@
 export interface Permission {
   action: string;
   resource: string;
-  effect: 'Allow' | 'Deny';
+  effect: "Allow" | "Deny";
   conditions?: Record<string, any>;
 }
 

@@ -1,8 +1,8 @@
-import React, { useEffect } from 'react';
-import { Box, Tabs, Tab } from '@mui/material';
-import FilterOperations from './FilterOperations';
-import BatchOperationsWrapper from './BatchOperationsWrapper';
-import { useRightSidebar } from './SidebarContext';
+import React, { useEffect } from "react";
+import { Box, Tabs, Tab } from "@mui/material";
+import FilterOperations from "./FilterOperations";
+import BatchOperationsWrapper from "./BatchOperationsWrapper";
+import { useRightSidebar } from "./SidebarContext";
 
 interface TabbedSidebarProps {
   selectedAssets: Array<{
@@ -30,8 +30,8 @@ const TabbedSidebar: React.FC<TabbedSidebarProps> = ({
   filterComponent,
 }) => {
   const { setHasSelectedItems } = useRightSidebar();
-  const [activeTab, setActiveTab] = React.useState<'filter' | 'batch'>(
-    selectedAssets.length > 0 ? 'batch' : 'filter'
+  const [activeTab, setActiveTab] = React.useState<"filter" | "batch">(
+    selectedAssets.length > 0 ? "batch" : "filter",
   );
 
   // Auto-switch to batch tab when items are first selected,
@@ -44,41 +44,44 @@ const TabbedSidebar: React.FC<TabbedSidebarProps> = ({
       // Only switch to batch tab if this is the initial selection
       // (when going from 0 selected to some selected)
       if (selectedAssets.length === 1) {
-        setActiveTab('batch');
+        setActiveTab("batch");
       }
     } else {
       setHasSelectedItems(false);
-      setActiveTab('filter');
+      setActiveTab("filter");
     }
   }, [selectedAssets.length, setHasSelectedItems]);
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: 'filter' | 'batch') => {
+  const handleTabChange = (
+    event: React.SyntheticEvent,
+    newValue: "filter" | "batch",
+  ) => {
     setActiveTab(newValue);
   };
 
   return (
     <Box
       sx={{
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        bgcolor: 'background.paper',
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        bgcolor: "background.paper",
       }}
     >
       {/* Only show tabs when there are selected assets, otherwise show filter directly */}
       {selectedAssets.length > 0 ? (
-        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+        <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
           <Tabs
             value={activeTab}
             onChange={handleTabChange}
             aria-label="search options tabs"
             variant="fullWidth"
             sx={{
-              '& .MuiTab-root': {
+              "& .MuiTab-root": {
                 py: 1.5,
                 fontWeight: 500,
               },
-              '& .Mui-selected': {
+              "& .Mui-selected": {
                 fontWeight: 600,
               },
             }}
@@ -100,17 +103,17 @@ const TabbedSidebar: React.FC<TabbedSidebarProps> = ({
       ) : null}
 
       {/* Content area that fills the remaining height */}
-      <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
+      <Box sx={{ flexGrow: 1, overflow: "auto" }}>
         {selectedAssets.length > 0 ? (
           <>
             <Box
               role="tabpanel"
-              hidden={activeTab !== 'filter'}
+              hidden={activeTab !== "filter"}
               id="filter-panel"
               aria-labelledby="filter-tab"
               sx={{
-                height: '100%',
-                display: activeTab === 'filter' ? 'block' : 'none',
+                height: "100%",
+                display: activeTab === "filter" ? "block" : "none",
               }}
             >
               <FilterOperations filterComponent={filterComponent} />
@@ -118,12 +121,12 @@ const TabbedSidebar: React.FC<TabbedSidebarProps> = ({
 
             <Box
               role="tabpanel"
-              hidden={activeTab !== 'batch'}
+              hidden={activeTab !== "batch"}
               id="batch-panel"
               aria-labelledby="batch-tab"
               sx={{
-                height: '100%',
-                display: activeTab === 'batch' ? 'block' : 'none',
+                height: "100%",
+                display: activeTab === "batch" ? "block" : "none",
               }}
             >
               <BatchOperationsWrapper

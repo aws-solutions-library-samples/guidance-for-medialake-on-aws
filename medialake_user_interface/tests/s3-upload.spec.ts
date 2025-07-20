@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 import {
   S3Client,
   PutObjectCommand,
@@ -8,11 +8,11 @@ import {
   DeleteBucketCommand,
   ListObjectsV2Command,
   BucketLocationConstraint,
-} from '@aws-sdk/client-s3';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
-import * as crypto from 'crypto';
+} from "@aws-sdk/client-s3";
+import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
+import * as crypto from "crypto";
 
 /**
  * S3 Upload Test
@@ -37,14 +37,14 @@ import * as crypto from 'crypto';
  */
 
 // Test configuration
-const TEST_FILE_NAME = 'test_photo1.jpg';
+const TEST_FILE_NAME = "test_photo1.jpg";
 const LOCAL_TEST_FILE_PATH = path.join(os.tmpdir(), TEST_FILE_NAME);
-const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
+const AWS_REGION = process.env.AWS_REGION || "us-east-1";
 
 // Generate a random bucket name
 function generateRandomBucketName(): string {
   // Generate a random ID (8 characters)
-  const randomId = crypto.randomBytes(4).toString('hex');
+  const randomId = crypto.randomBytes(4).toString("hex");
   return `medialake-test-${randomId}`;
 }
 
@@ -65,16 +65,20 @@ function createTestImage(filePath: string, width = 100, height = 100): void {
   // Create a simple test image (we're using a real JPG header with minimal data)
   // This is a very small valid JPEG that should work for testing
   const minimalJpeg = Buffer.from([
-    0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x01, 0x00, 0x48,
-    0x00, 0x48, 0x00, 0x00, 0xff, 0xdb, 0x00, 0x43, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xc0, 0x00, 0x0b, 0x08, 0x00, 0x01, 0x00,
-    0x01, 0x01, 0x01, 0x11, 0x00, 0xff, 0xc4, 0x00, 0x14, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xc4, 0x00, 0x14, 0x10,
-    0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0xff, 0xda, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3f, 0x00, 0x00, 0x00, 0xff, 0xd9,
+    0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01,
+    0x01, 0x01, 0x00, 0x48, 0x00, 0x48, 0x00, 0x00, 0xff, 0xdb, 0x00, 0x43,
+    0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xc0, 0x00, 0x0b, 0x08, 0x00, 0x01, 0x00,
+    0x01, 0x01, 0x01, 0x11, 0x00, 0xff, 0xc4, 0x00, 0x14, 0x00, 0x01, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0xff, 0xc4, 0x00, 0x14, 0x10, 0x01, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0xff, 0xda, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3f, 0x00, 0x00,
+    0x00, 0xff, 0xd9,
   ]);
 
   fs.writeFileSync(filePath, minimalJpeg);
@@ -82,7 +86,10 @@ function createTestImage(filePath: string, width = 100, height = 100): void {
 }
 
 // Helper function to empty a bucket before deletion
-async function emptyBucket(s3Client: S3Client, bucketName: string): Promise<void> {
+async function emptyBucket(
+  s3Client: S3Client,
+  bucketName: string,
+): Promise<void> {
   console.log(`Emptying bucket ${bucketName} before deletion`);
 
   try {
@@ -116,7 +123,7 @@ async function emptyBucket(s3Client: S3Client, bucketName: string): Promise<void
 }
 
 // This test will create a bucket, upload a file to S3, delete the file, and then delete the bucket
-test('create bucket, upload file to S3, and clean up', async ({ page }) => {
+test("create bucket, upload file to S3, and clean up", async ({ page }) => {
   // Ensure we have a test image
   createTestImage(LOCAL_TEST_FILE_PATH);
 
@@ -139,7 +146,7 @@ test('create bucket, upload file to S3, and clean up', async ({ page }) => {
     };
 
     // AWS requires no LocationConstraint for us-east-1, but requires it for other regions
-    if (AWS_REGION !== 'us-east-1') {
+    if (AWS_REGION !== "us-east-1") {
       createBucketParams.CreateBucketConfiguration = {
         LocationConstraint: AWS_REGION as BucketLocationConstraint,
       };
@@ -148,7 +155,10 @@ test('create bucket, upload file to S3, and clean up', async ({ page }) => {
     const createBucketCommand = new CreateBucketCommand(createBucketParams);
 
     const createBucketResponse = await s3Client.send(createBucketCommand);
-    console.log(`Bucket creation response:`, JSON.stringify(createBucketResponse, null, 2));
+    console.log(
+      `Bucket creation response:`,
+      JSON.stringify(createBucketResponse, null, 2),
+    );
     expect(createBucketResponse.$metadata.httpStatusCode).toBe(200);
 
     // Wait a moment for bucket to be available
@@ -172,18 +182,20 @@ test('create bucket, upload file to S3, and clean up', async ({ page }) => {
       Bucket: TEST_BUCKET,
       Key: TEST_FILE_NAME,
       Body: fileContent,
-      ContentType: 'image/jpeg',
+      ContentType: "image/jpeg",
       Metadata: {
-        'x-amz-meta-source': 'playwright-test',
-        'x-amz-meta-test-id': testId,
+        "x-amz-meta-source": "playwright-test",
+        "x-amz-meta-test-id": testId,
       },
     };
 
     console.log(`Uploading ${TEST_FILE_NAME} to ${TEST_BUCKET}`);
-    const uploadResponse = await s3Client.send(new PutObjectCommand(uploadParams));
+    const uploadResponse = await s3Client.send(
+      new PutObjectCommand(uploadParams),
+    );
 
     console.log(`Successfully uploaded ${TEST_FILE_NAME} to ${TEST_BUCKET}`);
-    console.log('S3 upload response:', JSON.stringify(uploadResponse, null, 2));
+    console.log("S3 upload response:", JSON.stringify(uploadResponse, null, 2));
 
     // Verify upload was successful
     expect(uploadResponse.$metadata.httpStatusCode).toBe(200);
@@ -195,14 +207,16 @@ test('create bucket, upload file to S3, and clean up', async ({ page }) => {
       Key: TEST_FILE_NAME,
     };
 
-    const deleteResponse = await s3Client.send(new DeleteObjectCommand(deleteParams));
-    console.log('Delete response:', JSON.stringify(deleteResponse, null, 2));
+    const deleteResponse = await s3Client.send(
+      new DeleteObjectCommand(deleteParams),
+    );
+    console.log("Delete response:", JSON.stringify(deleteResponse, null, 2));
 
     // Verify delete was successful
     expect(deleteResponse.$metadata.httpStatusCode).toBe(204);
     console.log(`Successfully deleted ${TEST_FILE_NAME} from ${TEST_BUCKET}`);
   } catch (error) {
-    console.error('Error during S3 operations:', error);
+    console.error("Error during S3 operations:", error);
     throw error;
   } finally {
     // Step 6: Clean up - Delete the bucket regardless of test success/failure
@@ -217,12 +231,17 @@ test('create bucket, upload file to S3, and clean up', async ({ page }) => {
       });
 
       const deleteBucketResponse = await s3Client.send(deleteBucketCommand);
-      console.log(`Bucket deletion response:`, JSON.stringify(deleteBucketResponse, null, 2));
+      console.log(
+        `Bucket deletion response:`,
+        JSON.stringify(deleteBucketResponse, null, 2),
+      );
       console.log(`Successfully deleted bucket ${TEST_BUCKET}`);
     } catch (error) {
       console.error(`Error deleting bucket ${TEST_BUCKET}:`, error);
       // Don't throw here to avoid masking the original test error
-      console.error('Bucket cleanup failed, you may need to manually delete the bucket');
+      console.error(
+        "Bucket cleanup failed, you may need to manually delete the bucket",
+      );
     }
   }
 });

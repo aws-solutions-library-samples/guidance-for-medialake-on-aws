@@ -1,9 +1,9 @@
-import React from 'react';
-import { Box, IconButton, useTheme, alpha } from '@mui/material';
-import { ViewColumn as ViewColumnIcon } from '@mui/icons-material';
-import { TableDensityToggle } from './TableDensityToggle';
-import { useTranslation } from 'react-i18next';
-import { SearchField } from '../SearchField';
+import React from "react";
+import { Box, IconButton, useTheme, alpha } from "@mui/material";
+import { ViewColumn as ViewColumnIcon } from "@mui/icons-material";
+import { TableDensityToggle } from "./TableDensityToggle";
+import { useTranslation } from "react-i18next";
+import { SearchField } from "../SearchField";
 
 export interface BaseTableToolbarProps {
   globalFilter: string;
@@ -32,46 +32,46 @@ export const BaseTableToolbar: React.FC<BaseTableToolbarProps> = ({
   return (
     <Box
       sx={{
-        display: 'flex',
+        display: "flex",
         gap: 2,
         mb: 3,
-        alignItems: 'center',
-        height: '40px',
-        width: '100%',
+        alignItems: "center",
+        height: "40px",
+        width: "100%",
       }}
     >
       <Box
         sx={{
-          display: 'flex',
+          display: "flex",
           gap: 2,
-          alignItems: 'center',
+          alignItems: "center",
           flex: 1,
-          overflow: 'hidden',
+          overflow: "hidden",
         }}
       >
         <SearchField
-          value={globalFilter ?? ''}
+          value={globalFilter ?? ""}
           onChange={onGlobalFilterChange}
-          placeholder={searchPlaceholder || t('common.search')}
+          placeholder={searchPlaceholder || t("common.search")}
         />
         <Box
           sx={{
-            display: 'flex',
+            display: "flex",
             gap: 1,
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            overflow: 'hidden',
+            flexWrap: "wrap",
+            alignItems: "center",
+            overflow: "hidden",
           }}
         >
           {activeFilters.map(({ columnId, value }) => (
             <Box
               key={`filter-${columnId}`}
               sx={{
-                display: 'inline-flex',
-                alignItems: 'center',
+                display: "inline-flex",
+                alignItems: "center",
                 px: 2,
                 py: 0.5,
-                borderRadius: '16px',
+                borderRadius: "16px",
                 backgroundColor: alpha(theme.palette.primary.main, 0.1),
                 color: theme.palette.primary.main,
               }}
@@ -84,10 +84,10 @@ export const BaseTableToolbar: React.FC<BaseTableToolbarProps> = ({
                   component="span"
                   onClick={() => onRemoveFilter(columnId)}
                   sx={{
-                    cursor: 'pointer',
-                    fontSize: '1.2rem',
+                    cursor: "pointer",
+                    fontSize: "1.2rem",
                     lineHeight: 1,
-                    '&:hover': { opacity: 0.7 },
+                    "&:hover": { opacity: 0.7 },
                   }}
                 >
                   ×
@@ -99,27 +99,27 @@ export const BaseTableToolbar: React.FC<BaseTableToolbarProps> = ({
             <Box
               key={`sort-${columnId}`}
               sx={{
-                display: 'inline-flex',
-                alignItems: 'center',
+                display: "inline-flex",
+                alignItems: "center",
                 px: 2,
                 py: 0.5,
-                borderRadius: '16px',
+                borderRadius: "16px",
                 backgroundColor: alpha(theme.palette.secondary.main, 0.1),
                 color: theme.palette.secondary.main,
               }}
             >
               <Box component="span" sx={{ mr: 1 }}>
-                {`Sorted by: ${columnId} (${desc ? 'desc' : 'asc'})`}
+                {`Sorted by: ${columnId} (${desc ? "desc" : "asc"})`}
               </Box>
               {onRemoveSort && (
                 <Box
                   component="span"
                   onClick={() => onRemoveSort(columnId)}
                   sx={{
-                    cursor: 'pointer',
-                    fontSize: '1.2rem',
+                    cursor: "pointer",
+                    fontSize: "1.2rem",
                     lineHeight: 1,
-                    '&:hover': { opacity: 0.7 },
+                    "&:hover": { opacity: 0.7 },
                   }}
                 >
                   ×
@@ -129,18 +129,20 @@ export const BaseTableToolbar: React.FC<BaseTableToolbarProps> = ({
           ))}
         </Box>
       </Box>
-      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexShrink: 0 }}>
+      <Box
+        sx={{ display: "flex", gap: 1, alignItems: "center", flexShrink: 0 }}
+      >
         <TableDensityToggle />
         <IconButton
           onClick={onColumnMenuOpen}
           size="small"
           sx={{
-            height: '32px',
-            width: '32px',
-            borderRadius: '6px',
+            height: "32px",
+            width: "32px",
+            borderRadius: "6px",
             border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
-            '& .MuiSvgIcon-root': {
-              fontSize: '1.2rem',
+            "& .MuiSvgIcon-root": {
+              fontSize: "1.2rem",
             },
           }}
         >

@@ -1,6 +1,6 @@
-import React from 'react';
-import { Box, Typography, Grid } from '@mui/material';
-import MetadataSection from '../common/MetadataSection';
+import React from "react";
+import { Box, Typography, Grid } from "@mui/material";
+import MetadataSection from "../common/MetadataSection";
 
 interface MetadataField {
   label: string;
@@ -34,7 +34,7 @@ const MetadataContent: React.FC<{ fields: MetadataField[] }> = ({ fields }) => (
 );
 
 const ActivityLogContent: React.FC<{
-  logs?: AssetMetadataTabsProps['activityLog'];
+  logs?: AssetMetadataTabsProps["activityLog"];
 }> = ({ logs }) => (
   <Box sx={{ mt: 2 }}>
     {logs?.map((log, index) => (
@@ -58,22 +58,22 @@ const AssetMetadataTabs: React.FC<AssetMetadataTabsProps> = ({
 }) => {
   const tabs = [
     {
-      label: 'Summary',
+      label: "Summary",
       content: <MetadataContent fields={summary} />,
     },
     {
-      label: 'Descriptor Metadata',
+      label: "Descriptor Metadata",
       content: <MetadataContent fields={descriptive} />,
     },
     {
-      label: 'Technical Metadata',
+      label: "Technical Metadata",
       content: <MetadataContent fields={technical} />,
     },
   ];
 
   if (activityLog) {
     tabs.push({
-      label: 'Activity Log',
+      label: "Activity Log",
       content: <ActivityLogContent logs={activityLog} />,
     });
   }

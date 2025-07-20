@@ -1,9 +1,9 @@
-import React, { useRef } from 'react';
-import { Box, CircularProgress } from '@mui/material';
-import { type Table as TanStackTable } from '@tanstack/react-table';
-import { useVirtualizer } from '@tanstack/react-virtual';
-import type { PipelineExecution } from '../types/pipelineExecutions.types';
-import { ResizableTable } from '@/components/common/table';
+import React, { useRef } from "react";
+import { Box, CircularProgress } from "@mui/material";
+import { type Table as TanStackTable } from "@tanstack/react-table";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import type { PipelineExecution } from "../types/pipelineExecutions.types";
+import { ResizableTable } from "@/components/common/table";
 
 interface ExecutionsTableProps {
   table: TanStackTable<PipelineExecution>;
@@ -12,7 +12,10 @@ interface ExecutionsTableProps {
   onViewDetails: (execution: PipelineExecution) => void;
   onRetryFromCurrent: (executionId: string) => void;
   onRetryFromStart: (executionId: string) => void;
-  onFilterColumn: (event: React.MouseEvent<HTMLElement>, columnId: string) => void;
+  onFilterColumn: (
+    event: React.MouseEvent<HTMLElement>,
+    columnId: string,
+  ) => void;
   activeFilters?: { columnId: string; value: string }[];
   activeSorting?: { columnId: string; desc: boolean }[];
   onRemoveFilter?: (columnId: string) => void;
@@ -41,7 +44,7 @@ export const ExecutionsTable: React.FC<ExecutionsTableProps> = ({
 
   if (isLoading || !data) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+      <Box sx={{ display: "flex", justifyContent: "center", p: 3 }}>
         <CircularProgress />
       </Box>
     );
@@ -50,15 +53,15 @@ export const ExecutionsTable: React.FC<ExecutionsTableProps> = ({
   return (
     <Box
       sx={{
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
         flex: 1,
-        overflow: 'hidden',
-        position: 'relative',
+        overflow: "hidden",
+        position: "relative",
         minHeight: 0,
-        '& > *': {
+        "& > *": {
           minHeight: 0,
           flex: 1,
         },

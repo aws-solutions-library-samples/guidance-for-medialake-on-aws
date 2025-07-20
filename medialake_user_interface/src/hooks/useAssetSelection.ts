@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { useBulkDownload } from '@/api/hooks/useAssets';
+import { useState, useCallback, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useBulkDownload } from "@/api/hooks/useAssets";
 
 /**
  * Hook for managing asset selection and bulk operations.
@@ -33,20 +33,22 @@ export function useAssetSelection<T>({
 }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedAssets, setSelectedAssets] = useState<SelectedAsset[]>([]);
-  const [bulkDownloadJobId, setBulkDownloadJobId] = useState<string | null>(null);
+  const [bulkDownloadJobId, setBulkDownloadJobId] = useState<string | null>(
+    null,
+  );
   const [isDownloadLoading, setIsDownloadLoading] = useState(false);
 
   // Modal state for API status
   const [modalState, setModalState] = useState<{
     open: boolean;
-    status: 'loading' | 'success' | 'error';
+    status: "loading" | "success" | "error";
     action: string;
     message?: string;
   }>({
     open: false,
-    status: 'loading',
-    action: '',
-    message: '',
+    status: "loading",
+    action: "",
+    message: "",
   });
 
   // Hooks
@@ -54,7 +56,7 @@ export function useAssetSelection<T>({
 
   // Load selections from localStorage on component mount
   useEffect(() => {
-    const savedSelections = localStorage.getItem('selectedAssets');
+    const savedSelections = localStorage.getItem("selectedAssets");
     if (savedSelections) {
       try {
         const parsedSelections = JSON.parse(savedSelections) as SelectedAsset[];
@@ -62,11 +64,11 @@ export function useAssetSelection<T>({
           setSelectedAssets(parsedSelections);
 
           // Update URL parameter
-          searchParams.set('selected', 'true');
+          searchParams.set("selected", "true");
           setSearchParams(searchParams);
         }
       } catch (e) {
-        console.error('Error parsing saved selections:', e);
+        console.error("Error parsing saved selections:", e);
       }
     }
   }, []);
@@ -74,16 +76,16 @@ export function useAssetSelection<T>({
   // Save selections to localStorage whenever they change
   useEffect(() => {
     if (selectedAssets.length > 0) {
-      localStorage.setItem('selectedAssets', JSON.stringify(selectedAssets));
+      localStorage.setItem("selectedAssets", JSON.stringify(selectedAssets));
     } else {
-      localStorage.removeItem('selectedAssets');
+      localStorage.removeItem("selectedAssets");
     }
   }, [selectedAssets]);
 
   // Handle selection toggle
   const handleSelectToggle = useCallback(
     (asset: T, event: React.MouseEvent<HTMLElement>) => {
-      console.log('handleSelectToggle called with asset:', getAssetId(asset));
+      console.log("handleSelectToggle called with asset:", getAssetId(asset));
 
       const assetId = getAssetId(asset);
       const selectedAsset: SelectedAsset = {
@@ -102,47 +104,47 @@ export function useAssetSelection<T>({
 
         // Update URL parameter
         if (newSelectedAssets.length > 0) {
-          searchParams.set('selected', 'true');
+          searchParams.set("selected", "true");
         } else {
-          searchParams.delete('selected');
+          searchParams.delete("selected");
           // Clear from localStorage when empty
-          localStorage.removeItem('selectedAssets');
+          localStorage.removeItem("selectedAssets");
         }
         setSearchParams(searchParams);
 
         return newSelectedAssets;
       });
     },
-    [searchParams, setSearchParams, getAssetId, getAssetName, getAssetType]
+    [searchParams, setSearchParams, getAssetId, getAssetName, getAssetType],
   );
 
   // Handle removing a single asset from selection
   const handleRemoveAsset = useCallback(
     (assetId: string) => {
-      console.log('Removing single asset from selection:', assetId);
+      console.log("Removing single asset from selection:", assetId);
       setSelectedAssets((prev) => {
         const newSelectedAssets = prev.filter((item) => item.id !== assetId);
 
         // Update URL parameter
         if (newSelectedAssets.length > 0) {
-          searchParams.set('selected', 'true');
+          searchParams.set("selected", "true");
         } else {
-          searchParams.delete('selected');
+          searchParams.delete("selected");
         }
         setSearchParams(searchParams);
 
         return newSelectedAssets;
       });
     },
-    [searchParams, setSearchParams]
+    [searchParams, setSearchParams],
   );
 
   // Handle clearing all selections
   const handleClearSelection = useCallback(() => {
     setSelectedAssets([]);
-    searchParams.delete('selected');
+    searchParams.delete("selected");
     setSearchParams(searchParams);
-    localStorage.removeItem('selectedAssets');
+    localStorage.removeItem("selectedAssets");
   }, [searchParams, setSearchParams]);
 
   // Check if an asset is selected
@@ -150,28 +152,35 @@ export function useAssetSelection<T>({
     (assetId: string) => {
       return selectedAssets.some((item) => item.id === assetId);
     },
-    [selectedAssets]
+    [selectedAssets],
   );
 
   // Handle select all functionality - additive across pages
   const handleSelectAll = useCallback(
     (currentPageAssets: T[]) => {
-      const currentPageAssetIds = currentPageAssets.map((asset) => getAssetId(asset));
+      const currentPageAssetIds = currentPageAssets.map((asset) =>
+        getAssetId(asset),
+      );
 
       setSelectedAssets((prev) => {
         // Check if all current page assets are already selected
         const allCurrentPageSelected = currentPageAssetIds.every((id) =>
-          prev.some((selected) => selected.id === id)
+          prev.some((selected) => selected.id === id),
         );
 
         let newSelectedAssets;
         if (allCurrentPageSelected) {
           // If all current page assets are selected, deselect only the current page assets
-          newSelectedAssets = prev.filter((selected) => !currentPageAssetIds.includes(selected.id));
+          newSelectedAssets = prev.filter(
+            (selected) => !currentPageAssetIds.includes(selected.id),
+          );
         } else {
           // Add current page assets to selection (avoiding duplicates)
           const newAssets = currentPageAssets
-            .filter((asset) => !prev.some((selected) => selected.id === getAssetId(asset)))
+            .filter(
+              (asset) =>
+                !prev.some((selected) => selected.id === getAssetId(asset)),
+            )
             .map((asset) => ({
               id: getAssetId(asset),
               name: getAssetName(asset),
@@ -184,38 +193,41 @@ export function useAssetSelection<T>({
 
         // Update URL parameter based on new selection state
         if (newSelectedAssets.length > 0) {
-          searchParams.set('selected', 'true');
+          searchParams.set("selected", "true");
         } else {
-          searchParams.delete('selected');
+          searchParams.delete("selected");
         }
         setSearchParams(searchParams);
 
         return newSelectedAssets;
       });
     },
-    [searchParams, setSearchParams, getAssetId, getAssetName, getAssetType]
+    [searchParams, setSearchParams, getAssetId, getAssetName, getAssetType],
   );
 
   // Get select all state for current page
   const getSelectAllState = useCallback(
-    (currentPageAssets: T[]): 'none' | 'some' | 'all' => {
-      if (selectedAssets.length === 0) return 'none';
+    (currentPageAssets: T[]): "none" | "some" | "all" => {
+      if (selectedAssets.length === 0) return "none";
 
-      const currentPageAssetIds = currentPageAssets.map((asset) => getAssetId(asset));
+      const currentPageAssetIds = currentPageAssets.map((asset) =>
+        getAssetId(asset),
+      );
       const selectedCurrentPageAssets = currentPageAssetIds.filter((id) =>
-        selectedAssets.some((selected) => selected.id === id)
+        selectedAssets.some((selected) => selected.id === id),
       );
 
-      if (selectedCurrentPageAssets.length === 0) return 'none';
-      if (selectedCurrentPageAssets.length === currentPageAssetIds.length) return 'all';
-      return 'some';
+      if (selectedCurrentPageAssets.length === 0) return "none";
+      if (selectedCurrentPageAssets.length === currentPageAssetIds.length)
+        return "all";
+      return "some";
     },
-    [selectedAssets, getAssetId]
+    [selectedAssets, getAssetId],
   );
 
   // Handle batch operations
   const handleBatchDelete = useCallback(() => {
-    console.log('Batch delete:', selectedAssets);
+    console.log("Batch delete:", selectedAssets);
     // Implement batch delete functionality
     // After deletion, clear selection
     handleClearSelection();
@@ -225,9 +237,9 @@ export function useAssetSelection<T>({
     if (selectedAssets.length === 0) {
       setModalState({
         open: true,
-        status: 'error',
-        action: 'Download Failed',
-        message: 'No assets selected for download',
+        status: "error",
+        action: "Download Failed",
+        message: "No assets selected for download",
       });
       return;
     }
@@ -241,12 +253,12 @@ export function useAssetSelection<T>({
     // Show loading modal
     setModalState({
       open: true,
-      status: 'loading',
-      action: 'Starting bulk download...',
+      status: "loading",
+      action: "Starting bulk download...",
     });
 
     try {
-      console.log('Starting batch download for:', selectedAssets);
+      console.log("Starting batch download for:", selectedAssets);
 
       // Extract asset IDs from selected assets
       const assetIds = selectedAssets.map((asset) => asset.id);
@@ -255,14 +267,14 @@ export function useAssetSelection<T>({
       const response = await bulkDownloadMutation.mutateAsync({
         assetIds,
         options: {
-          format: 'zip',
+          format: "zip",
           includeMetadata: false,
         },
       });
 
       if (response.data?.jobId) {
         setBulkDownloadJobId(response.data.jobId);
-        console.log('Bulk download job started:', response.data.jobId);
+        console.log("Bulk download job started:", response.data.jobId);
 
         // Success: Clear selection and close side panel
         handleClearSelection();
@@ -270,8 +282,8 @@ export function useAssetSelection<T>({
         // Show success modal
         setModalState({
           open: true,
-          status: 'success',
-          action: 'Download Started',
+          status: "success",
+          action: "Download Started",
           message: `Bulk download started for ${selectedAssets.length} assets. You'll be notified when it's ready.`,
         });
 
@@ -280,19 +292,21 @@ export function useAssetSelection<T>({
           onDownloadSuccess();
         }
       } else {
-        throw new Error('No job ID returned from server');
+        throw new Error("No job ID returned from server");
       }
     } catch (error) {
-      console.error('Failed to start bulk download:', error);
+      console.error("Failed to start bulk download:", error);
 
       // Show error message to user
       const errorMessage =
-        error instanceof Error ? error.message : 'Failed to start bulk download. Please try again.';
+        error instanceof Error
+          ? error.message
+          : "Failed to start bulk download. Please try again.";
 
       setModalState({
         open: true,
-        status: 'error',
-        action: 'Download Failed',
+        status: "error",
+        action: "Download Failed",
         message: errorMessage,
       });
     } finally {
@@ -307,7 +321,7 @@ export function useAssetSelection<T>({
   ]);
 
   const handleBatchShare = useCallback(() => {
-    console.log('Batch share:', selectedAssets);
+    console.log("Batch share:", selectedAssets);
     // Implement batch share functionality
   }, [selectedAssets]);
 

@@ -1,8 +1,17 @@
-import React from 'react';
-import { Box, Paper, Typography, IconButton, Tooltip, useTheme, Chip, Stack } from '@mui/material';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import { Role } from '../../../../api/types/api.types';
+import React from "react";
+import {
+  Box,
+  Paper,
+  Typography,
+  IconButton,
+  Tooltip,
+  useTheme,
+  Chip,
+  Stack,
+} from "@mui/material";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
+import { Role } from "../../../../api/types/api.types";
 
 interface RoleListProps {
   roles: Role[];
@@ -10,7 +19,11 @@ interface RoleListProps {
   onDeleteRole: (roleId: string) => void;
 }
 
-const RoleList: React.FC<RoleListProps> = ({ roles, onEditRole, onDeleteRole }) => {
+const RoleList: React.FC<RoleListProps> = ({
+  roles,
+  onEditRole,
+  onDeleteRole,
+}) => {
   const theme = useTheme();
 
   return (
@@ -20,16 +33,16 @@ const RoleList: React.FC<RoleListProps> = ({ roles, onEditRole, onDeleteRole }) 
           key={role.id}
           sx={{
             p: 2,
-            '&:hover': {
+            "&:hover": {
               backgroundColor: theme.palette.action.hover,
             },
           }}
         >
           <Box
             sx={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'flex-start',
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
             }}
           >
             <Box>
@@ -39,14 +52,16 @@ const RoleList: React.FC<RoleListProps> = ({ roles, onEditRole, onDeleteRole }) 
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                 {role.description}
               </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
                 {role.permissions.map((permission) => (
                   <Chip
                     key={permission}
                     label={permission
-                      .split('_')
-                      .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
-                      .join(' ')}
+                      .split("_")
+                      .map(
+                        (word) => word.charAt(0) + word.slice(1).toLowerCase(),
+                      )
+                      .join(" ")}
                     size="small"
                     color="primary"
                     variant="outlined"
@@ -54,7 +69,7 @@ const RoleList: React.FC<RoleListProps> = ({ roles, onEditRole, onDeleteRole }) 
                 ))}
               </Box>
             </Box>
-            <Box sx={{ display: 'flex', gap: 1 }}>
+            <Box sx={{ display: "flex", gap: 1 }}>
               <Tooltip title="Edit Role">
                 <IconButton
                   size="small"

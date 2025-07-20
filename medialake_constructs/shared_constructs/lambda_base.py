@@ -32,10 +32,9 @@ from constructs import Construct
 from config import DIST_PATH
 from config import config as env_config
 from medialake_constructs.shared_constructs.lambda_layers import (
+    CommonLibrariesLayer,
     PowertoolsLayer,
     PowertoolsLayerConfig,
-    PynamoDbLambdaLayer,
-    CommonLibrariesLayer,
 )
 
 # Constants
@@ -228,7 +227,7 @@ class Lambda(Construct):
         lambda_function = Lambda(self, "MyFunction", config)
         ```
     """
-    
+
     # Class-level shared layer instances per stack to avoid duplicate layer creation
     _shared_common_libraries_layers = {}
 
@@ -295,14 +294,18 @@ class Lambda(Construct):
         # Create or reuse common libraries layer (per-stack singleton pattern)
         stack_id = stack.stack_name
         if stack_id not in Lambda._shared_common_libraries_layers:
-            logger.debug(f"Creating shared Common Libraries layer for stack: {stack_id}")
+            logger.debug(
+                f"Creating shared Common Libraries layer for stack: {stack_id}"
+            )
             # Use the stack variable that was already created above
             Lambda._shared_common_libraries_layers[stack_id] = CommonLibrariesLayer(
                 stack, "CommonLibsLayer"
             )
         else:
-            logger.debug(f"Reusing existing Common Libraries layer for stack: {stack_id}")
-        
+            logger.debug(
+                f"Reusing existing Common Libraries layer for stack: {stack_id}"
+            )
+
         common_libraries_layer = Lambda._shared_common_libraries_layers[stack_id]
 
         layer_objects = [powertools_layer.layer, common_libraries_layer.layer]
@@ -514,8 +517,6 @@ class Lambda(Construct):
             logger.error(f"Failed to create Lambda function: {str(e)}", exc_info=True)
             raise
 
-   
-
     def _create_nodejs_function(self, props: dict):
         logger = Logger()
 
@@ -583,7 +584,7 @@ class Lambda(Construct):
                 # Copy lambda source files
                 echo "Copying Lambda source files..."
                 cp -au . /asset-output
-                
+
                 echo "Bundling process completed successfully"
                 """,
             ],

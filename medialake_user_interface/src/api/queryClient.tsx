@@ -1,4 +1,4 @@
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient } from "@tanstack/react-query";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -7,7 +7,7 @@ const queryClient = new QueryClient({
       retry: (failureCount, error: any) => {
         // Don't retry on 403 Forbidden errors
         if (error?.response?.status === 403) {
-          console.log('Not retrying 403 error:', error);
+          console.log("Not retrying 403 error:", error);
           return false;
         }
         // Otherwise retry up to 3 times

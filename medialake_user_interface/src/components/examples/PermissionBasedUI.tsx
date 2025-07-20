@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   Box,
   Typography,
@@ -8,13 +8,13 @@ import {
   CardActions,
   Divider,
   Grid,
-} from '@mui/material';
-import { Can } from '@/permissions';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import DownloadIcon from '@mui/icons-material/Download';
-import ShareIcon from '@mui/icons-material/Share';
-import VisibilityIcon from '@mui/icons-material/Visibility';
+} from "@mui/material";
+import { Can } from "@/permissions";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
+import DownloadIcon from "@mui/icons-material/Download";
+import ShareIcon from "@mui/icons-material/Share";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 
 /**
  * Example component demonstrating how to use the Can component for permission-based UI rendering
@@ -27,10 +27,10 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 const PermissionBasedUI: React.FC = () => {
   // Example asset object
   const asset = {
-    id: '123',
-    name: 'Example Asset',
-    type: 'image',
-    owner: 'current-user',
+    id: "123",
+    name: "Example Asset",
+    type: "image",
+    owner: "current-user",
     size: 1024000,
     createdAt: new Date().toISOString(),
   };
@@ -42,8 +42,8 @@ const PermissionBasedUI: React.FC = () => {
       </Typography>
 
       <Typography variant="body1" paragraph>
-        This component demonstrates different ways to use the Can component for permission-based UI
-        rendering.
+        This component demonstrates different ways to use the Can component for
+        permission-based UI rendering.
       </Typography>
 
       <Grid container spacing={3}>
@@ -58,7 +58,7 @@ const PermissionBasedUI: React.FC = () => {
 
               <Divider sx={{ my: 2 }} />
 
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+              <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
                 {/* Always visible */}
                 <Button variant="outlined" startIcon={<VisibilityIcon />}>
                   View
@@ -66,14 +66,22 @@ const PermissionBasedUI: React.FC = () => {
 
                 {/* Only visible with edit permission */}
                 <Can I="edit" a="asset" subject={asset}>
-                  <Button variant="contained" color="primary" startIcon={<EditIcon />}>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    startIcon={<EditIcon />}
+                  >
                     Edit
                   </Button>
                 </Can>
 
                 {/* Only visible with delete permission */}
                 <Can I="delete" a="asset" subject={asset}>
-                  <Button variant="contained" color="error" startIcon={<DeleteIcon />}>
+                  <Button
+                    variant="contained"
+                    color="error"
+                    startIcon={<DeleteIcon />}
+                  >
                     Delete
                   </Button>
                 </Can>
@@ -106,7 +114,10 @@ const PermissionBasedUI: React.FC = () => {
                     </Button>
 
                     {allowed && (
-                      <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>
+                      <Typography
+                        variant="caption"
+                        sx={{ mt: 1, display: "block" }}
+                      >
                         You can share this asset with other users
                       </Typography>
                     )}
@@ -128,13 +139,13 @@ const PermissionBasedUI: React.FC = () => {
 
               <Divider sx={{ my: 2 }} />
 
-              <Box sx={{ display: 'flex', gap: 2 }}>
+              <Box sx={{ display: "flex", gap: 2 }}>
                 <Can I="download" a="asset" subject={asset} passThrough>
                   <Button
                     variant="outlined"
                     color="primary"
                     startIcon={<DownloadIcon />}
-                    sx={{ minWidth: '150px' }}
+                    sx={{ minWidth: "150px" }}
                   >
                     Download
                   </Button>
@@ -147,8 +158,12 @@ const PermissionBasedUI: React.FC = () => {
                       color="error"
                       startIcon={<DeleteIcon />}
                       disabled={!allowed}
-                      title={!allowed ? "You don't have permission to delete this asset" : ''}
-                      sx={{ minWidth: '150px' }}
+                      title={
+                        !allowed
+                          ? "You don't have permission to delete this asset"
+                          : ""
+                      }
+                      sx={{ minWidth: "150px" }}
                     >
                       Delete
                     </Button>

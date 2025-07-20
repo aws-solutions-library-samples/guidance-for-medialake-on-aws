@@ -1,6 +1,6 @@
 // src/api/types/auth.types.ts
 
-import { AuthTokens, AuthUser as AmplifyAuthUser } from '@aws-amplify/auth';
+import { AuthTokens, AuthUser as AmplifyAuthUser } from "@aws-amplify/auth";
 
 export interface AuthSession {
   accessToken: string;

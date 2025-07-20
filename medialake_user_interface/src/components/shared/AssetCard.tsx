@@ -1,17 +1,24 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useFeatureFlag } from '@/utils/featureFlags';
-import { Box, Typography, IconButton, Button, CircularProgress, Checkbox } from '@mui/material';
-import { alpha } from '@mui/material/styles';
-import DeleteIcon from '@mui/icons-material/Delete';
-import DownloadIcon from '@mui/icons-material/Download';
-import EditIcon from '@mui/icons-material/Edit';
-import FavoriteIcon from '@mui/icons-material/Favorite';
-import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
-import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
-import { PLACEHOLDER_IMAGE } from '@/utils/placeholderSvg';
-import CheckBoxIcon from '@mui/icons-material/CheckBox';
-import { AssetAudio } from '../asset';
-import { InlineTextEditor } from '../common/InlineTextEditor';
+import React, { useState, useEffect, useRef } from "react";
+import { useFeatureFlag } from "@/utils/featureFlags";
+import {
+  Box,
+  Typography,
+  IconButton,
+  Button,
+  CircularProgress,
+  Checkbox,
+} from "@mui/material";
+import { alpha } from "@mui/material/styles";
+import DeleteIcon from "@mui/icons-material/Delete";
+import DownloadIcon from "@mui/icons-material/Download";
+import EditIcon from "@mui/icons-material/Edit";
+import FavoriteIcon from "@mui/icons-material/Favorite";
+import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
+import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
+import { PLACEHOLDER_IMAGE } from "@/utils/placeholderSvg";
+import CheckBoxIcon from "@mui/icons-material/CheckBox";
+import { AssetAudio } from "../asset";
+import { InlineTextEditor } from "../common/InlineTextEditor";
 
 export interface AssetField {
   id: string;
@@ -38,9 +45,9 @@ export interface AssetCardProps {
   editedName?: string;
   onEditNameChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onEditNameComplete?: (save: boolean, value?: string) => void;
-  cardSize?: 'small' | 'medium' | 'large';
-  aspectRatio?: 'vertical' | 'square' | 'horizontal';
-  thumbnailScale?: 'fit' | 'fill';
+  cardSize?: "small" | "medium" | "large";
+  aspectRatio?: "vertical" | "square" | "horizontal";
+  thumbnailScale?: "fit" | "fill";
   showMetadata?: boolean;
   menuOpen?: boolean; // Add prop to track menu state from parent
   isFavorite?: boolean; // Whether the asset is favorited
@@ -69,9 +76,9 @@ const AssetCard: React.FC<AssetCardProps> = ({
   editedName,
   onEditNameChange,
   onEditNameComplete,
-  cardSize = 'medium',
-  aspectRatio = 'square',
-  thumbnailScale = 'fill',
+  cardSize = "medium",
+  aspectRatio = "square",
+  thumbnailScale = "fill",
   showMetadata = true,
   menuOpen = false, // Default to false
   isFavorite = false,
@@ -87,8 +94,11 @@ const AssetCard: React.FC<AssetCardProps> = ({
   const commitRef = useRef<(() => void) | null>(null);
 
   // Check if features are enabled
-  const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', true);
-  const favoritesFeature = useFeatureFlag('user-favorites-enabled', true);
+  const multiSelectFeature = useFeatureFlag(
+    "search-multi-select-enabled",
+    true,
+  );
+  const favoritesFeature = useFeatureFlag("user-favorites-enabled", true);
 
   // Update when menuOpen prop changes
   useEffect(() => {
@@ -100,25 +110,28 @@ const AssetCard: React.FC<AssetCardProps> = ({
   // Determine the card dimensions based on props
   const getCardDimensions = () => {
     const baseHeight =
-      aspectRatio === 'vertical'
+      aspectRatio === "vertical"
         ? 300
-        : aspectRatio === 'square'
+        : aspectRatio === "square"
           ? 200
-          : aspectRatio === 'horizontal'
+          : aspectRatio === "horizontal"
             ? 150
             : 200;
 
-    const sizeMultiplier = cardSize === 'small' ? 0.8 : cardSize === 'large' ? 1.2 : 1;
+    const sizeMultiplier =
+      cardSize === "small" ? 0.8 : cardSize === "large" ? 1.2 : 1;
 
     return {
       height: baseHeight * sizeMultiplier,
-      width: '100%',
+      width: "100%",
     };
   };
   const dimensions = getCardDimensions();
 
   // Fallback image error
-  const defaultImageErrorHandler = (event: React.SyntheticEvent<HTMLImageElement, Event>) => {
+  const defaultImageErrorHandler = (
+    event: React.SyntheticEvent<HTMLImageElement, Event>,
+  ) => {
     event.currentTarget.src = placeholderImage;
   };
 
@@ -147,11 +160,11 @@ const AssetCard: React.FC<AssetCardProps> = ({
     };
 
     // Add event listener for clicks
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
 
     // Cleanup
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
@@ -161,31 +174,36 @@ const AssetCard: React.FC<AssetCardProps> = ({
   // Create a mapping between API field IDs and card field IDs based on the new API response structure
   const fieldMapping: Record<string, string> = {
     // Root level fields (new API structure)
-    id: 'id',
-    assetType: 'type',
-    format: 'format',
-    createdAt: 'createdAt',
-    objectName: 'name',
-    fileSize: 'size',
-    fullPath: 'fullPath',
-    bucket: 'bucket',
-    FileHash: 'hash',
+    id: "id",
+    assetType: "type",
+    format: "format",
+    createdAt: "createdAt",
+    objectName: "name",
+    fileSize: "size",
+    fullPath: "fullPath",
+    bucket: "bucket",
+    FileHash: "hash",
 
     // Legacy nested fields (for backward compatibility)
-    'DigitalSourceAsset.Type': 'type',
-    'DigitalSourceAsset.MainRepresentation.Format': 'format',
-    'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate':
-      'createdAt',
-    'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate': 'createdAt',
-    'DigitalSourceAsset.CreateDate': 'createdAt',
-    'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name': 'name',
-    'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size': 'size',
-    'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize': 'size',
-    'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath':
-      'fullPath',
-    'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket': 'bucket',
-    'Metadata.Consolidated': 'metadata',
-    InventoryID: 'id',
+    "DigitalSourceAsset.Type": "type",
+    "DigitalSourceAsset.MainRepresentation.Format": "format",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate":
+      "createdAt",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate":
+      "createdAt",
+    "DigitalSourceAsset.CreateDate": "createdAt",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name":
+      "name",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size":
+      "size",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize":
+      "size",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath":
+      "fullPath",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket":
+      "bucket",
+    "Metadata.Consolidated": "metadata",
+    InventoryID: "id",
   };
 
   // Create a reverse mapping for easier lookup
@@ -209,44 +227,54 @@ const AssetCard: React.FC<AssetCardProps> = ({
     if (!selectedSearchFields || selectedSearchFields.length === 0) return true;
 
     // Special case for name field - check if any selected field contains 'Name' or matches 'objectName'
-    if (field.id === 'name') {
-      return selectedSearchFields.some((field) => field.includes('Name') || field === 'objectName');
+    if (field.id === "name") {
+      return selectedSearchFields.some(
+        (field) => field.includes("Name") || field === "objectName",
+      );
     }
 
     // Special case for date field - check if any selected field contains 'CreateDate' or matches 'createdAt'
-    if (field.id === 'createdAt') {
+    if (field.id === "createdAt") {
       return selectedSearchFields.some(
-        (field) => field.includes('CreateDate') || field === 'createdAt'
+        (field) => field.includes("CreateDate") || field === "createdAt",
       );
     }
 
     // Special case for file size field - check if any selected field contains 'FileSize', 'Size', or matches 'fileSize'
-    if (field.id === 'size') {
+    if (field.id === "size") {
       return selectedSearchFields.some(
-        (field) => field.includes('FileSize') || field.includes('Size') || field === 'fileSize'
+        (field) =>
+          field.includes("FileSize") ||
+          field.includes("Size") ||
+          field === "fileSize",
       );
     }
 
     // Special case for fullPath field - check if any selected field contains 'FullPath' or 'Path'
-    if (field.id === 'fullPath') {
+    if (field.id === "fullPath") {
       return selectedSearchFields.some(
-        (field) => field.includes('FullPath') || field.includes('Path') || field === 'fullPath'
+        (field) =>
+          field.includes("FullPath") ||
+          field.includes("Path") ||
+          field === "fullPath",
       );
     }
 
     // For other fields, check if any of their mapped API field IDs are in the selectedSearchFields
     const apiFieldIds = reverseFieldMapping[field.id] || [];
-    return apiFieldIds.some((apiFieldId) => selectedSearchFields.includes(apiFieldId));
+    return apiFieldIds.some((apiFieldId) =>
+      selectedSearchFields.includes(apiFieldId),
+    );
   });
 
   return (
     <Box
       ref={cardRef}
       sx={{
-        position: 'relative',
-        transition: 'all 0.2s ease-in-out',
-        '&:hover': {
-          transform: 'translateY(-4px)',
+        position: "relative",
+        transition: "all 0.2s ease-in-out",
+        "&:hover": {
+          transform: "translateY(-4px)",
         },
       }}
       onMouseEnter={() => setIsHovering(true)}
@@ -255,17 +283,17 @@ const AssetCard: React.FC<AssetCardProps> = ({
       <Box
         sx={{
           borderRadius: 4, // Increased from 2 to 4 for more curved corners
-          overflow: 'hidden',
-          bgcolor: 'background.paper',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-          position: 'relative', // Ensure this is a positioning context
-          '&:hover': {
-            boxShadow: '0 8px 16px rgba(0,0,0,0.1)',
+          overflow: "hidden",
+          bgcolor: "background.paper",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+          position: "relative", // Ensure this is a positioning context
+          "&:hover": {
+            boxShadow: "0 8px 16px rgba(0,0,0,0.1)",
           },
         }}
       >
         {/* Render appropriate content based on asset type */}
-        {assetType === 'Video' ? (
+        {assetType === "Video" ? (
           <video
             onClick={(event) => {
               event.preventDefault();
@@ -274,27 +302,27 @@ const AssetCard: React.FC<AssetCardProps> = ({
             style={{
               width: dimensions.width,
               height: dimensions.height,
-              backgroundColor: 'rgba(0,0,0,0.03)',
-              objectFit: 'cover',
+              backgroundColor: "rgba(0,0,0,0.03)",
+              objectFit: "cover",
             }}
             controls
             src={proxyUrl}
           />
-        ) : assetType === 'Audio' ? (
+        ) : assetType === "Audio" ? (
           <Box
             onClick={onAssetClick}
             sx={{
-              cursor: 'pointer',
+              cursor: "pointer",
               width: dimensions.width,
               height: dimensions.height,
-              backgroundColor: 'rgba(0,0,0,0.03)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              overflow: 'hidden',
+              backgroundColor: "rgba(0,0,0,0.03)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              overflow: "hidden",
             }}
           >
-            <AssetAudio src={proxyUrl || ''} alt={name} compact={true} />
+            <AssetAudio src={proxyUrl || ""} alt={name} compact={true} />
           </Box>
         ) : (
           <Box
@@ -305,12 +333,12 @@ const AssetCard: React.FC<AssetCardProps> = ({
             onError={onImageError || defaultImageErrorHandler}
             data-image-id={id}
             sx={{
-              cursor: 'pointer',
+              cursor: "pointer",
               width: dimensions.width,
               height: dimensions.height,
-              backgroundColor: 'rgba(0,0,0,0.03)',
-              objectFit: thumbnailScale === 'fit' ? 'contain' : 'cover',
-              transition: 'all 0.2s ease-in-out',
+              backgroundColor: "rgba(0,0,0,0.03)",
+              objectFit: thumbnailScale === "fit" ? "contain" : "cover",
+              transition: "all 0.2s ease-in-out",
             }}
           />
         )}
@@ -318,16 +346,17 @@ const AssetCard: React.FC<AssetCardProps> = ({
         {/* Position checkbox and favorite buttons at the top left of the card */}
         <Box
           sx={{
-            position: 'absolute',
+            position: "absolute",
             top: 8,
             left: 8,
-            display: 'flex',
+            display: "flex",
             gap: 1,
             zIndex: 1000, // Keep high z-index to ensure it's above other elements
             opacity: shouldShowButtons || isSelected || isFavorite ? 1 : 0, // Visible when hovering, selected, or favorited
-            transition: 'opacity 0.2s ease-in-out',
-            pointerEvents: shouldShowButtons || isSelected || isFavorite ? 'auto' : 'none', // Ensure buttons are clickable when visible
-            '&:hover': {
+            transition: "opacity 0.2s ease-in-out",
+            pointerEvents:
+              shouldShowButtons || isSelected || isFavorite ? "auto" : "none", // Ensure buttons are clickable when visible
+            "&:hover": {
               opacity: shouldShowButtons || isSelected || isFavorite ? 1 : 0,
             },
           }}
@@ -337,16 +366,18 @@ const AssetCard: React.FC<AssetCardProps> = ({
           {multiSelectFeature.value && (
             <Box
               sx={(theme) => ({
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
                 // if selected and not hovered, make it transparent; otherwise show the light circle
-                bgcolor: isSelected ? 'transparent' : alpha(theme.palette.background.paper, 0.7),
-                borderRadius: '50%',
+                bgcolor: isSelected
+                  ? "transparent"
+                  : alpha(theme.palette.background.paper, 0.7),
+                borderRadius: "50%",
                 width: 28,
                 height: 28,
-                transition: 'all 0.2s ease-in-out',
-                '&:hover': {
+                transition: "all 0.2s ease-in-out",
+                "&:hover": {
                   // on hover always show the background
                   bgcolor: alpha(theme.palette.background.default, 0.9),
                 },
@@ -368,7 +399,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
                 checkedIcon={<CheckBoxIcon />}
                 sx={{
                   padding: 0,
-                  '& .MuiSvgIcon-root': {
+                  "& .MuiSvgIcon-root": {
                     fontSize: 18,
                   },
                 }}
@@ -387,7 +418,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
                 }
               }}
               sx={{
-                padding: '4px',
+                padding: "4px",
               }}
             >
               {isFavorite ? (
@@ -402,15 +433,15 @@ const AssetCard: React.FC<AssetCardProps> = ({
         {/* Position buttons at the top right of the card, visible on hover or when menu is open */}
         <Box
           sx={{
-            position: 'absolute',
+            position: "absolute",
             top: 8,
             right: 8,
-            display: 'flex',
+            display: "flex",
             gap: 1,
             zIndex: 10, // Increased z-index to ensure buttons are above other elements
             opacity: shouldShowButtons ? 1 : 0, // Visible when hovering or menu is clicked
-            transition: 'opacity 0.2s ease-in-out',
-            pointerEvents: shouldShowButtons ? 'auto' : 'none', // Ensure buttons are clickable when visible
+            transition: "opacity 0.2s ease-in-out",
+            pointerEvents: shouldShowButtons ? "auto" : "none", // Ensure buttons are clickable when visible
           }}
           onClick={(e) => e.stopPropagation()} // Stop propagation at the container level
         >
@@ -419,8 +450,8 @@ const AssetCard: React.FC<AssetCardProps> = ({
             onClick={handleDeleteClick}
             sx={(theme) => ({
               bgcolor: alpha(theme.palette.background.paper, 0.7),
-              padding: '4px',
-              '&:hover': {
+              padding: "4px",
+              "&:hover": {
                 bgcolor: alpha(theme.palette.background.default, 0.9),
               },
             })}
@@ -432,8 +463,8 @@ const AssetCard: React.FC<AssetCardProps> = ({
             onClick={handleDownloadClick}
             sx={(theme) => ({
               bgcolor: alpha(theme.palette.background.paper, 0.7),
-              padding: '4px',
-              '&:hover': {
+              padding: "4px",
+              "&:hover": {
                 bgcolor: alpha(theme.palette.background.default, 0.9),
               },
             })}
@@ -445,15 +476,15 @@ const AssetCard: React.FC<AssetCardProps> = ({
         {/* Metadata section */}
         {showMetadata && (
           <Box sx={{ p: 2 }}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {visibleFields.map((field) => (
                 <Box
                   key={field.id}
                   sx={{
-                    display: 'grid',
-                    gridTemplateColumns: '100px 1fr',
-                    alignItems: 'center',
-                    width: '100%',
+                    display: "grid",
+                    gridTemplateColumns: "100px 1fr",
+                    alignItems: "center",
+                    width: "100%",
                   }}
                 >
                   <Typography
@@ -466,20 +497,20 @@ const AssetCard: React.FC<AssetCardProps> = ({
                   >
                     {field.label}:
                   </Typography>
-                  {field.id === 'name' && onEditClick ? (
+                  {field.id === "name" && onEditClick ? (
                     isEditing ? (
                       <Box
                         sx={{
-                          gridColumn: '1 / span 2',
-                          display: 'flex',
-                          flexDirection: 'column',
+                          gridColumn: "1 / span 2",
+                          display: "flex",
+                          flexDirection: "column",
                           gap: 1,
-                          width: '100%',
+                          width: "100%",
                           mt: 1,
                         }}
                       >
                         <InlineTextEditor
-                          initialValue={editedName || ''}
+                          initialValue={editedName || ""}
                           editingCellId={id} // ← pass a stable ID (e.g. asset ID)
                           preventCommitRef={preventCommitRef} // ← pass the ref to prevent commit
                           commitRef={commitRef} // ← pass the ref to expose commit function
@@ -490,12 +521,17 @@ const AssetCard: React.FC<AssetCardProps> = ({
                             } as React.ChangeEvent<HTMLInputElement>);
                           }}
                           onComplete={(save, value) => {
-                            console.log('🎯 AssetCard onComplete - save:', save, 'value:', value);
                             console.log(
-                              '🎯 Calling onEditNameComplete with save:',
+                              "🎯 AssetCard onComplete - save:",
                               save,
-                              'value:',
-                              value
+                              "value:",
+                              value,
+                            );
+                            console.log(
+                              "🎯 Calling onEditNameComplete with save:",
+                              save,
+                              "value:",
+                              value,
                             );
                             onEditNameComplete?.(save, value);
                           }}
@@ -507,23 +543,25 @@ const AssetCard: React.FC<AssetCardProps> = ({
                           multiline
                           rows={2}
                           sx={{
-                            width: '100%',
-                            '& .MuiInputBase-root': {
-                              width: '100%',
+                            width: "100%",
+                            "& .MuiInputBase-root": {
+                              width: "100%",
                             },
-                            '& .MuiInputBase-input': {
-                              whiteSpace: 'normal',
-                              wordBreak: 'break-word',
+                            "& .MuiInputBase-input": {
+                              whiteSpace: "normal",
+                              wordBreak: "break-word",
                             },
                           }}
                           InputProps={{
-                            endAdornment: isRenaming && <CircularProgress size={16} />,
+                            endAdornment: isRenaming && (
+                              <CircularProgress size={16} />
+                            ),
                           }}
                         />
                         <Box
                           sx={{
-                            display: 'flex',
-                            justifyContent: 'flex-end',
+                            display: "flex",
+                            justifyContent: "flex-end",
                             gap: 1,
                           }}
                         >
@@ -532,23 +570,30 @@ const AssetCard: React.FC<AssetCardProps> = ({
                             onMouseDown={(e) => {
                               e.stopPropagation();
                               e.preventDefault();
-                              console.log('💾 AssetCard Save mousedown');
+                              console.log("💾 AssetCard Save mousedown");
                               // Set flag to prevent blur from canceling
                               preventCommitRef.current = true;
                             }}
                             onClick={(e) => {
                               e.stopPropagation();
                               e.preventDefault();
-                              console.log('💾 AssetCard Save clicked');
-                              console.log('💾 AssetCard commitRef.current:', commitRef.current);
+                              console.log("💾 AssetCard Save clicked");
+                              console.log(
+                                "💾 AssetCard commitRef.current:",
+                                commitRef.current,
+                              );
                               // Reset the prevent flag
                               preventCommitRef.current = false;
                               // Call the commit function directly via ref
                               if (commitRef.current) {
-                                console.log('💾 AssetCard calling commitRef.current()');
+                                console.log(
+                                  "💾 AssetCard calling commitRef.current()",
+                                );
                                 commitRef.current();
                               } else {
-                                console.error('💾 AssetCard commitRef.current is null!');
+                                console.error(
+                                  "💾 AssetCard commitRef.current is null!",
+                                );
                               }
                             }}
                             variant="contained"
@@ -561,7 +606,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
                             disabled={isRenaming}
                             onMouseDown={(e) => {
                               e.stopPropagation();
-                              console.log('🚫 AssetCard Cancel clicked');
+                              console.log("🚫 AssetCard Cancel clicked");
                               // Set flag to prevent InlineTextEditor commit from being called
                               // Use onMouseDown instead of onClick to set the flag before onBlur
                               preventCommitRef.current = true;
@@ -578,48 +623,52 @@ const AssetCard: React.FC<AssetCardProps> = ({
                     ) : (
                       <Box
                         sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          width: '100%',
-                          justifyContent: 'space-between',
+                          display: "flex",
+                          alignItems: "center",
+                          width: "100%",
+                          justifyContent: "space-between",
                         }}
                       >
                         <Typography
                           sx={{
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'normal',
-                            wordBreak: 'break-word',
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "normal",
+                            wordBreak: "break-word",
                             flexGrow: 1,
-                            userSelect: 'text', // Allow text selection
-                            maxHeight: '2.4em', // Limit to exactly 2 lines
-                            lineHeight: '1.2em',
-                            display: '-webkit-box',
+                            userSelect: "text", // Allow text selection
+                            maxHeight: "2.4em", // Limit to exactly 2 lines
+                            lineHeight: "1.2em",
+                            display: "-webkit-box",
                             WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            position: 'relative',
-                            '&:after': {
+                            WebkitBoxOrient: "vertical",
+                            position: "relative",
+                            "&:after": {
                               content: '"..."',
-                              position: 'absolute',
+                              position: "absolute",
                               bottom: 0,
                               right: 0,
-                              paddingLeft: '4px',
-                              backgroundColor: 'inherit',
-                              boxShadow: '-8px 0 8px rgba(255,255,255,0.8)',
-                              display: 'none',
+                              paddingLeft: "4px",
+                              backgroundColor: "inherit",
+                              boxShadow: "-8px 0 8px rgba(255,255,255,0.8)",
+                              display: "none",
                             },
-                            '&.truncated:after': {
-                              display: 'inline',
+                            "&.truncated:after": {
+                              display: "inline",
                             },
-                            '&:hover': {
-                              maxHeight: 'none', // Remove height limit on hover
-                              WebkitLineClamp: 'unset',
-                              '&:after': {
-                                display: 'none',
+                            "&:hover": {
+                              maxHeight: "none", // Remove height limit on hover
+                              WebkitLineClamp: "unset",
+                              "&:after": {
+                                display: "none",
                               },
                             },
                           }}
-                          className={String(renderField(field.id)).length > 60 ? 'truncated' : ''}
+                          className={
+                            String(renderField(field.id)).length > 60
+                              ? "truncated"
+                              : ""
+                          }
                           display="inline"
                           variant="body2"
                           title={String(renderField(field.id))}
@@ -643,44 +692,48 @@ const AssetCard: React.FC<AssetCardProps> = ({
                       </Box>
                     )
                   ) : (
-                    <Box sx={{ width: '100%' }}>
+                    <Box sx={{ width: "100%" }}>
                       <Typography
                         variant="body2"
                         sx={{
-                          userSelect: 'text',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'normal',
-                          wordBreak: 'break-word',
-                          width: '100%',
-                          maxHeight: '2.4em', // Limit to exactly 2 lines
-                          lineHeight: '1.2em',
-                          display: '-webkit-box',
+                          userSelect: "text",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "normal",
+                          wordBreak: "break-word",
+                          width: "100%",
+                          maxHeight: "2.4em", // Limit to exactly 2 lines
+                          lineHeight: "1.2em",
+                          display: "-webkit-box",
                           WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          position: 'relative',
-                          '&:after': {
+                          WebkitBoxOrient: "vertical",
+                          position: "relative",
+                          "&:after": {
                             content: '"..."',
-                            position: 'absolute',
+                            position: "absolute",
                             bottom: 0,
                             right: 0,
-                            paddingLeft: '4px',
-                            backgroundColor: 'inherit',
-                            boxShadow: '-8px 0 8px rgba(255,255,255,0.8)',
-                            display: 'none',
+                            paddingLeft: "4px",
+                            backgroundColor: "inherit",
+                            boxShadow: "-8px 0 8px rgba(255,255,255,0.8)",
+                            display: "none",
                           },
-                          '&.truncated:after': {
-                            display: 'inline',
+                          "&.truncated:after": {
+                            display: "inline",
                           },
-                          '&:hover': {
-                            maxHeight: 'none', // Remove height limit on hover
-                            WebkitLineClamp: 'unset',
-                            '&:after': {
-                              display: 'none',
+                          "&:hover": {
+                            maxHeight: "none", // Remove height limit on hover
+                            WebkitLineClamp: "unset",
+                            "&:after": {
+                              display: "none",
                             },
                           },
                         }}
-                        className={String(renderField(field.id)).length > 60 ? 'truncated' : ''}
+                        className={
+                          String(renderField(field.id)).length > 60
+                            ? "truncated"
+                            : ""
+                        }
                         title={String(renderField(field.id))}
                       >
                         {renderField(field.id)}

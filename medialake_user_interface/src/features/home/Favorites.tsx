@@ -1,12 +1,20 @@
-import React from 'react';
-import { Box, Typography, Stack, CircularProgress } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
-import { useGetFavorites, useRemoveFavorite } from '../../api/hooks/useFavorites';
-import AssetCard from '../../components/shared/AssetCard';
+import React from "react";
+import { Box, Typography, Stack, CircularProgress } from "@mui/material";
+import { useNavigate } from "react-router-dom";
+import {
+  useGetFavorites,
+  useRemoveFavorite,
+} from "../../api/hooks/useFavorites";
+import AssetCard from "../../components/shared/AssetCard";
 
 export const Favorites: React.FC = () => {
   const navigate = useNavigate();
-  const { data: unsortedFavorites, isLoading, error, refetch } = useGetFavorites('ASSET');
+  const {
+    data: unsortedFavorites,
+    isLoading,
+    error,
+    refetch,
+  } = useGetFavorites("ASSET");
   const { mutate: removeFavorite } = useRemoveFavorite();
 
   // Sort favorites by addedAt timestamp in descending order (newest first)
@@ -35,18 +43,20 @@ export const Favorites: React.FC = () => {
   }, [unsortedFavorites]);
 
   // Log when the component renders and when data changes
-  console.log('Favorites component rendering with sorted data:', favorites);
+  console.log("Favorites component rendering with sorted data:", favorites);
 
   // Add effect to log when favorites data changes
   React.useEffect(() => {
-    console.log('Favorites data changed:', unsortedFavorites);
-    console.log('Sorted favorites:', favorites);
+    console.log("Favorites data changed:", unsortedFavorites);
+    console.log("Sorted favorites:", favorites);
   }, [unsortedFavorites, favorites]);
 
   // Handle clicking on an asset to navigate to its detail page
   const handleAssetClick = (assetId: string, assetType: string) => {
     const pathPrefix =
-      assetType.toLowerCase() === 'audio' ? '/audio/' : `/${assetType.toLowerCase()}s/`;
+      assetType.toLowerCase() === "audio"
+        ? "/audio/"
+        : `/${assetType.toLowerCase()}s/`;
     navigate(`${pathPrefix}${assetId}`);
   };
 
@@ -54,7 +64,7 @@ export const Favorites: React.FC = () => {
   const handleFavoriteToggle = (
     assetId: string,
     itemType: string,
-    event: React.MouseEvent<HTMLElement>
+    event: React.MouseEvent<HTMLElement>,
   ) => {
     event.stopPropagation();
     removeFavorite({ itemId: assetId, itemType });
@@ -65,10 +75,10 @@ export const Favorites: React.FC = () => {
     return (
       <Box
         sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: '200px',
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "200px",
         }}
       >
         <CircularProgress />
@@ -83,7 +93,9 @@ export const Favorites: React.FC = () => {
         <Typography variant="h5" component="h2" sx={{ mb: 2 }}>
           Favorites
         </Typography>
-        <Typography color="error">Error loading favorites: {error.message}</Typography>
+        <Typography color="error">
+          Error loading favorites: {error.message}
+        </Typography>
       </Box>
     );
   }
@@ -110,18 +122,18 @@ export const Favorites: React.FC = () => {
         direction="row"
         spacing={2}
         sx={{
-          overflowX: 'auto',
+          overflowX: "auto",
           pb: 2,
-          '&::-webkit-scrollbar': {
-            height: '8px',
+          "&::-webkit-scrollbar": {
+            height: "8px",
           },
-          '&::-webkit-scrollbar-track': {
-            backgroundColor: 'rgba(0,0,0,0.05)',
-            borderRadius: '4px',
+          "&::-webkit-scrollbar-track": {
+            backgroundColor: "rgba(0,0,0,0.05)",
+            borderRadius: "4px",
           },
-          '&::-webkit-scrollbar-thumb': {
-            backgroundColor: 'rgba(0,0,0,0.2)',
-            borderRadius: '4px',
+          "&::-webkit-scrollbar-thumb": {
+            backgroundColor: "rgba(0,0,0,0.2)",
+            borderRadius: "4px",
           },
         }}
       >
@@ -129,31 +141,38 @@ export const Favorites: React.FC = () => {
           <Box
             key={favorite.itemId}
             sx={{
-              minWidth: '250px',
-              maxWidth: '250px',
+              minWidth: "250px",
+              maxWidth: "250px",
             }}
           >
             <AssetCard
               id={favorite.itemId}
               name={favorite.metadata?.name || favorite.itemId}
-              thumbnailUrl={favorite.metadata?.thumbnailUrl || ''}
-              assetType={favorite.metadata?.assetType || 'Unknown'}
+              thumbnailUrl={favorite.metadata?.thumbnailUrl || ""}
+              assetType={favorite.metadata?.assetType || "Unknown"}
               fields={[
-                { id: 'name', label: 'Name', visible: true },
-                { id: 'type', label: 'Type', visible: true },
+                { id: "name", label: "Name", visible: true },
+                { id: "type", label: "Type", visible: true },
               ]}
               renderField={(fieldId) => {
-                if (fieldId === 'name') return favorite.metadata?.name || favorite.itemId;
-                if (fieldId === 'type') return favorite.metadata?.assetType || 'Unknown';
-                return '';
+                if (fieldId === "name")
+                  return favorite.metadata?.name || favorite.itemId;
+                if (fieldId === "type")
+                  return favorite.metadata?.assetType || "Unknown";
+                return "";
               }}
               onAssetClick={() =>
-                handleAssetClick(favorite.itemId, favorite.metadata?.assetType || 'Unknown')
+                handleAssetClick(
+                  favorite.itemId,
+                  favorite.metadata?.assetType || "Unknown",
+                )
               }
               onDeleteClick={() => {}} // Not used in this context
               onDownloadClick={() => {}} // Not used in this context
               isFavorite={true}
-              onFavoriteToggle={(e) => handleFavoriteToggle(favorite.itemId, favorite.itemType, e)}
+              onFavoriteToggle={(e) =>
+                handleFavoriteToggle(favorite.itemId, favorite.itemType, e)
+              }
               cardSize="medium"
               aspectRatio="square"
               thumbnailScale="fill"

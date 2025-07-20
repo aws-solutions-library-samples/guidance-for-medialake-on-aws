@@ -15,7 +15,7 @@ export interface EventRuleInfo {
 export interface Pipeline {
   id: string;
   name: string;
-  type: 'Event Triggered' | string;
+  type: "Event Triggered" | string;
   system: boolean;
   description?: string;
   configuration?: PipelineConfiguration;
@@ -26,8 +26,11 @@ export interface Pipeline {
   stateMachineArn: string;
   sfnRoleArn: string;
   triggerLambdaArn: string;
-  dependentResources: [string, string | { rule_name: string; eventbus_name: string }][];
-  deploymentStatus?: 'CREATING' | 'DEPLOYED' | 'FAILED' | string;
+  dependentResources: [
+    string,
+    string | { rule_name: string; eventbus_name: string },
+  ][];
+  deploymentStatus?: "CREATING" | "DEPLOYED" | "FAILED" | string;
   executionArn?: string;
   active?: boolean; // New field to track if the pipeline is active
   eventRuleInfo?: EventRuleInfo; // New field to store event rule information
@@ -118,7 +121,12 @@ export interface PipelineSettings {
   timeout: number;
 }
 
-export type PipelineStatus = 'active' | 'inactive' | 'running' | 'failed' | 'completed';
+export type PipelineStatus =
+  | "active"
+  | "inactive"
+  | "running"
+  | "failed"
+  | "completed";
 
 export interface PipelineRun {
   id: string;

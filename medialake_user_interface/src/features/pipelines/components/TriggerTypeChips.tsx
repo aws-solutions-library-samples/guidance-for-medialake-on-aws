@@ -1,5 +1,5 @@
-import React from 'react';
-import { Stack, Chip, Tooltip, Typography, Box } from '@mui/material';
+import React from "react";
+import { Stack, Chip, Tooltip, Typography, Box } from "@mui/material";
 import {
   Event as EventIcon,
   Api as ApiIcon,
@@ -8,8 +8,8 @@ import {
   Videocam as VideoIcon,
   AudioFile as AudioIcon,
   Code as CodeIcon,
-} from '@mui/icons-material';
-import { Pipeline } from '../types/pipelines.types';
+} from "@mui/icons-material";
+import { Pipeline } from "../types/pipelines.types";
 
 interface EventRule {
   ruleName?: string;
@@ -55,7 +55,12 @@ export const TriggerTypeChips: React.FC<TriggerTypeChipsProps> = ({
 
         return (
           <Tooltip key={index} title={tooltipContent} arrow placement="top">
-            <Chip icon={icon} label={type} size="small" color={getChipColor(type)} />
+            <Chip
+              icon={icon}
+              label={type}
+              size="small"
+              color={getChipColor(type)}
+            />
           </Tooltip>
         );
       })}
@@ -66,27 +71,32 @@ export const TriggerTypeChips: React.FC<TriggerTypeChipsProps> = ({
 /**
  * Extract event rule information from a pipeline object
  */
-const extractEventRuleInfoFromPipeline = (pipeline: Pipeline): EventRuleInfo => {
+const extractEventRuleInfoFromPipeline = (
+  pipeline: Pipeline,
+): EventRuleInfo => {
   const eventRuleInfo: EventRuleInfo = {
-    triggerTypes: ['Event Triggered'],
+    triggerTypes: ["Event Triggered"],
     eventRules: [],
   };
 
   // Check for Event Triggered (EventBridge rules)
   if (pipeline.dependentResources) {
     for (const [resourceType, resourceValue] of pipeline.dependentResources) {
-      if (resourceType === 'eventbridge_rule') {
+      if (resourceType === "eventbridge_rule") {
         // Extract rule name and eventbus name if available
         const rule: EventRule = {};
 
-        if (typeof resourceValue === 'object' && resourceValue !== null) {
-          rule.ruleName = resourceValue.rule_name || '';
-          rule.eventBusName = resourceValue.eventbus_name || '';
+        if (typeof resourceValue === "object" && resourceValue !== null) {
+          rule.ruleName = resourceValue.rule_name || "";
+          rule.eventBusName = resourceValue.eventbus_name || "";
         } else {
           // If it's just a string ARN, extract the rule name from the ARN
           rule.ruleArn = resourceValue as string;
-          if (typeof resourceValue === 'string' && resourceValue.includes('/')) {
-            rule.ruleName = resourceValue.split('/').pop() || '';
+          if (
+            typeof resourceValue === "string" &&
+            resourceValue.includes("/")
+          ) {
+            rule.ruleName = resourceValue.split("/").pop() || "";
           }
         }
 
@@ -96,29 +106,41 @@ const extractEventRuleInfoFromPipeline = (pipeline: Pipeline): EventRuleInfo => 
 
           // Check for default pipeline patterns
           if (
-            ruleName.includes('default-image-pipeline') ||
-            pipeline.name.includes('Image Pipeline')
+            ruleName.includes("default-image-pipeline") ||
+            pipeline.name.includes("Image Pipeline")
           ) {
-            rule.description = 'Triggers on image files (TIF, JPG, JPEG, PNG, WEBP, GIF, SVG)';
-            rule.fileTypes = ['TIF', 'JPG', 'JPEG', 'PNG', 'WEBP', 'GIF', 'SVG'];
-            rule.eventType = 'AssetCreated';
+            rule.description =
+              "Triggers on image files (TIF, JPG, JPEG, PNG, WEBP, GIF, SVG)";
+            rule.fileTypes = [
+              "TIF",
+              "JPG",
+              "JPEG",
+              "PNG",
+              "WEBP",
+              "GIF",
+              "SVG",
+            ];
+            rule.eventType = "AssetCreated";
           } else if (
-            ruleName.includes('default-video-pipeline') ||
-            pipeline.name.includes('Video Pipeline')
+            ruleName.includes("default-video-pipeline") ||
+            pipeline.name.includes("Video Pipeline")
           ) {
-            rule.description = 'Triggers on video files (MP4, MOV, AVI, MKV, WEBM)';
-            rule.fileTypes = ['MP4', 'MOV', 'AVI', 'MKV', 'WEBM'];
-            rule.eventType = 'AssetCreated';
+            rule.description =
+              "Triggers on video files (MP4, MOV, AVI, MKV, WEBM)";
+            rule.fileTypes = ["MP4", "MOV", "AVI", "MKV", "WEBM"];
+            rule.eventType = "AssetCreated";
           } else if (
-            ruleName.includes('default-audio-pipeline') ||
-            pipeline.name.includes('Audio Pipeline')
+            ruleName.includes("default-audio-pipeline") ||
+            pipeline.name.includes("Audio Pipeline")
           ) {
-            rule.description = 'Triggers on audio files (WAV, AIFF, AIF, MP3, PCM, M4A)';
-            rule.fileTypes = ['WAV', 'AIFF', 'AIF', 'MP3', 'PCM', 'M4A'];
-            rule.eventType = 'AssetCreated';
-          } else if (ruleName.includes('pipeline_execution_completed')) {
-            rule.description = 'Triggers when another pipeline completes execution';
-            rule.eventType = 'Pipeline Execution Completed';
+            rule.description =
+              "Triggers on audio files (WAV, AIFF, AIF, MP3, PCM, M4A)";
+            rule.fileTypes = ["WAV", "AIFF", "AIF", "MP3", "PCM", "M4A"];
+            rule.eventType = "AssetCreated";
+          } else if (ruleName.includes("pipeline_execution_completed")) {
+            rule.description =
+              "Triggers when another pipeline completes execution";
+            rule.eventType = "Pipeline Execution Completed";
           } else {
             rule.description = `Custom event rule: ${ruleName}`;
           }
@@ -137,11 +159,11 @@ const extractEventRuleInfoFromPipeline = (pipeline: Pipeline): EventRuleInfo => 
  */
 const getTriggerIcon = (type: string) => {
   switch (type) {
-    case 'Event Triggered':
+    case "Event Triggered":
       return <EventIcon fontSize="small" />;
-    case 'API Triggered':
+    case "API Triggered":
       return <ApiIcon fontSize="small" />;
-    case 'Manually Triggered':
+    case "Manually Triggered":
       return <ManualIcon fontSize="small" />;
     default:
       return <EventIcon fontSize="small" />;
@@ -152,7 +174,11 @@ const getTriggerIcon = (type: string) => {
  * Get the tooltip content for a trigger type
  */
 const getTooltipContent = (type: string, eventRuleInfo?: EventRuleInfo) => {
-  if (!eventRuleInfo || !eventRuleInfo.eventRules || eventRuleInfo.eventRules.length === 0) {
+  if (
+    !eventRuleInfo ||
+    !eventRuleInfo.eventRules ||
+    eventRuleInfo.eventRules.length === 0
+  ) {
     return type;
   }
 
@@ -169,7 +195,7 @@ const getTooltipContent = (type: string, eventRuleInfo?: EventRuleInfo) => {
             </Typography>
           )}
           {rule.fileTypes && rule.fileTypes.length > 0 && (
-            <Box sx={{ mt: 0.5, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+            <Box sx={{ mt: 0.5, display: "flex", flexWrap: "wrap", gap: 0.5 }}>
               {rule.fileTypes.map((fileType, i) => {
                 const icon = getFileTypeIcon(fileType);
                 return (
@@ -179,7 +205,7 @@ const getTooltipContent = (type: string, eventRuleInfo?: EventRuleInfo) => {
                     label={fileType}
                     size="small"
                     variant="outlined"
-                    sx={{ height: 20, '& .MuiChip-label': { px: 0.5 } }}
+                    sx={{ height: 20, "& .MuiChip-label": { px: 0.5 } }}
                   />
                 );
               })}
@@ -200,9 +226,9 @@ const getTooltipContent = (type: string, eventRuleInfo?: EventRuleInfo) => {
  * Get the appropriate icon for a file type
  */
 const getFileTypeIcon = (fileType: string) => {
-  const videoFormats = ['MP4', 'MOV', 'AVI', 'MKV', 'WEBM'];
-  const imageFormats = ['TIF', 'JPG', 'JPEG', 'PNG', 'WEBP', 'GIF', 'SVG'];
-  const audioFormats = ['WAV', 'AIFF', 'AIF', 'MP3', 'PCM', 'M4A'];
+  const videoFormats = ["MP4", "MOV", "AVI", "MKV", "WEBM"];
+  const imageFormats = ["TIF", "JPG", "JPEG", "PNG", "WEBP", "GIF", "SVG"];
+  const audioFormats = ["WAV", "AIFF", "AIF", "MP3", "PCM", "M4A"];
 
   if (videoFormats.includes(fileType)) {
     return <VideoIcon fontSize="small" />;
@@ -218,15 +244,17 @@ const getFileTypeIcon = (fileType: string) => {
 /**
  * Get the appropriate color for a trigger type chip
  */
-const getChipColor = (type: string): 'primary' | 'secondary' | 'success' | 'info' => {
+const getChipColor = (
+  type: string,
+): "primary" | "secondary" | "success" | "info" => {
   switch (type) {
-    case 'Event Triggered':
-      return 'primary';
-    case 'API Triggered':
-      return 'secondary';
-    case 'Manually Triggered':
-      return 'success';
+    case "Event Triggered":
+      return "primary";
+    case "API Triggered":
+      return "secondary";
+    case "Manually Triggered":
+      return "success";
     default:
-      return 'info';
+      return "info";
   }
 };

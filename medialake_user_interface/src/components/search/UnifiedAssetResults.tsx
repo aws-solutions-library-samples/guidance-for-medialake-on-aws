@@ -1,9 +1,13 @@
-import React from 'react';
-import { Box } from '@mui/material';
-import { type ImageItem, type VideoItem, type AudioItem } from '@/types/search/searchResults';
-import ImageResults from './ImageResults';
-import VideoResults from './VideoResults';
-import AudioResults from './AudioResults';
+import React from "react";
+import { Box } from "@mui/material";
+import {
+  type ImageItem,
+  type VideoItem,
+  type AudioItem,
+} from "@/types/search/searchResults";
+import ImageResults from "./ImageResults";
+import VideoResults from "./VideoResults";
+import AudioResults from "./AudioResults";
 
 type AssetItem = (ImageItem | VideoItem | AudioItem) & {
   DigitalSourceAsset: {
@@ -21,16 +25,19 @@ interface UnifiedAssetResultsProps {
   onPageChange: (page: number) => void;
   searchTerm: string;
   groupByType: boolean;
-  cardSize: 'small' | 'medium' | 'large';
-  onCardSizeChange: (size: 'small' | 'medium' | 'large') => void;
-  aspectRatio: 'vertical' | 'square' | 'horizontal';
-  onAspectRatioChange: (ratio: 'vertical' | 'square' | 'horizontal') => void;
-  thumbnailScale: 'fit' | 'fill';
-  onThumbnailScaleChange: (scale: 'fit' | 'fill') => void;
+  cardSize: "small" | "medium" | "large";
+  onCardSizeChange: (size: "small" | "medium" | "large") => void;
+  aspectRatio: "vertical" | "square" | "horizontal";
+  onAspectRatioChange: (ratio: "vertical" | "square" | "horizontal") => void;
+  thumbnailScale: "fit" | "fill";
+  onThumbnailScaleChange: (scale: "fit" | "fill") => void;
   showMetadata: boolean;
   onShowMetadataChange: (show: boolean) => void;
   onAssetClick: (asset: AssetItem) => void;
-  onDeleteClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
+  onDeleteClick: (
+    asset: AssetItem,
+    event: React.MouseEvent<HTMLElement>,
+  ) => void;
   onMenuClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onEditClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onPageSizeChange: (newPageSize: number) => void;
@@ -58,13 +65,13 @@ const UnifiedAssetResults: React.FC<UnifiedAssetResultsProps> = ({
 }) => {
   // Split results by type if grouping is enabled
   const imageResults = results.filter(
-    (item) => item.DigitalSourceAsset.Type === 'Image'
+    (item) => item.DigitalSourceAsset.Type === "Image",
   ) as ImageItem[];
   const videoResults = results.filter(
-    (item) => item.DigitalSourceAsset.Type === 'Video'
+    (item) => item.DigitalSourceAsset.Type === "Video",
   ) as VideoItem[];
   const audioResults = results.filter(
-    (item) => item.DigitalSourceAsset.Type === 'Audio'
+    (item) => item.DigitalSourceAsset.Type === "Audio",
   ) as AudioItem[];
 
   const commonProps = {
@@ -88,13 +95,13 @@ const UnifiedAssetResults: React.FC<UnifiedAssetResultsProps> = ({
 
   if (groupByType) {
     return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {imageResults.length > 0 && (
           <Box
             sx={{
-              '& .MuiPaper-root': {
-                bgcolor: 'transparent',
-                boxShadow: 'none',
+              "& .MuiPaper-root": {
+                bgcolor: "transparent",
+                boxShadow: "none",
                 p: 0,
               },
             }}
@@ -105,9 +112,9 @@ const UnifiedAssetResults: React.FC<UnifiedAssetResultsProps> = ({
         {videoResults.length > 0 && (
           <Box
             sx={{
-              '& .MuiPaper-root': {
-                bgcolor: 'transparent',
-                boxShadow: 'none',
+              "& .MuiPaper-root": {
+                bgcolor: "transparent",
+                boxShadow: "none",
                 p: 0,
               },
             }}
@@ -118,9 +125,9 @@ const UnifiedAssetResults: React.FC<UnifiedAssetResultsProps> = ({
         {audioResults.length > 0 && (
           <Box
             sx={{
-              '& .MuiPaper-root': {
-                bgcolor: 'transparent',
-                boxShadow: 'none',
+              "& .MuiPaper-root": {
+                bgcolor: "transparent",
+                boxShadow: "none",
                 p: 0,
               },
             }}
@@ -135,9 +142,9 @@ const UnifiedAssetResults: React.FC<UnifiedAssetResultsProps> = ({
   return (
     <Box
       sx={{
-        '& .MuiPaper-root': {
-          bgcolor: 'transparent',
-          boxShadow: 'none',
+        "& .MuiPaper-root": {
+          bgcolor: "transparent",
+          boxShadow: "none",
           p: 0,
         },
       }}

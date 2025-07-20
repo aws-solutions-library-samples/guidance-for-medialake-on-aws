@@ -33,7 +33,7 @@ export interface AssetBase {
 
 export interface ImageItem extends AssetBase {
   DigitalSourceAsset: DigitalSourceAsset & {
-    Type: 'Image';
+    Type: "Image";
     MainRepresentation: {
       Format: string;
       StorageInfo: {
@@ -51,7 +51,7 @@ export interface ImageItem extends AssetBase {
 
 export interface VideoItem extends AssetBase {
   DigitalSourceAsset: DigitalSourceAsset & {
-    Type: 'Video';
+    Type: "Video";
     MainRepresentation: {
       Format: string;
       StorageInfo: {
@@ -74,7 +74,7 @@ export interface VideoItem extends AssetBase {
 
 export interface AudioItem extends AssetBase {
   DigitalSourceAsset: DigitalSourceAsset & {
-    Type: 'Audio';
+    Type: "Audio";
     MainRepresentation: {
       Format: string;
       StorageInfo: {

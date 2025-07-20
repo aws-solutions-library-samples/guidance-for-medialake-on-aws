@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -9,11 +9,11 @@ import {
   AccordionSummary,
   AccordionDetails,
   Divider,
-} from '@mui/material';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { useGetUnconfiguredNodeMethods } from '@/shared/nodes/api/nodesController';
-import { Node as NodeType } from '@/shared/nodes/types/nodes.types';
-import { RightSidebar } from '@/components/common/RightSidebar/RightSidebar';
+} from "@mui/material";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import { useGetUnconfiguredNodeMethods } from "@/shared/nodes/api/nodesController";
+import { Node as NodeType } from "@/shared/nodes/types/nodes.types";
+import { RightSidebar } from "@/components/common/RightSidebar/RightSidebar";
 // import { createJobStatusNodeData } from './jobStatusNodeUtils';
 
 interface NodeSection {
@@ -23,9 +23,15 @@ interface NodeSection {
 }
 
 const SidebarContent: React.FC = () => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [expandedSections, setExpandedSections] = useState<string[]>(['TRIGGER']);
-  const { data: nodesResponse, isLoading, error } = useGetUnconfiguredNodeMethods();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [expandedSections, setExpandedSections] = useState<string[]>([
+    "TRIGGER",
+  ]);
+  const {
+    data: nodesResponse,
+    isLoading,
+    error,
+  } = useGetUnconfiguredNodeMethods();
 
   const handleSectionToggle = (sectionId: string) => {
     setExpandedSections((prev) => {
@@ -36,42 +42,60 @@ const SidebarContent: React.FC = () => {
     });
   };
 
-  const onDragStart = (event: React.DragEvent, node: NodeType, methodName: string) => {
-    console.log('[Sidebar] onDragStart for node:', node.nodeId, 'method:', methodName);
-    console.log('[Sidebar] Node methods:', node.methods);
+  const onDragStart = (
+    event: React.DragEvent,
+    node: NodeType,
+    methodName: string,
+  ) => {
+    console.log(
+      "[Sidebar] onDragStart for node:",
+      node.nodeId,
+      "method:",
+      methodName,
+    );
+    console.log("[Sidebar] Node methods:", node.methods);
 
     // For trigger nodes, we need to use "trigger" as the method name
     let actualMethodName = methodName;
-    if (node.info.nodeType === 'TRIGGER') {
-      actualMethodName = 'trigger';
+    if (node.info.nodeType === "TRIGGER") {
+      actualMethodName = "trigger";
       console.log('[Sidebar] Using "trigger" as method name for trigger node');
-    } else if (node.info.nodeType === 'INTEGRATION') {
+    } else if (node.info.nodeType === "INTEGRATION") {
       // For integration nodes, we need to use the actual method name (post, get, etc.)
       // The methodName parameter might be an index, so we need to get the actual method name
       if (Array.isArray(node.methods)) {
         const methodObj = node.methods[parseInt(methodName)] as any;
         if (methodObj && methodObj.name) {
           actualMethodName = methodObj.name;
-          console.log('[Sidebar] Using method name from array:', actualMethodName);
+          console.log(
+            "[Sidebar] Using method name from array:",
+            actualMethodName,
+          );
         }
-      } else if (typeof node.methods === 'object') {
+      } else if (typeof node.methods === "object") {
         // If methods is an object, the keys might be the method names
         // But we need to check if the value has a name property
         const methodObj = node.methods[methodName] as any;
         if (methodObj && methodObj.name) {
           actualMethodName = methodObj.name;
-          console.log('[Sidebar] Using method name from object:', actualMethodName);
+          console.log(
+            "[Sidebar] Using method name from object:",
+            actualMethodName,
+          );
         }
       }
     }
 
     // Extract operationId from methodName if it's in the format "name:operationId"
     let targetOperationId: string | undefined;
-    if (methodName.includes(':')) {
-      const parts = methodName.split(':');
+    if (methodName.includes(":")) {
+      const parts = methodName.split(":");
       actualMethodName = parts[0];
       targetOperationId = parts[1];
-      console.log('[Sidebar] Extracted operationId from methodName:', targetOperationId);
+      console.log(
+        "[Sidebar] Extracted operationId from methodName:",
+        targetOperationId,
+      );
     }
 
     // Find the method in the methods array or object
@@ -80,27 +104,29 @@ const SidebarContent: React.FC = () => {
       // If we have an operationId, use it to find the exact method
       if (targetOperationId) {
         method = node.methods.find(
-          (m: any) => m.name === actualMethodName && m.config?.operationId === targetOperationId
+          (m: any) =>
+            m.name === actualMethodName &&
+            m.config?.operationId === targetOperationId,
         );
         console.log(
-          '[Sidebar] Finding method by name and operationId:',
+          "[Sidebar] Finding method by name and operationId:",
           actualMethodName,
-          targetOperationId
+          targetOperationId,
         );
       }
 
       // If no method found with operationId or no operationId provided, fall back to name only
       if (!method) {
         method = node.methods.find((m: any) => m.name === actualMethodName);
-        console.log('[Sidebar] Finding method by name only:', actualMethodName);
+        console.log("[Sidebar] Finding method by name only:", actualMethodName);
       }
 
       // If still not found and methodName is a number, use it as an index
       if (!method && !isNaN(parseInt(methodName))) {
         method = node.methods[parseInt(methodName)];
-        console.log('[Sidebar] Using method at index:', methodName);
+        console.log("[Sidebar] Using method at index:", methodName);
       }
-    } else if (typeof node.methods === 'object') {
+    } else if (typeof node.methods === "object") {
       method = node.methods[methodName];
       if (!method) {
         // Try to find by name in the object values
@@ -109,7 +135,9 @@ const SidebarContent: React.FC = () => {
         // If we have an operationId, use it to find the exact method
         if (targetOperationId) {
           method = methods.find(
-            (m: any) => m.name === actualMethodName && m.config?.operationId === targetOperationId
+            (m: any) =>
+              m.name === actualMethodName &&
+              m.config?.operationId === targetOperationId,
           );
         } else {
           method = methods.find((m: any) => m.name === actualMethodName);
@@ -119,26 +147,29 @@ const SidebarContent: React.FC = () => {
 
     // Use type assertion to access the config property
     const methodWithConfig = method as any;
-    console.log('[Sidebar] Method found:', methodWithConfig);
+    console.log("[Sidebar] Method found:", methodWithConfig);
 
     // Set methodConfig based on node type
     let methodConfig;
-    if (node.info.nodeType === 'TRIGGER') {
+    if (node.info.nodeType === "TRIGGER") {
       // For trigger nodes, use the method name as the method
       // and get parameters from the config.parameters array
       methodConfig = {
         method: actualMethodName,
         parameters:
-          methodWithConfig?.config?.parameters?.reduce((acc: any, param: any) => {
-            acc[param.name] = ''; // Initialize with empty values
-            return acc;
-          }, {}) || {},
+          methodWithConfig?.config?.parameters?.reduce(
+            (acc: any, param: any) => {
+              acc[param.name] = ""; // Initialize with empty values
+              return acc;
+            },
+            {},
+          ) || {},
         requestMapping: null,
         responseMapping: null,
-        path: '',
-        operationId: '',
+        path: "",
+        operationId: "",
       };
-      console.log('[Sidebar] Trigger node methodConfig:', methodConfig);
+      console.log("[Sidebar] Trigger node methodConfig:", methodConfig);
     } else {
       // For integration nodes, use the method name (post, get, etc.)
       methodConfig = {
@@ -175,56 +206,85 @@ const SidebarContent: React.FC = () => {
     let inputTypesConfig;
 
     // Check for output types in the standard location first
-    if (node.connections?.outgoing?.[actualMethodName]?.[0]?.connectionConfig?.type) {
-      outputTypesConfig = node.connections.outgoing[actualMethodName][0].connectionConfig.type;
-      console.log('[Sidebar] Found output types in standard location:', outputTypesConfig);
+    if (
+      node.connections?.outgoing?.[actualMethodName]?.[0]?.connectionConfig
+        ?.type
+    ) {
+      outputTypesConfig =
+        node.connections.outgoing[actualMethodName][0].connectionConfig.type;
+      console.log(
+        "[Sidebar] Found output types in standard location:",
+        outputTypesConfig,
+      );
     }
     // If not found, try to look in all outgoing connections
     else if (node.connections?.outgoing) {
       // Look through all methods in outgoing connections
-      Object.entries(node.connections.outgoing).forEach(([method, connections]) => {
-        if (Array.isArray(connections) && connections.length > 0) {
-          connections.forEach((connection: any) => {
-            if (connection.connectionConfig?.type) {
-              outputTypesConfig = connection.connectionConfig.type;
-              console.log('[Sidebar] Found output types in method:', method, outputTypesConfig);
-            }
-          });
-        }
-      });
+      Object.entries(node.connections.outgoing).forEach(
+        ([method, connections]) => {
+          if (Array.isArray(connections) && connections.length > 0) {
+            connections.forEach((connection: any) => {
+              if (connection.connectionConfig?.type) {
+                outputTypesConfig = connection.connectionConfig.type;
+                console.log(
+                  "[Sidebar] Found output types in method:",
+                  method,
+                  outputTypesConfig,
+                );
+              }
+            });
+          }
+        },
+      );
     }
 
     // Check for input types in the standard location first
-    if (node.connections?.incoming?.[actualMethodName]?.[0]?.connectionConfig?.type) {
-      inputTypesConfig = node.connections.incoming[actualMethodName][0].connectionConfig.type;
-      console.log('[Sidebar] Found input types in standard location:', inputTypesConfig);
+    if (
+      node.connections?.incoming?.[actualMethodName]?.[0]?.connectionConfig
+        ?.type
+    ) {
+      inputTypesConfig =
+        node.connections.incoming[actualMethodName][0].connectionConfig.type;
+      console.log(
+        "[Sidebar] Found input types in standard location:",
+        inputTypesConfig,
+      );
     }
     // If not found, try to look in all incoming connections
     else if (node.connections?.incoming) {
       // Look through all methods in incoming connections
-      Object.entries(node.connections.incoming).forEach(([method, connections]) => {
-        if (Array.isArray(connections) && connections.length > 0) {
-          connections.forEach((connection: any) => {
-            if (connection.connectionConfig?.type) {
-              inputTypesConfig = connection.connectionConfig.type;
-              console.log('[Sidebar] Found input types in method:', method, inputTypesConfig);
-            }
-          });
-        }
-      });
+      Object.entries(node.connections.incoming).forEach(
+        ([method, connections]) => {
+          if (Array.isArray(connections) && connections.length > 0) {
+            connections.forEach((connection: any) => {
+              if (connection.connectionConfig?.type) {
+                inputTypesConfig = connection.connectionConfig.type;
+                console.log(
+                  "[Sidebar] Found input types in method:",
+                  method,
+                  inputTypesConfig,
+                );
+              }
+            });
+          }
+        },
+      );
     }
 
     // If we found output types, use them
     if (outputTypesConfig) {
       // Check if outputTypesConfig is an array of strings or objects
       if (Array.isArray(outputTypesConfig) && outputTypesConfig.length > 0) {
-        if (typeof outputTypesConfig[0] === 'string') {
+        if (typeof outputTypesConfig[0] === "string") {
           // If it's an array of strings, convert each string to an object with name property
           outputTypes = outputTypesConfig.map((type: string) => ({
             name: type,
             description: `Output type: ${type}`,
           }));
-        } else if (typeof outputTypesConfig[0] === 'object' && outputTypesConfig[0] !== null) {
+        } else if (
+          typeof outputTypesConfig[0] === "object" &&
+          outputTypesConfig[0] !== null
+        ) {
           // If it's already an array of objects, use as is if they have name property
           // or create objects with name property if they don't
           outputTypes = outputTypesConfig.map((type: any) => {
@@ -236,35 +296,38 @@ const SidebarContent: React.FC = () => {
             } else {
               // If the object doesn't have a name property, use a default
               return {
-                name: 'output',
-                description: 'Default output type',
+                name: "output",
+                description: "Default output type",
               };
             }
           });
         }
       }
-      console.log('[Sidebar] Node has multiple output types:', outputTypes);
+      console.log("[Sidebar] Node has multiple output types:", outputTypes);
     }
 
     // If we found input types, use them
     if (inputTypesConfig) {
       // For inputTypes, we need to keep it as a string array
       if (Array.isArray(inputTypesConfig) && inputTypesConfig.length > 0) {
-        if (typeof inputTypesConfig[0] === 'string') {
+        if (typeof inputTypesConfig[0] === "string") {
           // If it's already an array of strings, use it directly
           inputTypes = inputTypesConfig;
-        } else if (typeof inputTypesConfig[0] === 'object' && inputTypesConfig[0] !== null) {
+        } else if (
+          typeof inputTypesConfig[0] === "object" &&
+          inputTypesConfig[0] !== null
+        ) {
           // If it's an array of objects, extract the name property
           inputTypes = inputTypesConfig.map((type: any) => {
             if (type.name) {
               return type.name;
             } else {
-              return 'input';
+              return "input";
             }
           });
         }
       }
-      console.log('[Sidebar] Node has multiple input types:', inputTypes);
+      console.log("[Sidebar] Node has multiple input types:", inputTypes);
     }
 
     const nodeData = {
@@ -280,12 +343,15 @@ const SidebarContent: React.FC = () => {
       methodConfig: methodConfig,
     };
 
-    console.log('[Sidebar] Final node data for drag:', nodeData);
+    console.log("[Sidebar] Final node data for drag:", nodeData);
 
-    console.log('[Sidebar] Node data for drag:', nodeData);
+    console.log("[Sidebar] Node data for drag:", nodeData);
 
-    event.dataTransfer.setData('application/reactflow', JSON.stringify(nodeData));
-    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData(
+      "application/reactflow",
+      JSON.stringify(nodeData),
+    );
+    event.dataTransfer.effectAllowed = "move";
   };
 
   // Handler for dragging the custom job status node
@@ -302,17 +368,20 @@ const SidebarContent: React.FC = () => {
     if (!nodesResponse?.data) return [];
 
     const groupedNodes: NodeSection[] = [
-      { title: 'Triggers', types: ['TRIGGER'], nodes: [] },
-      { title: 'Integrations', types: ['INTEGRATION'], nodes: [] },
-      { title: 'Flow', types: ['FLOW'], nodes: [] },
-      { title: 'Utilities', types: ['UTILITY'], nodes: [] },
+      { title: "Triggers", types: ["TRIGGER"], nodes: [] },
+      { title: "Integrations", types: ["INTEGRATION"], nodes: [] },
+      { title: "Flow", types: ["FLOW"], nodes: [] },
+      { title: "Utilities", types: ["UTILITY"], nodes: [] },
     ];
 
     nodesResponse.data.forEach((node) => {
       if (node.methods) {
         // For integration nodes with multiple methods with the same name,
         // we need to use the operationId to distinguish between them
-        if (node.info.nodeType === 'INTEGRATION' && Array.isArray(node.methods)) {
+        if (
+          node.info.nodeType === "INTEGRATION" &&
+          Array.isArray(node.methods)
+        ) {
           // Group methods by name to check for duplicates
           const methodsByName: Record<string, any[]> = {};
 
@@ -327,7 +396,7 @@ const SidebarContent: React.FC = () => {
           Object.entries(methodsByName).forEach(([name, methods]) => {
             const nodeType = node.info.nodeType;
             const section = groupedNodes.find((s) =>
-              s.types.some((type) => nodeType.includes(type))
+              s.types.some((type) => nodeType.includes(type)),
             );
 
             if (section) {
@@ -360,7 +429,7 @@ const SidebarContent: React.FC = () => {
           Object.entries(node.methods).forEach(([methodName, method]) => {
             const nodeType = node.info.nodeType;
             const section = groupedNodes.find((s) =>
-              s.types.some((type) => nodeType.includes(type))
+              s.types.some((type) => nodeType.includes(type)),
             );
 
             if (section) {
@@ -381,7 +450,9 @@ const SidebarContent: React.FC = () => {
         const searchLower = searchQuery.toLowerCase();
         return (
           node.info.title.toLowerCase().includes(searchLower) ||
-          (method.description || node.info.description).toLowerCase().includes(searchLower)
+          (method.description || node.info.description)
+            .toLowerCase()
+            .includes(searchLower)
         );
       }),
     }));
@@ -392,9 +463,9 @@ const SidebarContent: React.FC = () => {
       <Box
         sx={{
           p: 2,
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
         }}
       >
         <CircularProgress />
@@ -405,7 +476,9 @@ const SidebarContent: React.FC = () => {
   if (error || !nodesResponse?.data) {
     return (
       <Box sx={{ p: 2 }}>
-        <Typography color="error">Failed to load nodes. Please try again later.</Typography>
+        <Typography color="error">
+          Failed to load nodes. Please try again later.
+        </Typography>
       </Box>
     );
   }
@@ -413,7 +486,11 @@ const SidebarContent: React.FC = () => {
   return (
     <Box sx={{ pt: 2 }}>
       <Box sx={{ px: 2, mb: 2 }}>
-        <Typography variant="h6" gutterBottom sx={{ textAlign: 'center', mb: 2 }}>
+        <Typography
+          variant="h6"
+          gutterBottom
+          sx={{ textAlign: "center", mb: 2 }}
+        >
           Available Nodes
         </Typography>
 
@@ -428,9 +505,9 @@ const SidebarContent: React.FC = () => {
 
       <Box
         sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          '& .MuiAccordion-root + .MuiAccordion-root': {
+          display: "flex",
+          flexDirection: "column",
+          "& .MuiAccordion-root + .MuiAccordion-root": {
             mt: -1,
           },
         }}
@@ -442,46 +519,46 @@ const SidebarContent: React.FC = () => {
             onChange={() => handleSectionToggle(section.types[0])}
             disableGutters
             sx={{
-              '&.MuiAccordion-root': {
-                boxShadow: 'none',
-                '&:before': {
-                  display: 'none',
+              "&.MuiAccordion-root": {
+                boxShadow: "none",
+                "&:before": {
+                  display: "none",
                 },
-                width: '100%',
+                width: "100%",
                 margin: 0,
               },
             }}
           >
             <AccordionSummary
-              expandIcon={<ExpandMoreIcon sx={{ fontSize: '0.9rem' }} />}
+              expandIcon={<ExpandMoreIcon sx={{ fontSize: "0.9rem" }} />}
               sx={{
-                minHeight: '36px',
+                minHeight: "36px",
                 py: 0,
                 px: 2,
-                backgroundColor: 'background.default',
-                borderBottom: '1px solid',
-                borderColor: 'divider',
-                width: '100%',
+                backgroundColor: "background.default",
+                borderBottom: "1px solid",
+                borderColor: "divider",
+                width: "100%",
                 margin: 0,
-                '& .MuiAccordionSummary-content': {
-                  margin: '6px 0',
+                "& .MuiAccordionSummary-content": {
+                  margin: "6px 0",
                 },
               }}
             >
               <Typography
                 sx={{
                   fontWeight: 500,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.1em',
-                  fontSize: '0.75rem',
-                  color: 'text.secondary',
+                  textTransform: "uppercase",
+                  letterSpacing: "0.1em",
+                  fontSize: "0.75rem",
+                  color: "text.secondary",
                 }}
               >
                 {section.title}
               </Typography>
             </AccordionSummary>
             <AccordionDetails sx={{ p: 2 }}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
                 {/* If this is the Utilities section, add our custom Job Status node */}
                 {/* {section.types[0] === 'UTILITY' && (
                                     <Paper
@@ -514,21 +591,25 @@ const SidebarContent: React.FC = () => {
                   <Paper
                     key={`${node.nodeId}-${methodName}`}
                     elevation={2}
-                    onDragStart={(event) => onDragStart(event, node, methodName)}
+                    onDragStart={(event) =>
+                      onDragStart(event, node, methodName)
+                    }
                     draggable
                     sx={{
                       p: 2,
-                      cursor: 'grab',
-                      '&:hover': {
-                        backgroundColor: 'action.hover',
+                      cursor: "grab",
+                      "&:hover": {
+                        backgroundColor: "action.hover",
                       },
-                      display: 'flex',
-                      flexDirection: 'column',
+                      display: "flex",
+                      flexDirection: "column",
                       gap: 1,
                     }}
                   >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography variant="subtitle1">{node.info.title}</Typography>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Typography variant="subtitle1">
+                        {node.info.title}
+                      </Typography>
                     </Box>
                     <Typography variant="body2" color="text.secondary">
                       {method.description || node.info.description}

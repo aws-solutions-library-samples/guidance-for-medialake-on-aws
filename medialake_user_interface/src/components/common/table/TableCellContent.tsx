@@ -1,49 +1,59 @@
-import React, { memo } from 'react';
-import { Box, Typography, useTheme, alpha } from '@mui/material';
-import { Theme } from '@mui/material/styles';
+import React, { memo } from "react";
+import { Box, Typography, useTheme, alpha } from "@mui/material";
+import { Theme } from "@mui/material/styles";
 
 interface TableCellContentProps {
   children: React.ReactNode;
-  variant?: 'default' | 'primary' | 'secondary';
-  wordBreak?: 'normal' | 'break-all' | 'break-word' | 'keep-all';
-  'aria-label'?: string;
+  variant?: "default" | "primary" | "secondary";
+  wordBreak?: "normal" | "break-all" | "break-word" | "keep-all";
+  "aria-label"?: string;
 }
 
-const getStyles = (theme: Theme, variant: TableCellContentProps['variant'], isDark: boolean) => {
+const getStyles = (
+  theme: Theme,
+  variant: TableCellContentProps["variant"],
+  isDark: boolean,
+) => {
   switch (variant) {
-    case 'primary':
+    case "primary":
       return {
-        color: isDark ? alpha(theme.palette.text.primary, 0.95) : theme.palette.text.primary,
+        color: isDark
+          ? alpha(theme.palette.text.primary, 0.95)
+          : theme.palette.text.primary,
         fontWeight: 500,
       };
-    case 'secondary':
+    case "secondary":
       return {
-        color: isDark ? alpha(theme.palette.text.primary, 0.7) : theme.palette.text.secondary,
+        color: isDark
+          ? alpha(theme.palette.text.primary, 0.7)
+          : theme.palette.text.secondary,
         opacity: isDark ? 1 : 0.8,
       };
     default:
       return {
-        color: isDark ? alpha(theme.palette.text.primary, 0.9) : theme.palette.text.primary,
+        color: isDark
+          ? alpha(theme.palette.text.primary, 0.9)
+          : theme.palette.text.primary,
       };
   }
 };
 
 const TableCellContentBase = ({
   children,
-  variant = 'default',
-  wordBreak = 'break-word',
-  'aria-label': ariaLabel,
+  variant = "default",
+  wordBreak = "break-word",
+  "aria-label": ariaLabel,
 }: TableCellContentProps) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
+  const isDark = theme.palette.mode === "dark";
   const styles = getStyles(theme, variant, isDark);
 
   return (
     <Box
       sx={{
-        width: '100%',
-        overflow: 'visible',
-        userSelect: 'text',
+        width: "100%",
+        overflow: "visible",
+        userSelect: "text",
       }}
       role="cell"
       aria-label={ariaLabel}
@@ -53,11 +63,11 @@ const TableCellContentBase = ({
         sx={{
           ...styles,
           wordBreak,
-          whiteSpace: 'normal',
-          width: '100%',
-          userSelect: 'text',
+          whiteSpace: "normal",
+          width: "100%",
+          userSelect: "text",
           lineHeight: 1.5,
-          letterSpacing: '0.01em',
+          letterSpacing: "0.01em",
         }}
       >
         {children}

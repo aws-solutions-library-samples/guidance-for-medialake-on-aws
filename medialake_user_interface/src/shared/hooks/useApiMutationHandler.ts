@@ -1,9 +1,9 @@
-import { useState } from 'react';
-import { UseMutationResult } from '@tanstack/react-query';
+import { useState } from "react";
+import { UseMutationResult } from "@tanstack/react-query";
 
 type ApiStatus = {
   show: boolean;
-  status: 'idle' | 'loading' | 'success' | 'error';
+  status: "idle" | "loading" | "success" | "error";
   action: string; // e.g., 'Creating User', 'Deleting Role'
   message?: string;
 };
@@ -27,20 +27,24 @@ export const useApiMutationHandler = <
 >() => {
   const [apiStatus, setApiStatus] = useState<ApiStatus>({
     show: false,
-    status: 'idle',
-    action: '',
-    message: '',
+    status: "idle",
+    action: "",
+    message: "",
   });
 
-  const handleMutation = async <TMutData = TData, TMutError = TError, TMutVariables = TVariables>(
+  const handleMutation = async <
+    TMutData = TData,
+    TMutError = TError,
+    TMutVariables = TVariables,
+  >(
     options: UseApiMutationHandlerOptions<TMutData, TMutError, TMutVariables>,
-    variables: TMutVariables
+    variables: TMutVariables,
   ) => {
     const { mutation, actionMessages, onSuccess, onError } = options;
 
     setApiStatus({
       show: true,
-      status: 'loading',
+      status: "loading",
       action: actionMessages.loading,
       message: undefined,
     });
@@ -49,9 +53,10 @@ export const useApiMutationHandler = <
       const result = await mutation.mutateAsync(variables);
       setApiStatus({
         show: true,
-        status: 'success',
+        status: "success",
         action: actionMessages.success,
-        message: actionMessages.successMessage || 'Operation completed successfully.',
+        message:
+          actionMessages.successMessage || "Operation completed successfully.",
       });
       if (onSuccess) {
         onSuccess(result);
@@ -61,26 +66,30 @@ export const useApiMutationHandler = <
       const typedError = error as TMutError; // Cast error
       console.error(`${actionMessages.error}:`, error); // Log the original error
 
-      let displayMessage = 'An unknown error occurred.';
+      let displayMessage = "An unknown error occurred.";
 
       // Check if it looks like an Axios error with a response body
-      if (typeof typedError === 'object' && typedError !== null && 'response' in typedError) {
+      if (
+        typeof typedError === "object" &&
+        typedError !== null &&
+        "response" in typedError
+      ) {
         const response = (typedError as any).response;
         if (response?.data) {
           try {
             let responseData = response.data;
             // Attempt to parse if data is a string (API Gateway sometimes does this)
-            if (typeof responseData === 'string') {
+            if (typeof responseData === "string") {
               responseData = JSON.parse(responseData);
             }
             // Check if parsed data has a message property
             if (
-              typeof responseData === 'object' &&
+              typeof responseData === "object" &&
               responseData !== null &&
-              'message' in responseData
+              "message" in responseData
             ) {
               displayMessage = responseData.message || displayMessage;
-            } else if (typeof responseData === 'string') {
+            } else if (typeof responseData === "string") {
               // If after parsing it's just a string, use that
               displayMessage = responseData;
             } else if (response?.statusText) {
@@ -88,7 +97,7 @@ export const useApiMutationHandler = <
               displayMessage = response.statusText;
             }
           } catch (parseError) {
-            console.error('Failed to parse error response data:', parseError);
+            console.error("Failed to parse error response data:", parseError);
             // Fallback if parsing fails or data is not as expected
             if (response?.statusText) {
               displayMessage = response.statusText;
@@ -109,7 +118,7 @@ export const useApiMutationHandler = <
 
       setApiStatus({
         show: true,
-        status: 'error',
+        status: "error",
         action: actionMessages.error,
         message: displayMessage, // Use the extracted or default message
       });
@@ -125,9 +134,9 @@ export const useApiMutationHandler = <
   const resetApiStatus = () => {
     setApiStatus({
       show: false,
-      status: 'idle',
-      action: '',
-      message: '',
+      status: "idle",
+      action: "",
+      message: "",
     });
   };
 

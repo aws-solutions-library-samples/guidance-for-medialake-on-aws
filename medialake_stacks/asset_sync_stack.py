@@ -18,7 +18,9 @@ from constants import DynamoDBPermissions, EnvVars
 from medialake_constructs.shared_constructs.dynamodb import (
     DynamoDB as DynamoDBConstruct,
 )
-from medialake_constructs.shared_constructs.dynamodb import DynamoDBProps
+from medialake_constructs.shared_constructs.dynamodb import (
+    DynamoDBProps,
+)
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 

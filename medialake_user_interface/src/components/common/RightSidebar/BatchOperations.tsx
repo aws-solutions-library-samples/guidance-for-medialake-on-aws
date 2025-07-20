@@ -1,5 +1,5 @@
-import React from 'react';
-import { useFeatureFlag } from '@/utils/featureFlags';
+import React from "react";
+import { useFeatureFlag } from "@/utils/featureFlags";
 import {
   Box,
   Typography,
@@ -11,11 +11,11 @@ import {
   IconButton,
   Tooltip,
   CircularProgress,
-} from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
-import DownloadIcon from '@mui/icons-material/Download';
-import ShareIcon from '@mui/icons-material/Share';
-import { useRightSidebar } from './SidebarContext';
+} from "@mui/material";
+import DeleteIcon from "@mui/icons-material/Delete";
+import DownloadIcon from "@mui/icons-material/Download";
+import ShareIcon from "@mui/icons-material/Share";
+import { useRightSidebar } from "./SidebarContext";
 
 interface BatchOperationsProps {
   selectedAssets: Array<{
@@ -43,15 +43,18 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
   const { setHasSelectedItems } = useRightSidebar();
 
   // Check if multi-select feature is enabled
-  const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
+  const multiSelectFeature = useFeatureFlag(
+    "search-multi-select-enabled",
+    false,
+  );
 
   // Update selected items state
   React.useEffect(() => {
     if (selectedAssets.length > 0) {
       console.log(
-        'BatchOperations: Setting selected items state for',
+        "BatchOperations: Setting selected items state for",
         selectedAssets.length,
-        'selected assets'
+        "selected assets",
       );
       setHasSelectedItems(true);
     } else {
@@ -69,7 +72,7 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
         acc[asset.type].push(asset);
         return acc;
       },
-      {} as Record<string, typeof selectedAssets>
+      {} as Record<string, typeof selectedAssets>,
     );
   }, [selectedAssets]);
 
@@ -79,7 +82,7 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
       onRemoveItem(assetId);
     } else if (onClearSelection) {
       // Fall back to clearing all if specific handler not provided
-      console.log('No specific item removal handler provided, clearing all');
+      console.log("No specific item removal handler provided, clearing all");
       onClearSelection();
     }
   };
@@ -90,15 +93,15 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
   }
 
   return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
       {/* Action buttons */}
       <Box
         sx={{
-          display: 'flex',
+          display: "flex",
           gap: 1.5,
           p: 2,
-          borderBottom: '1px solid',
-          borderColor: 'divider',
+          borderBottom: "1px solid",
+          borderColor: "divider",
         }}
       >
         {/* <Tooltip title="Delete selected">
@@ -116,11 +119,17 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
           <Button
             variant="outlined"
             size="small"
-            startIcon={isDownloadLoading ? <CircularProgress size={16} /> : <DownloadIcon />}
+            startIcon={
+              isDownloadLoading ? (
+                <CircularProgress size={16} />
+              ) : (
+                <DownloadIcon />
+              )
+            }
             onClick={onBatchDownload}
             disabled={isDownloadLoading}
           >
-            {isDownloadLoading ? 'Starting...' : 'Download'}
+            {isDownloadLoading ? "Starting..." : "Download"}
           </Button>
         </Tooltip>
         {/* <Tooltip title="Share selected">
@@ -136,7 +145,7 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
       </Box>
 
       {/* Selected items list */}
-      <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
+      <Box sx={{ flexGrow: 1, overflow: "auto" }}>
         {Object.entries(assetsByType).map(([type, assets]) => (
           <Box key={type}>
             <Typography
@@ -144,7 +153,7 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
               sx={{
                 px: 2,
                 py: 1,
-                bgcolor: 'background.default',
+                bgcolor: "background.default",
                 fontWeight: 600,
               }}
             >
@@ -166,15 +175,15 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
                   }
                   sx={{
                     px: 2,
-                    '&:hover': {
-                      bgcolor: 'action.hover',
+                    "&:hover": {
+                      bgcolor: "action.hover",
                     },
                   }}
                 >
                   <ListItemText
                     primary={asset.name}
                     primaryTypographyProps={{
-                      variant: 'body2',
+                      variant: "body2",
                       noWrap: true,
                       title: asset.name,
                     }}
@@ -190,9 +199,9 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
       <Box
         sx={{
           p: 2,
-          textAlign: 'center',
-          borderTop: '1px solid',
-          borderColor: 'divider',
+          textAlign: "center",
+          borderTop: "1px solid",
+          borderColor: "divider",
         }}
       >
         <Button variant="text" size="small" onClick={onClearSelection}>

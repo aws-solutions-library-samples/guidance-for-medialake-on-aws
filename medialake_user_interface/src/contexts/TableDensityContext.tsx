@@ -1,19 +1,23 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState } from "react";
 
-type TableDensityMode = 'compact' | 'normal';
+type TableDensityMode = "compact" | "normal";
 
 interface TableDensityContextType {
   mode: TableDensityMode;
   toggleMode: () => void;
 }
 
-const TableDensityContext = createContext<TableDensityContextType | undefined>(undefined);
+const TableDensityContext = createContext<TableDensityContextType | undefined>(
+  undefined,
+);
 
-export const TableDensityProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [mode, setMode] = useState<TableDensityMode>('compact');
+export const TableDensityProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  const [mode, setMode] = useState<TableDensityMode>("compact");
 
   const toggleMode = () => {
-    setMode((prevMode) => (prevMode === 'compact' ? 'normal' : 'compact'));
+    setMode((prevMode) => (prevMode === "compact" ? "normal" : "compact"));
   };
 
   return (
@@ -26,7 +30,9 @@ export const TableDensityProvider: React.FC<{ children: React.ReactNode }> = ({ 
 export const useTableDensity = () => {
   const context = useContext(TableDensityContext);
   if (context === undefined) {
-    throw new Error('useTableDensity must be used within a TableDensityProvider');
+    throw new Error(
+      "useTableDensity must be used within a TableDensityProvider",
+    );
   }
   return context;
 };

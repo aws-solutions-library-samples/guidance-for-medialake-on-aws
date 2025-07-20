@@ -1,7 +1,7 @@
 // ColumnResizer.tsx
-import React from 'react';
-import { Box, useTheme, SxProps, Theme, alpha } from '@mui/material';
-import { Header } from '@tanstack/react-table';
+import React from "react";
+import { Box, useTheme, SxProps, Theme, alpha } from "@mui/material";
+import { Header } from "@tanstack/react-table";
 
 interface ColumnResizerProps {
   header: Header<any, unknown>;
@@ -9,7 +9,11 @@ interface ColumnResizerProps {
   sx?: SxProps<Theme>;
 }
 
-export const ColumnResizer: React.FC<ColumnResizerProps> = ({ header, className, sx = {} }) => {
+export const ColumnResizer: React.FC<ColumnResizerProps> = ({
+  header,
+  className,
+  sx = {},
+}) => {
   const theme = useTheme();
 
   return (
@@ -18,27 +22,27 @@ export const ColumnResizer: React.FC<ColumnResizerProps> = ({ header, className,
       onMouseDown={header.getResizeHandler()}
       onTouchStart={header.getResizeHandler()}
       sx={{
-        position: 'absolute',
+        position: "absolute",
         right: -2,
         top: 0,
-        height: '100%',
+        height: "100%",
         width: 4,
-        cursor: 'col-resize',
-        userSelect: 'none',
-        touchAction: 'none',
-        '&::after': {
+        cursor: "col-resize",
+        userSelect: "none",
+        touchAction: "none",
+        "&::after": {
           content: '""',
-          position: 'absolute',
+          position: "absolute",
           right: 1,
           top: 0,
           width: 2,
-          height: '100%',
+          height: "100%",
           backgroundColor: header.column.getIsResizing()
             ? theme.palette.primary.main
             : alpha(theme.palette.divider, 0.2),
-          transition: 'background-color 0.2s ease',
+          transition: "background-color 0.2s ease",
         },
-        '&:hover::after': {
+        "&:hover::after": {
           backgroundColor: theme.palette.primary.main,
         },
         zIndex: 1,

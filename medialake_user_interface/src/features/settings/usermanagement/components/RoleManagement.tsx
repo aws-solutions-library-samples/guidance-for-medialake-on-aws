@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Paper,
   Typography,
@@ -16,10 +16,10 @@ import {
   Chip,
   Box,
   Tooltip,
-} from '@mui/material';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import AddIcon from '@mui/icons-material/Add';
+} from "@mui/material";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
+import AddIcon from "@mui/icons-material/Add";
 
 export interface Role {
   id: string;
@@ -30,7 +30,7 @@ export interface Role {
 
 interface RoleManagementProps {
   roles: Role[];
-  onAddRole: (role: Omit<Role, 'id'>) => void;
+  onAddRole: (role: Omit<Role, "id">) => void;
   onEditRole: (role: Role) => void;
   onDeleteRole: (roleId: string) => void;
 }
@@ -43,9 +43,9 @@ const RoleManagement: React.FC<RoleManagementProps> = ({
 }) => {
   const [openDialog, setOpenDialog] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
-  const [formData, setFormData] = useState<Omit<Role, 'id'>>({
-    name: '',
-    description: '',
+  const [formData, setFormData] = useState<Omit<Role, "id">>({
+    name: "",
+    description: "",
     permissions: [],
   });
 
@@ -60,8 +60,8 @@ const RoleManagement: React.FC<RoleManagementProps> = ({
     } else {
       setEditingRole(null);
       setFormData({
-        name: '',
-        description: '',
+        name: "",
+        description: "",
         permissions: [],
       });
     }
@@ -72,8 +72,8 @@ const RoleManagement: React.FC<RoleManagementProps> = ({
     setOpenDialog(false);
     setEditingRole(null);
     setFormData({
-      name: '',
-      description: '',
+      name: "",
+      description: "",
       permissions: [],
     });
   };
@@ -108,9 +108,9 @@ const RoleManagement: React.FC<RoleManagementProps> = ({
     <Paper sx={{ p: 3, mt: 3 }}>
       <Box
         sx={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
           mb: 2,
         }}
       >
@@ -130,8 +130,8 @@ const RoleManagement: React.FC<RoleManagementProps> = ({
           <ListItem
             key={role.id}
             sx={{
-              border: '1px solid',
-              borderColor: 'divider',
+              border: "1px solid",
+              borderColor: "divider",
               borderRadius: 1,
               mb: 1,
             }}
@@ -143,9 +143,16 @@ const RoleManagement: React.FC<RoleManagementProps> = ({
                   <Typography variant="body2" color="text.secondary">
                     {role.description}
                   </Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
+                  <Box
+                    sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mt: 1 }}
+                  >
                     {role.permissions.map((permission) => (
-                      <Chip key={permission} label={permission} size="small" variant="outlined" />
+                      <Chip
+                        key={permission}
+                        label={permission}
+                        size="small"
+                        variant="outlined"
+                      />
                     ))}
                   </Box>
                 </Box>
@@ -153,12 +160,20 @@ const RoleManagement: React.FC<RoleManagementProps> = ({
             />
             <ListItemSecondaryAction>
               <Tooltip title="Edit Role">
-                <IconButton edge="end" onClick={() => handleOpenDialog(role)} sx={{ mr: 1 }}>
+                <IconButton
+                  edge="end"
+                  onClick={() => handleOpenDialog(role)}
+                  sx={{ mr: 1 }}
+                >
                   <EditIcon />
                 </IconButton>
               </Tooltip>
               <Tooltip title="Delete Role">
-                <IconButton edge="end" onClick={() => onDeleteRole(role.id)} color="error">
+                <IconButton
+                  edge="end"
+                  onClick={() => onDeleteRole(role.id)}
+                  color="error"
+                >
                   <DeleteIcon />
                 </IconButton>
               </Tooltip>
@@ -167,22 +182,35 @@ const RoleManagement: React.FC<RoleManagementProps> = ({
         ))}
       </List>
 
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
+      <Dialog
+        open={openDialog}
+        onClose={handleCloseDialog}
+        maxWidth="sm"
+        fullWidth
+      >
         <form onSubmit={handleSubmit}>
-          <DialogTitle>{editingRole ? 'Edit Role' : 'Add New Role'}</DialogTitle>
+          <DialogTitle>
+            {editingRole ? "Edit Role" : "Add New Role"}
+          </DialogTitle>
           <DialogContent>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
+            <Box
+              sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}
+            >
               <TextField
                 label="Role Name"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
                 required
                 fullWidth
               />
               <TextField
                 label="Description"
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
                 multiline
                 rows={2}
                 fullWidth
@@ -191,7 +219,7 @@ const RoleManagement: React.FC<RoleManagementProps> = ({
                 <Typography variant="subtitle2" gutterBottom>
                   Permissions
                 </Typography>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
                   {formData.permissions.map((permission) => (
                     <Chip
                       key={permission}
@@ -207,10 +235,10 @@ const RoleManagement: React.FC<RoleManagementProps> = ({
                   fullWidth
                   sx={{ mt: 1 }}
                   onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
+                    if (e.key === "Enter") {
                       e.preventDefault();
                       handlePermissionAdd((e.target as HTMLInputElement).value);
-                      (e.target as HTMLInputElement).value = '';
+                      (e.target as HTMLInputElement).value = "";
                     }
                   }}
                 />
@@ -220,7 +248,7 @@ const RoleManagement: React.FC<RoleManagementProps> = ({
           <DialogActions>
             <Button onClick={handleCloseDialog}>Cancel</Button>
             <Button type="submit" variant="contained" color="primary">
-              {editingRole ? 'Save Changes' : 'Add Role'}
+              {editingRole ? "Save Changes" : "Add Role"}
             </Button>
           </DialogActions>
         </form>

@@ -101,7 +101,6 @@ def get_cognito_jwks() -> Dict[str, Any]:
     Returns:
         JWKS dictionary containing the public keys
     """
-    global jwks_cache
     current_time = time.time()
 
     # Return cached JWKS if still valid

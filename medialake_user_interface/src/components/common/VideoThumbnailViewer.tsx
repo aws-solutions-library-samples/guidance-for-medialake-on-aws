@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { OmakasePlayer } from '@byomakase/omakase-player';
-import './VideoThumbnailViewer.css';
+import React, { useEffect, useRef, useState } from "react";
+import { OmakasePlayer } from "@byomakase/omakase-player";
+import "./VideoThumbnailViewer.css";
 
 interface VideoThumbnailViewerProps {
   videoSrc: string;
@@ -18,7 +18,7 @@ export const VideoThumbnailViewer: React.FC<VideoThumbnailViewerProps> = ({
     if (!player && playerContainerRef.current) {
       const newPlayer = new OmakasePlayer({
         playerHTMLElementId: playerContainerRef.current.id,
-        mediaChrome: 'enabled',
+        mediaChrome: "enabled",
       });
       setPlayer(newPlayer);
     }
@@ -38,14 +38,14 @@ export const VideoThumbnailViewer: React.FC<VideoThumbnailViewerProps> = ({
       player.loadVideo(videoSrc, 25).subscribe({
         next: (video) => {
           console.log(
-            `Video loaded. Duration: ${video.duration}, totalFrames: ${video.totalFrames}`
+            `Video loaded. Duration: ${video.duration}, totalFrames: ${video.totalFrames}`,
           );
         },
         error: (error) => {
-          console.error('Error loading video:', error);
+          console.error("Error loading video:", error);
         },
         complete: () => {
-          console.log('Video loading completed');
+          console.log("Video loading completed");
         },
       }),
       player.video.onPlay$.subscribe({

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Controller, Control, FieldValues, Path } from 'react-hook-form';
+import React from "react";
+import { Controller, Control, FieldValues, Path } from "react-hook-form";
 import {
   FormControlLabel,
   Switch,
@@ -9,9 +9,9 @@ import {
   Tooltip,
   IconButton,
   Box,
-} from '@mui/material';
-import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
-import { useTranslation } from 'react-i18next';
+} from "@mui/material";
+import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
+import { useTranslation } from "react-i18next";
 
 export type FormSwitchProps<T extends FieldValues> = {
   name: Path<T>;
@@ -20,7 +20,7 @@ export type FormSwitchProps<T extends FieldValues> = {
   tooltip?: string;
   translationPrefix?: string;
   showHelper?: boolean;
-} & Omit<SwitchProps, 'name' | 'value' | 'onChange'>;
+} & Omit<SwitchProps, "name" | "value" | "onChange">;
 
 export const FormSwitch = <T extends FieldValues>({
   name,
@@ -45,7 +45,7 @@ export const FormSwitch = <T extends FieldValues>({
 
   const translatedHelperText =
     translationPrefix && showHelper
-      ? t(`${translationPrefix}.fields.${name}.helper`, '')
+      ? t(`${translationPrefix}.fields.${name}.helper`, "")
       : undefined;
 
   return (
@@ -54,7 +54,7 @@ export const FormSwitch = <T extends FieldValues>({
       control={control}
       render={({ field: { onChange, value, ref }, fieldState: { error } }) => (
         <FormControl error={!!error}>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Box sx={{ display: "flex", alignItems: "center" }}>
             <FormControlLabel
               control={
                 <Switch
@@ -70,7 +70,7 @@ export const FormSwitch = <T extends FieldValues>({
               <Tooltip title={translatedTooltip} arrow>
                 <IconButton
                   size="small"
-                  aria-label={t('common.moreInfo', 'More information')}
+                  aria-label={t("common.moreInfo", "More information")}
                   tabIndex={-1}
                   sx={{ ml: 0.5 }}
                 >
@@ -83,7 +83,10 @@ export const FormSwitch = <T extends FieldValues>({
             <FormHelperText>
               {error
                 ? translationPrefix
-                  ? t(`${translationPrefix}.errors.${error.type}`, error.message || '')
+                  ? t(
+                      `${translationPrefix}.errors.${error.type}`,
+                      error.message || "",
+                    )
                   : error.message
                 : translatedHelperText}
             </FormHelperText>

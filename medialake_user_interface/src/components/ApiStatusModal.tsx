@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -7,15 +7,15 @@ import {
   Box,
   useTheme,
   IconButton,
-} from '@mui/material';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import ErrorIcon from '@mui/icons-material/Error';
-import CloseIcon from '@mui/icons-material/Close';
+} from "@mui/material";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import ErrorIcon from "@mui/icons-material/Error";
+import CloseIcon from "@mui/icons-material/Close";
 
 interface ApiStatusModalProps {
   open: boolean;
   onClose?: () => void;
-  status: 'loading' | 'success' | 'error';
+  status: "loading" | "success" | "error";
   action: string;
   message?: string;
 }
@@ -31,7 +31,7 @@ const ApiStatusModal: React.FC<ApiStatusModalProps> = ({
 
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
-    if (open && status === 'success' && onClose) {
+    if (open && status === "success" && onClose) {
       timeoutId = setTimeout(() => {
         onClose();
       }, 3000);
@@ -45,38 +45,51 @@ const ApiStatusModal: React.FC<ApiStatusModalProps> = ({
 
   const getStatusContent = () => {
     switch (status) {
-      case 'loading':
+      case "loading":
         return (
           <>
-            <CircularProgress size={48} sx={{ mb: 2, color: theme.palette.primary.main }} />
+            <CircularProgress
+              size={48}
+              sx={{ mb: 2, color: theme.palette.primary.main }}
+            />
             <Typography variant="h6" sx={{ color: theme.palette.text.primary }}>
               {action}
             </Typography>
           </>
         );
-      case 'success':
+      case "success":
         return (
           <>
-            <CheckCircleIcon sx={{ fontSize: 48, mb: 2, color: theme.palette.success.main }} />
+            <CheckCircleIcon
+              sx={{ fontSize: 48, mb: 2, color: theme.palette.success.main }}
+            />
             <Typography variant="h6" sx={{ color: theme.palette.text.primary }}>
               {action}
             </Typography>
             {message && (
-              <Typography variant="body1" sx={{ mt: 1, color: theme.palette.text.secondary }}>
+              <Typography
+                variant="body1"
+                sx={{ mt: 1, color: theme.palette.text.secondary }}
+              >
                 {message}
               </Typography>
             )}
           </>
         );
-      case 'error':
+      case "error":
         return (
           <>
-            <ErrorIcon sx={{ fontSize: 48, mb: 2, color: theme.palette.error.main }} />
+            <ErrorIcon
+              sx={{ fontSize: 48, mb: 2, color: theme.palette.error.main }}
+            />
             <Typography variant="h6" sx={{ color: theme.palette.text.primary }}>
               {action}
             </Typography>
             {message && (
-              <Typography variant="body1" sx={{ mt: 1, color: theme.palette.error.main }}>
+              <Typography
+                variant="body1"
+                sx={{ mt: 1, color: theme.palette.error.main }}
+              >
                 {message}
               </Typography>
             )}
@@ -88,7 +101,7 @@ const ApiStatusModal: React.FC<ApiStatusModalProps> = ({
   return (
     <Dialog
       open={open}
-      onClose={status === 'loading' ? undefined : onClose}
+      onClose={status === "loading" ? undefined : onClose}
       maxWidth="xs"
       fullWidth
       PaperProps={{
@@ -98,11 +111,11 @@ const ApiStatusModal: React.FC<ApiStatusModalProps> = ({
         },
       }}
     >
-      {status !== 'loading' && onClose && (
+      {status !== "loading" && onClose && (
         <IconButton
           onClick={onClose}
           sx={{
-            position: 'absolute',
+            position: "absolute",
             right: 8,
             top: 8,
             color: theme.palette.grey[500],
@@ -114,10 +127,10 @@ const ApiStatusModal: React.FC<ApiStatusModalProps> = ({
       <DialogContent>
         <Box
           sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            textAlign: 'center',
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            textAlign: "center",
             py: 2,
           }}
         >

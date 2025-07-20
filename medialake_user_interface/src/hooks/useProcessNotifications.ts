@@ -1,10 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef } from "react";
 
 interface UseProcessNotificationsProps {
   processId: string | null;
-  processType: 'bulk-download' | 'upload' | 'processing' | string;
+  processType: "bulk-download" | "upload" | "processing" | string;
   status?: {
-    status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | string;
+    status: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "FAILED" | string;
     progress?: number;
     error?: string;
     downloadUrl?: string;
@@ -13,7 +13,7 @@ interface UseProcessNotificationsProps {
   onCompleted?: (result: any) => void;
   addNotification?: (notification: {
     message: string;
-    type?: 'sticky' | 'sticky-dismissible' | 'dismissible';
+    type?: "sticky" | "sticky-dismissible" | "dismissible";
     actionText?: string;
     onAction?: () => void;
     autoCloseMs?: number;
@@ -50,45 +50,45 @@ export const useProcessNotifications = ({
     // Generate messages based on process type
     const getMessages = () => {
       switch (processType) {
-        case 'bulk-download':
+        case "bulk-download":
           return {
-            pending: 'Preparing your bulk download...',
+            pending: "Preparing your bulk download...",
             inProgress: `Creating download archive${
-              status.progress ? ` (${Math.round(status.progress)}%)` : ''
+              status.progress ? ` (${Math.round(status.progress)}%)` : ""
             }...`,
-            completed: 'Your download is ready!',
-            failed: `Download failed: ${status.error || 'Unknown error'}`,
-            actionText: 'Download',
+            completed: "Your download is ready!",
+            failed: `Download failed: ${status.error || "Unknown error"}`,
+            actionText: "Download",
           };
-        case 'upload':
+        case "upload":
           return {
-            pending: 'Preparing upload...',
+            pending: "Preparing upload...",
             inProgress: `Uploading files${
-              status.progress ? ` (${Math.round(status.progress)}%)` : ''
+              status.progress ? ` (${Math.round(status.progress)}%)` : ""
             }...`,
-            completed: 'Upload completed successfully!',
-            failed: `Upload failed: ${status.error || 'Unknown error'}`,
-            actionText: 'View',
+            completed: "Upload completed successfully!",
+            failed: `Upload failed: ${status.error || "Unknown error"}`,
+            actionText: "View",
           };
-        case 'processing':
+        case "processing":
           return {
-            pending: 'Processing started...',
+            pending: "Processing started...",
             inProgress: `Processing${
-              status.progress ? ` (${Math.round(status.progress)}%)` : ''
+              status.progress ? ` (${Math.round(status.progress)}%)` : ""
             }...`,
-            completed: 'Processing completed!',
-            failed: `Processing failed: ${status.error || 'Unknown error'}`,
-            actionText: 'View Results',
+            completed: "Processing completed!",
+            failed: `Processing failed: ${status.error || "Unknown error"}`,
+            actionText: "View Results",
           };
         default:
           return {
             pending: `${processType} started...`,
             inProgress: `${processType} in progress${
-              status.progress ? ` (${Math.round(status.progress)}%)` : ''
+              status.progress ? ` (${Math.round(status.progress)}%)` : ""
             }...`,
             completed: `${processType} completed!`,
-            failed: `${processType} failed: ${status.error || 'Unknown error'}`,
-            actionText: 'View',
+            failed: `${processType} failed: ${status.error || "Unknown error"}`,
+            actionText: "View",
           };
       }
     };
@@ -96,31 +96,31 @@ export const useProcessNotifications = ({
     const messages = getMessages();
 
     switch (currentStatus) {
-      case 'PENDING':
+      case "PENDING":
         notificationIdRef.current = addNotification({
           message: messages.pending,
-          type: 'sticky',
+          type: "sticky",
         });
         break;
 
-      case 'IN_PROGRESS':
+      case "IN_PROGRESS":
         notificationIdRef.current = addNotification({
           message: messages.inProgress,
-          type: 'sticky',
+          type: "sticky",
         });
         break;
 
-      case 'COMPLETED':
+      case "COMPLETED":
         notificationIdRef.current = addNotification({
           message: messages.completed,
-          type: 'sticky-dismissible',
+          type: "sticky-dismissible",
           actionText: messages.actionText,
           onAction: () => {
             if (onCompleted) {
               onCompleted(status);
-            } else if (processType === 'bulk-download' && status.downloadUrl) {
+            } else if (processType === "bulk-download" && status.downloadUrl) {
               // Default download behavior for bulk downloads
-              const link = document.createElement('a');
+              const link = document.createElement("a");
               link.href = status.downloadUrl;
               link.download = `${processType}-${processId}.zip`;
               document.body.appendChild(link);
@@ -137,15 +137,22 @@ export const useProcessNotifications = ({
         });
         break;
 
-      case 'FAILED':
+      case "FAILED":
         notificationIdRef.current = addNotification({
           message: messages.failed,
-          type: 'dismissible',
+          type: "dismissible",
           autoCloseMs: 10000,
         });
         break;
     }
-  }, [status, processId, processType, addNotification, dismissNotification, onCompleted]);
+  }, [
+    status,
+    processId,
+    processType,
+    addNotification,
+    dismissNotification,
+    onCompleted,
+  ]);
 
   // Cleanup notification when component unmounts or processId changes
   useEffect(() => {
@@ -158,6 +165,8 @@ export const useProcessNotifications = ({
 
   return {
     isProcessInProgress:
-      !!processId && status?.status !== 'COMPLETED' && status?.status !== 'FAILED',
+      !!processId &&
+      status?.status !== "COMPLETED" &&
+      status?.status !== "FAILED",
   };
 };

@@ -1,10 +1,10 @@
 export interface Environment {
   environment_id: string;
   name: string;
-  status: 'active' | 'disabled';
+  status: "active" | "disabled";
   region: string;
   tags: {
-    'cost-center': string;
+    "cost-center": string;
     team: string;
     [key: string]: string;
   };
@@ -15,9 +15,9 @@ export interface Environment {
 export interface EnvironmentCreate {
   name: string;
   region: string;
-  status?: 'active' | 'disabled';
+  status?: "active" | "disabled";
   tags: {
-    'cost-center': string;
+    "cost-center": string;
     team: string;
     [key: string]: string;
   };
@@ -25,10 +25,10 @@ export interface EnvironmentCreate {
 
 export interface EnvironmentUpdate {
   name?: string;
-  status?: 'active' | 'disabled';
+  status?: "active" | "disabled";
   region?: string;
   tags?: {
-    'cost-center': string;
+    "cost-center": string;
     team: string;
     [key: string]: string;
   };

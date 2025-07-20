@@ -4,17 +4,22 @@ import {
   useQueryClient,
   type UseQueryOptions,
   type UseMutationOptions,
-} from '@tanstack/react-query';
-import { apiClient } from '../../apiClient';
-import { logger } from '@/common/helpers/logger';
-import { useErrorModal } from '@/hooks/useErrorModal';
-import type { ApiResponse } from '../../types/api.types';
+} from "@tanstack/react-query";
+import { apiClient } from "../../apiClient";
+import { logger } from "@/common/helpers/logger";
+import { useErrorModal } from "@/hooks/useErrorModal";
+import type { ApiResponse } from "../../types/api.types";
 
 export const createQueryHook = <TData, TError = Error>(
   endpoint: string,
-  queryKey: readonly unknown[]
+  queryKey: readonly unknown[],
 ) => {
-  return (options?: Omit<UseQueryOptions<ApiResponse<TData>, TError>, 'queryKey' | 'queryFn'>) => {
+  return (
+    options?: Omit<
+      UseQueryOptions<ApiResponse<TData>, TError>,
+      "queryKey" | "queryFn"
+    >,
+  ) => {
     const { showError } = useErrorModal();
 
     return useQuery({
@@ -38,16 +43,21 @@ export const createQueryHook = <TData, TError = Error>(
 
 export const createMutationHook = <TData, TVariables>(
   endpoint: string,
-  queryKey: readonly unknown[]
+  queryKey: readonly unknown[],
 ) => {
-  return (options?: UseMutationOptions<ApiResponse<TData>, Error, TVariables>) => {
+  return (
+    options?: UseMutationOptions<ApiResponse<TData>, Error, TVariables>,
+  ) => {
     const queryClient = useQueryClient();
     const { showError } = useErrorModal();
 
     return useMutation({
       mutationFn: async (variables) => {
         try {
-          const response = await apiClient.post<ApiResponse<TData>>(endpoint, variables);
+          const response = await apiClient.post<ApiResponse<TData>>(
+            endpoint,
+            variables,
+          );
           return response.data;
         } catch (error) {
           logger.error(`Mutation error for ${endpoint}:`, error);

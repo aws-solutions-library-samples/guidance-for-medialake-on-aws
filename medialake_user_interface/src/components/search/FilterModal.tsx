@@ -1,6 +1,10 @@
-import React from 'react';
-import { FacetFilters } from '../../types/facetSearch';
-import { useFilterModalOpen, useFilterModalDraft, useUIActions } from '../../stores/searchStore';
+import React from "react";
+import { FacetFilters } from "../../types/facetSearch";
+import {
+  useFilterModalOpen,
+  useFilterModalDraft,
+  useUIActions,
+} from "../../stores/searchStore";
 import {
   Box,
   Dialog,
@@ -18,10 +22,10 @@ import {
   useTheme,
   ToggleButton,
   ToggleButtonGroup,
-} from '@mui/material';
-import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+} from "@mui/material";
+import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import {
   Close as CloseIcon,
   ImageOutlined as ImageIcon,
@@ -29,42 +33,42 @@ import {
   AudiotrackOutlined as AudioIcon,
   AspectRatioOutlined as SizeIcon,
   DateRangeOutlined as DateIcon,
-} from '@mui/icons-material';
-import { useTranslation } from 'react-i18next';
-import { subDays } from 'date-fns';
+} from "@mui/icons-material";
+import { useTranslation } from "react-i18next";
+import { subDays } from "date-fns";
 
 // File size units for conversion
 const FILE_SIZE_UNITS = [
-  { value: 1, label: 'B' },
-  { value: 1024, label: 'KB' },
-  { value: 1024 * 1024, label: 'MB' },
-  { value: 1024 * 1024 * 1024, label: 'GB' },
+  { value: 1, label: "B" },
+  { value: 1024, label: "KB" },
+  { value: 1024 * 1024, label: "MB" },
+  { value: 1024 * 1024 * 1024, label: "GB" },
 ];
 
 // Date range options
 const DATE_RANGE_OPTIONS = [
-  { value: '24h', label: 'Last 24 hours' },
-  { value: '7d', label: 'Last 7 days' },
-  { value: '14d', label: 'Last 14 days' },
-  { value: '30d', label: 'Last 30 days' },
+  { value: "24h", label: "Last 24 hours" },
+  { value: "7d", label: "Last 7 days" },
+  { value: "14d", label: "Last 14 days" },
+  { value: "30d", label: "Last 30 days" },
 ];
 
 // Media types with their associated extensions
 const MEDIA_TYPES = [
   {
-    key: 'Image',
+    key: "Image",
     icon: <ImageIcon />,
-    extensions: ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'tiff'],
+    extensions: ["jpg", "jpeg", "png", "gif", "svg", "webp", "tiff"],
   },
   {
-    key: 'Video',
+    key: "Video",
     icon: <VideoIcon />,
-    extensions: ['mp4', 'mov', 'avi', 'wmv', 'flv', 'webm', 'mkv'],
+    extensions: ["mp4", "mov", "avi", "wmv", "flv", "webm", "mkv"],
   },
   {
-    key: 'Audio',
+    key: "Audio",
     icon: <AudioIcon />,
-    extensions: ['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a'],
+    extensions: ["mp3", "wav", "ogg", "flac", "aac", "m4a"],
   },
 ];
 
@@ -84,8 +88,12 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
   // Use store state and actions
   const isOpen = useFilterModalOpen();
   const draft = useFilterModalDraft();
-  const { closeFilterModal, updateFilterModalDraft, applyFilterModalDraft, resetFilterModalDraft } =
-    useUIActions();
+  const {
+    closeFilterModal,
+    updateFilterModalDraft,
+    applyFilterModalDraft,
+    resetFilterModalDraft,
+  } = useUIActions();
 
   // Destructure draft state for easier access
   const {
@@ -136,16 +144,16 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
     let newStartDate: Date | null = null;
     let newEndDate: Date | null = null;
 
-    if (value === '24h') {
+    if (value === "24h") {
       newStartDate = subDays(now, 1);
       newEndDate = now;
-    } else if (value === '7d') {
+    } else if (value === "7d") {
       newStartDate = subDays(now, 7);
       newEndDate = now;
-    } else if (value === '14d') {
+    } else if (value === "14d") {
       newStartDate = subDays(now, 14);
       newEndDate = now;
-    } else if (value === '30d') {
+    } else if (value === "30d") {
       newStartDate = subDays(now, 30);
       newEndDate = now;
     }
@@ -169,20 +177,27 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
       PaperProps={{
         sx: {
           borderRadius: 2,
-          maxHeight: '80vh',
+          maxHeight: "80vh",
         },
       }}
     >
       <DialogTitle
         sx={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
           pb: 1,
         }}
       >
-        <Typography variant="h6">{t('search.filters.title', 'Filter Results')}</Typography>
-        <IconButton edge="end" color="inherit" onClick={handleClose} aria-label="close">
+        <Typography variant="h6">
+          {t("search.filters.title", "Filter Results")}
+        </Typography>
+        <IconButton
+          edge="end"
+          color="inherit"
+          onClick={handleClose}
+          aria-label="close"
+        >
           <CloseIcon />
         </IconButton>
       </DialogTitle>
@@ -190,15 +205,18 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
       <Divider />
 
       <DialogContent sx={{ p: 2 }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
           {/* Media Type and Extensions Section */}
           <Box>
             <Typography
               variant="subtitle1"
               fontWeight="medium"
-              sx={{ mb: 1.5, display: 'flex', alignItems: 'center' }}
+              sx={{ mb: 1.5, display: "flex", alignItems: "center" }}
             >
-              <Box component="span" sx={{ mr: 1, display: 'flex', alignItems: 'center' }}>
+              <Box
+                component="span"
+                sx={{ mr: 1, display: "flex", alignItems: "center" }}
+              >
                 <ImageIcon fontSize="small" />
               </Box>
               Media Type and Extensions
@@ -206,8 +224,11 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
 
             {/* Media Types with Extensions */}
             {MEDIA_TYPES.map((mediaType) => (
-              <Box key={mediaType.key} sx={{ mb: 1.5, display: 'flex', flexDirection: 'column' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Box
+                key={mediaType.key}
+                sx={{ mb: 1.5, display: "flex", flexDirection: "column" }}
+              >
+                <Box sx={{ display: "flex", alignItems: "center" }}>
                   {/* Media Type Button */}
                   <ToggleButton
                     value={mediaType.key}
@@ -217,19 +238,19 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
                     size="small"
                     color="primary"
                     sx={{
-                      textTransform: 'none',
-                      minWidth: '80px',
-                      display: 'flex',
+                      textTransform: "none",
+                      minWidth: "80px",
+                      display: "flex",
                       gap: 0.5,
                       px: 1.5,
                       py: 0.5,
-                      borderRadius: '4px',
+                      borderRadius: "4px",
                       mr: 1,
-                      '&.Mui-selected': {
-                        backgroundColor: '#1a4971',
-                        color: '#ffffff',
-                        '&:hover': {
-                          backgroundColor: '#153d61',
+                      "&.Mui-selected": {
+                        backgroundColor: "#1a4971",
+                        color: "#ffffff",
+                        "&:hover": {
+                          backgroundColor: "#153d61",
                         },
                       },
                     }}
@@ -239,7 +260,9 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
                   </ToggleButton>
 
                   {/* Extensions */}
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, ml: 1 }}>
+                  <Box
+                    sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, ml: 1 }}
+                  >
                     {mediaType.extensions.map((ext) => {
                       const isSelected = selectedExtensions.includes(ext);
 
@@ -247,17 +270,17 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
                         <Button
                           key={ext}
                           size="small"
-                          variant={isSelected ? 'contained' : 'outlined'}
-                          color={isSelected ? 'primary' : 'inherit'}
+                          variant={isSelected ? "contained" : "outlined"}
+                          color={isSelected ? "primary" : "inherit"}
                           onClick={() => handleExtensionToggle(ext)}
                           sx={{
-                            minWidth: '60px',
-                            height: '28px',
-                            fontSize: '0.75rem',
-                            textTransform: 'uppercase',
+                            minWidth: "60px",
+                            height: "28px",
+                            fontSize: "0.75rem",
+                            textTransform: "uppercase",
                             py: 0,
                             px: 1,
-                            borderRadius: '14px',
+                            borderRadius: "14px",
                             mb: 0.5,
                             opacity: 1,
                           }}
@@ -276,30 +299,34 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
 
           {/* File Size Section */}
           <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
               <Typography
                 variant="subtitle1"
                 fontWeight="medium"
-                sx={{ display: 'flex', alignItems: 'center' }}
+                sx={{ display: "flex", alignItems: "center" }}
               >
-                <Box component="span" sx={{ mr: 1, display: 'flex', alignItems: 'center' }}>
+                <Box
+                  component="span"
+                  sx={{ mr: 1, display: "flex", alignItems: "center" }}
+                >
                   <SizeIcon fontSize="small" />
                 </Box>
                 File Size
               </Typography>
 
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                 <TextField
                   type="number"
                   size="small"
                   value={minSizeValue}
                   onChange={(e) => {
-                    const newValue = e.target.value === '' ? '' : Number(e.target.value);
+                    const newValue =
+                      e.target.value === "" ? "" : Number(e.target.value);
                     updateFilterModalDraft({ minSizeValue: newValue });
                   }}
                   inputProps={{ min: 0 }}
-                  placeholder={t('search.filters.minSize', 'Min')}
-                  sx={{ width: '80px' }}
+                  placeholder={t("search.filters.minSize", "Min")}
+                  sx={{ width: "80px" }}
                 />
 
                 <Typography variant="body2" sx={{ mx: 0.5 }}>
@@ -311,15 +338,16 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
                   size="small"
                   value={maxSizeValue}
                   onChange={(e) => {
-                    const newValue = e.target.value === '' ? '' : Number(e.target.value);
+                    const newValue =
+                      e.target.value === "" ? "" : Number(e.target.value);
                     updateFilterModalDraft({ maxSizeValue: newValue });
                   }}
                   inputProps={{ min: 0 }}
-                  placeholder={t('search.filters.maxSize', 'Max')}
-                  sx={{ width: '80px' }}
+                  placeholder={t("search.filters.maxSize", "Max")}
+                  sx={{ width: "80px" }}
                 />
 
-                <FormControl size="small" sx={{ width: '70px', ml: 0.5 }}>
+                <FormControl size="small" sx={{ width: "70px", ml: 0.5 }}>
                   <Select
                     value={sizeUnit}
                     onChange={(e) => {
@@ -344,13 +372,16 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
 
           {/* Date Created Section */}
           <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
+            <Box sx={{ display: "flex", alignItems: "center", mb: 1.5 }}>
               <Typography
                 variant="subtitle1"
                 fontWeight="medium"
-                sx={{ display: 'flex', alignItems: 'center', mr: 2 }}
+                sx={{ display: "flex", alignItems: "center", mr: 2 }}
               >
-                <Box component="span" sx={{ mr: 1, display: 'flex', alignItems: 'center' }}>
+                <Box
+                  component="span"
+                  sx={{ mr: 1, display: "flex", alignItems: "center" }}
+                >
                   <DateIcon fontSize="small" />
                 </Box>
                 Date Created
@@ -363,12 +394,12 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
                 onChange={(e, newValue) => handleDateRangeChange(newValue)}
                 size="small"
                 sx={{
-                  '& .MuiToggleButton-root': {
-                    textTransform: 'none',
+                  "& .MuiToggleButton-root": {
+                    textTransform: "none",
                     px: 1.5,
                     py: 0.5,
-                    fontSize: '0.8125rem',
-                    borderRadius: '4px',
+                    fontSize: "0.8125rem",
+                    borderRadius: "4px",
                     mr: 0.5,
                   },
                 }}
@@ -383,10 +414,13 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
 
             {/* Date pickers */}
             <LocalizationProvider dateAdapter={AdapterDateFns}>
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                <Box sx={{ flex: 1, minWidth: '140px' }}>
-                  <Typography variant="body2" sx={{ mb: 0.5, fontSize: '0.75rem' }}>
-                    {t('search.filters.fromDate', 'From Date & Time')}
+              <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                <Box sx={{ flex: 1, minWidth: "140px" }}>
+                  <Typography
+                    variant="body2"
+                    sx={{ mb: 0.5, fontSize: "0.75rem" }}
+                  >
+                    {t("search.filters.fromDate", "From Date & Time")}
                   </Typography>
                   <DateTimePicker
                     value={startDate}
@@ -398,23 +432,24 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
                     closeOnSelect={false}
                     slotProps={{
                       textField: {
-                        size: 'small',
+                        size: "small",
                         fullWidth: true,
                         InputProps: {
                           sx: {
-                            '&.Mui-disabled': {
-                              backgroundColor: theme.palette.action.disabledBackground,
+                            "&.Mui-disabled": {
+                              backgroundColor:
+                                theme.palette.action.disabledBackground,
                               opacity: 0.8,
                             },
                           },
                         },
                       },
                       actionBar: {
-                        actions: ['clear', 'today', 'accept'],
+                        actions: ["clear", "today", "accept"],
                       },
                       layout: {
                         sx: {
-                          '& .MuiPickersLayout-contentWrapper': {
+                          "& .MuiPickersLayout-contentWrapper": {
                             backgroundColor: theme.palette.background.paper,
                           },
                         },
@@ -423,9 +458,12 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
                   />
                 </Box>
 
-                <Box sx={{ flex: 1, minWidth: '140px' }}>
-                  <Typography variant="body2" sx={{ mb: 0.5, fontSize: '0.75rem' }}>
-                    {t('search.filters.toDate', 'To Date & Time')}
+                <Box sx={{ flex: 1, minWidth: "140px" }}>
+                  <Typography
+                    variant="body2"
+                    sx={{ mb: 0.5, fontSize: "0.75rem" }}
+                  >
+                    {t("search.filters.toDate", "To Date & Time")}
                   </Typography>
                   <DateTimePicker
                     value={endDate}
@@ -437,23 +475,24 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
                     closeOnSelect={false}
                     slotProps={{
                       textField: {
-                        size: 'small',
+                        size: "small",
                         fullWidth: true,
                         InputProps: {
                           sx: {
-                            '&.Mui-disabled': {
-                              backgroundColor: theme.palette.action.disabledBackground,
+                            "&.Mui-disabled": {
+                              backgroundColor:
+                                theme.palette.action.disabledBackground,
                               opacity: 0.8,
                             },
                           },
                         },
                       },
                       actionBar: {
-                        actions: ['clear', 'today', 'accept'],
+                        actions: ["clear", "today", "accept"],
                       },
                       layout: {
                         sx: {
-                          '& .MuiPickersLayout-contentWrapper': {
+                          "& .MuiPickersLayout-contentWrapper": {
                             backgroundColor: theme.palette.background.paper,
                           },
                         },
@@ -469,12 +508,12 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
 
       <Divider />
 
-      <DialogActions sx={{ p: 2, justifyContent: 'space-between' }}>
+      <DialogActions sx={{ p: 2, justifyContent: "space-between" }}>
         <Button onClick={handleReset} variant="outlined" size="small">
-          {t('search.filters.reset', 'Reset')}
+          {t("search.filters.reset", "Reset")}
         </Button>
         <Button onClick={handleApply} variant="contained" size="small">
-          {t('search.filters.apply', 'Apply Filters')}
+          {t("search.filters.apply", "Apply Filters")}
         </Button>
       </DialogActions>
     </Dialog>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   Dialog,
   DialogTitle,
@@ -14,9 +14,9 @@ import {
   Typography,
   Box,
   useTheme,
-} from '@mui/material';
-import { useTranslation } from 'react-i18next';
-import { Node, NodesError } from '@/shared/nodes/types/nodes.types';
+} from "@mui/material";
+import { useTranslation } from "react-i18next";
+import { Node, NodesError } from "@/shared/nodes/types/nodes.types";
 
 interface SelectNodeModalProps {
   open: boolean;
@@ -46,7 +46,7 @@ const SelectNodeModal: React.FC<SelectNodeModalProps> = ({
       fullWidth
       PaperProps={{
         sx: {
-          borderRadius: '12px',
+          borderRadius: "12px",
         },
       }}
     >
@@ -57,15 +57,15 @@ const SelectNodeModal: React.FC<SelectNodeModalProps> = ({
         }}
       >
         <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
-          {t('integrations.selectNode.title')}
+          {t("integrations.selectNode.title")}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          {t('integrations.selectNode.description')}
+          {t("integrations.selectNode.description")}
         </Typography>
       </DialogTitle>
       <DialogContent sx={{ p: 0 }}>
         {isLoading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+          <Box sx={{ display: "flex", justifyContent: "center", p: 3 }}>
             <CircularProgress />
           </Box>
         ) : error ? (
@@ -73,8 +73,10 @@ const SelectNodeModal: React.FC<SelectNodeModalProps> = ({
             {error.message}
           </Alert>
         ) : nodes.length === 0 ? (
-          <Box sx={{ p: 3, textAlign: 'center' }}>
-            <Typography color="text.secondary">{t('integrations.selectNode.noNodes')}</Typography>
+          <Box sx={{ p: 3, textAlign: "center" }}>
+            <Typography color="text.secondary">
+              {t("integrations.selectNode.noNodes")}
+            </Typography>
           </Box>
         ) : (
           <List sx={{ pt: 0 }}>
@@ -87,19 +89,26 @@ const SelectNodeModal: React.FC<SelectNodeModalProps> = ({
                     sx={{
                       py: 2,
                       borderBottom: `1px solid ${theme.palette.divider}`,
-                      '&:hover': {
+                      "&:hover": {
                         backgroundColor: theme.palette.action.hover,
                       },
                     }}
                   >
                     <ListItemText
                       primary={
-                        <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
+                        <Typography
+                          variant="subtitle1"
+                          sx={{ fontWeight: 500 }}
+                        >
                           {node.info.title}
                         </Typography>
                       }
                       secondary={
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ mt: 0.5 }}
+                        >
                           {node.info.description}
                         </Typography>
                       }
@@ -119,11 +128,11 @@ const SelectNodeModal: React.FC<SelectNodeModalProps> = ({
         <Button
           onClick={onClose}
           sx={{
-            textTransform: 'none',
+            textTransform: "none",
             fontWeight: 500,
           }}
         >
-          {t('common.cancel')}
+          {t("common.cancel")}
         </Button>
       </DialogActions>
     </Dialog>

@@ -1,9 +1,9 @@
-import React from 'react';
-import { Box, IconButton, useTheme, alpha } from '@mui/material';
-import { ViewColumn as ViewColumnIcon } from '@mui/icons-material';
-import { TableDensityToggle } from '../../../../components/common/table/TableDensityToggle';
-import { useTranslation } from 'react-i18next';
-import { SearchField } from '../../../../components/common/SearchField';
+import React from "react";
+import { Box, IconButton, useTheme, alpha } from "@mui/material";
+import { ViewColumn as ViewColumnIcon } from "@mui/icons-material";
+import { TableDensityToggle } from "../../../../components/common/table/TableDensityToggle";
+import { useTranslation } from "react-i18next";
+import { SearchField } from "../../../../components/common/SearchField";
 
 interface UserTableToolbarProps {
   globalFilter: string;
@@ -30,37 +30,37 @@ export const UserTableToolbar: React.FC<UserTableToolbarProps> = ({
   return (
     <Box
       sx={{
-        display: 'flex',
+        display: "flex",
         gap: 2,
         mb: 3,
-        alignItems: 'center',
-        height: '40px',
-        width: '100%',
+        alignItems: "center",
+        height: "40px",
+        width: "100%",
       }}
     >
       <SearchField
-        value={globalFilter ?? ''}
+        value={globalFilter ?? ""}
         onChange={onGlobalFilterChange}
-        placeholder={t('common.search')}
+        placeholder={t("common.search")}
       />
       <Box
         sx={{
           flex: 1,
-          display: 'flex',
+          display: "flex",
           gap: 1,
-          flexWrap: 'wrap',
-          alignItems: 'center',
+          flexWrap: "wrap",
+          alignItems: "center",
         }}
       >
         {activeFilters.map(({ columnId, value }) => (
           <Box
             key={`filter-${columnId}`}
             sx={{
-              display: 'inline-flex',
-              alignItems: 'center',
+              display: "inline-flex",
+              alignItems: "center",
               px: 2,
               py: 0.5,
-              borderRadius: '16px',
+              borderRadius: "16px",
               backgroundColor: alpha(theme.palette.primary.main, 0.1),
               color: theme.palette.primary.main,
             }}
@@ -73,10 +73,10 @@ export const UserTableToolbar: React.FC<UserTableToolbarProps> = ({
                 component="span"
                 onClick={() => onRemoveFilter(columnId)}
                 sx={{
-                  cursor: 'pointer',
-                  fontSize: '1.2rem',
+                  cursor: "pointer",
+                  fontSize: "1.2rem",
                   lineHeight: 1,
-                  '&:hover': { opacity: 0.7 },
+                  "&:hover": { opacity: 0.7 },
                 }}
               >
                 ×
@@ -88,27 +88,27 @@ export const UserTableToolbar: React.FC<UserTableToolbarProps> = ({
           <Box
             key={`sort-${columnId}`}
             sx={{
-              display: 'inline-flex',
-              alignItems: 'center',
+              display: "inline-flex",
+              alignItems: "center",
               px: 2,
               py: 0.5,
-              borderRadius: '16px',
+              borderRadius: "16px",
               backgroundColor: alpha(theme.palette.secondary.main, 0.1),
               color: theme.palette.secondary.main,
             }}
           >
             <Box component="span" sx={{ mr: 1 }}>
-              {`Sorted by: ${columnId} (${desc ? 'desc' : 'asc'})`}
+              {`Sorted by: ${columnId} (${desc ? "desc" : "asc"})`}
             </Box>
             {onRemoveSort && (
               <Box
                 component="span"
                 onClick={() => onRemoveSort(columnId)}
                 sx={{
-                  cursor: 'pointer',
-                  fontSize: '1.2rem',
+                  cursor: "pointer",
+                  fontSize: "1.2rem",
                   lineHeight: 1,
-                  '&:hover': { opacity: 0.7 },
+                  "&:hover": { opacity: 0.7 },
                 }}
               >
                 ×
@@ -117,14 +117,14 @@ export const UserTableToolbar: React.FC<UserTableToolbarProps> = ({
           </Box>
         ))}
       </Box>
-      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+      <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
         <TableDensityToggle />
         <IconButton
           onClick={onColumnMenuOpen}
           sx={{
-            height: '40px',
-            width: '40px',
-            borderRadius: '8px',
+            height: "40px",
+            width: "40px",
+            borderRadius: "8px",
             border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
           }}
         >

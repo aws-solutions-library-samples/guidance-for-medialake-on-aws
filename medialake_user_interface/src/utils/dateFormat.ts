@@ -1,8 +1,10 @@
-import { formatLocalDateTime } from '@/shared/utils/dateUtils';
+import { formatLocalDateTime } from "@/shared/utils/dateUtils";
 
-export function formatDate(dateString: string | number | null | undefined): string {
+export function formatDate(
+  dateString: string | number | null | undefined,
+): string {
   if (!dateString) {
-    return '';
+    return "";
   }
   return formatLocalDateTime(dateString, { showSeconds: false });
 }
@@ -12,4 +14,4 @@ export {
   formatLocalDateTime,
   formatRelativeTime,
   isValidISOString,
-} from '@/shared/utils/dateUtils';
+} from "@/shared/utils/dateUtils";

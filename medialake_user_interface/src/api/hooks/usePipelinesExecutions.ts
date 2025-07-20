@@ -1,17 +1,17 @@
-import { useInfiniteQuery } from '@tanstack/react-query';
-import { apiClient } from '../apiClient';
-import { API_ENDPOINTS } from '../endpoints';
-import { QUERY_KEYS } from '../queryKeys';
-import { logger } from '../../common/helpers/logger';
-import { useErrorModal } from '../../hooks/useErrorModal';
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { apiClient } from "../apiClient";
+import { API_ENDPOINTS } from "../endpoints";
+import { QUERY_KEYS } from "../queryKeys";
+import { logger } from "../../common/helpers/logger";
+import { useErrorModal } from "../../hooks/useErrorModal";
 import type {
   PipelineExecutionsResponse,
   PipelineExecutionFilters,
-} from '../types/pipelineExecutions.types';
+} from "../types/pipelineExecutions.types";
 
 export const usePipelineExecutions = (
   pageSize: number = 20,
-  filters?: PipelineExecutionFilters
+  filters?: PipelineExecutionFilters,
 ) => {
   const { showError } = useErrorModal();
 
@@ -45,12 +45,12 @@ export const usePipelineExecutions = (
 
         const searchParams = new URLSearchParams(params);
         const response = await apiClient.get<PipelineExecutionsResponse>(
-          `${API_ENDPOINTS.PIPELINE_EXECUTIONS}?${searchParams.toString()}`
+          `${API_ENDPOINTS.PIPELINE_EXECUTIONS}?${searchParams.toString()}`,
         );
         return response.data;
       } catch (error) {
-        logger.error('Fetch pipeline executions error:', error);
-        showError('Failed to fetch pipeline executions');
+        logger.error("Fetch pipeline executions error:", error);
+        showError("Failed to fetch pipeline executions");
         throw error;
       }
     },

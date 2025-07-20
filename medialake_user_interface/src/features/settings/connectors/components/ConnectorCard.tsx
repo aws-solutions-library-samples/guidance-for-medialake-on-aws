@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Card,
   CardHeader,
@@ -17,7 +17,7 @@ import {
   Button,
   useTheme,
   alpha,
-} from '@mui/material';
+} from "@mui/material";
 import {
   Edit as EditIcon,
   Delete as DeleteIcon,
@@ -25,16 +25,16 @@ import {
   PowerSettingsNew as PowerIcon,
   AccessTime as AccessTimeIcon,
   Sync as SyncIcon,
-} from '@mui/icons-material';
-import { ConnectorResponse } from '@/api/types/api.types';
-import ConnectorEditModal from '@/features/settings/connectors/components/ConnectorEditModal';
-import { useDateFormat } from '@/shared/hooks/useDateFormat';
-import { Warning as WarningIcon } from '@mui/icons-material';
+} from "@mui/icons-material";
+import { ConnectorResponse } from "@/api/types/api.types";
+import ConnectorEditModal from "@/features/settings/connectors/components/ConnectorEditModal";
+import { useDateFormat } from "@/shared/hooks/useDateFormat";
+import { Warning as WarningIcon } from "@mui/icons-material";
 
 const formatBytes = (bytes: number): string => {
-  if (bytes === 0) return '0 Bytes';
+  if (bytes === 0) return "0 Bytes";
   const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 };
@@ -64,13 +64,18 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  const { formattedDate, absoluteDate, showSeconds, toggleSeconds, canToggleSeconds } =
-    useDateFormat(connector.updatedAt, {
-      showRelative: false,
-      showSeconds: initialShowSeconds,
-      allowSecondsToggle,
-      updateInterval: 60000,
-    });
+  const {
+    formattedDate,
+    absoluteDate,
+    showSeconds,
+    toggleSeconds,
+    canToggleSeconds,
+  } = useDateFormat(connector.updatedAt, {
+    showRelative: false,
+    showSeconds: initialShowSeconds,
+    allowSecondsToggle,
+    updateInterval: 60000,
+  });
 
   const handleDeleteClick = () => {
     setDeleteDialogOpen(true);
@@ -87,7 +92,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
   };
 
   const handleToggleStatus = async () => {
-    await onToggleStatus(connector.id, connector.status === 'disabled');
+    await onToggleStatus(connector.id, connector.status === "disabled");
   };
 
   const handleSyncClick = async () => {
@@ -102,15 +107,15 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
   };
 
   const getConnectorIcon = (type: string) => {
-    if (type === 's3') {
-      return <CloudUploadIcon sx={{ color: '#FF9900' }} />;
+    if (type === "s3") {
+      return <CloudUploadIcon sx={{ color: "#FF9900" }} />;
     }
     return null;
   };
 
   const getConnectorTypeLabel = (type: string) => {
-    if (type === 's3') {
-      return 'Amazon S3';
+    if (type === "s3") {
+      return "Amazon S3";
     }
     return type;
   };
@@ -119,15 +124,15 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
     <>
       <Card
         sx={{
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          borderRadius: '12px',
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          borderRadius: "12px",
           border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
           backgroundColor: theme.palette.background.paper,
-          transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-          '&:hover': {
-            transform: 'translateY(-2px)',
+          transition: "transform 0.2s ease, box-shadow 0.2s ease",
+          "&:hover": {
+            transform: "translateY(-2px)",
             boxShadow: `0 4px 20px ${alpha(theme.palette.common.black, 0.1)}`,
           },
         }}
@@ -144,33 +149,33 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
             <Stack
               direction="row"
               sx={{
-                justifyContent: 'space-between',
-                alignItems: 'center',
+                justifyContent: "space-between",
+                alignItems: "center",
               }}
               spacing={1}
             >
               {getConnectorTypeLabel(connector.type)}
               <Chip
                 size="small"
-                label={connector.status || 'active'}
+                label={connector.status || "active"}
                 sx={{
                   backgroundColor:
-                    connector.status === 'error'
+                    connector.status === "error"
                       ? alpha(theme.palette.error.main, 0.1)
-                      : connector.status === 'disabled'
+                      : connector.status === "disabled"
                         ? alpha(theme.palette.warning.main, 0.1)
                         : alpha(theme.palette.success.main, 0.1),
                   color:
-                    connector.status === 'error'
+                    connector.status === "error"
                       ? theme.palette.error.main
-                      : connector.status === 'disabled'
+                      : connector.status === "disabled"
                         ? theme.palette.warning.main
                         : theme.palette.success.main,
                   fontWeight: 600,
-                  borderRadius: '6px',
-                  height: '24px',
-                  textTransform: 'capitalize',
-                  '& .MuiChip-label': {
+                  borderRadius: "6px",
+                  height: "24px",
+                  textTransform: "capitalize",
+                  "& .MuiChip-label": {
                     px: 1.5,
                   },
                 }}
@@ -241,12 +246,13 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                 /> */}
         <CardContent sx={{ flexGrow: 1 }}>
           <Typography variant="body2">
-            <strong>Bucket:</strong>{' '}
+            <strong>Bucket:</strong>{" "}
             {connector.storageIdentifier || connector.configuration?.bucket}
           </Typography>
           {(connector.region || connector.configuration?.region) && (
             <Typography variant="body2">
-              <strong>Region:</strong> {connector.region || connector.configuration?.region}
+              <strong>Region:</strong>{" "}
+              {connector.region || connector.configuration?.region}
             </Typography>
           )}
           {connector.description && (
@@ -255,11 +261,12 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
             </Typography>
           )}
           {connector.objectPrefix &&
-            (typeof connector.objectPrefix === 'string' ? (
+            (typeof connector.objectPrefix === "string" ? (
               <Typography variant="body2">
                 <strong>Prefix:</strong> {connector.objectPrefix}
               </Typography>
-            ) : Array.isArray(connector.objectPrefix) && connector.objectPrefix.length > 0 ? (
+            ) : Array.isArray(connector.objectPrefix) &&
+              connector.objectPrefix.length > 0 ? (
               <>
                 <Typography variant="body2">
                   <strong>Prefixes:</strong>
@@ -273,7 +280,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
             ) : null)}
           {connector.configuration?.objectPrefix &&
             !connector.objectPrefix &&
-            (typeof connector.configuration.objectPrefix === 'string' ? (
+            (typeof connector.configuration.objectPrefix === "string" ? (
               <Typography variant="body2">
                 <strong>Prefix:</strong> {connector.configuration.objectPrefix}
               </Typography>
@@ -290,10 +297,12 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                 ))}
               </>
             ) : null)}
-          {(connector.integrationMethod || connector.configuration?.s3IntegrationMethod) && (
+          {(connector.integrationMethod ||
+            connector.configuration?.s3IntegrationMethod) && (
             <Typography variant="body2">
-              <strong>Integration Method:</strong>{' '}
-              {connector.integrationMethod || connector.configuration?.s3IntegrationMethod}
+              <strong>Integration Method:</strong>{" "}
+              {connector.integrationMethod ||
+                connector.configuration?.s3IntegrationMethod}
             </Typography>
           )}
           <Box sx={{ mt: 2 }}>
@@ -302,12 +311,12 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
               component="div"
               onClick={canToggleSeconds ? toggleSeconds : undefined}
               sx={{
-                display: 'flex',
-                alignItems: 'center',
+                display: "flex",
+                alignItems: "center",
                 gap: 0.5,
-                cursor: canToggleSeconds ? 'pointer' : 'default',
+                cursor: canToggleSeconds ? "pointer" : "default",
                 ...(canToggleSeconds && {
-                  '&:hover': {
+                  "&:hover": {
                     color: theme.palette.primary.main,
                   },
                 }),
@@ -316,7 +325,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
               <Tooltip
                 title={
                   canToggleSeconds
-                    ? `Click to ${showSeconds ? 'hide' : 'show'} seconds`
+                    ? `Click to ${showSeconds ? "hide" : "show"} seconds`
                     : absoluteDate
                 }
                 arrow
@@ -324,7 +333,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                 enterDelay={200}
                 leaveDelay={200}
               >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                   <AccessTimeIcon
                     sx={{
                       fontSize: 16,
@@ -342,8 +351,8 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
 
         <CardActions
           sx={{
-            justifyContent: 'flex-end',
-            alignItems: 'flex-end',
+            justifyContent: "flex-end",
+            alignItems: "flex-end",
             borderTop: `1px solid ${theme.palette.divider}`,
             pt: 2,
           }}
@@ -386,7 +395,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                         >
                             <PowerIcon fontSize="small" />
                         </IconButton> */}
-            {onSync && connector.type === 's3' && (
+            {onSync && connector.type === "s3" && (
               <Tooltip title="Sync connector">
                 <IconButton
                   onClick={handleSyncClick}
@@ -396,7 +405,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                     backgroundColor: alpha(theme.palette.primary.main, 0.1),
                     width: 40,
                     height: 40,
-                    '&:hover': {
+                    "&:hover": {
                       backgroundColor: alpha(theme.palette.primary.main, 0.2),
                     },
                   }}
@@ -404,13 +413,13 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                   <SyncIcon
                     fontSize="small"
                     sx={{
-                      animation: isSyncing ? 'spin 2s linear infinite' : 'none',
-                      '@keyframes spin': {
-                        '0%': {
-                          transform: 'rotate(0deg)',
+                      animation: isSyncing ? "spin 2s linear infinite" : "none",
+                      "@keyframes spin": {
+                        "0%": {
+                          transform: "rotate(0deg)",
                         },
-                        '100%': {
-                          transform: 'rotate(360deg)',
+                        "100%": {
+                          transform: "rotate(360deg)",
                         },
                       },
                     }}
@@ -425,7 +434,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                 backgroundColor: alpha(theme.palette.error.main, 0.1),
                 width: 40,
                 height: 40,
-                '&:hover': {
+                "&:hover": {
                   backgroundColor: alpha(theme.palette.error.main, 0.2),
                 },
               }}
@@ -452,16 +461,16 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
         <DialogTitle sx={{ fontWeight: 600 }}>Delete Connector</DialogTitle>
         <DialogContent>
           <Typography sx={{ color: theme.palette.text.secondary }}>
-            Are you sure you want to delete the connector "{connector.name}"? This action cannot be
-            undone.
+            Are you sure you want to delete the connector "{connector.name}"?
+            This action cannot be undone.
           </Typography>
-          {connector.integrationMethod?.toLowerCase() === 'eventbridge' && (
+          {connector.integrationMethod?.toLowerCase() === "eventbridge" && (
             <Typography
               sx={{
                 mt: 2,
                 color: theme.palette.warning.main,
-                display: 'flex',
-                alignItems: 'center',
+                display: "flex",
+                alignItems: "center",
                 gap: 1,
                 backgroundColor: alpha(theme.palette.warning.main, 0.1),
                 borderRadius: 1,
@@ -469,8 +478,8 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
               }}
             >
               <WarningIcon fontSize="small" />
-              Please ensure you disable the EventBridge integration for this S3 bucket if it is no
-              longer required.
+              Please ensure you disable the EventBridge integration for this S3
+              bucket if it is no longer required.
             </Typography>
           )}
         </DialogContent>
@@ -480,7 +489,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
             disabled={isDeleting}
             sx={{
               color: theme.palette.text.secondary,
-              '&:hover': {
+              "&:hover": {
                 backgroundColor: alpha(theme.palette.primary.main, 0.1),
               },
             }}
@@ -494,12 +503,12 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
             disabled={isDeleting}
             sx={{
               backgroundColor: theme.palette.error.main,
-              '&:hover': {
+              "&:hover": {
                 backgroundColor: theme.palette.error.dark,
               },
             }}
           >
-            {isDeleting ? 'Deleting...' : 'Delete'}
+            {isDeleting ? "Deleting..." : "Delete"}
           </Button>
         </DialogActions>
       </Dialog>

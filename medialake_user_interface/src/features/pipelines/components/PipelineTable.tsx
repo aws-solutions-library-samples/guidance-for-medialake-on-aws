@@ -1,11 +1,18 @@
-import React, { useMemo, useRef } from 'react';
-import { Box, IconButton, CircularProgress, Tooltip, Typography, Chip } from '@mui/material';
+import React, { useMemo, useRef } from "react";
+import {
+  Box,
+  IconButton,
+  CircularProgress,
+  Tooltip,
+  Typography,
+  Chip,
+} from "@mui/material";
 import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   PlayArrow as PlayIcon,
   Stop as StopIcon,
-} from '@mui/icons-material';
+} from "@mui/icons-material";
 import {
   useReactTable,
   getCoreRowModel,
@@ -14,15 +21,15 @@ import {
   getPaginationRowModel,
   createColumnHelper,
   ColumnDef,
-} from '@tanstack/react-table';
-import { useVirtualizer } from '@tanstack/react-virtual';
-import { BaseTableToolbar } from '@/components/common/table/BaseTableToolbar';
-import { ResizableTable } from '@/components/common/table/ResizableTable';
-import { TableCellContent } from '@/components/common/table/TableCellContent';
-import { TriggerTypeChips } from './TriggerTypeChips';
-import { PipelineStatusCell } from './PipelineStatusCell';
-import type { Pipeline } from '../types/pipelines.types';
-import type { TableState, TableActions } from '../types/table.types';
+} from "@tanstack/react-table";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { BaseTableToolbar } from "@/components/common/table/BaseTableToolbar";
+import { ResizableTable } from "@/components/common/table/ResizableTable";
+import { TableCellContent } from "@/components/common/table/TableCellContent";
+import { TriggerTypeChips } from "./TriggerTypeChips";
+import { PipelineStatusCell } from "./PipelineStatusCell";
+import type { Pipeline } from "../types/pipelines.types";
+import type { TableState, TableActions } from "../types/table.types";
 
 interface PipelineTableProps {
   data: Pipeline[];
@@ -51,23 +58,27 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
 
   const columns = useMemo<ColumnDef<Pipeline, any>[]>(
     () => [
-      columnHelper.accessor('name', {
-        header: 'Name',
-        cell: (info) => <TableCellContent variant="primary">{info.getValue()}</TableCellContent>,
+      columnHelper.accessor("name", {
+        header: "Name",
+        cell: (info) => (
+          <TableCellContent variant="primary">
+            {info.getValue()}
+          </TableCellContent>
+        ),
         enableSorting: true,
         size: 200,
       }),
-      columnHelper.accessor('type', {
-        header: 'Type',
+      columnHelper.accessor("type", {
+        header: "Type",
         cell: (info) => {
           // Get the pipeline object
           const pipeline = info.row.original;
 
           // Parse the comma-separated list into an array
-          const triggerTypes = info.getValue().split(',');
+          const triggerTypes = info.getValue().split(",");
 
           // Always display as "Event Triggered" regardless of the original value
-          const displayTypes = triggerTypes.map(() => 'Event Triggered');
+          const displayTypes = triggerTypes.map(() => "Event Triggered");
 
           return (
             <TableCellContent variant="secondary">
@@ -96,8 +107,8 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
       //     enableSorting: true,
       //     size: 100
       // }),
-      columnHelper.accessor('deploymentStatus', {
-        header: 'Status',
+      columnHelper.accessor("deploymentStatus", {
+        header: "Status",
         cell: (info) => {
           const pipeline = info.row.original;
           return (
@@ -111,8 +122,8 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
         enableSorting: true,
         size: 150, // Increased size to accommodate the switch
       }),
-      columnHelper.accessor('createdAt', {
-        header: 'Created',
+      columnHelper.accessor("createdAt", {
+        header: "Created",
         cell: (info) => (
           <TableCellContent variant="secondary">
             {new Date(info.getValue()).toLocaleString()}
@@ -121,8 +132,8 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
         enableSorting: true,
         size: 180,
       }),
-      columnHelper.accessor('updatedAt', {
-        header: 'Updated',
+      columnHelper.accessor("updatedAt", {
+        header: "Updated",
         cell: (info) => (
           <TableCellContent variant="secondary">
             {new Date(info.getValue()).toLocaleString()}
@@ -132,10 +143,10 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
         size: 180,
       }),
       columnHelper.display({
-        id: 'actions',
-        header: 'Actions',
+        id: "actions",
+        header: "Actions",
         cell: (info) => (
-          <Box sx={{ display: 'flex', gap: 1 }}>
+          <Box sx={{ display: "flex", gap: 1 }}>
             <Tooltip title="Edit Pipeline">
               <IconButton
                 size="small"
@@ -149,7 +160,10 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
               <IconButton
                 size="small"
                 onClick={() =>
-                  tableActions.openDeleteDialog(info.row.original.id, info.row.original.name)
+                  tableActions.openDeleteDialog(
+                    info.row.original.id,
+                    info.row.original.name,
+                  )
                 }
                 disabled={info.row.original.system}
               >
@@ -179,7 +193,7 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
         size: 200,
       }),
     ],
-    [tableActions, onStartPipeline, onStopPipeline, onToggleActive]
+    [tableActions, onStartPipeline, onStopPipeline, onToggleActive],
   );
 
   const table = useReactTable({
@@ -208,7 +222,7 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
 
   if (isLoading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+      <Box sx={{ display: "flex", justifyContent: "center", p: 3 }}>
         <CircularProgress />
       </Box>
     );
@@ -216,7 +230,7 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
 
   if (!data || data.length === 0) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+      <Box sx={{ display: "flex", justifyContent: "center", p: 3 }}>
         <Typography variant="body1" color="text.secondary">
           No pipelines found
         </Typography>
@@ -225,7 +239,7 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
       <BaseTableToolbar
         globalFilter={tableState.globalFilter}
         onGlobalFilterChange={tableActions.setGlobalFilter}
@@ -235,7 +249,9 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
           value: f.value as string,
         }))}
         onRemoveFilter={(columnId) => {
-          tableActions.setColumnFilters(tableState.columnFilters.filter((f) => f.id !== columnId));
+          tableActions.setColumnFilters(
+            tableState.columnFilters.filter((f) => f.id !== columnId),
+          );
         }}
         searchPlaceholder="Search pipelines..."
       />

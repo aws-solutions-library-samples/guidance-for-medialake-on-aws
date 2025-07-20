@@ -1,20 +1,25 @@
-import { Suspense } from 'react';
-import { Box, CircularProgress, Typography, Grid, Button } from '@mui/material';
+import { Suspense } from "react";
+import { Box, CircularProgress, Typography, Grid, Button } from "@mui/material";
 import {
   useGetConnectors,
   useDeleteConnector,
   useToggleConnector,
   useSyncConnector,
-} from '@/api/hooks/useConnectors';
-import { ConnectorResponse, ConnectorListResponse } from '@/api/types/api.types';
-import ConnectorCard from './ConnectorCard';
-import { UseQueryResult } from '@tanstack/react-query';
+} from "@/api/hooks/useConnectors";
+import {
+  ConnectorResponse,
+  ConnectorListResponse,
+} from "@/api/types/api.types";
+import ConnectorCard from "./ConnectorCard";
+import { UseQueryResult } from "@tanstack/react-query";
 
 interface ConnectorsListProps {
   onAddConnector: () => void;
 }
 
-export const ConnectorsList: React.FC<ConnectorsListProps> = ({ onAddConnector }) => {
+export const ConnectorsList: React.FC<ConnectorsListProps> = ({
+  onAddConnector,
+}) => {
   return (
     <Suspense fallback={<LoadingSpinner />}>
       <ConnectorsListContent onAddConnector={onAddConnector} />
@@ -23,7 +28,12 @@ export const ConnectorsList: React.FC<ConnectorsListProps> = ({ onAddConnector }
 };
 
 const LoadingSpinner = () => (
-  <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+  <Box
+    display="flex"
+    justifyContent="center"
+    alignItems="center"
+    minHeight="200px"
+  >
     <CircularProgress />
   </Box>
 );
@@ -32,7 +42,9 @@ interface ConnectorsListContentProps {
   onAddConnector: () => void;
 }
 
-const ConnectorsListContent: React.FC<ConnectorsListContentProps> = ({ onAddConnector }) => {
+const ConnectorsListContent: React.FC<ConnectorsListContentProps> = ({
+  onAddConnector,
+}) => {
   const {
     data: connectorsData,
     isLoading,
@@ -45,14 +57,14 @@ const ConnectorsListContent: React.FC<ConnectorsListContentProps> = ({ onAddConn
 
   const handleEdit = (connector: ConnectorResponse) => {
     // TODO: Implement edit functionality
-    console.log('Edit connector:', connector);
+    console.log("Edit connector:", connector);
   };
 
   const handleDelete = async (id: string) => {
     try {
       await deleteConnector.mutateAsync(id);
     } catch (error) {
-      console.error('Failed to delete connector:', error);
+      console.error("Failed to delete connector:", error);
     }
   };
 
@@ -60,7 +72,7 @@ const ConnectorsListContent: React.FC<ConnectorsListContentProps> = ({ onAddConn
     try {
       await toggleConnector.mutateAsync({ id, enabled });
     } catch (error) {
-      console.error('Failed to toggle connector status:', error);
+      console.error("Failed to toggle connector status:", error);
     }
   };
 
@@ -68,7 +80,7 @@ const ConnectorsListContent: React.FC<ConnectorsListContentProps> = ({ onAddConn
     try {
       await syncConnector.mutateAsync(id);
     } catch (error) {
-      console.error('Failed to sync connector:', error);
+      console.error("Failed to sync connector:", error);
     }
   };
 
@@ -79,7 +91,9 @@ const ConnectorsListContent: React.FC<ConnectorsListContentProps> = ({ onAddConn
   if (error) {
     return (
       <Box p={3}>
-        <Typography color="error">Error loading connectors: {error.message}</Typography>
+        <Typography color="error">
+          Error loading connectors: {error.message}
+        </Typography>
       </Box>
     );
   }

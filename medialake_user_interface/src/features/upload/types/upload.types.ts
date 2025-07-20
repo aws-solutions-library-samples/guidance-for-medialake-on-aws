@@ -41,7 +41,7 @@ export interface UploadFile {
   progress: number;
   error?: string;
   uploadURL?: string;
-  status: 'waiting' | 'uploading' | 'success' | 'error';
+  status: "waiting" | "uploading" | "success" | "error";
 }
 
 export interface UploadRequest {

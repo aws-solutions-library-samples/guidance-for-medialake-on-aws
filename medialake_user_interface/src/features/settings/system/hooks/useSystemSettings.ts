@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import {
   useSearchProvider,
   useCreateSearchProvider,
   useUpdateSearchProvider,
-} from '../api/systemHooks';
-import { SearchProvider } from '../types/system.types';
-import { SYSTEM_SETTINGS_CONFIG } from '../config';
+} from "../api/systemHooks";
+import { SearchProvider } from "../types/system.types";
+import { SYSTEM_SETTINGS_CONFIG } from "../config";
 
 // Function to check if semantic search is properly configured and enabled
 export const useSemanticSearchStatus = () => {
@@ -28,10 +28,10 @@ export const useSemanticSearchStatus = () => {
 
 export const useSystemSettingsManager = () => {
   const [provider, setProvider] = useState<SearchProvider>({
-    id: '',
+    id: "",
     name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS.name,
     type: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS.type,
-    apiKey: '',
+    apiKey: "",
     endpoint: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS.defaultEndpoint,
     isConfigured: false,
     isEnabled: true,
@@ -39,8 +39,10 @@ export const useSystemSettingsManager = () => {
 
   const [isProviderDialogOpen, setIsProviderDialogOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [newProviderDetails, setNewProviderDetails] = useState<Partial<SearchProvider>>({
-    apiKey: '',
+  const [newProviderDetails, setNewProviderDetails] = useState<
+    Partial<SearchProvider>
+  >({
+    apiKey: "",
     endpoint: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS.defaultEndpoint,
   });
 
@@ -70,7 +72,7 @@ export const useSystemSettingsManager = () => {
   const handleAddProviderClick = () => {
     setIsEditMode(false);
     setNewProviderDetails({
-      apiKey: '',
+      apiKey: "",
       endpoint: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS.defaultEndpoint,
     });
     setIsProviderDialogOpen(true);
@@ -80,8 +82,10 @@ export const useSystemSettingsManager = () => {
   const handleEditProviderClick = () => {
     setIsEditMode(true);
     setNewProviderDetails({
-      apiKey: provider.apiKey || '',
-      endpoint: provider.endpoint || SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS.defaultEndpoint,
+      apiKey: provider.apiKey || "",
+      endpoint:
+        provider.endpoint ||
+        SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS.defaultEndpoint,
     });
     setIsProviderDialogOpen(true);
   };
@@ -117,7 +121,7 @@ export const useSystemSettingsManager = () => {
           await createProvider.mutateAsync({
             name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS.name,
             type: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS.type,
-            apiKey: newProviderDetails.apiKey || '',
+            apiKey: newProviderDetails.apiKey || "",
             endpoint: newProviderDetails.endpoint,
             isEnabled: true,
           });
@@ -126,7 +130,7 @@ export const useSystemSettingsManager = () => {
         // Close the dialog after successful operation
         handleCloseDialog();
       } catch (error) {
-        console.error('Error configuring provider:', error);
+        console.error("Error configuring provider:", error);
       }
     }
   };
@@ -136,18 +140,18 @@ export const useSystemSettingsManager = () => {
     if (provider.id) {
       try {
         await updateProvider.mutateAsync({
-          apiKey: '',
+          apiKey: "",
           isEnabled: false,
         });
 
         setProvider({
           ...provider,
-          apiKey: '',
+          apiKey: "",
           isConfigured: false,
           isEnabled: false,
         });
       } catch (error) {
-        console.error('Error resetting provider:', error);
+        console.error("Error resetting provider:", error);
       }
     }
   };
