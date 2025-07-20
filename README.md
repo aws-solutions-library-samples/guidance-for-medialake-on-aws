@@ -212,8 +212,8 @@ See the [`MediaLake-Installation-Guide.md`](assets/docs/MediaLake-Installation-G
 ### 1. **Clone the repository**
 
 ```bash
-git clone git@github.com:aws-solutions-library-samples/guidance-for-medialake.git
-cd guidance-for-medialake
+git clone https://github.com/aws-solutions-library-samples/guidance-for-medialake-on-aws.git
+cd guidance-for-medialake-on-aws
 ```
 
 ### 2. **Prepare the environment**
