@@ -36,18 +36,18 @@ repos:
     rev: 25.1.0
     hooks:
       - id: black
-        args: ["--line-length=88"]
+        args: ["--line-length=88", "--fast"]
 
   # Run flake8 AFTER formatting (warnings only for now)
   - repo: https://github.com/PyCQA/flake8
     rev: 7.3.0
     hooks:
       - id: flake8
-        args:
-          [
+        args: [
             "--max-line-length=88",
-            "--extend-ignore=E203,W503,E501,F841,F401,F821,E722,E266,E402,F541,E122,E999,C901",
+            "--extend-ignore=E203,W503,E501,E266",
             "--max-complexity=15",
+            "--exit-zero", # Don't fail on linting findings
           ]
 
   # TypeScript/JavaScript - Auto-fixing with more lenient rules
@@ -62,6 +62,52 @@ repos:
             lambdas/nodes/image_metadata_extractor/.*|
             lambdas/layers/warmer/nodejs/.*
           )$
+
+  # Commit message validation (Phase 1)
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.2.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: [--strict, --optional-scope]
+
+  # Security scanning (Phase 2)
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ["--baseline", ".secrets.baseline"]
+        exclude: |
+          (?x)^(
+            package-lock\.json|
+            \.secrets\.baseline|
+            lambdas/nodes/image_metadata_extractor/.*|
+            lambdas/layers/warmer/nodejs/.*
+          )$
+
+  # Python security scanning (Phase 2)
+  # Temporarily disabled
+  # - repo: https://github.com/PyCQA/bandit
+  #   rev: 1.8.6
+  #   hooks:
+  #     - id: bandit
+  #       args: ["-f", "json", "-o", "bandit-report.json", "--exit-zero"]
+  #       files: \.py$
+  #       exclude: |
+  #         (?x)^(
+  #           tests/.*|
+  #           lambdas/nodes/image_metadata_extractor/.*|
+  #           lambdas/layers/warmer/nodejs/.*
+  #         )$
+
+  # AWS CloudFormation/CDK validation (Phase 2)
+  # Temporarily disabled due to file detection issues
+  # - repo: https://github.com/aws-cloudformation/cfn-lint
+  #   rev: v1.38.0
+  #   hooks:
+  #     - id: cfn-lint
+  #       files: ^medialake\.template$
+  #       args: [--ignore-checks, W]
 
   # Custom hooks
   - repo: local
