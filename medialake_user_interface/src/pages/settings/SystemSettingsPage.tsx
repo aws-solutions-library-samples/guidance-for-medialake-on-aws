@@ -35,8 +35,10 @@ import { SYSTEM_SETTINGS_CONFIG } from '@/features/settings/system/config';
 // Fallback notification hook
 const useNotificationWithFallback = () => {
   const [open, setOpen] = useState(false);
-  const [message, setMessage] = useState('');
-  const [severity, setSeverity] = useState<'success' | 'info' | 'warning' | 'error'>('info');
+  const [message, setMessage] = useState("");
+  const [severity, setSeverity] = useState<
+    "success" | "info" | "warning" | "error"
+  >("info");
 
   let globalNotification: any = null;
   try {
@@ -185,11 +187,11 @@ const SystemSettingsPage: React.FC = () => {
   return (
     <Box
       sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: 'calc(100vh - 120px)',
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        minHeight: "calc(100vh - 120px)",
         p: 3,
       }}
     >
@@ -199,32 +201,36 @@ const SystemSettingsPage: React.FC = () => {
           open={notificationOpen}
           autoHideDuration={4000}
           onClose={hideNotification}
-          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+          anchorOrigin={{ vertical: "top", horizontal: "right" }}
         >
-          <Alert onClose={hideNotification} severity={notificationSeverity} sx={{ width: '100%' }}>
+          <Alert
+            onClose={hideNotification}
+            severity={notificationSeverity}
+            sx={{ width: "100%" }}
+          >
             {notificationMessage}
           </Alert>
         </Snackbar>
       )}
 
       <Typography variant="h4" gutterBottom align="center" sx={{ mb: 4 }}>
-        {t('settings.systemSettings.title', 'System Settings')}
+        {t("settings.systemSettings.title", "System Settings")}
       </Typography>
 
       <Paper
         elevation={3}
         sx={{
           borderRadius: 2,
-          overflow: 'hidden',
-          display: 'flex',
-          width: '1350px',
-          height: '750px',
-          maxWidth: '90vw',
+          overflow: "hidden",
+          display: "flex",
+          width: "1350px",
+          height: "750px",
+          maxWidth: "90vw",
         }}
       >
         <Box
           sx={{
-            width: '250px',
+            width: "250px",
             borderRight: `1px solid ${theme.palette.divider}`,
             backgroundColor: theme.palette.background.default,
           }}
@@ -243,19 +249,22 @@ const SystemSettingsPage: React.FC = () => {
               },
             }}
           >
-            <Tab label={t('settings.systemSettings.tabs.search', 'Search')} />
+            <Tab label={t("settings.systemSettings.tabs.search", "Search")} />
           </Tabs>
         </Box>
 
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{ flex: 1, display: "flex", flexDirection: "column" }}>
           <TabPanel value={tabValue} index={0}>
             <Typography variant="h6" gutterBottom>
-              {t('settings.systemSettings.search.title', 'Search Configuration')}
+              {t(
+                "settings.systemSettings.search.title",
+                "Search Configuration",
+              )}
             </Typography>
             <Typography variant="body2" color="text.secondary" paragraph>
               {t(
-                'settings.systemSettings.search.description',
-                'Configure the search provider for enhanced search capabilities across your media assets.'
+                "settings.systemSettings.search.description",
+                "Configure the search provider for enhanced search capabilities across your media assets.",
               )}
             </Typography>
             <Divider sx={{ my: 3 }} />

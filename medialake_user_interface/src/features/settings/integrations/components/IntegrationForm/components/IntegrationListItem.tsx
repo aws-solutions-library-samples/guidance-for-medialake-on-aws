@@ -1,7 +1,12 @@
-import React from 'react';
-import { ListItem, ListItemButton, ListItemIcon, ListItemText } from '@mui/material';
-import { Extension as IntegrationIcon } from '@mui/icons-material';
-import { IntegrationListItemProps } from '../types';
+import React from "react";
+import {
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+} from "@mui/material";
+import { Extension as IntegrationIcon } from "@mui/icons-material";
+import { IntegrationListItemProps } from "../types";
 
 export const IntegrationListItem: React.FC<IntegrationListItemProps> = ({
   node,
@@ -19,33 +24,33 @@ export const IntegrationListItem: React.FC<IntegrationListItemProps> = ({
         onClick={handleClick}
         sx={{
           py: 2,
-          '&:hover': {
-            backgroundColor: 'action.hover',
+          "&:hover": {
+            backgroundColor: "action.hover",
           },
-          '&.Mui-selected': {
-            backgroundColor: 'transparent',
+          "&.Mui-selected": {
+            backgroundColor: "transparent",
             borderLeft: 4,
-            borderLeftColor: 'primary.main',
-            pl: '12px', // Compensate for border
-            '&:hover': {
-              backgroundColor: 'action.hover',
+            borderLeftColor: "primary.main",
+            pl: "12px", // Compensate for border
+            "&:hover": {
+              backgroundColor: "action.hover",
             },
           },
-          '& .MuiListItemIcon-root': {
+          "& .MuiListItemIcon-root": {
             minWidth: 40,
           },
-          '& .MuiListItemText-primary': {
+          "& .MuiListItemText-primary": {
             fontWeight: selected ? 600 : 400,
-            color: selected ? 'primary.main' : 'text.primary',
+            color: selected ? "primary.main" : "text.primary",
           },
-          '& .MuiListItemText-secondary': {
-            color: 'text.secondary',
-            whiteSpace: 'normal',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            display: '-webkit-box',
+          "& .MuiListItemText-secondary": {
+            color: "text.secondary",
+            whiteSpace: "normal",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            display: "-webkit-box",
             WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
+            WebkitBoxOrient: "vertical",
           },
         }}
       >
@@ -56,13 +61,13 @@ export const IntegrationListItem: React.FC<IntegrationListItemProps> = ({
           primary={node.info.title}
           secondary={node.info.description}
           primaryTypographyProps={{
-            variant: 'subtitle1',
+            variant: "subtitle1",
             fontWeight: selected ? 600 : 500,
-            color: selected ? 'primary.main' : 'text.primary',
+            color: selected ? "primary.main" : "text.primary",
           }}
           secondaryTypographyProps={{
-            variant: 'body2',
-            color: 'text.secondary',
+            variant: "body2",
+            color: "text.secondary",
           }}
         />
       </ListItemButton>

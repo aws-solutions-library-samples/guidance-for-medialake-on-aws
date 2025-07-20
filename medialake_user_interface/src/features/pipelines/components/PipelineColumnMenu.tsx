@@ -1,5 +1,11 @@
-import React from 'react';
-import { Menu, MenuItem, FormControlLabel, Checkbox, Typography } from '@mui/material';
+import React from "react";
+import {
+  Menu,
+  MenuItem,
+  FormControlLabel,
+  Checkbox,
+  Typography,
+} from "@mui/material";
 
 interface PipelineColumnMenuProps {
   anchorEl: HTMLElement | null;
@@ -15,10 +21,10 @@ export const PipelineColumnMenu: React.FC<PipelineColumnMenuProps> = ({
   onVisibilityChange,
 }) => {
   const columns = [
-    { id: 'name', label: 'Name' },
-    { id: 'description', label: 'Description' },
-    { id: 'status', label: 'Status' },
-    { id: 'createdAt', label: 'Created At' },
+    { id: "name", label: "Name" },
+    { id: "description", label: "Description" },
+    { id: "status", label: "Status" },
+    { id: "createdAt", label: "Created At" },
   ];
 
   const handleToggle = (columnId: string) => {

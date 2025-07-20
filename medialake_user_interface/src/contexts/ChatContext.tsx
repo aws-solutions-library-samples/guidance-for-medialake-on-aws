@@ -1,10 +1,10 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode } from "react";
 
 // Define the structure of a chat message
 export interface ChatMessage {
   id: string;
   content: string;
-  sender: 'user' | 'system';
+  sender: "user" | "system";
   timestamp: Date;
   isThinking?: boolean;
 }
@@ -16,7 +16,11 @@ interface ChatContextType {
   openChat: () => void;
   closeChat: () => void;
   toggleChat: () => void;
-  addMessage: (content: string, sender: 'user' | 'system', isThinking?: boolean) => void;
+  addMessage: (
+    content: string,
+    sender: "user" | "system",
+    isThinking?: boolean,
+  ) => void;
   updateLastMessage: (content: string) => void;
   clearHistory: () => void;
 }
@@ -44,7 +48,11 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const toggleChat = () => setIsOpen((prev) => !prev);
 
   // Add a new message to the chat history
-  const addMessage = (content: string, sender: 'user' | 'system', isThinking: boolean = false) => {
+  const addMessage = (
+    content: string,
+    sender: "user" | "system",
+    isThinking: boolean = false,
+  ) => {
     const newMessage: ChatMessage = {
       id: Date.now().toString(), // Simple ID generation
       content,
@@ -99,7 +107,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
 export const useChat = () => {
   const context = useContext(ChatContext);
   if (context === undefined) {
-    throw new Error('useChat must be used within a ChatProvider');
+    throw new Error("useChat must be used within a ChatProvider");
   }
   return context;
 };

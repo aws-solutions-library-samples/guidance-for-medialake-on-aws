@@ -1,8 +1,15 @@
-import React from 'react';
-import { Controller, Control, FieldValues, Path } from 'react-hook-form';
-import { TextField, TextFieldProps, Tooltip, IconButton, Box, InputAdornment } from '@mui/material';
-import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
-import { useTranslation } from 'react-i18next';
+import React from "react";
+import { Controller, Control, FieldValues, Path } from "react-hook-form";
+import {
+  TextField,
+  TextFieldProps,
+  Tooltip,
+  IconButton,
+  Box,
+  InputAdornment,
+} from "@mui/material";
+import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
+import { useTranslation } from "react-i18next";
 
 export type FormFieldProps<T extends FieldValues> = {
   name: Path<T>;
@@ -15,13 +22,13 @@ export type FormFieldProps<T extends FieldValues> = {
   translationPrefix?: string;
   useDirectLabels?: boolean;
   showHelper?: boolean;
-} & Omit<TextFieldProps, 'name'>;
+} & Omit<TextFieldProps, "name">;
 
 export const FormField = <T extends FieldValues>({
   name,
   control,
   label,
-  type = 'text',
+  type = "text",
   required = false,
   fullWidth = true,
   tooltip,
@@ -36,13 +43,13 @@ export const FormField = <T extends FieldValues>({
   const fieldLabel = useDirectLabels
     ? label
     : translationPrefix
-      ? t(`${translationPrefix}.fields.${name}.label`, label || '')
+      ? t(`${translationPrefix}.fields.${name}.label`, label || "")
       : label;
 
   const helperText = useDirectLabels
     ? undefined
     : translationPrefix
-      ? t(`${translationPrefix}.fields.${name}.helper`, '')
+      ? t(`${translationPrefix}.fields.${name}.helper`, "")
       : undefined;
 
   return (
@@ -62,7 +69,10 @@ export const FormField = <T extends FieldValues>({
             error
               ? useDirectLabels
                 ? error.message
-                : t(`${translationPrefix}.errors.${error.type}`, error.message || '')
+                : t(
+                    `${translationPrefix}.errors.${error.type}`,
+                    error.message || "",
+                  )
               : helperText
           }
           InputProps={{
@@ -85,4 +95,4 @@ export const FormField = <T extends FieldValues>({
   );
 };
 
-FormField.displayName = 'FormField';
+FormField.displayName = "FormField";

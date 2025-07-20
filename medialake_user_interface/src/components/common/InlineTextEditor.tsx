@@ -1,7 +1,13 @@
-import React, { useRef, useEffect, useState, useLayoutEffect, useCallback } from 'react';
-import { TextField, TextFieldProps } from '@mui/material';
+import React, {
+  useRef,
+  useEffect,
+  useState,
+  useLayoutEffect,
+  useCallback,
+} from "react";
+import { TextField, TextFieldProps } from "@mui/material";
 
-interface InlineTextEditorProps extends Omit<TextFieldProps, 'value'> {
+interface InlineTextEditorProps extends Omit<TextFieldProps, "value"> {
   /** Called once when editing finishes (onBlur or Enter) */
   onChangeCommit: (newValue: string) => void;
   onComplete?: (save: boolean, value?: string) => void;
@@ -70,11 +76,11 @@ export const InlineTextEditor: React.FC<InlineTextEditorProps> = React.memo(
       onComplete?.(false, undefined);
     }, [onComplete]);
     const handleKeyDown = (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') {
+      if (e.key === "Enter") {
         commit();
         e.preventDefault();
       }
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         cancel();
         e.preventDefault();
       }
@@ -129,7 +135,7 @@ export const InlineTextEditor: React.FC<InlineTextEditorProps> = React.memo(
         fullWidth
       />
     );
-  }
+  },
 );
 
-InlineTextEditor.displayName = 'InlineTextEditor';
+InlineTextEditor.displayName = "InlineTextEditor";

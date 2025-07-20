@@ -1,31 +1,39 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import { ColumnFiltersState, PaginationState } from '@tanstack/react-table';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { ColumnFiltersState, PaginationState } from "@tanstack/react-table";
 import {
   useGetPipelines,
   useDeletePipeline,
   useStartPipeline,
   useStopPipeline,
   useUpdatePipeline,
-} from '../api/pipelinesController';
-import type { Pipeline, PipelinesResponse } from '../types/pipelines.types';
-import queryClient from '@/api/queryClient';
+} from "../api/pipelinesController";
+import type { Pipeline, PipelinesResponse } from "../types/pipelines.types";
+import queryClient from "@/api/queryClient";
 
 const PAGE_SIZE = 20;
 
 export const usePipelineManager = () => {
   // Track which pipelines are currently being toggled
-  const [togglingPipelines, setTogglingPipelines] = useState<Record<string, boolean>>({});
+  const [togglingPipelines, setTogglingPipelines] = useState<
+    Record<string, boolean>
+  >({});
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [showDeleteButton, setShowDeleteButton] = useState(false);
-  const [globalFilter, setGlobalFilter] = useState('');
+  const [globalFilter, setGlobalFilter] = useState("");
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState({});
-  const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(null);
-  const [filterMenuAnchor, setFilterMenuAnchor] = useState<null | HTMLElement>(null);
-  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
+  const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(
+    null,
+  );
+  const [filterMenuAnchor, setFilterMenuAnchor] = useState<null | HTMLElement>(
+    null,
+  );
+  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(
+    null,
+  );
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: PAGE_SIZE,
@@ -33,26 +41,31 @@ export const usePipelineManager = () => {
 
   const [deleteDialog, setDeleteDialog] = useState({
     open: false,
-    pipelineId: '',
-    pipelineName: '',
-    userInput: '',
+    pipelineId: "",
+    pipelineName: "",
+    userInput: "",
   });
 
   const [filters, setFilters] = useState({
-    type: '',
-    name: '',
-    system: '',
-    sortBy: 'createdAt',
-    sortOrder: 'desc' as 'asc' | 'desc',
+    type: "",
+    name: "",
+    system: "",
+    sortBy: "createdAt",
+    sortOrder: "desc" as "asc" | "desc",
   });
 
   const [snackbar, setSnackbar] = useState({
     open: false,
-    message: '',
-    severity: 'success' as 'success' | 'error',
+    message: "",
+    severity: "success" as "success" | "error",
   });
 
-  const { data: pipelinesResponse, isLoading, error, refetch } = useGetPipelines();
+  const {
+    data: pipelinesResponse,
+    isLoading,
+    error,
+    refetch,
+  } = useGetPipelines();
 
   const deletePipelineMutation = useDeletePipeline();
   const startPipelineMutation = useStartPipeline();
@@ -69,9 +82,12 @@ export const usePipelineManager = () => {
         shiftKeyPressed = true;
       }
 
-      if (shiftKeyPressed && ['d', 'e', 'l'].includes(event.key.toLowerCase())) {
+      if (
+        shiftKeyPressed &&
+        ["d", "e", "l"].includes(event.key.toLowerCase())
+      ) {
         keySequence.push(event.key.toLowerCase());
-        if (keySequence.join('') === 'del') {
+        if (keySequence.join("") === "del") {
           event.preventDefault();
           setShowDeleteButton((prev) => !prev);
           keySequence = [];
@@ -82,18 +98,18 @@ export const usePipelineManager = () => {
     };
 
     const handleKeyUp = (event: KeyboardEvent) => {
-      if (event.key === 'Shift') {
+      if (event.key === "Shift") {
         shiftKeyPressed = false;
         keySequence = [];
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
 
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
     };
   }, []);
 
@@ -112,16 +128,16 @@ export const usePipelineManager = () => {
       open: true,
       pipelineId: id,
       pipelineName: name,
-      userInput: '',
+      userInput: "",
     });
   };
 
   const closeDeleteDialog = () => {
     setDeleteDialog({
       open: false,
-      pipelineId: '',
-      pipelineName: '',
-      userInput: '',
+      pipelineId: "",
+      pipelineName: "",
+      userInput: "",
     });
   };
 
@@ -137,7 +153,10 @@ export const usePipelineManager = () => {
     setColumnMenuAnchor(null);
   };
 
-  const handleFilterMenuOpen = (event: React.MouseEvent<HTMLElement>, columnId: string) => {
+  const handleFilterMenuOpen = (
+    event: React.MouseEvent<HTMLElement>,
+    columnId: string,
+  ) => {
     setFilterMenuAnchor(event.currentTarget);
     setActiveFilterColumn(columnId);
   };
@@ -174,15 +193,17 @@ export const usePipelineManager = () => {
     // Non-blocking function that handles errors and timeouts
     deletePipeline: (id: string) => {
       const startTime = performance.now();
-      console.log(`[usePipelineManager] Starting delete operation for pipeline ID: ${id}`);
+      console.log(
+        `[usePipelineManager] Starting delete operation for pipeline ID: ${id}`,
+      );
 
       // Create a timeout promise to prevent hanging
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
           console.error(
-            `[usePipelineManager] Delete operation timed out after 30 seconds for pipeline ID: ${id}`
+            `[usePipelineManager] Delete operation timed out after 30 seconds for pipeline ID: ${id}`,
           );
-          reject(new Error('Delete operation timed out after 30 seconds'));
+          reject(new Error("Delete operation timed out after 30 seconds"));
         }, 30000);
       });
 
@@ -194,14 +215,14 @@ export const usePipelineManager = () => {
             console.log(
               `[usePipelineManager] Delete operation completed successfully for pipeline ID: ${id} in ${
                 performance.now() - startTime
-              }ms`
+              }ms`,
             );
 
             // Refresh the pipeline list in the background
             refetch().catch((refetchError) => {
               console.error(
                 `[usePipelineManager] Error refreshing pipeline list after deletion:`,
-                refetchError
+                refetchError,
               );
             });
 
@@ -212,14 +233,14 @@ export const usePipelineManager = () => {
               `[usePipelineManager] Error in delete operation for pipeline ID: ${id} after ${
                 performance.now() - startTime
               }ms`,
-              error
+              error,
             );
 
             // Still try to refresh the list in case the deletion actually succeeded
             refetch().catch((refetchError) => {
               console.error(
                 `[usePipelineManager] Error refreshing pipeline list after deletion:`,
-                refetchError
+                refetchError,
               );
             });
 
@@ -234,18 +255,20 @@ export const usePipelineManager = () => {
 
     // Enhanced toggleActive with optimistic updates
     toggleActive: (id: string, active: boolean) => {
-      console.log(`[usePipelineManager] Toggling pipeline ${id} active state to ${active}`);
+      console.log(
+        `[usePipelineManager] Toggling pipeline ${id} active state to ${active}`,
+      );
 
       // Mark this pipeline as currently toggling
       setTogglingPipelines((prev) => ({ ...prev, [id]: true }));
 
       // Create a copy of the current pipelines for optimistic update
       const updatedPipelines = pipelines.map((pipeline) =>
-        pipeline.id === id ? { ...pipeline, active } : pipeline
+        pipeline.id === id ? { ...pipeline, active } : pipeline,
       );
 
       // Optimistically update the query data
-      queryClient.setQueryData(['pipelines', 'list'], {
+      queryClient.setQueryData(["pipelines", "list"], {
         ...pipelinesResponse,
         data: {
           ...pipelinesResponse?.data,
@@ -260,7 +283,7 @@ export const usePipelineManager = () => {
         })
         .then(() => {
           console.log(
-            `[usePipelineManager] Successfully toggled pipeline ${id} active state to ${active}`
+            `[usePipelineManager] Successfully toggled pipeline ${id} active state to ${active}`,
           );
           // Remove from toggling state
           setTogglingPipelines((prev) => {
@@ -272,10 +295,13 @@ export const usePipelineManager = () => {
           refetch();
         })
         .catch((error) => {
-          console.error(`[usePipelineManager] Error toggling pipeline ${id} active state:`, error);
+          console.error(
+            `[usePipelineManager] Error toggling pipeline ${id} active state:`,
+            error,
+          );
 
           // Revert the optimistic update on error
-          queryClient.setQueryData(['pipelines', 'list'], pipelinesResponse);
+          queryClient.setQueryData(["pipelines", "list"], pipelinesResponse);
 
           // Remove from toggling state
           setTogglingPipelines((prev) => {
@@ -287,10 +313,10 @@ export const usePipelineManager = () => {
           // Show error in snackbar
           setSnackbar({
             open: true,
-            message: `Failed to ${active ? 'enable' : 'disable'} pipeline: ${
-              error.message || 'Unknown error'
+            message: `Failed to ${active ? "enable" : "disable"} pipeline: ${
+              error.message || "Unknown error"
             }`,
-            severity: 'error',
+            severity: "error",
           });
 
           throw error;

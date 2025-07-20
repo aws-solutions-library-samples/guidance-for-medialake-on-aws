@@ -1,9 +1,9 @@
-import { useEffect, useCallback, useRef } from 'react';
-import { useAuth } from '../common/hooks/auth-context';
-import { authService } from '../api/authService';
-import { isTokenExpiringSoon } from '../common/helpers/token-helper';
-import { StorageHelper } from '../common/helpers/storage-helper';
-import { logPermissionDebugInfo } from '../utils/permission-debug';
+import { useEffect, useCallback, useRef } from "react";
+import { useAuth } from "../common/hooks/auth-context";
+import { authService } from "../api/authService";
+import { isTokenExpiringSoon } from "../common/helpers/token-helper";
+import { StorageHelper } from "../common/helpers/storage-helper";
+import { logPermissionDebugInfo } from "../utils/permission-debug";
 
 export const useTokenRefresh = () => {
   const { refreshSession, isAuthenticated, checkAuthStatus } = useAuth();
@@ -18,14 +18,14 @@ export const useTokenRefresh = () => {
     try {
       // Check if token is expiring soon (5 minutes before expiry)
       if (isTokenExpiringSoon(token, 300)) {
-        console.log('Token is expiring soon, refreshing...');
+        console.log("Token is expiring soon, refreshing...");
         refreshInProgress.current = true;
 
         try {
           await refreshSession();
-          console.log('Token refreshed successfully');
+          console.log("Token refreshed successfully");
         } catch (error) {
-          console.error('Failed to refresh token:', error);
+          console.error("Failed to refresh token:", error);
           // If refresh fails, check auth status to potentially redirect to login
           await checkAuthStatus();
         } finally {
@@ -33,7 +33,7 @@ export const useTokenRefresh = () => {
         }
       }
     } catch (error) {
-      console.error('Error checking token expiration:', error);
+      console.error("Error checking token expiration:", error);
       refreshInProgress.current = false;
     }
   }, [isAuthenticated, refreshSession, checkAuthStatus]);
@@ -56,7 +56,7 @@ export const useTokenRefresh = () => {
     };
 
     // Listen for user activity events
-    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+    const events = ["mousedown", "keydown", "scroll", "touchstart"];
     events.forEach((event) => {
       document.addEventListener(event, handleUserActivity, { passive: true });
     });
@@ -64,7 +64,7 @@ export const useTokenRefresh = () => {
     // Handle when user returns to the tab
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        console.log('User returned to tab, checking token status...');
+        console.log("User returned to tab, checking token status...");
         logPermissionDebugInfo(); // Log debug info when user returns
         // Small delay to ensure any background token refresh has completed
         setTimeout(() => {
@@ -73,25 +73,25 @@ export const useTokenRefresh = () => {
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     // Handle when window regains focus
     const handleFocus = () => {
-      console.log('Window regained focus, checking token status...');
+      console.log("Window regained focus, checking token status...");
       setTimeout(() => {
         checkAndRefreshToken();
       }, 1000);
     };
 
-    window.addEventListener('focus', handleFocus);
+    window.addEventListener("focus", handleFocus);
 
     return () => {
       clearInterval(interval);
       events.forEach((event) => {
         document.removeEventListener(event, handleUserActivity);
       });
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
     };
   }, [isAuthenticated, checkAndRefreshToken]);
 

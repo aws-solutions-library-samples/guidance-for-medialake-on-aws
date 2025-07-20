@@ -1,5 +1,5 @@
-import React, { ReactNode } from 'react';
-import { Paper, Typography, Box, useTheme } from '@mui/material';
+import React, { ReactNode } from "react";
+import { Paper, Typography, Box, useTheme } from "@mui/material";
 
 interface StatCardProps {
   icon: ReactNode;
@@ -8,7 +8,12 @@ interface StatCardProps {
   subtitle: string;
 }
 
-export const StatCard: React.FC<StatCardProps> = ({ icon, title, value, subtitle }) => {
+export const StatCard: React.FC<StatCardProps> = ({
+  icon,
+  title,
+  value,
+  subtitle,
+}) => {
   const theme = useTheme();
 
   return (
@@ -16,27 +21,31 @@ export const StatCard: React.FC<StatCardProps> = ({ icon, title, value, subtitle
       elevation={0}
       sx={{
         p: 3,
-        height: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
-        backdropFilter: 'blur(10px)',
-        border: '1px solid',
-        borderColor: 'divider',
+        height: "100%",
+        display: "flex",
+        alignItems: "center",
+        backgroundColor: "rgba(255, 255, 255, 0.8)",
+        backdropFilter: "blur(10px)",
+        border: "1px solid",
+        borderColor: "divider",
         borderRadius: 2,
-        transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
-        '&:hover': {
-          transform: 'translateY(-2px)',
+        transition: "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
+        "&:hover": {
+          transform: "translateY(-2px)",
           boxShadow: theme.shadows[2],
         },
       }}
     >
-      <Box sx={{ mr: 2, color: 'primary.main' }}>{icon}</Box>
+      <Box sx={{ mr: 2, color: "primary.main" }}>{icon}</Box>
       <Box>
         <Typography variant="h6" component="div" sx={{ mb: 0.5 }}>
           {title}
         </Typography>
-        <Typography variant="h4" component="div" sx={{ mb: 0.5, fontWeight: 'bold' }}>
+        <Typography
+          variant="h4"
+          component="div"
+          sx={{ mb: 0.5, fontWeight: "bold" }}
+        >
           {value}
         </Typography>
         <Typography variant="body2" color="text.secondary">

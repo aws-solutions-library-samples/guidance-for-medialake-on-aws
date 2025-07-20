@@ -1,7 +1,15 @@
-import React from 'react';
-import { Box, Typography, List, ListItem, ListItemIcon, ListItemText, Chip } from '@mui/material';
-import HistoryIcon from '@mui/icons-material/History';
-import { formatFileSize } from '../../utils/imageUtils';
+import React from "react";
+import {
+  Box,
+  Typography,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Chip,
+} from "@mui/material";
+import HistoryIcon from "@mui/icons-material/History";
+import { formatFileSize } from "../../utils/imageUtils";
 
 interface Representation {
   id: string;
@@ -25,20 +33,25 @@ const AssetVersions: React.FC<AssetVersionsProps> = ({ versions }) => {
             key={version.id}
             sx={{
               mb: 2,
-              border: '1px solid',
-              borderColor: 'divider',
+              border: "1px solid",
+              borderColor: "divider",
               borderRadius: 1,
-              flexDirection: 'column',
-              alignItems: 'flex-start',
+              flexDirection: "column",
+              alignItems: "flex-start",
               p: 2,
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'flex-start', width: '100%' }}>
+            <Box
+              sx={{ display: "flex", alignItems: "flex-start", width: "100%" }}
+            >
               <ListItemIcon sx={{ minWidth: 40, mt: 0.5 }}>
                 <HistoryIcon />
               </ListItemIcon>
               <Box sx={{ flex: 1 }}>
-                <Typography variant="subtitle1" sx={{ textTransform: 'capitalize' }}>
+                <Typography
+                  variant="subtitle1"
+                  sx={{ textTransform: "capitalize" }}
+                >
                   {version.type}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">

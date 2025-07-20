@@ -1,14 +1,14 @@
-import React from 'react';
-import { Box, Button } from '@mui/material';
-import { useTranslation } from 'react-i18next';
-import { Form } from './Form';
-import { FormField } from './FormField';
-import { FormSelect } from './FormSelect';
-import { FormSwitch } from './FormSwitch';
-import { useFormWithValidation } from '../hooks/useFormWithValidation';
-import { FormDefinition, FormFieldDefinition } from '../types';
-import { createZodSchema } from '../utils/createZodSchema';
-import { z } from 'zod';
+import React from "react";
+import { Box, Button } from "@mui/material";
+import { useTranslation } from "react-i18next";
+import { Form } from "./Form";
+import { FormField } from "./FormField";
+import { FormSelect } from "./FormSelect";
+import { FormSwitch } from "./FormSwitch";
+import { useFormWithValidation } from "../hooks/useFormWithValidation";
+import { FormDefinition, FormFieldDefinition } from "../types";
+import { createZodSchema } from "../utils/createZodSchema";
+import { z } from "zod";
 
 interface DynamicFormProps {
   definition: FormDefinition;
@@ -20,12 +20,19 @@ interface DynamicFormProps {
 }
 
 export const DynamicForm: React.FC<DynamicFormProps> = React.memo(
-  ({ definition, defaultValues, onSubmit, onCancel, onBack, showButtons = true }) => {
+  ({
+    definition,
+    defaultValues,
+    onSubmit,
+    onCancel,
+    onBack,
+    showButtons = true,
+  }) => {
     const { t } = useTranslation();
 
     // Only log initial mount
     React.useEffect(() => {
-      console.log('[DynamicForm] Mounted:', {
+      console.log("[DynamicForm] Mounted:", {
         formId: definition.id,
         hasDefaultValues: !!defaultValues,
       });
@@ -35,7 +42,7 @@ export const DynamicForm: React.FC<DynamicFormProps> = React.memo(
     const fields = React.useMemo(
       () => definition.fields,
       // Use JSON.stringify to compare deep equality
-      [JSON.stringify(definition.fields)]
+      [JSON.stringify(definition.fields)],
     );
 
     // Create schema using cached version
@@ -44,8 +51,8 @@ export const DynamicForm: React.FC<DynamicFormProps> = React.memo(
     const form = useFormWithValidation({
       validationSchema: schema,
       defaultValues: defaultValues || { parameters: {} },
-      mode: 'onBlur',
-      reValidateMode: 'onBlur',
+      mode: "onBlur",
+      reValidateMode: "onBlur",
     });
 
     const renderField = React.useMemo(() => {
@@ -69,13 +76,21 @@ export const DynamicForm: React.FC<DynamicFormProps> = React.memo(
         };
 
         switch (field.type) {
-          case 'select':
-            return <FormSelect {...commonProps} options={field.options || []} />;
+          case "select":
+            return (
+              <FormSelect {...commonProps} options={field.options || []} />
+            );
 
-          case 'multiselect':
-            return <FormSelect {...commonProps} options={field.options || []} multiple />;
+          case "multiselect":
+            return (
+              <FormSelect
+                {...commonProps}
+                options={field.options || []}
+                multiple
+              />
+            );
 
-          case 'switch':
+          case "switch":
             return <FormSwitch {...commonProps} />;
 
           default:
@@ -86,44 +101,64 @@ export const DynamicForm: React.FC<DynamicFormProps> = React.memo(
 
     const handleSubmit = React.useCallback(
       async (data: any) => {
-        console.log('[DynamicForm] Submitting form with data:', data);
+        console.log("[DynamicForm] Submitting form with data:", data);
         try {
           // Parse and validate
           const validatedData = schema.safeParse(data);
 
           if (!validatedData.success) {
-            console.error('[DynamicForm] Validation failed:', validatedData.error);
-            console.error('[DynamicForm] Validation errors:', validatedData.error.errors);
-            console.error('[DynamicForm] Form data that failed validation:', data);
+            console.error(
+              "[DynamicForm] Validation failed:",
+              validatedData.error,
+            );
+            console.error(
+              "[DynamicForm] Validation errors:",
+              validatedData.error.errors,
+            );
+            console.error(
+              "[DynamicForm] Form data that failed validation:",
+              data,
+            );
 
             // Try to submit anyway with the original data
             console.warn(
-              '[DynamicForm] Attempting to submit with original data despite validation errors'
+              "[DynamicForm] Attempting to submit with original data despite validation errors",
             );
             try {
               await onSubmit(data);
-              console.log('[DynamicForm] Submit successful despite validation errors');
+              console.log(
+                "[DynamicForm] Submit successful despite validation errors",
+              );
               return;
             } catch (submitError) {
-              console.error('[DynamicForm] Submit failed with original data:', submitError);
+              console.error(
+                "[DynamicForm] Submit failed with original data:",
+                submitError,
+              );
               throw validatedData.error;
             }
           }
 
-          console.log('[DynamicForm] Validation successful, submitting data:', validatedData.data);
+          console.log(
+            "[DynamicForm] Validation successful, submitting data:",
+            validatedData.data,
+          );
           await onSubmit(validatedData.data);
         } catch (error) {
-          console.error('[DynamicForm] Submit error:', error);
+          console.error("[DynamicForm] Submit error:", error);
           throw error;
         }
       },
-      [onSubmit, schema]
+      [onSubmit, schema],
     );
 
     // Only log errors and submission state
     React.useEffect(() => {
-      if (form.formState.errors && Object.keys(form.formState.errors).length > 0) {
-        console.log('[DynamicForm] Form errors:', form.formState.errors);
+      if (
+        form.formState.errors &&
+        Object.keys(form.formState.errors).length > 0
+      ) {
+        console.log("[DynamicForm] Form errors:", form.formState.errors);
       }
     }, [form.formState.errors]);
 
@@ -135,10 +170,12 @@ export const DynamicForm: React.FC<DynamicFormProps> = React.memo(
         showButtons={showButtons}
         id={definition.id}
       >
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>{renderField}</Box>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          {renderField}
+        </Box>
       </Form>
     );
-  }
+  },
 );
 
-DynamicForm.displayName = 'DynamicForm';
+DynamicForm.displayName = "DynamicForm";

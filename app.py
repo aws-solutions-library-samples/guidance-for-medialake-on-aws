@@ -264,7 +264,9 @@ class MediaLakeStack(cdk.Stack):
         )
 
         # Now that pipeline_stack is created, configure the integrations stack with the pipeline lambda
-        integrations_stack.set_post_pipelines_lambda(pipeline_stack.post_pipelines_async_handler)
+        integrations_stack.set_post_pipelines_lambda(
+            pipeline_stack.post_pipelines_async_handler
+        )
 
         _ = SettingsApiStack(
             self,

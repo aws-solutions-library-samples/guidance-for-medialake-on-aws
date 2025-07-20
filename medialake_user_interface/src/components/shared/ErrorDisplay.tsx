@@ -1,6 +1,6 @@
-import React from 'react';
-import { Box, Paper, Typography, Alert, AlertTitle } from '@mui/material';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import React from "react";
+import { Box, Paper, Typography, Alert, AlertTitle } from "@mui/material";
+import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 
 interface ErrorDisplayProps {
   title: string;
@@ -8,7 +8,11 @@ interface ErrorDisplayProps {
   detailedMessage?: string;
 }
 
-const ErrorDisplay: React.FC<ErrorDisplayProps> = ({ title, message, detailedMessage }) => {
+const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
+  title,
+  message,
+  detailedMessage,
+}) => {
   return (
     <Box sx={{ mt: 4 }}>
       <Paper
@@ -16,16 +20,16 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({ title, message, detailedMes
         sx={{
           p: 4,
           borderRadius: 2,
-          bgcolor: 'background.paper',
+          bgcolor: "background.paper",
           border: (theme) => `1px solid ${theme.palette.divider}`,
         }}
       >
         <Box
           sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            textAlign: 'center',
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            textAlign: "center",
             mb: 3,
           }}
         >

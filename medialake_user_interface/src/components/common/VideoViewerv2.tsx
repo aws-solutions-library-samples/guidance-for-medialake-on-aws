@@ -1,15 +1,22 @@
 // VideoViewer.tsx
-import React, { useEffect, useRef, useCallback, useState, FC, SyntheticEvent } from 'react';
-import { OmakasePlayer } from '@byomakase/omakase-player';
-import Slider from '@mui/material/Slider';
-import IconButton from '@mui/material/IconButton';
-import Tooltip from '@mui/material/Tooltip';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import PauseIcon from '@mui/icons-material/Pause';
-import VolumeUpIcon from '@mui/icons-material/VolumeUp';
-import VolumeOffIcon from '@mui/icons-material/VolumeOff';
-import FullscreenIcon from '@mui/icons-material/Fullscreen';
-import './VideoViewer.css';
+import React, {
+  useEffect,
+  useRef,
+  useCallback,
+  useState,
+  FC,
+  SyntheticEvent,
+} from "react";
+import { OmakasePlayer } from "@byomakase/omakase-player";
+import Slider from "@mui/material/Slider";
+import IconButton from "@mui/material/IconButton";
+import Tooltip from "@mui/material/Tooltip";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import PauseIcon from "@mui/icons-material/Pause";
+import VolumeUpIcon from "@mui/icons-material/VolumeUp";
+import VolumeOffIcon from "@mui/icons-material/VolumeOff";
+import FullscreenIcon from "@mui/icons-material/Fullscreen";
+import "./VideoViewer.css";
 
 export interface VideoViewerProps {
   videoSrc: string;
@@ -38,7 +45,7 @@ export interface VideoViewerProps {
 const useOmakasePlayer = (
   videoSrc: string,
   containerRef: React.RefObject<HTMLDivElement>,
-  callbacks: Partial<VideoViewerProps>
+  callbacks: Partial<VideoViewerProps>,
 ) => {
   const playerRef = useRef<OmakasePlayer | null>(null);
   const [duration, setDuration] = useState(0);
@@ -57,16 +64,16 @@ const useOmakasePlayer = (
       player.loadVideo(videoSrc, 25).subscribe({
         next: (video) => {
           console.log(
-            `Video loaded. Duration: ${video.duration}, totalFrames: ${video.totalFrames}`
+            `Video loaded. Duration: ${video.duration}, totalFrames: ${video.totalFrames}`,
           );
           setDuration(video.duration);
         },
         error: (error) => {
-          console.error('Error loading video:', error);
+          console.error("Error loading video:", error);
           callbacks.onError?.(error);
         },
         complete: () => {
-          console.log('Video loading completed');
+          console.log("Video loading completed");
         },
       }),
       player.video.onPlay$.subscribe({
@@ -89,13 +96,13 @@ const useOmakasePlayer = (
       }),
       player.video.onBuffering$.subscribe({
         next: () => {
-          console.log('Video buffering');
+          console.log("Video buffering");
           callbacks.onBuffering?.();
         },
       }),
       player.video.onEnded$.subscribe({
         next: () => {
-          console.log('Video ended');
+          console.log("Video ended");
           callbacks.onEnded?.();
         },
       }),
@@ -119,7 +126,7 @@ const useOmakasePlayer = (
       }),
       player.video.onVideoError$.subscribe({
         next: (error) => {
-          console.error('Video error:', error);
+          console.error("Video error:", error);
           callbacks.onError?.(error);
         },
       }),
@@ -173,25 +180,25 @@ const useOmakasePlayer = (
     (id: string) => {
       playerRef.current?.video.removeSafeZone(id).subscribe({
         next: () => {
-          console.log('Safe zone removed:', id);
+          console.log("Safe zone removed:", id);
           callbacks.onRemoveSafeZone?.(id);
         },
         error: (error) => {
-          console.error('Error removing safe zone:', error);
+          console.error("Error removing safe zone:", error);
         },
       });
     },
-    [callbacks]
+    [callbacks],
   );
 
   const clearSafeZones = useCallback(() => {
     playerRef.current?.video.clearSafeZones().subscribe({
       next: () => {
-        console.log('All safe zones cleared');
+        console.log("All safe zones cleared");
         callbacks.onClearSafeZones?.();
       },
       error: (error) => {
-        console.error('Error clearing safe zones:', error);
+        console.error("Error clearing safe zones:", error);
       },
     });
   }, [callbacks]);
@@ -226,7 +233,7 @@ function ThumbLabel(props: any) {
         <img
           src={thumbnailUrl}
           alt={`Thumbnail at ${value}`}
-          style={{ width: 100, display: 'block' }}
+          style={{ width: 100, display: "block" }}
         />
       }
       placement="top"
@@ -322,14 +329,17 @@ export const VideoViewer: FC<VideoViewerProps> = ({
     // (Optional: you might want to update a “preview” state here)
   };
 
-  const handleSeekCommitted = (event: Event | SyntheticEvent, newValue: number | number[]) => {
-    if (typeof newValue === 'number') {
+  const handleSeekCommitted = (
+    event: Event | SyntheticEvent,
+    newValue: number | number[],
+  ) => {
+    if (typeof newValue === "number") {
       seek(newValue);
     }
   };
 
   const handleVolumeChange = (event: Event, newValue: number | number[]) => {
-    if (typeof newValue === 'number') {
+    if (typeof newValue === "number") {
       setPlayerVolume(newValue);
       setVolumeState(newValue);
     }
@@ -356,7 +366,7 @@ export const VideoViewer: FC<VideoViewerProps> = ({
   const formatTime = (time: number): string => {
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+    return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
   };
 
   return (

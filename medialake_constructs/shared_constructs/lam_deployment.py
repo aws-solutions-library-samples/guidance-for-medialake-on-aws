@@ -139,7 +139,7 @@ class LambdaDeployment(Construct):
             d = os.path.join(package_path, item)
             if os.path.isfile(s):
                 shutil.copy2(s, d)
-        
+
         shutil.make_archive(zip_path.replace(".zip", ""), "zip", package_path)
 
     def _package_nodejs_lambda(self, source_path, package_path, zip_path):

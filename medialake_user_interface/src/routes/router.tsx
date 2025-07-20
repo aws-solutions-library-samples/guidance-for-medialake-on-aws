@@ -1,30 +1,30 @@
-import React from 'react';
-import { createBrowserRouter, Navigate, useParams } from 'react-router-dom';
-import AuthPage from '@/components/AuthPage';
-import AppLayout from '@/components/AppLayout';
-import { ProtectedRoute } from '@/components/ProtectedRoute';
-import { RouteErrorBoundary } from '@/shared/ui/errors';
-import { RoutePermissionGuard } from '@/permissions';
-import AccessDeniedPage from '@/pages/AccessDeniedPage';
-import GroupBasedAccess from '@/components/examples/GroupBasedAccess';
-import Home from '@/pages/Home';
-import SearchPage from '@/pages/SearchPage';
-import AssetsPage from '@/pages/AssetsPage';
-import UploadDemo from '@/pages/UploadDemo';
-import { S3Explorer } from '@/features/home/S3Explorer';
-import { ExecutionsPage } from '@/features/executions';
-import { PipelinesPage, PipelineEditorPage } from '@/features/pipelines/pages';
-import ImageDetailPage from '@/pages/ImageDetailPage';
-import VideoDetailPage from '@/pages/VideoDetailPage';
-import AudioDetailPage from '@/pages/AudioDetailPage';
-import ConnectorsPage from '@/pages/settings/ConnectorsPage';
-import ProfilePage from '@/pages/settings/ProfilePage';
-import UserManagement from '@/pages/settings/UserManagement';
-import RoleManagement from '@/pages/settings/RoleManagement';
-import IntegrationsPage from '@/pages/settings/IntegrationsPage';
-import EnvironmentsPage from '@/pages/settings/EnvironmentsPage';
-import SystemSettingsPage from '@/pages/settings/SystemSettingsPage';
-import PermissionSetsPage from '@/pages/settings/PermissionSetsPage';
+import React from "react";
+import { createBrowserRouter, Navigate, useParams } from "react-router-dom";
+import AuthPage from "@/components/AuthPage";
+import AppLayout from "@/components/AppLayout";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { RouteErrorBoundary } from "@/shared/ui/errors";
+import { RoutePermissionGuard } from "@/permissions";
+import AccessDeniedPage from "@/pages/AccessDeniedPage";
+import GroupBasedAccess from "@/components/examples/GroupBasedAccess";
+import Home from "@/pages/Home";
+import SearchPage from "@/pages/SearchPage";
+import AssetsPage from "@/pages/AssetsPage";
+import UploadDemo from "@/pages/UploadDemo";
+import { S3Explorer } from "@/features/home/S3Explorer";
+import { ExecutionsPage } from "@/features/executions";
+import { PipelinesPage, PipelineEditorPage } from "@/features/pipelines/pages";
+import ImageDetailPage from "@/pages/ImageDetailPage";
+import VideoDetailPage from "@/pages/VideoDetailPage";
+import AudioDetailPage from "@/pages/AudioDetailPage";
+import ConnectorsPage from "@/pages/settings/ConnectorsPage";
+import ProfilePage from "@/pages/settings/ProfilePage";
+import UserManagement from "@/pages/settings/UserManagement";
+import RoleManagement from "@/pages/settings/RoleManagement";
+import IntegrationsPage from "@/pages/settings/IntegrationsPage";
+import EnvironmentsPage from "@/pages/settings/EnvironmentsPage";
+import SystemSettingsPage from "@/pages/settings/SystemSettingsPage";
+import PermissionSetsPage from "@/pages/settings/PermissionSetsPage";
 
 const S3ExplorerWrapper = () => {
   const { connectorId } = useParams<{ connectorId: string }>();
@@ -33,17 +33,17 @@ const S3ExplorerWrapper = () => {
 
 export const router = createBrowserRouter([
   {
-    path: '/sign-in',
+    path: "/sign-in",
     element: <AuthPage />,
     errorElement: <RouteErrorBoundary />,
   },
   {
-    path: '/access-denied',
+    path: "/access-denied",
     element: <AccessDeniedPage />,
     errorElement: <RouteErrorBoundary />,
   },
   {
-    path: '/',
+    path: "/",
     element: (
       <ProtectedRoute>
         <AppLayout />
@@ -56,208 +56,208 @@ export const router = createBrowserRouter([
         element: <Home />,
       },
       {
-        path: 'search',
+        path: "search",
         element: (
           <RoutePermissionGuard
-            permission={{ action: 'view', subject: 'asset' }}
+            permission={{ action: "view", subject: "asset" }}
             element={<SearchPage />}
           />
         ),
       },
       {
-        path: 's3/explorer/:connectorId',
+        path: "s3/explorer/:connectorId",
         element: (
           <RoutePermissionGuard
-            permission={{ action: 'view', subject: 'connector' }}
+            permission={{ action: "view", subject: "connector" }}
             element={<S3ExplorerWrapper />}
           />
         ),
       },
       {
-        path: 'assets',
+        path: "assets",
         element: (
           <RoutePermissionGuard
-            permission={{ action: 'view', subject: 'asset' }}
+            permission={{ action: "view", subject: "asset" }}
             element={<AssetsPage />}
           />
         ),
       },
       {
-        path: 'assets/upload',
+        path: "assets/upload",
         element: (
           <RoutePermissionGuard
-            permission={{ action: 'upload', subject: 'asset' }}
+            permission={{ action: "upload", subject: "asset" }}
             element={<UploadDemo />}
           />
         ),
       },
       {
-        path: 'executions',
+        path: "executions",
         element: (
           <RoutePermissionGuard
-            permission={{ action: 'view', subject: 'pipeline' }}
+            permission={{ action: "view", subject: "pipeline" }}
             element={<ExecutionsPage />}
           />
         ),
       },
       {
-        path: 'pipelines',
+        path: "pipelines",
         element: (
           <RoutePermissionGuard
-            permission={{ action: 'view', subject: 'pipeline' }}
+            permission={{ action: "view", subject: "pipeline" }}
             element={<PipelinesPage />}
           />
         ),
       },
       {
-        path: 'pipelines/new',
+        path: "pipelines/new",
         element: (
           <RoutePermissionGuard
-            permission={{ action: 'create', subject: 'pipeline' }}
+            permission={{ action: "create", subject: "pipeline" }}
             element={<PipelineEditorPage />}
           />
         ),
       },
       {
-        path: 'images/:id',
+        path: "images/:id",
         element: (
           <RoutePermissionGuard
-            permission={{ action: 'view', subject: 'asset' }}
+            permission={{ action: "view", subject: "asset" }}
             element={<ImageDetailPage />}
           />
         ),
       },
       {
-        path: 'videos/:id',
+        path: "videos/:id",
         element: (
           <RoutePermissionGuard
-            permission={{ action: 'view', subject: 'asset' }}
+            permission={{ action: "view", subject: "asset" }}
             element={<VideoDetailPage />}
           />
         ),
       },
       {
-        path: 'audio/:id',
+        path: "audio/:id",
         element: (
           <RoutePermissionGuard
-            permission={{ action: 'view', subject: 'asset' }}
+            permission={{ action: "view", subject: "asset" }}
             element={<AudioDetailPage />}
           />
         ),
       },
       {
-        path: 'settings/profile',
+        path: "settings/profile",
         element: <ProfilePage />,
       },
       {
-        path: 'settings/connectors',
+        path: "settings/connectors",
         element: (
           <RoutePermissionGuard
-            permission={{ action: 'manage', subject: 'connector' }}
+            permission={{ action: "manage", subject: "connector" }}
             element={<ConnectorsPage />}
           />
         ),
       },
       {
-        path: 'settings/users',
+        path: "settings/users",
         element: (
           <RoutePermissionGuard
-            permission={{ action: 'manage', subject: 'user' }}
+            permission={{ action: "manage", subject: "user" }}
             element={<UserManagement />}
           />
         ),
       },
       {
-        path: 'settings/users-groups',
+        path: "settings/users-groups",
         element: (
           <RoutePermissionGuard
-            permission={{ action: 'manage', subject: 'group' }}
+            permission={{ action: "manage", subject: "group" }}
             element={<UserManagement />}
           />
         ),
       },
       {
-        path: 'settings/roles',
+        path: "settings/roles",
         element: (
           <RoutePermissionGuard
-            permission={{ action: 'manage', subject: 'permission-set' }}
+            permission={{ action: "manage", subject: "permission-set" }}
             element={<RoleManagement />}
           />
         ),
       },
       {
-        path: 'settings/permission-sets',
+        path: "settings/permission-sets",
         element: (
           <RoutePermissionGuard
-            permission={{ action: 'manage', subject: 'permission-set' }}
+            permission={{ action: "manage", subject: "permission-set" }}
             element={<PermissionSetsPage />}
           />
         ),
       },
       {
-        path: 'settings/integrations',
+        path: "settings/integrations",
         element: (
           <RoutePermissionGuard
-            permission={{ action: 'manage', subject: 'integration' }}
+            permission={{ action: "manage", subject: "integration" }}
             element={<IntegrationsPage />}
           />
         ),
       },
       {
-        path: 'settings/environments',
+        path: "settings/environments",
         element: (
           <RoutePermissionGuard
-            permission={{ action: 'manage', subject: 'settings' }}
+            permission={{ action: "manage", subject: "settings" }}
             element={<EnvironmentsPage />}
           />
         ),
       },
       {
-        path: 'settings/pipelines',
+        path: "settings/pipelines",
         element: (
           <RoutePermissionGuard
-            permission={{ action: 'manage', subject: 'pipeline' }}
+            permission={{ action: "manage", subject: "pipeline" }}
             element={<PipelinesPage />}
           />
         ),
       },
       {
-        path: 'settings/pipelines/new',
+        path: "settings/pipelines/new",
         element: (
           <RoutePermissionGuard
-            permission={{ action: 'create', subject: 'pipeline' }}
+            permission={{ action: "create", subject: "pipeline" }}
             element={<PipelineEditorPage />}
           />
         ),
       },
       {
-        path: 'settings/pipelines/edit/:id',
+        path: "settings/pipelines/edit/:id",
         element: (
           <RoutePermissionGuard
-            permission={{ action: 'edit', subject: 'pipeline' }}
+            permission={{ action: "edit", subject: "pipeline" }}
             element={<PipelineEditorPage />}
           />
         ),
       },
       {
-        path: 'settings/system',
+        path: "settings/system",
         element: (
           <RoutePermissionGuard
-            permission={{ action: 'manage', subject: 'settings' }}
+            permission={{ action: "manage", subject: "settings" }}
             element={<SystemSettingsPage />}
           />
         ),
       },
       {
-        path: 'examples/group-based-access',
+        path: "examples/group-based-access",
         element: <GroupBasedAccess />,
       },
       {
-        path: 'settings',
+        path: "settings",
         element: <Navigate to="settings/profile" replace />,
       },
       {
-        path: '*',
+        path: "*",
         element: <Navigate to="/" replace />,
         errorElement: <RouteErrorBoundary />,
       },

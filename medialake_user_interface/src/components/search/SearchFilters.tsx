@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   List,
   ListItemText,
@@ -8,18 +8,18 @@ import {
   ListItemButton,
   Divider,
   Collapse,
-} from '@mui/material';
-import ExpandLess from '@mui/icons-material/ExpandLess';
-import ExpandMore from '@mui/icons-material/ExpandMore';
+} from "@mui/material";
+import ExpandLess from "@mui/icons-material/ExpandLess";
+import ExpandMore from "@mui/icons-material/ExpandMore";
 
 const filterLabels = {
-  recent: 'Recent',
-  lastWeek: 'Last Week',
-  lastMonth: 'Last Month',
-  lastYear: 'Last Year',
-  videos: 'Videos',
-  images: 'Images',
-  audio: 'Audio',
+  recent: "Recent",
+  lastWeek: "Last Week",
+  lastMonth: "Last Month",
+  lastYear: "Last Year",
+  videos: "Videos",
+  images: "Images",
+  audio: "Audio",
 };
 
 interface FiltersState {
@@ -60,7 +60,11 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
   onFilterChange,
   onSectionToggle,
 }) => {
-  const renderFilterSection = (title: string, section: string, items: Record<string, boolean>) => (
+  const renderFilterSection = (
+    title: string,
+    section: string,
+    items: Record<string, boolean>,
+  ) => (
     <>
       <ListItemButton
         onClick={() => onSectionToggle(section)}
@@ -68,8 +72,8 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
           py: 1,
           minHeight: 40,
           px: 2,
-          '&:hover': {
-            bgcolor: 'action.hover',
+          "&:hover": {
+            bgcolor: "action.hover",
           },
         }}
       >
@@ -77,7 +81,7 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
           primary={title}
           primaryTypographyProps={{
             fontWeight: 600,
-            fontSize: '0.875rem',
+            fontSize: "0.875rem",
           }}
         />
         {expandedSections[section as keyof typeof expandedSections] ? (
@@ -86,7 +90,10 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
           <ExpandMore />
         )}
       </ListItemButton>
-      <Collapse in={expandedSections[section as keyof typeof expandedSections]} timeout="auto">
+      <Collapse
+        in={expandedSections[section as keyof typeof expandedSections]}
+        timeout="auto"
+      >
         <List component="div" disablePadding>
           {Object.entries(items).map(([key, value]) => (
             <ListItemButton
@@ -95,13 +102,13 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
               sx={{
                 pl: 3,
                 py: 0.75,
-                '&:hover': {
-                  bgcolor: 'action.hover',
+                "&:hover": {
+                  bgcolor: "action.hover",
                 },
               }}
             >
               <ListItemIcon sx={{ minWidth: 32 }}>
-                {section === 'time' ? (
+                {section === "time" ? (
                   <Radio
                     edge="start"
                     checked={value}
@@ -109,9 +116,9 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
                     disableRipple
                     size="small"
                     sx={{
-                      color: 'primary.main',
-                      '&.Mui-checked': {
-                        color: 'primary.main',
+                      color: "primary.main",
+                      "&.Mui-checked": {
+                        color: "primary.main",
                       },
                     }}
                   />
@@ -123,9 +130,9 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
                     disableRipple
                     size="small"
                     sx={{
-                      color: 'primary.main',
-                      '&.Mui-checked': {
-                        color: 'primary.main',
+                      color: "primary.main",
+                      "&.Mui-checked": {
+                        color: "primary.main",
                       },
                     }}
                   />
@@ -134,10 +141,10 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
               <ListItemText
                 primary={filterLabels[key as keyof typeof filterLabels]}
                 primaryTypographyProps={{
-                  variant: 'body2',
+                  variant: "body2",
                   sx: {
                     fontWeight: value ? 500 : 400,
-                    fontSize: '0.8125rem',
+                    fontSize: "0.8125rem",
                   },
                 }}
               />
@@ -150,9 +157,9 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
   );
 
   return (
-    <List component="nav" sx={{ width: '100%' }}>
-      {renderFilterSection('Media Types', 'mediaTypes', filters.mediaTypes)}
-      {renderFilterSection('Time Period', 'time', filters.time)}
+    <List component="nav" sx={{ width: "100%" }}>
+      {renderFilterSection("Media Types", "mediaTypes", filters.mediaTypes)}
+      {renderFilterSection("Time Period", "time", filters.time)}
     </List>
   );
 };

@@ -51,9 +51,9 @@ Your AWS profile needs the following Cognito permissions:
 #### Basic Usage
 
 ```typescript
-import { test, expect } from '../fixtures/cognito.fixtures';
+import { test, expect } from "../fixtures/cognito.fixtures";
 
-test('my test', async ({ cognitoTestUser }) => {
+test("my test", async ({ cognitoTestUser }) => {
   console.log(`Username: ${cognitoTestUser.username}`);
   console.log(`Password: ${cognitoTestUser.password}`);
   console.log(`Email: ${cognitoTestUser.email}`);
@@ -65,9 +65,9 @@ test('my test', async ({ cognitoTestUser }) => {
 #### With Authentication
 
 ```typescript
-import { test, expect } from '../fixtures/auth.fixtures';
+import { test, expect } from "../fixtures/auth.fixtures";
 
-test('authenticated test', async ({ authenticatedPage, cognitoTestUser }) => {
+test("authenticated test", async ({ authenticatedPage, cognitoTestUser }) => {
   // Page is already logged in with the test user
   await expect(authenticatedPage).toHaveURL(/.*dashboard.*/);
 });
@@ -76,14 +76,14 @@ test('authenticated test', async ({ authenticatedPage, cognitoTestUser }) => {
 #### Manual Login
 
 ```typescript
-import { test, expect } from '../fixtures/cognito.fixtures';
+import { test, expect } from "../fixtures/cognito.fixtures";
 
-test('manual login', async ({ page, cognitoTestUser }) => {
-  await page.goto('/sign-in');
+test("manual login", async ({ page, cognitoTestUser }) => {
+  await page.goto("/sign-in");
   await page.fill('[name="email"]', cognitoTestUser.username);
   await page.fill('[name="password"]', cognitoTestUser.password);
   await page.click('button[type="submit"]');
-  await page.waitForURL('**/dashboard');
+  await page.waitForURL("**/dashboard");
 });
 ```
 
@@ -120,17 +120,17 @@ Extends the Cognito fixture to provide pre-authenticated pages and contexts.
 ### Usage
 
 ```typescript
-import { test, expect } from '../fixtures/auth.fixtures';
+import { test, expect } from "../fixtures/auth.fixtures";
 
-test('test with authenticated page', async ({ authenticatedPage }) => {
+test("test with authenticated page", async ({ authenticatedPage }) => {
   // Page is already logged in
-  await authenticatedPage.goto('/protected-route');
+  await authenticatedPage.goto("/protected-route");
   // Test protected functionality
 });
 
-test('test with authenticated context', async ({ authenticatedContext }) => {
+test("test with authenticated context", async ({ authenticatedContext }) => {
   const page = await authenticatedContext.newPage();
-  await page.goto('/dashboard');
+  await page.goto("/dashboard");
   // Multiple pages can share the same authenticated context
 });
 ```

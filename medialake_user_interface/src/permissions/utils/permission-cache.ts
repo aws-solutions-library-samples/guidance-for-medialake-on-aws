@@ -23,24 +23,24 @@ class PermissionCache {
    * @returns The cached result or undefined if not found
    */
   get(key: string): boolean | undefined {
-    console.log('Permission cache get:', key);
+    console.log("Permission cache get:", key);
     this.cleanExpired();
 
     const timestamp = this.timestamps.get(key);
     if (timestamp === undefined) {
-      console.log('Permission cache miss:', key);
+      console.log("Permission cache miss:", key);
       return undefined;
     }
 
     // Check if the entry has expired
     if (Date.now() - timestamp > this.ttl) {
-      console.log('Permission cache expired:', key);
+      console.log("Permission cache expired:", key);
       this.delete(key);
       return undefined;
     }
 
     const value = this.cache.get(key);
-    console.log('Permission cache hit:', key, value);
+    console.log("Permission cache hit:", key, value);
     return value;
   }
 
@@ -50,7 +50,7 @@ class PermissionCache {
    * @param value The permission check result
    */
   set(key: string, value: boolean): void {
-    console.log('Permission cache set:', key, value);
+    console.log("Permission cache set:", key, value);
 
     // If the cache is full, remove the oldest entry
     if (this.cache.size >= this.maxSize) {
@@ -83,7 +83,7 @@ class PermissionCache {
    * Clear the entire cache
    */
   clear(): void {
-    console.log('Permission cache cleared');
+    console.log("Permission cache cleared");
     this.cache.clear();
     this.timestamps.clear();
   }

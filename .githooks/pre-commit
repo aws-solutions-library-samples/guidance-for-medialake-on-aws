@@ -1,30 +1,35 @@
 #!/bin/bash
 
-echo "🔍 Running Git hooks..."
+echo "Running Git hooks..."
 
 # Run git-defender hooks first (if they exist)
 if [ -f "/usr/local/amazon/var/git-defender/hooks/pre-commit" ]; then
-    echo "🛡️  Running git-defender checks..."
+    echo "Running git-defender checks..."
     /usr/local/amazon/var/git-defender/hooks/pre-commit
     GIT_DEFENDER_EXIT=$?
     if [ $GIT_DEFENDER_EXIT -ne 0 ]; then
-        echo "❌ git-defender checks failed"
+        echo "ERROR: git-defender checks failed"
         exit $GIT_DEFENDER_EXIT
     fi
-    echo "✅ git-defender checks passed"
+    echo "git-defender checks passed"
 fi
 
 # Run pre-commit framework directly (without needing pre-commit install)
 if command -v pre-commit &> /dev/null && [ -f ".pre-commit-config.yaml" ]; then
-    echo "🔧 Running pre-commit checks..."
-    pre-commit run
+    echo "Running pre-commit checks..."
+    # Use --all-files for initial setup, otherwise run on staged files
+    if [ "${1:-}" = "--all-files" ]; then
+        pre-commit run --all-files
+    else
+        pre-commit run --files $(git diff --cached --name-only --diff-filter=ACM 2>/dev/null || echo "")
+    fi
     PRE_COMMIT_EXIT=$?
     if [ $PRE_COMMIT_EXIT -ne 0 ]; then
-        echo "❌ pre-commit checks failed"
+        echo "ERROR: pre-commit checks failed"
         exit $PRE_COMMIT_EXIT
     fi
-    echo "✅ pre-commit checks passed"
+    echo "pre-commit checks passed"
 fi
 
-echo "✅ All Git hooks passed!"
+echo "All Git hooks passed!"
 exit 0

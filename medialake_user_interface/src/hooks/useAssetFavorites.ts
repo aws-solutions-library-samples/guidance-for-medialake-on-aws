@@ -1,6 +1,10 @@
-import { useCallback } from 'react';
-import { useFeatureFlag } from '../utils/featureFlags';
-import { useGetFavorites, useAddFavorite, useRemoveFavorite } from '../api/hooks/useFavorites';
+import { useCallback } from "react";
+import { useFeatureFlag } from "../utils/featureFlags";
+import {
+  useGetFavorites,
+  useAddFavorite,
+  useRemoveFavorite,
+} from "../api/hooks/useFavorites";
 
 export function useAssetFavorites<T>({
   getAssetId,
@@ -14,10 +18,10 @@ export function useAssetFavorites<T>({
   getAssetThumbnail: (asset: T) => string;
 }) {
   // Check if favorites feature is enabled
-  const favoritesFeature = useFeatureFlag('user-favorites-enabled', false);
+  const favoritesFeature = useFeatureFlag("user-favorites-enabled", false);
 
   // Favorites functionality
-  const { data: favorites } = useGetFavorites('ASSET');
+  const { data: favorites } = useGetFavorites("ASSET");
   const { mutate: addFavorite } = useAddFavorite();
   const { mutate: removeFavorite } = useRemoveFavorite();
 
@@ -27,7 +31,7 @@ export function useAssetFavorites<T>({
       if (!favoritesFeature.value || !favorites) return false;
       return favorites.some((favorite) => favorite.itemId === assetId);
     },
-    [favorites, favoritesFeature.value]
+    [favorites, favoritesFeature.value],
   );
 
   // Handle favorite toggle - only if feature is enabled
@@ -37,30 +41,30 @@ export function useAssetFavorites<T>({
 
       // If feature is disabled, do nothing
       if (!favoritesFeature.value) {
-        console.log('Favorites feature is disabled');
+        console.log("Favorites feature is disabled");
         return;
       }
 
       const assetId = getAssetId(asset);
 
-      console.log('Toggling favorite for asset:', assetId);
-      console.log('Current favorites state:', favorites);
+      console.log("Toggling favorite for asset:", assetId);
+      console.log("Current favorites state:", favorites);
 
       if (isAssetFavorited(assetId)) {
-        console.log('Removing favorite for asset:', assetId);
-        removeFavorite({ itemType: 'ASSET', itemId: assetId });
+        console.log("Removing favorite for asset:", assetId);
+        removeFavorite({ itemType: "ASSET", itemId: assetId });
       } else {
-        console.log('Adding favorite for asset:', assetId);
+        console.log("Adding favorite for asset:", assetId);
         const favoriteData = {
           itemId: assetId,
-          itemType: 'ASSET' as const, // Use const assertion to fix type error
+          itemType: "ASSET" as const, // Use const assertion to fix type error
           metadata: {
             name: getAssetName(asset),
             assetType: getAssetType(asset), // Note: using assetType to match what Favorites.tsx expects
-            thumbnailUrl: getAssetThumbnail(asset) || '',
+            thumbnailUrl: getAssetThumbnail(asset) || "",
           },
         };
-        console.log('Favorite data being sent:', favoriteData);
+        console.log("Favorite data being sent:", favoriteData);
         addFavorite(favoriteData);
       }
     },
@@ -74,7 +78,7 @@ export function useAssetFavorites<T>({
       getAssetType,
       getAssetThumbnail,
       favoritesFeature.value,
-    ]
+    ],
   );
 
   return {

@@ -32,7 +32,7 @@ export interface NodeAuth {
 export interface NodeMethodParameter {
   name: string;
   label: string;
-  type: 'string' | 'number' | 'boolean' | 'array';
+  type: "string" | "number" | "boolean" | "array";
   schema: any;
   description: string;
   required: boolean;

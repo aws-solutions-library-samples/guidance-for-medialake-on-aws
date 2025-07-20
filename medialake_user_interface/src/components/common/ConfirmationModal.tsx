@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   Dialog,
   DialogTitle,
@@ -6,9 +6,9 @@ import {
   DialogActions,
   Typography,
   IconButton,
-} from '@mui/material';
-import { Close as CloseIcon } from '@mui/icons-material';
-import { ActionButton } from './button/ActionButton';
+} from "@mui/material";
+import { Close as CloseIcon } from "@mui/icons-material";
+import { ActionButton } from "./button/ActionButton";
 
 interface ConfirmationModalProps {
   open: boolean;
@@ -27,8 +27,8 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   message,
   onConfirm,
   onCancel,
-  confirmText = 'Confirm',
-  cancelText = 'Cancel',
+  confirmText = "Confirm",
+  cancelText = "Cancel",
   isLoading = false,
 }) => {
   return (
@@ -46,9 +46,9 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     >
       <DialogTitle
         sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
           p: 2,
         }}
       >
@@ -61,10 +61,19 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         <Typography>{message}</Typography>
       </DialogContent>
       <DialogActions sx={{ p: 2, pt: 0 }}>
-        <ActionButton variant="outlined" onClick={onCancel} disabled={isLoading}>
+        <ActionButton
+          variant="outlined"
+          onClick={onCancel}
+          disabled={isLoading}
+        >
           {cancelText}
         </ActionButton>
-        <ActionButton variant="contained" color="error" onClick={onConfirm} loading={isLoading}>
+        <ActionButton
+          variant="contained"
+          color="error"
+          onClick={onConfirm}
+          loading={isLoading}
+        >
           {confirmText}
         </ActionButton>
       </DialogActions>

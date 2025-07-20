@@ -4,15 +4,15 @@ export interface NavigationPanelState {
 }
 
 export enum SearchType {
-  ASSETS = 'assets',
-  TITLE = 'title',
-  RIGHTS = 'rights',
-  QC = 'qc',
+  ASSETS = "assets",
+  TITLE = "title",
+  RIGHTS = "rights",
+  QC = "qc",
 }
 
 export enum AssetType {
-  VIDEO = 'video',
-  CLIP = 'clip',
+  VIDEO = "video",
+  CLIP = "clip",
 }
 
 export interface Query {

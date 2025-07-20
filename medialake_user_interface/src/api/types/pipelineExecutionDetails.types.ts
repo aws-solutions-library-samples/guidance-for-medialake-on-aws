@@ -2,7 +2,7 @@ export interface ExecutionDetails {
   executionArn: string;
   stateMachineArn: string;
   name: string;
-  status: 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'TIMED_OUT' | 'ABORTED';
+  status: "RUNNING" | "SUCCEEDED" | "FAILED" | "TIMED_OUT" | "ABORTED";
   startDate: string;
   stopDate?: string;
   input: string;

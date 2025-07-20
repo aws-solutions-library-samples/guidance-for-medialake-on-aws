@@ -1,12 +1,14 @@
-import React, { useEffect } from 'react';
-import { useTokenRefresh } from '../hooks/useTokenRefresh';
-import { useAuth } from '../common/hooks/auth-context';
+import React, { useEffect } from "react";
+import { useTokenRefresh } from "../hooks/useTokenRefresh";
+import { useAuth } from "../common/hooks/auth-context";
 
 /**
  * Component that manages token refresh lifecycle
  * This component should be placed within the AuthProvider context
  */
-export const TokenRefreshManager: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const TokenRefreshManager: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const { checkAndRefreshToken } = useTokenRefresh();
   const { checkAuthStatus, isAuthenticated } = useAuth();
 
@@ -16,7 +18,9 @@ export const TokenRefreshManager: React.FC<{ children: React.ReactNode }> = ({ c
     // Handle page visibility changes specifically for token refresh
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        console.log('Page became visible, refreshing auth status and checking token...');
+        console.log(
+          "Page became visible, refreshing auth status and checking token...",
+        );
         // When user returns to page, check auth status first, then token
         checkAuthStatus()
           .then(() => {
@@ -26,15 +30,18 @@ export const TokenRefreshManager: React.FC<{ children: React.ReactNode }> = ({ c
             }, 500);
           })
           .catch((error) => {
-            console.error('Error checking auth status on visibility change:', error);
+            console.error(
+              "Error checking auth status on visibility change:",
+              error,
+            );
           });
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [isAuthenticated, checkAuthStatus, checkAndRefreshToken]);
 

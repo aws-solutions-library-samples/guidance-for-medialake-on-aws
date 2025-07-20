@@ -1,8 +1,8 @@
-import { Integration as BaseIntegration } from '../../types/integrations.types';
+import { Integration as BaseIntegration } from "../../types/integrations.types";
 import {
   ColumnSort as TanStackColumnSort,
   ColumnFilter as TanStackColumnFilter,
-} from '@tanstack/react-table';
+} from "@tanstack/react-table";
 
 export interface Integration extends BaseIntegration {
   id: string;

@@ -4,17 +4,18 @@
 >
 > - [Overview](#overview)
 > - [Cost](#cost)
->   - [Cost Table](#cost-table)
-> - [Development](#development)
->   - [Prerequisites](#prerequisites)
->   - [Operating System](#operating-system)
-> - [Deployment Steps](#deployment-steps)
+>   - [Base Services Cost Table](#base-services-cost-table)
+>   - [Usage Based Cost Example Table](#usage-based-cost-example-table)
+> - [Quick Deployment (CloudFormation)](#quick-deployment-cloudformation)
+> - [Development Environment Setup and CDK Deployment](#development-environment-setup-and-cdk-deployment)
 >   - [Clone the repository](#1-clone-the-repository)
 >   - [Prepare the environment](#2-prepare-the-environment)
 >   - [Configure AWS account and region](#3-configure-aws-account-and-region)
 >   - [Configuration Setup](#4-configuration-setup)
->   - [Deploy using CloudFormation Template (Recommended)](#5-deploy-using-cloudformation-template-recommended)
->   - [Alternative: Deploy using AWS CDK](#6-alternative-deploy-using-aws-cdk)
+>   - [Deploy using AWS CDK](#5-deploy-using-aws-cdk)
+> - [Development](#development)
+>   - [Prerequisites](#prerequisites)
+>   - [Operating System](#operating-system)
 > - [Deployment Validation](#deployment-validation)
 > - [Running the Guidance](#running-the-guidance)
 >   - [Login](#1-login)
@@ -44,13 +45,7 @@
 
 ## Overview
 
-**Guidance for a Media Lake on AWS** provides a comprehensive, serverless, and scalable platform for media ingestion, processing, management, and workflow orchestration on AWS. Media lake enables you to connect various storage sources, ingest and organize media at scale, run customizable processing pipelines (such as proxy/thumbnail generation and AI enrichment), and integrate with both AWS native and partner services.
-
-Media lake is designed for:
-
-- Media organizations and content creators needing automated processing and enrichment of large media libraries.
-- Use cases such as media asset management, automated compliance, and media AI/ML workflows.
-- Organizations requiring secure, event-driven, and highly available media workflows.
+**Guidance for a Media Lake on AWS** provides a comprehensive, serverless, and scalable platform for media ingestion, processing, management, metadata management, and workflow orchestration on AWS. Media lake enables you to connect multiple storage sources, known as connectors, ingest and organize media at scale, creating a unified search space for your media. Workflows, knows as pipelines, run customizable processing workflows (such as proxy/thumbnail generation and AI enrichment), and integrate with both AWS native and partner services.
 
 ### High-Level Overview
 
@@ -77,26 +72,42 @@ Media lake is designed for:
 You are responsible for the cost of the AWS services used while running this Guidance.
 
 **Base Infrastructure Cost (without variable workloads):**
-As of July 2025, the cost for running this Guidance with the **small deployment configuration** in the **US East (N. Virginia)** region is approximately **$379.12 per month** for the core infrastructure only.
+As of July 2025, the cost for running this Guidance with the **small deployment configuration** in the **US East (N. Virginia)** region is approximately **$423.62 per month** for the baseline services only.
 
 **Variable Workload Costs:**
 Additional costs will be incurred based on actual usage:
 
-- Media processing and enrichment services (Twelve Labs, Transcription)
-- S3 storage and data transfer
-- Lambda execution time
-- OpenSearch queries and indexing
-- Step Functions executions
+- Media processing and enrichment services (Lambda, Step Functions, MediaConvert, TwelveLabs, Transcription)
+- Media and Metadata storage (OpenSearch, DynamoDB, S3)
+- Interfactions with the user interface and viewing media(CloudFront, Data Transfer Out, Step Functions, Lambda, OpenSearch and DynamoDB queries)
 
-The total monthly cost will vary significantly based on the volume of media processed, storage requirements, and usage patterns.
+The total monthly cost will vary based on the volume of media processed, storage requirements, and usage patterns.
 
-We recommend creating a **Budget through AWS Cost Explorer** to help manage costs. Prices are subject to change. For full details, refer to the pricing webpage for each AWS service used in this Guidance.
+We recommend creating a **Budget through AWS Cost Explorer** to help manage costs. Prices are subject to change. For full details, refer to the pricing webpage for each AWS service used in this guidance.
 
-### Cost Table
+### Base Services Cost Table - OpenSearch Deployment
+
+| **Service & Usage**                | **How It Relates to Your Team's Usage**                    | **Estimated Monthly Cost (USD)**                        |
+| ---------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------- |
+| **Cognito (Users)**                | 50 active users signing in and using the system each month | \$2.00                                                  |
+| **OpenSearch Service (Search)**    | Search and index storage and compute                       | t3.small: \$28.72 (1 instance)<br>Storage: \$2.44 (gp3) |
+| **OpenSearch Ingestion (OSI)**     | Data ingestion processing units                            | \$350.40 (2 OCUs)                                       |
+| **NAT Gateway (VPC)**              | Outbound internet access from VPC                          | \$33.30                                                 |
+| **WAF (Web Application Firewall)** | API & web protection (rules + ACLs + requests)             | WebACL: \$5.00<br>Rules: \$2.00                         |
+| **TOTAL**                          | **Monthly cost estimate for small deployment**             | **\$423.60**                                            |
+
+### Base Services Cost Table - S3 Vectors Deployment
+
+| **Service & Usage**                | **How It Relates to Your Team's Usage**                    | **Estimated Monthly Cost (USD)** |
+| ---------------------------------- | ---------------------------------------------------------- | -------------------------------- |
+| **Cognito (Users)**                | 50 active users signing in and using the system each month | \$2.00                           |
+| **WAF (Web Application Firewall)** | API & web protection (rules + ACLs + requests)             | WebACL: \$5.00<br>Rules: \$2.00  |
+| **TOTAL**                          | **Monthly cost estimate for small deployment**             | **\$9.00**                       |
+
+### Usage Based Cost Example Table
 
 | **Service & Usage**                           | **How It Relates to Your Team’s Usage**                                                                           | **Estimated Monthly Cost (USD)**                                                        |
 | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| **Cognito (Users)**                           | 50 active users signing in and using the system each month                                                        | \$2.00                                                                                  |
 | **S3 + Step Functions (Uploads)**             | 1,000 new media files uploaded/month, each triggering a workflow                                                  | S3 storage: \$23.55<br>Step Functions: \$2.40                                           |
 | **S3/CloudFront (Images, Audio, Video)**      | All users viewing/downloading images, audio, and video each month (aggregate, served via S3 and CloudFront)       | S3 requests: \$0.05 + \$0.40<br>CloudFront data: \$29.75<br>CloudFront requests: \$0.03 |
 | **Total Media Downloaded (S3/CloudFront)**    | About 350GB of media files viewed/downloaded per month                                                            | S3 data transfer out: \$45.00                                                           |
@@ -106,98 +117,90 @@ We recommend creating a **Budget through AWS Cost Explorer** to help manage cost
 | **Database Usage (DynamoDB)**                 | 200,000 new or updated records per month (write/read/storage)                                                     | Writes: \$18.75<br>Reads: \$7.50<br>Storage: \$25.00                                    |
 | **Message Queues (SQS)**                      | 10,000 standard and 1,000 FIFO auto-messages per month                                                            | Standard: \$0.002<br>FIFO: \$0.0005                                                     |
 | **Workflow Automations (Step Functions)**     | 1,000 automated workflows (pipelines), 20 steps each every month                                                  | \$2.40                                                                                  |
-| **Encryption (KMS)**                          | 30 keys, 311,000 encryption/decryption actions per month                                                          | \$30.00 (CMK/month) + \$15.00 (requests) = \$45.00                                      |
+| **WAF (Web Application Firewall)**            | API & web protection (rules + ACLs + requests)                                                                    | Requests: \$0.30                                                                        |
+| **Encryption (KMS)**                          | 311,000 encryption/decryption actions per month                                                                   | \$15.00.00                                                                              |
 | **Monitoring/Logging (CloudWatch)**           | Storage, metrics, logs for all services                                                                           | Data: \$7.50<br>Storage: \$0.07                                                         |
-| **OpenSearch Service (Search)**               | Search and index storage and compute                                                                              | t3.small: \$28.72 (1 instance)<br>Storage: \$2.44 (gp3)                                 |
-| **OpenSearch Ingestion (OSI)**                | Data ingestion processing units                                                                                   | \$350.40 (2 OCUs)                                                                       |
-| **NAT Gateway (VPC)**                         | Outbound internet access from VPC                                                                                 | \$33.30                                                                                 |
-| **WAF (Web Application Firewall)**            | API & web protection (rules + ACLs + requests)                                                                    | WebACL: \$5.00<br>Rules: \$2.00<br>Requests: \$0.30                                     |
 | **EventBridge**                               | Event-driven triggers                                                                                             | \$0.01                                                                                  |
 | **X-Ray (Tracing)**                           | Distributed trace monitoring                                                                                      | \$5.00                                                                                  |
-| **TOTAL**                                     | **Monthly cost estimate for small deployment**                                                                    | **\$379.12**                                                                            |
+| **TOTAL**                                     | **Monthly cost estimate for usage-based services**                                                                | **\$197.50**                                                                            |
 
-## Development
+## Quick Deployment (CloudFormation)
+
+**Recommended for most users** - Deploy media lake quickly using the pre-built CloudFormation template without setting up a development environment.
 
 ### Prerequisites
 
-- An AWS account with appropriate permissions to create and manage resources.
-- **AWS CLI** configured with your account credentials.
-- **AWS CDK CLI** (`npm install -g aws-cdk`).
-- **Node.js** (v20.x or later).
-- **Python** (3.12).
-- **Docker** (for local development).
-- **Git** for cloning the repository.
-- Optional: Third-party services (such as Twelve Labs) require separate setup and API credentials for integration.
+- An AWS account with appropriate permissions to create and manage resources
+- Access to the AWS Console
 
-### Operating System
+### Deployment Steps
 
-Development and deployment instructions are validated for **MacOS** and **Windows**.
-Deployment to AWS services is fully managed through the AWS CLI and Console and does not depend on local OS beyond the tools above.
+1. **Download the CloudFormation template**
+   - Download `medialake.template` from the GitHub repository
 
-> These deployment instructions are optimized for modern developer environments (MacOS/Windows). Deployment to AWS services (e.g., Lambda, CloudFormation, CDK) runs on AWS-managed infrastructure.
+2. **Deploy using AWS Console**
+   - Go to the AWS Console > CloudFormation > "Create Stack" > "With new resources (standard)"
+   - Choose **Upload a template file**, select `medialake.template`
+   - Set stack name to `medialake-cf`
 
-**Required Packages:**
+3. **Configure template parameters:**
 
-- Python 3.12 (`python3 --version`)
-- Node.js 20+ (`node --version`)
-- Docker Desktop (`docker --version`)
-- AWS CLI (`aws --version`)
-- AWS CDK (`cdk --version`)
+   #### Initial Media Lake User
+   - **InitialUserEmail**: Email address for the initial administrator account (required)
+   - **InitialUserFirstName**: First name of the initial administrator (1-50 characters, letters/spaces/hyphens/periods only)
+   - **InitialUserLastName**: Last name of the initial administrator (1-50 characters, letters/spaces/hyphens/periods only)
 
-**Install Python 3.12 specifically:**
+   #### Media Lake Configuration
+   - **MediaLakeEnvironmentName**: Environment identifier (1-4 alphanumeric characters, default: `dev`)
+   - **OpenSearchDeploymentSize**: Controls the size of your OpenSearch cluster
+     - `small`: Suitable for development and testing environments
+     - `medium`: Recommended for moderate production workloads
+     - `large`: Designed for high-volume production environments
 
-**MacOS:**
+   #### Media Lake Deployment Configuration
+   - **SourceType**: Deployment source method
+     - `Git`: Deploy directly from a public Git repository
+     - `S3PresignedURL`: Deploy from a ZIP file via presigned URL
+   - **GitRepositoryUrl**: Public Git repository URL (default: AWS Solutions Library media lake repository)
+   - **S3PresignedURL**: Presigned URL for ZIP file download (required when using S3PresignedURL source type)
 
-```bash
-# Download and install Python 3.12 directly from python.org
-# Visit https://www.python.org/downloads/release/python-3120/
+   > **Note:** You can use the default deployment configuration settings without making any changes. The defaults are configured to deploy from the official AWS Solutions Library repository.
 
-# Alternative: Use pyenv without brew
-curl https://pyenv.run | bash
-pyenv install 3.12.0
-pyenv global 3.12.0
-```
+4. **Complete deployment**
+   - Accept the required IAM capabilities and deploy
+   - Monitor the stack creation progress in the CloudFormation console
 
-**Windows:**
+5. **Initiate deployment**
+   - Click "Create stack" to begin the deployment process
+   - The initial CloudFormation stack will be created first
 
-```powershell
-# Download Python 3.12 from python.org
-# Visit https://www.python.org/downloads/release/python-3120/
-```
+6. **Monitor CodePipeline deployment**
+   - A CodePipeline will be automatically created to deploy the CDK code
+   - This deployment process will take approximately 1 hour to complete
+   - You will receive a welcome email at the address you provided once deployment is finished
+   - To monitor deployment progress:
+     - Go to the CloudFormation console
+     - Navigate to your stack's "Outputs" tab
+     - Click on the CodePipeline link to view the deployment status
 
-**Install other dependencies:**
-
-**MacOS:**
-
-```bash
-# Install Docker Desktop from https://www.docker.com/products/docker-desktop
-
-# Install Node.js from https://nodejs.org/
-# Download and install the LTS version
-
-# Install AWS CLI
-curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"
-sudo installer -pkg AWSCLIV2.pkg -target /
-
-# Install AWS CDK
-npm install -g aws-cdk
-```
-
-**Windows:**
-
-```powershell
-# Install Docker Desktop from https://www.docker.com/products/docker-desktop
-# Install Node.js from https://nodejs.org/
-# Install AWS CLI
-winget install Amazon.AWSCLI
-npm install -g aws-cdk
-```
+See the [`MediaLake-Installation-Guide.md`](assets/docs/MediaLake-Installation-Guide.md) for a complete CloudFormation deployment guide.
 
 ---
 
-## Deployment Steps
+## Development Environment Setup and CDK Deployment
 
-You can deploy media lake using either the CloudFormation template (recommended) or AWS CDK.
+**For developers** who want to customize the solution, contribute to the project, or deploy using AWS CDK.
+
+### Prerequisites
+
+- An AWS account with appropriate permissions to create and manage resources
+- **AWS CLI** configured with your account credentials
+- **AWS CDK CLI** (`npm install -g aws-cdk`)
+- **Node.js** (v20.x or later)
+- **Python** (3.12)
+- **Docker** (for local development)
+- **Git** for cloning the repository
+- Optional: Third-party services (such as Twelve Labs) require separate setup and API credentials for integration
 
 ### 1. **Clone the repository**
 
@@ -214,7 +217,7 @@ cd guidance-for-medialake
 python3 -m venv .venv
 source .venv/bin/activate      # Mac
 # OR for Windows
-.venv\Scriptsctivate.bat     # Windows
+.venv\Scripts\activate.bat     # Windows
 ```
 
 #### (b) **Install dependencies:**
@@ -232,7 +235,7 @@ pip install -r requirements-dev.txt
 
 ### 3. **Configure AWS account and region**
 
-Ensure AWS credentials are configured (`aws configure`), and bootstrap your account for CDK (if using CDK):
+Ensure AWS credentials are configured (`aws configure`), and bootstrap your account for CDK:
 
 ```bash
 cdk bootstrap --profile <profile> --region <region>
@@ -248,59 +251,20 @@ touch config.json
 
 Key configuration parameters include:
 
-- **environment**: Choose between "dev" or "prd"
+- **environment**: Choose between 1-4 letters that are alphanumeric that represent an environment name
 - **deployment_size**: OpenSearch deployment size ("small", "medium", "large")
 - **resource_prefix**: Prefix for all AWS resources created
 - **account_id**: AWS Account ID for deployment
-- **primary_region**: Primary region for deployment (tested in us-east-1)
+- **primary_region**: Primary region for deployment
 - **initial_user**: Initial user configuration with email and name
 - **vpc**: VPC configuration for using existing or creating new VPC
 - **authZ**: Identity provider configuration (Cognito, SAML)
 
 See the [`config-example.json`](config-example.json) for a complete configuration example.
 
----
+### 5. **Deploy using AWS CDK**
 
-### 5. **Deploy using CloudFormation Template (Recommended)**
-
-Deploy directly using the CloudFormation template from GitHub:
-
-1. Go to the AWS Console > CloudFormation > "Create Stack" > "With new resources (standard)".
-2. Choose **Upload a template file**, select `medialake.template`.
-3. Set stack name to `medialake-cf`.
-4. Configure the CloudFormation template parameters:
-
-   ### Initial Media Lake User
-
-   - **InitialUserEmail**: Email address for the initial administrator account (required)
-   - **InitialUserFirstName**: First name of the initial administrator (1-50 characters, letters/spaces/hyphens/periods only)
-   - **InitialUserLastName**: Last name of the initial administrator (1-50 characters, letters/spaces/hyphens/periods only)
-
-   ### Media Lake Configuration
-
-   - **MediaLakeEnvironmentName**: Environment identifier (1-10 alphanumeric characters, default: `dev`)
-   - **OpenSearchDeploymentSize**: Controls the size of your OpenSearch cluster
-     - `small`: Suitable for development and testing environments
-     - `medium`: Recommended for moderate production workloads
-     - `large`: Designed for high-volume production environments
-
-   ### Media Lake Deployment Configuration
-
-   - **SourceType**: Deployment source method
-     - `Git`: Deploy directly from a public Git repository
-     - `S3PresignedURL`: Deploy from a ZIP file via presigned URL
-   - **GitRepositoryUrl**: Public Git repository URL (default: AWS Solutions Library media lake repository)
-   - **S3PresignedURL**: Presigned URL for ZIP file download (required when using S3PresignedURL source type)
-
-5. Accept the required IAM capabilities and deploy.
-
-See the [`MediaLake-Installation-Guide.md`](assets/docs/MediaLake-Installation-Guide.md) for a complete CloudFormation deployment guide.
-
----
-
-### 6. **Alternative: Deploy using AWS CDK**
-
-For advanced users who prefer CDK deployment:
+Deploy all stacks using CDK:
 
 ```bash
 cdk deploy --all --profile <profile> --region <region>
@@ -310,7 +274,7 @@ cdk deploy --all --profile <profile> --region <region>
 
 ## Deployment Validation
 
-1. In the AWS CloudFormation console, check that the stack `medialake-cf` (and related media lake stacks) are in **CREATE_COMPLETE** status.
+1. In the AWS CloudFormation console, check that the related media lake stacks are in **CREATE_COMPLETE** status.
 2. After deployment, you will receive a welcome email at the address you provided, containing:
    - The media lake application URL
    - Username (your email)
@@ -331,14 +295,14 @@ Use the emailed credentials to log in to the media lake UI.
 - Add a connector, choosing Amazon S3 and providing your bucket details.
 - **Note**: If you create new S3 buckets through media lake, remember that these will need to be manually emptied and deleted during cleanup as they are not automatically removed when the media lake stack is deleted.
 
-### 3. **Ingest Media**
+### 3. **Enable Semantic Search and Integrations**
 
-- Upload media to your configured S3 bucket or use the UI’s manual upload feature.
-
-### 4. **Enable Semantic Search and Integrations**
-
-- Enable and configure semantic search providers (e.g., Twelve Labs) as described in the UI and [MediaLake-Instructions.md](assets/docs/MediaLake-Instructions.md).
+- Enable and configure semantic search providers (e.g., TwelveLabs) as described in the UI and [MediaLake-Instructions.md](assets/docs/MediaLake-Installation-Guide.md).
 - Import pipelines for enrichment and transcription.
+
+### 4. **Ingest Media**
+
+- Upload media to your configured S3 bucket.
 
 ### 5. **Process and Retrieve Assets**
 
@@ -356,29 +320,48 @@ Use the emailed credentials to log in to the media lake UI.
 ## Project Structure
 
 ```
-medialake/
-├── assets/                   # Documentation, images, and scripts
-│   ├── docs/                 # Documentation files
-│   ├── images/               # Architecture diagrams
-│   └── scripts/              # Deployment and utility scripts
-├── medialake_constructs/     # CDK construct definitions
-│   ├── shared_constructs/    # Shared AWS constructs
-│   └── api_gateway_connectors.py
-├── medialake_stacks/         # CDK stack definitions
-│   ├── base_infrastructure.py # Base infrastructure stack
-│   └── api_gateway.py         # API Gateway stack
-├── lambdas/                  # Lambda functions
-│   ├── api/                  # API handlers
-│   └── pipelines/           # Pipeline processors
-├── medialake_user_interface/ # React-based user interface
-├── pipeline_library/         # Pipeline templates and configurations
-├── s3_bucket_assets/         # S3 deployment assets
-├── app.py                    # Main CDK app
-├── requirements.txt          # Python dependencies
-├── cdk.json                 # CDK configuration
-├── config.py                # Configuration interpreter and validator
-├── config.json              # Configuration file
-└── README.md                # This file
+guidance-for-medialake-on-aws/
+├── assets/                          # Documentation, images, and scripts
+│   ├── docs/                        # Installation and configuration guides
+│   └── images/                      # Architecture diagrams and screenshots
+├── medialake_constructs/            # CDK construct definitions
+│   ├── api_gateway/                 # API Gateway constructs
+│   ├── auth/                        # Authentication constructs
+│   └── shared_constructs/           # Shared AWS constructs
+├── medialake_stacks/                # CDK stack definitions
+│   ├── api_gateway_core_stack.py    # Core API Gateway stack
+│   ├── api_gateway_deployment_stack.py # API deployment stack
+│   ├── api_gateway_stack.py         # Main API Gateway stack
+│   └── [additional stack files]     # Infrastructure and service stacks
+├── medialake_user_interface/        # React TypeScript frontend
+│   ├── src/                         # Source code
+│   │   ├── api/                     # API service layer
+│   │   ├── features/                # Feature-based modules
+│   │   ├── pages/                   # Page components
+│   │   ├── shared/                  # Common utilities and types
+│   │   └── [additional folders]     # Components, hooks, contexts
+│   ├── tests/                       # End-to-end tests
+│   ├── package.json                 # Node.js dependencies
+│   └── playwright.config.ts         # Testing configuration
+├── lambdas/                         # Lambda function source code
+│   ├── api/                         # API endpoint handlers
+│   ├── auth/                        # Authentication functions
+│   ├── back_end/                    # Backend processing functions
+│   ├── nodes/                       # Pipeline processing nodes
+│   ├── pipelines/                   # Pipeline orchestration
+│   └── common_libraries/            # Shared Lambda utilities
+├── pipeline_library/               # Default pipeline templates
+├── s3_bucket_assets/               # S3 deployment assets
+│   ├── pipeline_library/           # Pipeline definitions
+│   └── pipeline_nodes/             # Node templates and specs
+├── app.py                          # Main CDK application entry point
+├── cdk.json                        # CDK configuration and settings
+├── config_utils.py                 # Configuration utilities
+├── config-dev.json                 # Development configuration example
+├── requirements.txt                # Python dependencies
+├── requirements-dev.txt            # Development Python dependencies
+├── package.json                    # Node.js dependencies for CDK
+└── README.md                       # This documentation file
 ```
 
 ---
@@ -410,7 +393,8 @@ medialake/
 - **Amazon API Gateway** - REST API endpoint management
 - **Amazon DynamoDB** - Asset metadata and configuration storage
 - **AWS MediaConvert** - Media transcoding and format conversion service
-- **Amazon Transcribe** - Speech-to-text transcription service (only when pipeline is imported and enabled)
+- **Amazon CloudWatch** - Metrics, logging, and alerting
+- **Amazon OpenSearch** - Search and analytics engine
 
 **Security & Authentication:**
 
@@ -418,18 +402,12 @@ medialake/
 - **AWS KMS** - Encryption key management
 - **AWS IAM** - Resource access control
 
-**Monitoring & Search:**
-
-- **Amazon CloudWatch** - Metrics, logging, and alerting
-- **Amazon OpenSearch** - Search and analytics engine
-
 ---
 
 ## Security Features
 
 - AWS Cognito authentication and authorization including support for local username/password and federated authentication via SAML
 - KMS encryption for sensitive data
-- IAM role-based access control
 - CORS-enabled API endpoints
 - VPC deployment options for network isolation
 
@@ -491,7 +469,7 @@ To remove all media lake resources:
 - For feedback, questions, or suggestions, please use the [GitHub Issues page](https://github.com/aws-solutions-library-samples/guidance-for-medialake/issues).
 - Known issues and deployment tips will be tracked in the Issues section.
 - Service quotas: media lake relies on OpenSearch, DynamoDB, Lambda, and S3 limits; monitor and request increases if needed for large-scale deployments.
-- For SAML integration and advanced identity provider setup, refer to the SAML instructions in [MediaLake-Instructions.docx](assets/docs/MediaLake-Instructions.docx).
+- For SAML integration and advanced identity provider setup, refer to the SAML instructions in [MediaLake-Installation-Guide.md](assets/docs/MediaLake-Installation-Guide.md).
 
 ---
 
@@ -504,7 +482,7 @@ To remove all media lake resources:
 
 ## Notices
 
-Customers are responsible for making their own independent assessment of the information in this Guidance. This Guidance: (a) is for informational purposes only, (b) represents AWS current product offerings and practices, which are subject to change without notice, and (c) does not create any commitments or assurances from AWS and its affiliates, suppliers or licensors. AWS products or services are provided “as is” without warranties, representations, or conditions of any kind, whether express or implied. AWS responsibilities and liabilities to its customers are controlled by AWS agreements, and this Guidance is not part of, nor does it modify, any agreement between AWS and its customers.
+Customers are responsible for making their own independent assessment of the information in this Guidance. This Guidance: (a) is for informational purposes only, (b) represents AWS current product offerings and practices, which are subject to change without notice, and (c) does not create any commitments or assurances from AWS and its affiliates, suppliers or licensors. AWS products or services are provided "as is" without warranties, representations, or conditions of any kind, whether express or implied. AWS responsibilities and liabilities to its customers are controlled by AWS agreements, and this Guidance is not part of, nor does it modify, any agreement between AWS and its customers.
 
 ---
 
@@ -513,5 +491,3 @@ Customers are responsible for making their own independent assessment of the inf
 - Joao Seike
 - Lior Berezinski
 - Robert Raver
-
-# test

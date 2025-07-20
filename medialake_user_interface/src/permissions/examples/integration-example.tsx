@@ -1,10 +1,13 @@
 // src/permissions/examples/integration-example.tsx
-import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { PermissionProvider } from '../context/permission-context';
-import { Can } from '../components/Can';
-import { PermissionGuard, RoutePermissionGuard } from '../components/PermissionGuard';
-import { usePermission } from '../hooks/usePermission';
+import React from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { PermissionProvider } from "../context/permission-context";
+import { Can } from "../components/Can";
+import {
+  PermissionGuard,
+  RoutePermissionGuard,
+} from "../components/PermissionGuard";
+import { usePermission } from "../hooks/usePermission";
 
 /**
  * Example component showing how to use the Can component for conditional rendering
@@ -27,7 +30,9 @@ function AssetActions({ asset }: { asset: any }) {
         {(allowed) => (
           <button
             disabled={!allowed}
-            title={!allowed ? "You don't have permission to delete this asset" : ''}
+            title={
+              !allowed ? "You don't have permission to delete this asset" : ""
+            }
           >
             Delete
           </button>
@@ -44,7 +49,7 @@ function AssetHeader({ asset }: { asset: any }) {
   const { can } = usePermission();
 
   // Check if user can share the asset
-  const canShare = can('share', 'asset', asset);
+  const canShare = can("share", "asset", asset);
 
   return (
     <div className="asset-header">
@@ -98,7 +103,7 @@ function AppRoutes() {
         path="/assets"
         element={
           <RoutePermissionGuard
-            permission={{ action: 'view', subject: 'asset' }}
+            permission={{ action: "view", subject: "asset" }}
             element={<div>Assets Page</div>}
           />
         }
@@ -108,7 +113,7 @@ function AppRoutes() {
         path="/settings"
         element={
           <RoutePermissionGuard
-            permission={{ action: 'manage', subject: 'settings' }}
+            permission={{ action: "manage", subject: "settings" }}
             element={<SettingsPage />}
           />
         }

@@ -1,5 +1,5 @@
 export interface IntegrationAuth {
-  type: 'apiKey' | 'awsIam';
+  type: "apiKey" | "awsIam";
   credentials: {
     apiKey?: string;
     iamRole?: string;
@@ -7,7 +7,7 @@ export interface IntegrationAuth {
 }
 
 export interface IntegrationStatus {
-  state: 'Active' | 'Disabled' | 'Error';
+  state: "Active" | "Disabled" | "Error";
   lastSuccessfulConnection?: string; // ISO timestamp
   lastError?: {
     message: string;

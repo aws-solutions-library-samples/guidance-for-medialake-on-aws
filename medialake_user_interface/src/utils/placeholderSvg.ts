@@ -14,9 +14,9 @@
 export function createPlaceholderSvg(
   width: number = 300,
   height: number = 200,
-  text: string = 'Placeholder',
-  backgroundColor: string = '#DDDDDD',
-  textColor: string = '#999999'
+  text: string = "Placeholder",
+  backgroundColor: string = "#DDDDDD",
+  textColor: string = "#999999",
 ): string {
   const fontSize = Math.min(width, height) * 0.12; // Responsive font size
 
@@ -31,17 +31,21 @@ export function createPlaceholderSvg(
 /**
  * Creates a standard placeholder image (300x200)
  */
-export const PLACEHOLDER_IMAGE = createPlaceholderSvg(300, 200, 'Placeholder');
+export const PLACEHOLDER_IMAGE = createPlaceholderSvg(300, 200, "Placeholder");
 
 /**
  * Creates a video placeholder image (300x200)
  */
-export const VIDEO_PLACEHOLDER_IMAGE = createPlaceholderSvg(300, 200, 'Placeholder');
+export const VIDEO_PLACEHOLDER_IMAGE = createPlaceholderSvg(
+  300,
+  200,
+  "Placeholder",
+);
 
 /**
  * Creates a small timecode placeholder for video scrubbing (100x56)
  * @param timeString - The timecode string to display
  */
 export function createTimecodePlaceholder(timeString: string): string {
-  return createPlaceholderSvg(100, 56, timeString, '#000000', '#FFFFFF');
+  return createPlaceholderSvg(100, 56, timeString, "#000000", "#FFFFFF");
 }

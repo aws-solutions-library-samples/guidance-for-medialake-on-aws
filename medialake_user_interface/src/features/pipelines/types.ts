@@ -1,7 +1,7 @@
 export interface NodeParameter {
   name: string;
   label: string;
-  type: 'text' | 'number' | 'boolean' | 'select';
+  type: "text" | "number" | "boolean" | "select";
   required: boolean;
   description?: string;
 }
@@ -37,7 +37,9 @@ export interface NodeConfiguration {
 }
 
 // Helper function to ensure numeric values remain as numbers
-export const ensureCorrectTypes = (config: NodeConfiguration): NodeConfiguration => {
+export const ensureCorrectTypes = (
+  config: NodeConfiguration,
+): NodeConfiguration => {
   if (!config || !config.parameters) return config;
 
   const processedParams: Record<string, any> = {};
@@ -45,28 +47,28 @@ export const ensureCorrectTypes = (config: NodeConfiguration): NodeConfiguration
   // Process each parameter
   Object.entries(config.parameters).forEach(([key, value]) => {
     // Handle numeric parameters
-    if (typeof value === 'string' && !isNaN(Number(value))) {
+    if (typeof value === "string" && !isNaN(Number(value))) {
       // Check if this is a numeric parameter by looking at its schema
       const paramDef = Object.values(config.parameters).find(
-        (p: any) => p?.name === key && p?.schema?.type === 'number'
+        (p: any) => p?.name === key && p?.schema?.type === "number",
       );
 
-      if (paramDef || key === 'ConcurrencyLimit') {
+      if (paramDef || key === "ConcurrencyLimit") {
         processedParams[key] = Number(value);
       } else {
         processedParams[key] = value;
       }
     } else if (
-      typeof value === 'object' &&
+      typeof value === "object" &&
       value !== null &&
-      value.schema?.type === 'number' &&
+      value.schema?.type === "number" &&
       value.default !== undefined
     ) {
       // Handle parameter definitions with numeric defaults
       processedParams[key] = {
         ...value,
         default:
-          typeof value.default === 'string' && !isNaN(Number(value.default))
+          typeof value.default === "string" && !isNaN(Number(value.default))
             ? Number(value.default)
             : value.default,
       };

@@ -1,19 +1,19 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '../apiClient';
-import { API_ENDPOINTS } from '../endpoints';
-import { QUERY_KEYS } from '../queryKeys';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiClient } from "../apiClient";
+import { API_ENDPOINTS } from "../endpoints";
+import { QUERY_KEYS } from "../queryKeys";
 
 // Types for favorites
 export interface Favorite {
   itemId: string;
-  itemType: 'ASSET' | 'PIPELINE' | 'COLLECTION';
+  itemType: "ASSET" | "PIPELINE" | "COLLECTION";
   metadata?: Record<string, any>;
   addedAt?: string;
 }
 
 export interface AddFavoriteRequest {
   itemId: string;
-  itemType: 'ASSET' | 'PIPELINE' | 'COLLECTION';
+  itemType: "ASSET" | "PIPELINE" | "COLLECTION";
   metadata?: Record<string, any>;
 }
 
@@ -61,20 +61,23 @@ export const useAddFavorite = () => {
     mutationFn: async (favoriteData) => {
       const { data } = await apiClient.post<AddFavoriteResponse>(
         API_ENDPOINTS.FAVORITES.BASE,
-        favoriteData
+        favoriteData,
       );
       return data.data.favorite;
     },
     onSuccess: (data, variables) => {
-      console.log('Adding favorite succeeded:', data);
-      console.log('Invalidating queries with key:', QUERY_KEYS.FAVORITES.all);
+      console.log("Adding favorite succeeded:", data);
+      console.log("Invalidating queries with key:", QUERY_KEYS.FAVORITES.all);
 
       // Invalidate all favorites queries to refresh data
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FAVORITES.all });
 
       // Also explicitly invalidate the specific query for the item type
       // This ensures that filtered queries like useGetFavorites('ASSET') are also refreshed
-      console.log('Invalidating specific query with itemType:', variables.itemType);
+      console.log(
+        "Invalidating specific query with itemType:",
+        variables.itemType,
+      );
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.FAVORITES.list(variables.itemType),
       });
@@ -93,14 +96,17 @@ export const useRemoveFavorite = () => {
       await apiClient.delete(API_ENDPOINTS.FAVORITES.DELETE(itemType, itemId));
     },
     onSuccess: (_, variables) => {
-      console.log('Removing favorite succeeded for:', variables);
-      console.log('Invalidating queries with key:', QUERY_KEYS.FAVORITES.all);
+      console.log("Removing favorite succeeded for:", variables);
+      console.log("Invalidating queries with key:", QUERY_KEYS.FAVORITES.all);
 
       // Invalidate all favorites queries to refresh data
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FAVORITES.all });
 
       // Also explicitly invalidate the specific query for the item type
-      console.log('Invalidating specific query with itemType:', variables.itemType);
+      console.log(
+        "Invalidating specific query with itemType:",
+        variables.itemType,
+      );
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.FAVORITES.list(variables.itemType),
       });
@@ -115,7 +121,8 @@ export const useRemoveFavorite = () => {
 export const useIsFavorited = (itemId: string, itemType: string) => {
   const { data: favorites, isLoading } = useGetFavorites(itemType);
 
-  const isFavorited = favorites?.some((favorite) => favorite.itemId === itemId) || false;
+  const isFavorited =
+    favorites?.some((favorite) => favorite.itemId === itemId) || false;
 
   return {
     isFavorited,

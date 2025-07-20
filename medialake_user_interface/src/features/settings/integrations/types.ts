@@ -5,7 +5,7 @@ export interface IntegrationNode {
     description: string;
   };
   auth?: {
-    authMethod: 'awsIam' | 'apiKey';
+    authMethod: "awsIam" | "apiKey";
   };
 }
 
@@ -15,13 +15,13 @@ export interface Integration {
   description: string;
   environmentId: string;
   auth: {
-    type: 'awsIam' | 'apiKey';
+    type: "awsIam" | "apiKey";
     credentials: {
       apiKey?: string;
       iamRole?: string;
     };
   };
-  status: 'active' | 'inactive' | 'error';
+  status: "active" | "inactive" | "error";
   createdAt: string;
   updatedAt: string;
 }

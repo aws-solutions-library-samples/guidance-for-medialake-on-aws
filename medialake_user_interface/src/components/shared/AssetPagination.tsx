@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   Box,
   Typography,
@@ -7,7 +7,7 @@ import {
   MenuItem,
   FormControl,
   SelectChangeEvent,
-} from '@mui/material';
+} from "@mui/material";
 
 interface AssetPaginationProps {
   page: number;
@@ -35,18 +35,18 @@ const AssetPagination: React.FC<AssetPaginationProps> = ({
   return (
     <Box
       sx={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
         mt: 6,
         mb: 2,
-        backgroundColor: 'transparent',
+        backgroundColor: "transparent",
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
         <Typography variant="body2" color="text.secondary">
-          Showing {(page - 1) * pageSize + 1} - {Math.min(page * pageSize, totalResults)} of{' '}
-          {totalResults} results
+          Showing {(page - 1) * pageSize + 1} -{" "}
+          {Math.min(page * pageSize, totalResults)} of {totalResults} results
         </Typography>
         <FormControl size="small" variant="outlined">
           <Select
@@ -55,7 +55,7 @@ const AssetPagination: React.FC<AssetPaginationProps> = ({
             sx={{
               minWidth: 80,
               height: 32,
-              '& .MuiSelect-select': {
+              "& .MuiSelect-select": {
                 py: 0.5,
                 px: 1.5,
               },
@@ -79,16 +79,16 @@ const AssetPagination: React.FC<AssetPaginationProps> = ({
         showFirstButton
         showLastButton
         sx={{
-          '& .MuiPaginationItem-root': {
-            borderRadius: '50%',
+          "& .MuiPaginationItem-root": {
+            borderRadius: "50%",
             minWidth: 40,
             height: 40,
-            '&.Mui-selected': {
-              fontWeight: 'bold',
-              backgroundColor: 'primary.main',
-              color: 'white',
-              '&:hover': {
-                backgroundColor: 'primary.dark',
+            "&.Mui-selected": {
+              fontWeight: "bold",
+              backgroundColor: "primary.main",
+              color: "white",
+              "&:hover": {
+                backgroundColor: "primary.dark",
               },
             },
           },

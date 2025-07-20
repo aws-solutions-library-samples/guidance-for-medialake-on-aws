@@ -1,10 +1,10 @@
-import { StorageHelper } from '@/common/helpers/storage-helper';
+import { StorageHelper } from "@/common/helpers/storage-helper";
 
 export abstract class ApiClientBase {
   protected async getHeaders() {
     const token = StorageHelper.getToken();
     if (!token) {
-      throw new Error('No authentication token available');
+      throw new Error("No authentication token available");
     }
     return {
       Authorization: `Bearer ${token}`,

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -10,64 +10,64 @@ import {
   Chip,
   useTheme,
   alpha,
-} from '@mui/material';
-import { SimpleTreeView } from '@mui/x-tree-view/SimpleTreeView';
-import { TreeItem } from '@mui/x-tree-view/TreeItem';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import SearchIcon from '@mui/icons-material/Search';
-import MetadataContent from './MetadataContent';
+} from "@mui/material";
+import { SimpleTreeView } from "@mui/x-tree-view/SimpleTreeView";
+import { TreeItem } from "@mui/x-tree-view/TreeItem";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import SearchIcon from "@mui/icons-material/Search";
+import MetadataContent from "./MetadataContent";
 
 // Category mapping for display names
 const categoryMapping = {
-  exif: 'EXIF',
-  ifd1: 'Thumbnail (IFD1)',
-  ifd0: 'Image (IFD0)',
-  gps: 'GPS',
-  iptc: 'IPTC',
-  xmp: 'XMP',
-  icc: 'ICC',
-  jfif: 'JFIF (JPEG only)',
-  ihdr: 'IHDR (PNG only)',
-  makerNote: 'Maker Note',
-  userComment: 'User Comment',
-  xmpRights: 'Rights',
-  Iptc4xmpCore: 'IPTC Core',
-  Iptc4xmpExt: 'IPTC Extension',
-  photoshop: 'Photoshop',
-  plus: 'PLUS',
-  dc: 'Dublin Core',
-  xmpMM: 'XMP Media Management',
-  aux: 'Auxiliary',
-  crs: 'Camera Raw Settings',
-  exifEX: 'EXIF Extended',
-  xmpDM: 'XMP Dynamic Media',
-  interop: 'Interoperability',
+  exif: "EXIF",
+  ifd1: "Thumbnail (IFD1)",
+  ifd0: "Image (IFD0)",
+  gps: "GPS",
+  iptc: "IPTC",
+  xmp: "XMP",
+  icc: "ICC",
+  jfif: "JFIF (JPEG only)",
+  ihdr: "IHDR (PNG only)",
+  makerNote: "Maker Note",
+  userComment: "User Comment",
+  xmpRights: "Rights",
+  Iptc4xmpCore: "IPTC Core",
+  Iptc4xmpExt: "IPTC Extension",
+  photoshop: "Photoshop",
+  plus: "PLUS",
+  dc: "Dublin Core",
+  xmpMM: "XMP Media Management",
+  aux: "Auxiliary",
+  crs: "Camera Raw Settings",
+  exifEX: "EXIF Extended",
+  xmpDM: "XMP Dynamic Media",
+  interop: "Interoperability",
   // Audio-specific categories
-  id3v2: 'ID3v2',
-  mp3Info: 'MP3 Info',
-  flac: 'FLAC',
-  wav: 'WAV',
-  oggVorbis: 'Ogg Vorbis',
-  audioMetadata: 'Audio Metadata',
-  technical: 'Technical',
-  musicBrainz: 'MusicBrainz',
-  encoding: 'Encoding',
-  rights: 'Rights',
+  id3v2: "ID3v2",
+  mp3Info: "MP3 Info",
+  flac: "FLAC",
+  wav: "WAV",
+  oggVorbis: "Ogg Vorbis",
+  audioMetadata: "Audio Metadata",
+  technical: "Technical",
+  musicBrainz: "MusicBrainz",
+  encoding: "Encoding",
+  rights: "Rights",
   // Add mapping for ObjectMetadata to display as "Object Metadata"
-  ObjectMetadata: 'Object Metadata',
+  ObjectMetadata: "Object Metadata",
 };
 
 interface TechnicalMetadataTabProps {
   metadataAccordions: any[];
   availableCategories: string[];
-  mediaType?: 'image' | 'audio' | 'video';
+  mediaType?: "image" | "audio" | "video";
 }
 
 const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
   metadataAccordions,
   availableCategories,
-  mediaType = 'image',
+  mediaType = "image",
 }) => {
   const theme = useTheme();
 
@@ -75,8 +75,8 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
   /*  Local UI state                                                     */
   /* ---------------------------------------------------------------------- */
 
-  const [categoryFilter, setCategoryFilter] = useState<'all' | string>('all');
-  const [textFilter, setTextFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<"all" | string>("all");
+  const [textFilter, setTextFilter] = useState("");
 
   /* ---------------------------------------------------------------------- */
   /*  Filter the accordion list whenever UI filters change              */
@@ -86,11 +86,12 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
     let result = metadataAccordions;
 
     // category filter
-    if (categoryFilter !== 'all') {
+    if (categoryFilter !== "all") {
       result = result
         .map((parent) => {
           const subCategories = parent.subCategories.filter(
-            (sub: any) => sub.category.toLowerCase() === categoryFilter.toLowerCase()
+            (sub: any) =>
+              sub.category.toLowerCase() === categoryFilter.toLowerCase(),
           );
           return subCategories.length
             ? { ...parent, subCategories, count: subCategories.length }
@@ -105,7 +106,7 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
       result = result
         .map((parent) => {
           const subCategories = parent.subCategories.filter((sub: any) =>
-            JSON.stringify(sub.data).toLowerCase().includes(term)
+            JSON.stringify(sub.data).toLowerCase().includes(term),
           );
           return subCategories.length
             ? { ...parent, subCategories, count: subCategories.length }
@@ -125,7 +126,9 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
     const all: string[] = [];
     filteredAccordions.forEach((parent, pIdx) => {
       all.push(`parent-${pIdx}`);
-      parent.subCategories.forEach((_: any, sIdx: number) => all.push(`${pIdx}-${sIdx}`));
+      parent.subCategories.forEach((_: any, sIdx: number) =>
+        all.push(`${pIdx}-${sIdx}`),
+      );
     });
     return all;
   }, [filteredAccordions]);
@@ -148,9 +151,9 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
   /* ---------------------------------------------------------------------- */
 
   return (
-    <Box sx={{ borderRadius: 1, width: '100%' }}>
+    <Box sx={{ borderRadius: 1, width: "100%" }}>
       {/* --------------------------------------------------  Filter bar  --- */}
-      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+      <Box sx={{ mb: 2, display: "flex", alignItems: "center", gap: 2 }}>
         <TextField
           placeholder="Filter metadata…"
           size="small"
@@ -175,7 +178,8 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
             <MenuItem value="all">All Categories</MenuItem>
             {availableCategories.map((key) => (
               <MenuItem key={key} value={key}>
-                {categoryMapping[key] || key.charAt(0).toUpperCase() + key.slice(1)}
+                {categoryMapping[key] ||
+                  key.charAt(0).toUpperCase() + key.slice(1)}
               </MenuItem>
             ))}
           </Select>
@@ -186,17 +190,17 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
       <SimpleTreeView
         defaultExpandedItems={expandedItems}
         sx={{
-          '& .MuiTreeItem-content': {
-            padding: '4px 8px',
-            borderRadius: '4px',
-            '&:hover': {
+          "& .MuiTreeItem-content": {
+            padding: "4px 8px",
+            borderRadius: "4px",
+            "&:hover": {
               backgroundColor: alpha(theme.palette.primary.main, 0.05),
             },
           },
-          '& .MuiTreeItem-group': {
-            marginLeft: '24px',
+          "& .MuiTreeItem-group": {
+            marginLeft: "24px",
             borderLeft: `1px dashed ${alpha(theme.palette.text.primary, 0.2)}`,
-            paddingLeft: '8px',
+            paddingLeft: "8px",
           },
         }}
         slots={{ collapseIcon: ExpandMoreIcon, expandIcon: ChevronRightIcon }}
@@ -206,12 +210,13 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
             key={pIdx}
             itemId={`parent-${pIdx}`}
             label={
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Box sx={{ display: "flex", alignItems: "center" }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                  {parent.category === 'EmbeddedMetadata'
-                    ? 'Embedded Metadata'
-                    : categoryMapping[parent.category as keyof typeof categoryMapping] ||
-                      parent.category}
+                  {parent.category === "EmbeddedMetadata"
+                    ? "Embedded Metadata"
+                    : categoryMapping[
+                        parent.category as keyof typeof categoryMapping
+                      ] || parent.category}
                 </Typography>
                 <Chip
                   size="small"
@@ -219,7 +224,7 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
                   sx={{
                     ml: 1,
                     height: 20,
-                    fontSize: '0.70rem',
+                    fontSize: "0.70rem",
                     backgroundColor: alpha(theme.palette.primary.main, 0.1),
                     color: theme.palette.primary.main,
                   }}
@@ -232,10 +237,11 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
                 key={sIdx}
                 itemId={`${pIdx}-${sIdx}`}
                 label={
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Box sx={{ display: "flex", alignItems: "center" }}>
                     <Typography variant="body2">
-                      {categoryMapping[sub.category as keyof typeof categoryMapping] ||
-                        sub.category}
+                      {categoryMapping[
+                        sub.category as keyof typeof categoryMapping
+                      ] || sub.category}
                     </Typography>
                     <Chip
                       size="small"
@@ -243,8 +249,11 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
                       sx={{
                         ml: 1,
                         height: 18,
-                        fontSize: '0.65rem',
-                        backgroundColor: alpha(theme.palette.secondary.main, 0.1),
+                        fontSize: "0.65rem",
+                        backgroundColor: alpha(
+                          theme.palette.secondary.main,
+                          0.1,
+                        ),
                         color: theme.palette.secondary.main,
                       }}
                     />

@@ -4,7 +4,7 @@ stages:
   - test
 
 default:
-  image: registry.gitlab.aws.dev/aws-mne-msc/media-lake-v2
+  image: public.ecr.aws/amazonlinux/amazonlinux:latest
   tags:
     - arch:amd64
     - size:large
@@ -61,6 +61,8 @@ workflow:
         CDK_DEPLOY_REGION: $DEMO_AWS_REGION
         AWS_REGION: $DEMO_AWS_REGION
         AMAZON_REGION: $DEMO_AWS_REGION
+    # Allow merge requests to run
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - when: never
 
 # Cache modules in between jobs
@@ -71,6 +73,15 @@ cache:
 
 .echo_versions: &echo_versions
   before_script:
+    # Install required dependencies
+    - yum update -y
+    - yum install -y python3 python3-pip nodejs npm git jq unzip which findutils
+    # Install AWS CLI
+    - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+    - unzip awscliv2.zip
+    - ./aws/install
+    # Install AWS CDK
+    - npm install -g aws-cdk
     - echo "login = $GITLAB_USER_LOGIN - role = $AWS_CREDS_TARGET_ROLE"
     - npm --version
     - node --version
@@ -81,6 +92,8 @@ cache:
 job_deploy:
   stage: deploy
   <<: *echo_versions
+  rules:
+    - when: never # This prevents the job from running
   script:
     - echo "Deploying the project"
     - mv .cicd/config.json-template config.json
@@ -117,17 +130,52 @@ pre_commit_checks:
     - pip install autoflake isort black flake8
     - npm install -g prettier
     # Run pre-commit hooks excluding ESLint
-    - pre-commit run --all-files --hook-stage manual trailing-whitespace
-    - pre-commit run --all-files --hook-stage manual end-of-file-fixer
-    - pre-commit run --all-files --hook-stage manual check-yaml
-    - pre-commit run --all-files --hook-stage manual check-added-large-files
-    - pre-commit run --all-files --hook-stage manual check-merge-conflict
-    - pre-commit run --all-files --hook-stage manual detect-private-key
-    - pre-commit run --all-files --hook-stage manual check-json
-    - pre-commit run --all-files --hook-stage manual autoflake
-    - pre-commit run --all-files --hook-stage manual isort
-    - pre-commit run --all-files --hook-stage manual black
-    - pre-commit run --all-files --hook-stage manual flake8
-    - pre-commit run --all-files --hook-stage manual prettier
-    - pre-commit run --all-files --hook-stage manual cdk-synth-check
-    - pre-commit run --all-files --hook-stage manual remove-ds-store
+    - pre-commit run --all-files trailing-whitespace
+    - pre-commit run --all-files end-of-file-fixer
+    - pre-commit run --all-files check-yaml
+    - pre-commit run --all-files check-added-large-files
+    - pre-commit run --all-files check-merge-conflict
+    - pre-commit run --all-files detect-private-key
+    - pre-commit run --all-files check-json
+    - pre-commit run --all-files autoflake
+    - pre-commit run --all-files isort
+    - pre-commit run --all-files black
+    - pre-commit run --all-files flake8
+    - pre-commit run --all-files prettier
+    # Remove .DS_Store files directly (since hook was removed from local config)
+    - find . -name .DS_Store -type f -delete
+
+sync-to-github:
+  image: alpine:latest
+  stage: deploy
+  rules:
+    - if: $CI_COMMIT_REF_NAME == "release"
+  script:
+    - apk add --no-cache git openssh
+    - mkdir -p ~/.ssh
+    - echo "$GITHUB_SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - ssh-keyscan github.com >> ~/.ssh/known_hosts
+    - git config --global user.email "medialake@amazon.com"
+    - git config --global user.name "MediaLake CI"
+    - git clone --single-branch --branch release $CI_REPOSITORY_URL repo-copy
+    - cd repo-copy
+    - RELEASE_COMMIT_MESSAGE=$(git log -1 --pretty=format:"%s")
+    - echo "Release commit message $RELEASE_COMMIT_MESSAGE"
+    - echo "Current commit" && git log --oneline -1
+    - echo "Current branch" && git branch -a
+    - git remote add github git@github.com:aws-solutions-library-samples/guidance-for-medialake-on-aws.git
+    - git fetch github main
+    - echo "GitHub main commit" && git log --oneline -1 github/main
+    - rm -f secrets.txt
+    - rm -rf docs/
+    - rm -rf .roo/
+    - rm -f setup-dev.sh
+    - rm -f manage-hooks.sh
+    - rm -f fix.sh
+    - rm -f .roomodes
+    - rm -f .pre-commit-config.yaml
+    - rm -rf .githooks/
+    - git add -A
+    - git commit -m "$RELEASE_COMMIT_MESSAGE" --allow-empty
+    - git push -f github HEAD:main

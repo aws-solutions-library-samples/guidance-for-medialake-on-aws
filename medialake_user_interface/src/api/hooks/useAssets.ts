@@ -1,12 +1,12 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { QUERY_KEYS } from '@/api/queryKeys';
-import { apiClient } from '@/api/apiClient';
-import { API_ENDPOINTS } from '@/api/endpoints';
-import { logger } from '@/common/helpers/logger';
-import { useErrorModal } from '@/hooks/useErrorModal';
-import { useFeatureFlag } from '@/utils/featureFlags';
-import { useSnackbar, closeSnackbar } from 'notistack';
-import { useAuth } from '@/common/hooks/auth-context';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { QUERY_KEYS } from "@/api/queryKeys";
+import { apiClient } from "@/api/apiClient";
+import { API_ENDPOINTS } from "@/api/endpoints";
+import { logger } from "@/common/helpers/logger";
+import { useErrorModal } from "@/hooks/useErrorModal";
+import { useFeatureFlag } from "@/utils/featureFlags";
+import { useSnackbar, closeSnackbar } from "notistack";
+import { useAuth } from "@/common/hooks/auth-context";
 
 interface Asset {
   asset: {
@@ -210,7 +210,7 @@ interface BulkDownloadRequest {
   assetIds: string[];
   options?: {
     includeMetadata?: boolean;
-    format?: 'zip';
+    format?: "zip";
   };
 }
 
@@ -219,7 +219,13 @@ interface BulkDownloadResponse {
   message: string;
   data: {
     jobId: string;
-    status: 'INITIATED' | 'ASSESSED' | 'STAGING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+    status:
+      | "INITIATED"
+      | "ASSESSED"
+      | "STAGING"
+      | "PROCESSING"
+      | "COMPLETED"
+      | "FAILED";
     downloadUrl?: string;
     estimatedSize?: number;
     createdAt: string;
@@ -231,7 +237,13 @@ interface BulkDownloadStatusResponse {
   message: string;
   data: {
     jobId: string;
-    status: 'INITIATED' | 'ASSESSED' | 'STAGING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+    status:
+      | "INITIATED"
+      | "ASSESSED"
+      | "STAGING"
+      | "PROCESSING"
+      | "COMPLETED"
+      | "FAILED";
     downloadUrl?: string;
     progress?: number;
     estimatedSize?: number;
@@ -250,11 +262,13 @@ export const useAsset = (inventoryId: string) => {
     queryKey: QUERY_KEYS.ASSETS.detail(inventoryId),
     queryFn: async () => {
       try {
-        const response = await apiClient.get<AssetResponse>(`assets/${inventoryId}`);
+        const response = await apiClient.get<AssetResponse>(
+          `assets/${inventoryId}`,
+        );
         return response.data;
       } catch (error) {
-        logger.error('Error fetching asset details:', error);
-        showError('Failed to fetch asset details');
+        logger.error("Error fetching asset details:", error);
+        showError("Failed to fetch asset details");
         throw error;
       }
     },
@@ -271,11 +285,13 @@ export const useDeleteAsset = () => {
   return useMutation({
     mutationFn: async (inventoryId: string) => {
       try {
-        const response = await apiClient.delete<DeleteAssetResponse>(`assets/${inventoryId}`);
+        const response = await apiClient.delete<DeleteAssetResponse>(
+          `assets/${inventoryId}`,
+        );
         return response.data;
       } catch (error) {
-        logger.error('Error deleting asset:', error);
-        showError('Failed to delete asset');
+        logger.error("Error deleting asset:", error);
+        showError("Failed to delete asset");
         throw error;
       }
     },
@@ -291,8 +307,8 @@ export const useDeleteAsset = () => {
       });
     },
     onError: (error) => {
-      logger.error('Error in delete mutation:', error);
-      showError('Failed to delete asset');
+      logger.error("Error in delete mutation:", error);
+      showError("Failed to delete asset");
     },
   });
 };
@@ -304,14 +320,23 @@ export const useRenameAsset = (onError?: (message: string) => void) => {
   const { enqueueSnackbar } = useSnackbar();
 
   return useMutation({
-    mutationFn: async ({ inventoryId, newName }: { inventoryId: string; newName: string }) => {
+    mutationFn: async ({
+      inventoryId,
+      newName,
+    }: {
+      inventoryId: string;
+      newName: string;
+    }) => {
       try {
-        const response = await apiClient.post<AssetResponse>(`assets/${inventoryId}/rename`, {
-          newName,
-        });
+        const response = await apiClient.post<AssetResponse>(
+          `assets/${inventoryId}/rename`,
+          {
+            newName,
+          },
+        );
         return response.data;
       } catch (error: any) {
-        logger.error('Error renaming asset:', error);
+        logger.error("Error renaming asset:", error);
 
         // Check if this is a 409 Conflict error
         if (error.response?.status === 409) {
@@ -319,13 +344,13 @@ export const useRenameAsset = (onError?: (message: string) => void) => {
           const errorMessage =
             error.response?.data?.message ||
             error.response?.data?.error ||
-            'Cannot rename: file already exists or conflict occurred';
+            "Cannot rename: file already exists or conflict occurred";
 
           if (onError) {
             onError(errorMessage);
           } else {
             enqueueSnackbar(errorMessage, {
-              variant: 'error',
+              variant: "error",
               autoHideDuration: 8000, // Longer duration for important error
               persist: false,
             });
@@ -333,9 +358,9 @@ export const useRenameAsset = (onError?: (message: string) => void) => {
         } else {
           // Use modal for other errors
           if (onError) {
-            onError('Failed to rename asset');
+            onError("Failed to rename asset");
           } else {
-            showError('Failed to rename asset');
+            showError("Failed to rename asset");
           }
         }
         throw error;
@@ -343,7 +368,10 @@ export const useRenameAsset = (onError?: (message: string) => void) => {
     },
     onSuccess: (data, variables) => {
       // Update the specific asset cache
-      queryClient.setQueryData(QUERY_KEYS.ASSETS.detail(variables.inventoryId), data);
+      queryClient.setQueryData(
+        QUERY_KEYS.ASSETS.detail(variables.inventoryId),
+        data,
+      );
 
       // Update asset in any search results cache
       queryClient
@@ -358,7 +386,9 @@ export const useRenameAsset = (onError?: (message: string) => void) => {
                   // (in case there's a duplicate with the same ID)
                   asset.InventoryID !== variables.inventoryId ||
                   asset ===
-                    queryData.data.results.find((a: any) => a.InventoryID === variables.inventoryId)
+                    queryData.data.results.find(
+                      (a: any) => a.InventoryID === variables.inventoryId,
+                    ),
               )
               .map((asset: any) => {
                 if (asset.InventoryID === variables.inventoryId) {
@@ -386,19 +416,28 @@ export const useRenameAsset = (onError?: (message: string) => void) => {
       // Removed invalidation to avoid eventual consistency issues
     },
     onError: (error: any) => {
-      logger.error('Error in rename mutation:', error);
+      logger.error("Error in rename mutation:", error);
       // Error handling is now done in mutationFn to avoid duplicate messages
     },
   });
 };
 
-export const useRelatedVersions = (assetId: string, page: number = 1, pageSize: number = 50) => {
-  console.log('useRelatedVersions - Called with assetId:', assetId, 'page:', page);
+export const useRelatedVersions = (
+  assetId: string,
+  page: number = 1,
+  pageSize: number = 50,
+) => {
+  console.log(
+    "useRelatedVersions - Called with assetId:",
+    assetId,
+    "page:",
+    page,
+  );
 
   return useQuery<RelatedVersionsResponse, Error>({
-    queryKey: ['relatedVersions', assetId, page, pageSize],
+    queryKey: ["relatedVersions", assetId, page, pageSize],
     queryFn: async (): Promise<RelatedVersionsResponse> => {
-      console.log('useRelatedVersions - Fetching data for assetId:', assetId);
+      console.log("useRelatedVersions - Fetching data for assetId:", assetId);
       const response = await apiClient.get<RelatedVersionsResponse>(
         `/assets/${assetId}/relatedversions`,
         {
@@ -407,9 +446,9 @@ export const useRelatedVersions = (assetId: string, page: number = 1, pageSize: 
             pageSize,
             min_score: 0.01,
           },
-        }
+        },
       );
-      console.log('useRelatedVersions - Received response:', response.data);
+      console.log("useRelatedVersions - Received response:", response.data);
       return response.data;
     },
     enabled: !!assetId,
@@ -422,17 +461,17 @@ export const useTranscription = (inventoryId: string) => {
   const { showError } = useErrorModal();
 
   return useQuery({
-    queryKey: ['transcription', inventoryId],
+    queryKey: ["transcription", inventoryId],
     queryFn: async () => {
       try {
         const response = await apiClient.get<TranscriptionResponse>(
-          `assets/${inventoryId}/transcript`
+          `assets/${inventoryId}/transcript`,
         );
-        console.log('Transcription API response:', response.data);
+        console.log("Transcription API response:", response.data);
         return response.data;
       } catch (error) {
-        logger.error('Error fetching asset transcript:', error);
-        showError('Failed to fetch asset transcript');
+        logger.error("Error fetching asset transcript:", error);
+        showError("Failed to fetch asset transcript");
         throw error;
       }
     },
@@ -450,37 +489,40 @@ export const useBulkDownload = () => {
       try {
         const response = await apiClient.post<BulkDownloadResponse>(
           API_ENDPOINTS.ASSETS.BULK_DOWNLOAD,
-          request
+          request,
         );
         return response.data;
       } catch (error) {
-        logger.error('Error initiating bulk download:', error);
-        showError('Failed to initiate bulk download');
+        logger.error("Error initiating bulk download:", error);
+        showError("Failed to initiate bulk download");
         throw error;
       }
     },
     onError: (error) => {
-      logger.error('Error in bulk download mutation:', error);
-      showError('Failed to initiate bulk download');
+      logger.error("Error in bulk download mutation:", error);
+      showError("Failed to initiate bulk download");
     },
   });
 };
 
 // Hook to check bulk download status
-export const useBulkDownloadStatus = (jobId: string, enabled: boolean = true) => {
+export const useBulkDownloadStatus = (
+  jobId: string,
+  enabled: boolean = true,
+) => {
   const { showError } = useErrorModal();
 
   return useQuery({
-    queryKey: ['bulkDownloadStatus', jobId],
+    queryKey: ["bulkDownloadStatus", jobId],
     queryFn: async () => {
       try {
         const response = await apiClient.get<BulkDownloadStatusResponse>(
-          `${API_ENDPOINTS.ASSETS.BULK_DOWNLOAD}/${jobId}/status`
+          `${API_ENDPOINTS.ASSETS.BULK_DOWNLOAD}/${jobId}/status`,
         );
         return response.data;
       } catch (error) {
-        logger.error('Error fetching bulk download status:', error);
-        showError('Failed to fetch download status');
+        logger.error("Error fetching bulk download status:", error);
+        showError("Failed to fetch download status");
         throw error;
       }
     },
@@ -494,10 +536,13 @@ export const useBulkDownloadStatus = (jobId: string, enabled: boolean = true) =>
 export const useUserBulkDownloadJobs = (enabled: boolean = true) => {
   const { showError } = useErrorModal();
   const { isAuthenticated } = useAuth();
-  const multiSelectFeature = useFeatureFlag('search-multi-select-enabled', false);
+  const multiSelectFeature = useFeatureFlag(
+    "search-multi-select-enabled",
+    false,
+  );
 
   return useQuery({
-    queryKey: ['userBulkDownloadJobs'],
+    queryKey: ["userBulkDownloadJobs"],
     queryFn: async () => {
       try {
         const response = await apiClient.get<{
@@ -506,7 +551,13 @@ export const useUserBulkDownloadJobs = (enabled: boolean = true) => {
           data: {
             jobs: Array<{
               jobId: string;
-              status: 'INITIATED' | 'ASSESSED' | 'STAGING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+              status:
+                | "INITIATED"
+                | "ASSESSED"
+                | "STAGING"
+                | "PROCESSING"
+                | "COMPLETED"
+                | "FAILED";
               progress?: number;
               createdAt: string;
               updatedAt: string;
@@ -530,8 +581,8 @@ export const useUserBulkDownloadJobs = (enabled: boolean = true) => {
         }>(API_ENDPOINTS.ASSETS.BULK_DOWNLOAD_USER_JOBS);
         return response.data;
       } catch (error) {
-        logger.error('Error fetching user bulk download jobs:', error);
-        showError('Failed to fetch download jobs');
+        logger.error("Error fetching user bulk download jobs:", error);
+        showError("Failed to fetch download jobs");
         throw error;
       }
     },
@@ -556,14 +607,14 @@ export const useDeleteBulkDownloadJob = () => {
         }>(API_ENDPOINTS.ASSETS.BULK_DOWNLOAD_DELETE(jobId));
         return response.data;
       } catch (error) {
-        logger.error('Error deleting bulk download job:', error);
-        showError('Failed to delete download job');
+        logger.error("Error deleting bulk download job:", error);
+        showError("Failed to delete download job");
         throw error;
       }
     },
     onSuccess: () => {
       // Invalidate and refetch user jobs
-      queryClient.invalidateQueries({ queryKey: ['userBulkDownloadJobs'] });
+      queryClient.invalidateQueries({ queryKey: ["userBulkDownloadJobs"] });
     },
   });
 };

@@ -1,9 +1,17 @@
-import React from 'react';
-import { Box, Typography, FormControlLabel, CircularProgress } from '@mui/material';
-import { PowerSettingsNew as PowerOnIcon, PowerOff as PowerOffIcon } from '@mui/icons-material';
-import { IconSwitch } from '@/components/common';
-import { TableCellContent } from '@/components/common/table/TableCellContent';
-import type { Pipeline } from '../types/pipelines.types';
+import React from "react";
+import {
+  Box,
+  Typography,
+  FormControlLabel,
+  CircularProgress,
+} from "@mui/material";
+import {
+  PowerSettingsNew as PowerOnIcon,
+  PowerOff as PowerOffIcon,
+} from "@mui/icons-material";
+import { IconSwitch } from "@/components/common";
+import { TableCellContent } from "@/components/common/table/TableCellContent";
+import type { Pipeline } from "../types/pipelines.types";
 
 interface PipelineStatusCellProps {
   pipeline: Pipeline;
@@ -17,14 +25,15 @@ export const PipelineStatusCell: React.FC<PipelineStatusCellProps> = ({
   togglingPipelines,
 }) => {
   const status = pipeline.deploymentStatus;
-  let color: 'text.secondary' | 'success.main' | 'info.main' | 'error.main' = 'text.secondary';
+  let color: "text.secondary" | "success.main" | "info.main" | "error.main" =
+    "text.secondary";
 
-  if (status === 'DEPLOYED') {
-    color = 'success.main';
-  } else if (status === 'CREATING') {
-    color = 'info.main';
-  } else if (status === 'FAILED') {
-    color = 'error.main';
+  if (status === "DEPLOYED") {
+    color = "success.main";
+  } else if (status === "CREATING") {
+    color = "info.main";
+  } else if (status === "FAILED") {
+    color = "error.main";
   }
 
   const isToggling = togglingPipelines[pipeline.id] || false;
@@ -33,32 +42,34 @@ export const PipelineStatusCell: React.FC<PipelineStatusCellProps> = ({
     <TableCellContent variant="secondary">
       <Box
         sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'flex-start',
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-start",
         }}
       >
-        {status !== 'DEPLOYED' && (
+        {status !== "DEPLOYED" && (
           <Typography
             variant="body2"
             sx={{
               color: color,
-              fontWeight: 'medium',
+              fontWeight: "medium",
             }}
           >
-            {status || 'N/A'}
+            {status || "N/A"}
           </Typography>
         )}
 
-        {status === 'DEPLOYED' && (
+        {status === "DEPLOYED" && (
           <FormControlLabel
             control={
-              <Box sx={{ position: 'relative' }}>
+              <Box sx={{ position: "relative" }}>
                 <IconSwitch
                   sx={{ m: 1 }}
                   size="small"
                   checked={pipeline.active !== false}
-                  onChange={(e) => onToggleActive(pipeline.id, e.target.checked)}
+                  onChange={(e) =>
+                    onToggleActive(pipeline.id, e.target.checked)
+                  }
                   disabled={pipeline.system || isToggling}
                   onIcon={<PowerOnIcon />}
                   offIcon={<PowerOffIcon />}
@@ -71,12 +82,12 @@ export const PipelineStatusCell: React.FC<PipelineStatusCellProps> = ({
                   <CircularProgress
                     size={24}
                     sx={{
-                      position: 'absolute',
-                      top: '50%',
-                      left: '50%',
-                      marginTop: '-12px',
-                      marginLeft: '-12px',
-                      color: pipeline.active !== false ? '#2e7d32' : '#757575',
+                      position: "absolute",
+                      top: "50%",
+                      left: "50%",
+                      marginTop: "-12px",
+                      marginLeft: "-12px",
+                      color: pipeline.active !== false ? "#2e7d32" : "#757575",
                     }}
                   />
                 )}

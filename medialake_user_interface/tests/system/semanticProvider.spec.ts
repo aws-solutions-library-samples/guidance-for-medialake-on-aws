@@ -1,23 +1,27 @@
-import { test } from '../fixtures/auth.fixtures';
-import { expect } from '@playwright/test';
+import { test } from "../fixtures/auth.fixtures";
+import { expect } from "@playwright/test";
 
-test.describe('Semantic Provider Configuration Management', () => {
-  test('should navigate to System Settings page', async ({ authenticatedPage: page }) => {
+test.describe("Semantic Provider Configuration Management", () => {
+  test("should navigate to System Settings page", async ({
+    authenticatedPage: page,
+  }) => {
     // Navigate to System Settings
-    await page.getByRole('button', { name: 'Settings' }).click();
-    await page.getByRole('button', { name: 'System Settings' }).click();
+    await page.getByRole("button", { name: "Settings" }).click();
+    await page.getByRole("button", { name: "System Settings" }).click();
 
     // Verify we're on the System Settings page
-    await expect(page.locator('#settings-tabpanel-0')).toBeVisible({
+    await expect(page.locator("#settings-tabpanel-0")).toBeVisible({
       timeout: 10000,
     });
 
     // Verify the checkbox exists
-    const checkbox = page.locator('#settings-tabpanel-0').getByRole('checkbox');
+    const checkbox = page.locator("#settings-tabpanel-0").getByRole("checkbox");
     await expect(checkbox).toBeVisible();
 
     // Verify if Edit Provider button exists - using a more flexible selector
-    await expect(page.getByRole('button', { name: /Edit Provider/i })).toBeVisible({
+    await expect(
+      page.getByRole("button", { name: /Edit Provider/i }),
+    ).toBeVisible({
       timeout: 10000,
     });
   });

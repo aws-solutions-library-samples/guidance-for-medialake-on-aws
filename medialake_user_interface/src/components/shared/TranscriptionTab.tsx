@@ -1,4 +1,10 @@
-import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import React, {
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+  useRef,
+} from "react";
 import {
   Box,
   CircularProgress,
@@ -18,23 +24,23 @@ import {
   Menu,
   MenuItem,
   ListItemText,
-} from '@mui/material';
-import { TranscriptionResponse } from '../../api/hooks/useAssets';
-import MarkdownRenderer from '../common/MarkdownRenderer';
+} from "@mui/material";
+import { TranscriptionResponse } from "../../api/hooks/useAssets";
+import MarkdownRenderer from "../common/MarkdownRenderer";
 
 // MUI Icons
-import SubtitlesOutlinedIcon from '@mui/icons-material/SubtitlesOutlined';
-import CodeOutlinedIcon from '@mui/icons-material/CodeOutlined';
-import SearchIcon from '@mui/icons-material/Search';
-import ClearIcon from '@mui/icons-material/Clear';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import PersonIcon from '@mui/icons-material/Person';
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
-import LanguageIcon from '@mui/icons-material/Language';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import SubtitlesOutlinedIcon from "@mui/icons-material/SubtitlesOutlined";
+import CodeOutlinedIcon from "@mui/icons-material/CodeOutlined";
+import SearchIcon from "@mui/icons-material/Search";
+import ClearIcon from "@mui/icons-material/Clear";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import PersonIcon from "@mui/icons-material/Person";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
+import LanguageIcon from "@mui/icons-material/Language";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import FileDownloadIcon from "@mui/icons-material/FileDownload";
 
 // Types
 interface TranscriptWordAlternative {
@@ -48,7 +54,7 @@ interface TranscriptWord {
   startTime: number;
   endTime: number;
   confidence: number;
-  type: 'pronunciation' | 'punctuation';
+  type: "pronunciation" | "punctuation";
   alternatives?: TranscriptWordAlternative[];
 }
 
@@ -84,18 +90,21 @@ interface TranscriptionTabProps {
   transcriptionData: TranscriptionResponse | undefined;
   isLoading: boolean;
   assetData: any;
-  mediaType: 'audio' | 'video';
+  mediaType: "audio" | "video";
   mediaController?: MediaPlayerController;
 }
 
 // Custom hooks
-const useTranscriptProcessor = (transcriptionData: TranscriptionResponse | undefined) => {
+const useTranscriptProcessor = (
+  transcriptionData: TranscriptionResponse | undefined,
+) => {
   return useMemo(() => {
     if (!transcriptionData?.data?.results)
       return { segments: [], speakers: [], languageData: null };
 
     const items = transcriptionData.data.results.items || [];
-    const audioSegments = (transcriptionData.data.results as any).audio_segments || [];
+    const audioSegments =
+      (transcriptionData.data.results as any).audio_segments || [];
     const languageCode = transcriptionData.data.results.language_code;
     const languageIdentification =
       (transcriptionData.data.results as any).language_identification || [];
@@ -111,40 +120,46 @@ const useTranscriptProcessor = (transcriptionData: TranscriptionResponse | undef
 
     // If audio_segments exist, use them for better organization
     if (audioSegments.length > 0) {
-      const segments: TranscriptSegment[] = audioSegments.map((segment: any) => {
-        const segmentWords = segment.items
-          .map((itemId: number) => items[itemId])
-          .filter((item: any) => item && item.type === 'pronunciation')
-          .map((item: any, index: number) => ({
-            id: item.id || index,
-            content: item.alternatives?.[0]?.content || '',
-            startTime: parseFloat(String(item.start_time || '0')),
-            endTime: parseFloat(String(item.end_time || '0')),
-            confidence: parseFloat(item.alternatives?.[0]?.confidence || '0'),
-            type: item.type as 'pronunciation' | 'punctuation',
-            alternatives:
-              item.alternatives?.map((alt: any) => ({
-                content: alt.content,
-                confidence: parseFloat(alt.confidence || '0'),
-              })) || [],
-          }));
+      const segments: TranscriptSegment[] = audioSegments.map(
+        (segment: any) => {
+          const segmentWords = segment.items
+            .map((itemId: number) => items[itemId])
+            .filter((item: any) => item && item.type === "pronunciation")
+            .map((item: any, index: number) => ({
+              id: item.id || index,
+              content: item.alternatives?.[0]?.content || "",
+              startTime: parseFloat(String(item.start_time || "0")),
+              endTime: parseFloat(String(item.end_time || "0")),
+              confidence: parseFloat(item.alternatives?.[0]?.confidence || "0"),
+              type: item.type as "pronunciation" | "punctuation",
+              alternatives:
+                item.alternatives?.map((alt: any) => ({
+                  content: alt.content,
+                  confidence: parseFloat(alt.confidence || "0"),
+                })) || [],
+            }));
 
-        return {
-          id: segment.id,
-          text: segment.transcript,
-          startTime: parseFloat(segment.start_time),
-          endTime: parseFloat(segment.end_time),
-          words: segmentWords,
-          speaker: segment.speaker || `Speaker ${(segment.id % 2) + 1}`,
-        };
-      });
+          return {
+            id: segment.id,
+            text: segment.transcript,
+            startTime: parseFloat(segment.start_time),
+            endTime: parseFloat(segment.end_time),
+            words: segmentWords,
+            speaker: segment.speaker || `Speaker ${(segment.id % 2) + 1}`,
+          };
+        },
+      );
 
-      const speakers = Array.from(new Set(segments.map((s) => s.speaker).filter(Boolean)));
+      const speakers = Array.from(
+        new Set(segments.map((s) => s.speaker).filter(Boolean)),
+      );
       return { segments, speakers, languageData };
     }
 
     // Fallback: create segments from individual items
-    const pronunciationItems = items.filter((item) => item.type === 'pronunciation');
+    const pronunciationItems = items.filter(
+      (item) => item.type === "pronunciation",
+    );
     const wordsPerSegment = 20; // Group words into segments
     const segments: TranscriptSegment[] = [];
 
@@ -152,22 +167,22 @@ const useTranscriptProcessor = (transcriptionData: TranscriptionResponse | undef
       const segmentItems = pronunciationItems.slice(i, i + wordsPerSegment);
       const words = segmentItems.map((item, index) => ({
         id: item.id || i + index,
-        content: item.alternatives?.[0]?.content || '',
-        startTime: parseFloat(String(item.start_time || '0')),
-        endTime: parseFloat(String(item.end_time || '0')),
-        confidence: parseFloat(item.alternatives?.[0]?.confidence || '0'),
-        type: item.type as 'pronunciation' | 'punctuation',
+        content: item.alternatives?.[0]?.content || "",
+        startTime: parseFloat(String(item.start_time || "0")),
+        endTime: parseFloat(String(item.end_time || "0")),
+        confidence: parseFloat(item.alternatives?.[0]?.confidence || "0"),
+        type: item.type as "pronunciation" | "punctuation",
         alternatives:
           item.alternatives?.map((alt: any) => ({
             content: alt.content,
-            confidence: parseFloat(alt.confidence || '0'),
+            confidence: parseFloat(alt.confidence || "0"),
           })) || [],
       }));
 
       if (words.length > 0) {
         segments.push({
           id: Math.floor(i / wordsPerSegment),
-          text: words.map((w) => w.content).join(' '),
+          text: words.map((w) => w.content).join(" "),
           startTime: words[0].startTime,
           endTime: words[words.length - 1].endTime,
           words,
@@ -176,13 +191,15 @@ const useTranscriptProcessor = (transcriptionData: TranscriptionResponse | undef
       }
     }
 
-    const speakers = Array.from(new Set(segments.map((s) => s.speaker).filter(Boolean)));
+    const speakers = Array.from(
+      new Set(segments.map((s) => s.speaker).filter(Boolean)),
+    );
     return { segments, speakers, languageData };
   }, [transcriptionData]);
 };
 
 const useTranscriptSearch = (segments: TranscriptSegment[]) => {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
 
   const search = useCallback(
@@ -193,7 +210,10 @@ const useTranscriptSearch = (segments: TranscriptSegment[]) => {
       }
 
       const results: SearchResult[] = [];
-      const regex = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      const regex = new RegExp(
+        query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+        "gi",
+      );
 
       segments.forEach((segment) => {
         segment.words.forEach((word) => {
@@ -210,7 +230,7 @@ const useTranscriptSearch = (segments: TranscriptSegment[]) => {
 
       setSearchResults(results);
     },
-    [segments]
+    [segments],
   );
 
   useEffect(() => {
@@ -220,7 +240,10 @@ const useTranscriptSearch = (segments: TranscriptSegment[]) => {
   return { searchQuery, setSearchQuery, searchResults, search };
 };
 
-const useCurrentWordHighlight = (currentTime: number, segments: TranscriptSegment[]) => {
+const useCurrentWordHighlight = (
+  currentTime: number,
+  segments: TranscriptSegment[],
+) => {
   return useMemo(() => {
     if (!currentTime) return null;
 
@@ -237,7 +260,9 @@ const useCurrentWordHighlight = (currentTime: number, segments: TranscriptSegmen
         // If not exact match, find the closest word for better UX
         // This helps when seeking to a word's start time
         const distanceToStart = Math.abs(currentTime - word.startTime);
-        const distanceToMid = Math.abs(currentTime - (word.startTime + word.endTime) / 2);
+        const distanceToMid = Math.abs(
+          currentTime - (word.startTime + word.endTime) / 2,
+        );
         const minDistance = Math.min(distanceToStart, distanceToMid);
 
         if (minDistance < closestDistance && minDistance < 0.1) {
@@ -277,8 +302,10 @@ const LanguageDetectionInfo: React.FC<{
         border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <LanguageIcon sx={{ fontSize: 16, color: theme.palette.text.secondary }} />
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+        <LanguageIcon
+          sx={{ fontSize: 16, color: theme.palette.text.secondary }}
+        />
         <Typography variant="caption" sx={{ fontWeight: 600 }}>
           Language Detection:
         </Typography>
@@ -288,21 +315,30 @@ const LanguageDetectionInfo: React.FC<{
           sx={{
             backgroundColor: alpha(theme.palette.primary.main, 0.1),
             color: theme.palette.primary.main,
-            fontSize: '0.7rem',
+            fontSize: "0.7rem",
           }}
         />
         {hasMultipleLanguages && (
           <Tooltip
             title={
               <Box>
-                <Typography variant="caption" sx={{ fontWeight: 600, display: 'block' }}>
+                <Typography
+                  variant="caption"
+                  sx={{ fontWeight: 600, display: "block" }}
+                >
                   Other detected languages:
                 </Typography>
-                {languageData.detectedLanguages.slice(1, 4).map((lang, index) => (
-                  <Typography key={index} variant="caption" sx={{ display: 'block' }}>
-                    {lang.code}: {Math.round(lang.score * 100)}%
-                  </Typography>
-                ))}
+                {languageData.detectedLanguages
+                  .slice(1, 4)
+                  .map((lang, index) => (
+                    <Typography
+                      key={index}
+                      variant="caption"
+                      sx={{ display: "block" }}
+                    >
+                      {lang.code}: {Math.round(lang.score * 100)}%
+                    </Typography>
+                  ))}
               </Box>
             }
           >
@@ -312,7 +348,7 @@ const LanguageDetectionInfo: React.FC<{
               sx={{
                 backgroundColor: alpha(theme.palette.secondary.main, 0.1),
                 color: theme.palette.secondary.main,
-                fontSize: '0.7rem',
+                fontSize: "0.7rem",
               }}
             />
           </Tooltip>
@@ -360,10 +396,10 @@ const TranscriptWord: React.FC<{
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         style={{
-          cursor: 'pointer',
-          padding: '2px 4px',
-          borderRadius: '4px',
-          margin: '0 1px',
+          cursor: "pointer",
+          padding: "2px 4px",
+          borderRadius: "4px",
+          margin: "0 1px",
           backgroundColor: isHighlighted
             ? alpha(theme.palette.primary.main, 0.3)
             : isSearchMatch
@@ -372,25 +408,25 @@ const TranscriptWord: React.FC<{
                 ? alpha(theme.palette.error.main, 0.1)
                 : isLowConfidence
                   ? alpha(theme.palette.warning.main, 0.1)
-                  : 'transparent',
+                  : "transparent",
           color: isHighlighted
             ? theme.palette.primary.contrastText
             : isVeryLowConfidence
               ? theme.palette.error.main
               : isLowConfidence
                 ? theme.palette.warning.main
-                : 'inherit',
-          fontWeight: isHighlighted ? 600 : 'normal',
-          fontStyle: isLowConfidence ? 'italic' : 'normal',
-          textDecoration: isVeryLowConfidence ? 'underline dotted' : 'none',
-          transition: 'all 0.2s ease-in-out',
-          display: 'inline-block',
-          position: 'relative',
+                : "inherit",
+          fontWeight: isHighlighted ? 600 : "normal",
+          fontStyle: isLowConfidence ? "italic" : "normal",
+          textDecoration: isVeryLowConfidence ? "underline dotted" : "none",
+          transition: "all 0.2s ease-in-out",
+          display: "inline-block",
+          position: "relative",
         }}
         title={`${word.startTime.toFixed(1)}s - ${word.endTime.toFixed(1)}s (${Math.round(
-          word.confidence * 100
-        )}% confidence)${isLowConfidence ? ' - Low confidence' : ''}${
-          hasAlternatives ? ' - Click icon for alternatives' : ''
+          word.confidence * 100,
+        )}% confidence)${isLowConfidence ? " - Low confidence" : ""}${
+          hasAlternatives ? " - Click icon for alternatives" : ""
         }`}
       >
         {word.content}
@@ -401,12 +437,12 @@ const TranscriptWord: React.FC<{
             sx={{
               ml: 0.3,
               p: 0.2,
-              minWidth: 'auto',
+              minWidth: "auto",
               width: 16,
               height: 16,
               opacity: isHovered ? 1 : 0.4,
-              transition: 'opacity 0.2s ease-in-out',
-              '&:hover': {
+              transition: "opacity 0.2s ease-in-out",
+              "&:hover": {
                 backgroundColor: alpha(theme.palette.primary.main, 0.1),
               },
             }}
@@ -429,7 +465,7 @@ const TranscriptWord: React.FC<{
           <MenuItem disabled>
             <ListItemText
               primary="Alternative transcriptions:"
-              primaryTypographyProps={{ variant: 'caption', fontWeight: 600 }}
+              primaryTypographyProps={{ variant: "caption", fontWeight: 600 }}
             />
           </MenuItem>
           <Divider />
@@ -461,7 +497,7 @@ const TranscriptSegment: React.FC<{
   const searchWordIds = new Set(
     searchResults
       .filter((result) => result.segment.id === segment.id)
-      .map((result) => result.word.id)
+      .map((result) => result.word.id),
   );
 
   return (
@@ -473,12 +509,12 @@ const TranscriptSegment: React.FC<{
         backgroundColor: alpha(theme.palette.background.paper, 0.7),
         borderRadius: 1,
         border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-        '&:hover': {
+        "&:hover": {
           backgroundColor: alpha(theme.palette.background.paper, 0.9),
         },
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+      <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
         <Chip
           icon={<PersonIcon />}
           label={segment.speaker}
@@ -492,7 +528,11 @@ const TranscriptSegment: React.FC<{
         <Typography variant="caption" color="text.secondary">
           {segment.startTime.toFixed(1)}s - {segment.endTime.toFixed(1)}s
         </Typography>
-        <IconButton size="small" onClick={() => onSeek(segment.startTime + 0.01)} sx={{ ml: 1 }}>
+        <IconButton
+          size="small"
+          onClick={() => onSeek(segment.startTime + 0.01)}
+          sx={{ ml: 1 }}
+        >
           <PlayArrowIcon fontSize="small" />
         </IconButton>
       </Box>
@@ -503,7 +543,8 @@ const TranscriptSegment: React.FC<{
             key={word.id}
             word={word}
             isHighlighted={
-              currentHighlight?.segmentId === segment.id && currentHighlight?.wordId === word.id
+              currentHighlight?.segmentId === segment.id &&
+              currentHighlight?.wordId === word.id
             }
             isSearchMatch={searchWordIds.has(word.id)}
             onSeek={onSeek}
@@ -539,11 +580,18 @@ const SearchBar: React.FC<{
           endAdornment: searchQuery && (
             <InputAdornment position="end">
               <Badge badgeContent={searchResults.length} color="primary">
-                <IconButton size="small" onClick={() => setShowResults(!showResults)}>
-                  {showResults ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+                <IconButton
+                  size="small"
+                  onClick={() => setShowResults(!showResults)}
+                >
+                  {showResults ? (
+                    <KeyboardArrowUpIcon />
+                  ) : (
+                    <KeyboardArrowDownIcon />
+                  )}
                 </IconButton>
               </Badge>
-              <IconButton size="small" onClick={() => onSearchChange('')}>
+              <IconButton size="small" onClick={() => onSearchChange("")}>
                 <ClearIcon />
               </IconButton>
             </InputAdornment>
@@ -552,22 +600,23 @@ const SearchBar: React.FC<{
       />
 
       <Collapse in={showResults && searchResults.length > 0}>
-        <Paper sx={{ mt: 1, maxHeight: 200, overflow: 'auto' }}>
+        <Paper sx={{ mt: 1, maxHeight: 200, overflow: "auto" }}>
           {searchResults.map((result, index) => (
             <Box
               key={index}
               sx={{
                 p: 1,
-                borderBottom: index < searchResults.length - 1 ? '1px solid' : 'none',
-                borderColor: 'divider',
-                cursor: 'pointer',
-                '&:hover': { backgroundColor: 'action.hover' },
+                borderBottom:
+                  index < searchResults.length - 1 ? "1px solid" : "none",
+                borderColor: "divider",
+                cursor: "pointer",
+                "&:hover": { backgroundColor: "action.hover" },
               }}
               onClick={() => onJumpToResult(result)}
             >
               <Typography variant="body2">
-                <strong>{result.word.content}</strong> - {result.segment.speaker} at{' '}
-                {result.timestamp.toFixed(1)}s
+                <strong>{result.word.content}</strong> -{" "}
+                {result.segment.speaker} at {result.timestamp.toFixed(1)}s
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 {result.segment.text.substring(0, 100)}...
@@ -594,10 +643,12 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
   const transcriptRef = useRef<HTMLDivElement>(null);
 
   // Process transcript data
-  const { segments, speakers, languageData } = useTranscriptProcessor(transcriptionData);
+  const { segments, speakers, languageData } =
+    useTranscriptProcessor(transcriptionData);
 
   // Search functionality
-  const { searchQuery, setSearchQuery, searchResults } = useTranscriptSearch(segments);
+  const { searchQuery, setSearchQuery, searchResults } =
+    useTranscriptSearch(segments);
 
   // Current word highlighting
   const currentHighlight = useCurrentWordHighlight(currentTime, segments);
@@ -617,7 +668,7 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
         mediaController.seekTo(time);
       }
     },
-    [mediaController]
+    [mediaController],
   );
 
   // Jump to search result
@@ -626,12 +677,14 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
       handleSeek(result.timestamp);
 
       // Scroll to the segment
-      const segmentElement = document.getElementById(`segment-${result.segment.id}`);
+      const segmentElement = document.getElementById(
+        `segment-${result.segment.id}`,
+      );
       if (segmentElement) {
-        segmentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        segmentElement.scrollIntoView({ behavior: "smooth", block: "center" });
       }
     },
-    [handleSeek]
+    [handleSeek],
   );
 
   // Handle loading state
@@ -640,10 +693,10 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
       <Box
         sx={{
           p: 2,
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '300px',
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "300px",
         }}
       >
         <CircularProgress />
@@ -652,11 +705,15 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
   }
 
   // Handle missing or invalid data
-  if (!transcriptionData || !transcriptionData.data || !transcriptionData.data.results) {
+  if (
+    !transcriptionData ||
+    !transcriptionData.data ||
+    !transcriptionData.data.results
+  ) {
     return (
-      <Box sx={{ p: 2, textAlign: 'center' }}>
+      <Box sx={{ p: 2, textAlign: "center" }}>
         <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
-          {mediaType === 'audio' ? 'Audio' : 'Video'} Transcription
+          {mediaType === "audio" ? "Audio" : "Video"} Transcription
         </Typography>
         <Paper
           elevation={0}
@@ -685,17 +742,17 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
   const handleExportTranscript = useCallback(() => {
     if (!transcriptionData?.data?.results) return;
 
-    let exportText = '';
+    let exportText = "";
 
     if (segments.length > 0) {
       // Export with timestamps and speakers
       exportText = segments
         .map((segment) => {
           const timeStamp = `[${segment.startTime.toFixed(1)}s - ${segment.endTime.toFixed(1)}s]`;
-          const speaker = segment.speaker ? `${segment.speaker}: ` : '';
+          const speaker = segment.speaker ? `${segment.speaker}: ` : "";
           return `${timeStamp} ${speaker}${segment.text}`;
         })
-        .join('\n\n');
+        .join("\n\n");
     } else if (hasTranscripts) {
       // Fallback to simple transcript
       exportText = transcriptionData.data.results.transcripts[0].transcript;
@@ -703,9 +760,9 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
 
     if (exportText) {
       // Create and download file
-      const blob = new Blob([exportText], { type: 'text/plain' });
+      const blob = new Blob([exportText], { type: "text/plain" });
       const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
       link.download = `transcript-${assetId}.txt`;
       document.body.appendChild(link);
@@ -732,28 +789,28 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
         <Box
           sx={{
             backgroundColor: alpha(theme.palette.background.paper, 0.7),
-            '&:hover': {
+            "&:hover": {
               backgroundColor: alpha(theme.palette.background.paper, 0.9),
             },
-            display: 'flex',
-            alignItems: 'center',
-            padding: '8px 16px',
-            minHeight: '48px',
+            display: "flex",
+            alignItems: "center",
+            padding: "8px 16px",
+            minHeight: "48px",
           }}
         >
           {/* Custom Header Content */}
           <Box
             sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              width: '100%',
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              width: "100%",
             }}
           >
             <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-              {mediaType === 'audio' ? 'Audio' : 'Video'} Transcription
+              {mediaType === "audio" ? "Audio" : "Video"} Transcription
             </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
               {/* Quick Search */}
               {segments.length > 0 && (
                 <TextField
@@ -767,7 +824,7 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
                         <SearchIcon sx={{ fontSize: 16 }} />
                       </InputAdornment>
                     ),
-                    sx: { fontSize: '0.875rem' },
+                    sx: { fontSize: "0.875rem" },
                   }}
                   sx={{ width: 200 }}
                 />
@@ -778,13 +835,13 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
                 <Chip
                   icon={<LanguageIcon />}
                   label={`${languageData.detectedLanguages[0].code} (${Math.round(
-                    languageData.detectedLanguages[0].score * 100
+                    languageData.detectedLanguages[0].score * 100,
                   )}%)`}
                   size="small"
                   sx={{
                     backgroundColor: alpha(theme.palette.primary.main, 0.1),
                     color: theme.palette.primary.main,
-                    fontSize: '0.7rem',
+                    fontSize: "0.7rem",
                   }}
                 />
               )}
@@ -799,7 +856,7 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
                 title="Export transcript"
                 sx={{
                   backgroundColor: alpha(theme.palette.secondary.main, 0.1),
-                  '&:hover': {
+                  "&:hover": {
                     backgroundColor: alpha(theme.palette.secondary.main, 0.2),
                   },
                 }}
@@ -811,17 +868,21 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
               <IconButton
                 size="small"
                 onClick={() => setAccordionExpanded(!accordionExpanded)}
-                title={accordionExpanded ? 'Collapse details' : 'Expand details'}
+                title={
+                  accordionExpanded ? "Collapse details" : "Expand details"
+                }
                 sx={{
-                  '&:hover': {
+                  "&:hover": {
                     backgroundColor: alpha(theme.palette.primary.main, 0.1),
                   },
                 }}
               >
                 <ExpandMoreIcon
                   sx={{
-                    transform: accordionExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                    transition: 'transform 0.2s ease-in-out',
+                    transform: accordionExpanded
+                      ? "rotate(180deg)"
+                      : "rotate(0deg)",
+                    transition: "transform 0.2s ease-in-out",
                   }}
                 />
               </IconButton>
@@ -848,7 +909,7 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
                   variant="body2"
                   sx={{
                     mb: 2,
-                    fontStyle: 'italic',
+                    fontStyle: "italic",
                     color: theme.palette.text.secondary,
                   }}
                 >
@@ -870,27 +931,34 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
                   border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
                 }}
               >
-                <Typography variant="caption" sx={{ mb: 1, display: 'block', fontWeight: 600 }}>
+                <Typography
+                  variant="caption"
+                  sx={{ mb: 1, display: "block", fontWeight: 600 }}
+                >
                   Search Results ({searchResults.length}):
                 </Typography>
-                <Box sx={{ maxHeight: 250, overflowY: 'auto' }}>
+                <Box sx={{ maxHeight: 250, overflowY: "auto" }}>
                   {searchResults.map((result, index) => (
                     <Box
                       key={index}
                       onClick={() => handleJumpToResult(result)}
                       sx={{
                         p: 1,
-                        cursor: 'pointer',
+                        cursor: "pointer",
                         borderRadius: 1,
-                        '&:hover': {
-                          backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                        "&:hover": {
+                          backgroundColor: alpha(
+                            theme.palette.primary.main,
+                            0.1,
+                          ),
                         },
                       }}
                     >
                       <Typography variant="caption" color="text.secondary">
-                        {result.segment.speaker} • {result.timestamp.toFixed(1)}s
+                        {result.segment.speaker} • {result.timestamp.toFixed(1)}
+                        s
                       </Typography>
-                      <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                      <Typography variant="body2" sx={{ fontSize: "0.8rem" }}>
                         ...{result.word.content}...
                       </Typography>
                     </Box>
@@ -911,10 +979,13 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
                   border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
                 }}
               >
-                <Typography variant="caption" sx={{ mb: 1, display: 'block', fontWeight: 600 }}>
+                <Typography
+                  variant="caption"
+                  sx={{ mb: 1, display: "block", fontWeight: 600 }}
+                >
                   Language Detection Details:
                 </Typography>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
                   {languageData.detectedLanguages
                     .filter((lang) => lang.score >= 0.7) // Only show languages with 70%+ confidence
                     .slice(0, 5)
@@ -923,8 +994,8 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
                         key={index}
                         label={`${lang.code}: ${Math.round(lang.score * 100)}%`}
                         size="small"
-                        variant={index === 0 ? 'filled' : 'outlined'}
-                        sx={{ fontSize: '0.7rem' }}
+                        variant={index === 0 ? "filled" : "outlined"}
+                        sx={{ fontSize: "0.7rem" }}
                       />
                     ))}
                 </Box>
@@ -943,24 +1014,27 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
                   border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
                 }}
               >
-                <Typography variant="caption" sx={{ mb: 1, display: 'block', fontWeight: 600 }}>
+                <Typography
+                  variant="caption"
+                  sx={{ mb: 1, display: "block", fontWeight: 600 }}
+                >
                   Confidence Indicators:
                 </Typography>
                 <Box
                   sx={{
-                    display: 'flex',
+                    display: "flex",
                     gap: 2,
-                    flexWrap: 'wrap',
-                    alignItems: 'center',
+                    flexWrap: "wrap",
+                    alignItems: "center",
                   }}
                 >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                     <span
                       style={{
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        fontSize: '0.75rem',
-                        backgroundColor: 'transparent',
+                        padding: "2px 6px",
+                        borderRadius: "4px",
+                        fontSize: "0.75rem",
+                        backgroundColor: "transparent",
                       }}
                     >
                       Normal
@@ -969,13 +1043,13 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
                       ≥80% confidence
                     </Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                     <span
                       style={{
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        fontSize: '0.75rem',
-                        fontStyle: 'italic',
+                        padding: "2px 6px",
+                        borderRadius: "4px",
+                        fontSize: "0.75rem",
+                        fontStyle: "italic",
                         backgroundColor: alpha(theme.palette.warning.main, 0.1),
                         color: theme.palette.warning.main,
                       }}
@@ -986,14 +1060,14 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
                       60-79% confidence
                     </Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                     <span
                       style={{
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        fontSize: '0.75rem',
-                        fontStyle: 'italic',
-                        textDecoration: 'underline dotted',
+                        padding: "2px 6px",
+                        borderRadius: "4px",
+                        fontSize: "0.75rem",
+                        fontStyle: "italic",
+                        textDecoration: "underline dotted",
                         backgroundColor: alpha(theme.palette.error.main, 0.1),
                         color: theme.palette.error.main,
                       }}
@@ -1049,10 +1123,13 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
                   border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
                 }}
               >
-                <Typography variant="caption" sx={{ mb: 1, display: 'block', fontWeight: 600 }}>
+                <Typography
+                  variant="caption"
+                  sx={{ mb: 1, display: "block", fontWeight: 600 }}
+                >
                   Speakers:
                 </Typography>
-                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
                   {speakers.map((speaker) => (
                     <Chip
                       key={speaker}
@@ -1060,7 +1137,7 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
                       label={speaker}
                       size="small"
                       variant="outlined"
-                      sx={{ fontSize: '0.7rem' }}
+                      sx={{ fontSize: "0.7rem" }}
                     />
                   ))}
                 </Box>
@@ -1112,7 +1189,7 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
             variant="body2"
             sx={{
               mb: 2,
-              fontStyle: 'italic',
+              fontStyle: "italic",
               color: theme.palette.text.secondary,
             }}
           >
@@ -1121,7 +1198,7 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
           <Typography variant="body1" paragraph>
             {hasTranscripts
               ? transcriptionData.data.results.transcripts[0].transcript
-              : 'Full transcript not available'}
+              : "Full transcript not available"}
           </Typography>
         </Paper>
       )}

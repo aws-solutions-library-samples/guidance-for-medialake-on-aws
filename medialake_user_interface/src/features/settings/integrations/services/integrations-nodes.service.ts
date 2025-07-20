@@ -2,13 +2,20 @@ import {
   useGetNodes,
   useGetNode,
   useGetUnconfiguredNodeMethods,
-} from '@/shared/nodes/api/nodesController';
-import { Node, NodesError } from '@/shared/nodes/types/nodes.types';
+} from "@/shared/nodes/api/nodesController";
+import { Node, NodesError } from "@/shared/nodes/types/nodes.types";
 
 export class IntegrationsNodesService {
   public static useNodes() {
-    const { data, isLoading, error, isError, isFetching, refetch, isRefetching } =
-      useGetUnconfiguredNodeMethods();
+    const {
+      data,
+      isLoading,
+      error,
+      isError,
+      isFetching,
+      refetch,
+      isRefetching,
+    } = useGetUnconfiguredNodeMethods();
 
     return {
       nodes: data?.data ?? [],
@@ -17,8 +24,8 @@ export class IntegrationsNodesService {
       isRefetching,
       error: error
         ? {
-            status: (error as any).status || 'error',
-            message: error.message || 'An unknown error occurred',
+            status: (error as any).status || "error",
+            message: error.message || "An unknown error occurred",
           }
         : null,
       hasError: isError,
@@ -28,8 +35,15 @@ export class IntegrationsNodesService {
   }
 
   public static useNode(nodeId: string) {
-    const { data, isLoading, error, isError, isFetching, refetch, isRefetching } =
-      useGetNode(nodeId);
+    const {
+      data,
+      isLoading,
+      error,
+      isError,
+      isFetching,
+      refetch,
+      isRefetching,
+    } = useGetNode(nodeId);
 
     return {
       node: data?.data?.[0],
@@ -38,8 +52,8 @@ export class IntegrationsNodesService {
       isRefetching,
       error: error
         ? {
-            status: (error as any).status || 'error',
-            message: error.message || 'An unknown error occurred',
+            status: (error as any).status || "error",
+            message: error.message || "An unknown error occurred",
           }
         : null,
       hasError: isError,

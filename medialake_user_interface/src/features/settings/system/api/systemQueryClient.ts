@@ -1,10 +1,10 @@
-import { QueryClient } from '@tanstack/react-query';
-import { QUERY_KEYS } from '@/api/queryKeys';
+import { QueryClient } from "@tanstack/react-query";
+import { QUERY_KEYS } from "@/api/queryKeys";
 
 // Query key constants
 export const SYSTEM_QUERY_KEYS = {
-  SYSTEM_SETTINGS: 'systemSettings',
-  SEARCH_PROVIDER: 'searchProvider',
+  SYSTEM_SETTINGS: "systemSettings",
+  SEARCH_PROVIDER: "searchProvider",
 };
 
 export const invalidateSystemQueries = (queryClient: QueryClient) => {

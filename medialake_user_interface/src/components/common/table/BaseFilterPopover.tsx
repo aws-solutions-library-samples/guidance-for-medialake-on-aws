@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   Box,
   TextField,
@@ -10,10 +10,10 @@ import {
   Typography,
   Stack,
   IconButton,
-} from '@mui/material';
-import { Close as CloseIcon } from '@mui/icons-material';
-import { Column } from '@tanstack/react-table';
-import { useTranslation } from 'react-i18next';
+} from "@mui/material";
+import { Close as CloseIcon } from "@mui/icons-material";
+import { Column } from "@tanstack/react-table";
+import { useTranslation } from "react-i18next";
 
 export interface BaseFilterPopoverProps<T> {
   anchorEl: HTMLElement | null;
@@ -44,12 +44,12 @@ export function BaseFilterPopover<T>({
     if (value) {
       column.setFilterValue(value);
     } else {
-      column.setFilterValue('');
+      column.setFilterValue("");
     }
   };
 
   const handleTextFilterSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       e.preventDefault();
       e.stopPropagation();
       onClose();
@@ -60,13 +60,13 @@ export function BaseFilterPopover<T>({
     if (value) {
       column.setFilterValue(value);
     } else {
-      column.setFilterValue('');
+      column.setFilterValue("");
     }
     onClose();
   };
 
   const handleClearFilter = () => {
-    column.setFilterValue('');
+    column.setFilterValue("");
   };
 
   const displayValue = (value: string) => {
@@ -82,19 +82,19 @@ export function BaseFilterPopover<T>({
       anchorEl={anchorEl}
       onClose={onClose}
       anchorOrigin={{
-        vertical: 'bottom',
-        horizontal: 'left',
+        vertical: "bottom",
+        horizontal: "left",
       }}
       transformOrigin={{
-        vertical: 'top',
-        horizontal: 'left',
+        vertical: "top",
+        horizontal: "left",
       }}
       PaperProps={{
         sx: {
           p: 2,
           width: 300,
-          borderRadius: '8px',
-          position: 'relative',
+          borderRadius: "8px",
+          position: "relative",
         },
       }}
     >
@@ -102,11 +102,11 @@ export function BaseFilterPopover<T>({
         onClick={onClose}
         size="small"
         sx={{
-          position: 'absolute',
+          position: "absolute",
           right: 8,
           top: 8,
           color: theme.palette.text.secondary,
-          '&:hover': {
+          "&:hover": {
             color: theme.palette.text.primary,
           },
         }}
@@ -115,40 +115,48 @@ export function BaseFilterPopover<T>({
       </IconButton>
       <Stack spacing={2}>
         <Box>
-          <Typography variant="caption" color="textSecondary" sx={{ mb: 1, display: 'block' }}>
-            {t('common.textFilter')}
+          <Typography
+            variant="caption"
+            color="textSecondary"
+            sx={{ mb: 1, display: "block" }}
+          >
+            {t("common.textFilter")}
           </Typography>
           <TextField
             fullWidth
             size="small"
-            placeholder={`${t('common.filter')} ${column.columnDef.header as string}`}
-            value={currentValue ?? ''}
+            placeholder={`${t("common.filter")} ${column.columnDef.header as string}`}
+            value={currentValue ?? ""}
             onChange={(e) => handleTextFilterChange(e.target.value)}
             onKeyDown={handleTextFilterSubmit}
             sx={{
-              '& .MuiOutlinedInput-root': {
-                borderRadius: '8px',
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "8px",
               },
             }}
           />
         </Box>
 
         <Box>
-          <Typography variant="caption" color="textSecondary" sx={{ mb: 1, display: 'block' }}>
-            {t('common.selectFilter')}
+          <Typography
+            variant="caption"
+            color="textSecondary"
+            sx={{ mb: 1, display: "block" }}
+          >
+            {t("common.selectFilter")}
           </Typography>
           <Select
             fullWidth
             size="small"
-            value={currentValue ?? ''}
+            value={currentValue ?? ""}
             onChange={(e) => handleSelectFilterChange(e.target.value)}
             displayEmpty
             sx={{
-              borderRadius: '8px',
+              borderRadius: "8px",
             }}
           >
             <MenuItem value="">
-              <em>{t('common.all')}</em>
+              <em>{t("common.all")}</em>
             </MenuItem>
             {uniqueValues.map((value) => (
               <MenuItem key={value} value={value}>
@@ -159,8 +167,12 @@ export function BaseFilterPopover<T>({
         </Box>
 
         {currentValue && (
-          <Button size="small" onClick={handleClearFilter} sx={{ alignSelf: 'flex-start' }}>
-            {t('common.clearFilter')}
+          <Button
+            size="small"
+            onClick={handleClearFilter}
+            sx={{ alignSelf: "flex-start" }}
+          >
+            {t("common.clearFilter")}
           </Button>
         )}
       </Stack>

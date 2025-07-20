@@ -1,5 +1,5 @@
-import { Theme } from '@aws-amplify/ui-react';
-import { amplifyTheme } from '../../theme/theme';
+import { Theme } from "@aws-amplify/ui-react";
+import { amplifyTheme } from "../../theme/theme";
 
 export const theme: Theme = amplifyTheme;
 

@@ -1,10 +1,10 @@
-import React from 'react';
-import { Box, Link, Typography, Chip, Stack, Divider } from '@mui/material';
+import React from "react";
+import { Box, Link, Typography, Chip, Stack, Divider } from "@mui/material";
 import {
   Download as DownloadIcon,
   Archive as ArchiveIcon,
   InsertDriveFile as FileIcon,
-} from '@mui/icons-material';
+} from "@mui/icons-material";
 
 interface DownloadLinksDisplayProps {
   downloadUrls:
@@ -28,7 +28,9 @@ export const DownloadLinksDisplay: React.FC<DownloadLinksDisplayProps> = ({
     if (!expiresAt) return false;
 
     // Handle Unix timestamp (string of numbers) or ISO date string
-    const timestamp = /^\d+$/.test(expiresAt) ? parseInt(expiresAt, 10) * 1000 : expiresAt;
+    const timestamp = /^\d+$/.test(expiresAt)
+      ? parseInt(expiresAt, 10) * 1000
+      : expiresAt;
     const expirationDate = new Date(timestamp);
 
     if (isNaN(expirationDate.getTime())) return false;
@@ -38,9 +40,11 @@ export const DownloadLinksDisplay: React.FC<DownloadLinksDisplayProps> = ({
 
   // Format expiration date
   const formatExpirationDate = React.useCallback((expiresAt: string) => {
-    const timestamp = /^\d+$/.test(expiresAt) ? parseInt(expiresAt, 10) * 1000 : expiresAt;
+    const timestamp = /^\d+$/.test(expiresAt)
+      ? parseInt(expiresAt, 10) * 1000
+      : expiresAt;
     const date = new Date(timestamp);
-    return isNaN(date.getTime()) ? 'Unknown' : date.toLocaleString();
+    return isNaN(date.getTime()) ? "Unknown" : date.toLocaleString();
   }, []);
   // Handle legacy format (array of URLs)
   if (Array.isArray(downloadUrls)) {
@@ -57,36 +61,36 @@ export const DownloadLinksDisplay: React.FC<DownloadLinksDisplayProps> = ({
               target="_blank"
               rel="noopener noreferrer"
               sx={{
-                display: 'flex',
-                alignItems: 'center',
+                display: "flex",
+                alignItems: "center",
                 gap: 0.5,
-                fontSize: '0.875rem',
-                textDecoration: 'none',
-                color: isExpired ? 'text.disabled' : 'primary.main',
-                cursor: isExpired ? 'not-allowed' : 'pointer',
+                fontSize: "0.875rem",
+                textDecoration: "none",
+                color: isExpired ? "text.disabled" : "primary.main",
+                cursor: isExpired ? "not-allowed" : "pointer",
                 opacity: isExpired ? 0.5 : 1,
-                '&:hover': {
-                  textDecoration: isExpired ? 'none' : 'underline',
+                "&:hover": {
+                  textDecoration: isExpired ? "none" : "underline",
                 },
               }}
               onClick={isExpired ? (e) => e.preventDefault() : undefined}
             >
               <DownloadIcon fontSize="small" />
-              Download {index + 1} {isExpired && '(EXPIRED)'}
+              Download {index + 1} {isExpired && "(EXPIRED)"}
             </Link>
           ))}
         </Stack>
         {expiresAt && (
           <Typography
             variant="caption"
-            color={isExpired ? 'error.main' : 'warning.main'}
+            color={isExpired ? "error.main" : "warning.main"}
             sx={{
               mt: 1,
-              display: 'block',
-              fontWeight: isExpired ? 'bold' : 'normal',
+              display: "block",
+              fontWeight: isExpired ? "bold" : "normal",
             }}
           >
-            {isExpired ? 'EXPIRED: ' : 'Expires: '}
+            {isExpired ? "EXPIRED: " : "Expires: "}
             {formatExpirationDate(expiresAt)}
           </Typography>
         )}
@@ -96,7 +100,8 @@ export const DownloadLinksDisplay: React.FC<DownloadLinksDisplayProps> = ({
 
   // Handle new structured format
   const { zippedFiles, files = [], singleFiles = [] } = downloadUrls;
-  const hasDownloads = zippedFiles || files.length > 0 || singleFiles.length > 0;
+  const hasDownloads =
+    zippedFiles || files.length > 0 || singleFiles.length > 0;
 
   if (!hasDownloads) {
     return null;
@@ -119,22 +124,22 @@ export const DownloadLinksDisplay: React.FC<DownloadLinksDisplayProps> = ({
               target="_blank"
               rel="noopener noreferrer"
               sx={{
-                display: 'flex',
-                alignItems: 'center',
+                display: "flex",
+                alignItems: "center",
                 gap: 0.5,
-                fontSize: '0.875rem',
-                textDecoration: 'none',
-                color: isExpired ? 'text.disabled' : 'primary.main',
-                cursor: isExpired ? 'not-allowed' : 'pointer',
+                fontSize: "0.875rem",
+                textDecoration: "none",
+                color: isExpired ? "text.disabled" : "primary.main",
+                cursor: isExpired ? "not-allowed" : "pointer",
                 opacity: isExpired ? 0.5 : 1,
-                '&:hover': {
-                  textDecoration: isExpired ? 'none' : 'underline',
+                "&:hover": {
+                  textDecoration: isExpired ? "none" : "underline",
                 },
               }}
               onClick={isExpired ? (e) => e.preventDefault() : undefined}
             >
               <ArchiveIcon fontSize="small" />
-              Download ZIP Archive {isExpired && '(EXPIRED)'}
+              Download ZIP Archive {isExpired && "(EXPIRED)"}
             </Link>
           </Box>
         )}
@@ -154,22 +159,22 @@ export const DownloadLinksDisplay: React.FC<DownloadLinksDisplayProps> = ({
                   target="_blank"
                   rel="noopener noreferrer"
                   sx={{
-                    display: 'flex',
-                    alignItems: 'center',
+                    display: "flex",
+                    alignItems: "center",
                     gap: 0.5,
-                    fontSize: '0.875rem',
-                    textDecoration: 'none',
-                    color: isExpired ? 'text.disabled' : 'primary.main',
-                    cursor: isExpired ? 'not-allowed' : 'pointer',
+                    fontSize: "0.875rem",
+                    textDecoration: "none",
+                    color: isExpired ? "text.disabled" : "primary.main",
+                    cursor: isExpired ? "not-allowed" : "pointer",
                     opacity: isExpired ? 0.5 : 1,
-                    '&:hover': {
-                      textDecoration: isExpired ? 'none' : 'underline',
+                    "&:hover": {
+                      textDecoration: isExpired ? "none" : "underline",
                     },
                   }}
                   onClick={isExpired ? (e) => e.preventDefault() : undefined}
                 >
                   <FileIcon fontSize="small" />
-                  File {index + 1} {isExpired && '(EXPIRED)'}
+                  File {index + 1} {isExpired && "(EXPIRED)"}
                 </Link>
               ))}
             </Stack>
@@ -188,22 +193,22 @@ export const DownloadLinksDisplay: React.FC<DownloadLinksDisplayProps> = ({
                   target="_blank"
                   rel="noopener noreferrer"
                   sx={{
-                    display: 'flex',
-                    alignItems: 'center',
+                    display: "flex",
+                    alignItems: "center",
                     gap: 0.5,
-                    fontSize: '0.875rem',
-                    textDecoration: 'none',
-                    color: isExpired ? 'text.disabled' : 'primary.main',
-                    cursor: isExpired ? 'not-allowed' : 'pointer',
+                    fontSize: "0.875rem",
+                    textDecoration: "none",
+                    color: isExpired ? "text.disabled" : "primary.main",
+                    cursor: isExpired ? "not-allowed" : "pointer",
                     opacity: isExpired ? 0.5 : 1,
-                    '&:hover': {
-                      textDecoration: isExpired ? 'none' : 'underline',
+                    "&:hover": {
+                      textDecoration: isExpired ? "none" : "underline",
                     },
                   }}
                   onClick={isExpired ? (e) => e.preventDefault() : undefined}
                 >
                   <DownloadIcon fontSize="small" />
-                  Download File {index + 1} {isExpired && '(EXPIRED)'}
+                  Download File {index + 1} {isExpired && "(EXPIRED)"}
                 </Link>
               ))}
             </Stack>
@@ -215,18 +220,18 @@ export const DownloadLinksDisplay: React.FC<DownloadLinksDisplayProps> = ({
       {expiresAt && (
         <Box sx={{ mt: 1 }}>
           <Chip
-            label={`${isExpired ? 'EXPIRED: ' : 'Expires: '}${formatExpirationDate(expiresAt)}`}
+            label={`${isExpired ? "EXPIRED: " : "Expires: "}${formatExpirationDate(expiresAt)}`}
             size="small"
-            color={isExpired ? 'error' : 'warning'}
-            variant={isExpired ? 'filled' : 'outlined'}
+            color={isExpired ? "error" : "warning"}
+            variant={isExpired ? "filled" : "outlined"}
             sx={{
-              fontSize: '0.75rem',
-              fontWeight: isExpired ? 'bold' : 'normal',
-              animation: isExpired ? 'pulse 2s infinite' : 'none',
-              '@keyframes pulse': {
-                '0%': { opacity: 1 },
-                '50%': { opacity: 0.7 },
-                '100%': { opacity: 1 },
+              fontSize: "0.75rem",
+              fontWeight: isExpired ? "bold" : "normal",
+              animation: isExpired ? "pulse 2s infinite" : "none",
+              "@keyframes pulse": {
+                "0%": { opacity: 1 },
+                "50%": { opacity: 0.7 },
+                "100%": { opacity: 1 },
               },
             }}
           />

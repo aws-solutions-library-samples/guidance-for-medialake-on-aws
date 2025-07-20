@@ -3,10 +3,10 @@ import axios, {
   AxiosRequestConfig,
   AxiosRequestHeaders,
   InternalAxiosRequestConfig,
-} from 'axios';
-import { ApiClientBase } from '@/api/apiClientBase';
-import { StorageHelper } from '@/common/helpers/storage-helper';
-import { authService } from '@/api/authService';
+} from "axios";
+import { ApiClientBase } from "@/api/apiClientBase";
+import { StorageHelper } from "@/common/helpers/storage-helper";
+import { authService } from "@/api/authService";
 
 class ApiClient extends ApiClientBase {
   private axiosInstance: AxiosInstance;
@@ -22,9 +22,9 @@ class ApiClient extends ApiClientBase {
       baseURL: this.getBaseURL(),
 
       headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        Pragma: 'no-cache',
-        Expires: '0',
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        Pragma: "no-cache",
+        Expires: "0",
       },
     });
     this.setupInterceptors();
@@ -32,8 +32,8 @@ class ApiClient extends ApiClientBase {
 
   private getBaseURL() {
     const awsConfig = StorageHelper.getAwsConfig();
-    const baseURL = awsConfig?.API?.REST?.RestApi?.endpoint || '';
-    console.log('🌐 Base URL Configuration:', {
+    const baseURL = awsConfig?.API?.REST?.RestApi?.endpoint || "";
+    console.log("🌐 Base URL Configuration:", {
       hasConfig: !!awsConfig,
       hasAPI: !!awsConfig?.API,
       hasREST: !!awsConfig?.API?.REST,
@@ -58,7 +58,7 @@ class ApiClient extends ApiClientBase {
   private setupInterceptors() {
     this.axiosInstance.interceptors.request.use(
       async (config: InternalAxiosRequestConfig) => {
-        console.log('🚀 API Request:', {
+        console.log("🚀 API Request:", {
           method: config.method?.toUpperCase(),
           url: config.url,
           baseURL: config.baseURL,
@@ -72,18 +72,18 @@ class ApiClient extends ApiClientBase {
           ...headers,
         } as AxiosRequestHeaders;
 
-        console.log('🔑 Auth Header Added:', !!config.headers?.Authorization);
+        console.log("🔑 Auth Header Added:", !!config.headers?.Authorization);
         return config;
       },
       (error) => {
-        console.error('❌ Request Interceptor Error:', error);
+        console.error("❌ Request Interceptor Error:", error);
         return Promise.reject(error);
-      }
+      },
     );
 
     this.axiosInstance.interceptors.response.use(
       (response) => {
-        console.log('✅ API Response Success:', {
+        console.log("✅ API Response Success:", {
           status: response.status,
           url: response.config.url,
           method: response.config.method?.toUpperCase(),
@@ -91,7 +91,7 @@ class ApiClient extends ApiClientBase {
         return response;
       },
       async (error) => {
-        console.error('❌ API Response Error:', {
+        console.error("❌ API Response Error:", {
           status: error.response?.status,
           statusText: error.response?.statusText,
           url: error.config?.url,
@@ -105,13 +105,15 @@ class ApiClient extends ApiClientBase {
         // Check if error is token expiration
         if (
           error.response?.status === 401 &&
-          error.response?.data?.message === 'The incoming token has expired' &&
+          error.response?.data?.message === "The incoming token has expired" &&
           !originalRequest._retry
         ) {
-          console.log('🔄 Token expired, attempting refresh...');
+          console.log("🔄 Token expired, attempting refresh...");
 
           if (this.isRefreshing) {
-            console.log('⏳ Token refresh already in progress, queuing request...');
+            console.log(
+              "⏳ Token refresh already in progress, queuing request...",
+            );
             return new Promise((resolve, reject) => {
               this.failedQueue.push({ resolve, reject });
             })
@@ -127,14 +129,14 @@ class ApiClient extends ApiClientBase {
           try {
             const newToken = await authService.refreshToken();
             if (!newToken) {
-              console.error('❌ Failed to refresh token');
-              this.processQueue(new Error('Failed to refresh token'));
+              console.error("❌ Failed to refresh token");
+              this.processQueue(new Error("Failed to refresh token"));
               return Promise.reject(error);
             }
 
-            console.log('✅ Token refreshed successfully');
+            console.log("✅ Token refreshed successfully");
             // Update the failed request with new token
-            originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+            originalRequest.headers["Authorization"] = `Bearer ${newToken}`;
 
             // Process any requests that were waiting
             this.processQueue();
@@ -142,7 +144,7 @@ class ApiClient extends ApiClientBase {
             // Retry the original request
             return this.axiosInstance(originalRequest);
           } catch (refreshError) {
-            console.error('❌ Token refresh failed:', refreshError);
+            console.error("❌ Token refresh failed:", refreshError);
             this.processQueue(refreshError);
             return Promise.reject(refreshError);
           } finally {
@@ -151,7 +153,7 @@ class ApiClient extends ApiClientBase {
         }
 
         return Promise.reject(error);
-      }
+      },
     );
   }
 

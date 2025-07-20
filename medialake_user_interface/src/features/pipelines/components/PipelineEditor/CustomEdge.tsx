@@ -1,6 +1,6 @@
-import React from 'react';
-import { EdgeProps, getBezierPath } from 'reactflow';
-import { Box, Typography } from '@mui/material';
+import React from "react";
+import { EdgeProps, getBezierPath } from "reactflow";
+import { Box, Typography } from "@mui/material";
 
 const CustomEdge: React.FC<EdgeProps> = ({
   id,
@@ -29,9 +29,9 @@ const CustomEdge: React.FC<EdgeProps> = ({
         id={id}
         style={{
           ...style,
-          stroke: '#b1b1b7',
+          stroke: "#b1b1b7",
           strokeWidth: 2,
-          fill: 'none',
+          fill: "none",
         }}
         className="react-flow__edge-path"
         d={edgePath}
@@ -40,16 +40,16 @@ const CustomEdge: React.FC<EdgeProps> = ({
       {data?.text && (
         <Box
           sx={{
-            position: 'absolute',
-            transform: 'translate(-50%, -50%)',
+            position: "absolute",
+            transform: "translate(-50%, -50%)",
             fontSize: 12,
-            pointerEvents: 'all',
+            pointerEvents: "all",
             left: labelX,
             top: labelY,
-            padding: '4px',
-            borderRadius: '4px',
-            backgroundColor: 'rgba(255, 255, 255, 0.75)',
-            userSelect: 'none',
+            padding: "4px",
+            borderRadius: "4px",
+            backgroundColor: "rgba(255, 255, 255, 0.75)",
+            userSelect: "none",
           }}
         >
           <Typography variant="caption" color="text.secondary">

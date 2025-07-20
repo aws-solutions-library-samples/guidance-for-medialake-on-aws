@@ -18,13 +18,11 @@ from config import config
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 from medialake_constructs.shared_constructs.lambda_layers import (
+    CommonLibrariesLayer,
     PowertoolsLayer,
     PowertoolsLayerConfig,
     PyamlLayer,
     ShortuuidLayer,
-    PowertoolsLayer,
-    PowertoolsLayerConfig,
-    CommonLibrariesLayer
 )
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket
 
@@ -274,7 +272,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                 ),
                 "OPENSEARCH_SECURITY_GROUP_ID": props.security_group.security_group_id,
                 "ACCOUNT_ID": self.account_id,
-                "POWERTOOLS_LAYER_ARN":   powertools_layer.layer.layer_version_arn,
+                "POWERTOOLS_LAYER_ARN": powertools_layer.layer.layer_version_arn,
                 "COMMON_LIBRARIES_LAYER_ARN": common_libraries_layer.layer.layer_version_arn,
                 # S3 Vector configuration
                 "VECTOR_BUCKET_NAME": props.s3_vector_bucket_name,

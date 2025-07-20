@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
-import { signOut, fetchUserAttributes } from 'aws-amplify/auth';
-import { useAuth } from './common/hooks/auth-context';
-import { useDirection } from './contexts/DirectionContext';
-import { Can, usePermission } from './permissions';
-import { useFeatureFlag } from './contexts/FeatureFlagsContext';
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useTranslation } from "react-i18next";
+import { signOut, fetchUserAttributes } from "aws-amplify/auth";
+import { useAuth } from "./common/hooks/auth-context";
+import { useDirection } from "./contexts/DirectionContext";
+import { Can, usePermission } from "./permissions";
+import { useFeatureFlag } from "./contexts/FeatureFlagsContext";
 import {
   Drawer,
   List,
@@ -22,7 +22,7 @@ import {
   Menu,
   MenuItem,
   Avatar,
-} from '@mui/material';
+} from "@mui/material";
 import {
   AccountTree as PipelineIcon,
   Settings as SettingsIcon,
@@ -39,13 +39,13 @@ import {
   Extension as IntegrationIcon,
   Cloud as EnvironmentIcon,
   Terrain as LogoIcon,
-} from '@mui/icons-material';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { useTheme as useCustomTheme } from './hooks/useTheme';
-import { useSidebar } from './contexts/SidebarContext';
-import { ThemeToggle } from './components/ThemeToggle';
+} from "@mui/icons-material";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useTheme as useCustomTheme } from "./hooks/useTheme";
+import { useSidebar } from "./contexts/SidebarContext";
+import { ThemeToggle } from "./components/ThemeToggle";
 
-import { drawerWidth, collapsedDrawerWidth } from '@/constants';
+import { drawerWidth, collapsedDrawerWidth } from "@/constants";
 
 function Sidebar() {
   const { t } = useTranslation();
@@ -57,10 +57,10 @@ function Sidebar() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { isCollapsed, setIsCollapsed } = useSidebar();
   const { direction } = useDirection();
-  const isRTL = direction === 'rtl';
+  const isRTL = direction === "rtl";
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [userInitial, setUserInitial] = useState('U');
-  const [userName, setUserName] = useState('');
+  const [userInitial, setUserInitial] = useState("U");
+  const [userName, setUserName] = useState("");
 
   useEffect(() => {
     const loadUserInfo = async () => {
@@ -75,8 +75,11 @@ function Sidebar() {
         }
       } catch (error) {
         console.error(
-          t('app.errors.loadingUserAttributes', 'Error loading user attributes:'),
-          error
+          t(
+            "app.errors.loadingUserAttributes",
+            "Error loading user attributes:",
+          ),
+          error,
         );
       }
     };
@@ -95,9 +98,9 @@ function Sidebar() {
     try {
       await signOut();
       setIsAuthenticated(false);
-      navigate('/sign-in');
+      navigate("/sign-in");
     } catch (error) {
-      console.error(t('app.errors.signingOut', 'Error signing out:'), error);
+      console.error(t("app.errors.signingOut", "Error signing out:"), error);
     }
     handleClose();
   };
@@ -109,19 +112,22 @@ function Sidebar() {
     if (isItemActive) {
       return theme.palette.primary.main;
     }
-    return customTheme === 'dark' ? 'white' : theme.palette.text.secondary;
+    return customTheme === "dark" ? "white" : theme.palette.text.secondary;
   };
 
   const { ability, loading: permissionsLoading } = usePermission();
 
   // Feature flags
-  const advancedPermissionsEnabled = useFeatureFlag('advanced-permissions-enabled', false);
+  const advancedPermissionsEnabled = useFeatureFlag(
+    "advanced-permissions-enabled",
+    false,
+  );
 
   const canViewPipeline = useMemo(() => {
     try {
-      return ability?.can('view', 'pipeline') ?? false;
+      return ability?.can("view", "pipeline") ?? false;
     } catch (error) {
-      console.error('Error checking pipeline permission:', error);
+      console.error("Error checking pipeline permission:", error);
       return false;
     }
   }, [ability]);
@@ -132,12 +138,15 @@ function Sidebar() {
       try {
         return ability?.can(action as any, resource as any) ?? false;
       } catch (error) {
-        console.error(`Error checking ${action} permission on ${resource}:`, error);
+        console.error(
+          `Error checking ${action} permission on ${resource}:`,
+          error,
+        );
         // During errors, default to false but log the error
         return false;
       }
     },
-    [ability]
+    [ability],
   );
 
   // Memoize permission checks with error handling
@@ -145,21 +154,21 @@ function Sidebar() {
     try {
       // Check if user has any settings-related permissions
       return (
-        (ability?.can('view', 'settings') ||
-          ability?.can('view', 'user') ||
-          ability?.can('view', 'group') ||
-          ability?.can('view', 'permission-set') ||
-          ability?.can('view', 'connector') ||
-          ability?.can('view', 'integration') ||
-          safePermissionCheck('view', 'settings.users') ||
-          safePermissionCheck('view', 'settings.connectors') ||
-          safePermissionCheck('view', 'settings.integrations') ||
-          safePermissionCheck('view', 'settings.system') ||
-          safePermissionCheck('view', 'settings.permissions')) ??
+        (ability?.can("view", "settings") ||
+          ability?.can("view", "user") ||
+          ability?.can("view", "group") ||
+          ability?.can("view", "permission-set") ||
+          ability?.can("view", "connector") ||
+          ability?.can("view", "integration") ||
+          safePermissionCheck("view", "settings.users") ||
+          safePermissionCheck("view", "settings.connectors") ||
+          safePermissionCheck("view", "settings.integrations") ||
+          safePermissionCheck("view", "settings.system") ||
+          safePermissionCheck("view", "settings.permissions")) ??
         false
       );
     } catch (error) {
-      console.error('Error checking settings permission:', error);
+      console.error("Error checking settings permission:", error);
       return false;
     }
   }, [ability, safePermissionCheck]);
@@ -167,31 +176,31 @@ function Sidebar() {
   // Build menu items based on permissions
   const mainMenuItems = [
     {
-      text: t('sidebar.menu.home'),
+      text: t("sidebar.menu.home"),
       icon: <HomeIcon />,
-      path: '/',
+      path: "/",
       visible: true, // Always show home
     },
     {
-      text: t('sidebar.menu.assets'),
+      text: t("sidebar.menu.assets"),
       icon: <MediaAssetsIcon />,
-      path: '/assets',
+      path: "/assets",
       visible: true, // Assets should always be shown
     },
     {
-      text: t('sidebar.menu.pipelines'),
+      text: t("sidebar.menu.pipelines"),
       icon: <PipelineIcon />,
-      path: '/pipelines',
+      path: "/pipelines",
       visible: canViewPipeline,
     },
     {
-      text: t('sidebar.menu.pipelineExecutions'),
+      text: t("sidebar.menu.pipelineExecutions"),
       icon: <ExecutionsIcon />,
-      path: '/executions',
+      path: "/executions",
       visible: canViewPipeline,
     },
     {
-      text: t('sidebar.menu.settings'),
+      text: t("sidebar.menu.settings"),
       icon: <SettingsIcon />,
       onClick: () => setSettingsOpen(!settingsOpen),
       isExpandable: true,
@@ -199,44 +208,46 @@ function Sidebar() {
       visible: canViewSettings,
       subItems: [
         {
-          text: t('sidebar.submenu.connectors'),
+          text: t("sidebar.submenu.connectors"),
           icon: <StorageIcon />,
-          path: '/settings/connectors',
+          path: "/settings/connectors",
           visible:
-            safePermissionCheck('view', 'connector') ||
-            safePermissionCheck('view', 'settings.connectors'),
+            safePermissionCheck("view", "connector") ||
+            safePermissionCheck("view", "settings.connectors"),
         },
         {
-          text: t('sidebar.submenu.usersAndGroups', 'Users and Groups'),
+          text: t("sidebar.submenu.usersAndGroups", "Users and Groups"),
           icon: <GroupIcon />,
-          path: '/settings/users-groups',
+          path: "/settings/users-groups",
           visible:
-            safePermissionCheck('view', 'user') ||
-            safePermissionCheck('view', 'group') ||
-            safePermissionCheck('view', 'settings.users'),
+            safePermissionCheck("view", "user") ||
+            safePermissionCheck("view", "group") ||
+            safePermissionCheck("view", "settings.users"),
         },
         {
-          text: t('sidebar.submenu.permissionSets', 'Permissions'),
+          text: t("sidebar.submenu.permissionSets", "Permissions"),
           icon: <SecurityIcon />,
-          path: '/settings/permission-sets',
-          visible: advancedPermissionsEnabled && safePermissionCheck('view', 'permission-set'),
+          path: "/settings/permission-sets",
+          visible:
+            advancedPermissionsEnabled &&
+            safePermissionCheck("view", "permission-set"),
         },
         {
-          text: t('sidebar.submenu.integrations'),
+          text: t("sidebar.submenu.integrations"),
           icon: <IntegrationIcon />,
-          path: '/settings/integrations',
+          path: "/settings/integrations",
           visible:
-            safePermissionCheck('view', 'integration') ||
-            safePermissionCheck('view', 'settings.integrations'),
+            safePermissionCheck("view", "integration") ||
+            safePermissionCheck("view", "settings.integrations"),
         },
         // { text: t('sidebar.submenu.environments'), icon: <EnvironmentIcon />, path: '/settings/environments' },
         {
-          text: t('sidebar.submenu.system'),
+          text: t("sidebar.submenu.system"),
           icon: <SettingsIcon />,
-          path: '/settings/system',
+          path: "/settings/system",
           visible:
-            safePermissionCheck('view', 'settings') ||
-            safePermissionCheck('view', 'settings.system'),
+            safePermissionCheck("view", "settings") ||
+            safePermissionCheck("view", "settings.system"),
         },
       ].filter((item) => item.visible !== false),
     },
@@ -246,16 +257,19 @@ function Sidebar() {
     // Don't navigate if:
     // 1. We're already on this exact path, or
     // 2. We're on a sub-route of this path (except for root path '/')
-    if (location.pathname === path || (path !== '/' && location.pathname.startsWith(path))) {
+    if (
+      location.pathname === path ||
+      (path !== "/" && location.pathname.startsWith(path))
+    ) {
       console.log(
-        `${t('app.navigation.preventedDuplicate', 'Prevented duplicate navigation to')} ${path}`
+        `${t("app.navigation.preventedDuplicate", "Prevented duplicate navigation to")} ${path}`,
       );
       return;
     }
 
     // Log navigation for debugging
     console.log(
-      `${t('app.navigation.navigating', 'Navigating from')} ${location.pathname} to ${path}`
+      `${t("app.navigation.navigating", "Navigating from")} ${location.pathname} to ${path}`,
     );
     navigate(path);
   };
@@ -270,27 +284,27 @@ function Sidebar() {
       sx={{
         width: isCollapsed ? collapsedDrawerWidth : drawerWidth,
         flexShrink: 0,
-        position: 'fixed',
+        position: "fixed",
         zIndex: theme.zIndex.drawer + 1,
-        height: '100vh',
+        height: "100vh",
         transition: (theme) =>
-          theme.transitions.create(['width'], {
+          theme.transitions.create(["width"], {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.enteringScreen,
           }),
-        '& .MuiDrawer-paper': {
+        "& .MuiDrawer-paper": {
           width: isCollapsed ? collapsedDrawerWidth : drawerWidth,
-          boxSizing: 'border-box',
-          borderRight: isRTL ? 'none' : '1px solid rgba(0,0,0,0.08)',
-          borderLeft: isRTL ? '1px solid rgba(0,0,0,0.08)' : 'none',
+          boxSizing: "border-box",
+          borderRight: isRTL ? "none" : "1px solid rgba(0,0,0,0.08)",
+          borderLeft: isRTL ? "1px solid rgba(0,0,0,0.08)" : "none",
           backgroundColor: theme.palette.background.paper,
-          position: 'fixed',
-          height: '100vh',
+          position: "fixed",
+          height: "100vh",
           top: 0,
-          [isRTL ? 'right' : 'left']: 0,
-          overflow: 'visible',
+          [isRTL ? "right" : "left"]: 0,
+          overflow: "visible",
           transition: (theme) =>
-            theme.transitions.create(['width'], {
+            theme.transitions.create(["width"], {
               easing: theme.transitions.easing.sharp,
               duration: theme.transitions.duration.enteringScreen,
             }),
@@ -299,27 +313,27 @@ function Sidebar() {
     >
       <Box
         sx={{
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
         }}
       >
         {/* Logo Section */}
         <Box
           sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: isCollapsed ? 'center' : 'flex-start',
+            display: "flex",
+            alignItems: "center",
+            justifyContent: isCollapsed ? "center" : "flex-start",
             height: 64,
             px: isCollapsed ? 1 : 2,
-            borderBottom: '1px solid',
-            borderColor: 'divider',
+            borderBottom: "1px solid",
+            borderColor: "divider",
           }}
         >
           <LogoIcon
             sx={{
-              fontSize: '32px',
+              fontSize: "32px",
               color: theme.palette.primary.main,
               marginRight: isRTL ? 0 : isCollapsed ? 0 : 1,
               marginLeft: isRTL ? (isCollapsed ? 0 : 1) : 0,
@@ -333,7 +347,7 @@ function Sidebar() {
                 color: theme.palette.primary.main,
               }}
             >
-              {t('app.branding.name', 'MediaLake')}
+              {t("app.branding.name", "MediaLake")}
             </Typography>
           )}
         </Box>
@@ -341,26 +355,26 @@ function Sidebar() {
         <Button
           onClick={toggleDrawer}
           sx={{
-            position: 'absolute',
-            [isRTL ? 'left' : 'right']: -16,
-            top: '50%',
-            transform: 'translateY(-50%)',
-            minWidth: '32px',
-            width: '32px',
-            height: '32px',
-            bgcolor: 'background.paper',
-            borderRadius: '8px',
-            boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: '1px solid',
-            borderColor: 'divider',
+            position: "absolute",
+            [isRTL ? "left" : "right"]: -16,
+            top: "50%",
+            transform: "translateY(-50%)",
+            minWidth: "32px",
+            width: "32px",
+            height: "32px",
+            bgcolor: "background.paper",
+            borderRadius: "8px",
+            boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.1)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            border: "1px solid",
+            borderColor: "divider",
             zIndex: 9999,
             padding: 0,
-            '&:hover': {
-              bgcolor: 'background.paper',
-              boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.1)',
+            "&:hover": {
+              bgcolor: "background.paper",
+              boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.1)",
             },
           }}
         >
@@ -379,14 +393,14 @@ function Sidebar() {
         <List
           sx={{
             flex: 1,
-            overflowY: 'auto',
-            overflowX: 'hidden',
+            overflowY: "auto",
+            overflowX: "hidden",
             py: 2,
           }}
         >
           {mainMenuItems.map((item) => {
             // If this is the Settings menu item, wrap it with Can component
-            if (item.text === t('sidebar.menu.settings')) {
+            if (item.text === t("sidebar.menu.settings")) {
               return (
                 <Can key={item.text} I="view" a="settings">
                   <React.Fragment>
@@ -397,17 +411,18 @@ function Sidebar() {
                             onClick={
                               item.isExpandable
                                 ? item.onClick
-                                : () => handleNavigation(item.path || '/')
+                                : () => handleNavigation(item.path || "/")
                             }
                             sx={{
                               minHeight: 48,
-                              justifyContent: 'center',
+                              justifyContent: "center",
                               px: 2.5,
                               backgroundColor:
-                                isActive(item.path || '') || (item.isExpandable && item.isExpanded)
+                                isActive(item.path || "") ||
+                                (item.isExpandable && item.isExpanded)
                                   ? `${theme.palette.primary.main}08`
-                                  : 'transparent',
-                              '&:hover': {
+                                  : "transparent",
+                              "&:hover": {
                                 backgroundColor: `${theme.palette.primary.main}15`,
                               },
                             }}
@@ -415,11 +430,11 @@ function Sidebar() {
                             <ListItemIcon
                               sx={{
                                 minWidth: 0,
-                                mr: 'auto',
-                                justifyContent: 'center',
+                                mr: "auto",
+                                justifyContent: "center",
                                 color: getIconColor(
-                                  isActive(item.path || '') ||
-                                    (item.isExpandable && item.isExpanded)
+                                  isActive(item.path || "") ||
+                                    (item.isExpandable && item.isExpanded),
                                 ),
                               }}
                             >
@@ -432,36 +447,38 @@ function Sidebar() {
                           onClick={
                             item.isExpandable
                               ? item.onClick
-                              : () => handleNavigation(item.path || '/')
+                              : () => handleNavigation(item.path || "/")
                           }
                           sx={{
                             backgroundColor:
-                              isActive(item.path || '') || (item.isExpandable && item.isExpanded)
+                              isActive(item.path || "") ||
+                              (item.isExpandable && item.isExpanded)
                                 ? `${theme.palette.primary.main}08`
-                                : 'transparent',
-                            '&:hover': {
+                                : "transparent",
+                            "&:hover": {
                               backgroundColor: `${theme.palette.primary.main}15`,
                             },
                             borderRight:
-                              isActive(item.path || '') && !isRTL
+                              isActive(item.path || "") && !isRTL
                                 ? `3px solid ${theme.palette.primary.main}`
-                                : 'none',
+                                : "none",
                             borderLeft:
-                              isActive(item.path || '') && isRTL
+                              isActive(item.path || "") && isRTL
                                 ? `3px solid ${theme.palette.primary.main}`
-                                : 'none',
+                                : "none",
                             mx: 1,
-                            borderRadius: '8px',
-                            flexDirection: 'row',
-                            justifyContent: isRTL ? 'flex-start' : 'flex-start',
+                            borderRadius: "8px",
+                            flexDirection: "row",
+                            justifyContent: isRTL ? "flex-start" : "flex-start",
                           }}
                         >
                           <ListItemIcon
                             sx={{
                               color: getIconColor(
-                                isActive(item.path || '') || (item.isExpandable && item.isExpanded)
+                                isActive(item.path || "") ||
+                                  (item.isExpandable && item.isExpanded),
                               ),
-                              minWidth: '40px',
+                              minWidth: "40px",
                             }}
                           >
                             {item.icon}
@@ -472,70 +489,85 @@ function Sidebar() {
                                 variant="body2"
                                 sx={{
                                   fontWeight:
-                                    isActive(item.path || '') ||
+                                    isActive(item.path || "") ||
                                     (item.isExpandable && item.isExpanded)
                                       ? 600
                                       : 400,
                                   color:
-                                    isActive(item.path || '') ||
+                                    isActive(item.path || "") ||
                                     (item.isExpandable && item.isExpanded)
                                       ? theme.palette.primary.main
-                                      : customTheme === 'dark'
-                                        ? 'white'
+                                      : customTheme === "dark"
+                                        ? "white"
                                         : theme.palette.text.primary,
-                                  textAlign: isRTL ? 'right' : 'left',
+                                  textAlign: isRTL ? "right" : "left",
                                 }}
                               >
                                 {item.text}
                               </Typography>
                             }
-                            sx={{ textAlign: isRTL ? 'right' : 'left' }}
+                            sx={{ textAlign: isRTL ? "right" : "left" }}
                           />
                           {item.isExpandable && (
                             <Box
                               sx={{
-                                color: customTheme === 'dark' ? 'white' : 'inherit',
+                                color:
+                                  customTheme === "dark" ? "white" : "inherit",
                               }}
                             >
-                              {item.isExpanded ? <ExpandLess /> : <ExpandMore />}
+                              {item.isExpanded ? (
+                                <ExpandLess />
+                              ) : (
+                                <ExpandMore />
+                              )}
                             </Box>
                           )}
                         </ListItemButton>
                       )}
                     </ListItem>
                     {!isCollapsed && item.isExpandable && item.subItems && (
-                      <Collapse in={item.isExpanded} timeout="auto" unmountOnExit>
+                      <Collapse
+                        in={item.isExpanded}
+                        timeout="auto"
+                        unmountOnExit
+                      >
                         <List component="div" disablePadding>
                           {item.subItems.map((subItem) => (
                             <ListItem key={subItem.text} disablePadding>
                               <ListItemButton
                                 onClick={() => handleNavigation(subItem.path)}
                                 sx={{
-                                  [isRTL ? 'pr' : 'pl']: 6,
-                                  backgroundColor: isSettingsActive(subItem.path)
+                                  [isRTL ? "pr" : "pl"]: 6,
+                                  backgroundColor: isSettingsActive(
+                                    subItem.path,
+                                  )
                                     ? `${theme.palette.primary.main}08`
-                                    : 'transparent',
-                                  '&:hover': {
+                                    : "transparent",
+                                  "&:hover": {
                                     backgroundColor: `${theme.palette.primary.main}15`,
                                   },
                                   borderRight:
                                     isSettingsActive(subItem.path) && !isRTL
                                       ? `3px solid ${theme.palette.primary.main}`
-                                      : 'none',
+                                      : "none",
                                   borderLeft:
                                     isSettingsActive(subItem.path) && isRTL
                                       ? `3px solid ${theme.palette.primary.main}`
-                                      : 'none',
+                                      : "none",
                                   mx: 1,
-                                  borderRadius: '8px',
-                                  flexDirection: 'row',
-                                  justifyContent: isRTL ? 'flex-start' : 'flex-start',
+                                  borderRadius: "8px",
+                                  flexDirection: "row",
+                                  justifyContent: isRTL
+                                    ? "flex-start"
+                                    : "flex-start",
                                 }}
                               >
                                 <ListItemIcon
                                   sx={{
-                                    color: getIconColor(isSettingsActive(subItem.path)),
-                                    minWidth: '40px',
+                                    color: getIconColor(
+                                      isSettingsActive(subItem.path),
+                                    ),
+                                    minWidth: "40px",
                                   }}
                                 >
                                   {subItem.icon}
@@ -545,19 +577,23 @@ function Sidebar() {
                                     <Typography
                                       variant="body2"
                                       sx={{
-                                        fontWeight: isSettingsActive(subItem.path) ? 600 : 400,
+                                        fontWeight: isSettingsActive(
+                                          subItem.path,
+                                        )
+                                          ? 600
+                                          : 400,
                                         color: isSettingsActive(subItem.path)
                                           ? theme.palette.primary.main
-                                          : customTheme === 'dark'
-                                            ? 'white'
+                                          : customTheme === "dark"
+                                            ? "white"
                                             : theme.palette.text.primary,
-                                        textAlign: isRTL ? 'right' : 'left',
+                                        textAlign: isRTL ? "right" : "left",
                                       }}
                                     >
                                       {subItem.text}
                                     </Typography>
                                   }
-                                  sx={{ textAlign: isRTL ? 'right' : 'left' }}
+                                  sx={{ textAlign: isRTL ? "right" : "left" }}
                                 />
                               </ListItemButton>
                             </ListItem>
@@ -580,17 +616,18 @@ function Sidebar() {
                         onClick={
                           item.isExpandable
                             ? item.onClick
-                            : () => handleNavigation(item.path || '/')
+                            : () => handleNavigation(item.path || "/")
                         }
                         sx={{
                           minHeight: 48,
-                          justifyContent: 'center',
+                          justifyContent: "center",
                           px: 2.5,
                           backgroundColor:
-                            isActive(item.path || '') || (item.isExpandable && item.isExpanded)
+                            isActive(item.path || "") ||
+                            (item.isExpandable && item.isExpanded)
                               ? `${theme.palette.primary.main}08`
-                              : 'transparent',
-                          '&:hover': {
+                              : "transparent",
+                          "&:hover": {
                             backgroundColor: `${theme.palette.primary.main}15`,
                           },
                         }}
@@ -598,10 +635,11 @@ function Sidebar() {
                         <ListItemIcon
                           sx={{
                             minWidth: 0,
-                            mr: 'auto',
-                            justifyContent: 'center',
+                            mr: "auto",
+                            justifyContent: "center",
                             color: getIconColor(
-                              isActive(item.path || '') || (item.isExpandable && item.isExpanded)
+                              isActive(item.path || "") ||
+                                (item.isExpandable && item.isExpanded),
                             ),
                           }}
                         >
@@ -612,36 +650,40 @@ function Sidebar() {
                   ) : (
                     <ListItemButton
                       onClick={
-                        item.isExpandable ? item.onClick : () => handleNavigation(item.path || '/')
+                        item.isExpandable
+                          ? item.onClick
+                          : () => handleNavigation(item.path || "/")
                       }
                       sx={{
                         backgroundColor:
-                          isActive(item.path || '') || (item.isExpandable && item.isExpanded)
+                          isActive(item.path || "") ||
+                          (item.isExpandable && item.isExpanded)
                             ? `${theme.palette.primary.main}08`
-                            : 'transparent',
-                        '&:hover': {
+                            : "transparent",
+                        "&:hover": {
                           backgroundColor: `${theme.palette.primary.main}15`,
                         },
                         borderRight:
-                          isActive(item.path || '') && !isRTL
+                          isActive(item.path || "") && !isRTL
                             ? `3px solid ${theme.palette.primary.main}`
-                            : 'none',
+                            : "none",
                         borderLeft:
-                          isActive(item.path || '') && isRTL
+                          isActive(item.path || "") && isRTL
                             ? `3px solid ${theme.palette.primary.main}`
-                            : 'none',
+                            : "none",
                         mx: 1,
-                        borderRadius: '8px',
-                        flexDirection: 'row',
-                        justifyContent: isRTL ? 'flex-start' : 'flex-start',
+                        borderRadius: "8px",
+                        flexDirection: "row",
+                        justifyContent: isRTL ? "flex-start" : "flex-start",
                       }}
                     >
                       <ListItemIcon
                         sx={{
                           color: getIconColor(
-                            isActive(item.path || '') || (item.isExpandable && item.isExpanded)
+                            isActive(item.path || "") ||
+                              (item.isExpandable && item.isExpanded),
                           ),
-                          minWidth: '40px',
+                          minWidth: "40px",
                         }}
                       >
                         {item.icon}
@@ -652,27 +694,29 @@ function Sidebar() {
                             variant="body2"
                             sx={{
                               fontWeight:
-                                isActive(item.path || '') || (item.isExpandable && item.isExpanded)
+                                isActive(item.path || "") ||
+                                (item.isExpandable && item.isExpanded)
                                   ? 600
                                   : 400,
                               color:
-                                isActive(item.path || '') || (item.isExpandable && item.isExpanded)
+                                isActive(item.path || "") ||
+                                (item.isExpandable && item.isExpanded)
                                   ? theme.palette.primary.main
-                                  : customTheme === 'dark'
-                                    ? 'white'
+                                  : customTheme === "dark"
+                                    ? "white"
                                     : theme.palette.text.primary,
-                              textAlign: isRTL ? 'right' : 'left',
+                              textAlign: isRTL ? "right" : "left",
                             }}
                           >
                             {item.text}
                           </Typography>
                         }
-                        sx={{ textAlign: isRTL ? 'right' : 'left' }}
+                        sx={{ textAlign: isRTL ? "right" : "left" }}
                       />
                       {item.isExpandable && (
                         <Box
                           sx={{
-                            color: customTheme === 'dark' ? 'white' : 'inherit',
+                            color: customTheme === "dark" ? "white" : "inherit",
                           }}
                         >
                           {item.isExpanded ? <ExpandLess /> : <ExpandMore />}
@@ -687,9 +731,9 @@ function Sidebar() {
                       {item.subItems.map((subItem) => {
                         // Check if this is a system settings item that requires permission
                         const isSystemSettings =
-                          subItem.path === '/settings/system' ||
-                          subItem.path === '/settings/users-groups' ||
-                          subItem.path === '/settings/permission-sets';
+                          subItem.path === "/settings/system" ||
+                          subItem.path === "/settings/users-groups" ||
+                          subItem.path === "/settings/permission-sets";
 
                         // Wrap system settings items with Can component
                         const menuItem = (
@@ -697,31 +741,35 @@ function Sidebar() {
                             <ListItemButton
                               onClick={() => handleNavigation(subItem.path)}
                               sx={{
-                                [isRTL ? 'pr' : 'pl']: 6,
+                                [isRTL ? "pr" : "pl"]: 6,
                                 backgroundColor: isSettingsActive(subItem.path)
                                   ? `${theme.palette.primary.main}08`
-                                  : 'transparent',
-                                '&:hover': {
+                                  : "transparent",
+                                "&:hover": {
                                   backgroundColor: `${theme.palette.primary.main}15`,
                                 },
                                 borderRight:
                                   isSettingsActive(subItem.path) && !isRTL
                                     ? `3px solid ${theme.palette.primary.main}`
-                                    : 'none',
+                                    : "none",
                                 borderLeft:
                                   isSettingsActive(subItem.path) && isRTL
                                     ? `3px solid ${theme.palette.primary.main}`
-                                    : 'none',
+                                    : "none",
                                 mx: 1,
-                                borderRadius: '8px',
-                                flexDirection: 'row',
-                                justifyContent: isRTL ? 'flex-start' : 'flex-start',
+                                borderRadius: "8px",
+                                flexDirection: "row",
+                                justifyContent: isRTL
+                                  ? "flex-start"
+                                  : "flex-start",
                               }}
                             >
                               <ListItemIcon
                                 sx={{
-                                  color: getIconColor(isSettingsActive(subItem.path)),
-                                  minWidth: '40px',
+                                  color: getIconColor(
+                                    isSettingsActive(subItem.path),
+                                  ),
+                                  minWidth: "40px",
                                 }}
                               >
                                 {subItem.icon}
@@ -731,19 +779,21 @@ function Sidebar() {
                                   <Typography
                                     variant="body2"
                                     sx={{
-                                      fontWeight: isSettingsActive(subItem.path) ? 600 : 400,
+                                      fontWeight: isSettingsActive(subItem.path)
+                                        ? 600
+                                        : 400,
                                       color: isSettingsActive(subItem.path)
                                         ? theme.palette.primary.main
-                                        : customTheme === 'dark'
-                                          ? 'white'
+                                        : customTheme === "dark"
+                                          ? "white"
                                           : theme.palette.text.primary,
-                                      textAlign: isRTL ? 'right' : 'left',
+                                      textAlign: isRTL ? "right" : "left",
                                     }}
                                   >
                                     {subItem.text}
                                   </Typography>
                                 }
-                                sx={{ textAlign: isRTL ? 'right' : 'left' }}
+                                sx={{ textAlign: isRTL ? "right" : "left" }}
                               />
                             </ListItemButton>
                           </ListItem>
@@ -769,9 +819,9 @@ function Sidebar() {
         {/* Bottom Section */}
         <Box
           sx={{
-            mt: 'auto',
-            borderTop: '1px solid',
-            borderColor: 'divider',
+            mt: "auto",
+            borderTop: "1px solid",
+            borderColor: "divider",
             backgroundColor: theme.palette.background.paper,
           }}
         >
@@ -784,14 +834,17 @@ function Sidebar() {
             }}
           >
             {isCollapsed ? (
-              <Tooltip title={userName || t('common.profile')} placement="right">
+              <Tooltip
+                title={userName || t("common.profile")}
+                placement="right"
+              >
                 <IconButton
                   onClick={handleProfileClick}
                   sx={{
-                    width: '100%',
+                    width: "100%",
                     height: 40,
-                    borderRadius: '8px',
-                    '&:hover': {
+                    borderRadius: "8px",
+                    "&:hover": {
                       backgroundColor: `${theme.palette.primary.main}15`,
                     },
                   }}
@@ -801,7 +854,7 @@ function Sidebar() {
                       width: 32,
                       height: 32,
                       backgroundColor: theme.palette.primary.main,
-                      fontSize: '0.9rem',
+                      fontSize: "0.9rem",
                     }}
                   >
                     {userInitial}
@@ -812,15 +865,15 @@ function Sidebar() {
               <Button
                 onClick={handleProfileClick}
                 sx={{
-                  width: '100%',
+                  width: "100%",
                   height: 40,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'flex-start',
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "flex-start",
                   gap: 1.5,
-                  borderRadius: '8px',
+                  borderRadius: "8px",
                   px: 1.5,
-                  '&:hover': {
+                  "&:hover": {
                     backgroundColor: `${theme.palette.primary.main}15`,
                   },
                 }}
@@ -830,7 +883,7 @@ function Sidebar() {
                     width: 32,
                     height: 32,
                     backgroundColor: theme.palette.primary.main,
-                    fontSize: '0.9rem',
+                    fontSize: "0.9rem",
                   }}
                 >
                   {userInitial}
@@ -838,7 +891,10 @@ function Sidebar() {
                 <Typography
                   variant="body2"
                   sx={{
-                    color: customTheme === 'dark' ? 'white' : theme.palette.text.primary,
+                    color:
+                      customTheme === "dark"
+                        ? "white"
+                        : theme.palette.text.primary,
                     fontWeight: 500,
                   }}
                 >
@@ -852,19 +908,19 @@ function Sidebar() {
               open={Boolean(anchorEl)}
               onClose={handleClose}
               anchorOrigin={{
-                vertical: 'top',
-                horizontal: 'right',
+                vertical: "top",
+                horizontal: "right",
               }}
               transformOrigin={{
-                vertical: 'bottom',
-                horizontal: 'left',
+                vertical: "bottom",
+                horizontal: "left",
               }}
               slotProps={{
                 paper: {
                   sx: {
-                    width: '200px',
+                    width: "200px",
                     mt: -1,
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
                   },
                 },
               }}
@@ -872,13 +928,13 @@ function Sidebar() {
               <MenuItem
                 onClick={() => {
                   handleClose();
-                  navigate('/settings/profile');
+                  navigate("/settings/profile");
                 }}
               >
-                {t('common.profile')}
+                {t("common.profile")}
               </MenuItem>
-              <MenuItem onClick={handleLogout} sx={{ color: 'error.main' }}>
-                {t('common.logout')}
+              <MenuItem onClick={handleLogout} sx={{ color: "error.main" }}>
+                {t("common.logout")}
               </MenuItem>
             </Menu>
           </Box>

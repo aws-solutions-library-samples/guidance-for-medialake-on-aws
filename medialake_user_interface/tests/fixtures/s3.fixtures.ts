@@ -1,4 +1,4 @@
-import { test as base } from '@playwright/test';
+import { test as base } from "@playwright/test";
 import {
   S3Client,
   CreateBucketCommand,
@@ -7,20 +7,23 @@ import {
   DeleteObjectCommand,
   HeadBucketCommand,
   BucketLocationConstraint,
-} from '@aws-sdk/client-s3';
-import * as crypto from 'crypto';
-import { TestInfo } from '@playwright/test';
+} from "@aws-sdk/client-s3";
+import * as crypto from "crypto";
+import { TestInfo } from "@playwright/test";
 
-const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
+const AWS_REGION = process.env.AWS_REGION || "us-east-1";
 
 // Generate a random bucket name
 function generateRandomBucketName(): string {
-  const randomId = crypto.randomBytes(4).toString('hex');
+  const randomId = crypto.randomBytes(4).toString("hex");
   return `medialake-pw-test-${randomId}`; // Prefix to identify test buckets
 }
 
 // Helper function to empty a bucket before deletion
-async function emptyBucket(s3Client: S3Client, bucketName: string): Promise<void> {
+async function emptyBucket(
+  s3Client: S3Client,
+  bucketName: string,
+): Promise<void> {
   console.log(`[Fixture] Emptying bucket ${bucketName} before deletion`);
   try {
     const listCommand = new ListObjectsV2Command({ Bucket: bucketName });
@@ -32,14 +35,18 @@ async function emptyBucket(s3Client: S3Client, bucketName: string): Promise<void
         new ListObjectsV2Command({
           Bucket: bucketName,
           ContinuationToken: continuationToken,
-        })
+        }),
       );
 
       if (listResponse.Contents && listResponse.Contents.length > 0) {
         const deletePromises = listResponse.Contents.map((object) => {
           if (object.Key) {
-            console.log(`[Fixture] Deleting object ${object.Key} from bucket ${bucketName}`);
-            return s3Client.send(new DeleteObjectCommand({ Bucket: bucketName, Key: object.Key }));
+            console.log(
+              `[Fixture] Deleting object ${object.Key} from bucket ${bucketName}`,
+            );
+            return s3Client.send(
+              new DeleteObjectCommand({ Bucket: bucketName, Key: object.Key }),
+            );
           }
           return Promise.resolve();
         });
@@ -50,8 +57,10 @@ async function emptyBucket(s3Client: S3Client, bucketName: string): Promise<void
     }
     console.log(`[Fixture] Bucket ${bucketName} emptied successfully`);
   } catch (error: any) {
-    if (error.name === 'NoSuchBucket') {
-      console.log(`[Fixture] Bucket ${bucketName} does not exist, skipping emptying.`);
+    if (error.name === "NoSuchBucket") {
+      console.log(
+        `[Fixture] Bucket ${bucketName} does not exist, skipping emptying.`,
+      );
       return; // Bucket doesn't exist, nothing to empty
     }
     console.error(`[Fixture] Error emptying bucket ${bucketName}:`, error);
@@ -75,11 +84,12 @@ export const test = base.extend<S3Fixtures>({
         /* No base fixtures needed here */
       },
       use,
-      workerInfo
+      workerInfo,
     ) => {
-      const bucketName = generateRandomBucketName() + `-worker-${workerInfo.workerIndex}`;
+      const bucketName =
+        generateRandomBucketName() + `-worker-${workerInfo.workerIndex}`;
       console.log(
-        `[Fixture Worker ${workerInfo.workerIndex}] Generated bucket name: ${bucketName}`
+        `[Fixture Worker ${workerInfo.workerIndex}] Generated bucket name: ${bucketName}`,
       );
 
       // Initialize S3 client.
@@ -100,16 +110,18 @@ export const test = base.extend<S3Fixtures>({
       try {
         // Create the bucket
         console.log(
-          `[Fixture Worker ${workerInfo.workerIndex}] Creating bucket ${bucketName} in region ${AWS_REGION}...`
+          `[Fixture Worker ${workerInfo.workerIndex}] Creating bucket ${bucketName} in region ${AWS_REGION}...`,
         );
         const createBucketParams: any = { Bucket: bucketName };
-        if (AWS_REGION !== 'us-east-1') {
+        if (AWS_REGION !== "us-east-1") {
           createBucketParams.CreateBucketConfiguration = {
             LocationConstraint: AWS_REGION as BucketLocationConstraint,
           };
         }
         await s3Client.send(new CreateBucketCommand(createBucketParams));
-        console.log(`[Fixture Worker ${workerInfo.workerIndex}] Bucket ${bucketName} created.`);
+        console.log(
+          `[Fixture Worker ${workerInfo.workerIndex}] Bucket ${bucketName} created.`,
+        );
 
         // Wait briefly for bucket to be available
         await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -117,7 +129,7 @@ export const test = base.extend<S3Fixtures>({
         // Verify bucket exists
         await s3Client.send(new HeadBucketCommand({ Bucket: bucketName }));
         console.log(
-          `[Fixture Worker ${workerInfo.workerIndex}] Bucket ${bucketName} confirmed to exist.`
+          `[Fixture Worker ${workerInfo.workerIndex}] Bucket ${bucketName} confirmed to exist.`,
         );
 
         // Use the bucket name in the test
@@ -125,62 +137,73 @@ export const test = base.extend<S3Fixtures>({
       } catch (error) {
         console.error(
           `[Fixture Worker ${workerInfo.workerIndex}] Error setting up bucket ${bucketName}:`,
-          error
+          error,
         );
         // If setup fails, ensure cleanup still attempts (though bucket might not exist)
         throw error; // Fail the test if setup fails
       } finally {
         // Teardown: Delete the bucket after the tests for this worker are done
         console.log(
-          `[Fixture Worker ${workerInfo.workerIndex}] Cleaning up bucket ${bucketName}...`
+          `[Fixture Worker ${workerInfo.workerIndex}] Cleaning up bucket ${bucketName}...`,
         );
         try {
           await emptyBucket(s3Client, bucketName);
           await s3Client.send(new DeleteBucketCommand({ Bucket: bucketName }));
           console.log(
-            `[Fixture Worker ${workerInfo.workerIndex}] Successfully deleted bucket ${bucketName}`
+            `[Fixture Worker ${workerInfo.workerIndex}] Successfully deleted bucket ${bucketName}`,
           );
         } catch (error: any) {
-          if (error.name === 'NoSuchBucket') {
+          if (error.name === "NoSuchBucket") {
             console.log(
-              `[Fixture Worker ${workerInfo.workerIndex}] Bucket ${bucketName} already deleted or never created.`
+              `[Fixture Worker ${workerInfo.workerIndex}] Bucket ${bucketName} already deleted or never created.`,
             );
           } else {
             console.error(
               `[Fixture Worker ${workerInfo.workerIndex}] Error deleting bucket ${bucketName}:`,
-              error
+              error,
             );
             // Log error but don't fail the teardown unless critical
           }
         }
       }
     },
-    { scope: 'worker' },
+    { scope: "worker" },
   ],
 
   s3BucketDeletion: [
     async ({ s3BucketName }, use) => {
       // Provide a cleanup function that can be called manually if needed
       const cleanup = async () => {
-        console.log(`[Fixture] Manual cleanup requested for bucket ${s3BucketName}`);
+        console.log(
+          `[Fixture] Manual cleanup requested for bucket ${s3BucketName}`,
+        );
         const s3Client = new S3Client({ region: AWS_REGION });
         try {
           await emptyBucket(s3Client, s3BucketName);
-          await s3Client.send(new DeleteBucketCommand({ Bucket: s3BucketName }));
-          console.log(`[Fixture] Successfully manually deleted bucket ${s3BucketName}`);
+          await s3Client.send(
+            new DeleteBucketCommand({ Bucket: s3BucketName }),
+          );
+          console.log(
+            `[Fixture] Successfully manually deleted bucket ${s3BucketName}`,
+          );
         } catch (error: any) {
-          if (error.name === 'NoSuchBucket') {
-            console.log(`[Fixture] Bucket ${s3BucketName} already deleted or never created.`);
+          if (error.name === "NoSuchBucket") {
+            console.log(
+              `[Fixture] Bucket ${s3BucketName} already deleted or never created.`,
+            );
           } else {
-            console.error(`[Fixture] Error manually deleting bucket ${s3BucketName}:`, error);
+            console.error(
+              `[Fixture] Error manually deleting bucket ${s3BucketName}:`,
+              error,
+            );
           }
         }
       };
 
       await use(cleanup);
     },
-    { scope: 'test' },
+    { scope: "test" },
   ],
 });
 
-export { expect } from '@playwright/test';
+export { expect } from "@playwright/test";

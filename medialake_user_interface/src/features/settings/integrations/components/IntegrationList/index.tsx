@@ -1,16 +1,16 @@
-import React, { useRef } from 'react';
-import { Box } from '@mui/material';
+import React, { useRef } from "react";
+import { Box } from "@mui/material";
 import {
   useReactTable,
   getCoreRowModel,
   getSortedRowModel,
   getFilteredRowModel,
-} from '@tanstack/react-table';
-import { ResizableTable } from '@/components/common/table';
-import { BaseTableToolbar } from '@/components/common/table';
-import { useTableVirtualizer } from '@/features/settings/integrations/hooks/useTableVirtualizer';
-import { useColumns } from '@/features/settings/integrations/hooks/useColumns';
-import { IntegrationListProps, ColumnSort, ColumnFilter } from './types';
+} from "@tanstack/react-table";
+import { ResizableTable } from "@/components/common/table";
+import { BaseTableToolbar } from "@/components/common/table";
+import { useTableVirtualizer } from "@/features/settings/integrations/hooks/useTableVirtualizer";
+import { useColumns } from "@/features/settings/integrations/hooks/useColumns";
+import { IntegrationListProps, ColumnSort, ColumnFilter } from "./types";
 
 const IntegrationList: React.FC<IntegrationListProps> = ({
   integrations,
@@ -38,7 +38,8 @@ const IntegrationList: React.FC<IntegrationListProps> = ({
       columnFilters: activeFilters,
     },
     onSortingChange: (updater) => {
-      const newSorting = typeof updater === 'function' ? updater(activeSorting) : updater;
+      const newSorting =
+        typeof updater === "function" ? updater(activeSorting) : updater;
       if (newSorting.length === 0 && activeSorting.length > 0) {
         onRemoveSort(activeSorting[0].id);
       } else if (newSorting.length > 0) {
@@ -46,7 +47,8 @@ const IntegrationList: React.FC<IntegrationListProps> = ({
       }
     },
     onColumnFiltersChange: (updater) => {
-      const newFilters = typeof updater === 'function' ? updater(activeFilters) : updater;
+      const newFilters =
+        typeof updater === "function" ? updater(activeFilters) : updater;
       if (newFilters.length > 0) {
         const lastFilter = newFilters[newFilters.length - 1];
         onFilterChange(lastFilter.id, lastFilter.value as string);
@@ -67,7 +69,10 @@ const IntegrationList: React.FC<IntegrationListProps> = ({
     desc: sort.desc,
   }));
 
-  const handleFilterClick = (event: React.MouseEvent<HTMLElement>, columnId: string) => {
+  const handleFilterClick = (
+    event: React.MouseEvent<HTMLElement>,
+    columnId: string,
+  ) => {
     // Handle filter click if needed
   };
 
@@ -77,7 +82,7 @@ const IntegrationList: React.FC<IntegrationListProps> = ({
   };
 
   return (
-    <Box ref={containerRef} sx={{ height: '100%', overflow: 'auto' }}>
+    <Box ref={containerRef} sx={{ height: "100%", overflow: "auto" }}>
       <BaseTableToolbar
         globalFilter={table.getState().globalFilter}
         onGlobalFilterChange={(value) => table.setGlobalFilter(value)}
@@ -89,7 +94,7 @@ const IntegrationList: React.FC<IntegrationListProps> = ({
         onColumnMenuOpen={() => {}}
       />
       {isLoading ? (
-        <Box sx={{ p: 2, textAlign: 'center' }}>Loading...</Box>
+        <Box sx={{ p: 2, textAlign: "center" }}>Loading...</Box>
       ) : (
         <ResizableTable
           table={table}

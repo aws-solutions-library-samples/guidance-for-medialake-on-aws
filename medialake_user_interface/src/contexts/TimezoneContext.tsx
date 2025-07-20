@@ -1,15 +1,21 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect } from "react";
 
 interface TimezoneContextType {
   timezone: string;
   setTimezone: (timezone: string) => void;
 }
 
-const TimezoneContext = createContext<TimezoneContextType | undefined>(undefined);
+const TimezoneContext = createContext<TimezoneContextType | undefined>(
+  undefined,
+);
 
-export const TimezoneProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const TimezoneProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   // Initialize with browser's timezone
-  const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const [timezone, setTimezone] = useState(
+    Intl.DateTimeFormat().resolvedOptions().timeZone,
+  );
 
   const value = {
     timezone,
@@ -18,13 +24,17 @@ export const TimezoneProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     },
   };
 
-  return <TimezoneContext.Provider value={value}>{children}</TimezoneContext.Provider>;
+  return (
+    <TimezoneContext.Provider value={value}>
+      {children}
+    </TimezoneContext.Provider>
+  );
 };
 
 export const useTimezone = () => {
   const context = useContext(TimezoneContext);
   if (context === undefined) {
-    throw new Error('useTimezone must be used within a TimezoneProvider');
+    throw new Error("useTimezone must be used within a TimezoneProvider");
   }
   return context;
 };

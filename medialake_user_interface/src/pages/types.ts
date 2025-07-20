@@ -1,4 +1,8 @@
-import { type ImageItem, type VideoItem, type AudioItem } from '@/types/search/searchResults';
+import {
+  type ImageItem,
+  type VideoItem,
+  type AudioItem,
+} from "@/types/search/searchResults";
 
 export type AssetItem = (ImageItem | VideoItem | AudioItem) & {
   DigitalSourceAsset: {
@@ -10,10 +14,10 @@ export interface LocationState {
   query?: string;
   isSemantic?: boolean;
   preserveSearch?: boolean;
-  viewMode?: 'card' | 'table';
-  cardSize?: 'small' | 'medium' | 'large';
-  aspectRatio?: 'vertical' | 'square' | 'horizontal';
-  thumbnailScale?: 'fit' | 'fill';
+  viewMode?: "card" | "table";
+  cardSize?: "small" | "medium" | "large";
+  aspectRatio?: "vertical" | "square" | "horizontal";
+  thumbnailScale?: "fit" | "fill";
   showMetadata?: boolean;
   groupByType?: boolean;
   type?: string;

@@ -1,7 +1,7 @@
-import React from 'react';
-import { Box, Button, Stack } from '@mui/material';
-import { UseFormReturn } from 'react-hook-form';
-import { useTranslation } from 'react-i18next';
+import React from "react";
+import { Box, Button, Stack } from "@mui/material";
+import { UseFormReturn } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 
 interface FormProps {
   form: UseFormReturn<any>;
@@ -14,12 +14,20 @@ interface FormProps {
 }
 
 export const Form: React.FC<FormProps> = React.memo(
-  ({ form, onSubmit, onCancel, submitLabel = 'common.save', children, showButtons = true, id }) => {
+  ({
+    form,
+    onSubmit,
+    onCancel,
+    submitLabel = "common.save",
+    children,
+    showButtons = true,
+    id,
+  }) => {
     const { t } = useTranslation();
 
     // Only log initial mount
     React.useEffect(() => {
-      console.log('[Form] Mounted:', {
+      console.log("[Form] Mounted:", {
         formId: id,
         isValid: form.formState.isValid,
       });
@@ -27,9 +35,9 @@ export const Form: React.FC<FormProps> = React.memo(
 
     const handleSubmit = React.useCallback(
       async (data: any) => {
-        console.log('[Form] Submitting form:', { formId: id });
-        console.log('[Form] Form data to submit:', data);
-        console.log('[Form] Form validation state:', {
+        console.log("[Form] Submitting form:", { formId: id });
+        console.log("[Form] Form data to submit:", data);
+        console.log("[Form] Form validation state:", {
           isValid: form.formState.isValid,
           isDirty: form.formState.isDirty,
           errors: form.formState.errors,
@@ -37,13 +45,13 @@ export const Form: React.FC<FormProps> = React.memo(
 
         try {
           await onSubmit(data);
-          console.log('[Form] Submit successful');
+          console.log("[Form] Submit successful");
         } catch (error) {
-          console.error('[Form] Submit failed:', error);
+          console.error("[Form] Submit failed:", error);
           throw error;
         }
       },
-      [onSubmit, id]
+      [onSubmit, id],
     );
 
     const handleFormSubmit = React.useCallback(
@@ -51,11 +59,11 @@ export const Form: React.FC<FormProps> = React.memo(
         e.preventDefault();
         return form.handleSubmit(handleSubmit)(e);
       },
-      [form, handleSubmit]
+      [form, handleSubmit],
     );
 
     const handleCancel = React.useCallback(() => {
-      console.log('[Form] Cancelled');
+      console.log("[Form] Cancelled");
       onCancel?.();
     }, [onCancel]);
 
@@ -66,17 +74,22 @@ export const Form: React.FC<FormProps> = React.memo(
         onSubmit={handleFormSubmit}
         noValidate
         sx={{
-          display: 'flex',
-          flexDirection: 'column',
+          display: "flex",
+          flexDirection: "column",
           gap: 2,
         }}
       >
         {children}
         {showButtons && (
-          <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ mt: 2 }}>
+          <Stack
+            direction="row"
+            spacing={2}
+            justifyContent="flex-end"
+            sx={{ mt: 2 }}
+          >
             {onCancel && (
               <Button onClick={handleCancel} variant="outlined">
-                {t('common.cancel')}
+                {t("common.cancel")}
               </Button>
             )}
             <Button type="submit" variant="contained" color="primary">
@@ -86,7 +99,7 @@ export const Form: React.FC<FormProps> = React.memo(
         )}
       </Box>
     );
-  }
+  },
 );
 
-Form.displayName = 'Form';
+Form.displayName = "Form";

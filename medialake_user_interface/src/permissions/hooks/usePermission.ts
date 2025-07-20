@@ -1,8 +1,8 @@
 // src/permissions/hooks/usePermission.ts
-import { useCallback } from 'react';
-import { usePermissionContext } from '../context/permission-context';
-import { globalPermissionCache } from '../utils/global-permission-cache';
-import { Actions, Subjects } from '../types/ability.types';
+import { useCallback } from "react";
+import { usePermissionContext } from "../context/permission-context";
+import { globalPermissionCache } from "../utils/global-permission-cache";
+import { Actions, Subjects } from "../types/ability.types";
 
 /**
  * Hook for checking permissions in components
@@ -23,8 +23,9 @@ export function usePermission() {
   const can = useCallback(
     (action: Actions, subject: Subjects | any, field?: string) => {
       // Generate a cache key based on the parameters
-      const subjectKey = typeof subject === 'string' ? subject : JSON.stringify(subject);
-      const cacheKey = `${action}:${subjectKey}:${field || ''}`;
+      const subjectKey =
+        typeof subject === "string" ? subject : JSON.stringify(subject);
+      const cacheKey = `${action}:${subjectKey}:${field || ""}`;
 
       // Check global cache first for performance
       const cachedResult = globalPermissionCache.getPermissionCheck(cacheKey);
@@ -40,7 +41,7 @@ export function usePermission() {
         // Cache the result in global cache
         globalPermissionCache.setPermissionCheck(cacheKey, result);
       } catch (error) {
-        console.error('Error during permission check:', error);
+        console.error("Error during permission check:", error);
         result = false;
         // Cache the failed result to avoid repeated errors
         globalPermissionCache.setPermissionCheck(cacheKey, result);
@@ -48,7 +49,7 @@ export function usePermission() {
 
       return result;
     },
-    [ability, loading]
+    [ability, loading],
   );
 
   /**
@@ -63,7 +64,7 @@ export function usePermission() {
     (action: Actions, subject: Subjects | any, field?: string) => {
       return !can(action, subject, field);
     },
-    [can]
+    [can],
   );
 
   return { ability, can, cannot, loading, error };
@@ -89,7 +90,7 @@ export function useSubjectPermission(subject: any) {
     (action: Actions, field?: string) => {
       return can(action, subject, field);
     },
-    [can, subject]
+    [can, subject],
   );
 
   /**
@@ -103,7 +104,7 @@ export function useSubjectPermission(subject: any) {
     (action: Actions, field?: string) => {
       return cannot(action, subject, field);
     },
-    [cannot, subject]
+    [cannot, subject],
   );
 
   return { can: canOnSubject, cannot: cannotOnSubject, loading, error };

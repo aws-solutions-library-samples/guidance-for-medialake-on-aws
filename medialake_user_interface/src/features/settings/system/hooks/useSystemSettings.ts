@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import {
   useSearchProvider,
   useCreateSearchProvider,
@@ -429,7 +429,7 @@ export const useSystemSettingsManager = () => {
         // Close the dialog after successful operation
         handleCloseDialog();
       } catch (error) {
-        console.error('Error configuring provider:', error);
+        console.error("Error configuring provider:", error);
       }
     }
   };
@@ -439,18 +439,18 @@ export const useSystemSettingsManager = () => {
     if (provider.id) {
       try {
         await updateProvider.mutateAsync({
-          apiKey: '',
+          apiKey: "",
           isEnabled: false,
         });
 
         setProvider({
           ...provider,
-          apiKey: '',
+          apiKey: "",
           isConfigured: false,
           isEnabled: false,
         });
       } catch (error) {
-        console.error('Error resetting provider:', error);
+        console.error("Error resetting provider:", error);
       }
     }
   };

@@ -21,7 +21,7 @@ export interface PipelineExecutionFilters {
   startDate?: string;
   endDate?: string;
   sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
+  sortOrder?: "asc" | "desc";
 }
 
 export interface PipelineExecutionsSearchMetadata {
