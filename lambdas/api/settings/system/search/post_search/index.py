@@ -92,13 +92,13 @@ def create_search_provider():
         embedding_store_response = None
         if "embeddingStore" in body:
             embedding_store_data = body["embeddingStore"]
-            
+
             # Validate embedding store type
             allowed_embedding_types = ["opensearch", "s3-vector"]
             embedding_type = embedding_store_data.get("type", "opensearch")
             if embedding_type not in allowed_embedding_types:
                 embedding_type = "opensearch"  # Default to opensearch if invalid
-            
+
             # Create embedding store record
             embedding_store_item = {
                 "PK": "SYSTEM_SETTINGS",
@@ -106,29 +106,26 @@ def create_search_provider():
                 "type": embedding_type,
                 "isEnabled": embedding_store_data.get("isEnabled", True),
                 "createdAt": now,
-                "updatedAt": now
+                "updatedAt": now,
             }
-            
+
             # Add config if provided
             if "config" in embedding_store_data:
                 embedding_store_item["config"] = embedding_store_data["config"]
-            
+
             # Save embedding store to DynamoDB
             system_settings_table.put_item(Item=embedding_store_item)
-            
+
             # Prepare embedding store for response
             embedding_store_response = {
                 "type": embedding_store_item["type"],
-                "isEnabled": embedding_store_item["isEnabled"]
+                "isEnabled": embedding_store_item["isEnabled"],
             }
             if "config" in embedding_store_item:
                 embedding_store_response["config"] = embedding_store_item["config"]
         else:
             # Default embedding store
-            embedding_store_response = {
-                "type": "opensearch",
-                "isEnabled": True
-            }
+            embedding_store_response = {"type": "opensearch", "isEnabled": True}
 
         # Remove DynamoDB specific attributes for response
         response_provider = search_provider.copy()
@@ -145,7 +142,7 @@ def create_search_provider():
             "message": "Search settings created successfully",
             "data": {
                 "searchProvider": response_provider,
-                "embeddingStore": embedding_store_response
+                "embeddingStore": embedding_store_response,
             },
         }
     except Exception as e:

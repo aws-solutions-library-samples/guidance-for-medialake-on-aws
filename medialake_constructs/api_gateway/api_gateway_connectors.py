@@ -54,11 +54,11 @@ class ConnectorsProps:
     pipelines_event_bus: str | None
     vpc_subnet_ids: str
     security_group_id: str
-    
+
     # S3 Vector Store configuration
     s3_vector_bucket_name: str
     s3_vector_index_name: str = "media-vectors"
-    
+
     # Optional fields
     api_resource: str | None = None
     cognito_authorizer: str | None = None

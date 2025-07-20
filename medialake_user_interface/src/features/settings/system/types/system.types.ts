@@ -17,14 +17,14 @@ export interface SearchProviderCreate {
   endpoint?: string;
   isEnabled?: boolean;
   embeddingStore?: {
-    type: 'opensearch' | 's3-vector';
+    type: "opensearch" | "s3-vector";
     isEnabled?: boolean;
     config?: object;
   };
 }
 
 export interface EmbeddingStore {
-  type: 'opensearch' | 's3-vector';
+  type: "opensearch" | "s3-vector";
   isEnabled: boolean;
   config?: {
     opensearchEndpoint?: string;
@@ -41,7 +41,7 @@ export interface SearchProviderUpdate {
   endpoint?: string;
   isEnabled?: boolean;
   embeddingStore?: {
-    type: 'opensearch' | 's3-vector';
+    type: "opensearch" | "s3-vector";
     isEnabled?: boolean;
     config?: object;
   };
@@ -51,11 +51,11 @@ export interface SearchProviderUpdate {
 export interface SemanticSearchSettings {
   isEnabled: boolean;
   provider: {
-    type: 'twelvelabs-api' | 'twelvelabs-bedrock';
+    type: "twelvelabs-api" | "twelvelabs-bedrock";
     config: SearchProvider | null;
   };
   embeddingStore: {
-    type: 'opensearch' | 's3-vector';
+    type: "opensearch" | "s3-vector";
   };
 }
 

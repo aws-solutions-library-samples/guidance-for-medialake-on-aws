@@ -15,7 +15,6 @@ from dynamodb_operations import (
 )
 from iam_operations import (
     create_lambda_role,
-    sanitize_role_name,
     wait_for_role_propagation,
 )
 
@@ -454,7 +453,9 @@ def create_lambda_function(
     zip_file_key = get_zip_file_key(IAC_ASSETS_BUCKET, zip_file_prefix)
 
     runtime = lambda_config["runtime"].lower()
-    role_arn = create_lambda_role(pipeline_name, node.data.id, yaml_data, operation_id, function_name)
+    role_arn = create_lambda_role(
+        pipeline_name, node.data.id, yaml_data, operation_id, function_name
+    )
 
     # Wait for the role to propagate before attempting to create the Lambda function
     try:
@@ -662,8 +663,10 @@ def create_lambda_function(
                             cf_match = re.match(
                                 r"^\${(AWS::Region|AWS::AccountId)}$", env_var_value
                             )
-                            
-                            logger.info(f"Processing parameter {param_key}={param_value}, env_var_value={env_var_value}")
+
+                            logger.info(
+                                f"Processing parameter {param_key}={param_value}, env_var_value={env_var_value}"
+                            )
                             logger.info(f"var_match: {var_match}, cf_match: {cf_match}")
 
                             if cf_match:
@@ -689,13 +692,17 @@ def create_lambda_function(
                             elif var_match:
                                 # Extract the variable name
                                 config_var_name = var_match.group(1)
-                                logger.info(f"Attempting to resolve variable: {config_var_name}")
+                                logger.info(
+                                    f"Attempting to resolve variable: {config_var_name}"
+                                )
                                 # Try to get the value from the config module
                                 import config
 
                                 if hasattr(config, config_var_name):
                                     config_value = getattr(config, config_var_name)
-                                    logger.info(f"Found config variable {config_var_name} with value: {config_value}")
+                                    logger.info(
+                                        f"Found config variable {config_var_name} with value: {config_value}"
+                                    )
                                     if config_value is not None:
                                         env_var_value = str(config_value)
                                         logger.info(
@@ -722,7 +729,7 @@ def create_lambda_function(
                                     break
                             else:
                                 env_var_value = ""
-                            
+
                             # Apply variable resolution to default values as well
                             if env_var_value:
                                 # Check for standard environment variables
@@ -733,10 +740,14 @@ def create_lambda_function(
                                 cf_match = re.match(
                                     r"^\${(AWS::Region|AWS::AccountId)}$", env_var_value
                                 )
-                                
-                                logger.info(f"Processing default parameter {param_key}={env_var_value}")
-                                logger.info(f"var_match: {var_match}, cf_match: {cf_match}")
-                                
+
+                                logger.info(
+                                    f"Processing default parameter {param_key}={env_var_value}"
+                                )
+                                logger.info(
+                                    f"var_match: {var_match}, cf_match: {cf_match}"
+                                )
+
                                 if cf_match:
                                     # Handle CloudFormation parameters
                                     cf_param = cf_match.group(1)
@@ -760,13 +771,17 @@ def create_lambda_function(
                                 elif var_match:
                                     # Extract the variable name
                                     config_var_name = var_match.group(1)
-                                    logger.info(f"Attempting to resolve default variable: {config_var_name}")
+                                    logger.info(
+                                        f"Attempting to resolve default variable: {config_var_name}"
+                                    )
                                     # Try to get the value from the config module
                                     import config
 
                                     if hasattr(config, config_var_name):
                                         config_value = getattr(config, config_var_name)
-                                        logger.info(f"Found config variable {config_var_name} with value: {config_value}")
+                                        logger.info(
+                                            f"Found config variable {config_var_name} with value: {config_value}"
+                                        )
                                         if config_value is not None:
                                             env_var_value = str(config_value)
                                             logger.info(

@@ -48,10 +48,10 @@ class AssetsProps:
     user_table: (
         dynamodb.Table
     )  # User table for bulk download jobs (replaces dedicated bulk download table)
-    
+
     # S3 Vector Store configuration
     s3_vector_bucket_name: str
-    
+
     # Optional fields (must come after required fields)
     vpc: Optional[ec2.IVpc] = None
     security_group: Optional[ec2.SecurityGroup] = None

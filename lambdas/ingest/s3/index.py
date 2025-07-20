@@ -468,51 +468,60 @@ class AssetProcessor:
             # List all vectors with metadata to filter by inventory_id
             vectors_to_delete = []
             next_token = None
-            
+
             while True:
                 list_params = {
                     "vectorBucketName": VECTOR_BUCKET_NAME,
                     "indexName": VECTOR_INDEX_NAME,
                     "returnMetadata": True,
-                    "maxResults": 500  # Process in batches
+                    "maxResults": 500,  # Process in batches
                 }
-                
+
                 if next_token:
                     list_params["nextToken"] = next_token
-                
+
                 response = s3_vector_client.list_vectors(**list_params)
                 vectors = response.get("vectors", [])
-                
+
                 # Filter vectors by inventory_id in metadata
                 for vector in vectors:
                     metadata = vector.get("metadata", {})
-                    if isinstance(metadata, dict) and metadata.get("inventory_id") == inventory_id:
+                    if (
+                        isinstance(metadata, dict)
+                        and metadata.get("inventory_id") == inventory_id
+                    ):
                         vectors_to_delete.append(vector["key"])
-                
+
                 next_token = response.get("nextToken")
                 if not next_token:
                     break
-            
+
             if not vectors_to_delete:
                 logger.info(f"No vectors found for inventory_id: {inventory_id}")
                 return 0
-            
+
             logger.info(
                 f"Found {len(vectors_to_delete)} vectors to delete for {inventory_id}",
-                extra={"keys": vectors_to_delete[:10]}  # Log first 10 keys for debugging
+                extra={
+                    "keys": vectors_to_delete[:10]
+                },  # Log first 10 keys for debugging
             )
-            
+
             # Batch delete vectors
             s3_vector_client.delete_vectors(
                 vectorBucketName=VECTOR_BUCKET_NAME,
                 indexName=VECTOR_INDEX_NAME,
-                keys=vectors_to_delete
+                keys=vectors_to_delete,
             )
-            
-            logger.info(f"Successfully deleted {len(vectors_to_delete)} vectors for {inventory_id}")
-            metrics.add_metric("VectorsDeleted", MetricUnit.Count, len(vectors_to_delete))
+
+            logger.info(
+                f"Successfully deleted {len(vectors_to_delete)} vectors for {inventory_id}"
+            )
+            metrics.add_metric(
+                "VectorsDeleted", MetricUnit.Count, len(vectors_to_delete)
+            )
             return len(vectors_to_delete)
-            
+
         except Exception as e:
             logger.error(f"S3 vector deletion failed for {inventory_id}: {e}")
             metrics.add_metric("VectorDeletionErrors", MetricUnit.Count, 1)
@@ -1508,7 +1517,9 @@ class AssetProcessor:
 
                             # Delete S3 vectors
                             vector_count = self.delete_s3_vectors(inventory_id)
-                            logger.info(f"Deleted {vector_count} vectors for asset {inventory_id}")
+                            logger.info(
+                                f"Deleted {vector_count} vectors for asset {inventory_id}"
+                            )
 
                             # Publish deletion event
                             self.publish_deletion_event(inventory_id)

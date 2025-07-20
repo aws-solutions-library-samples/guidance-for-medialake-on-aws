@@ -1,6 +1,6 @@
 // SystemSettingsPage.tsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -25,12 +25,16 @@ import {
   InputLabel,
   Card,
   CardContent,
-  Chip
-} from '@mui/material';
-import { useTranslation } from 'react-i18next';
-import { Edit as EditIcon, CheckCircle as CheckCircleIcon, Cancel as CancelIcon } from '@mui/icons-material';
-import { useSemanticSearchSettings } from '@/features/settings/system/hooks/useSystemSettings';
-import { SYSTEM_SETTINGS_CONFIG } from '@/features/settings/system/config';
+  Chip,
+} from "@mui/material";
+import { useTranslation } from "react-i18next";
+import {
+  Edit as EditIcon,
+  CheckCircle as CheckCircleIcon,
+  Cancel as CancelIcon,
+} from "@mui/icons-material";
+import { useSemanticSearchSettings } from "@/features/settings/system/hooks/useSystemSettings";
+import { SYSTEM_SETTINGS_CONFIG } from "@/features/settings/system/config";
 
 // Fallback notification hook
 const useNotificationWithFallback = () => {
@@ -44,13 +48,16 @@ const useNotificationWithFallback = () => {
   try {
     // Dynamic import to avoid SSR/client mismatch
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { useNotification } = require('@/shared/context/NotificationContext');
+    const { useNotification } = require("@/shared/context/NotificationContext");
     globalNotification = useNotification();
   } catch {
-    console.log('NotificationContext not available, using fallback');
+    console.log("NotificationContext not available, using fallback");
   }
 
-  const showNotification = (msg: string, sev: 'success' | 'info' | 'warning' | 'error' = 'info') => {
+  const showNotification = (
+    msg: string,
+    sev: "success" | "info" | "warning" | "error" = "info",
+  ) => {
     if (globalNotification) {
       globalNotification.showNotification(msg, sev);
     } else {
@@ -64,7 +71,14 @@ const useNotificationWithFallback = () => {
     setOpen(false);
   };
 
-  return { showNotification, hideNotification, open, message, severity, usingFallback: !globalNotification };
+  return {
+    showNotification,
+    hideNotification,
+    open,
+    message,
+    severity,
+    usingFallback: !globalNotification,
+  };
 };
 
 interface TabPanelProps {
@@ -73,16 +87,21 @@ interface TabPanelProps {
   value: number;
 }
 
-const TabPanel: React.FC<TabPanelProps> = ({ children, value, index, ...other }) => (
+const TabPanel: React.FC<TabPanelProps> = ({
+  children,
+  value,
+  index,
+  ...other
+}) => (
   <div
     role="tabpanel"
     hidden={value !== index}
     id={`settings-tabpanel-${index}`}
     aria-labelledby={`settings-tab-${index}`}
     {...other}
-    style={{ width: '100%', height: '100%' }}
+    style={{ width: "100%", height: "100%" }}
   >
-    {value === index && <Box sx={{ p: 3, height: '100%' }}>{children}</Box>}
+    {value === index && <Box sx={{ p: 3, height: "100%" }}>{children}</Box>}
   </div>
 );
 
@@ -131,17 +150,23 @@ const SystemSettingsPage: React.FC = () => {
     const ok = await handleSave();
     showNotification(
       ok
-        ? t('settings.systemSettings.search.saveSuccess', 'Settings saved successfully')
-        : t('settings.systemSettings.search.saveError', 'Failed to save settings'),
-      ok ? 'success' : 'error'
+        ? t(
+            "settings.systemSettings.search.saveSuccess",
+            "Settings saved successfully",
+          )
+        : t(
+            "settings.systemSettings.search.saveError",
+            "Failed to save settings",
+          ),
+      ok ? "success" : "error",
     );
   };
 
   const handleCancelSettings = () => {
     handleCancel();
     showNotification(
-      t('settings.systemSettings.search.cancelSuccess', 'Changes cancelled'),
-      'info'
+      t("settings.systemSettings.search.cancelSuccess", "Changes cancelled"),
+      "info",
     );
   };
 
@@ -149,37 +174,46 @@ const SystemSettingsPage: React.FC = () => {
     try {
       await handleSaveEmbeddingStore();
       showNotification(
-        t('settings.systemSettings.search.embeddingStoreSaveSuccess', 'Embedding store settings saved successfully'),
-        'success'
+        t(
+          "settings.systemSettings.search.embeddingStoreSaveSuccess",
+          "Embedding store settings saved successfully",
+        ),
+        "success",
       );
     } catch {
       showNotification(
-        t('settings.systemSettings.search.embeddingStoreSaveError', 'Failed to save embedding store settings'),
-        'error'
+        t(
+          "settings.systemSettings.search.embeddingStoreSaveError",
+          "Failed to save embedding store settings",
+        ),
+        "error",
       );
     }
   };
 
   useEffect(() => {
     if (isApiKeyDialogOpen) {
-      setApiKeyInput(settings.provider.config?.apiKey ?? '');
+      setApiKeyInput(settings.provider.config?.apiKey ?? "");
     }
   }, [isApiKeyDialogOpen, settings.provider.config, setApiKeyInput]);
 
   const onSaveApiKey = async () => {
     try {
       await handleSaveApiKey();
-      handleToggleChange(true);         // if this throws, we’ll catch below
+      handleToggleChange(true); // if this throws, we’ll catch below
       handleCloseApiKeyDialog();
       showNotification(
-        t('settings.systemSettings.search.apiKeySaveSuccess', 'API key saved'),
-        'success'
+        t("settings.systemSettings.search.apiKeySaveSuccess", "API key saved"),
+        "success",
       );
-      await handleSave();               // re‑persist the rest of your settings
+      await handleSave(); // re‑persist the rest of your settings
     } catch (err) {
       showNotification(
-        t('settings.systemSettings.search.apiKeySaveError', 'Failed to save API key'),
-        'error'
+        t(
+          "settings.systemSettings.search.apiKeySaveError",
+          "Failed to save API key",
+        ),
+        "error",
       );
     }
   };
@@ -241,10 +275,10 @@ const SystemSettingsPage: React.FC = () => {
             value={tabValue}
             onChange={handleTabChange}
             sx={{
-              height: '100%',
-              '& .MuiTab-root': {
-                alignItems: 'flex-start',
-                textAlign: 'left',
+              height: "100%",
+              "& .MuiTab-root": {
+                alignItems: "flex-start",
+                textAlign: "left",
                 pl: 3,
               },
             }}
@@ -270,39 +304,61 @@ const SystemSettingsPage: React.FC = () => {
             <Divider sx={{ my: 3 }} />
 
             {isLoading ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+              <Box sx={{ display: "flex", justifyContent: "center", my: 4 }}>
                 <CircularProgress />
               </Box>
             ) : error ? (
               <Alert severity="error" sx={{ my: 2 }}>
-                {t('settings.systemSettings.search.errorLoading', 'Error loading settings')}
+                {t(
+                  "settings.systemSettings.search.errorLoading",
+                  "Error loading settings",
+                )}
               </Alert>
             ) : (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 {/* 1. Semantic Search Enabled */}
-                <Card elevation={0} sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 2 }}>
+                <Card
+                  elevation={0}
+                  sx={{
+                    border: `1px solid ${theme.palette.divider}`,
+                    borderRadius: 2,
+                  }}
+                >
                   <CardContent>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                    >
                       <Box>
                         <Typography variant="h6" sx={{ mb: 1 }}>
-                          {t('settings.systemSettings.search.semanticEnabled', 'Semantic Search Enabled')}
+                          {t(
+                            "settings.systemSettings.search.semanticEnabled",
+                            "Semantic Search Enabled",
+                          )}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
                           {t(
-                            'settings.systemSettings.search.semanticEnabledDesc',
-                            'Enable or disable semantic search functionality'
+                            "settings.systemSettings.search.semanticEnabledDesc",
+                            "Enable or disable semantic search functionality",
                           )}
                         </Typography>
                       </Box>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 2 }}
+                      >
                         <Chip
-                          label={settings.isEnabled ? 'ON' : 'OFF'}
-                          color={settings.isEnabled ? 'success' : 'error'}
+                          label={settings.isEnabled ? "ON" : "OFF"}
+                          color={settings.isEnabled ? "success" : "error"}
                           size="small"
                         />
                         <Switch
                           checked={settings.isEnabled}
-                          onChange={(_evt, checked) => handleToggleChange(checked)}
+                          onChange={(_evt, checked) =>
+                            handleToggleChange(checked)
+                          }
                           disabled={!settings.provider.config?.isConfigured}
                           color="success"
                           size="medium"
@@ -323,46 +379,77 @@ const SystemSettingsPage: React.FC = () => {
                 >
                   <CardContent>
                     <Typography variant="h6" sx={{ mb: 2 }}>
-                      {t('settings.systemSettings.search.provider', 'Semantic Search Provider')}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                       {t(
-                        'settings.systemSettings.search.providerDesc',
-                        'Select the AI provider for semantic search capabilities'
+                        "settings.systemSettings.search.provider",
+                        "Semantic Search Provider",
                       )}
                     </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <FormControl sx={{ minWidth: 200 }} disabled={!settings.isEnabled}>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mb: 3 }}
+                    >
+                      {t(
+                        "settings.systemSettings.search.providerDesc",
+                        "Select the AI provider for semantic search capabilities",
+                      )}
+                    </Typography>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                      <FormControl
+                        sx={{ minWidth: 200 }}
+                        disabled={!settings.isEnabled}
+                      >
                         <InputLabel>
-                          {t('settings.systemSettings.search.selectProvider', 'Select Provider')}
+                          {t(
+                            "settings.systemSettings.search.selectProvider",
+                            "Select Provider",
+                          )}
                         </InputLabel>
                         <Select
                           value={settings.provider.type}
-                          label={t('settings.systemSettings.search.selectProvider', 'Select Provider')}
-                          onChange={(e) => handleProviderTypeChange(e.target.value as any)}
+                          label={t(
+                            "settings.systemSettings.search.selectProvider",
+                            "Select Provider",
+                          )}
+                          onChange={(e) =>
+                            handleProviderTypeChange(e.target.value as any)
+                          }
                         >
                           <MenuItem value="twelvelabs-api">
-                            {SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.name}
+                            {
+                              SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API
+                                .name
+                            }
                           </MenuItem>
                           <MenuItem value="twelvelabs-bedrock">
-                            {SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_BEDROCK.name}
+                            {
+                              SYSTEM_SETTINGS_CONFIG.PROVIDERS
+                                .TWELVE_LABS_BEDROCK.name
+                            }
                           </MenuItem>
                         </Select>
                       </FormControl>
-                      {settings.provider.type === 'twelvelabs-api' && settings.provider.config?.isConfigured && (
-                        <Button
-                          variant="outlined"
-                          startIcon={<EditIcon />}
-                          onClick={() => handleOpenApiKeyDialog(true)}
-                          disabled={!settings.isEnabled}
-                        >
-                          {t('settings.systemSettings.search.editApiKey', 'Edit')}
-                        </Button>
-                      )}
+                      {settings.provider.type === "twelvelabs-api" &&
+                        settings.provider.config?.isConfigured && (
+                          <Button
+                            variant="outlined"
+                            startIcon={<EditIcon />}
+                            onClick={() => handleOpenApiKeyDialog(true)}
+                            disabled={!settings.isEnabled}
+                          >
+                            {t(
+                              "settings.systemSettings.search.editApiKey",
+                              "Edit",
+                            )}
+                          </Button>
+                        )}
                       {settings.provider.config?.isConfigured && (
                         <Chip
                           icon={<CheckCircleIcon />}
-                          label={t('settings.systemSettings.search.configured', 'Configured')}
+                          label={t(
+                            "settings.systemSettings.search.configured",
+                            "Configured",
+                          )}
                           color="success"
                           variant="outlined"
                         />
@@ -382,28 +469,53 @@ const SystemSettingsPage: React.FC = () => {
                 >
                   <CardContent>
                     <Typography variant="h6" sx={{ mb: 2 }}>
-                      {t('settings.systemSettings.search.embeddingStore', 'Semantic Search Embedding Store')}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                       {t(
-                        'settings.systemSettings.search.embeddingStoreDesc',
-                        'Choose where to store and search vector embeddings'
+                        "settings.systemSettings.search.embeddingStore",
+                        "Semantic Search Embedding Store",
+                      )}
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mb: 3 }}
+                    >
+                      {t(
+                        "settings.systemSettings.search.embeddingStoreDesc",
+                        "Choose where to store and search vector embeddings",
                       )}
                     </Typography>
 
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <FormControl sx={{ minWidth: 200 }} disabled={!settings.isEnabled}>
-                        <InputLabel>{t('settings.systemSettings.search.selectStore', 'Select Store')}</InputLabel>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                      <FormControl
+                        sx={{ minWidth: 200 }}
+                        disabled={!settings.isEnabled}
+                      >
+                        <InputLabel>
+                          {t(
+                            "settings.systemSettings.search.selectStore",
+                            "Select Store",
+                          )}
+                        </InputLabel>
                         <Select
                           value={settings.embeddingStore.type}
                           label="Select Store"
-                          onChange={(e) => handleEmbeddingStoreChange(e.target.value as 'opensearch' | 's3-vector')}
+                          onChange={(e) =>
+                            handleEmbeddingStoreChange(
+                              e.target.value as "opensearch" | "s3-vector",
+                            )
+                          }
                         >
                           <MenuItem value="opensearch">
-                            {SYSTEM_SETTINGS_CONFIG.EMBEDDING_STORES.OPENSEARCH.name}
+                            {
+                              SYSTEM_SETTINGS_CONFIG.EMBEDDING_STORES.OPENSEARCH
+                                .name
+                            }
                           </MenuItem>
                           <MenuItem value="s3-vector">
-                            {SYSTEM_SETTINGS_CONFIG.EMBEDDING_STORES.S3_VECTOR.name}
+                            {
+                              SYSTEM_SETTINGS_CONFIG.EMBEDDING_STORES.S3_VECTOR
+                                .name
+                            }
                           </MenuItem>
                         </Select>
                       </FormControl>
@@ -412,9 +524,17 @@ const SystemSettingsPage: React.FC = () => {
                         variant="contained"
                         onClick={handleSaveEmbeddingStoreSettings}
                         disabled={!settings.isEnabled || isSaving}
-                        startIcon={isSaving ? <CircularProgress size={16} /> : <CheckCircleIcon />}
+                        startIcon={
+                          isSaving ? (
+                            <CircularProgress size={16} />
+                          ) : (
+                            <CheckCircleIcon />
+                          )
+                        }
                       >
-                        {isSaving ? t('common.saving', 'Saving...') : t('common.save', 'Save')}
+                        {isSaving
+                          ? t("common.saving", "Saving...")
+                          : t("common.save", "Save")}
                       </Button>
                     </Box>
                   </CardContent>
@@ -423,8 +543,8 @@ const SystemSettingsPage: React.FC = () => {
                 {/* Save & Cancel */}
                 <Box
                   sx={{
-                    display: 'flex',
-                    justifyContent: 'flex-end',
+                    display: "flex",
+                    justifyContent: "flex-end",
                     gap: 2,
                     mt: 4,
                     pt: 3,
@@ -437,15 +557,23 @@ const SystemSettingsPage: React.FC = () => {
                     disabled={!hasChanges || isSaving}
                     startIcon={<CancelIcon />}
                   >
-                    {t('common.cancel', 'Cancel')}
+                    {t("common.cancel", "Cancel")}
                   </Button>
                   <Button
                     variant="contained"
                     onClick={handleSaveSettings}
                     disabled={!hasChanges || isSaving}
-                    startIcon={isSaving ? <CircularProgress size={20} /> : <CheckCircleIcon />}
+                    startIcon={
+                      isSaving ? (
+                        <CircularProgress size={20} />
+                      ) : (
+                        <CheckCircleIcon />
+                      )
+                    }
                   >
-                    {isSaving ? t('common.saving', 'Saving...') : t('common.save', 'Save')}
+                    {isSaving
+                      ? t("common.saving", "Saving...")
+                      : t("common.save", "Save")}
                   </Button>
                 </Box>
               </Box>
@@ -455,26 +583,38 @@ const SystemSettingsPage: React.FC = () => {
       </Paper>
 
       {/* API Key Configuration Dialog */}
-      <Dialog open={isApiKeyDialogOpen} onClose={handleCloseApiKeyDialog} maxWidth="sm" fullWidth>
+      <Dialog
+        open={isApiKeyDialogOpen}
+        onClose={handleCloseApiKeyDialog}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>
           {isEditingApiKey
-            ? t('settings.systemSettings.search.editApiKey', 'Edit API Key')
-            : t('settings.systemSettings.search.configureApiKey', 'Configure API Key')}
+            ? t("settings.systemSettings.search.editApiKey", "Edit API Key")
+            : t(
+                "settings.systemSettings.search.configureApiKey",
+                "Configure API Key",
+              )}
         </DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             {t(
-              'settings.systemSettings.search.apiKeyDesc',
-              'Enter your Twelve Labs API key to enable semantic search functionality.'
+              "settings.systemSettings.search.apiKeyDesc",
+              "Enter your Twelve Labs API key to enable semantic search functionality.",
             )}
           </Typography>
           <TextField
-            label={t('settings.systemSettings.search.apiKey', 'API Key')}
+            label={t("settings.systemSettings.search.apiKey", "API Key")}
             value={apiKeyInput}
             onChange={(e) => setApiKeyInput(e.target.value)}
             fullWidth
             margin="normal"
-            type={isEditingApiKey && apiKeyInput === '••••••••••••••••' ? 'password' : 'text'}
+            type={
+              isEditingApiKey && apiKeyInput === "••••••••••••••••"
+                ? "password"
+                : "text"
+            }
             placeholder="Enter your API key"
             required
             autoFocus
@@ -482,7 +622,7 @@ const SystemSettingsPage: React.FC = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseApiKeyDialog}>
-            {t('common.cancel', 'Cancel')}
+            {t("common.cancel", "Cancel")}
           </Button>
           <Button
             onClick={onSaveApiKey}
@@ -490,7 +630,7 @@ const SystemSettingsPage: React.FC = () => {
             color="primary"
             disabled={!apiKeyInput}
           >
-            {t('common.save', 'Save')}
+            {t("common.save", "Save")}
           </Button>
         </DialogActions>
       </Dialog>

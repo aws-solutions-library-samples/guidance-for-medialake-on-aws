@@ -20,12 +20,12 @@ from medialake_constructs.shared_constructs.opensearch_managed_cluster import (
     OpenSearchCluster,
     OpenSearchClusterProps,
 )
+from medialake_constructs.shared_constructs.s3_logging import (
+    add_s3_access_logging_policy,
+)
 from medialake_constructs.shared_constructs.s3_vectors import (
     S3VectorCluster,
     S3VectorClusterProps,
-)
-from medialake_constructs.shared_constructs.s3_logging import (
-    add_s3_access_logging_policy,
 )
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
 from medialake_constructs.vpc import CustomVpc, CustomVpcProps
@@ -254,7 +254,7 @@ class BaseInfrastructureStack(Stack):
             "MediaLakeS3Vector",
             props=S3VectorClusterProps(
                 bucket_name=f"{config.resource_prefix}-vectors-{self.account}-{region}-{config.environment}",
-                vector_dimension=1024, 
+                vector_dimension=1024,
                 collection_indexes=[s3_vector_index_name],
                 vpc=self._vpc.vpc,
                 security_group=self._security_group,
@@ -309,7 +309,7 @@ class BaseInfrastructureStack(Stack):
                             allowed_origins=[
                                 "http://localhost:5173",
                                 "http://localhost:5174",
-                                "http://localhost:3000", 
+                                "http://localhost:3000",
                                 "http://localhost:8080",
                                 "https://*.cloudfront.net",
                             ],

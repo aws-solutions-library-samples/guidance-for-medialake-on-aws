@@ -175,22 +175,22 @@ def extract_framerate(container: Dict[str, Any]) -> Optional[float]:
         first_item = container["data"][0]
         if isinstance(first_item, dict) and first_item.get("framerate"):
             return first_item["framerate"]
-    
+
     itm = _item(container)
     if itm and itm.get("framerate"):
         return itm["framerate"]
-    
+
     data = container.get("data")
     if isinstance(data, dict) and data.get("framerate"):
         return data["framerate"]
-    
+
     m_itm = _map_item(container)
     if m_itm and m_itm.get("framerate"):
         return m_itm["framerate"]
-    
+
     if container.get("framerate"):
         return container["framerate"]
-    
+
     return None
 
 

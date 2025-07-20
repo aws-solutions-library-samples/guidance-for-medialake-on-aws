@@ -706,9 +706,9 @@ def create_lambda_iam_role(iam_client, role_name, kms_key_arn=None):
                     "s3vectors:ListVectors",
                     "s3vectors:GetVectors",
                     "s3vectors:DeleteVectors",
-                    "s3vectors:QueryVectors"
+                    "s3vectors:QueryVectors",
                 ],
-                "Resource": "*"
+                "Resource": "*",
             }
         ],
     }
@@ -723,7 +723,9 @@ def create_lambda_iam_role(iam_client, role_name, kms_key_arn=None):
         )
         logger.info(f"Attached S3 Vector Store policy to {role_name}")
     except Exception as e:
-        logger.error(f"Error attaching S3 Vector Store policy to role {role_name}: {str(e)}")
+        logger.error(
+            f"Error attaching S3 Vector Store policy to role {role_name}: {str(e)}"
+        )
         # Don't fail the entire operation for policy attachment issues
 
     return role["Role"]["Arn"]
@@ -1578,7 +1580,9 @@ def create_connector(createconnector: S3Connector) -> dict:
                         "REGION": bucket_region,
                         # S3 Vector Store configuration
                         "VECTOR_BUCKET_NAME": os.environ.get("VECTOR_BUCKET_NAME", ""),
-                        "VECTOR_INDEX_NAME": os.environ.get("VECTOR_INDEX_NAME", "media-vectors"),
+                        "VECTOR_INDEX_NAME": os.environ.get(
+                            "VECTOR_INDEX_NAME", "media-vectors"
+                        ),
                     }
                 },
                 "Layers": layers,  # Updated to include both custom and AWS SDK layers

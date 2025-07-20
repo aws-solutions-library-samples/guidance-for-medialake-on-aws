@@ -50,9 +50,12 @@ def update_search_provider():
                     "message": "embeddingStore must be an object",
                     "data": {},
                 }
-            
+
             allowed_embedding_types = ["opensearch", "s3-vector"]
-            if "type" in embedding_store and embedding_store["type"] not in allowed_embedding_types:
+            if (
+                "type" in embedding_store
+                and embedding_store["type"] not in allowed_embedding_types
+            ):
                 return {
                     "status": "error",
                     "message": f"Invalid embedding store type. Allowed types are: {', '.join(allowed_embedding_types)}",
@@ -147,36 +150,36 @@ def update_search_provider():
         updated_embedding_store = None
         if "embeddingStore" in body:
             embedding_store_data = body["embeddingStore"]
-            
+
             # Prepare embedding store record
             embedding_store_item = {
                 "PK": "SYSTEM_SETTINGS",
                 "SK": "EMBEDDING_STORE",
                 "type": embedding_store_data.get("type", "opensearch"),
                 "isEnabled": embedding_store_data.get("isEnabled", True),
-                "updatedAt": datetime.utcnow().isoformat()
+                "updatedAt": datetime.utcnow().isoformat(),
             }
-            
+
             # Add config if provided
             if "config" in embedding_store_data:
                 embedding_store_item["config"] = embedding_store_data["config"]
-            
+
             # Check if embedding store record exists
             existing_embedding_store = system_settings_table.get_item(
                 Key={"PK": "SYSTEM_SETTINGS", "SK": "EMBEDDING_STORE"}
             ).get("Item")
-            
+
             if not existing_embedding_store:
                 # Create new embedding store record
                 embedding_store_item["createdAt"] = embedding_store_item["updatedAt"]
-            
+
             # Update or create embedding store record
             system_settings_table.put_item(Item=embedding_store_item)
-            
+
             # Prepare embedding store for response
             updated_embedding_store = {
                 "type": embedding_store_item["type"],
-                "isEnabled": embedding_store_item["isEnabled"]
+                "isEnabled": embedding_store_item["isEnabled"],
             }
             if "config" in embedding_store_item:
                 updated_embedding_store["config"] = embedding_store_item["config"]
@@ -187,7 +190,7 @@ def update_search_provider():
                 Key={"PK": "SYSTEM_SETTINGS", "SK": "EMBEDDING_STORE"}
             )
             embedding_store = embedding_response.get("Item", {})
-            
+
             if embedding_store:
                 embedding_store.pop("PK", None)
                 embedding_store.pop("SK", None)
@@ -195,10 +198,7 @@ def update_search_provider():
                 embedding_store.pop("updatedAt", None)
                 updated_embedding_store = embedding_store
             else:
-                updated_embedding_store = {
-                    "type": "opensearch",
-                    "isEnabled": True
-                }
+                updated_embedding_store = {"type": "opensearch", "isEnabled": True}
 
         # Prepare response
         return {
@@ -206,7 +206,7 @@ def update_search_provider():
             "message": "Search settings updated successfully",
             "data": {
                 "searchProvider": updated_provider,
-                "embeddingStore": updated_embedding_store
+                "embeddingStore": updated_embedding_store,
             },
         }
     except Exception as e:

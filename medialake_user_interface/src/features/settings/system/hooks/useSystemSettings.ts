@@ -3,13 +3,13 @@ import {
   useSearchProvider,
   useCreateSearchProvider,
   useUpdateSearchProvider,
-} from '../api/systemHooks';
-import { 
-  SearchProvider, 
+} from "../api/systemHooks";
+import {
+  SearchProvider,
   SemanticSearchSettings,
-  SystemSettingsState
-} from '../types/system.types';
-import { SYSTEM_SETTINGS_CONFIG } from '../config';
+  SystemSettingsState,
+} from "../types/system.types";
+import { SYSTEM_SETTINGS_CONFIG } from "../config";
 
 // Function to check if semantic search is properly configured and enabled
 export const useSemanticSearchStatus = () => {
@@ -26,7 +26,7 @@ export const useSemanticSearchStatus = () => {
     isConfigured,
     isLoading,
     error,
-    providerData
+    providerData,
   };
 };
 
@@ -36,35 +36,35 @@ export const useSemanticSearchSettings = () => {
     current: {
       isEnabled: false,
       provider: {
-        type: 'twelvelabs-api',
-        config: null
+        type: "twelvelabs-api",
+        config: null,
       },
       embeddingStore: {
-        type: 'opensearch'
-      }
+        type: "opensearch",
+      },
     },
     original: {
       isEnabled: false,
       provider: {
-        type: 'twelvelabs-api',
-        config: null
+        type: "twelvelabs-api",
+        config: null,
       },
       embeddingStore: {
-        type: 'opensearch'
-      }
+        type: "opensearch",
+      },
     },
-    hasChanges: false
+    hasChanges: false,
   });
 
   const [isApiKeyDialogOpen, setIsApiKeyDialogOpen] = useState(false);
-  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [apiKeyInput, setApiKeyInput] = useState("");
   const [isEditingApiKey, setIsEditingApiKey] = useState(false);
 
   // Fetch the current search provider
-  const { 
-    data: providerData, 
-    isLoading: isProviderLoading, 
-    error: providerError 
+  const {
+    data: providerData,
+    isLoading: isProviderLoading,
+    error: providerError,
   } = useSearchProvider();
 
   // Mutations for creating and updating the provider
@@ -76,89 +76,97 @@ export const useSemanticSearchSettings = () => {
     if (providerData?.data?.searchProvider) {
       const fetchedProvider = providerData.data.searchProvider;
       const fetchedEmbeddingStore = providerData.data.embeddingStore;
-      const providerType = fetchedProvider.type === 'twelvelabs-bedrock' ? 'twelvelabs-bedrock' : 'twelvelabs-api';
-      
+      const providerType =
+        fetchedProvider.type === "twelvelabs-bedrock"
+          ? "twelvelabs-bedrock"
+          : "twelvelabs-api";
+
       const initialSettings: SemanticSearchSettings = {
         isEnabled: fetchedProvider.isEnabled || false,
         provider: {
           type: providerType,
           config: {
             ...fetchedProvider,
-            isConfigured: true
-          }
+            isConfigured: true,
+          },
         },
         embeddingStore: {
-          type: fetchedEmbeddingStore?.type || 'opensearch'
-        }
+          type: fetchedEmbeddingStore?.type || "opensearch",
+        },
       };
 
       setSettings({
         current: initialSettings,
         original: initialSettings,
-        hasChanges: false
+        hasChanges: false,
       });
     }
   }, [providerData]);
 
   // Check if current settings differ from original
   useEffect(() => {
-    const hasChanges = JSON.stringify(settings.current) !== JSON.stringify(settings.original);
-    setSettings(prev => ({
+    const hasChanges =
+      JSON.stringify(settings.current) !== JSON.stringify(settings.original);
+    setSettings((prev) => ({
       ...prev,
-      hasChanges
+      hasChanges,
     }));
   }, [settings.current, settings.original]);
 
   // Handle toggle change
   const handleToggleChange = (enabled: boolean) => {
-    setSettings(prev => ({
+    setSettings((prev) => ({
       ...prev,
       current: {
         ...prev.current,
-        isEnabled: enabled
-      }
+        isEnabled: enabled,
+      },
     }));
   };
 
   // Handle provider type change
-  const handleProviderTypeChange = (providerType: 'twelvelabs-api' | 'twelvelabs-bedrock') => {
-    if (providerType === 'twelvelabs-api') {
+  const handleProviderTypeChange = (
+    providerType: "twelvelabs-api" | "twelvelabs-bedrock",
+  ) => {
+    if (providerType === "twelvelabs-api") {
       // Open API key dialog for Twelve Labs API
       setIsEditingApiKey(false);
-      setApiKeyInput('');
+      setApiKeyInput("");
       setIsApiKeyDialogOpen(true);
     } else {
       // No API key needed for Bedrock
-      setSettings(prev => ({
+      setSettings((prev) => ({
         ...prev,
         current: {
           ...prev.current,
           provider: {
-            type: 'twelvelabs-bedrock',
+            type: "twelvelabs-bedrock",
             config: {
-              id: '',
+              id: "",
               name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_BEDROCK.name,
-              type: 'twelvelabs-bedrock',
-              apiKey: '',
+              type: "twelvelabs-bedrock",
+              apiKey: "",
               isConfigured: true,
-              isEnabled: true
-            }
-          }
-        }
+              isEnabled: true,
+            },
+          },
+        },
       }));
     }
   };
 
   // Handle embedding store change
-  const handleEmbeddingStoreChange = (storeType: 'opensearch' | 's3-vector') => {
-    setSettings(prev => ({
+  const handleEmbeddingStoreChange = (
+    storeType: "opensearch" | "s3-vector",
+  ) => {
+    setSettings((prev) => ({
       ...prev,
       current: {
         ...prev.current,
         embeddingStore: {
-          type: storeType
-        }
-      }
+          type: storeType,
+        },
+      },
     }));
   };
 
@@ -166,34 +174,36 @@ export const useSemanticSearchSettings = () => {
   const handleSaveEmbeddingStore = async () => {
     try {
       const { current } = settings;
-      
+
       // Build embedding store payload
       const embeddingStorePayload = {
         type: current.embeddingStore.type,
-        isEnabled: current.isEnabled
+        isEnabled: current.isEnabled,
       };
-      
+
       // Always use updateProvider to save embedding store settings
       await updateProvider.mutateAsync({
-        embeddingStore: embeddingStorePayload
+        embeddingStore: embeddingStorePayload,
       });
 
       // Update original embedding store to match current (changes saved)
-      setSettings(prev => ({
+      setSettings((prev) => ({
         ...prev,
         original: {
           ...prev.original,
-          embeddingStore: prev.current.embeddingStore
+          embeddingStore: prev.current.embeddingStore,
         },
-        hasChanges: JSON.stringify(prev.current) !== JSON.stringify({
-          ...prev.original,
-          embeddingStore: prev.current.embeddingStore
-        })
+        hasChanges:
+          JSON.stringify(prev.current) !==
+          JSON.stringify({
+            ...prev.original,
+            embeddingStore: prev.current.embeddingStore,
+          }),
       }));
 
       return true;
     } catch (error) {
-      console.error('Error saving embedding store settings:', error);
+      console.error("Error saving embedding store settings:", error);
       return false;
     }
   };
@@ -201,36 +211,41 @@ export const useSemanticSearchSettings = () => {
   // Handle API key dialog
   const handleOpenApiKeyDialog = (isEdit = false) => {
     setIsEditingApiKey(isEdit);
-    setApiKeyInput(isEdit && settings.current.provider.config?.apiKey ? '••••••••••••••••' : '');
+    setApiKeyInput(
+      isEdit && settings.current.provider.config?.apiKey
+        ? "••••••••••••••••"
+        : "",
+    );
     setIsApiKeyDialogOpen(true);
   };
 
   const handleCloseApiKeyDialog = () => {
     setIsApiKeyDialogOpen(false);
-    setApiKeyInput('');
+    setApiKeyInput("");
   };
 
   const handleSaveApiKey = () => {
-    if (apiKeyInput && apiKeyInput !== '••••••••••••••••') {
+    if (apiKeyInput && apiKeyInput !== "••••••••••••••••") {
       const providerConfig: SearchProvider = {
-        id: settings.current.provider.config?.id || '',
+        id: settings.current.provider.config?.id || "",
         name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.name,
-        type: 'twelvelabs',
+        type: "twelvelabs",
         apiKey: apiKeyInput,
-        endpoint: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.defaultEndpoint,
+        endpoint:
+          SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.defaultEndpoint,
         isConfigured: true,
-        isEnabled: true
+        isEnabled: true,
       };
 
-      setSettings(prev => ({
+      setSettings((prev) => ({
         ...prev,
         current: {
           ...prev.current,
           provider: {
-            type: 'twelvelabs-api',
-            config: providerConfig
-          }
-        }
+            type: "twelvelabs-api",
+            config: providerConfig,
+          },
+        },
       }));
     }
     handleCloseApiKeyDialog();
@@ -240,21 +255,24 @@ export const useSemanticSearchSettings = () => {
   const handleSave = async () => {
     try {
       const { current } = settings;
-      
+
       // Build embedding store payload
       const embeddingStorePayload = {
         type: current.embeddingStore.type,
-        isEnabled: current.isEnabled
+        isEnabled: current.isEnabled,
       };
-      
-      if (current.provider.config && current.provider.type === 'twelvelabs-api') {
+
+      if (
+        current.provider.config &&
+        current.provider.type === "twelvelabs-api"
+      ) {
         if (isEditingApiKey && current.provider.config.id) {
           // Update existing provider
           await updateProvider.mutateAsync({
             apiKey: current.provider.config.apiKey,
             endpoint: current.provider.config.endpoint,
             isEnabled: current.isEnabled,
-            embeddingStore: embeddingStorePayload
+            embeddingStore: embeddingStorePayload,
           });
         } else {
           // Create new provider
@@ -264,37 +282,37 @@ export const useSemanticSearchSettings = () => {
             apiKey: current.provider.config.apiKey,
             endpoint: current.provider.config.endpoint,
             isEnabled: current.isEnabled,
-            embeddingStore: embeddingStorePayload
+            embeddingStore: embeddingStorePayload,
           });
         }
-      } else if (current.provider.type === 'twelvelabs-bedrock') {
+      } else if (current.provider.type === "twelvelabs-bedrock") {
         // For Bedrock, we still need to save embedding store settings
         await updateProvider.mutateAsync({
           isEnabled: current.isEnabled,
-          embeddingStore: embeddingStorePayload
+          embeddingStore: embeddingStorePayload,
         });
       }
 
       // Update original to match current (changes saved)
-      setSettings(prev => ({
+      setSettings((prev) => ({
         ...prev,
         original: prev.current,
-        hasChanges: false
+        hasChanges: false,
       }));
 
       return true;
     } catch (error) {
-      console.error('Error saving settings:', error);
+      console.error("Error saving settings:", error);
       return false;
     }
   };
 
   // Handle cancel changes
   const handleCancel = () => {
-    setSettings(prev => ({
+    setSettings((prev) => ({
       ...prev,
       current: prev.original,
-      hasChanges: false
+      hasChanges: false,
     }));
   };
 
@@ -304,12 +322,12 @@ export const useSemanticSearchSettings = () => {
     hasChanges: settings.hasChanges,
     isLoading: isProviderLoading,
     error: providerError,
-    
+
     // Dialog state
     isApiKeyDialogOpen,
     apiKeyInput,
     isEditingApiKey,
-    
+
     // Handlers
     handleToggleChange,
     handleProviderTypeChange,
@@ -320,21 +338,21 @@ export const useSemanticSearchSettings = () => {
     handleSaveApiKey,
     handleSave,
     handleCancel,
-    
+
     // Mutations
     isSaving: createProvider.isPending || updateProvider.isPending,
-    
+
     // Dialog input handlers
-    setApiKeyInput
+    setApiKeyInput,
   };
 };
 
 export const useSystemSettingsManager = () => {
   const [provider, setProvider] = useState<SearchProvider>({
-    id: '',
+    id: "",
     name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.name,
     type: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.type,
-    apiKey: '',
+    apiKey: "",
     endpoint: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.defaultEndpoint,
     isConfigured: false,
     isEnabled: true,
@@ -342,9 +360,11 @@ export const useSystemSettingsManager = () => {
 
   const [isProviderDialogOpen, setIsProviderDialogOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [newProviderDetails, setNewProviderDetails] = useState<Partial<SearchProvider>>({
-    apiKey: '',
-    endpoint: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.defaultEndpoint
+  const [newProviderDetails, setNewProviderDetails] = useState<
+    Partial<SearchProvider>
+  >({
+    apiKey: "",
+    endpoint: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.defaultEndpoint,
   });
 
   // Fetch the current search provider
@@ -373,8 +393,9 @@ export const useSystemSettingsManager = () => {
   const handleAddProviderClick = () => {
     setIsEditMode(false);
     setNewProviderDetails({
-      apiKey: '',
-      endpoint: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.defaultEndpoint
+      apiKey: "",
+      endpoint:
+        SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.defaultEndpoint,
     });
     setIsProviderDialogOpen(true);
   };
@@ -383,8 +404,10 @@ export const useSystemSettingsManager = () => {
   const handleEditProviderClick = () => {
     setIsEditMode(true);
     setNewProviderDetails({
-      apiKey: provider.apiKey || '',
-      endpoint: provider.endpoint || SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.defaultEndpoint
+      apiKey: provider.apiKey || "",
+      endpoint:
+        provider.endpoint ||
+        SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.defaultEndpoint,
     });
     setIsProviderDialogOpen(true);
   };
@@ -420,7 +443,7 @@ export const useSystemSettingsManager = () => {
           await createProvider.mutateAsync({
             name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.name,
             type: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.type,
-            apiKey: newProviderDetails.apiKey || '',
+            apiKey: newProviderDetails.apiKey || "",
             endpoint: newProviderDetails.endpoint,
             isEnabled: true,
           });

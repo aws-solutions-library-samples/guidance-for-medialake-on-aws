@@ -72,7 +72,7 @@ class NodesStack(cdk.NestedStack):
         self.pyaml_layer = PyamlLayer(self, "PyamlLayer")
         self.ffprobe_layer = FFProbeLayer(self, "FFProbeLayer")
         self.resvgcli_layer = ResvgCliLayer(self, "ResvgCliLayer")
-       
+
         # Node Lambda Deployments
 
         self.check_media_convert_status_lambda_deployment = LambdaDeployment(
@@ -227,7 +227,6 @@ class NodesStack(cdk.NestedStack):
             destination_bucket=props.iac_bucket.bucket,
             parent_folder="nodes/utility",
             code_path=["lambdas", "nodes", "audio_splitter"],
-            
         )
 
         self.s3_vector_store_lambda_deployment = LambdaDeployment(
@@ -237,7 +236,6 @@ class NodesStack(cdk.NestedStack):
             parent_folder="nodes/utility",
             code_path=["lambdas", "nodes", "s3_vector_store"],
         )
-
 
         # Create DynamoDB table for nodes
         self._pipelines_nodes_table = DynamoDB(
@@ -333,7 +331,6 @@ class NodesStack(cdk.NestedStack):
                     "PYAML_LAYER_ARN": self.pyaml_layer.layer.layer_version_arn,
                     "FFPROBE_LAYER_ARN": self.ffprobe_layer.layer.layer_version_arn,
                     "RESVGCLI_LAYER_ARN": self.resvgcli_layer.layer.layer_version_arn,
-                  
                 },
             ),
         )

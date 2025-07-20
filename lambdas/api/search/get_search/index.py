@@ -7,7 +7,6 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 import boto3
-from api_utils import get_api_key
 from aws_lambda_powertools import Logger, Metrics
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
@@ -206,19 +205,19 @@ def build_search_query(params: SearchParams) -> Dict:
     if params.semantic:
         # Use embedding store factory for semantic search
         from embedding_store_factory import EmbeddingStoreFactory
-        
+
         factory = EmbeddingStoreFactory(logger, metrics)
         embedding_store = factory.create_embedding_store()
-        
+
         # Get the search result from the embedding store
         search_result = embedding_store.search(params)
-        
+
         # Return the result in a format that can be processed by perform_search
         result = {
             "embedding_store_result": search_result,
-            "store_type": factory.get_embedding_store_setting()
+            "store_type": factory.get_embedding_store_setting(),
         }
-        
+
         logger.info(
             f"[PERF] Total search query build time (semantic): {time.time() - start_time:.3f}s"
         )
@@ -930,24 +929,28 @@ def perform_search(params: SearchParams) -> Dict:
         if params.semantic and "embedding_store_result" in search_body:
             embedding_result = search_body["embedding_store_result"]
             store_type = search_body["store_type"]
-            
+
             logger.info(f"Using {store_type} embedding store for semantic search")
-            
+
             hits = embedding_result.hits
             total_results = embedding_result.total_results
             aggregations = embedding_result.aggregations
             suggestions = embedding_result.suggestions
-            
+
             logger.info(
                 f"{store_type} returned {len(hits)} hits from {total_results} total"
             )
         else:
             # Regular OpenSearch query
-            logger.info("Executing OpenSearch query", extra={"semantic": params.semantic})
+            logger.info(
+                "Executing OpenSearch query", extra={"semantic": params.semantic}
+            )
             opensearch_start = time.time()
             response = client.search(body=search_body, index=index_name)
             opensearch_time = time.time() - opensearch_start
-            logger.info(f"[PERF] OpenSearch query execution took: {opensearch_time:.3f}s")
+            logger.info(
+                f"[PERF] OpenSearch query execution took: {opensearch_time:.3f}s"
+            )
 
             hits = response.get("hits", {}).get("hits", [])
             total_results = response["hits"]["total"]["value"]
@@ -963,7 +966,9 @@ def perform_search(params: SearchParams) -> Dict:
                 # Check if we're using S3 Vector Store which already processes clips
                 store_type = search_body.get("store_type", "")
                 if store_type == "s3-vector":
-                    logger.info("Using S3 Vector Store - clips already processed, processing individual hits for UI format")
+                    logger.info(
+                        "Using S3 Vector Store - clips already processed, processing individual hits for UI format"
+                    )
                     semantic_processing_start = time.time()
                     # S3 Vector Store already has clips grouped, just process each hit for UI format while preserving clips
                     processed_results = []
@@ -978,7 +983,9 @@ def perform_search(params: SearchParams) -> Dict:
                         f"[PERF] S3 Vector results processing took: {time.time() - semantic_processing_start:.3f}s"
                     )
                 else:
-                    logger.info("Using OpenSearch - processing clips with process_semantic_results_parallel")
+                    logger.info(
+                        "Using OpenSearch - processing clips with process_semantic_results_parallel"
+                    )
                     semantic_processing_start = time.time()
                     processed_results = process_semantic_results_parallel(hits)
                     logger.info(

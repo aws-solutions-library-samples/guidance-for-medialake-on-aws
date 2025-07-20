@@ -68,7 +68,9 @@ def translate_event_to_request(response_body_and_event):
     try:
         assets = event.get("payload", {}).get("assets", [])
         if assets:
-            embedded_metadata = assets[0].get("Metadata", {}).get("EmbeddedMetadata", {})
+            embedded_metadata = (
+                assets[0].get("Metadata", {}).get("EmbeddedMetadata", {})
+            )
             general_metadata = embedded_metadata.get("general", {})
             framerate_str = general_metadata.get("FrameRate")
             if framerate_str:

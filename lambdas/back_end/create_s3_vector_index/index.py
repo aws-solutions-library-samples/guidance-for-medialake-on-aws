@@ -1,7 +1,6 @@
 import json
 import os
 import time
-import uuid
 
 import boto3
 from lambda_utils import lambda_handler_decorator, logger
@@ -18,20 +17,17 @@ def vector_bucket_exists(s3_vector_client, bucket_name: str) -> bool:
         response = s3_vector_client.get_vector_bucket(vectorBucketName=bucket_name)
         logger.info(
             "Vector bucket exists",
-            extra={"bucket_name": bucket_name, "response": response}
+            extra={"bucket_name": bucket_name, "response": response},
         )
         return True
     except s3_vector_client.exceptions.NotFoundException:
-        logger.info(
-            "Vector bucket does not exist",
-            extra={"bucket_name": bucket_name}
-        )
+        logger.info("Vector bucket does not exist", extra={"bucket_name": bucket_name})
         return False
     except Exception as e:
         logger.error(
             "Error checking vector bucket existence",
             extra={"bucket_name": bucket_name, "error": str(e)},
-            exc_info=True
+            exc_info=True,
         )
         raise
 
@@ -42,22 +38,21 @@ def index_exists(s3_vector_client, bucket_name: str, index_name: str) -> bool:
     """
     try:
         response = s3_vector_client.get_index(
-            vectorBucketName=bucket_name,
-            indexName=index_name
+            vectorBucketName=bucket_name, indexName=index_name
         )
         logger.info(
             "Vector index exists",
             extra={
                 "bucket_name": bucket_name,
                 "index_name": index_name,
-                "response": response
-            }
+                "response": response,
+            },
         )
         return True
     except s3_vector_client.exceptions.NotFoundException:
         logger.info(
             "Vector index does not exist",
-            extra={"bucket_name": bucket_name, "index_name": index_name}
+            extra={"bucket_name": bucket_name, "index_name": index_name},
         )
         return False
     except Exception as e:
@@ -66,9 +61,9 @@ def index_exists(s3_vector_client, bucket_name: str, index_name: str) -> bool:
             extra={
                 "bucket_name": bucket_name,
                 "index_name": index_name,
-                "error": str(e)
+                "error": str(e),
             },
-            exc_info=True
+            exc_info=True,
         )
         raise
 
@@ -79,17 +74,16 @@ def delete_index(s3_vector_client, bucket_name: str, index_name: str) -> None:
     """
     try:
         s3_vector_client.delete_index(
-            vectorBucketName=bucket_name,
-            indexName=index_name
+            vectorBucketName=bucket_name, indexName=index_name
         )
         logger.info(
             "Vector index deleted",
-            extra={"bucket_name": bucket_name, "index_name": index_name}
+            extra={"bucket_name": bucket_name, "index_name": index_name},
         )
     except s3_vector_client.exceptions.NotFoundException:
         logger.info(
             "Vector index did not exist during deletion",
-            extra={"bucket_name": bucket_name, "index_name": index_name}
+            extra={"bucket_name": bucket_name, "index_name": index_name},
         )
     except Exception as e:
         logger.error(
@@ -97,9 +91,9 @@ def delete_index(s3_vector_client, bucket_name: str, index_name: str) -> None:
             extra={
                 "bucket_name": bucket_name,
                 "index_name": index_name,
-                "error": str(e)
+                "error": str(e),
             },
-            exc_info=True
+            exc_info=True,
         )
         raise
 
@@ -119,7 +113,7 @@ def wait_for_index_deletion(
         if not index_exists(s3_vector_client, bucket_name, index_name):
             logger.info(
                 "Index confirmed deleted",
-                extra={"bucket_name": bucket_name, "index_name": index_name}
+                extra={"bucket_name": bucket_name, "index_name": index_name},
             )
             return
         time.sleep(interval)
@@ -136,27 +130,20 @@ def create_vector_bucket(s3_vector_client, bucket_name: str, region: str) -> boo
         # Check if bucket already exists
         if vector_bucket_exists(s3_vector_client, bucket_name):
             logger.info(
-                "Vector bucket already exists",
-                extra={"bucket_name": bucket_name}
+                "Vector bucket already exists", extra={"bucket_name": bucket_name}
             )
             return True
 
         # Create the vector bucket
-        encryption_config = {
-            "sseType": "AES256"  # Using AES256 encryption
-        }
+        encryption_config = {"sseType": "AES256"}  # Using AES256 encryption
 
         response = s3_vector_client.create_vector_bucket(
-            vectorBucketName=bucket_name,
-            encryptionConfiguration=encryption_config
+            vectorBucketName=bucket_name, encryptionConfiguration=encryption_config
         )
 
         logger.info(
             "Vector bucket created successfully",
-            extra={
-                "bucket_name": bucket_name,
-                "response": response
-            }
+            extra={"bucket_name": bucket_name, "response": response},
         )
         return True
 
@@ -164,7 +151,7 @@ def create_vector_bucket(s3_vector_client, bucket_name: str, region: str) -> boo
         logger.error(
             "Failed to create vector bucket",
             extra={"bucket_name": bucket_name, "error": str(e)},
-            exc_info=True
+            exc_info=True,
         )
         raise
 
@@ -175,7 +162,7 @@ def create_vector_index_with_retry(
     index_name: str,
     dimension: int,
     max_retries: int = 5,
-    recreate_if_exists: bool = True
+    recreate_if_exists: bool = True,
 ) -> bool:
     """
     Create S3 Vector index with retry logic and exponential backoff.
@@ -187,14 +174,14 @@ def create_vector_index_with_retry(
         if recreate_if_exists:
             logger.info(
                 "Index exists – deleting before recreation",
-                extra={"bucket_name": bucket_name, "index_name": index_name}
+                extra={"bucket_name": bucket_name, "index_name": index_name},
             )
             delete_index(s3_vector_client, bucket_name, index_name)
             wait_for_index_deletion(s3_vector_client, bucket_name, index_name)
         else:
             logger.info(
                 "Index already exists – skipping creation",
-                extra={"bucket_name": bucket_name, "index_name": index_name}
+                extra={"bucket_name": bucket_name, "index_name": index_name},
             )
             return True
 
@@ -203,8 +190,8 @@ def create_vector_index_with_retry(
         extra={
             "bucket_name": bucket_name,
             "index_name": index_name,
-            "dimension": dimension
-        }
+            "dimension": dimension,
+        },
     )
 
     for attempt in range(max_retries):
@@ -215,7 +202,7 @@ def create_vector_index_with_retry(
                 indexName=index_name,
                 dimension=dimension,
                 dataType="float32",  # Using float32 for embeddings
-                distanceMetric="cosine"  # Default distance metric
+                distanceMetric="cosine",  # Default distance metric
             )
 
             logger.info(
@@ -225,8 +212,8 @@ def create_vector_index_with_retry(
                     "index_name": index_name,
                     "dimension": dimension,
                     "attempt": attempt + 1,
-                    "response": response
-                }
+                    "response": response,
+                },
             )
             return True
 
@@ -239,25 +226,25 @@ def create_vector_index_with_retry(
                     "dimension": dimension,
                     "error": str(e),
                     "attempt": attempt + 1,
-                    "max_retries": max_retries
+                    "max_retries": max_retries,
                 },
-                exc_info=True
+                exc_info=True,
             )
 
             # Don't retry on certain errors
-            if hasattr(e, 'response') and e.response.get('Error', {}).get('Code') in [
-                'InvalidParameterValue',
-                'ValidationException'
+            if hasattr(e, "response") and e.response.get("Error", {}).get("Code") in [
+                "InvalidParameterValue",
+                "ValidationException",
             ]:
                 logger.error(
                     "Non-retryable error encountered",
-                    extra={"error_code": e.response.get('Error', {}).get('Code')}
+                    extra={"error_code": e.response.get("Error", {}).get("Code")},
                 )
                 break
 
         # Exponential backoff
         if attempt < max_retries - 1:
-            backoff_time = 2 ** attempt
+            backoff_time = 2**attempt
             logger.info(
                 "Retrying index creation after backoff",
                 extra={
@@ -265,8 +252,8 @@ def create_vector_index_with_retry(
                     "index_name": index_name,
                     "attempt": attempt + 1,
                     "max_retries": max_retries,
-                    "backoff_seconds": backoff_time
-                }
+                    "backoff_seconds": backoff_time,
+                },
             )
             time.sleep(backoff_time)
 
@@ -289,14 +276,16 @@ def handler(event, context):
 
     req_type = event.get("RequestType")
     if req_type not in ["Create", "Update"]:
-        logger.info("Skipping non-Create/Update request", extra={"RequestType": req_type})
+        logger.info(
+            "Skipping non-Create/Update request", extra={"RequestType": req_type}
+        )
         return {"statusCode": 200, "body": f"Skipped {req_type} request"}
 
     # Determine if we should recreate existing resources
     recreate_if_exists = req_type == "Create"
     logger.info(
         "Processing request",
-        extra={"RequestType": req_type, "recreate_if_exists": recreate_if_exists}
+        extra={"RequestType": req_type, "recreate_if_exists": recreate_if_exists},
     )
 
     # Environment variables
@@ -318,23 +307,20 @@ def handler(event, context):
             "bucket_name": bucket_name,
             "indexes": index_names,
             "region": region,
-            "vector_dimension": vector_dimension
-        }
+            "vector_dimension": vector_dimension,
+        },
     )
 
     # Initialize S3 Vector client using the custom boto3 SDK
     try:
         session = boto3.Session()
-        s3_vector_client = session.client(
-            "s3vectors",
-            region_name=region
-        )
+        s3_vector_client = session.client("s3vectors", region_name=region)
         logger.info("S3 Vector client initialized successfully")
     except Exception as e:
         logger.error(
             "Failed to initialize S3 Vector client",
             extra={"error": str(e)},
-            exc_info=True
+            exc_info=True,
         )
         raise
 
@@ -347,22 +333,19 @@ def handler(event, context):
         logger.error(
             "Vector bucket creation failed",
             extra={"bucket_name": bucket_name, "error": str(e)},
-            exc_info=True
+            exc_info=True,
         )
         raise
 
     # Create indexes
     indexes = index_names.split(",")
-    logger.info(
-        f"Creating {len(indexes)} vector indexes",
-        extra={"indexes": indexes}
-    )
+    logger.info(f"Creating {len(indexes)} vector indexes", extra={"indexes": indexes})
 
     for index_name in indexes:
         index_name = index_name.strip()
         logger.info(
             "Processing vector index",
-            extra={"bucket_name": bucket_name, "index_name": index_name}
+            extra={"bucket_name": bucket_name, "index_name": index_name},
         )
 
         success = create_vector_index_with_retry(
@@ -370,7 +353,7 @@ def handler(event, context):
             bucket_name,
             index_name,
             vector_dimension,
-            recreate_if_exists=recreate_if_exists
+            recreate_if_exists=recreate_if_exists,
         )
 
         if not success:
@@ -384,10 +367,12 @@ def handler(event, context):
     logger.info("Successfully created all vector indexes and bucket")
     return {
         "statusCode": 200,
-        "body": json.dumps({
-            "message": "All vector indexes and bucket created successfully",
-            "bucket_name": bucket_name,
-            "indexes": indexes,
-            "vector_dimension": vector_dimension
-        })
+        "body": json.dumps(
+            {
+                "message": "All vector indexes and bucket created successfully",
+                "bucket_name": bucket_name,
+                "indexes": indexes,
+                "vector_dimension": vector_dimension,
+            }
+        ),
     }

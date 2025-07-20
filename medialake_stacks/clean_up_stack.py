@@ -9,6 +9,7 @@ from constructs import Construct
 
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
+
 @dataclass
 class CleanupStackProps:
     pipelines_event_bus: events.EventBus
@@ -226,7 +227,9 @@ class CleanupStack(Stack):
                     "s3vectors:ListVectorBuckets",
                     "s3vectors:ListIndexes",
                 ],
-                resources=["*"],  # List operations require * resource per AWS API limitations
+                resources=[
+                    "*"
+                ],  # List operations require * resource per AWS API limitations
             )
         )
 

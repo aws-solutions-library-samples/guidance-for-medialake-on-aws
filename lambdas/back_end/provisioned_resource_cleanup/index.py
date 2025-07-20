@@ -28,8 +28,11 @@ def get_s3_vector_client():
         # Import custom boto3 from the layer for S3 Vector operations only
         # The custom boto3 layer will override the regular boto3 import within this function scope
         import boto3 as custom_boto3
+
         session = custom_boto3.Session()
-        client = session.client('s3vectors', region_name=os.environ.get('AWS_REGION', 'us-east-1'))
+        client = session.client(
+            "s3vectors", region_name=os.environ.get("AWS_REGION", "us-east-1")
+        )
         return client
     except Exception as e:
         logger.error(f"Failed to initialize S3 Vector client: {str(e)}")
@@ -41,22 +44,27 @@ def delete_s3_vector_indexes(client, bucket_name: str):
     try:
         # List all indexes in the bucket
         response = client.list_indexes(vectorBucketName=bucket_name)
-        indexes = response.get('indexes', [])
-        
+        indexes = response.get("indexes", [])
+
         for index in indexes:
-            index_name = index.get('indexName')
+            index_name = index.get("indexName")
             if index_name:
                 try:
                     client.delete_index(
-                        vectorBucketName=bucket_name,
-                        indexName=index_name
+                        vectorBucketName=bucket_name, indexName=index_name
                     )
-                    logger.info(f"Deleted S3 Vector index {index_name} from bucket {bucket_name}")
+                    logger.info(
+                        f"Deleted S3 Vector index {index_name} from bucket {bucket_name}"
+                    )
                 except Exception as e:
-                    logger.error(f"Failed to delete S3 Vector index {index_name}: {str(e)}")
-                    
+                    logger.error(
+                        f"Failed to delete S3 Vector index {index_name}: {str(e)}"
+                    )
+
     except Exception as e:
-        logger.error(f"Failed to list/delete S3 Vector indexes in bucket {bucket_name}: {str(e)}")
+        logger.error(
+            f"Failed to list/delete S3 Vector indexes in bucket {bucket_name}: {str(e)}"
+        )
 
 
 def delete_s3_vector_bucket(client, bucket_name: str):
@@ -64,14 +72,16 @@ def delete_s3_vector_bucket(client, bucket_name: str):
     try:
         # First delete all indexes in the bucket
         delete_s3_vector_indexes(client, bucket_name)
-        
+
         # Then delete the bucket
         client.delete_vector_bucket(vectorBucketName=bucket_name)
         logger.info(f"Deleted S3 Vector bucket {bucket_name}")
-        
+
     except Exception as e:
         if "NotFoundException" in str(e) or "NoSuchBucket" in str(e):
-            logger.warning(f"S3 Vector bucket {bucket_name} not found or already deleted")
+            logger.warning(
+                f"S3 Vector bucket {bucket_name} not found or already deleted"
+            )
         else:
             logger.error(f"Failed to delete S3 Vector bucket {bucket_name}: {str(e)}")
             raise
@@ -83,9 +93,11 @@ def cleanup_s3_vector_resources():
         # Get S3 Vector client
         s3_vector_client = get_s3_vector_client()
         if not s3_vector_client:
-            logger.warning("Could not initialize S3 Vector client, skipping S3 Vector cleanup")
+            logger.warning(
+                "Could not initialize S3 Vector client, skipping S3 Vector cleanup"
+            )
             return
-            
+
         # Get bucket name from environment or use default pattern
         vector_bucket_name = os.environ.get("VECTOR_BUCKET_NAME")
         if not vector_bucket_name:
@@ -93,10 +105,10 @@ def cleanup_s3_vector_resources():
             environment = os.environ.get("ENVIRONMENT", "dev")
             region = os.environ.get("AWS_REGION", "us-east-1")
             vector_bucket_name = f"medialake-vectors-{region}-{environment}"
-            
+
         logger.info(f"Cleaning up S3 Vector bucket: {vector_bucket_name}")
         delete_s3_vector_bucket(s3_vector_client, vector_bucket_name)
-        
+
     except Exception as e:
         logger.error(f"Error during S3 Vector cleanup: {str(e)}")
         # Don't raise the exception to avoid failing the entire cleanup process

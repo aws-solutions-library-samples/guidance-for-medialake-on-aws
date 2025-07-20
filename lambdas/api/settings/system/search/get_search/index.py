@@ -41,7 +41,9 @@ def get_search_provider():
             search_provider.pop("secretArn", None)
 
             # Add isConfigured flag if secretArn exists in the original item
-            search_provider["isConfigured"] = "secretArn" in provider_response.get("Item", {})
+            search_provider["isConfigured"] = "secretArn" in provider_response.get(
+                "Item", {}
+            )
 
         # Get embedding store settings
         embedding_response = system_settings_table.get_item(
@@ -56,10 +58,7 @@ def get_search_provider():
             embedding_store.pop("SK", None)
         else:
             # Default embedding store configuration
-            embedding_store = {
-                "type": "opensearch",
-                "isEnabled": True
-            }
+            embedding_store = {"type": "opensearch", "isEnabled": True}
 
         # Prepare response
         return {
@@ -76,7 +75,7 @@ def get_search_provider():
                         "isEnabled": False,
                     }
                 ),
-                "embeddingStore": embedding_store
+                "embeddingStore": embedding_store,
             },
         }
     except Exception as e:

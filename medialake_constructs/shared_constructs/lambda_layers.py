@@ -1,7 +1,7 @@
 import os
 from dataclasses import dataclass
 
-from aws_cdk import BundlingOptions, DockerImage, Stack, AssetHashType
+from aws_cdk import AssetHashType, BundlingOptions, DockerImage, Stack
 from aws_cdk import aws_lambda as lambda_
 from constructs import Construct
 
@@ -417,13 +417,12 @@ class ShortuuidLayer(Construct):
         return self.layer_version.layer
 
 
-
 # class CustomBoto3Layer(Construct):
 #     """
 #     A Lambda layer containing custom unreleased boto3 SDK.
 #     Uses wheel files for boto3 and botocore packages.
 #     """
-    
+
 #     def __init__(self, scope: Construct, id: str, **kwargs):
 #         super().__init__(scope, id, **kwargs)
 
@@ -463,20 +462,20 @@ class ShortuuidLayer(Construct):
 #                             "-c",
 #                             """
 #                             set -euo pipefail
-                            
+
 #                             # Install Python and pip
 #                             yum -y update && yum -y install python3 python3-pip
-                            
+
 #                             # Create layer directory structure
 #                             mkdir -p /asset-output/python
-                            
+
 #                             # Install custom boto3 and botocore wheels
 #                             pip3 install \
 #                                 lambdas/layers/custom_boto3/boto3-1.39.4-py3-none-any.whl \
 #                                 lambdas/layers/custom_boto3/botocore-1.39.4-py3-none-any.whl \
 #                                 --target /asset-output/python \
 #                                 --no-deps
-                            
+
 #                             # Clean up unnecessary files to reduce layer size
 #                             find /asset-output/python -type d -name "__pycache__" -exec rm -rf {} + || true
 #                             find /asset-output/python -name "*.pyc" -delete || true
@@ -486,6 +485,7 @@ class ShortuuidLayer(Construct):
 #                     ),
 #                 ),
 #             )
+
 
 class CommonLibrariesLayer(Construct):
     """
@@ -497,7 +497,15 @@ class CommonLibrariesLayer(Construct):
     directory structure by copying them into `/asset-output/python/`
     inside a container matching the Lambda Python 3.12 environment.
     """
-    def __init__(self, scope: Construct, id: str, *, entry: str = "lambdas/common_libraries", **kwargs):
+
+    def __init__(
+        self,
+        scope: Construct,
+        id: str,
+        *,
+        entry: str = "lambdas/common_libraries",
+        **kwargs,
+    ):
         super().__init__(scope, id, **kwargs)
 
         # Package the layer code from the source directory, hashing on

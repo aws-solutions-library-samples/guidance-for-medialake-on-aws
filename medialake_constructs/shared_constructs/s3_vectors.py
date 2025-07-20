@@ -4,15 +4,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional
 
-from aws_cdk import CfnOutput, CustomResource, RemovalPolicy, Stack
+from aws_cdk import CfnOutput, CustomResource, Stack
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_logs as logs
 from aws_cdk import custom_resources as cr
 from constructs import Construct
 
-from config import config
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
+
 
 @dataclass
 class S3VectorClusterProps:
@@ -24,9 +24,7 @@ class S3VectorClusterProps:
 
 
 class S3VectorCluster(Construct):
-    def __init__(
-        self, scope: Construct, id: str, props: S3VectorClusterProps
-    ) -> None:
+    def __init__(self, scope: Construct, id: str, props: S3VectorClusterProps) -> None:
         super().__init__(scope, id)
 
         stack = Stack.of(self)
@@ -46,8 +44,10 @@ class S3VectorCluster(Construct):
                 entry="lambdas/back_end/create_s3_vector_index",
                 lambda_handler="handler",
                 vpc=props.vpc,
-                security_groups=[props.security_group] if props.security_group else None,
-                timeout_minutes=5, 
+                security_groups=(
+                    [props.security_group] if props.security_group else None
+                ),
+                timeout_minutes=5,
                 environment_variables={
                     "VECTOR_BUCKET_NAME": self._bucket_name,
                     "INDEX_NAMES": ",".join(props.collection_indexes),
@@ -105,9 +105,9 @@ class S3VectorCluster(Construct):
         )
 
         # Generate hash of Lambda code for change detection
-        lambda_code = Path("lambdas/back_end/create_s3_vector_index/index.py").read_text(
-            encoding="utf-8"
-        )
+        lambda_code = Path(
+            "lambdas/back_end/create_s3_vector_index/index.py"
+        ).read_text(encoding="utf-8")
         code_hash = hashlib.sha256(lambda_code.encode()).hexdigest()
 
         # Create custom resource to trigger S3 Vector setup

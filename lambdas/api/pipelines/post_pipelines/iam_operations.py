@@ -589,7 +589,11 @@ def create_lambda_execution_policy(role_name: str, yaml_data: Dict[str, Any]) ->
 
 
 def create_lambda_role(
-    pipeline_name: str, node_id: str, yaml_data: Dict[str, Any], operation_id: str = "", lambda_function_name: str = ""
+    pipeline_name: str,
+    node_id: str,
+    yaml_data: Dict[str, Any],
+    operation_id: str = "",
+    lambda_function_name: str = "",
 ) -> str:
     """Create a Lambda execution role."""
     iam = boto3.client("iam")

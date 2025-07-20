@@ -202,7 +202,7 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
       // Convert parameters to Record format
       // Handle both array format and single object format
       let parameters = {};
-      
+
       if (Array.isArray(method.parameters)) {
         // Standard array format
         parameters = method.parameters.reduce((paramAcc, param) => {
@@ -210,9 +210,9 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
             name: param.name,
             label: param.label,
             type:
-              param.schema.type === 'string'
-                ? 'text'
-                : (param.schema.type as 'number' | 'boolean' | 'select'),
+              param.schema.type === "string"
+                ? "text"
+                : (param.schema.type as "number" | "boolean" | "select"),
             required: param.required || false,
             description: param.description,
           };
@@ -227,7 +227,7 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
             parameterData.defaultValue = (param as any).default;
             console.log(
               `[PipelineEditorPage] Found default value for ${param.name}:`,
-              (param as any).default
+              (param as any).default,
             );
           }
 
@@ -236,38 +236,50 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
             [param.name]: parameterData,
           };
         }, {});
-      } else if (method.parameters && typeof method.parameters === 'object') {
+      } else if (method.parameters && typeof method.parameters === "object") {
         // Single object format (like S3 Vector Store)
         const param = method.parameters as any;
-        const paramName = param.name || 'parameter';
-        
+        const paramName = param.name || "parameter";
+
         // Handle object type parameters with nested properties
-        if (param.schema && param.schema.type === 'object' && param.schema.properties) {
+        if (
+          param.schema &&
+          param.schema.type === "object" &&
+          param.schema.properties
+        ) {
           // For object parameters, create individual fields for each property
-          Object.entries(param.schema.properties).forEach(([propName, propSchema]: [string, any]) => {
-            const parameterData: any = {
-              name: propName,
-              label: propName.charAt(0).toUpperCase() + propName.slice(1),
-              type: propSchema.type === 'string' ? 'text' : (propSchema.type as 'number' | 'boolean' | 'select'),
-              required: param.schema.required?.includes(propName) || false,
-              description: propSchema.description || '',
-            };
+          Object.entries(param.schema.properties).forEach(
+            ([propName, propSchema]: [string, any]) => {
+              const parameterData: any = {
+                name: propName,
+                label: propName.charAt(0).toUpperCase() + propName.slice(1),
+                type:
+                  propSchema.type === "string"
+                    ? "text"
+                    : (propSchema.type as "number" | "boolean" | "select"),
+                required: param.schema.required?.includes(propName) || false,
+                description: propSchema.description || "",
+              };
 
-            // Add options if they exist in the schema
-            if (propSchema.options) {
-              parameterData.options = propSchema.options;
-            }
+              // Add options if they exist in the schema
+              if (propSchema.options) {
+                parameterData.options = propSchema.options;
+              }
 
-            parameters[propName] = parameterData;
-          });
+              parameters[propName] = parameterData;
+            },
+          );
         } else {
           // Single parameter
           const parameterData: any = {
             name: paramName,
             label: param.label || paramName,
-            type: param.schema?.type === 'string' ? 'text' : (param.schema?.type as 'number' | 'boolean' | 'select'),
+            type:
+              param.schema?.type === "string"
+                ? "text"
+                : (param.schema?.type as "number" | "boolean" | "select"),
             required: param.required || false,
-            description: param.description || param.schema?.description || '',
+            description: param.description || param.schema?.description || "",
           };
 
           // Add options if they exist in the schema
@@ -280,7 +292,7 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
             parameterData.defaultValue = param.default;
             console.log(
               `[PipelineEditorPage] Found default value for ${paramName}:`,
-              param.default
+              param.default,
             );
           }
 
@@ -356,21 +368,21 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
         //     };
       } else if (nodeType === "FLOW") {
         // For FLOW nodes, use the parameters from the method object directly
-        console.log('[PipelineEditorPage] Flow node action name:', method.name);
-        
+        console.log("[PipelineEditorPage] Flow node action name:", method.name);
+
         // Use the same parameter processing logic as above
         let flowParameters = {};
-        
+
         if (Array.isArray(method.parameters)) {
           flowParameters = method.parameters.reduce((paramAcc, param) => {
-            console.log('[PipelineEditorPage] Processing parameter:', param);
+            console.log("[PipelineEditorPage] Processing parameter:", param);
             const parameterData: any = {
               name: param.name,
               label: param.label || param.name,
               type:
-                param.schema?.type === 'string'
-                  ? 'text'
-                  : (param.schema?.type as 'number' | 'boolean' | 'select'),
+                param.schema?.type === "string"
+                  ? "text"
+                  : (param.schema?.type as "number" | "boolean" | "select"),
               required: param.required || false,
               description: param.description,
             };
@@ -380,39 +392,51 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
               parameterData.defaultValue = (param as any).default;
               console.log(
                 `[PipelineEditorPage] Found default value for ${param.name}:`,
-                (param as any).default
+                (param as any).default,
               );
             }
             return { ...paramAcc, [param.name]: parameterData };
           }, {});
-        } else if (method.parameters && typeof method.parameters === 'object') {
+        } else if (method.parameters && typeof method.parameters === "object") {
           // Handle single object format for FLOW nodes too
           const param = method.parameters as any;
-          const paramName = param.name || 'parameter';
-          
-          if (param.schema && param.schema.type === 'object' && param.schema.properties) {
-            Object.entries(param.schema.properties).forEach(([propName, propSchema]: [string, any]) => {
-              const parameterData: any = {
-                name: propName,
-                label: propName.charAt(0).toUpperCase() + propName.slice(1),
-                type: propSchema.type === 'string' ? 'text' : (propSchema.type as 'number' | 'boolean' | 'select'),
-                required: param.schema.required?.includes(propName) || false,
-                description: propSchema.description || '',
-              };
+          const paramName = param.name || "parameter";
 
-              if (propSchema.options) {
-                parameterData.options = propSchema.options;
-              }
+          if (
+            param.schema &&
+            param.schema.type === "object" &&
+            param.schema.properties
+          ) {
+            Object.entries(param.schema.properties).forEach(
+              ([propName, propSchema]: [string, any]) => {
+                const parameterData: any = {
+                  name: propName,
+                  label: propName.charAt(0).toUpperCase() + propName.slice(1),
+                  type:
+                    propSchema.type === "string"
+                      ? "text"
+                      : (propSchema.type as "number" | "boolean" | "select"),
+                  required: param.schema.required?.includes(propName) || false,
+                  description: propSchema.description || "",
+                };
 
-              flowParameters[propName] = parameterData;
-            });
+                if (propSchema.options) {
+                  parameterData.options = propSchema.options;
+                }
+
+                flowParameters[propName] = parameterData;
+              },
+            );
           } else {
             const parameterData: any = {
               name: paramName,
               label: param.label || paramName,
-              type: param.schema?.type === 'string' ? 'text' : (param.schema?.type as 'number' | 'boolean' | 'select'),
+              type:
+                param.schema?.type === "string"
+                  ? "text"
+                  : (param.schema?.type as "number" | "boolean" | "select"),
               required: param.required || false,
-              description: param.description || param.schema?.description || '',
+              description: param.description || param.schema?.description || "",
             };
 
             if (param.schema?.options) {
@@ -435,7 +459,11 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
         const config = {
           path: "",
           operationId: method.name,
-          parameters: Array.isArray(method.parameters) ? method.parameters : (method.parameters ? [method.parameters] : []),
+          parameters: Array.isArray(method.parameters)
+            ? method.parameters
+            : method.parameters
+              ? [method.parameters]
+              : [],
           requestMapping: (method as any).requestMapping || null,
           responseMapping: (method as any).responseMapping || null,
         };
@@ -447,7 +475,7 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
           ...acc,
           [method.name]: {
             name: method.name,
-            description: method.description || '',
+            description: method.description || "",
             parameters: flowParameters,
             config: config,
           },
@@ -1590,24 +1618,30 @@ const PipelineEditorContent = () => {
       // Determine whether configuration parameters exist
       const parameters = newReactFlowNode.data.configuration?.parameters;
       const hasParameters = parameters && Object.keys(parameters).length > 0;
-      
-      console.log('[PipelineEditorPage] Node configuration check:', {
+
+      console.log("[PipelineEditorPage] Node configuration check:", {
         nodeId: nodeData.id,
         nodeType: nodeData.type,
         configuration: newReactFlowNode.data.configuration,
         parameters: parameters,
         hasParameters: hasParameters,
-        parameterKeys: parameters ? Object.keys(parameters) : []
+        parameterKeys: parameters ? Object.keys(parameters) : [],
       });
 
       if (hasParameters) {
         // If parameters exist, open the configuration dialog
-        console.log('[PipelineEditorPage] Opening configuration dialog for node:', nodeData.id);
+        console.log(
+          "[PipelineEditorPage] Opening configuration dialog for node:",
+          nodeData.id,
+        );
         setSelectedNode(nodeWithHandlers);
         setIsNodeConfigOpen(true);
       } else {
         // No configuration needed—skip opening the dialog
-        console.log('[PipelineEditorPage] Node has no configuration parameters; skipping config dialog for:', nodeData.id);
+        console.log(
+          "[PipelineEditorPage] Node has no configuration parameters; skipping config dialog for:",
+          nodeData.id,
+        );
       }
 
       // setNodes((nds) => nds.concat(nodeWithHandlers));
