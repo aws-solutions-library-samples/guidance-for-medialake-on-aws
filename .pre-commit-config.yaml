@@ -6,7 +6,6 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
-        exclude: ^\.gitlab-ci\.yml$
       - id: check-added-large-files
         args: ["--maxkb=1000"]
       - id: check-merge-conflict
@@ -109,12 +108,3 @@ repos:
   #     - id: cfn-lint
   #       files: ^medialake\.template$
   #       args: [--ignore-checks, W]
-
-  # Custom hooks
-  - repo: local
-    hooks:
-      - id: remove-ds-store
-        name: Remove .DS_Store files
-        entry: find . -name .DS_Store -type f -delete
-        language: system
-        pass_filenames: false
