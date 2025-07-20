@@ -418,15 +418,21 @@ export default {
       title: "System Settings",
       tabs: {
         search: "Search",
+        regions: "Regions",
         notifications: "Notifications",
         security: "Security",
         performance: "Performance",
+      },
+      regions: {
+        title: "Regions",
+        description:
+          "Enable and disable regions that assets can be indexed from and pipelines can be deployed to.",
       },
       search: {
         title: "Search Configuration",
         description:
           "Configure the search provider for enhanced search capabilities across your media assets.",
-        provider: "Search Provider:",
+        provider: "Semantic Search Provider",
         configureProvider: "Configure Search Provider",
         editProvider: "Edit Provider",
         resetProvider: "Reset Provider",
@@ -437,6 +443,24 @@ export default {
         enabled: "Search Enabled",
         noProvider: "No search provider configured.",
         configurePrompt: "Configure Twelve Labs to enable search capabilities.",
+        semanticEnabled: "Semantic Search Enabled",
+        semanticEnabledDesc: "Enable or disable semantic search functionality",
+        providerDesc:
+          "Select the embedding provider for semantic search capabilities",
+        selectProvider: "Select Provider",
+        editApiKey: "Edit", // pragma: allowlist secret
+        configured: "Configured",
+        configureApiKey: "Configure API Key", // pragma: allowlist secret
+        apiKeyDesc:
+          "Enter your Twelve Labs API key to enable semantic search functionality.",
+        embeddingStore: "Semantic Search Embedding Store",
+        embeddingStoreDesc:
+          "Choose what embedding store to use for semantic searches",
+        selectStore: "Select Store",
+        saveSuccess: "Settings saved successfully",
+        saveError: "Failed to save settings",
+        cancelSuccess: "Changes cancelled",
+        errorLoading: "Error loading search provider configuration",
       },
       notifications: {
         title: "Notifications Settings",
@@ -463,6 +487,7 @@ export default {
     refresh: "Refresh",
     cancel: "Cancel",
     save: "Save",
+    saving: "Saving...",
     loading: "Loading...",
     loadMore: "Load More",
     tableDensity: "Table Density",

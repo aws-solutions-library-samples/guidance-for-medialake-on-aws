@@ -32,12 +32,33 @@ def update_search_provider():
         body = app.current_event.json_body
 
         # Manual validation of request body
-        allowed_fields = ["name", "apiKey", "endpoint", "isEnabled"]
+        allowed_fields = ["name", "apiKey", "endpoint", "isEnabled", "embeddingStore"]
         for field in body:
             if field not in allowed_fields:
                 return {
                     "status": "error",
                     "message": f"Invalid field: {field}. Allowed fields are: {', '.join(allowed_fields)}",
+                    "data": {},
+                }
+
+        # Validate embedding store if provided
+        if "embeddingStore" in body:
+            embedding_store = body["embeddingStore"]
+            if not isinstance(embedding_store, dict):
+                return {
+                    "status": "error",
+                    "message": "embeddingStore must be an object",
+                    "data": {},
+                }
+
+            allowed_embedding_types = ["opensearch", "s3-vector"]
+            if (
+                "type" in embedding_store
+                and embedding_store["type"] not in allowed_embedding_types
+            ):
+                return {
+                    "status": "error",
+                    "message": f"Invalid embedding store type. Allowed types are: {', '.join(allowed_embedding_types)}",
                     "data": {},
                 }
 
@@ -125,11 +146,68 @@ def update_search_provider():
             )  # Don't expose the secret ARN in the response
             updated_provider["isConfigured"] = True
 
+        # Handle embedding store update if provided
+        updated_embedding_store = None
+        if "embeddingStore" in body:
+            embedding_store_data = body["embeddingStore"]
+
+            # Prepare embedding store record
+            embedding_store_item = {
+                "PK": "SYSTEM_SETTINGS",
+                "SK": "EMBEDDING_STORE",
+                "type": embedding_store_data.get("type", "opensearch"),
+                "isEnabled": embedding_store_data.get("isEnabled", True),
+                "updatedAt": datetime.utcnow().isoformat(),
+            }
+
+            # Add config if provided
+            if "config" in embedding_store_data:
+                embedding_store_item["config"] = embedding_store_data["config"]
+
+            # Check if embedding store record exists
+            existing_embedding_store = system_settings_table.get_item(
+                Key={"PK": "SYSTEM_SETTINGS", "SK": "EMBEDDING_STORE"}
+            ).get("Item")
+
+            if not existing_embedding_store:
+                # Create new embedding store record
+                embedding_store_item["createdAt"] = embedding_store_item["updatedAt"]
+
+            # Update or create embedding store record
+            system_settings_table.put_item(Item=embedding_store_item)
+
+            # Prepare embedding store for response
+            updated_embedding_store = {
+                "type": embedding_store_item["type"],
+                "isEnabled": embedding_store_item["isEnabled"],
+            }
+            if "config" in embedding_store_item:
+                updated_embedding_store["config"] = embedding_store_item["config"]
+
+        # Get current embedding store if not updated
+        if updated_embedding_store is None:
+            embedding_response = system_settings_table.get_item(
+                Key={"PK": "SYSTEM_SETTINGS", "SK": "EMBEDDING_STORE"}
+            )
+            embedding_store = embedding_response.get("Item", {})
+
+            if embedding_store:
+                embedding_store.pop("PK", None)
+                embedding_store.pop("SK", None)
+                embedding_store.pop("createdAt", None)
+                embedding_store.pop("updatedAt", None)
+                updated_embedding_store = embedding_store
+            else:
+                updated_embedding_store = {"type": "opensearch", "isEnabled": True}
+
         # Prepare response
         return {
             "status": "success",
-            "message": "Search provider updated successfully",
-            "data": {"searchProvider": updated_provider},
+            "message": "Search settings updated successfully",
+            "data": {
+                "searchProvider": updated_provider,
+                "embeddingStore": updated_embedding_store,
+            },
         }
     except Exception as e:
         logger.exception("Error updating search provider")

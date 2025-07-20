@@ -52,6 +52,10 @@ class ApiGatewayPipelinesProps:
     mediaconvert_role_arn: str = None
     vpc: Optional[ec2.IVpc] = None
     security_group: Optional[ec2.SecurityGroup] = None
+    # S3 Vector configuration
+    s3_vector_bucket_name: str = None
+    s3_vector_index_name: str = "media-vectors"
+    s3_vector_dimension: int = 1024
 
 
 class ApiGatewayPipelinesConstruct(Construct):
@@ -270,6 +274,10 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "ACCOUNT_ID": self.account_id,
                 "POWERTOOLS_LAYER_ARN": powertools_layer.layer.layer_version_arn,
                 "COMMON_LIBRARIES_LAYER_ARN": common_libraries_layer.layer.layer_version_arn,
+                # S3 Vector configuration
+                "VECTOR_BUCKET_NAME": props.s3_vector_bucket_name,
+                "INDEX_NAME": props.s3_vector_index_name,
+                "VECTOR_DIMENSION": str(props.s3_vector_dimension),
             },
         )
 

@@ -54,6 +54,12 @@ class ConnectorsProps:
     pipelines_event_bus: str | None
     vpc_subnet_ids: str
     security_group_id: str
+
+    # S3 Vector Store configuration
+    s3_vector_bucket_name: str
+    s3_vector_index_name: str = "media-vectors"
+
+    # Optional fields
     api_resource: str | None = None
     cognito_authorizer: str | None = None
     x_origin_verify_secret: secretsmanager.Secret | None = None
@@ -415,6 +421,9 @@ class ConnectorsConstruct(Construct):
             "INDEX_NAME": props.opensearch_index,
             "OPENSEARCH_VPC_SUBNET_IDS": props.vpc_subnet_ids,
             "OPENSEARCH_SECURITY_GROUP_ID": props.security_group_id,
+            # S3 Vector Store configuration
+            "VECTOR_BUCKET_NAME": props.s3_vector_bucket_name,
+            "VECTOR_INDEX_NAME": props.s3_vector_index_name,
         }
 
         connector_s3_post_lambda = Lambda(
@@ -556,6 +565,22 @@ class ConnectorsConstruct(Construct):
                     "iam:GetRole",
                 ],
                 resources=[f"arn:aws:iam::{account_id}:role/*"],
+            )
+        )
+
+        # Add S3 Vector Store permissions for connector S3 post Lambda
+        connector_s3_post_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3vectors:ListVectors",
+                    "s3vectors:GetVectors",  # Required when returnMetadata=True
+                    "s3vectors:DeleteVectors",
+                    "s3vectors:QueryVectors",
+                ],
+                resources=[
+                    f"arn:aws:s3vectors:{Stack.of(self).region}:{Stack.of(self).account}:bucket/{props.s3_vector_bucket_name}",
+                    f"arn:aws:s3vectors:{Stack.of(self).region}:{Stack.of(self).account}:bucket/{props.s3_vector_bucket_name}/*",
+                ],
             )
         )
 

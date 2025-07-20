@@ -28,6 +28,10 @@ OPENSEARCH_INDEX = os.environ.get("INDEX_NAME", "media")
 OPENSEARCH_SERVICE = os.environ.get("OPENSEARCH_SERVICE", "es")
 AWS_REGION = os.environ.get("REGION", "")
 
+# S3 Vector Store configuration
+VECTOR_BUCKET_NAME = os.environ.get("VECTOR_BUCKET_NAME", "")
+VECTOR_INDEX_NAME = os.environ.get("VECTOR_INDEX_NAME", "media-vectors")
+
 # Re-use boto3’s session credentials
 _session = boto3.Session()
 _credentials = _session.get_credentials()
@@ -37,6 +41,7 @@ s3_client = None
 dynamodb_resource = None
 dynamodb_client = None
 eventbridge_client = None
+s3_vector_client = None
 
 # Environment configuration
 DO_NOT_INGEST_DUPLICATES = (
@@ -79,7 +84,7 @@ s3_config = Config(
 
 def initialize_global_clients():
     """Initialize global AWS clients for container reuse"""
-    global s3_client, dynamodb_resource, dynamodb_client, eventbridge_client
+    global s3_client, dynamodb_resource, dynamodb_client, eventbridge_client, s3_vector_client
 
     if s3_client is None:
         s3_client = boto3.client("s3", config=s3_config)
@@ -96,6 +101,14 @@ def initialize_global_clients():
     if eventbridge_client is None:
         eventbridge_client = boto3.client("events")
         logger.info("Initialized global EventBridge client")
+
+    if s3_vector_client is None and VECTOR_BUCKET_NAME:
+        try:
+            s3_vector_client = boto3.client("s3vectors", region_name=AWS_REGION)
+            logger.info("Initialized global S3 Vector Store client")
+        except Exception as e:
+            logger.warning(f"Failed to initialize S3 Vector Store client: {e}")
+            s3_vector_client = None
 
 
 # Improved JSON serialization
@@ -441,6 +454,79 @@ class AssetProcessor:
             metrics.add_metric(
                 name="OpenSearchDocsDeleted", unit=MetricUnit.Count, value=deleted
             )
+
+    def delete_s3_vectors(self, inventory_id: str) -> int:
+        """
+        Delete S3 vectors associated with inventory_id.
+        Uses metadata filtering to find all vectors for the asset.
+        """
+        if not VECTOR_BUCKET_NAME or not s3_vector_client:
+            logger.info("S3 Vector Store not configured – skipping vector deletion")
+            return 0
+
+        try:
+            # List all vectors with metadata to filter by inventory_id
+            vectors_to_delete = []
+            next_token = None
+
+            while True:
+                list_params = {
+                    "vectorBucketName": VECTOR_BUCKET_NAME,
+                    "indexName": VECTOR_INDEX_NAME,
+                    "returnMetadata": True,
+                    "maxResults": 500,  # Process in batches
+                }
+
+                if next_token:
+                    list_params["nextToken"] = next_token
+
+                response = s3_vector_client.list_vectors(**list_params)
+                vectors = response.get("vectors", [])
+
+                # Filter vectors by inventory_id in metadata
+                for vector in vectors:
+                    metadata = vector.get("metadata", {})
+                    if (
+                        isinstance(metadata, dict)
+                        and metadata.get("inventory_id") == inventory_id
+                    ):
+                        vectors_to_delete.append(vector["key"])
+
+                next_token = response.get("nextToken")
+                if not next_token:
+                    break
+
+            if not vectors_to_delete:
+                logger.info(f"No vectors found for inventory_id: {inventory_id}")
+                return 0
+
+            logger.info(
+                f"Found {len(vectors_to_delete)} vectors to delete for {inventory_id}",
+                extra={
+                    "keys": vectors_to_delete[:10]
+                },  # Log first 10 keys for debugging
+            )
+
+            # Batch delete vectors
+            s3_vector_client.delete_vectors(
+                vectorBucketName=VECTOR_BUCKET_NAME,
+                indexName=VECTOR_INDEX_NAME,
+                keys=vectors_to_delete,
+            )
+
+            logger.info(
+                f"Successfully deleted {len(vectors_to_delete)} vectors for {inventory_id}"
+            )
+            metrics.add_metric(
+                "VectorsDeleted", MetricUnit.Count, len(vectors_to_delete)
+            )
+            return len(vectors_to_delete)
+
+        except Exception as e:
+            logger.error(f"S3 vector deletion failed for {inventory_id}: {e}")
+            metrics.add_metric("VectorDeletionErrors", MetricUnit.Count, 1)
+            # Don't raise - vector deletion failure shouldn't block asset deletion
+            return 0
 
     @contextmanager
     def asset_context(self, asset_id=None, inventory_id=None):
@@ -1397,6 +1483,10 @@ class AssetProcessor:
                 # Delete associated OpenSearch docs
                 self.delete_opensearch_docs(inventory_id)
 
+                # Delete S3 vectors
+                vector_count = self.delete_s3_vectors(inventory_id)
+                logger.info(f"Deleted {vector_count} vectors for asset {inventory_id}")
+
                 # Publish deletion event
                 self.publish_deletion_event(inventory_id)
 
@@ -1424,6 +1514,12 @@ class AssetProcessor:
 
                             # Delete from DynamoDB
                             self.dynamodb.delete_item(Key={"InventoryID": inventory_id})
+
+                            # Delete S3 vectors
+                            vector_count = self.delete_s3_vectors(inventory_id)
+                            logger.info(
+                                f"Deleted {vector_count} vectors for asset {inventory_id}"
+                            )
 
                             # Publish deletion event
                             self.publish_deletion_event(inventory_id)

@@ -62,6 +62,7 @@ class ApiGatewayStackProps:
     user_pool_client: str
     waf_acl_arn: str
     user_table: dynamodb.TableV2
+    s3_vector_bucket_name: str
 
 
 class ApiGatewayStack(cdk.NestedStack):
@@ -114,6 +115,7 @@ class ApiGatewayStack(cdk.NestedStack):
                 security_group_id=props.security_group.security_group_id,
                 system_settings_table_name=props.system_settings_table,
                 system_settings_table_arn=f"arn:aws:dynamodb:{self.region}:{self.account}:table/{props.system_settings_table}",
+                s3_vector_bucket_name=props.s3_vector_bucket_name,
             ),
         )
 
@@ -133,6 +135,7 @@ class ApiGatewayStack(cdk.NestedStack):
                 vpc=props.vpc,
                 security_group=props.security_group,
                 system_settings_table=props.system_settings_table,
+                s3_vector_bucket_name=props.s3_vector_bucket_name,
             ),
         )
 
@@ -150,6 +153,7 @@ class ApiGatewayStack(cdk.NestedStack):
                 security_group=props.security_group,
                 open_search_arn=props.collection_arn,
                 user_table=props.user_table,
+                s3_vector_bucket_name=props.s3_vector_bucket_name,
             ),
         )
 

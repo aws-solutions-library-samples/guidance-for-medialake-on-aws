@@ -15,7 +15,6 @@ from dynamodb_operations import (
 )
 from iam_operations import (
     create_lambda_role,
-    sanitize_role_name,
     wait_for_role_propagation,
 )
 
@@ -454,33 +453,14 @@ def create_lambda_function(
     zip_file_key = get_zip_file_key(IAC_ASSETS_BUCKET, zip_file_prefix)
 
     runtime = lambda_config["runtime"].lower()
-    role_arn = create_lambda_role(pipeline_name, node.data.id, yaml_data, operation_id)
+    role_arn = create_lambda_role(
+        pipeline_name, node.data.id, yaml_data, operation_id, function_name
+    )
 
     # Wait for the role to propagate before attempting to create the Lambda function
     try:
-        # Use the same role name construction logic as in create_lambda_role
-        base_role_name = (
-            f"{resource_prefix}_{pipeline_name}_{node.data.id}_lambda_execution_role"
-        )
-
-        if operation_id:
-            # Calculate how much space we have left for the operation_id
-            max_base_length = (
-                63 - len(operation_id) - 1
-            )  # 63 to leave room for the underscore
-
-            if len(base_role_name) > max_base_length:
-                # Truncate the base_role_name to make room for the operation_id
-                base_role_name = base_role_name[:max_base_length]
-
-            # Now add the operation_id
-            role_name = sanitize_role_name(f"{base_role_name}_{operation_id}")
-        else:
-            role_name = sanitize_role_name(base_role_name)
-
-        # Ensure the final role name is within the 64-character limit
-        if len(role_name) > 64:
-            role_name = role_name[:64]
+        # Use the function name as the role name (same as in create_lambda_role)
+        role_name = function_name
 
         wait_for_role_propagation(role_name)
     except Exception as e:
@@ -684,6 +664,11 @@ def create_lambda_function(
                                 r"^\${(AWS::Region|AWS::AccountId)}$", env_var_value
                             )
 
+                            logger.info(
+                                f"Processing parameter {param_key}={param_value}, env_var_value={env_var_value}"
+                            )
+                            logger.info(f"var_match: {var_match}, cf_match: {cf_match}")
+
                             if cf_match:
                                 # Handle CloudFormation parameters
                                 cf_param = cf_match.group(1)
@@ -707,11 +692,17 @@ def create_lambda_function(
                             elif var_match:
                                 # Extract the variable name
                                 config_var_name = var_match.group(1)
+                                logger.info(
+                                    f"Attempting to resolve variable: {config_var_name}"
+                                )
                                 # Try to get the value from the config module
                                 import config
 
                                 if hasattr(config, config_var_name):
                                     config_value = getattr(config, config_var_name)
+                                    logger.info(
+                                        f"Found config variable {config_var_name} with value: {config_value}"
+                                    )
                                     if config_value is not None:
                                         env_var_value = str(config_value)
                                         logger.info(
@@ -738,6 +729,72 @@ def create_lambda_function(
                                     break
                             else:
                                 env_var_value = ""
+
+                            # Apply variable resolution to default values as well
+                            if env_var_value:
+                                # Check for standard environment variables
+                                var_match = re.match(
+                                    r"^\${([A-Za-z0-9_]+)}$", env_var_value
+                                )
+                                # Check for CloudFormation parameters (AWS::Region, AWS::AccountId)
+                                cf_match = re.match(
+                                    r"^\${(AWS::Region|AWS::AccountId)}$", env_var_value
+                                )
+
+                                logger.info(
+                                    f"Processing default parameter {param_key}={env_var_value}"
+                                )
+                                logger.info(
+                                    f"var_match: {var_match}, cf_match: {cf_match}"
+                                )
+
+                                if cf_match:
+                                    # Handle CloudFormation parameters
+                                    cf_param = cf_match.group(1)
+                                    if cf_param == "AWS::Region":
+                                        # Get the current AWS region
+                                        region = boto3.session.Session().region_name
+                                        env_var_value = str(region)
+                                        logger.info(
+                                            f"Replaced CloudFormation parameter {env_var_value} with region: {env_var_value}"
+                                        )
+                                    elif cf_param == "AWS::AccountId":
+                                        # Get the current AWS account ID
+                                        sts_client = boto3.client("sts")
+                                        account_id = sts_client.get_caller_identity()[
+                                            "Account"
+                                        ]
+                                        env_var_value = str(account_id)
+                                        logger.info(
+                                            f"Replaced CloudFormation parameter {env_var_value} with account ID: {env_var_value}"
+                                        )
+                                elif var_match:
+                                    # Extract the variable name
+                                    config_var_name = var_match.group(1)
+                                    logger.info(
+                                        f"Attempting to resolve default variable: {config_var_name}"
+                                    )
+                                    # Try to get the value from the config module
+                                    import config
+
+                                    if hasattr(config, config_var_name):
+                                        config_value = getattr(config, config_var_name)
+                                        logger.info(
+                                            f"Found config variable {config_var_name} with value: {config_value}"
+                                        )
+                                        if config_value is not None:
+                                            env_var_value = str(config_value)
+                                            logger.info(
+                                                f"Replaced default variable reference {env_var_value} with value from config: {env_var_value}"
+                                            )
+                                        else:
+                                            logger.warning(
+                                                f"Config variable {config_var_name} exists but is None, using original value"
+                                            )
+                                    else:
+                                        logger.warning(
+                                            f"Config variable {config_var_name} not found in config module, using original value"
+                                        )
 
                         # Add the environment variable
                         create_function_params["Environment"]["Variables"][

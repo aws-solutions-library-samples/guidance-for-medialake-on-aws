@@ -229,6 +229,14 @@ class NodesStack(cdk.NestedStack):
             code_path=["lambdas", "nodes", "audio_splitter"],
         )
 
+        self.s3_vector_store_lambda_deployment = LambdaDeployment(
+            self,
+            "S3VectorStoreLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "s3_vector_store"],
+        )
+
         # Create DynamoDB table for nodes
         self._pipelines_nodes_table = DynamoDB(
             self,

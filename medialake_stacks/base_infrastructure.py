@@ -23,6 +23,10 @@ from medialake_constructs.shared_constructs.opensearch_managed_cluster import (
 from medialake_constructs.shared_constructs.s3_logging import (
     add_s3_access_logging_policy,
 )
+from medialake_constructs.shared_constructs.s3_vectors import (
+    S3VectorCluster,
+    S3VectorClusterProps,
+)
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
 from medialake_constructs.vpc import CustomVpc, CustomVpcProps
 
@@ -71,6 +75,7 @@ class BaseInfrastructureStack(Stack):
         Stack.of(self).account
         region = Stack.of(self).region
         opensearch_index_name = "media"
+        s3_vector_index_name = "media-vectors"
         parent_stack = cdk.Stack.of(self)
         parent_stack.region
 
@@ -243,6 +248,19 @@ class BaseInfrastructureStack(Stack):
             ),
         )
 
+        # Create S3 Vector cluster
+        self._s3_vector_cluster = S3VectorCluster(
+            self,
+            "MediaLakeS3Vector",
+            props=S3VectorClusterProps(
+                bucket_name=f"{config.resource_prefix}-vectors-{self.account}-{region}-{config.environment}",
+                vector_dimension=1024,
+                collection_indexes=[s3_vector_index_name],
+                vpc=self._vpc.vpc,
+                security_group=self._security_group,
+            ),
+        )
+
         # Handle media asset bucket
         if config.s3.use_existing_buckets and config.s3.asset_bucket:
             # Import existing asset bucket
@@ -290,6 +308,9 @@ class BaseInfrastructureStack(Stack):
                             ],
                             allowed_origins=[
                                 "http://localhost:5173",
+                                "http://localhost:5174",
+                                "http://localhost:3000",
+                                "http://localhost:8080",
                                 "https://*.cloudfront.net",
                             ],
                             allowed_headers=["*"],
@@ -642,6 +663,28 @@ class BaseInfrastructureStack(Stack):
             description="Retained OpenSearch Cluster (Endpoint|ARN)",
         )
 
+        # S3 Vector Cluster Outputs
+        CfnOutput(
+            self,
+            "RetainedS3VectorCluster",
+            value=f"{self._s3_vector_cluster.bucket_name}|{self._s3_vector_cluster.bucket_arn}",
+            description="Retained S3 Vector Cluster (Bucket Name|ARN)",
+        )
+
+        CfnOutput(
+            self,
+            "RetainedS3VectorDimension",
+            value=str(self._s3_vector_cluster.vector_dimension),
+            description="Retained S3 Vector Dimension",
+        )
+
+        CfnOutput(
+            self,
+            "RetainedS3VectorIndexes",
+            value=",".join(self._s3_vector_cluster.indexes),
+            description="Retained S3 Vector Indexes",
+        )
+
         # S3 Bucket Outputs
         CfnOutput(
             self,
@@ -864,3 +907,64 @@ class BaseInfrastructureStack(Stack):
             s3.IBucket: S3 bucket object
         """
         return self.access_logs_bucket
+
+    @property
+    def s3_vector_cluster(self) -> "S3VectorCluster":
+        """
+        Returns the S3 Vector cluster.
+
+        Returns:
+            S3VectorCluster: The configured S3 Vector cluster
+        """
+        return self._s3_vector_cluster
+
+    @property
+    def s3_vector_bucket_name(self) -> str:
+        """
+        Returns the name of the S3 Vector bucket.
+
+        Returns:
+            str: Name of the S3 Vector bucket
+        """
+        return self._s3_vector_cluster.bucket_name
+
+    @property
+    def s3_vector_bucket_arn(self) -> str:
+        """
+        Returns the ARN of the S3 Vector bucket.
+
+        Returns:
+            str: ARN of the S3 Vector bucket
+        """
+        return self._s3_vector_cluster.bucket_arn
+
+    @property
+    def s3_vector_dimension(self) -> int:
+        """
+        Returns the vector dimension for S3 Vector indexes.
+
+        Returns:
+            int: Vector dimension
+        """
+        return self._s3_vector_cluster.vector_dimension
+
+    @property
+    def s3_vector_indexes(self) -> list:
+        """
+        Returns the list of S3 Vector indexes.
+
+        Returns:
+            list: List of S3 Vector index names
+        """
+        return self._s3_vector_cluster.indexes
+
+    @property
+    def s3_vector_index_name(self) -> str:
+        """
+        Returns the primary S3 Vector index name.
+
+        Returns:
+            str: Primary S3 Vector index name
+        """
+        indexes = self._s3_vector_cluster.indexes
+        return indexes[0] if indexes else "media-vectors"

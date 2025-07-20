@@ -1,7 +1,7 @@
 import os
 from dataclasses import dataclass
 
-from aws_cdk import BundlingOptions, DockerImage, Stack, AssetHashType
+from aws_cdk import AssetHashType, BundlingOptions, DockerImage, Stack
 from aws_cdk import aws_lambda as lambda_
 from constructs import Construct
 
@@ -417,6 +417,76 @@ class ShortuuidLayer(Construct):
         return self.layer_version.layer
 
 
+# class CustomBoto3Layer(Construct):
+#     """
+#     A Lambda layer containing custom unreleased boto3 SDK.
+#     Uses wheel files for boto3 and botocore packages.
+#     """
+
+#     def __init__(self, scope: Construct, id: str, **kwargs):
+#         super().__init__(scope, id, **kwargs)
+
+#         if "CI" in os.environ:
+#             # In CI, use pre-built layer from dist directory
+#             self.layer = lambda_.LayerVersion(
+#                 self,
+#                 "CustomBoto3Layer",
+#                 layer_version_name="custom-boto3-layer",
+#                 compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
+#                 compatible_architectures=[
+#                     lambda_.Architecture.X86_64,
+#                     lambda_.Architecture.ARM_64,
+#                 ],
+#                 description="A Lambda layer with custom unreleased boto3 SDK",
+#                 code=lambda_.Code.from_asset("dist/lambdas/layers/custom_boto3"),
+#             )
+#         else:
+#             # Build layer from wheel files using Docker bundling
+#             self.layer = lambda_.LayerVersion(
+#                 self,
+#                 "CustomBoto3Layer",
+#                 layer_version_name="custom-boto3-layer",
+#                 compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
+#                 compatible_architectures=[
+#                     lambda_.Architecture.X86_64,
+#                     lambda_.Architecture.ARM_64,
+#                 ],
+#                 description="A Lambda layer with custom unreleased boto3 SDK",
+#                 code=lambda_.Code.from_asset(
+#                     path=".",
+#                     bundling=BundlingOptions(
+#                         image=DockerImage.from_registry("public.ecr.aws/amazonlinux/amazonlinux:2023"),
+#                         user="root",
+#                         command=[
+#                             "/bin/bash",
+#                             "-c",
+#                             """
+#                             set -euo pipefail
+
+#                             # Install Python and pip
+#                             yum -y update && yum -y install python3 python3-pip
+
+#                             # Create layer directory structure
+#                             mkdir -p /asset-output/python
+
+#                             # Install custom boto3 and botocore wheels
+#                             pip3 install \
+#                                 lambdas/layers/custom_boto3/boto3-1.39.4-py3-none-any.whl \
+#                                 lambdas/layers/custom_boto3/botocore-1.39.4-py3-none-any.whl \
+#                                 --target /asset-output/python \
+#                                 --no-deps
+
+#                             # Clean up unnecessary files to reduce layer size
+#                             find /asset-output/python -type d -name "__pycache__" -exec rm -rf {} + || true
+#                             find /asset-output/python -name "*.pyc" -delete || true
+#                             find /asset-output/python -name "*.pyo" -delete || true
+#                             """
+#                         ],
+#                     ),
+#                 ),
+#             )
+
+
 class CommonLibrariesLayer(Construct):
     """
     A Lambda layer that bundles shared Python utility modules under the
@@ -427,7 +497,15 @@ class CommonLibrariesLayer(Construct):
     directory structure by copying them into `/asset-output/python/`
     inside a container matching the Lambda Python 3.12 environment.
     """
-    def __init__(self, scope: Construct, id: str, *, entry: str = "lambdas/common_libraries", **kwargs):
+
+    def __init__(
+        self,
+        scope: Construct,
+        id: str,
+        *,
+        entry: str = "lambdas/common_libraries",
+        **kwargs,
+    ):
         super().__init__(scope, id, **kwargs)
 
         # Package the layer code from the source directory, hashing on

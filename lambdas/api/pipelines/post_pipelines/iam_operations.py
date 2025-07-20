@@ -589,36 +589,46 @@ def create_lambda_execution_policy(role_name: str, yaml_data: Dict[str, Any]) ->
 
 
 def create_lambda_role(
-    pipeline_name: str, node_id: str, yaml_data: Dict[str, Any], operation_id: str = ""
+    pipeline_name: str,
+    node_id: str,
+    yaml_data: Dict[str, Any],
+    operation_id: str = "",
+    lambda_function_name: str = "",
 ) -> str:
     """Create a Lambda execution role."""
     iam = boto3.client("iam")
 
-    # Create a base role name without the operation_id
-    base_role_name = (
-        f"{resource_prefix}_{pipeline_name}_{node_id}_lambda_execution_role"
-    )
-
-    # If we have an operation_id, we need to ensure we don't exceed the 64-character limit
-    if operation_id:
-        # Calculate how much space we have left for the operation_id
-        # We need to account for the underscore that will be added before the operation_id
-        max_base_length = (
-            63 - len(operation_id) - 1
-        )  # 63 to leave room for the underscore
-
-        if len(base_role_name) > max_base_length:
-            # Truncate the base_role_name to make room for the operation_id
-            base_role_name = base_role_name[:max_base_length]
-
-        # Now add the operation_id
-        role_name = sanitize_role_name(f"{base_role_name}_{operation_id}")
+    # Use the lambda function name as the role name if provided
+    if lambda_function_name:
+        role_name = lambda_function_name
+        logger.info(f"Using lambda function name as role name: {role_name}")
     else:
-        role_name = sanitize_role_name(base_role_name)
+        # Fallback to the old naming pattern if lambda_function_name is not provided
+        # Create a base role name without the operation_id
+        base_role_name = (
+            f"{resource_prefix}_{pipeline_name}_{node_id}_lambda_execution_role"
+        )
 
-    # Ensure the final role name is within the 64-character limit
-    if len(role_name) > 64:
-        role_name = role_name[:64]
+        # If we have an operation_id, we need to ensure we don't exceed the 64-character limit
+        if operation_id:
+            # Calculate how much space we have left for the operation_id
+            # We need to account for the underscore that will be added before the operation_id
+            max_base_length = (
+                63 - len(operation_id) - 1
+            )  # 63 to leave room for the underscore
+
+            if len(base_role_name) > max_base_length:
+                # Truncate the base_role_name to make room for the operation_id
+                base_role_name = base_role_name[:max_base_length]
+
+            # Now add the operation_id
+            role_name = sanitize_role_name(f"{base_role_name}_{operation_id}")
+        else:
+            role_name = sanitize_role_name(base_role_name)
+
+        # Ensure the final role name is within the 64-character limit
+        if len(role_name) > 64:
+            role_name = role_name[:64]
     max_retries = 5  # Increased from 3 to 5
     retry_delay = 3  # Increased from 2 to 3 seconds
 

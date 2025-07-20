@@ -7,7 +7,6 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 import boto3
-from api_utils import get_api_key
 from aws_lambda_powertools import Logger, Metrics
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
@@ -196,149 +195,29 @@ def get_opensearch_client() -> OpenSearch:
     return _opensearch_client
 
 
-def build_semantic_query(params: SearchParams) -> Dict:
-    from twelvelabs import TwelveLabs
-
-    start_time = time.time()
-    logger.info(f"[PERF] Starting semantic query build for: {params.q}")
-
-    # Get the API key from Secrets Manager
-    api_key_start = time.time()
-    api_key = get_api_key()
-    logger.info(f"[PERF] API key retrieval took: {time.time() - api_key_start:.3f}s")
-
-    if not api_key:
-        raise SearchException(
-            "Search provider API key not configured or provider not enabled"
-        )
-
-    # Initialize the Twelve Labs client
-    client_init_start = time.time()
-    twelve_labs_client = TwelveLabs(api_key=api_key)
-    logger.info(
-        f"[PERF] TwelveLabs client initialization took: {time.time() - client_init_start:.3f}s"
-    )
-
-    try:
-        # Create embedding for the search query
-        embedding_start = time.time()
-        logger.info(f"[PERF] Starting embedding creation for query: {params.q}")
-        res = twelve_labs_client.embed.create(
-            model_name="Marengo-retrieval-2.7",
-            text=params.q,
-        )
-        logger.info(
-            f"[PERF] Embedding creation took: {time.time() - embedding_start:.3f}s"
-        )
-
-        if res.text_embedding is not None and res.text_embedding.segments is not None:
-            embedding = list(res.text_embedding.segments[0].embeddings_float)
-            if not all(isinstance(x, (int, float)) for x in embedding):
-                raise SearchException("Invalid embedding format")
-
-            logger.info(
-                f"Generated embedding for query: {params.q} (length: {len(embedding)})"
-            )
-
-            query = {
-                "size": params.pageSize * 20,
-                "query": {
-                    "bool": {
-                        "filter": {"bool": {"must": []}},
-                        "must": [
-                            {
-                                "knn": {
-                                    "embedding": {
-                                        "vector": embedding,
-                                        "k": params.pageSize * 20,
-                                    }
-                                }
-                            }
-                        ],
-                    }
-                },
-                "_source": {"excludes": ["embedding"]},
-            }
-            # If clip logic is disabled, exclude clip hits in the semantic query
-            if not CLIP_LOGIC_ENABLED:
-                query["query"]["bool"]["must_not"] = [
-                    {"term": {"embedding_scope": "clip"}}
-                ]
-
-            # Process Facet filters
-
-            if params.type is not None:
-                var_type = params.type.split(",")
-                query["query"]["bool"]["filter"]["bool"]["must"].append(
-                    {"terms": {"DigitalSourceAsset.Type": var_type}}
-                )
-
-            if params.extension is not None:
-                var_ext = params.extension.split(",")
-                query["query"]["bool"]["filter"]["bool"]["must"].append(
-                    {"terms": {"DigitalSourceAsset.MainRepresentation.Format": var_ext}}
-                )
-
-            if params.asset_size_lte is not None or params.asset_size_gte is not None:
-                try:
-                    query["query"]["bool"]["filter"]["bool"]["must"].append(
-                        {
-                            "range": {
-                                "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size": {
-                                    "gte": params.asset_size_gte,
-                                    "lte": params.asset_size_lte,
-                                }
-                            }
-                        }
-                    )
-                except ValueError:
-                    logger.warning(
-                        f"Invalid values for asset size: {params.asset_size_gte, params.asset_size_lte}"
-                    )
-
-            if (
-                params.ingested_date_lte is not None
-                or params.ingested_date_gte is not None
-            ):
-                try:
-                    query["query"]["bool"]["filter"]["bool"]["must"].append(
-                        {
-                            "range": {
-                                "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate": {
-                                    "gte": params.ingested_date_gte,
-                                    "lte": params.ingested_date_lte,
-                                }
-                            }
-                        }
-                    )
-                except ValueError:
-                    logger.warning(
-                        f"Invalid values for asset size: {params.asset_size_gte, params.asset_size_lte}"
-                    )
-
-            logger.info(
-                f"Semantic query size: {query['size']}, k: {query['query']['bool']['must'][0]['knn']['embedding']['k']}"
-            )
-            logger.info(
-                f"[PERF] Total semantic query build time: {time.time() - start_time:.3f}s"
-            )
-            return query
-        else:
-            raise SearchException("Failed to generate embedding for search term")
-    except Exception as e:
-        logger.exception("Error generating embedding for search term")
-        raise SearchException(f"Error generating embedding: {str(e)}")
-
-
 def build_search_query(params: SearchParams) -> Dict:
-    """Build OpenSearch query from search parameters"""
+    """Build search query from search parameters"""
     start_time = time.time()
     logger.info(
         f"[PERF] Starting search query build - semantic: {params.semantic}, query: {params.q}"
     )
 
     if params.semantic:
-        result = build_semantic_query(params)
+        # Use embedding store factory for semantic search
+        from embedding_store_factory import EmbeddingStoreFactory
+
+        factory = EmbeddingStoreFactory(logger, metrics)
+        embedding_store = factory.create_embedding_store()
+
+        # Get the search result from the embedding store
+        search_result = embedding_store.search(params)
+
+        # Return the result in a format that can be processed by perform_search
+        result = {
+            "embedding_store_result": search_result,
+            "store_type": factory.get_embedding_store_setting(),
+        }
+
         logger.info(
             f"[PERF] Total search query build time (semantic): {time.time() - start_time:.3f}s"
         )
@@ -1046,25 +925,72 @@ def perform_search(params: SearchParams) -> Dict:
             f"[PERF] Search query building took: {time.time() - query_build_start:.3f}s"
         )
 
-        logger.info("Executing OpenSearch query", extra={"semantic": params.semantic})
-        opensearch_start = time.time()
-        response = client.search(body=search_body, index=index_name)
-        opensearch_time = time.time() - opensearch_start
-        logger.info(f"[PERF] OpenSearch query execution took: {opensearch_time:.3f}s")
+        # Handle semantic search with embedding stores
+        if params.semantic and "embedding_store_result" in search_body:
+            embedding_result = search_body["embedding_store_result"]
+            store_type = search_body["store_type"]
 
-        hits = response.get("hits", {}).get("hits", [])
+            logger.info(f"Using {store_type} embedding store for semantic search")
 
-        logger.info(
-            f"OpenSearch returned {len(hits)} hits from {response['hits']['total']['value']} total"
-        )
+            hits = embedding_result.hits
+            total_results = embedding_result.total_results
+            aggregations = embedding_result.aggregations
+            suggestions = embedding_result.suggestions
+
+            logger.info(
+                f"{store_type} returned {len(hits)} hits from {total_results} total"
+            )
+        else:
+            # Regular OpenSearch query
+            logger.info(
+                "Executing OpenSearch query", extra={"semantic": params.semantic}
+            )
+            opensearch_start = time.time()
+            response = client.search(body=search_body, index=index_name)
+            opensearch_time = time.time() - opensearch_start
+            logger.info(
+                f"[PERF] OpenSearch query execution took: {opensearch_time:.3f}s"
+            )
+
+            hits = response.get("hits", {}).get("hits", [])
+            total_results = response["hits"]["total"]["value"]
+            aggregations = response.get("aggregations")
+            suggestions = response.get("suggest")
+
+            logger.info(
+                f"OpenSearch returned {len(hits)} hits from {total_results} total"
+            )
 
         if params.semantic:
             if CLIP_LOGIC_ENABLED:
-                semantic_processing_start = time.time()
-                processed_results = process_semantic_results_parallel(hits)
-                logger.info(
-                    f"[PERF] Semantic results processing took: {time.time() - semantic_processing_start:.3f}s"
-                )
+                # Check if we're using S3 Vector Store which already processes clips
+                store_type = search_body.get("store_type", "")
+                if store_type == "s3-vector":
+                    logger.info(
+                        "Using S3 Vector Store - clips already processed, processing individual hits for UI format"
+                    )
+                    semantic_processing_start = time.time()
+                    # S3 Vector Store already has clips grouped, just process each hit for UI format while preserving clips
+                    processed_results = []
+                    for hit in hits:
+                        # Preserve the clips array before processing
+                        clips = hit.get("clips", None)
+                        processed_hit = process_search_hit(hit)
+                        # Restore the clips array after processing
+                        processed_hit["clips"] = clips
+                        processed_results.append(processed_hit)
+                    logger.info(
+                        f"[PERF] S3 Vector results processing took: {time.time() - semantic_processing_start:.3f}s"
+                    )
+                else:
+                    logger.info(
+                        "Using OpenSearch - processing clips with process_semantic_results_parallel"
+                    )
+                    semantic_processing_start = time.time()
+                    processed_results = process_semantic_results_parallel(hits)
+                    logger.info(
+                        f"[PERF] Semantic results processing took: {time.time() - semantic_processing_start:.3f}s"
+                    )
 
                 # Add common fields to each result and clips
                 common_fields_start = time.time()
@@ -1099,8 +1025,8 @@ def perform_search(params: SearchParams) -> Dict:
                 search_metadata = create_search_metadata(
                     total_count,
                     params,
-                    response.get("aggregations"),
-                    response.get("suggest"),
+                    aggregations,
+                    suggestions,
                 )
 
                 logger.info(
@@ -1177,8 +1103,8 @@ def perform_search(params: SearchParams) -> Dict:
                 search_metadata = create_search_metadata(
                     total_results,
                     params,
-                    response.get("aggregations"),
-                    response.get("suggest"),
+                    aggregations,
+                    suggestions,
                 )
 
                 return {
@@ -1236,10 +1162,10 @@ def perform_search(params: SearchParams) -> Dict:
             logger.info(f"Regular search completed: {len(results)} results processed")
 
             search_metadata = create_search_metadata(
-                response["hits"]["total"]["value"],
+                total_results,
                 params,
-                response.get("aggregations"),
-                response.get("suggest"),
+                aggregations,
+                suggestions,
             )
 
             return {

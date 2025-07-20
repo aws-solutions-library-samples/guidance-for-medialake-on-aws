@@ -25,7 +25,8 @@ def translate_event_to_request(response_body_and_event):
           "end_offset_sec":   <float|None>,
           "embedding_option": <str|None>,
           "embedding_scope":  <str|None>,
-          "asset_id":         <str|None>
+          "asset_id":         <str|None>,
+          "framerate":        <float|None>
         }
 
     Downstream (Jinja) receives one key called `vectors`.
@@ -60,7 +61,22 @@ def translate_event_to_request(response_body_and_event):
         pass  # we’ll complain below if still None
 
     if not inventory_id:
-        raise KeyError("InventoryID (‘inventory_id’) not found on the event")
+        raise KeyError("InventoryID ('inventory_id') not found on the event")
+
+    # ── Extract framerate from embedded metadata ────────────────────
+    framerate = None
+    try:
+        assets = event.get("payload", {}).get("assets", [])
+        if assets:
+            embedded_metadata = (
+                assets[0].get("Metadata", {}).get("EmbeddedMetadata", {})
+            )
+            general_metadata = embedded_metadata.get("general", {})
+            framerate_str = general_metadata.get("FrameRate")
+            if framerate_str:
+                framerate = float(framerate_str)
+    except (AttributeError, TypeError, ValueError):
+        pass  # framerate will remain None if extraction fails
 
     # ── Build the list of vectors ───────────────────────────────────
     vectors = [
@@ -72,6 +88,7 @@ def translate_event_to_request(response_body_and_event):
             "embedding_scope": seg.get("embedding_scope"),
             "asset_id": asset_id,
             "inventory_id": inventory_id,
+            "framerate": framerate,
         }
         for seg in segments
         if seg.get("float")  # keep only segments that actually have vectors

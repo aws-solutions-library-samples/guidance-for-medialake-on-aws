@@ -168,6 +168,32 @@ def extract_embedding_vector(container: Dict[str, Any]) -> Optional[List[float]]
     return None
 
 
+def extract_framerate(container: Dict[str, Any]) -> Optional[float]:
+    """Extract framerate from various payload structures."""
+    # Check if data is an array (batch processing) - get from first item
+    if isinstance(container.get("data"), list) and container["data"]:
+        first_item = container["data"][0]
+        if isinstance(first_item, dict) and first_item.get("framerate"):
+            return first_item["framerate"]
+
+    itm = _item(container)
+    if itm and itm.get("framerate"):
+        return itm["framerate"]
+
+    data = container.get("data")
+    if isinstance(data, dict) and data.get("framerate"):
+        return data["framerate"]
+
+    m_itm = _map_item(container)
+    if m_itm and m_itm.get("framerate"):
+        return m_itm["framerate"]
+
+    if container.get("framerate"):
+        return container["framerate"]
+
+    return None
+
+
 def _get_segment_bounds(payload: Dict[str, Any]) -> Tuple[int, int]:
     candidates: List[Dict[str, Any]] = []
 
@@ -329,9 +355,10 @@ def process_single_embedding(
 
     start_sec, end_sec = _get_segment_bounds(temp_payload)
 
+    # Extract framerate from input data (only for video content)
     if CONTENT_TYPE == "video":
-        master_src = _get_master_doc(client, asset_id, is_video=True)
-        fps = _extract_fps(master_src, asset_id)
+        framerate = embedding_data.get("framerate") or extract_framerate(temp_payload)
+        fps = int(round(framerate)) if framerate else 30
     else:
         fps = 30
 
@@ -666,9 +693,10 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
         if scope in {"clip", "audio"}:
             start_sec, end_sec = _get_segment_bounds(payload)
 
+            # Extract framerate from input data (only for video content)
             if CONTENT_TYPE == "video":
-                master_src = _get_master_doc(client, asset_id, is_video=True)
-                fps = _extract_fps(master_src, asset_id)  # may raise
+                framerate = extract_framerate(payload)
+                fps = int(round(framerate)) if framerate else 30
             else:  # audio clip
                 fps = 30  # arbitrary; frame-rate irrelevant for audio
 

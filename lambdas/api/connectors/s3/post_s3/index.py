@@ -696,6 +696,38 @@ def create_lambda_iam_role(iam_client, role_name, kms_key_arn=None):
             logger.error(f"Error attaching KMS policy to role {role_name}: {str(e)}")
             # Don't fail the entire operation for policy attachment issues
 
+    # Add S3 Vector Store permissions for vector deletion functionality
+    s3_vector_policy = {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "s3vectors:ListVectors",
+                    "s3vectors:GetVectors",
+                    "s3vectors:DeleteVectors",
+                    "s3vectors:QueryVectors",
+                ],
+                "Resource": "*",
+            }
+        ],
+    }
+    s3_vector_policy_name = truncate_resource_name(
+        "iam_policy", f"{role_name}-s3-vector-policy"
+    )
+    try:
+        iam_client.put_role_policy(
+            RoleName=role_name,
+            PolicyName=s3_vector_policy_name,
+            PolicyDocument=json.dumps(s3_vector_policy),
+        )
+        logger.info(f"Attached S3 Vector Store policy to {role_name}")
+    except Exception as e:
+        logger.error(
+            f"Error attaching S3 Vector Store policy to role {role_name}: {str(e)}"
+        )
+        # Don't fail the entire operation for policy attachment issues
+
     return role["Role"]["Arn"]
 
 
@@ -1546,6 +1578,11 @@ def create_connector(createconnector: S3Connector) -> dict:
                         "INDEX_NAME": os.environ.get("INDEX_NAME", "media"),
                         "OPENSEARCH_SERVICE": "es",
                         "REGION": bucket_region,
+                        # S3 Vector Store configuration
+                        "VECTOR_BUCKET_NAME": os.environ.get("VECTOR_BUCKET_NAME", ""),
+                        "VECTOR_INDEX_NAME": os.environ.get(
+                            "VECTOR_INDEX_NAME", "media-vectors"
+                        ),
                     }
                 },
                 "Layers": layers,  # Updated to include both custom and AWS SDK layers

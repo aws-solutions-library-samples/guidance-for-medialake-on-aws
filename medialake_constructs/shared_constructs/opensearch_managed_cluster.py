@@ -316,7 +316,7 @@ class OpenSearchCluster(Construct):
                 self,
                 "MediaLakeIndexCreationFunction",
                 config=LambdaConfig(
-                    entry="lambdas/back_end/create_oss_index",
+                    entry="lambdas/back_end/create_os_index",
                     lambda_handler="handler",
                     vpc=props.vpc,
                     security_groups=[props.security_group],
@@ -363,7 +363,7 @@ class OpenSearchCluster(Construct):
                 log_retention=logs.RetentionDays.ONE_WEEK,
             )
 
-            lambda_code = Path("lambdas/back_end/create_oss_index/index.py").read_text(
+            lambda_code = Path("lambdas/back_end/create_os_index/index.py").read_text(
                 encoding="utf-8"
             )
             code_hash = hashlib.sha256(lambda_code.encode()).hexdigest()
