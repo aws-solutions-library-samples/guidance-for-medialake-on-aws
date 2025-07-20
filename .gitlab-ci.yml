@@ -92,6 +92,8 @@ cache:
 job_deploy:
   stage: deploy
   <<: *echo_versions
+  rules:
+    - when: never # This prevents the job from running
   script:
     - echo "Deploying the project"
     - mv .cicd/config.json-template config.json
