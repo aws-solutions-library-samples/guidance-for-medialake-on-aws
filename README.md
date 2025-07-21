@@ -24,7 +24,7 @@
 >   - [Enable Semantic Search and Integrations](#4-enable-semantic-search-and-integrations)
 >   - [Process and Retrieve Assets](#5-process-and-retrieve-assets)
 > - [Next Steps](#next-steps)
-> - [Project Structure](#project-structure)
+> - [Project Structure](#project-structure)sdafasdfsadf asdf asdf sadf
 > - [Key Components](#key-components)
 >   - [Storage Connectors](#storage-connectors)
 >   - [Processing Pipelines](#processing-pipelines)
