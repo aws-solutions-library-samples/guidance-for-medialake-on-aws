@@ -2,14 +2,14 @@ export const SYSTEM_SETTINGS_CONFIG = {
   PROVIDERS: {
     TWELVE_LABS_API: {
       id: "twelvelabs-api",
-      name: "Twelve Labs API",
+      name: "TwelveLabs API",
       type: "twelvelabs",
       defaultEndpoint: "https://api.twelvelabs.io/v1",
       requiresApiKey: true,
     },
     TWELVE_LABS_BEDROCK: {
       id: "twelvelabs-bedrock",
-      name: "Twelve Labs Bedrock",
+      name: "TwelveLabs Bedrock",
       type: "twelvelabs-bedrock",
       requiresApiKey: false,
     },
@@ -21,7 +21,7 @@ export const SYSTEM_SETTINGS_CONFIG = {
     },
     S3_VECTOR: {
       id: "s3-vector",
-      name: "S3 Vector",
+      name: "S3 Vectors",
     },
   },
   DEFAULT_PROVIDER: "twelvelabs-api",

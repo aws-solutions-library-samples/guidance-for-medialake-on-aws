@@ -1,7 +1,7 @@
 spec: v1.0.0
 node:
   id: s3_vector_store
-  title: S3 Vector Store
+  title: S3 Vectors
   description: Store and retrieve vector embeddings using S3 Vectors
   version: 1.0.0
   type: utility

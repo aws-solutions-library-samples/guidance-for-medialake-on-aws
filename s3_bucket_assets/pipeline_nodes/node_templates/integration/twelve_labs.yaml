@@ -1,8 +1,8 @@
 spec: v1.0.0
 node:
   id: twelve_labs
-  title: Twelve Labs
-  description: Twelve Labs API for video, image, and audio understanding and multimodal embeddings
+  title: TwelveLabs
+  description: TwelveLabs API for video, image, and audio understanding and multimodal embeddings
   version: 1.0.0
   type: integration
   integration:

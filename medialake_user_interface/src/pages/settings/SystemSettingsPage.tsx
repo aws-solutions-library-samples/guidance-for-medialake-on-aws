@@ -601,7 +601,7 @@ const SystemSettingsPage: React.FC = () => {
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             {t(
               "settings.systemSettings.search.apiKeyDesc",
-              "Enter your Twelve Labs API key to enable semantic search functionality.",
+              "Enter your TwelveLabs API key to enable semantic search functionality.",
             )}
           </Typography>
           <TextField
