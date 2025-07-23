@@ -36,7 +36,7 @@
 5. Acknowledge required checkboxes, hit **Next**, then **Submit**.
    ![Acknowledge](../images/installation-guide/CF-Install-5.png)
    ![Acknowledge](../images/installation-guide/CF-Install-6.png)
-6. After provisioning, you'll receive login details by email.
+6. After provisioning, you'll receive login details by email.  Full provisioning may take more than 1 hour.  To check on the status after the CloudFormation has finished, navigate to AWS CodePipeline and find the `MediaLakeCDKPipeline` job for real-time status of the remaining build items.
 
 ---
 
