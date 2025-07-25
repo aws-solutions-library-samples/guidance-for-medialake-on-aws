@@ -63,7 +63,8 @@ class SettingsStack(cdk.NestedStack):
                     or "",
                     "ASSET_SYNC_RESULTS_BUCKET_NAME": props.asset_sync_results_bucket_name
                     or "",
-                    "USER_INTERFACE_BUCKET_NAME": props.user_interface_bucket_name or "",
+                    "USER_INTERFACE_BUCKET_NAME": props.user_interface_bucket_name
+                    or "",
                 },
             ),
         )
