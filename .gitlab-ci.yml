@@ -147,7 +147,9 @@ job_deploy_cf_dev1:
   rules:
     - if: $CI_COMMIT_REF_NAME == "stable"
       when: on_success
-    - when: never # Prevents the job from running for other branches or MR pipelines
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
+      when: on_success
+    - when: never # Prevents the job from running for other branches
   variables:
     STACK_NAME: "medialake-cf-dev1"
     ZIP_FILE_NAME: "medialake-source-${CI_COMMIT_SHORT_SHA}.zip"
