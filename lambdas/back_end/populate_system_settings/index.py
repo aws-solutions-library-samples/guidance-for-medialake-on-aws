@@ -29,6 +29,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 "DDB_EXPORT_BUCKET_NAME",
                 "PIPELINES_NODES_TEMPLATES_BUCKET_NAME",
                 "ASSET_SYNC_RESULTS_BUCKET_NAME",
+                "USER_INTERFACE_BUCKET_NAME",
             ]
 
             for env_var in bucket_env_vars:

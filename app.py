@@ -178,6 +178,7 @@ class MediaLakeStack(cdk.Stack):
                 ddb_export_bucket_name=props.base_infrastructure.ddb_export_bucket.bucket_name,
                 pipelines_nodes_templates_bucket_name=nodes_stack.pipelines_nodes_templates_bucket.bucket_name,
                 asset_sync_results_bucket_name=asset_sync_stack.results_bucket.bucket_name,
+                user_interface_bucket_name=f"{config.resource_prefix}-user-interface-{self.account}-{config.environment}",
             ),
         )
         # Add dependencies to ensure stacks are created before settings_stack
