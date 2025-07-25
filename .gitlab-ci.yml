@@ -155,16 +155,16 @@ job_deploy_cf_dev1:
     ZIP_FILE_NAME: "medialake-source-${CI_COMMIT_SHORT_SHA}.zip"
   script:
     - echo "Deploying MediaLake to DEV1 account via CloudFormation"
-    - echo "Using CICD Account ID: $CICD_ACCOUNT_ID"
-    - echo "Using CICD IAM Role: $CICD_IAM_ROLE"
-    - echo "Using CICD S3 Bucket: $CICD_S3_BUCKET"
+    - 'echo "Using CICD Account ID: $CICD_ACCOUNT_ID"'
+    - 'echo "Using CICD IAM Role: $CICD_IAM_ROLE"'
+    - 'echo "Using CICD S3 Bucket: $CICD_S3_BUCKET"'
     - export AWS_DEFAULT_REGION=us-east-1
     - export AWS_REGION=us-east-1
     - aws sts assume-role --role-arn "arn:aws:iam::${CICD_ACCOUNT_ID}:role/${CICD_IAM_ROLE}" --role-session-name "gitlab-ci-deploy" > assume-role-output.json
     - export AWS_ACCESS_KEY_ID=$(jq -r '.Credentials.AccessKeyId' assume-role-output.json)
     - export AWS_SECRET_ACCESS_KEY=$(jq -r '.Credentials.SecretAccessKey' assume-role-output.json)
     - export AWS_SESSION_TOKEN=$(jq -r '.Credentials.SessionToken' assume-role-output.json)
-    - echo "Checking for existing CloudFormation stack: $STACK_NAME"
+    - 'echo "Checking for existing CloudFormation stack: $STACK_NAME"'
     - |
       if aws cloudformation describe-stacks --stack-name $STACK_NAME --region us-east-1 2>/dev/null; then
         echo "Stack exists, deleting..."
@@ -177,17 +177,17 @@ job_deploy_cf_dev1:
     - echo "Creating zip file of repository..."
     - zip -r $ZIP_FILE_NAME . -x "*.git*" "*.venv*" "*__pycache__*" "*.pyc" "*node_modules*" "*.DS_Store*"
     - ls -la $ZIP_FILE_NAME
-    - echo "Uploading zip file to S3 bucket: $CICD_S3_BUCKET"
+    - 'echo "Uploading zip file to S3 bucket: $CICD_S3_BUCKET"'
     - aws s3 cp $ZIP_FILE_NAME s3://$CICD_S3_BUCKET/$ZIP_FILE_NAME --region us-east-1
     - echo "Generating pre-signed URL for zip file..."
     - PRESIGNED_URL=$(aws s3 presign s3://$CICD_S3_BUCKET/$ZIP_FILE_NAME --expires-in 3600 --region us-east-1)
     - echo "Pre-signed URL generated successfully"
-    - echo "Deploying CloudFormation stack: $STACK_NAME"
+    - 'echo "Deploying CloudFormation stack: $STACK_NAME"'
     - aws cloudformation create-stack --stack-name $STACK_NAME --template-body file://medialake.template --parameters ParameterKey=SourceCodeUrl,ParameterValue="$PRESIGNED_URL" --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM --region us-east-1
     - echo "Waiting for stack creation to complete..."
     - aws cloudformation wait stack-create-complete --stack-name $STACK_NAME --region us-east-1
     - echo "CloudFormation deployment completed successfully"
-    - echo "Stack outputs:"
+    - 'echo "Stack outputs:"'
     - aws cloudformation describe-stacks --stack-name $STACK_NAME --region us-east-1 --query 'Stacks[0].Outputs'
 
 # Pre-commit hooks job for merge requests to main (excluding ESLint)
