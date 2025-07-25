@@ -144,6 +144,9 @@ job_deploy_cf_dev1:
   stage: deploy
   <<: *echo_versions
   timeout: 3h
+  tags:
+    - arch:amd64
+    - size:xlarge
   rules:
     - if: $CI_COMMIT_REF_NAME == "stable"
       when: on_success
@@ -153,21 +156,16 @@ job_deploy_cf_dev1:
   variables:
     STACK_NAME: "medialake-cf-dev1"
     ZIP_FILE_NAME: "medialake-source-${CI_COMMIT_SHORT_SHA}.zip"
-    CICD_ROLE_ARN: "arn:aws:iam::992382509199:role/gitlab-aws-dev-cicd-role"
+    AWS_CREDS_TARGET_ROLE: "arn:aws:iam::992382509199:role/gitlab-aws-dev-cicd-role"
+    AWS_DEFAULT_REGION: "us-east-1"
     CICD_S3_BUCKET: "medialake-cicd"
   script:
     - echo "Deploying MediaLake to DEV1 account via CloudFormation"
-    - 'echo "Using CICD Role ARN: $CICD_ROLE_ARN"'
-    - 'echo "Using CICD S3 Bucket: $CICD_S3_BUCKET"'
-    - export AWS_DEFAULT_REGION=us-east-1
-    - export AWS_REGION=us-east-1
-    - echo "Current AWS identity before assume-role:"
+    - echo "Using AWS_CREDS_TARGET_ROLE: $AWS_CREDS_TARGET_ROLE"
+    - echo "Using AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION"
+    - echo "Using CICD S3 Bucket: $CICD_S3_BUCKET"
+    - echo "Current AWS identity (should be assumed role):"
     - aws sts get-caller-identity
-    - 'echo "Attempting to assume role: $CICD_ROLE_ARN"'
-    - aws sts assume-role --role-arn "$CICD_ROLE_ARN" --role-session-name "gitlab-ci-deploy" --debug > assume-role-output.json 2>&1 || (echo "Assume role failed, output:" && cat assume-role-output.json && exit 1)
-    - export AWS_ACCESS_KEY_ID=$(jq -r '.Credentials.AccessKeyId' assume-role-output.json)
-    - export AWS_SECRET_ACCESS_KEY=$(jq -r '.Credentials.SecretAccessKey' assume-role-output.json)
-    - export AWS_SESSION_TOKEN=$(jq -r '.Credentials.SessionToken' assume-role-output.json)
     - 'echo "Checking for existing CloudFormation stack: $STACK_NAME"'
     - |
       if aws cloudformation describe-stacks --stack-name $STACK_NAME --region us-east-1 2>/dev/null; then
