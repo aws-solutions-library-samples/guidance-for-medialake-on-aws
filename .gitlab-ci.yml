@@ -219,10 +219,13 @@ job_deploy_cf_dev1:
         --stack-name $STACK_NAME \
         --template-body file://medialake.template \
         --parameters \
-          ParameterKey=SourceCodeUrl,ParameterValue="$PRESIGNED_URL" \
+          ParameterKey=SourceType,ParameterValue="S3PresignedURL" \
+          ParameterKey=S3PresignedURL,ParameterValue="$PRESIGNED_URL" \
           ParameterKey=InitialUserFirstName,ParameterValue="Admin" \
           ParameterKey=InitialUserLastName,ParameterValue="User" \
           ParameterKey=InitialUserEmail,ParameterValue="admin@example.com" \
+          ParameterKey=MediaLakeEnvironmentName,ParameterValue="dev" \
+          ParameterKey=OpenSearchDeploymentSize,ParameterValue="small" \
         --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
         --region us-east-1
     - echo "Waiting for stack creation to complete..."
