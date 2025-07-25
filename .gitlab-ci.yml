@@ -214,7 +214,17 @@ job_deploy_cf_dev1:
     - PRESIGNED_URL=$(aws s3 presign s3://$S3_BUCKET_NAME/$ZIP_FILE_NAME --expires-in 3600 --region us-east-1)
     - echo "Pre-signed URL generated successfully"
     - 'echo "Deploying CloudFormation stack: $STACK_NAME"'
-    - aws cloudformation create-stack --stack-name $STACK_NAME --template-body file://medialake.template --parameters ParameterKey=SourceCodeUrl,ParameterValue="$PRESIGNED_URL" --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM --region us-east-1
+    - |
+      aws cloudformation create-stack \
+        --stack-name $STACK_NAME \
+        --template-body file://medialake.template \
+        --parameters \
+          ParameterKey=SourceCodeUrl,ParameterValue="$PRESIGNED_URL" \
+          ParameterKey=InitialUserFirstName,ParameterValue="Admin" \
+          ParameterKey=InitialUserLastName,ParameterValue="User" \
+          ParameterKey=InitialUserEmail,ParameterValue="admin@example.com" \
+        --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+        --region us-east-1
     - echo "Waiting for stack creation to complete..."
     - aws cloudformation wait stack-create-complete --stack-name $STACK_NAME --region us-east-1
     - echo "CloudFormation deployment completed successfully"
