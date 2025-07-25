@@ -157,7 +157,6 @@ job_deploy_cf_dev1:
     STACK_NAME: "medialake-cf-dev1"
     ZIP_FILE_NAME: "medialake-source-${CI_COMMIT_SHORT_SHA}.zip"
     AWS_DEFAULT_REGION: "us-east-1"
-    CICD_S3_BUCKET: "medialake-cicd"
   before_script:
     # Install required dependencies
     - yum update -y
@@ -176,22 +175,26 @@ job_deploy_cf_dev1:
     - jq --version
   script:
     - echo "Deploying MediaLake to DEV1 account via CloudFormation"
-    - echo "Configuring AWS credentials for CICD account access"
+    - echo "Using current account credentials for deployment"
     - 'echo "Using AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION"'
-    - 'echo "Using CICD S3 Bucket: $CICD_S3_BUCKET"'
-    - |
-      # Configure AWS credentials for CICD account access
-      echo "Setting up AWS configuration for CICD account..."
-      aws configure set aws_access_key_id "$CICD_ACCESS_KEY"
-      aws configure set aws_secret_access_key "$CICD_SECRET_KEY"
-      aws configure set default.region "us-east-1"
-      aws configure set default.output "json"
-      echo "AWS configuration completed for CICD account"
-    - echo "Verifying AWS identity (should be CICD account):"
+    - echo "Verifying AWS identity:"
     - aws sts get-caller-identity
-    - echo "Testing S3 access to CICD bucket:"
-    - aws s3 ls s3://$CICD_S3_BUCKET/ --region us-east-1 || echo "Failed to access CICD bucket"
-    - echo "S3 bucket access confirmed, proceeding with deployment workflow"
+    - |
+      # Generate unique S3 bucket name using UUID
+      echo "Generating unique S3 bucket name..."
+      BUCKET_UUID=$(python3 -c "import uuid; print(str(uuid.uuid4())[:8])")
+      S3_BUCKET_NAME="medialake-deploy-${BUCKET_UUID}-${CI_COMMIT_SHORT_SHA}"
+      echo "Generated S3 bucket name: $S3_BUCKET_NAME"
+
+      # Create S3 bucket in current account
+      echo "Creating S3 bucket in current account..."
+      aws s3 mb s3://$S3_BUCKET_NAME --region us-east-1
+      echo "S3 bucket created successfully: $S3_BUCKET_NAME"
+
+      # Test S3 access
+      echo "Testing S3 bucket access..."
+      aws s3 ls s3://$S3_BUCKET_NAME/ --region us-east-1
+      echo "S3 bucket access confirmed"
     - 'echo "Checking for existing CloudFormation stack: $STACK_NAME"'
     - |
       if aws cloudformation describe-stacks --stack-name $STACK_NAME --region us-east-1 2>/dev/null; then
@@ -205,10 +208,10 @@ job_deploy_cf_dev1:
     - echo "Creating zip file of repository..."
     - zip -r $ZIP_FILE_NAME . -x "*.git*" "*.venv*" "*__pycache__*" "*.pyc" "*node_modules*" "*.DS_Store*"
     - ls -la $ZIP_FILE_NAME
-    - 'echo "Uploading zip file to S3 bucket: $CICD_S3_BUCKET"'
-    - aws s3 cp $ZIP_FILE_NAME s3://$CICD_S3_BUCKET/$ZIP_FILE_NAME --region us-east-1
+    - 'echo "Uploading zip file to S3 bucket: $S3_BUCKET_NAME"'
+    - aws s3 cp $ZIP_FILE_NAME s3://$S3_BUCKET_NAME/$ZIP_FILE_NAME --region us-east-1
     - echo "Generating pre-signed URL for zip file..."
-    - PRESIGNED_URL=$(aws s3 presign s3://$CICD_S3_BUCKET/$ZIP_FILE_NAME --expires-in 3600 --region us-east-1)
+    - PRESIGNED_URL=$(aws s3 presign s3://$S3_BUCKET_NAME/$ZIP_FILE_NAME --expires-in 3600 --region us-east-1)
     - echo "Pre-signed URL generated successfully"
     - 'echo "Deploying CloudFormation stack: $STACK_NAME"'
     - aws cloudformation create-stack --stack-name $STACK_NAME --template-body file://medialake.template --parameters ParameterKey=SourceCodeUrl,ParameterValue="$PRESIGNED_URL" --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM --region us-east-1
@@ -217,6 +220,12 @@ job_deploy_cf_dev1:
     - echo "CloudFormation deployment completed successfully"
     - 'echo "Stack outputs:"'
     - aws cloudformation describe-stacks --stack-name $STACK_NAME --region us-east-1 --query 'Stacks[0].Outputs'
+    - |
+      # Clean up: Delete the temporary S3 bucket after deployment
+      echo "Cleaning up temporary S3 bucket..."
+      aws s3 rm s3://$S3_BUCKET_NAME --recursive --region us-east-1
+      aws s3 rb s3://$S3_BUCKET_NAME --region us-east-1
+      echo "Temporary S3 bucket deleted: $S3_BUCKET_NAME"
 
 # Pre-commit hooks job for merge requests to main (excluding ESLint)
 pre_commit_checks:
