@@ -27,7 +27,6 @@ variables:
 
 workflow:
   rules:
-    # TODO: find a way to make the following more dynamic
     - if: $CI_COMMIT_REF_NAME == "dev4"
       variables:
         INITIAL_USER_EMAIL: $DEV4_INITIAL_USER_EMAIL
@@ -71,6 +70,17 @@ workflow:
         CDK_DEPLOY_REGION: $US_WEST_2_AWS_REGION
         AWS_REGION: $US_WEST_2_AWS_REGION
         AMAZON_REGION: $US_WEST_2_AWS_REGION
+    # Allow merge requests targeting stable to use US West 2 variables
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
+      variables:
+        AWS_CREDS_TARGET_ROLE: $US_WEST_2_AWS_IAM_ROLE
+        AWS_DEFAULT_ACCOUNT: $US_WEST_2_AWS_ACCOUNT_ID
+        CDK_DEPLOY_ACCOUNT: $US_WEST_2_AWS_ACCOUNT_ID
+        CDK_DEFAULT_ACCOUNT: $US_WEST_2_AWS_ACCOUNT_ID
+        AWS_DEFAULT_REGION: $US_WEST_2_AWS_REGION
+        CDK_DEPLOY_REGION: $US_WEST_2_AWS_REGION
+        AWS_REGION: $US_WEST_2_AWS_REGION
+        AMAZON_REGION: $US_WEST_2_AWS_REGION
     # Allow merge requests to run
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - when: never
@@ -104,6 +114,8 @@ job_deploy:
   <<: *echo_versions
   rules:
     - if: $CI_COMMIT_REF_NAME == "stable"
+      when: on_success
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
       when: on_success
     - when: never # This prevents the job from running for other branches
   script:
