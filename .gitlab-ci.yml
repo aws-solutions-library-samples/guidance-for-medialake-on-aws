@@ -159,6 +159,22 @@ job_deploy_cf_dev1:
     AWS_CREDS_TARGET_ROLE: "arn:aws:iam::992382509199:role/gitlab-aws-dev-cicd-role"
     AWS_DEFAULT_REGION: "us-east-1"
     CICD_S3_BUCKET: "medialake-cicd"
+  before_script:
+    # Install required dependencies
+    - yum update -y
+    - yum install -y python3 python3-pip nodejs npm git jq unzip which findutils zip
+    # Install AWS CLI
+    - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+    - unzip awscliv2.zip
+    - ./aws/install
+    # Install AWS CDK
+    - npm install -g aws-cdk
+    - echo "login = $GITLAB_USER_LOGIN - role = $AWS_CREDS_TARGET_ROLE"
+    - npm --version
+    - node --version
+    - aws --version
+    - cdk --version
+    - jq --version
   script:
     - echo "Deploying MediaLake to DEV1 account via CloudFormation"
     - 'echo "Using AWS_CREDS_TARGET_ROLE: $AWS_CREDS_TARGET_ROLE"'
