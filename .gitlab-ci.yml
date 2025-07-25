@@ -182,6 +182,13 @@ job_deploy_cf_dev1:
     - 'echo "Using CICD S3 Bucket: $CICD_S3_BUCKET"'
     - 'echo "Current AWS identity (should be assumed role):"'
     - aws sts get-caller-identity
+    - echo "Testing S3 access with assumed role:"
+    - echo "Attempting to list S3 buckets:"
+    - aws s3 ls --region us-east-1 || echo "Failed to list S3 buckets"
+    - echo "Attempting to list contents of target bucket:"
+    - aws s3 ls s3://$CICD_S3_BUCKET/ --region us-east-1 || echo "Failed to list bucket contents"
+    - echo "Testing S3 bucket permissions:"
+    - aws s3api head-bucket --bucket $CICD_S3_BUCKET --region us-east-1 || echo "Failed to access bucket"
     - 'echo "Checking for existing CloudFormation stack: $STACK_NAME"'
     - |
       if aws cloudformation describe-stacks --stack-name $STACK_NAME --region us-east-1 2>/dev/null; then
