@@ -176,21 +176,22 @@ job_deploy_cf_dev1:
     - jq --version
   script:
     - echo "Deploying MediaLake to DEV1 account via CloudFormation"
-    - echo "Configuring AWS credentials using CICD_ACCESS_KEY and CICD_SECRET_KEY"
+    - echo "Configuring AWS credentials for CICD account access"
     - 'echo "Using AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION"'
     - 'echo "Using CICD S3 Bucket: $CICD_S3_BUCKET"'
     - |
-      # Configure AWS credentials using aws configure
-      echo "Setting up AWS configuration..."
+      # Configure AWS credentials for CICD account access
+      echo "Setting up AWS configuration for CICD account..."
       aws configure set aws_access_key_id "$CICD_ACCESS_KEY"
       aws configure set aws_secret_access_key "$CICD_SECRET_KEY"
       aws configure set default.region "us-east-1"
       aws configure set default.output "json"
-      echo "AWS configuration completed"
-    - echo "Verifying AWS identity:"
+      echo "AWS configuration completed for CICD account"
+    - echo "Verifying AWS identity (should be CICD account):"
     - aws sts get-caller-identity
-    - echo "Testing S3 access:"
+    - echo "Testing S3 access to CICD bucket:"
     - aws s3 ls s3://$CICD_S3_BUCKET/ --region us-east-1 || echo "Failed to access CICD bucket"
+    - echo "S3 bucket access confirmed, proceeding with deployment workflow"
     - 'echo "Checking for existing CloudFormation stack: $STACK_NAME"'
     - |
       if aws cloudformation describe-stacks --stack-name $STACK_NAME --region us-east-1 2>/dev/null; then
