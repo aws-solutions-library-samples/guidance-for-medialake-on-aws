@@ -112,6 +112,7 @@ cache:
 job_deploy:
   stage: deploy
   <<: *echo_versions
+  timeout: 3h
   rules:
     - if: $CI_COMMIT_REF_NAME == "stable"
       when: on_success
@@ -142,6 +143,7 @@ job_deploy:
 job_deploy_cf_dev1:
   stage: deploy
   <<: *echo_versions
+  timeout: 3h
   rules:
     - if: $CI_COMMIT_REF_NAME == "stable"
       when: on_success
@@ -165,16 +167,7 @@ job_deploy_cf_dev1:
     - export AWS_SESSION_TOKEN=$(jq -r '.Credentials.SessionToken' assume-role-output.json)
     # Delete existing CloudFormation stack if it exists
     - echo "Checking for existing CloudFormation stack: $STACK_NAME"
-    - >
-      if aws cloudformation describe-stacks --stack-name $STACK_NAME --region us-east-1 2>/dev/null; then
-        echo "Stack $STACK_NAME exists, deleting it...";
-        aws cloudformation delete-stack --stack-name $STACK_NAME --region us-east-1;
-        echo "Waiting for stack deletion to complete...";
-        aws cloudformation wait stack-delete-complete --stack-name $STACK_NAME --region us-east-1;
-        echo "Stack $STACK_NAME deleted successfully";
-      else
-        echo "Stack $STACK_NAME does not exist, proceeding with deployment";
-      fi
+    - aws cloudformation describe-stacks --stack-name $STACK_NAME --region us-east-1 2>/dev/null && echo "Stack exists, deleting..." && aws cloudformation delete-stack --stack-name $STACK_NAME --region us-east-1 && aws cloudformation wait stack-delete-complete --stack-name $STACK_NAME --region us-east-1 && echo "Stack deleted" || echo "Stack does not exist, proceeding"
     # Create zip file of the repository
     - echo "Creating zip file of repository..."
     - zip -r $ZIP_FILE_NAME . -x "*.git*" "*.venv*" "*__pycache__*" "*.pyc" "*node_modules*" "*.DS_Store*"
@@ -188,13 +181,7 @@ job_deploy_cf_dev1:
     - echo "Pre-signed URL generated successfully"
     # Deploy CloudFormation stack using medialake.template
     - echo "Deploying CloudFormation stack: $STACK_NAME"
-    - >
-      aws cloudformation create-stack
-      --stack-name $STACK_NAME
-      --template-body file://medialake.template
-      --parameters ParameterKey=SourceCodeUrl,ParameterValue="$PRESIGNED_URL"
-      --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM
-      --region us-east-1
+    - aws cloudformation create-stack --stack-name $STACK_NAME --template-body file://medialake.template --parameters ParameterKey=SourceCodeUrl,ParameterValue="$PRESIGNED_URL" --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM --region us-east-1
     # Wait for stack creation to complete
     - echo "Waiting for stack creation to complete..."
     - aws cloudformation wait stack-create-complete --stack-name $STACK_NAME --region us-east-1
