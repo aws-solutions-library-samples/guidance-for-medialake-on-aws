@@ -156,7 +156,6 @@ job_deploy_cf_dev1:
   variables:
     STACK_NAME: "medialake-cf-dev1"
     ZIP_FILE_NAME: "medialake-source-${CI_COMMIT_SHORT_SHA}.zip"
-    AWS_CREDS_TARGET_ROLE: "arn:aws:iam::992382509199:role/gitlab-aws-dev-cicd-role"
     AWS_DEFAULT_REGION: "us-east-1"
     CICD_S3_BUCKET: "medialake-cicd"
   before_script:
@@ -169,7 +168,7 @@ job_deploy_cf_dev1:
     - ./aws/install
     # Install AWS CDK
     - npm install -g aws-cdk
-    - echo "login = $GITLAB_USER_LOGIN - role = $AWS_CREDS_TARGET_ROLE"
+    - echo "login = $GITLAB_USER_LOGIN - using CICD credentials"
     - npm --version
     - node --version
     - aws --version
@@ -177,45 +176,19 @@ job_deploy_cf_dev1:
     - jq --version
   script:
     - echo "Deploying MediaLake to DEV1 account via CloudFormation"
-    - 'echo "Using AWS_CREDS_TARGET_ROLE: $AWS_CREDS_TARGET_ROLE"'
+    - echo "Configuring AWS credentials using CICD_ACCESS_KEY and CICD_SECRET_KEY"
     - 'echo "Using AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION"'
     - 'echo "Using CICD S3 Bucket: $CICD_S3_BUCKET"'
-    - 'echo "Current AWS identity (should be assumed role):"'
-    - aws sts get-caller-identity
-    - 'echo "CRITICAL: AWS Credential Vendor failed to assume target role!"'
-    - 'echo "Expected role: $AWS_CREDS_TARGET_ROLE"'
-    - 'echo "Actual identity shows original GitLab CI user instead of assumed role"'
-    - 'echo "Attempting manual role assumption..."'
     - |
-      # Extract account ID and role name from the target role ARN
-      ACCOUNT_ID=$(echo $AWS_CREDS_TARGET_ROLE | cut -d':' -f5)
-      ROLE_NAME=$(echo $AWS_CREDS_TARGET_ROLE | cut -d'/' -f2)
-      echo "Account ID: $ACCOUNT_ID"
-      echo "Role Name: $ROLE_NAME"
-
-      # Attempt manual role assumption
-      echo "Attempting to assume role manually..."
-      TEMP_CREDS=$(aws sts assume-role --role-arn $AWS_CREDS_TARGET_ROLE --role-session-name gitlab-ci-session --output json)
-
-      if [ $? -eq 0 ]; then
-        echo "Manual role assumption successful!"
-        export AWS_ACCESS_KEY_ID=$(echo $TEMP_CREDS | jq -r '.Credentials.AccessKeyId')
-        export AWS_SECRET_ACCESS_KEY=$(echo $TEMP_CREDS | jq -r '.Credentials.SecretAccessKey')
-        export AWS_SESSION_TOKEN=$(echo $TEMP_CREDS | jq -r '.Credentials.SessionToken')
-        echo "Temporary credentials configured"
-
-        # Verify the new identity
-        echo "Verifying assumed role identity:"
-        aws sts get-caller-identity
-
-        # Test S3 access with assumed role
-        echo "Testing S3 access with manually assumed role:"
-        aws s3 ls s3://$CICD_S3_BUCKET/ --region us-east-1 || echo "Still failed to access CICD bucket"
-      else
-        echo "Manual role assumption failed!"
-        echo "This indicates a trust relationship or permission issue"
-        exit 1
-      fi
+      # Configure AWS credentials using the GitLab variables
+      export AWS_ACCESS_KEY_ID="$CICD_ACCESS_KEY"
+      export AWS_SECRET_ACCESS_KEY="$CICD_SECRET_KEY"
+      export AWS_DEFAULT_REGION="us-east-1"
+      echo "AWS credentials configured from GitLab variables"
+    - echo "Verifying AWS identity:"
+    - aws sts get-caller-identity
+    - echo "Testing S3 access:"
+    - aws s3 ls s3://$CICD_S3_BUCKET/ --region us-east-1 || echo "Failed to access CICD bucket"
     - 'echo "Checking for existing CloudFormation stack: $STACK_NAME"'
     - |
       if aws cloudformation describe-stacks --stack-name $STACK_NAME --region us-east-1 2>/dev/null; then
