@@ -147,9 +147,7 @@ job_deploy_cf_dev1:
   rules:
     - if: $CI_COMMIT_REF_NAME == "stable"
       when: on_success
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
-      when: on_success
-    - when: never # This prevents the job from running for other branches
+    - when: never # Prevents the job from running for other branches or MR pipelines
   variables:
     STACK_NAME: "medialake-cf-dev1"
     ZIP_FILE_NAME: "medialake-source-${CI_COMMIT_SHORT_SHA}.zip"
@@ -160,7 +158,7 @@ job_deploy_cf_dev1:
     - 'echo "Using CICD S3 Bucket: $CICD_S3_BUCKET"'
     - export AWS_DEFAULT_REGION=us-east-1
     - export AWS_REGION=us-east-1
-    - aws sts assume-role --role-arn "arn:aws:iam::${CICD_ACCOUNT_ID}:role/${CICD_IAM_ROLE}" --role-session-name "gitlab-ci-deploy" > assume-role-output.json
+    - aws sts assume-role --role-arn "$CICD_IAM_ROLE" --role-session-name "gitlab-ci-deploy" > assume-role-output.json
     - export AWS_ACCESS_KEY_ID=$(jq -r '.Credentials.AccessKeyId' assume-role-output.json)
     - export AWS_SECRET_ACCESS_KEY=$(jq -r '.Credentials.SecretAccessKey' assume-role-output.json)
     - export AWS_SESSION_TOKEN=$(jq -r '.Credentials.SessionToken' assume-role-output.json)
