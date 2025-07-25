@@ -116,8 +116,9 @@ job_deploy:
   rules:
     - if: $CI_COMMIT_REF_NAME == "stable"
       when: on_success
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
+      when: on_success
     - when: never # This prevents the job from running for other branches
-  protected: true
   script:
     - echo "Deploying the project"
     - mv .cicd/config.json-template config.json
@@ -146,8 +147,9 @@ job_deploy_cf_dev1:
   rules:
     - if: $CI_COMMIT_REF_NAME == "stable"
       when: on_success
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
+      when: on_success
     - when: never # This prevents the job from running for other branches
-  protected: true
   variables:
     STACK_NAME: "medialake-cf-dev1"
     ZIP_FILE_NAME: "medialake-source-${CI_COMMIT_SHORT_SHA}.zip"
