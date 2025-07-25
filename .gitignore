@@ -143,3 +143,4 @@ s3_bucket_assets/pipeline_nodes/node_templates/utility/debug_input.yaml
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+1scratch
