@@ -161,10 +161,10 @@ job_deploy_cf_dev1:
     CICD_S3_BUCKET: "medialake-cicd"
   script:
     - echo "Deploying MediaLake to DEV1 account via CloudFormation"
-    - echo "Using AWS_CREDS_TARGET_ROLE: $AWS_CREDS_TARGET_ROLE"
-    - echo "Using AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION"
-    - echo "Using CICD S3 Bucket: $CICD_S3_BUCKET"
-    - echo "Current AWS identity (should be assumed role):"
+    - 'echo "Using AWS_CREDS_TARGET_ROLE: $AWS_CREDS_TARGET_ROLE"'
+    - 'echo "Using AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION"'
+    - 'echo "Using CICD S3 Bucket: $CICD_S3_BUCKET"'
+    - 'echo "Current AWS identity (should be assumed role):"'
     - aws sts get-caller-identity
     - 'echo "Checking for existing CloudFormation stack: $STACK_NAME"'
     - |
