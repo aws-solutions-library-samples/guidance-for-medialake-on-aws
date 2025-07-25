@@ -234,6 +234,98 @@ job_deploy_cf_dev1:
     - 'echo "Stack outputs:"'
     - aws cloudformation describe-stacks --stack-name $STACK_NAME --region us-east-1 --query 'Stacks[0].Outputs'
     - |
+      # Monitor CodePipeline execution similar to deploy-medialake.sh
+      echo "Waiting for CodePipeline to be created by CloudFormation..."
+      sleep 120  # Wait for pipeline creation
+
+      # Check for pipeline existence (try multiple possible names)
+      PIPELINE_NAME=""
+      for pipeline_candidate in "MediaLakeCDKPipeline" "CDKDeploymentPipeline"; do
+        if aws codepipeline get-pipeline --name "$pipeline_candidate" --region us-east-1 >/dev/null 2>&1; then
+          PIPELINE_NAME="$pipeline_candidate"
+          echo "Found pipeline: $PIPELINE_NAME"
+          break
+        fi
+      done
+
+      if [ -z "$PIPELINE_NAME" ]; then
+        echo "Warning: No CodePipeline found after CloudFormation deployment"
+        echo "Pipeline may still be creating. Deployment infrastructure is ready."
+      else
+        echo "Monitoring CodePipeline execution: $PIPELINE_NAME"
+        echo "This may take several minutes to complete..."
+
+        # Monitor pipeline with timeout (2 hours max)
+        MAX_WAIT_TIME=7200
+        ELAPSED_TIME=0
+
+        while [ $ELAPSED_TIME -lt $MAX_WAIT_TIME ]; do
+          # Get pipeline execution status
+          EXECUTION_STATUS=$(aws codepipeline list-pipeline-executions \
+            --pipeline-name "$PIPELINE_NAME" \
+            --region us-east-1 \
+            --max-items 1 \
+            --query "pipelineExecutionSummaries[0].status" \
+            --output text 2>/dev/null | tr -d '\n\r' | sed 's/None//g' | xargs)
+
+          if [ $? -ne 0 ] || [ "$EXECUTION_STATUS" == "None" ] || [ -z "$EXECUTION_STATUS" ] || [ "$EXECUTION_STATUS" == "null" ]; then
+            echo "Pipeline $PIPELINE_NAME not found or no executions yet. Waiting..."
+          else
+            echo "Pipeline Status: $EXECUTION_STATUS ($(date '+%H:%M:%S'))"
+
+            case "$EXECUTION_STATUS" in
+              "Succeeded")
+                echo "✅ Pipeline completed successfully!"
+                echo "MediaLake deployment completed successfully!"
+                break
+                ;;
+              "Failed")
+                echo "❌ Pipeline failed!"
+                echo "Pipeline execution failed. Check CodePipeline console for details."
+                exit 1
+                ;;
+              "Stopped")
+                echo "⏹️ Pipeline was stopped!"
+                echo "Pipeline execution was stopped."
+                exit 1
+                ;;
+              "Stopping")
+                echo "⏸️ Pipeline is stopping..."
+                ;;
+              "InProgress"|"IN_PROGRESS"|"In_Progress")
+                echo "🔄 Pipeline is running..."
+                ;;
+              "Superseded")
+                echo "🔄 Pipeline was superseded by a newer execution..."
+                echo "Pipeline execution was superseded."
+                exit 1
+                ;;
+              *)
+                # Check for failure patterns
+                if [[ "$EXECUTION_STATUS" == *"FAILED"* ]] || [[ "$EXECUTION_STATUS" == *"Failed"* ]] || [[ "$EXECUTION_STATUS" == *"failed"* ]]; then
+                  echo "❌ Pipeline appears to have failed (status: $EXECUTION_STATUS)"
+                  exit 1
+                # Check for in-progress patterns
+                elif [[ "$EXECUTION_STATUS" == *"PROGRESS"* ]] || [[ "$EXECUTION_STATUS" == *"Progress"* ]] || [[ "$EXECUTION_STATUS" == *"RUNNING"* ]] || [[ "$EXECUTION_STATUS" == *"Running"* ]]; then
+                  echo "🔄 Pipeline appears to be running (status: $EXECUTION_STATUS)"
+                else
+                  echo "⚠️ Unknown pipeline status: $EXECUTION_STATUS"
+                fi
+                ;;
+            esac
+          fi
+
+          sleep 60
+          ELAPSED_TIME=$((ELAPSED_TIME + 60))
+        done
+
+        if [ $ELAPSED_TIME -ge $MAX_WAIT_TIME ]; then
+          echo "⏰ Pipeline monitoring timed out after 2 hours"
+          echo "Pipeline may still be running. Check CodePipeline console for current status."
+          exit 1
+        fi
+      fi
+    - |
       # Clean up: Delete the temporary S3 bucket after deployment
       echo "Cleaning up temporary S3 bucket..."
       aws s3 rm s3://$S3_BUCKET_NAME --recursive --region us-east-1
