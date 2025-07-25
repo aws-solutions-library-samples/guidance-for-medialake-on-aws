@@ -182,13 +182,40 @@ job_deploy_cf_dev1:
     - 'echo "Using CICD S3 Bucket: $CICD_S3_BUCKET"'
     - 'echo "Current AWS identity (should be assumed role):"'
     - aws sts get-caller-identity
-    - echo "Testing S3 access with assumed role:"
-    - echo "Attempting to list S3 buckets:"
-    - aws s3 ls --region us-east-1 || echo "Failed to list S3 buckets"
-    - echo "Attempting to list contents of target bucket:"
-    - aws s3 ls s3://$CICD_S3_BUCKET/ --region us-east-1 || echo "Failed to list bucket contents"
-    - echo "Testing S3 bucket permissions:"
-    - aws s3api head-bucket --bucket $CICD_S3_BUCKET --region us-east-1 || echo "Failed to access bucket"
+    - echo "CRITICAL: AWS Credential Vendor failed to assume target role!"
+    - echo "Expected role: $AWS_CREDS_TARGET_ROLE"
+    - echo "Actual identity shows original GitLab CI user instead of assumed role"
+    - echo "Attempting manual role assumption..."
+    - |
+      # Extract account ID and role name from the target role ARN
+      ACCOUNT_ID=$(echo $AWS_CREDS_TARGET_ROLE | cut -d':' -f5)
+      ROLE_NAME=$(echo $AWS_CREDS_TARGET_ROLE | cut -d'/' -f2)
+      echo "Account ID: $ACCOUNT_ID"
+      echo "Role Name: $ROLE_NAME"
+
+      # Attempt manual role assumption
+      echo "Attempting to assume role manually..."
+      TEMP_CREDS=$(aws sts assume-role --role-arn $AWS_CREDS_TARGET_ROLE --role-session-name gitlab-ci-session --output json)
+
+      if [ $? -eq 0 ]; then
+        echo "Manual role assumption successful!"
+        export AWS_ACCESS_KEY_ID=$(echo $TEMP_CREDS | jq -r '.Credentials.AccessKeyId')
+        export AWS_SECRET_ACCESS_KEY=$(echo $TEMP_CREDS | jq -r '.Credentials.SecretAccessKey')
+        export AWS_SESSION_TOKEN=$(echo $TEMP_CREDS | jq -r '.Credentials.SessionToken')
+        echo "Temporary credentials configured"
+
+        # Verify the new identity
+        echo "Verifying assumed role identity:"
+        aws sts get-caller-identity
+
+        # Test S3 access with assumed role
+        echo "Testing S3 access with manually assumed role:"
+        aws s3 ls s3://$CICD_S3_BUCKET/ --region us-east-1 || echo "Still failed to access CICD bucket"
+      else
+        echo "Manual role assumption failed!"
+        echo "This indicates a trust relationship or permission issue"
+        exit 1
+      fi
     - 'echo "Checking for existing CloudFormation stack: $STACK_NAME"'
     - |
       if aws cloudformation describe-stacks --stack-name $STACK_NAME --region us-east-1 2>/dev/null; then
