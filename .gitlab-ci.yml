@@ -182,10 +182,10 @@ job_deploy_cf_dev1:
     - 'echo "Using CICD S3 Bucket: $CICD_S3_BUCKET"'
     - 'echo "Current AWS identity (should be assumed role):"'
     - aws sts get-caller-identity
-    - echo "CRITICAL: AWS Credential Vendor failed to assume target role!"
-    - echo "Expected role: $AWS_CREDS_TARGET_ROLE"
-    - echo "Actual identity shows original GitLab CI user instead of assumed role"
-    - echo "Attempting manual role assumption..."
+    - 'echo "CRITICAL: AWS Credential Vendor failed to assume target role!"'
+    - 'echo "Expected role: $AWS_CREDS_TARGET_ROLE"'
+    - 'echo "Actual identity shows original GitLab CI user instead of assumed role"'
+    - 'echo "Attempting manual role assumption..."'
     - |
       # Extract account ID and role name from the target role ARN
       ACCOUNT_ID=$(echo $AWS_CREDS_TARGET_ROLE | cut -d':' -f5)
