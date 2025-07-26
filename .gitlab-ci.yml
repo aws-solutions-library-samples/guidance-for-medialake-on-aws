@@ -19,9 +19,6 @@ workflow:
     # Allow merge requests to run
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     # Allow specific branches to run
-    - if: $CI_COMMIT_REF_NAME == "dev4"
-    - if: $CI_COMMIT_REF_NAME == "dev5"
-    - if: $CI_COMMIT_REF_NAME == "demo"
     - if: $CI_COMMIT_REF_NAME == "stable"
     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
     - if: $CI_COMMIT_REF_NAME == "release"
@@ -84,7 +81,7 @@ medialake_deploy_us_east_1:
     - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
     - unzip awscliv2.zip
     - ./aws/install
-    - echo "login = $GITLAB_USER_LOGIN - using CICD credentials"
+    - echo "login = $GITLAB_USER_LOGIN - role = arn:aws:iam::438465153766:role/gitlab-ci"
     - npm --version
     - node --version
     - aws --version
