@@ -23,6 +23,7 @@ class SettingsStackProps:
     ddb_export_bucket_name: str = None
     pipelines_nodes_templates_bucket_name: str = None
     asset_sync_results_bucket_name: str = None
+    user_interface_bucket_name: str = None
 
 
 class SettingsStack(cdk.NestedStack):
@@ -62,6 +63,8 @@ class SettingsStack(cdk.NestedStack):
                     or "",
                     "ASSET_SYNC_RESULTS_BUCKET_NAME": props.asset_sync_results_bucket_name
                     or "",
+                    "USER_INTERFACE_BUCKET_NAME": props.user_interface_bucket_name
+                    or "",
                 },
             ),
         )
@@ -93,6 +96,7 @@ class SettingsStack(cdk.NestedStack):
                     or "",
                     "AssetSyncResultsBucket": props.asset_sync_results_bucket_name
                     or "",
+                    "UserInterfaceBucket": props.user_interface_bucket_name or "",
                 }
             },
         )
