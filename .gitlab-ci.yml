@@ -27,6 +27,7 @@ variables:
 
 workflow:
   rules:
+    # TODO: find a way to make the following more dynamic
     - if: $CI_COMMIT_REF_NAME == "dev4"
       variables:
         INITIAL_USER_EMAIL: $DEV4_INITIAL_USER_EMAIL
@@ -60,16 +61,6 @@ workflow:
         CDK_DEPLOY_REGION: $DEMO_AWS_REGION
         AWS_REGION: $DEMO_AWS_REGION
         AMAZON_REGION: $DEMO_AWS_REGION
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev5"
-      variables:
-        AWS_CREDS_TARGET_ROLE: $DEV1_AWS_IAM_ROLE
-        AWS_DEFAULT_ACCOUNT: $DEV1_AWS_ACCOUNT_ID
-        CDK_DEPLOY_ACCOUNT: $DEV1_AWS_ACCOUNT_ID
-        CDK_DEFAULT_ACCOUNT: $DEV1_AWS_ACCOUNT_ID
-        AWS_DEFAULT_REGION: $DEV1_AWS_REGION
-        CDK_DEPLOY_REGION: $DEV1_AWS_REGION
-        AWS_REGION: $DEV1_AWS_REGION
-        AMAZON_REGION: $DEV1_AWS_REGION
     # Allow merge requests to run
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - when: never
@@ -92,7 +83,6 @@ cache:
     # Install AWS CDK
     - npm install -g aws-cdk
     - echo "login = $GITLAB_USER_LOGIN - role = $AWS_CREDS_TARGET_ROLE"
-    - aws s3 ls
     - npm --version
     - node --version
     - aws --version
@@ -102,13 +92,8 @@ cache:
 job_deploy:
   stage: deploy
   <<: *echo_versions
-  timeout: 3h
   rules:
-    - if: $CI_COMMIT_REF_NAME == "stable"
-      when: on_success
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
-      when: on_success
-    - when: never # This prevents the job from running for other branches
+    - when: never # This prevents the job from running
   script:
     - echo "Deploying the project"
     - mv .cicd/config.json-template config.json
@@ -122,195 +107,12 @@ job_deploy:
     - pip install -r requirements.txt
     - pip install -r requirements-dev.txt
     - npm install
+    - python3 .cicd/build_lambdas.py build
+    - bash .cicd/build_ffprobe.sh
+    - bash .cicd/build_ffmpeg.sh
+    - bash .cicd/build_resvg.sh
     - cdk bootstrap
     - cdk deploy --all --require-approval never
-
-# CloudFormation deployment job for DEV1 account
-job_deploy_cf_dev1:
-  stage: deploy
-  <<: *echo_versions
-  timeout: 3h
-  tags:
-    - arch:amd64
-    - size:xlarge
-  rules:
-    - if: $CI_COMMIT_REF_NAME == "stable"
-      when: on_success
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
-      when: on_success
-    - when: never
-  variables:
-    STACK_NAME: "medialake-cf-dev1"
-    ZIP_FILE_NAME: "medialake-source-${CI_COMMIT_SHORT_SHA}.zip"
-    AWS_DEFAULT_REGION: "us-east-1"
-    AWS_REGION: "us-east-1"
-  before_script:
-    # Install required dependencies
-    - yum update -y
-    - yum install -y python3 python3-pip nodejs npm git jq unzip which findutils zip
-    # Install AWS CLI
-    - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-    - unzip awscliv2.zip
-    - ./aws/install
-    # Install AWS CDK
-    - npm --version
-    - node --version
-    - aws --version
-    - cdk --version
-    - jq --version
-  script:
-    - |
-      # Generate unique S3 bucket name using UUID
-      echo "Generating unique S3 bucket name..."
-      BUCKET_UUID=$(python3 -c "import uuid; print(str(uuid.uuid4())[:8])")
-      S3_BUCKET_NAME="medialake-deploy-${BUCKET_UUID}-${CI_COMMIT_SHORT_SHA}"
-      echo "Generated S3 bucket name: $S3_BUCKET_NAME"
-
-      # Create S3 bucket in current account
-      echo "Creating S3 bucket in current account..."
-      aws s3 mb s3://$S3_BUCKET_NAME --region us-east-1
-      echo "S3 bucket created successfully: $S3_BUCKET_NAME"
-
-      # Test S3 access
-      echo "Testing S3 bucket access..."
-      aws s3 ls s3://$S3_BUCKET_NAME/ --region us-east-1
-      echo "S3 bucket access confirmed"
-    - 'echo "Checking for existing CloudFormation stack: $STACK_NAME"'
-    - |
-      if aws cloudformation describe-stacks --stack-name $STACK_NAME --region us-east-1 2>/dev/null; then
-        echo "Stack exists, deleting..."
-        aws cloudformation delete-stack --stack-name $STACK_NAME --region us-east-1
-        aws cloudformation wait stack-delete-complete --stack-name $STACK_NAME --region us-east-1
-        echo "Stack deleted"
-      else
-        echo "Stack does not exist, proceeding"
-      fi
-    - echo "Creating zip file of repository..."
-    - zip -r $ZIP_FILE_NAME . -x "*.git*" "*.venv*" "*__pycache__*" "*.pyc" "*node_modules*" "*.DS_Store*"
-    - ls -la $ZIP_FILE_NAME
-    - 'echo "Uploading zip file to S3 bucket: $S3_BUCKET_NAME"'
-    - aws s3 cp $ZIP_FILE_NAME s3://$S3_BUCKET_NAME/$ZIP_FILE_NAME --region us-east-1
-    - echo "Generating pre-signed URL for zip file..."
-    - PRESIGNED_URL=$(aws s3 presign s3://$S3_BUCKET_NAME/$ZIP_FILE_NAME --expires-in 3600 --region us-east-1)
-    - echo "Pre-signed URL generated successfully"
-    - 'echo "Deploying CloudFormation stack: $STACK_NAME"'
-    - |
-      aws cloudformation create-stack \
-        --stack-name $STACK_NAME \
-        --template-body file://medialake.template \
-        --parameters \
-          ParameterKey=SourceType,ParameterValue="S3PresignedURL" \
-          ParameterKey=S3PresignedURL,ParameterValue="$PRESIGNED_URL" \
-          ParameterKey=InitialUserFirstName,ParameterValue="Admin" \
-          ParameterKey=InitialUserLastName,ParameterValue="User" \
-          ParameterKey=InitialUserEmail,ParameterValue="admin@example.com" \
-          ParameterKey=MediaLakeEnvironmentName,ParameterValue="dev" \
-          ParameterKey=OpenSearchDeploymentSize,ParameterValue="small" \
-        --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
-        --region us-east-1
-    - echo "Waiting for stack creation to complete..."
-    - aws cloudformation wait stack-create-complete --stack-name $STACK_NAME --region us-east-1
-    - echo "CloudFormation deployment completed successfully"
-    - 'echo "Stack outputs:"'
-    - aws cloudformation describe-stacks --stack-name $STACK_NAME --region us-east-1 --query 'Stacks[0].Outputs'
-    - |
-      # Monitor CodePipeline execution similar to deploy-medialake.sh
-      echo "Waiting for CodePipeline to be created by CloudFormation..."
-      sleep 120  # Wait for pipeline creation
-
-      # Check for pipeline existence (try multiple possible names)
-      PIPELINE_NAME=""
-      for pipeline_candidate in "MediaLakeCDKPipeline" "CDKDeploymentPipeline"; do
-        if aws codepipeline get-pipeline --name "$pipeline_candidate" --region us-east-1 >/dev/null 2>&1; then
-          PIPELINE_NAME="$pipeline_candidate"
-          echo "Found pipeline: $PIPELINE_NAME"
-          break
-        fi
-      done
-
-      if [ -z "$PIPELINE_NAME" ]; then
-        echo "Warning: No CodePipeline found after CloudFormation deployment"
-        echo "Pipeline may still be creating. Deployment infrastructure is ready."
-      else
-        echo "Monitoring CodePipeline execution: $PIPELINE_NAME"
-        echo "This may take several minutes to complete..."
-
-        # Monitor pipeline with timeout (2 hours max)
-        MAX_WAIT_TIME=7200
-        ELAPSED_TIME=0
-
-        while [ $ELAPSED_TIME -lt $MAX_WAIT_TIME ]; do
-          # Get pipeline execution status
-          EXECUTION_STATUS=$(aws codepipeline list-pipeline-executions \
-            --pipeline-name "$PIPELINE_NAME" \
-            --region us-east-1 \
-            --max-items 1 \
-            --query "pipelineExecutionSummaries[0].status" \
-            --output text 2>/dev/null | tr -d '\n\r' | sed 's/None//g' | xargs)
-
-          if [ $? -ne 0 ] || [ "$EXECUTION_STATUS" == "None" ] || [ -z "$EXECUTION_STATUS" ] || [ "$EXECUTION_STATUS" == "null" ]; then
-            echo "Pipeline $PIPELINE_NAME not found or no executions yet. Waiting..."
-          else
-            echo "Pipeline Status: $EXECUTION_STATUS ($(date '+%H:%M:%S'))"
-
-            case "$EXECUTION_STATUS" in
-              "Succeeded")
-                echo "✅ Pipeline completed successfully!"
-                echo "MediaLake deployment completed successfully!"
-                break
-                ;;
-              "Failed")
-                echo "❌ Pipeline failed!"
-                echo "Pipeline execution failed. Check CodePipeline console for details."
-                exit 1
-                ;;
-              "Stopped")
-                echo "⏹️ Pipeline was stopped!"
-                echo "Pipeline execution was stopped."
-                exit 1
-                ;;
-              "Stopping")
-                echo "⏸️ Pipeline is stopping..."
-                ;;
-              "InProgress"|"IN_PROGRESS"|"In_Progress")
-                echo "🔄 Pipeline is running..."
-                ;;
-              "Superseded")
-                echo "🔄 Pipeline was superseded by a newer execution..."
-                echo "Pipeline execution was superseded."
-                exit 1
-                ;;
-              *)
-                # Check for failure patterns
-                if [[ "$EXECUTION_STATUS" == *"FAILED"* ]] || [[ "$EXECUTION_STATUS" == *"Failed"* ]] || [[ "$EXECUTION_STATUS" == *"failed"* ]]; then
-                  echo "❌ Pipeline appears to have failed (status: $EXECUTION_STATUS)"
-                  exit 1
-                # Check for in-progress patterns
-                elif [[ "$EXECUTION_STATUS" == *"PROGRESS"* ]] || [[ "$EXECUTION_STATUS" == *"Progress"* ]] || [[ "$EXECUTION_STATUS" == *"RUNNING"* ]] || [[ "$EXECUTION_STATUS" == *"Running"* ]]; then
-                  echo "🔄 Pipeline appears to be running (status: $EXECUTION_STATUS)"
-                else
-                  echo "⚠️ Unknown pipeline status: $EXECUTION_STATUS"
-                fi
-                ;;
-            esac
-          fi
-
-          sleep 60
-          ELAPSED_TIME=$((ELAPSED_TIME + 60))
-        done
-
-        if [ $ELAPSED_TIME -ge $MAX_WAIT_TIME ]; then
-          echo "⏰ Pipeline monitoring timed out after 2 hours"
-          echo "Pipeline may still be running. Check CodePipeline console for current status."
-          exit 1
-        fi
-      fi
-    - |
-      # Clean up: Delete the temporary S3 bucket after deployment
-      echo "Cleaning up temporary S3 bucket..."
-      aws s3 rm s3://$S3_BUCKET_NAME --recursive --region us-east-1
-      aws s3 rb s3://$S3_BUCKET_NAME --region us-east-1
-      echo "Temporary S3 bucket deleted: $S3_BUCKET_NAME"
 
 # Pre-commit hooks job for merge requests to main (excluding ESLint)
 pre_commit_checks:
@@ -340,6 +142,7 @@ pre_commit_checks:
     - pre-commit run --all-files black
     - pre-commit run --all-files flake8
     - pre-commit run --all-files prettier
+    # Remove .DS_Store files directly (since hook was removed from local config)
     - find . -name .DS_Store -type f -delete
 
 sync-to-github:
