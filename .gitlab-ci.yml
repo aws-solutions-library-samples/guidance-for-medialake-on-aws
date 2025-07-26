@@ -107,9 +107,12 @@ medialake_deploy_us_west_2:
       when: on_success
     - when: never # Prevents the job from running for other branches
   variables:
-    STACK_NAME: "medialake-cf-dev1"
+    STACK_NAME: "medialake-us-west-2"
     ZIP_FILE_NAME: "medialake-source-${CI_COMMIT_SHORT_SHA}.zip"
+    AWS_CREDS_TARGET_ROLE: $US_WEST_2_AWS_IAM_ROLE
+    AWS_DEFAULT_ACCOUNT: $US_WEST_2_AWS_ACCOUNT_ID
     AWS_DEFAULT_REGION: "us-west-2"
+
   before_script:
     # Install required dependencies
     - yum update -y
@@ -148,80 +151,120 @@ medialake_deploy_us_west_2:
       echo "Testing S3 bucket access..."
       aws s3 ls s3://$S3_BUCKET_NAME/ --region us-east-1
       echo "S3 bucket access confirmed"
-    - 'echo "Checking for existing CloudFormation stack: $STACK_NAME"'
+    - echo "Comprehensive infrastructure cleanup - checking for existing resources..."
     - |
-      # Enhanced stack deletion logic with comprehensive error handling
-      STACK_EXISTS=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --region us-east-1 --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "STACK_NOT_FOUND")
+      # Function to list all matching stacks using grep for case-insensitive matching
+      list_stacks() {
+        local region=$1
+        local stack_prefix="medialake"
+        # Get all stacks excluding DELETE_COMPLETE and filter case-insensitively for the prefix
+        aws cloudformation list-stacks \
+          --region $region \
+          --stack-status-filter CREATE_COMPLETE CREATE_FAILED CREATE_IN_PROGRESS REVIEW_IN_PROGRESS ROLLBACK_COMPLETE ROLLBACK_FAILED ROLLBACK_IN_PROGRESS UPDATE_COMPLETE UPDATE_COMPLETE_CLEANUP_IN_PROGRESS UPDATE_IN_PROGRESS UPDATE_ROLLBACK_COMPLETE UPDATE_ROLLBACK_COMPLETE_CLEANUP_IN_PROGRESS UPDATE_ROLLBACK_FAILED UPDATE_ROLLBACK_IN_PROGRESS DELETE_FAILED \
+          --query "StackSummaries[].StackName" \
+          --output text | tr '\t' '\n' | grep -i "$stack_prefix" || true
+      }
 
-      if [ "$STACK_EXISTS" != "STACK_NOT_FOUND" ]; then
-        echo "Found existing stack with status: $STACK_EXISTS"
+      # Function to check if any matching stacks are being deleted
+      any_deleting() {
+        local region=$1
+        local stack_prefix="medialake"
+        local deleting_stacks=$(aws cloudformation list-stacks \
+          --region $region \
+          --stack-status-filter DELETE_IN_PROGRESS \
+          --query "StackSummaries[].StackName" \
+          --output text | tr '\t' '\n' | grep -i "$stack_prefix" || true)
 
-        # Check if stack is in a state that allows deletion
-        case "$STACK_EXISTS" in
-          "DELETE_IN_PROGRESS")
-            echo "Stack is already being deleted. Waiting for completion..."
-            ;;
-          "DELETE_FAILED")
-            echo "Previous deletion failed. Attempting to delete again..."
-            aws cloudformation delete-stack --stack-name $STACK_NAME --region us-east-1
-            ;;
-          "CREATE_IN_PROGRESS"|"UPDATE_IN_PROGRESS"|"UPDATE_ROLLBACK_IN_PROGRESS")
-            echo "Stack is currently being modified. Waiting for operation to complete before deletion..."
-            echo "Waiting for stack to reach a stable state..."
-            aws cloudformation wait stack-create-complete --stack-name $STACK_NAME --region us-east-1 2>/dev/null || \
-            aws cloudformation wait stack-update-complete --stack-name $STACK_NAME --region us-east-1 2>/dev/null || \
-            aws cloudformation wait stack-rollback-complete --stack-name $STACK_NAME --region us-east-1 2>/dev/null || true
+        if [ -z "$deleting_stacks" ]; then
+          return 1
+        else
+          echo "Stacks currently being deleted in $region: $deleting_stacks"
+          return 0
+        fi
+      }
 
-            # After waiting, initiate deletion
-            echo "Stack is now stable. Initiating deletion..."
-            aws cloudformation delete-stack --stack-name $STACK_NAME --region us-east-1
-            ;;
-          *)
-            echo "Stack is in deletable state. Initiating deletion..."
-            aws cloudformation delete-stack --stack-name $STACK_NAME --region us-east-1
-            ;;
-        esac
+      # Function to delete stacks in a specific region
+      delete_stacks_in_region() {
+        local region=$1
+        echo "Starting comprehensive stack cleanup in region $region"
+        echo "Will delete all stacks containing (case-insensitive): 'medialake'"
 
-        # Wait for deletion to complete with timeout and status monitoring
-        echo "Monitoring stack deletion progress..."
-        MAX_WAIT_TIME=1800  # 30 minutes timeout for deletion
-        ELAPSED_TIME=0
-        WAIT_INTERVAL=30
+        # Main loop to delete stacks
+        while true; do
+          stacks=$(list_stacks "$region")
 
-        while [ $ELAPSED_TIME -lt $MAX_WAIT_TIME ]; do
-          CURRENT_STATUS=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --region us-east-1 --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "STACK_DELETED")
-
-          if [ "$CURRENT_STATUS" = "STACK_DELETED" ]; then
-            echo "✅ Stack successfully deleted!"
+          if [ -z "$stacks" ]; then
+            echo "No more medialake stacks found in region $region. Cleanup complete!"
             break
-          elif [ "$CURRENT_STATUS" = "DELETE_COMPLETE" ]; then
-            echo "✅ Stack deletion completed successfully!"
-            break
-          elif [ "$CURRENT_STATUS" = "DELETE_FAILED" ]; then
-            echo "❌ Stack deletion failed!"
-            echo "Checking for deletion failure reasons..."
-            aws cloudformation describe-stack-events --stack-name $STACK_NAME --region us-east-1 --query 'StackEvents[?ResourceStatus==`DELETE_FAILED`].[LogicalResourceId,ResourceStatusReason]' --output table || true
-            echo "Attempting to continue with deployment despite deletion failure..."
-            break
-          elif [ "$CURRENT_STATUS" = "DELETE_IN_PROGRESS" ]; then
-            echo "🔄 Stack deletion in progress... ($(date '+%H:%M:%S'))"
-          else
-            echo "⚠️ Unexpected stack status during deletion: $CURRENT_STATUS"
           fi
 
-          sleep $WAIT_INTERVAL
-          ELAPSED_TIME=$((ELAPSED_TIME + WAIT_INTERVAL))
+          echo "Found stacks in $region: $stacks"
+
+          # Check if any stack is already being deleted
+          if any_deleting "$region"; then
+            echo "Waiting for in-progress deletions to complete in $region..."
+          else
+            # Attempt to delete each stack
+            for stack in $stacks; do
+              echo "Attempting to delete stack: $stack in region $region"
+
+              # Check if stack is in DELETE_FAILED state and try with retain resources
+              stack_status=$(aws cloudformation describe-stacks --stack-name "$stack" --region "$region" --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "STACK_NOT_FOUND")
+
+              if [ "$stack_status" == "DELETE_FAILED" ]; then
+                echo "Stack $stack is in DELETE_FAILED state. Attempting to get resources that failed to delete..."
+
+                # Get resources that might have failed to delete
+                resources=$(aws cloudformation list-stack-resources --stack-name "$stack" --region "$region" --query "StackResourceSummaries[?ResourceStatus=='DELETE_FAILED'].LogicalResourceId" --output text || true)
+
+                if [ -n "$resources" ]; then
+                  echo "Found resources that failed to delete: $resources"
+                  echo "Attempting to delete stack with --retain-resources option"
+                  aws cloudformation delete-stack \
+                    --region $region \
+                    --stack-name $stack \
+                    --retain-resources $resources || true
+                else
+                  # Standard delete attempt
+                  aws cloudformation delete-stack \
+                    --region $region \
+                    --stack-name $stack || true
+                fi
+              else
+                # Standard delete attempt
+                aws cloudformation delete-stack \
+                  --region $region \
+                  --stack-name $stack || true
+              fi
+
+              # Break after initiating one deletion to handle dependencies
+              break
+            done
+          fi
+
+          echo "Waiting 60 seconds before checking again in $region..."
+          sleep 60
         done
+      }
 
-        if [ $ELAPSED_TIME -ge $MAX_WAIT_TIME ]; then
-          echo "⏰ Stack deletion timed out after 30 minutes"
-          echo "Current stack status: $(aws cloudformation describe-stacks --stack-name $STACK_NAME --region us-east-1 --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo 'UNKNOWN')"
-          echo "Proceeding with deployment - manual cleanup may be required"
+      # Check for existing CodePipelines that might conflict
+      echo "Checking for existing CodePipelines..."
+      for pipeline_candidate in "MediaLakeCDKPipeline" "CDKDeploymentPipeline"; do
+        if aws codepipeline get-pipeline --name "$pipeline_candidate" --region us-east-1 >/dev/null 2>&1; then
+          echo "Found existing pipeline: $pipeline_candidate - will be cleaned up with stack deletion"
         fi
+      done
 
-      else
-        echo "No existing stack found. Proceeding with fresh deployment."
+      # First, destroy stacks in us-east-1 (where the deployment will happen)
+      delete_stacks_in_region "us-east-1"
+
+      # Then destroy stacks in us-west-2 if different (for any regional resources)
+      if [ "$AWS_DEFAULT_REGION" != "us-east-1" ]; then
+        echo "Checking for regional resources in $AWS_DEFAULT_REGION..."
+        delete_stacks_in_region "$AWS_DEFAULT_REGION"
       fi
+
+      echo "Infrastructure cleanup completed. Proceeding with fresh deployment."
     - echo "Creating zip file of repository..."
     - zip -r $ZIP_FILE_NAME . -x "*.git*" "*.venv*" "*__pycache__*" "*.pyc" "*node_modules*" "*.DS_Store*"
     - ls -la $ZIP_FILE_NAME
@@ -246,7 +289,7 @@ medialake_deploy_us_west_2:
         --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
         --region us-east-1
     - echo "Waiting for stack creation to complete..."
-    - aws cloudformation wait stack-create-complete --stack-name $STACK_NAME --region us-east-1
+    - aws cloudformation wait stack-create-complete --stack-name $STACK_NAME --region us-west-2
     - echo "CloudFormation deployment completed successfully"
     - 'echo "Stack outputs:"'
     - aws cloudformation describe-stacks --stack-name $STACK_NAME --region us-east-1 --query 'Stacks[0].Outputs'
