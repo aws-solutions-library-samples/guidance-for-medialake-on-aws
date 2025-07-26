@@ -512,12 +512,16 @@ def copy_s3_objects(asset: Dict[str, Any], new_name: str) -> List[Dict[str, Any]
             # Use consistent path construction logic matching top-level DerivedRepresentations
             dirpath = get_object_path(derived_path)
             orig_filename = get_object_name_from_path(derived_path)
-            
+
             try:
                 # Extract base name and extension from original filename
                 prefix, ext = orig_filename.rsplit(".", 1)
                 # Calculate suffix by removing the original base name
-                suffix = prefix[len(orig_base):] if prefix.startswith(orig_base) else f"_derived_{idx}"
+                suffix = (
+                    prefix[len(orig_base) :]
+                    if prefix.startswith(orig_base)
+                    else f"_derived_{idx}"
+                )
                 # Construct new filename with new base + suffix + extension
                 new_derived_name = f"{new_base}{suffix}.{ext}"
                 # Construct full path preserving original directory structure
