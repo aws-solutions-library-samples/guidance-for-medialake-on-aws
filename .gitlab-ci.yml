@@ -14,75 +14,19 @@ variables:
   PROJECT_ENV: $CI_COMMIT_REF_SLUG
   AWS_CONFIG_FILE: $CI_BUILDS_DIR/.awscredentialvendor/config
   AWS_SHARED_CREDENTIALS_FILE: $CI_BUILDS_DIR/.awscredentialvendor/credentials
-  # Default deployment environment
-  INITIAL_USER_EMAIL: $DEFAULT_INITIAL_USER_EMAIL
-  AWS_CREDS_TARGET_ROLE: $DEFAULT_AWS_IAM_ROLE
-  AWS_DEFAULT_ACCOUNT: $DEFAULT_AWS_ACCOUNT_ID
-  CDK_DEPLOY_ACCOUNT: $DEFAULT_AWS_ACCOUNT_ID
-  CDK_DEFAULT_ACCOUNT: $DEFAULT_AWS_ACCOUNT_ID
-  AWS_DEFAULT_REGION: $DEFAULT_AWS_REGION
-  CDK_DEPLOY_REGION: $DEFAULT_AWS_REGION
-  AWS_REGION: $DEFAULT_AWS_REGION
-  AMAZON_REGION: $DEFAULT_AWS_REGION
 
 workflow:
   rules:
-    - if: $CI_COMMIT_REF_NAME == "dev4"
-      variables:
-        INITIAL_USER_EMAIL: $DEV4_INITIAL_USER_EMAIL
-        AWS_CREDS_TARGET_ROLE: $DEV4_AWS_IAM_ROLE
-        AWS_DEFAULT_ACCOUNT: $DEV4_AWS_ACCOUNT_ID
-        CDK_DEPLOY_ACCOUNT: $DEV4_AWS_ACCOUNT_ID
-        CDK_DEFAULT_ACCOUNT: $DEV4_AWS_ACCOUNT_ID
-        AWS_DEFAULT_REGION: $DEV4_AWS_REGION
-        CDK_DEPLOY_REGION: $DEV4_AWS_REGION
-        AWS_REGION: $DEV4_AWS_REGION
-        AMAZON_REGION: $DEV4_AWS_REGION
-    - if: $CI_COMMIT_REF_NAME == "dev5"
-      variables:
-        INITIAL_USER_EMAIL: $DEV5_INITIAL_USER_EMAIL
-        AWS_CREDS_TARGET_ROLE: $DEV5_AWS_IAM_ROLE
-        AWS_DEFAULT_ACCOUNT: $DEV5_AWS_ACCOUNT_ID
-        CDK_DEPLOY_ACCOUNT: $DEV5_AWS_ACCOUNT_ID
-        CDK_DEFAULT_ACCOUNT: $DEV5_AWS_ACCOUNT_ID
-        AWS_DEFAULT_REGION: $DEV5_AWS_REGION
-        CDK_DEPLOY_REGION: $DEV5_AWS_REGION
-        AWS_REGION: $DEV5_AWS_REGION
-        AMAZON_REGION: $DEV5_AWS_REGION
-    - if: $CI_COMMIT_REF_NAME == "demo"
-      variables:
-        INITIAL_USER_EMAIL: $DEMO_INITIAL_USER_EMAIL
-        AWS_CREDS_TARGET_ROLE: $DEMO_AWS_IAM_ROLE
-        AWS_DEFAULT_ACCOUNT: $DEMO_AWS_ACCOUNT_ID
-        CDK_DEPLOY_ACCOUNT: $DEMO_AWS_ACCOUNT_ID
-        CDK_DEFAULT_ACCOUNT: $DEMO_AWS_ACCOUNT_ID
-        AWS_DEFAULT_REGION: $DEMO_AWS_REGION
-        CDK_DEPLOY_REGION: $DEMO_AWS_REGION
-        AWS_REGION: $DEMO_AWS_REGION
-        AMAZON_REGION: $DEMO_AWS_REGION
-    - if: $CI_COMMIT_REF_NAME == "stable"
-      variables:
-        AWS_CREDS_TARGET_ROLE: $US_WEST_2_AWS_IAM_ROLE
-        AWS_DEFAULT_ACCOUNT: $US_WEST_2_AWS_ACCOUNT_ID
-        CDK_DEPLOY_ACCOUNT: $US_WEST_2_AWS_ACCOUNT_ID
-        CDK_DEFAULT_ACCOUNT: $US_WEST_2_AWS_ACCOUNT_ID
-        AWS_DEFAULT_REGION: $US_WEST_2_AWS_REGION
-        CDK_DEPLOY_REGION: $US_WEST_2_AWS_REGION
-        AWS_REGION: $US_WEST_2_AWS_REGION
-        AMAZON_REGION: $US_WEST_2_AWS_REGION
-    # Allow merge requests targeting stable to use US West 2 variables
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
-      variables:
-        AWS_CREDS_TARGET_ROLE: $US_WEST_2_AWS_IAM_ROLE
-        AWS_DEFAULT_ACCOUNT: $US_WEST_2_AWS_ACCOUNT_ID
-        CDK_DEPLOY_ACCOUNT: $US_WEST_2_AWS_ACCOUNT_ID
-        CDK_DEFAULT_ACCOUNT: $US_WEST_2_AWS_ACCOUNT_ID
-        AWS_DEFAULT_REGION: $US_WEST_2_AWS_REGION
-        CDK_DEPLOY_REGION: $US_WEST_2_AWS_REGION
-        AWS_REGION: $US_WEST_2_AWS_REGION
-        AMAZON_REGION: $US_WEST_2_AWS_REGION
     # Allow merge requests to run
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    # Allow specific branches to run
+    - if: $CI_COMMIT_REF_NAME == "dev4"
+    - if: $CI_COMMIT_REF_NAME == "dev5"
+    - if: $CI_COMMIT_REF_NAME == "demo"
+    - if: $CI_COMMIT_REF_NAME == "stable"
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
+    - if: $CI_COMMIT_REF_NAME == "release"
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
     - when: never
 
 # Cache modules in between jobs
@@ -113,6 +57,16 @@ job_deploy:
   stage: deploy
   <<: *echo_versions
   timeout: 3h
+  variables:
+    INITIAL_USER_EMAIL: $DEFAULT_INITIAL_USER_EMAIL
+    AWS_CREDS_TARGET_ROLE: $DEFAULT_AWS_IAM_ROLE
+    AWS_DEFAULT_ACCOUNT: $DEFAULT_AWS_ACCOUNT_ID
+    CDK_DEPLOY_ACCOUNT: $DEFAULT_AWS_ACCOUNT_ID
+    CDK_DEFAULT_ACCOUNT: $DEFAULT_AWS_ACCOUNT_ID
+    AWS_DEFAULT_REGION: $DEFAULT_AWS_REGION
+    CDK_DEPLOY_REGION: $DEFAULT_AWS_REGION
+    AWS_REGION: $DEFAULT_AWS_REGION
+    AMAZON_REGION: $DEFAULT_AWS_REGION
   rules:
     - if: $CI_COMMIT_REF_NAME == "stable"
       when: on_success
@@ -139,8 +93,7 @@ job_deploy:
     - cdk bootstrap
     - cdk deploy --all --require-approval never
 
-# CloudFormation deployment job for DEV1 account
-job_deploy_cf_dev1:
+medialake_deploy_us_west_2:
   stage: deploy
   <<: *echo_versions
   timeout: 3h
@@ -156,7 +109,7 @@ job_deploy_cf_dev1:
   variables:
     STACK_NAME: "medialake-cf-dev1"
     ZIP_FILE_NAME: "medialake-source-${CI_COMMIT_SHORT_SHA}.zip"
-    AWS_DEFAULT_REGION: "us-east-1"
+    AWS_DEFAULT_REGION: "us-west-2"
   before_script:
     # Install required dependencies
     - yum update -y
@@ -197,13 +150,77 @@ job_deploy_cf_dev1:
       echo "S3 bucket access confirmed"
     - 'echo "Checking for existing CloudFormation stack: $STACK_NAME"'
     - |
-      if aws cloudformation describe-stacks --stack-name $STACK_NAME --region us-east-1 2>/dev/null; then
-        echo "Stack exists, deleting..."
-        aws cloudformation delete-stack --stack-name $STACK_NAME --region us-east-1
-        aws cloudformation wait stack-delete-complete --stack-name $STACK_NAME --region us-east-1
-        echo "Stack deleted"
+      # Enhanced stack deletion logic with comprehensive error handling
+      STACK_EXISTS=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --region us-east-1 --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "STACK_NOT_FOUND")
+
+      if [ "$STACK_EXISTS" != "STACK_NOT_FOUND" ]; then
+        echo "Found existing stack with status: $STACK_EXISTS"
+
+        # Check if stack is in a state that allows deletion
+        case "$STACK_EXISTS" in
+          "DELETE_IN_PROGRESS")
+            echo "Stack is already being deleted. Waiting for completion..."
+            ;;
+          "DELETE_FAILED")
+            echo "Previous deletion failed. Attempting to delete again..."
+            aws cloudformation delete-stack --stack-name $STACK_NAME --region us-east-1
+            ;;
+          "CREATE_IN_PROGRESS"|"UPDATE_IN_PROGRESS"|"UPDATE_ROLLBACK_IN_PROGRESS")
+            echo "Stack is currently being modified. Waiting for operation to complete before deletion..."
+            echo "Waiting for stack to reach a stable state..."
+            aws cloudformation wait stack-create-complete --stack-name $STACK_NAME --region us-east-1 2>/dev/null || \
+            aws cloudformation wait stack-update-complete --stack-name $STACK_NAME --region us-east-1 2>/dev/null || \
+            aws cloudformation wait stack-rollback-complete --stack-name $STACK_NAME --region us-east-1 2>/dev/null || true
+
+            # After waiting, initiate deletion
+            echo "Stack is now stable. Initiating deletion..."
+            aws cloudformation delete-stack --stack-name $STACK_NAME --region us-east-1
+            ;;
+          *)
+            echo "Stack is in deletable state. Initiating deletion..."
+            aws cloudformation delete-stack --stack-name $STACK_NAME --region us-east-1
+            ;;
+        esac
+
+        # Wait for deletion to complete with timeout and status monitoring
+        echo "Monitoring stack deletion progress..."
+        MAX_WAIT_TIME=1800  # 30 minutes timeout for deletion
+        ELAPSED_TIME=0
+        WAIT_INTERVAL=30
+
+        while [ $ELAPSED_TIME -lt $MAX_WAIT_TIME ]; do
+          CURRENT_STATUS=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --region us-east-1 --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "STACK_DELETED")
+
+          if [ "$CURRENT_STATUS" = "STACK_DELETED" ]; then
+            echo "✅ Stack successfully deleted!"
+            break
+          elif [ "$CURRENT_STATUS" = "DELETE_COMPLETE" ]; then
+            echo "✅ Stack deletion completed successfully!"
+            break
+          elif [ "$CURRENT_STATUS" = "DELETE_FAILED" ]; then
+            echo "❌ Stack deletion failed!"
+            echo "Checking for deletion failure reasons..."
+            aws cloudformation describe-stack-events --stack-name $STACK_NAME --region us-east-1 --query 'StackEvents[?ResourceStatus==`DELETE_FAILED`].[LogicalResourceId,ResourceStatusReason]' --output table || true
+            echo "Attempting to continue with deployment despite deletion failure..."
+            break
+          elif [ "$CURRENT_STATUS" = "DELETE_IN_PROGRESS" ]; then
+            echo "🔄 Stack deletion in progress... ($(date '+%H:%M:%S'))"
+          else
+            echo "⚠️ Unexpected stack status during deletion: $CURRENT_STATUS"
+          fi
+
+          sleep $WAIT_INTERVAL
+          ELAPSED_TIME=$((ELAPSED_TIME + WAIT_INTERVAL))
+        done
+
+        if [ $ELAPSED_TIME -ge $MAX_WAIT_TIME ]; then
+          echo "⏰ Stack deletion timed out after 30 minutes"
+          echo "Current stack status: $(aws cloudformation describe-stacks --stack-name $STACK_NAME --region us-east-1 --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo 'UNKNOWN')"
+          echo "Proceeding with deployment - manual cleanup may be required"
+        fi
+
       else
-        echo "Stack does not exist, proceeding"
+        echo "No existing stack found. Proceeding with fresh deployment."
       fi
     - echo "Creating zip file of repository..."
     - zip -r $ZIP_FILE_NAME . -x "*.git*" "*.venv*" "*__pycache__*" "*.pyc" "*node_modules*" "*.DS_Store*"
@@ -221,9 +238,9 @@ job_deploy_cf_dev1:
         --parameters \
           ParameterKey=SourceType,ParameterValue="S3PresignedURL" \
           ParameterKey=S3PresignedURL,ParameterValue="$PRESIGNED_URL" \
-          ParameterKey=InitialUserFirstName,ParameterValue="Admin" \
-          ParameterKey=InitialUserLastName,ParameterValue="User" \
-          ParameterKey=InitialUserEmail,ParameterValue="admin@example.com" \
+          ParameterKey=InitialUserFirstName,ParameterValue="Media" \
+          ParameterKey=InitialUserLastName,ParameterValue="Lake" \
+          ParameterKey=InitialUserEmail,ParameterValue="medialake+deploy@amazon.com" \
           ParameterKey=MediaLakeEnvironmentName,ParameterValue="dev" \
           ParameterKey=OpenSearchDeploymentSize,ParameterValue="small" \
         --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
