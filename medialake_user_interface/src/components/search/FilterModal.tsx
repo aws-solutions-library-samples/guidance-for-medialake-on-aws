@@ -256,7 +256,9 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
                     }}
                   >
                     {mediaType.icon}
-                    <Typography variant="body2">{mediaType.key}</Typography>
+                    <Typography variant="body2" sx={{ color: "inherit" }}>
+                      {mediaType.key}
+                    </Typography>
                   </ToggleButton>
 
                   {/* Extensions */}
