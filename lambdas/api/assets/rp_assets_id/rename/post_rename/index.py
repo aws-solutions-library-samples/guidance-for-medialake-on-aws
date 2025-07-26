@@ -509,52 +509,37 @@ def copy_s3_objects(asset: Dict[str, Any], new_name: str) -> List[Dict[str, Any]
             derived_bucket = storage["Bucket"]
             derived_path = storage["ObjectKey"]["FullPath"]
 
-            # Simplified derived name generation to prevent path construction errors
+            # Use consistent path construction logic matching top-level DerivedRepresentations
+            dirpath = get_object_path(derived_path)
+            orig_filename = get_object_name_from_path(derived_path)
+
             try:
-                original_name = get_object_name_from_path(source_path)
-                derived_name = get_object_name_from_path(derived_path)
+                # Extract base name and extension from original filename
+                prefix, ext = orig_filename.rsplit(".", 1)
+                # Calculate suffix by removing the original base name
+                suffix = (
+                    prefix[len(orig_base) :]
+                    if prefix.startswith(orig_base)
+                    else f"_derived_{idx}"
+                )
+                # Construct new filename with new base + suffix + extension
+                new_derived_name = f"{new_base}{suffix}.{ext}"
+                # Construct full path preserving original directory structure
+                new_derived_path = join_key(dirpath, new_derived_name)
 
                 logger.info(
-                    "Processing derived representation naming",
+                    "Processing derived representation with consistent naming",
                     extra={
-                        "original_name": original_name,
-                        "derived_name": derived_name,
-                        "new_object_name": new_object_name,
+                        "orig_filename": orig_filename,
+                        "orig_base": orig_base,
+                        "new_base": new_base,
+                        "suffix": suffix,
+                        "new_derived_name": new_derived_name,
+                        "dirpath": dirpath,
+                        "new_derived_path": new_derived_path,
                         "derived_index": idx,
                     },
                 )
-
-                # Simple replacement approach - if original name is part of derived name, replace it
-                if original_name in derived_name:
-                    new_derived_name = derived_name.replace(
-                        original_name, new_object_name
-                    )
-                else:
-                    # Fallback: use new name with derived extension if different
-                    original_parts = original_name.split(".")
-                    derived_parts = derived_name.split(".")
-                    new_parts = new_object_name.split(".")
-
-                    if len(derived_parts) > 1 and len(original_parts) > 1:
-                        # If derived has different extension, preserve it
-                        if derived_parts[-1] != original_parts[-1]:
-                            new_base = (
-                                ".".join(new_parts[:-1])
-                                if len(new_parts) > 1
-                                else new_object_name
-                            )
-                            new_derived_name = f"{new_base}.{derived_parts[-1]}"
-                        else:
-                            new_derived_name = new_object_name
-                    else:
-                        new_derived_name = new_object_name
-
-                # Construct new path safely
-                derived_base_path = get_object_path(derived_path)
-                if derived_base_path:
-                    new_derived_path = join_key(derived_base_path, new_derived_name)
-                else:
-                    new_derived_path = new_derived_name
 
             except Exception as e:
                 logger.error(
@@ -566,14 +551,9 @@ def copy_s3_objects(asset: Dict[str, Any], new_name: str) -> List[Dict[str, Any]
                         "new_object_name": new_object_name,
                     },
                 )
-                # Fallback to simple naming
+                # Fallback to simple naming with preserved directory structure
                 new_derived_name = f"{new_object_name}_derived_{idx}"
-                derived_base_path = get_object_path(derived_path)
-                new_derived_path = (
-                    join_key(derived_base_path, new_derived_name)
-                    if derived_base_path
-                    else new_derived_name
-                )
+                new_derived_path = join_key(dirpath, new_derived_name)
 
             # Update object name in DynamoDB
             derived["Name"] = new_derived_name
@@ -943,7 +923,7 @@ def update_asset_paths(asset: Dict[str, Any], new_name: str) -> Dict[str, Any]:
             name_only, orig_ext = orig_name.rsplit(".", 1)
             suffix = name_only[len(orig_base) :]
             new_name_derived = f"{new_base}{suffix}.{orig_ext}"
-            new_full_derived = f"{get_object_path(old_full)}/{new_name_derived}"
+            new_full_derived = join_key(get_object_path(old_full), new_name_derived)
             dk["FullPath"] = new_full_derived
             dk["Name"] = new_name_derived
 
