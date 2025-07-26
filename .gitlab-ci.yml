@@ -103,6 +103,7 @@ cache:
     # Install AWS CDK
     - npm install -g aws-cdk
     - echo "login = $GITLAB_USER_LOGIN - role = $AWS_CREDS_TARGET_ROLE"
+    - aws s3 ls
     - npm --version
     - node --version
     - aws --version
