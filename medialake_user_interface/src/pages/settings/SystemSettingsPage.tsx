@@ -199,14 +199,23 @@ const SystemSettingsPage: React.FC = () => {
 
   const onSaveApiKey = async () => {
     try {
-      await handleSaveApiKey();
-      handleToggleChange(true); // if this throws, we’ll catch below
-      handleCloseApiKeyDialog();
-      showNotification(
-        t("settings.systemSettings.search.apiKeySaveSuccess", "API key saved"),
-        "success",
-      );
-      await handleSave(); // re‑persist the rest of your settings
+      const success = await handleSaveApiKey();
+      if (success) {
+        handleToggleChange(true); // Enable the provider after successful save
+        handleCloseApiKeyDialog();
+        showNotification(
+          t("settings.systemSettings.search.apiKeySaveSuccess", "API key saved"),
+          "success",
+        );
+      } else {
+        showNotification(
+          t(
+            "settings.systemSettings.search.apiKeySaveError",
+            "Failed to save API key",
+          ),
+          "error",
+        );
+      }
     } catch (err) {
       showNotification(
         t(
