@@ -158,6 +158,7 @@ job_deploy_cf_dev1:
     STACK_NAME: "medialake-cf-dev1"
     ZIP_FILE_NAME: "medialake-source-${CI_COMMIT_SHORT_SHA}.zip"
     AWS_DEFAULT_REGION: "us-east-1"
+    AWS_REGION: "us-east-1"
   before_script:
     # Install required dependencies
     - yum update -y
@@ -179,6 +180,7 @@ job_deploy_cf_dev1:
     - echo "Using current account credentials for deployment"
     - 'echo "Using AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION"'
     - echo "Verifying AWS identity:"
+    - aws s3 ls
     - aws sts get-caller-identity
     - |
       # Generate unique S3 bucket name using UUID
