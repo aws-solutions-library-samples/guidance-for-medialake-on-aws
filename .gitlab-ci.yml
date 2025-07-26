@@ -6,8 +6,7 @@ stages:
 default:
   image: public.ecr.aws/amazonlinux/amazonlinux:latest
   tags:
-    - arch:amd64
-    - size:large
+    - cicd
 
 # Variables
 variables:
@@ -475,7 +474,7 @@ medialake_deploy_us_west_2:
   timeout: 3h
   tags:
     - arch:amd64
-    - size:xlarge
+    - size:large
   rules:
     - if: $CI_COMMIT_REF_NAME == "stable"
       when: on_success
@@ -485,8 +484,8 @@ medialake_deploy_us_west_2:
   variables:
     STACK_NAME: "medialake-us-west-2"
     ZIP_FILE_NAME: "medialake-source-${CI_COMMIT_SHORT_SHA}.zip"
-    AWS_CREDS_TARGET_ROLE: $US_WEST_2_AWS_IAM_ROLE
-    AWS_DEFAULT_ACCOUNT: $US_WEST_2_AWS_ACCOUNT_ID
+    AWS_CREDS_TARGET_ROLE: "arn:aws:iam::438465153766:role/gitlab-ci"
+    AWS_DEFAULT_ACCOUNT: "438465153766"
     AWS_DEFAULT_REGION: "us-west-2"
     DEPLOY_REGION: "us-west-2"
     STACK_PREFIX: "medialake"
