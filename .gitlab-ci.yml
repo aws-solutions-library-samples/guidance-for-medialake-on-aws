@@ -105,13 +105,17 @@ medialake_deploy_us_west_2:
       when: on_success
     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
       when: on_success
-    - when: never # Prevents the job from running for other branches
+    - when: never
   variables:
     STACK_NAME: "medialake-us-west-2"
     ZIP_FILE_NAME: "medialake-source-${CI_COMMIT_SHORT_SHA}.zip"
     AWS_CREDS_TARGET_ROLE: $US_WEST_2_AWS_IAM_ROLE
     AWS_DEFAULT_ACCOUNT: $US_WEST_2_AWS_ACCOUNT_ID
     AWS_DEFAULT_REGION: "us-west-2"
+    DEPLOY_REGION: "us-west-2"
+    STACK_PREFIX: "medialake"
+    ENVIRONMENT_NAME: "dev"
+    DEPLOYMENT_SIZE: "small"
 
   before_script:
     # Install required dependencies
@@ -121,18 +125,16 @@ medialake_deploy_us_west_2:
     - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
     - unzip awscliv2.zip
     - ./aws/install
-    # Install AWS CDK
-    - npm install -g aws-cdk
     - echo "login = $GITLAB_USER_LOGIN - using CICD credentials"
     - npm --version
     - node --version
     - aws --version
-    - cdk --version
     - jq --version
   script:
-    - echo "Deploying MediaLake to DEV1 account via CloudFormation"
+    - echo "Deploying MediaLake to us-west-2 test account via CloudFormation"
     - echo "Using current account credentials for deployment"
     - 'echo "Using AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION"'
+    - 'echo "Using DEPLOY_REGION: $DEPLOY_REGION"'
     - echo "Verifying AWS identity:"
     - aws sts get-caller-identity
     - |
@@ -144,31 +146,31 @@ medialake_deploy_us_west_2:
 
       # Create S3 bucket in current account
       echo "Creating S3 bucket in current account..."
-      aws s3 mb s3://$S3_BUCKET_NAME --region us-east-1
+      aws s3 mb s3://$S3_BUCKET_NAME --region $DEPLOY_REGION
       echo "S3 bucket created successfully: $S3_BUCKET_NAME"
 
       # Test S3 access
       echo "Testing S3 bucket access..."
-      aws s3 ls s3://$S3_BUCKET_NAME/ --region us-east-1
+      aws s3 ls s3://$S3_BUCKET_NAME/ --region $DEPLOY_REGION
       echo "S3 bucket access confirmed"
-    - echo "Comprehensive infrastructure cleanup - checking for existing resources..."
+    - echo "Infrastructure cleanup - checking for existing resources..."
     - |
       # Function to list all matching stacks using grep for case-insensitive matching
       list_stacks() {
         local region=$1
-        local stack_prefix="medialake"
+        local stack_prefix="$STACK_PREFIX"
         # Get all stacks excluding DELETE_COMPLETE and filter case-insensitively for the prefix
         aws cloudformation list-stacks \
           --region $region \
           --stack-status-filter CREATE_COMPLETE CREATE_FAILED CREATE_IN_PROGRESS REVIEW_IN_PROGRESS ROLLBACK_COMPLETE ROLLBACK_FAILED ROLLBACK_IN_PROGRESS UPDATE_COMPLETE UPDATE_COMPLETE_CLEANUP_IN_PROGRESS UPDATE_IN_PROGRESS UPDATE_ROLLBACK_COMPLETE UPDATE_ROLLBACK_COMPLETE_CLEANUP_IN_PROGRESS UPDATE_ROLLBACK_FAILED UPDATE_ROLLBACK_IN_PROGRESS DELETE_FAILED \
           --query "StackSummaries[].StackName" \
-          --output text | tr '\t' '\n' | grep -i "$stack_prefix" || true
+          --output text | tr '\t' '\n' | grep -i "$STACK_PREFIX" || true
       }
 
       # Function to check if any matching stacks are being deleted
       any_deleting() {
         local region=$1
-        local stack_prefix="medialake"
+        local stack_prefix="$STACK_PREFIX"
         local deleting_stacks=$(aws cloudformation list-stacks \
           --region $region \
           --stack-status-filter DELETE_IN_PROGRESS \
@@ -187,7 +189,7 @@ medialake_deploy_us_west_2:
       delete_stacks_in_region() {
         local region=$1
         echo "Starting comprehensive stack cleanup in region $region"
-        echo "Will delete all stacks containing (case-insensitive): 'medialake'"
+        echo "Will delete all stacks containing (case-insensitive): '$STACK_PREFIX'"
 
         # Main loop to delete stacks
         while true; do
@@ -269,9 +271,9 @@ medialake_deploy_us_west_2:
     - zip -r $ZIP_FILE_NAME . -x "*.git*" "*.venv*" "*__pycache__*" "*.pyc" "*node_modules*" "*.DS_Store*"
     - ls -la $ZIP_FILE_NAME
     - 'echo "Uploading zip file to S3 bucket: $S3_BUCKET_NAME"'
-    - aws s3 cp $ZIP_FILE_NAME s3://$S3_BUCKET_NAME/$ZIP_FILE_NAME --region us-east-1
+    - aws s3 cp $ZIP_FILE_NAME s3://$S3_BUCKET_NAME/$ZIP_FILE_NAME --region $DEPLOY_REGION
     - echo "Generating pre-signed URL for zip file..."
-    - PRESIGNED_URL=$(aws s3 presign s3://$S3_BUCKET_NAME/$ZIP_FILE_NAME --expires-in 3600 --region us-east-1)
+    - PRESIGNED_URL=$(aws s3 presign s3://$S3_BUCKET_NAME/$ZIP_FILE_NAME --expires-in 3600 --region $DEPLOY_REGION)
     - echo "Pre-signed URL generated successfully"
     - 'echo "Deploying CloudFormation stack: $STACK_NAME"'
     - |
@@ -284,15 +286,15 @@ medialake_deploy_us_west_2:
           ParameterKey=InitialUserFirstName,ParameterValue="Media" \
           ParameterKey=InitialUserLastName,ParameterValue="Lake" \
           ParameterKey=InitialUserEmail,ParameterValue="medialake+deploy@amazon.com" \
-          ParameterKey=MediaLakeEnvironmentName,ParameterValue="dev" \
-          ParameterKey=OpenSearchDeploymentSize,ParameterValue="small" \
+          ParameterKey=MediaLakeEnvironmentName,ParameterValue="$ENVIRONMENT_NAME" \
+          ParameterKey=OpenSearchDeploymentSize,ParameterValue="$DEPLOYMENT_SIZE" \
         --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
-        --region us-east-1
+        --region $DEPLOY_REGION
     - echo "Waiting for stack creation to complete..."
-    - aws cloudformation wait stack-create-complete --stack-name $STACK_NAME --region us-west-2
+    - aws cloudformation wait stack-create-complete --stack-name $STACK_NAME --region $DEPLOY_REGION
     - echo "CloudFormation deployment completed successfully"
     - 'echo "Stack outputs:"'
-    - aws cloudformation describe-stacks --stack-name $STACK_NAME --region us-east-1 --query 'Stacks[0].Outputs'
+    - aws cloudformation describe-stacks --stack-name $STACK_NAME --region $DEPLOY_REGION --query 'Stacks[0].Outputs'
     - |
       # Monitor CodePipeline execution similar to deploy-medialake.sh
       echo "Waiting for CodePipeline to be created by CloudFormation..."
@@ -388,8 +390,8 @@ medialake_deploy_us_west_2:
     - |
       # Clean up: Delete the temporary S3 bucket after deployment
       echo "Cleaning up temporary S3 bucket..."
-      aws s3 rm s3://$S3_BUCKET_NAME --recursive --region us-east-1
-      aws s3 rb s3://$S3_BUCKET_NAME --region us-east-1
+      aws s3 rm s3://$S3_BUCKET_NAME --recursive --region $DEPLOY_REGION
+      aws s3 rb s3://$S3_BUCKET_NAME --region $DEPLOY_REGION
       echo "Temporary S3 bucket deleted: $S3_BUCKET_NAME"
 
 # Pre-commit hooks job for merge requests to main (excluding ESLint)
