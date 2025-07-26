@@ -46,10 +46,10 @@ workflow:
         AWS_DEFAULT_ACCOUNT: $DEV5_AWS_ACCOUNT_ID
         CDK_DEPLOY_ACCOUNT: $DEV5_AWS_ACCOUNT_ID
         CDK_DEFAULT_ACCOUNT: $DEV5_AWS_ACCOUNT_ID
-        AWS_DEFAULT_REGION: $DEV5_AWS_REGION
-        CDK_DEPLOY_REGION: $DEV5_AWS_REGION
-        AWS_REGION: $DEV5_AWS_REGION
-        AMAZON_REGION: $DEV5_AWS_REGION
+        AWS_DEFAULT_REGION: "us-east-1"
+        CDK_DEPLOY_REGION: "us-east-1"
+        AWS_REGION: "us-east-1"
+        AMAZON_REGION: "us-east-1"
     - if: $CI_COMMIT_REF_NAME == "demo"
       variables:
         INITIAL_USER_EMAIL: $DEMO_INITIAL_USER_EMAIL
@@ -112,7 +112,6 @@ job_deploy:
     # - bash .cicd/build_ffprobe.sh
     # - bash .cicd/build_ffmpeg.sh
     # - bash .cicd/build_resvg.sh
-    - aws s3 ls
     - cdk bootstrap
     - cdk deploy --all --require-approval never
 
