@@ -106,7 +106,6 @@ class SQSConstruct(Construct):
             if self.props.content_based_deduplication:
                 queue_props["content_based_deduplication"] = True
 
-
         # Add encryption if enabled
         if self.props.encryption:
             queue_props["encryption"] = sqs.QueueEncryption.KMS

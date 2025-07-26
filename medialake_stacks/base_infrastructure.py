@@ -10,8 +10,7 @@ from constructs import Construct
 
 from config import config
 from constants import Lambda as LambdaConstants
-from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
-from medialake_constructs.shared_constructs.eventbridge import EventBus, EventBusConfig
+
 # from medialake_constructs.shared_constructs.opensearch_ingestion_pipeline import (
 #     OpenSearchIngestionPipeline,
 #     OpenSearchIngestionPipelineProps,
@@ -20,7 +19,8 @@ from medialake_constructs.shared_constructs.asset_table_stream import (
     AssetTableStream,
     AssetTableStreamProps,
 )
-
+from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
+from medialake_constructs.shared_constructs.eventbridge import EventBus, EventBusConfig
 from medialake_constructs.shared_constructs.opensearch_managed_cluster import (
     OpenSearchCluster,
     OpenSearchClusterProps,
@@ -478,8 +478,6 @@ class BaseInfrastructureStack(Stack):
             # Expose lambda and DLQ for backward compatibility
             self._asset_sync_engine_lambda = self._asset_table_stream.lambda_function
             self.storage_ingest_connector_dlq = self._asset_table_stream.dlq
-
-
 
         ## Asset V2 table, commented out until implementation needed
         # if config.db.use_existing_tables:

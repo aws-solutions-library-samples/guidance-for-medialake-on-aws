@@ -29,7 +29,7 @@ class AssetTableStreamProps:
 class AssetTableStream(Construct):
     """
     Construct for handling DynamoDB stream events from the asset table.
-    
+
     Creates a Lambda function that processes DynamoDB stream events and syncs
     data to OpenSearch, with proper IAM permissions and error handling via DLQ.
     """
@@ -102,7 +102,7 @@ class AssetTableStream(Construct):
 
     def _add_permissions(self, props: AssetTableStreamProps) -> None:
         """Add IAM permissions to the Lambda function."""
-        
+
         # OpenSearch permissions
         self._asset_sync_engine_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -112,9 +112,7 @@ class AssetTableStream(Construct):
                     "es:ESHttpGet",
                     "es:ESHttpPut",
                 ],
-                resources=[
-                    f"{props.opensearch_cluster_domain_arn}/*"
-                ],
+                resources=[f"{props.opensearch_cluster_domain_arn}/*"],
             )
         )
 
@@ -127,9 +125,7 @@ class AssetTableStream(Construct):
                     "dynamodb:ListStreams",
                     "dynamodb:GetRecords",
                 ],
-                resources=[
-                    f"{props.asset_table.table_arn}/stream/*"
-                ],
+                resources=[f"{props.asset_table.table_arn}/stream/*"],
             )
         )
 
@@ -141,9 +137,7 @@ class AssetTableStream(Construct):
                     "sqs:GetQueueAttributes",
                     "sqs:GetQueueUrl",
                 ],
-                resources=[
-                    self.storage_ingest_connector_dlq.queue_arn
-                ],
+                resources=[self.storage_ingest_connector_dlq.queue_arn],
             )
         )
 
