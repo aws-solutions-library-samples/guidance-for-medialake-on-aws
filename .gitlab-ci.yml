@@ -112,6 +112,7 @@ job_deploy:
     # - bash .cicd/build_ffprobe.sh
     # - bash .cicd/build_ffmpeg.sh
     # - bash .cicd/build_resvg.sh
+    - aws s3 ls
     - cdk bootstrap
     - cdk deploy --all --require-approval never
 
