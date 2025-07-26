@@ -38,7 +38,7 @@ workflow:
         CDK_DEPLOY_REGION: $DEV4_AWS_REGION
         AWS_REGION: $DEV4_AWS_REGION
         AMAZON_REGION: $DEV4_AWS_REGION
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
       variables:
         INITIAL_USER_EMAIL: $DEV5_INITIAL_USER_EMAIL
         AWS_CREDS_TARGET_ROLE: $DEV5_AWS_IAM_ROLE
@@ -60,7 +60,6 @@ workflow:
         CDK_DEPLOY_REGION: $DEMO_AWS_REGION
         AWS_REGION: $DEMO_AWS_REGION
         AMAZON_REGION: $DEMO_AWS_REGION
-    # Allow merge requests targeting stable to use US West 2 variables
     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev5"
       variables:
         AWS_CREDS_TARGET_ROLE: $DEV1_AWS_IAM_ROLE
