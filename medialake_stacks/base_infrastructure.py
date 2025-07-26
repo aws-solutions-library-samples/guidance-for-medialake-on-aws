@@ -12,10 +12,15 @@ from config import config
 from constants import Lambda as LambdaConstants
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.eventbridge import EventBus, EventBusConfig
-from medialake_constructs.shared_constructs.opensearch_ingestion_pipeline import (
-    OpenSearchIngestionPipeline,
-    OpenSearchIngestionPipelineProps,
+# from medialake_constructs.shared_constructs.opensearch_ingestion_pipeline import (
+#     OpenSearchIngestionPipeline,
+#     OpenSearchIngestionPipelineProps,
+# )
+from medialake_constructs.shared_constructs.asset_table_stream import (
+    AssetTableStream,
+    AssetTableStreamProps,
 )
+
 from medialake_constructs.shared_constructs.opensearch_managed_cluster import (
     OpenSearchCluster,
     OpenSearchClusterProps,
@@ -414,7 +419,7 @@ class BaseInfrastructureStack(Stack):
                     partition_key_type=dynamodb.AttributeType.STRING,
                     pipeline_name=f"{config.resource_prefix}-dynamodb-etl-pipeline",
                     ddb_export_bucket=self.ddb_export_bucket,
-                    stream=dynamodb.StreamViewType.NEW_IMAGE,
+                    stream=dynamodb.StreamViewType.NEW_AND_OLD_IMAGES,
                     point_in_time_recovery=True,
                     removal_policy=(
                         RemovalPolicy.RETAIN
@@ -453,6 +458,28 @@ class BaseInfrastructureStack(Stack):
                 ),
                 projection_type=dynamodb.ProjectionType.ALL,
             )
+
+            # Create asset table stream construct
+            self._asset_table_stream = AssetTableStream(
+                self,
+                "AssetTableStreamConstruct",
+                props=AssetTableStreamProps(
+                    asset_table=self._asset_table,
+                    opensearch_cluster_domain_endpoint=self._opensearch_cluster.domain_endpoint,
+                    opensearch_cluster_domain_arn=self._opensearch_cluster.domain_arn,
+                    opensearch_cluster_region=self._opensearch_cluster.region,
+                    opensearch_index_name=opensearch_index_name,
+                    vpc=self._vpc.vpc,
+                    security_group=self._security_group,
+                    batch_size=100,
+                ),
+            )
+
+            # Expose lambda and DLQ for backward compatibility
+            self._asset_sync_engine_lambda = self._asset_table_stream.lambda_function
+            self.storage_ingest_connector_dlq = self._asset_table_stream.dlq
+
+
 
         ## Asset V2 table, commented out until implementation needed
         # if config.db.use_existing_tables:
@@ -548,19 +575,19 @@ class BaseInfrastructureStack(Stack):
         #         ),
         #     )
 
-        self._opensearch_ingestion_pipeline = OpenSearchIngestionPipeline(
-            self,
-            "MediaLakeOSIngestionPipeline",
-            props=OpenSearchIngestionPipelineProps(
-                asset_table=self._asset_table,
-                access_logs_bucket=self.access_logs_bucket,
-                opensearch_cluster=self._opensearch_cluster,
-                ddb_export_bucket=self.ddb_export_bucket,
-                index_name=opensearch_index_name,
-                vpc=self._vpc,
-                security_group=self._security_group,
-            ),
-        )
+        # self._opensearch_ingestion_pipeline = OpenSearchIngestionPipeline(
+        #     self,
+        #     "MediaLakeOSIngestionPipeline",
+        #     props=OpenSearchIngestionPipelineProps(
+        #         asset_table=self._asset_table,
+        #         access_logs_bucket=self.access_logs_bucket,
+        #         opensearch_cluster=self._opensearch_cluster,
+        #         ddb_export_bucket=self.ddb_export_bucket,
+        #         index_name=opensearch_index_name,
+        #         vpc=self._vpc,
+        #         security_group=self._security_group,
+        #     ),
+        # )
 
         # Lambda warmer EventBridge rule
         if lambda_warmer and lambda_functions_to_warm:

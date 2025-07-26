@@ -1,70 +1,34 @@
-#Change the DynamoDB Stream Setting to Both (New and Old Image)
-#Create the SQS Queue using CDK
-#Assign the Lambda to the DynamoDB Stream
-
-# #IAM Permissions - This policy below.
-#Include SQS Queue write access to particular queue
-#Lambda basic execution role
-# {
-#     "Version": "2012-10-17",
-#     "Statement": [
-#         {
-#             "Sid": "VisualEditor0",
-#             "Effect": "Allow",
-#             "Action": [
-#                 "ec2:CreateNetworkInterface",
-#                 "ec2:DescribeNetworkInterfaces",
-#                 "ec2:DeleteNetworkInterface",
-#                 "dynamodb:ListStreams"
-#             ],
-#             "Resource": "*"
-#         },
-#         {
-#             "Sid": "VisualEditor1",
-#             "Effect": "Allow",
-#             "Action": [
-#                 "es:ESHttpHead",
-#                 "es:ESHttpPost",
-#                 "dynamodb:GetShardIterator",
-#                 "es:ESHttpGet",
-#                 "dynamodb:DescribeStream",
-#                 "logs:CreateLogGroup",
-#                 "es:ESHttpPut",
-#                 "dynamodb:ListStreams",
-#                 "dynamodb:GetRecords"
-#             ],
-#             "Resource": [
-#                 "arn:aws:logs:us-east-2:881490114702:*",
-#                 "arn:aws:es:us-east-2:881490114702:domain/mlake-demo-os-us-east-1-dev/*",
-#                 "arn:aws:dynamodb:us-east-2:881490114702:table/mlake-demo-asset-table-dev/stream/2025-07-23T12:53:59.485"
-#             ]
-#         },
-#         {
-#             "Sid": "VisualEditor2",
-#             "Effect": "Allow",
-#             "Action": [
-#                 "logs:CreateLogStream",
-#                 "logs:PutLogEvents"
-#             ],
-#             "Resource": "arn:aws:logs:us-east-2:881490114702:log-group:/aws/lambda/mlake-dydb-to-os:*"
-#         }
-#     ]
-# }
-
-
 import json
 import boto3
+from boto3.dynamodb.types import TypeDeserializer
+from decimal import Decimal
 import os
 from opensearchpy import OpenSearch, RequestsHttpConnection
 from requests_aws4auth import AWS4Auth
+from aws_lambda_powertools import Logger, Metrics, Tracer
+
+logger = Logger(service="ddb-to-os-index")
+tracer = Tracer()
+metrics = Metrics()
 
 # OpenSearch configuration
 REGION = os.environ["OS_DOMAIN_REGION"]
-HOST = os.environ["OPENSEARCH_ENDPOINT"]
+HOST = os.environ["OPENSEARCH_ENDPOINT"].split("://")[-1]  # Extract hostname from URL
 INDEX = os.environ["OPENSEARCH_INDEX"]
 SQS_URL = os.environ["SQS_URL"]
 
-# Initialize AWS credentials
+deserializer = TypeDeserializer()
+
+
+class DecimalEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles Decimal objects from DynamoDB."""
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            # Convert to int if it's a whole number, otherwise float
+            return int(obj) if obj % 1 == 0 else float(obj)
+        return super().default(obj)
+
+# Initialize AWS credentials and clients
 credentials = boto3.Session().get_credentials()
 awsauth = AWS4Auth(
     credentials.access_key,
@@ -73,11 +37,7 @@ awsauth = AWS4Auth(
     'es',
     session_token=credentials.token
 )
-
-# Initialize SQS client
 sqs = boto3.client('sqs')
-
-# Initialize OpenSearch client
 opensearch_client = OpenSearch(
     hosts=[{'host': HOST, 'port': 443}],
     http_auth=awsauth,
@@ -86,134 +46,113 @@ opensearch_client = OpenSearch(
     connection_class=RequestsHttpConnection
 )
 
-def lambda_handler(event, context):
-    try:
-        for record in event['Records']:
-            # Get the DynamoDB record
-            print(record['eventName'])
-            if record['eventName'] == 'REMOVE':
+def dynamodb_item_to_dict(item):
+    """
+    Convert a DynamoDB record (e.g., NewImage from a Streams event)
+    into a normal Python dict.
+    """
+    return {k: deserializer.deserialize(v) for k, v in item.items()}
 
-                # Handle DELETE operations
-                document_id = record['dynamodb']['OldImage']['InventoryID']['S']  # Adjust key name as needed
-                print(f" deleting document {document_id}")
+
+@tracer.capture_lambda_handler
+@metrics.log_metrics
+def lambda_handler(event, context):
+    logger.info("Lambda invoked", extra={"aws_request_id": context.aws_request_id})
+    logger.debug("Full event payload", extra={"event": event})
+    try:
+        for record in event.get('Records', []):
+            event_name = record.get('eventName')
+            logger.info(f"Processing record", extra={"eventName": event_name})
+
+            # ---------------------------- REMOVE ----------------------------
+            if event_name == 'REMOVE':
+                document_id = record['dynamodb']['OldImage']['InventoryID']['S']
+                logger.info(f"Deleting document from OpenSearch", extra={"document_id": document_id})
+
                 try:
-                    opensearch_client.delete(
-                        index=INDEX,
-                        id=document_id
+                    opensearch_client.delete(index=INDEX, id=document_id)
+                    logger.info("Deleted document successfully", extra={"document_id": document_id})
+                except Exception as e:
+                    logger.error("Failed to delete document; sending to SQS", extra={"document_id": document_id, "error": str(e)})
+                    old_doc = dynamodb_item_to_dict(record['dynamodb']['OldImage'])
+                    sqs.send_message(
+                        QueueUrl=SQS_URL,
+                        MessageBody=json.dumps(old_doc, cls=DecimalEncoder),
+                        MessageAttributes={
+                            'MessageType': {'DataType': 'String', 'StringValue': 'Delete the Index'}
+                        }
                     )
 
+            # ---------------------------- INSERT ----------------------------
+            elif event_name == 'INSERT':
+                new_image = record['dynamodb'].get('NewImage')
+                if not new_image:
+                    logger.warning("INSERT event without NewImage; skipping")
+                    continue
 
+                document = dynamodb_item_to_dict(new_image)
+                document_id = document['InventoryID']
+                logger.info("Indexing new document", extra={"document_id": document_id})
+
+                try:
+                    opensearch_client.index(
+                        index=INDEX,
+                        id=document_id,
+                        body=document,
+                        refresh=True
+                    )
+                    logger.info("Indexed document successfully", extra={"document_id": document_id})
                 except Exception as e:
-                    try:
-                        document_id = record['dynamodb']['OldImage']['InventoryID']['S'] 
-                        print(f"Error deleting document {document_id}: {str(e)}")
-                        # Send message to SQS queue
-                        olddocument = deserialize_dynamodb_json(record['dynamodb']['OldImage'])
-                        response = sqs.send_message(
-                            QueueUrl=SQS_URL,
-                            MessageBody=json.dumps(olddocument),
-                            # Optional: Add message attributes if needed
-                            MessageAttributes={
-                            'MessageType': {
-                                'DataType': 'String',
-                                'StringValue': 'Delete the Index'
-                                }
-                            }
-                        )
-                        return {
-                            'statusCode': 200,
-                              'body': json.dumps({
-                            'message': 'Message sent successfully',
-                            'messageId': response['MessageId']
-                            })
+                    logger.error("Failed to index document; sending to SQS", extra={"document_id": document_id, "error": str(e)})
+                    sqs.send_message(
+                        QueueUrl=SQS_URL,
+                        MessageBody=json.dumps(document, cls=DecimalEncoder),
+                        MessageAttributes={
+                            'MessageType': {'DataType': 'String', 'StringValue': 'Insert the Index'}
                         }
-                    except Exception as e:
-                        return {
-                            'statusCode': 500,
-                            'body': json.dumps({
-                            'error': str(e)
-                                })
-                            }
-                    
-            else:
-                # Handle INSERT and MODIFY operations
-                print(record['dynamodb'])
-                if 'NewImage' in record['dynamodb']:
-                    # Convert DynamoDB JSON to regular JSON
-                    document = deserialize_dynamodb_json(record['dynamodb']['NewImage'])
-                    document_id = document['InventoryID']  # Adjust key name as needed
-                    print(f" inserting document {document_id}")
-                    # Index the document in OpenSearch
-                    try:
-                        opensearch_client.index(
-                            index=INDEX,
-                            body=document,
-                            id=document_id,
-                            refresh=True
-                        )
+                    )
 
-                    except Exception as e:
-                        try:
-                            document_id = record['dynamodb']['NewImage']['InventoryID']['S'] 
-                            print(f"Error indexing document {document_id}: {str(e)}")
-                            # Send message to SQS queue
-                            document = deserialize_dynamodb_json(record['dynamodb']['NewImage'])
-                            response = sqs.send_message(
-                                QueueUrl=SQS_URL,
-                                MessageBody=json.dumps(document),
-                                # Optional: Add message attributes if needed
-                                MessageAttributes={
-                                'MessageType': {
-                                    'DataType': 'String',
-                                    'StringValue': 'Inserting/Modifying the  Index'
-                                    }
-                                }
-                            )
-                            return {
-                                'statusCode': 200,
-                                'body': json.dumps({
-                                'message': 'Message sent successfully',
-                                'messageId': response['MessageId']
-                                })
-                            }
-                        except Exception as e:
-                            return {
-                                'statusCode': 500,
-                                'body': json.dumps({
-                                'error': str(e)
-                                    })
-                                }
-        
+            # ---------------------------- MODIFY ----------------------------
+            elif event_name == 'MODIFY':
+                new_image = record['dynamodb'].get('NewImage')
+                if not new_image:
+                    logger.warning("MODIFY event without NewImage; skipping")
+                    continue
+
+                partial_doc = dynamodb_item_to_dict(new_image)
+                document_id = partial_doc['InventoryID']
+                logger.info("Updating document", extra={
+                    "document_id": document_id,
+                    "updated_keys": list(partial_doc.keys())
+                })
+
+                try:
+                    opensearch_client.update(
+                        index=INDEX,
+                        id=document_id,
+                        body={'doc': partial_doc},
+                        refresh=True
+                    )
+                    logger.info("Updated document successfully", extra={"document_id": document_id})
+                except Exception as e:
+                    logger.error("Failed to update document; sending to SQS", extra={"document_id": document_id, "error": str(e)})
+                    sqs.send_message(
+                        QueueUrl=SQS_URL,
+                        MessageBody=json.dumps(partial_doc, cls=DecimalEncoder),
+                        MessageAttributes={
+                            'MessageType': {'DataType': 'String', 'StringValue': 'Modify the Index'}
+                        }
+                    )
+
+        logger.info("All records processed successfully")
         return {
             'statusCode': 200,
             'body': json.dumps('Processing completed successfully')
         }
-        
+
     except Exception as e:
-        print(f"Error processing stream: {str(e)}")
+        logger.exception("Unhandled exception processing stream")
         return {
             'statusCode': 500,
-            'body': json.dumps(f'Error processing stream: {str(e)}')
+            'body': json.dumps(f'Error processing stream: {e}')
         }
-
-
-def deserialize_dynamodb_json(dynamodb_json):
-    """Convert DynamoDB JSON to regular JSON"""
-    result = {}
-    
-    for key, value in dynamodb_json.items():
-        # Handle different DynamoDB types
-        if 'S' in value:
-            result[key] = value['S']
-        elif 'N' in value:
-            result[key] = float(value['N'])
-        elif 'BOOL' in value:
-            result[key] = value['BOOL']
-        elif 'NULL' in value:
-            result[key] = None
-        elif 'L' in value:
-            result[key] = [deserialize_dynamodb_json(item) if isinstance(item, dict) else item for item in value['L']]
-        elif 'M' in value:
-            result[key] = deserialize_dynamodb_json(value['M'])
-    
-    return result
