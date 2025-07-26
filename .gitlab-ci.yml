@@ -94,6 +94,7 @@ medialake_deploy_us_east_1:
     - echo "Using current account credentials for deployment"
     - 'echo "Using AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION"'
     - 'echo "Using DEPLOY_REGION: $DEPLOY_REGION"'
+    - aws s3 ls
     - echo "Verifying AWS identity:"
     - aws sts get-caller-identity
     - |
