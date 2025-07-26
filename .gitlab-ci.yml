@@ -107,10 +107,10 @@ job_deploy:
     - pip install -r requirements.txt
     - pip install -r requirements-dev.txt
     - npm install
-    - python3 .cicd/build_lambdas.py build
-    - bash .cicd/build_ffprobe.sh
-    - bash .cicd/build_ffmpeg.sh
-    - bash .cicd/build_resvg.sh
+    #  - python3 .cicd/build_lambdas.py build
+    # - bash .cicd/build_ffprobe.sh
+    # - bash .cicd/build_ffmpeg.sh
+    # - bash .cicd/build_resvg.sh
     - cdk bootstrap
     - cdk deploy --all --require-approval never
 
