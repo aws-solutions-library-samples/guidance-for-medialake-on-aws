@@ -51,7 +51,6 @@ cache:
 
 medialake_deploy_us_east_1:
   stage: deploy
-  <<: *echo_versions
   timeout: 3h
   tags:
     - arch:amd64
