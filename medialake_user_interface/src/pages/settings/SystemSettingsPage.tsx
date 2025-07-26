@@ -204,7 +204,10 @@ const SystemSettingsPage: React.FC = () => {
         handleToggleChange(true); // Enable the provider after successful save
         handleCloseApiKeyDialog();
         showNotification(
-          t("settings.systemSettings.search.apiKeySaveSuccess", "API key saved"),
+          t(
+            "settings.systemSettings.search.apiKeySaveSuccess",
+            "API key saved",
+          ),
           "success",
         );
       } else {
