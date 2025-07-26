@@ -180,7 +180,6 @@ job_deploy_cf_dev1:
     - echo "Using current account credentials for deployment"
     - 'echo "Using AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION"'
     - echo "Verifying AWS identity:"
-    - aws s3 ls
     - aws sts get-caller-identity
     - |
       # Generate unique S3 bucket name using UUID
