@@ -69,8 +69,8 @@ medialake_deploy_us_east_1:
   variables:
     STACK_NAME: "medialake"
     ZIP_FILE_NAME: "medialake-source-${CI_COMMIT_SHORT_SHA}.zip"
-    AWS_CREDS_TARGET_ROLE: $US_WEST_2_AWS_IAM_ROLE
-    AWS_DEFAULT_ACCOUNT: $US_WEST_2_AWS_ACCOUNT_ID
+    AWS_CREDS_TARGET_ROLE: $US_EAST_1_AWS_IAM_ROLE
+    AWS_DEFAULT_ACCOUNT: $US_EAST_1_AWS_ACCOUNT_ID
     AWS_DEFAULT_REGION: "us-east-1"
     DEPLOY_REGION: "us-east-1"
     STACK_PREFIX: "medialake"
