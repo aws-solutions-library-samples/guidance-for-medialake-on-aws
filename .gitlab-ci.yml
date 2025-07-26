@@ -93,7 +93,8 @@ job_deploy:
   stage: deploy
   <<: *echo_versions
   rules:
-    - when: never # This prevents the job from running
+    - if: $CI_COMMIT_REF_NAME == "stable"
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
   script:
     - echo "Deploying the project"
     - mv .cicd/config.json-template config.json
@@ -120,6 +121,7 @@ pre_commit_checks:
   <<: *echo_versions
   rules:
     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
   script:
     - echo "Running pre-commit checks for merge request to main"
     - python3 -m venv .venv
