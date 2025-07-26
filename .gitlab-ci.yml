@@ -121,7 +121,6 @@ pre_commit_checks:
   <<: *echo_versions
   rules:
     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
   script:
     - echo "Running pre-commit checks for merge request to main"
     - python3 -m venv .venv
