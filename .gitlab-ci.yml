@@ -12,8 +12,8 @@ default:
 # Variables
 variables:
   PROJECT_ENV: $CI_COMMIT_REF_SLUG
-  # AWS_CONFIG_FILE: $CI_BUILDS_DIR/.awscredentialvendor/config
-  # AWS_SHARED_CREDENTIALS_FILE: $CI_BUILDS_DIR/.awscredentialvendor/credentials
+  AWS_CONFIG_FILE: $CI_BUILDS_DIR/.awscredentialvendor/config
+  AWS_SHARED_CREDENTIALS_FILE: $CI_BUILDS_DIR/.awscredentialvendor/credentials
   # Default deployment environment
   INITIAL_USER_EMAIL: $DEFAULT_INITIAL_USER_EMAIL
   AWS_CREDS_TARGET_ROLE: $DEFAULT_AWS_IAM_ROLE
