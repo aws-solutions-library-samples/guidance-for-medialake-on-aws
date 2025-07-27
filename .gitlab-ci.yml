@@ -4,7 +4,6 @@ stages:
   - test
 
 default:
-  image: registry.gitlab.com/gitlab-org/cloud-deploy/aws-base:latest
   tags:
     - arch:amd64
     - size:large
@@ -27,7 +26,6 @@ variables:
 
 workflow:
   rules:
-    # TODO: find a way to make the following more dynamic
     - if: $CI_COMMIT_REF_NAME == "dev4"
       variables:
         INITIAL_USER_EMAIL: $DEV4_INITIAL_USER_EMAIL
