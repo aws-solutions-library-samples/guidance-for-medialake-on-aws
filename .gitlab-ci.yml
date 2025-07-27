@@ -73,13 +73,10 @@ cache:
   before_script:
     # Install required dependencies (Alpine Linux)
     - apk update
-    - apk add --no-cache python3 py3-pip nodejs npm git jq unzip curl findutils bash
-    # Install AWS CLI
-    - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-    - unzip awscliv2.zip
-    - ./aws/install
+    - apk add --no-cache python3 py3-pip nodejs npm git jq unzip curl findutils bash gcc musl-dev libffi-dev
+    # Install AWS CLI via pip (more compatible with Alpine)
+    - pip3 install awscli
     # Install AWS CDK
-    - aws s3 ls
     - npm install -g aws-cdk
     - echo "login = $GITLAB_USER_LOGIN - role = $AWS_CREDS_TARGET_ROLE"
     - npm --version
