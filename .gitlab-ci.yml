@@ -53,46 +53,6 @@ cache:
     - cdk --version
     - jq --version
 
-job_deploy:
-  stage: deploy
-  <<: *echo_versions
-  timeout: 3h
-  variables:
-    INITIAL_USER_EMAIL: $DEFAULT_INITIAL_USER_EMAIL
-    AWS_CREDS_TARGET_ROLE: $DEFAULT_AWS_IAM_ROLE
-    AWS_DEFAULT_ACCOUNT: $DEFAULT_AWS_ACCOUNT_ID
-    CDK_DEPLOY_ACCOUNT: $DEFAULT_AWS_ACCOUNT_ID
-    CDK_DEFAULT_ACCOUNT: $DEFAULT_AWS_ACCOUNT_ID
-    AWS_DEFAULT_REGION: $DEFAULT_AWS_REGION
-    CDK_DEPLOY_REGION: $DEFAULT_AWS_REGION
-    AWS_REGION: $DEFAULT_AWS_REGION
-    AMAZON_REGION: $DEFAULT_AWS_REGION
-  rules:
-    - if: $CI_COMMIT_REF_NAME == "stable"
-      when: on_success
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
-      when: on_success
-    - when: never # This prevents the job from running for other branches
-  script:
-    - echo "Deploying the project"
-    - mv .cicd/config.json-template config.json
-    - echo "$( jq --arg e "$PROJECT_ENV" '.environment = $e' config.json )" > config.json
-    - echo "$( jq --arg a "$CDK_DEPLOY_ACCOUNT" '.account_id = $a' config.json )" > config.json
-    - echo "$( jq --arg r "$AWS_REGION" '.primary_region = $r' config.json )" > config.json
-    - echo "$( jq --arg u "$INITIAL_USER_EMAIL" '.initial_user.email = $u' config.json )" > config.json
-    - cat config.json
-    - python3 -m venv .venv
-    - source .venv/bin/activate
-    - pip install -r requirements.txt
-    - pip install -r requirements-dev.txt
-    - npm install
-    - python3 .cicd/build_lambdas.py build
-    - bash .cicd/build_ffprobe.sh
-    - bash .cicd/build_ffmpeg.sh
-    - bash .cicd/build_resvg.sh
-    - cdk bootstrap
-    - cdk deploy --all --require-approval never
-
 medialake_deploy_us_west_2:
   stage: deploy
   <<: *echo_versions
@@ -116,6 +76,8 @@ medialake_deploy_us_west_2:
     STACK_PREFIX: "medialake"
     ENVIRONMENT_NAME: "dev"
     DEPLOYMENT_SIZE: "small"
+    ACCESS_KEY_ID: $US_WEST_2_ACCESS_KEY
+    SECRET_ACCESS_KEY: $US_WEST_2_SECRET_KEY
 
   before_script:
     # Install required dependencies
@@ -125,6 +87,11 @@ medialake_deploy_us_west_2:
     - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
     - unzip awscliv2.zip
     - ./aws/install
+    # Configure AWS credentials
+    - aws configure set aws_access_key_id $ACCESS_KEY_ID
+    - aws configure set aws_secret_access_key $SECRET_ACCESS_KEY
+    - aws configure set default.region $DEPLOY_REGION
+    - echo "AWS credentials configured for region: $DEPLOY_REGION"
     - echo "login = $GITLAB_USER_LOGIN - using CICD credentials"
     - npm --version
     - node --version
