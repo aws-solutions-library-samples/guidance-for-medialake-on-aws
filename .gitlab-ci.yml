@@ -55,7 +55,6 @@ cache:
 
 medialake_deploy_us_west_2:
   stage: deploy
-  <<: *echo_versions
   timeout: 3h
   tags:
     - arch:amd64
@@ -78,7 +77,6 @@ medialake_deploy_us_west_2:
     DEPLOYMENT_SIZE: "small"
     ACCESS_KEY_ID: $US_WEST_2_ACCESS_KEY
     SECRET_ACCESS_KEY: $US_WEST_2_SECRET_KEY
-
   before_script:
     # Install required dependencies
     - yum update -y
