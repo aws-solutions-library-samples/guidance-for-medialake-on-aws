@@ -77,6 +77,7 @@ cache:
     - apt-get update -y
     - apt-get install -y python3 python3-pip nodejs npm git jq unzip curl findutils
     # Install AWS CDK
+    - aws s3 ls
     - npm install -g aws-cdk
     - echo "login = $GITLAB_USER_LOGIN - role = $AWS_CREDS_TARGET_ROLE"
     - npm --version
@@ -92,7 +93,6 @@ job_deploy:
     - if: $CI_COMMIT_REF_NAME == "stable"
     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
   script:
-    - aws s3 ls
     - echo "Deploying the project"
     - mv .cicd/config.json-template config.json
     - echo "$( jq --arg e "$PROJECT_ENV" '.environment = $e' config.json )" > config.json
