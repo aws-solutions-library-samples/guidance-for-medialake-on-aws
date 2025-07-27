@@ -417,8 +417,6 @@ class BaseInfrastructureStack(Stack):
                     name=f"{config.resource_prefix}-asset-table-{config.environment}",
                     partition_key_name="InventoryID",
                     partition_key_type=dynamodb.AttributeType.STRING,
-                    pipeline_name=f"{config.resource_prefix}-dynamodb-etl-pipeline",
-                    ddb_export_bucket=self.ddb_export_bucket,
                     stream=dynamodb.StreamViewType.NEW_AND_OLD_IMAGES,
                     point_in_time_recovery=True,
                     removal_policy=(
