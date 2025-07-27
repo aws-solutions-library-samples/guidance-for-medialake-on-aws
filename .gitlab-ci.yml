@@ -154,7 +154,7 @@ medialake_deploy_us_west_2:
         if [ -z "$deleting_stacks" ]; then
           return 1
         else
-          echo "Stacks currently being deleted in $region: $deleting_stacks"
+          echo "Stacks currently being deleted in $DEPLOY_REGION: $deleting_stacks"
           return 0
         fi
       }
@@ -162,54 +162,54 @@ medialake_deploy_us_west_2:
       # Function to delete stacks in a specific region
       delete_stacks_in_region() {
         local region=$1
-        echo "Starting comprehensive stack cleanup in region $region"
+        echo "Starting comprehensive stack cleanup in region $DEPLOY_REGION"
         echo "Will delete all stacks containing (case-insensitive): '$STACK_PREFIX'"
 
         # Main loop to delete stacks
         while true; do
-          stacks=$(list_stacks "$region")
+          stacks=$(list_stacks "$DEPLOY_REGION")
 
           if [ -z "$stacks" ]; then
             echo "No more medialake stacks found in region $region. Cleanup complete!"
             break
           fi
 
-          echo "Found stacks in $region: $stacks"
+          echo "Found stacks in $DEPLOY_REGION: $stacks"
 
           # Check if any stack is already being deleted
-          if any_deleting "$region"; then
-            echo "Waiting for in-progress deletions to complete in $region..."
+          if any_deleting "$DEPLOY_REGION"; then
+            echo "Waiting for in-progress deletions to complete in $DEPLOY_REGION..."
           else
             # Attempt to delete each stack
             for stack in $stacks; do
-              echo "Attempting to delete stack: $stack in region $region"
+              echo "Attempting to delete stack: $stack in region $DEPLOY_REGION"
 
               # Check if stack is in DELETE_FAILED state and try with retain resources
-              stack_status=$(aws cloudformation describe-stacks --stack-name "$stack" --region "$region" --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "STACK_NOT_FOUND")
+              stack_status=$(aws cloudformation describe-stacks --stack-name "$stack" --region "$DEPLOY_REGION" --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "STACK_NOT_FOUND")
 
               if [ "$stack_status" == "DELETE_FAILED" ]; then
                 echo "Stack $stack is in DELETE_FAILED state. Attempting to get resources that failed to delete..."
 
                 # Get resources that might have failed to delete
-                resources=$(aws cloudformation list-stack-resources --stack-name "$stack" --region "$region" --query "StackResourceSummaries[?ResourceStatus=='DELETE_FAILED'].LogicalResourceId" --output text || true)
+                resources=$(aws cloudformation list-stack-resources --stack-name "$stack" --region "$DEPLOY_REGION" --query "StackResourceSummaries[?ResourceStatus=='DELETE_FAILED'].LogicalResourceId" --output text || true)
 
                 if [ -n "$resources" ]; then
                   echo "Found resources that failed to delete: $resources"
                   echo "Attempting to delete stack with --retain-resources option"
                   aws cloudformation delete-stack \
-                    --region $region \
+                    --region $DEPLOY_REGION \
                     --stack-name $stack \
                     --retain-resources $resources || true
                 else
                   # Standard delete attempt
                   aws cloudformation delete-stack \
-                    --region $region \
+                    --region $DEPLOY_REGION \
                     --stack-name $stack || true
                 fi
               else
                 # Standard delete attempt
                 aws cloudformation delete-stack \
-                  --region $region \
+                  --region $DEPLOY_REGION \
                   --stack-name $stack || true
               fi
 
@@ -218,7 +218,7 @@ medialake_deploy_us_west_2:
             done
           fi
 
-          echo "Waiting 60 seconds before checking again in $region..."
+          echo "Waiting 60 seconds before checking again in $DEPLOY_REGION..."
           sleep 60
         done
       }
@@ -226,18 +226,18 @@ medialake_deploy_us_west_2:
       # Check for existing CodePipelines that might conflict
       echo "Checking for existing CodePipelines..."
       for pipeline_candidate in "MediaLakeCDKPipeline" "CDKDeploymentPipeline"; do
-        if aws codepipeline get-pipeline --name "$pipeline_candidate" --region us-east-1 >/dev/null 2>&1; then
+        if aws codepipeline get-pipeline --name "$pipeline_candidate" --region $DEPLOY_REGION >/dev/null 2>&1; then
           echo "Found existing pipeline: $pipeline_candidate - will be cleaned up with stack deletion"
         fi
       done
 
-      # First, destroy stacks in us-east-1 (where the deployment will happen)
+      # First, destroy stacks in us-east-1
       delete_stacks_in_region "us-east-1"
 
       # Then destroy stacks in us-west-2 if different (for any regional resources)
-      if [ "$AWS_DEFAULT_REGION" != "us-east-1" ]; then
-        echo "Checking for regional resources in $AWS_DEFAULT_REGION..."
-        delete_stacks_in_region "$AWS_DEFAULT_REGION"
+      if [ "$DEPLOY_REGION" != "us-east-1" ]; then
+        echo "Checking for regional resources in $DEPLOY_REGION..."
+        delete_stacks_in_region "$DEPLOY_REGION"
       fi
 
       echo "Infrastructure cleanup completed. Proceeding with fresh deployment."
@@ -277,7 +277,7 @@ medialake_deploy_us_west_2:
       # Check for pipeline existence (try multiple possible names)
       PIPELINE_NAME=""
       for pipeline_candidate in "MediaLakeCDKPipeline" "CDKDeploymentPipeline"; do
-        if aws codepipeline get-pipeline --name "$pipeline_candidate" --region us-east-1 >/dev/null 2>&1; then
+        if aws codepipeline get-pipeline --name "$pipeline_candidate" --region $DEPLOY_REGION >/dev/null 2>&1; then
           PIPELINE_NAME="$pipeline_candidate"
           echo "Found pipeline: $PIPELINE_NAME"
           break
@@ -299,7 +299,7 @@ medialake_deploy_us_west_2:
           # Get pipeline execution status
           EXECUTION_STATUS=$(aws codepipeline list-pipeline-executions \
             --pipeline-name "$PIPELINE_NAME" \
-            --region us-east-1 \
+            --region $DEPLOY_REGION \
             --max-items 1 \
             --query "pipelineExecutionSummaries[0].status" \
             --output text 2>/dev/null | tr -d '\n\r' | sed 's/None//g' | xargs)
@@ -432,3 +432,64 @@ sync-to-github:
     - git add -A
     - git commit -m "$RELEASE_COMMIT_MESSAGE" --allow-empty
     - git push -f github HEAD:main
+
+playwright_e2e_test:
+  stage: test
+  timeout: 1h
+  tags:
+    - arch:amd64
+    - size:large
+  rules:
+    - if: $CI_COMMIT_REF_NAME == "stable"
+      when: on_success
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
+      when: on_success
+    - when: never
+  needs:
+    - job: medialake_deploy_us_west_2
+      artifacts: false
+  variables:
+    AWS_CREDS_TARGET_ROLE: $US_WEST_2_AWS_IAM_ROLE
+    AWS_DEFAULT_ACCOUNT: $US_WEST_2_AWS_ACCOUNT_ID
+    AWS_DEFAULT_REGION: "us-west-2"
+    ACCESS_KEY_ID: $US_WEST_2_ACCESS_KEY
+    SECRET_ACCESS_KEY: $US_WEST_2_SECRET_KEY
+  before_script:
+    # Install required dependencies
+    - yum update -y
+    - yum install -y python3 python3-pip nodejs npm git jq unzip which findutils
+    # Install AWS CLI
+    - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+    - unzip awscliv2.zip
+    - ./aws/install
+    # Configure AWS credentials for test execution
+    - aws configure set aws_access_key_id $ACCESS_KEY_ID
+    - aws configure set aws_secret_access_key $SECRET_ACCESS_KEY
+    - aws configure set default.region $AWS_DEFAULT_REGION
+    - echo "AWS credentials configured for testing in region $AWS_DEFAULT_REGION"
+    # Navigate to UI directory and install dependencies
+    - cd medialake_user_interface
+    - npm install
+    # Install Playwright browsers
+    - npx playwright install --with-deps chromium
+    - echo "Playwright setup completed"
+    # Verify AWS access
+    - aws sts get-caller-identity
+    - echo "AWS identity verified for testing"
+  script:
+    - echo "Running comprehensive Playwright E2E test against deployed MediaLake infrastructure"
+    - cd medialake_user_interface
+    - echo "Starting Playwright test execution..."
+    - npx playwright test tests/integration/comprehensive-user-lifecycle-e2e.spec.ts --reporter=html --output=test-results
+    - echo "Playwright E2E test completed successfully"
+  artifacts:
+    when: always
+    paths:
+      - medialake_user_interface/test-results/
+      - medialake_user_interface/playwright-report/
+    expire_in: 1 week
+    reports:
+      junit: medialake_user_interface/test-results/junit.xml
+  after_script:
+    - echo "E2E test execution completed"
+    - echo "Test artifacts available in test-results/ and playwright-report/ directories"
