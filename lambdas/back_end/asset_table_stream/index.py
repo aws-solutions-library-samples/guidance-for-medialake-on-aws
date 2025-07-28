@@ -1,11 +1,14 @@
 import json
 import os
+import time
 from decimal import Decimal
+from functools import wraps
 
 import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from boto3.dynamodb.types import TypeDeserializer
 from opensearchpy import OpenSearch, RequestsHttpConnection
+from opensearchpy.exceptions import NotFoundError
 from requests_aws4auth import AWS4Auth
 
 logger = Logger(service="ddb-to-os-index")
@@ -19,6 +22,60 @@ INDEX = os.environ["OPENSEARCH_INDEX"]
 SQS_URL = os.environ["SQS_URL"]
 
 deserializer = TypeDeserializer()
+
+
+def retry_with_backoff(max_retries=10, base_delay=0.5, max_delay=30):
+    """
+    Decorator that implements exponential backoff retry logic.
+
+    Args:
+        max_retries: Maximum number of retry attempts (default: 10)
+        base_delay: Base delay in seconds for the first retry (default: 0.5s)
+        max_delay: Maximum delay in seconds between retries (default: 30s)
+    """
+
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            last_exception = None
+
+            for attempt in range(max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    last_exception = e
+
+                    if attempt == max_retries:
+                        # Last attempt failed, re-raise the exception
+                        raise e
+
+                    # Calculate delay with exponential backoff and jitter
+                    delay = min(base_delay * (2**attempt), max_delay)
+                    # Add some jitter to prevent thundering herd
+                    import random
+
+                    jitter = random.uniform(0.1, 0.3) * delay
+                    final_delay = delay + jitter
+
+                    logger.warning(
+                        f"Attempt {attempt + 1} failed, retrying in {final_delay:.2f}s",
+                        extra={
+                            "attempt": attempt + 1,
+                            "max_retries": max_retries,
+                            "delay": final_delay,
+                            "error": str(e),
+                            "error_type": type(e).__name__,
+                        },
+                    )
+
+                    time.sleep(final_delay)
+
+            # This should never be reached, but just in case
+            raise last_exception
+
+        return wrapper
+
+    return decorator
 
 
 class DecimalEncoder(json.JSONEncoder):
@@ -50,6 +107,41 @@ opensearch_client = OpenSearch(
 )
 
 
+@retry_with_backoff(max_retries=10, base_delay=0.5, max_delay=30)
+def opensearch_delete_document(document_id):
+    """Delete a document from OpenSearch with retry logic."""
+    return opensearch_client.delete(index=INDEX, id=document_id)
+
+
+@retry_with_backoff(max_retries=10, base_delay=0.5, max_delay=30)
+def opensearch_index_document(document_id, document):
+    """Index a document in OpenSearch with retry logic."""
+    return opensearch_client.index(
+        index=INDEX, id=document_id, body=document, refresh=True
+    )
+
+
+@retry_with_backoff(max_retries=10, base_delay=0.5, max_delay=30)
+def opensearch_update_document(document_id, partial_doc):
+    """Update a document in OpenSearch with retry logic."""
+    try:
+        return opensearch_client.update(
+            index=INDEX,
+            id=document_id,
+            body={"doc": partial_doc},
+            refresh=True,
+        )
+    except NotFoundError:
+        # Document doesn't exist, create it instead
+        logger.info(
+            "Document not found during update, creating new document",
+            extra={"document_id": document_id},
+        )
+        return opensearch_client.index(
+            index=INDEX, id=document_id, body=partial_doc, refresh=True
+        )
+
+
 def dynamodb_item_to_dict(item):
     """
     Convert a DynamoDB record (e.g., NewImage from a Streams event)
@@ -77,15 +169,19 @@ def lambda_handler(event, context):
                 )
 
                 try:
-                    opensearch_client.delete(index=INDEX, id=document_id)
+                    opensearch_delete_document(document_id)
                     logger.info(
                         "Deleted document successfully",
                         extra={"document_id": document_id},
                     )
                 except Exception as e:
                     logger.error(
-                        "Failed to delete document; sending to SQS",
-                        extra={"document_id": document_id, "error": str(e)},
+                        "Failed to delete document after 10 retries; sending to SQS",
+                        extra={
+                            "document_id": document_id,
+                            "error": str(e),
+                            "error_type": type(e).__name__,
+                        },
                     )
                     old_doc = dynamodb_item_to_dict(record["dynamodb"]["OldImage"])
                     sqs.send_message(
@@ -111,17 +207,19 @@ def lambda_handler(event, context):
                 logger.info("Indexing new document", extra={"document_id": document_id})
 
                 try:
-                    opensearch_client.index(
-                        index=INDEX, id=document_id, body=document, refresh=True
-                    )
+                    opensearch_index_document(document_id, document)
                     logger.info(
                         "Indexed document successfully",
                         extra={"document_id": document_id},
                     )
                 except Exception as e:
                     logger.error(
-                        "Failed to index document; sending to SQS",
-                        extra={"document_id": document_id, "error": str(e)},
+                        "Failed to index document after 10 retries; sending to SQS",
+                        extra={
+                            "document_id": document_id,
+                            "error": str(e),
+                            "error_type": type(e).__name__,
+                        },
                     )
                     sqs.send_message(
                         QueueUrl=SQS_URL,
@@ -152,20 +250,19 @@ def lambda_handler(event, context):
                 )
 
                 try:
-                    opensearch_client.update(
-                        index=INDEX,
-                        id=document_id,
-                        body={"doc": partial_doc},
-                        refresh=True,
-                    )
+                    opensearch_update_document(document_id, partial_doc)
                     logger.info(
                         "Updated document successfully",
                         extra={"document_id": document_id},
                     )
                 except Exception as e:
                     logger.error(
-                        "Failed to update document; sending to SQS",
-                        extra={"document_id": document_id, "error": str(e)},
+                        "Failed to update document after 10 retries; sending to SQS",
+                        extra={
+                            "document_id": document_id,
+                            "error": str(e),
+                            "error_type": type(e).__name__,
+                        },
                     )
                     sqs.send_message(
                         QueueUrl=SQS_URL,

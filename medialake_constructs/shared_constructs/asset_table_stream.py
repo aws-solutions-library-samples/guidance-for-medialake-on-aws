@@ -141,6 +141,23 @@ class AssetTableStream(Construct):
             )
         )
 
+        # KMS permissions for SQS queue encryption
+        if self.storage_ingest_connector_dlq.encryption_key:
+            self._asset_sync_engine_lambda.function.add_to_role_policy(
+                iam.PolicyStatement(
+                    actions=[
+                        "kms:Encrypt",
+                        "kms:Decrypt",
+                        "kms:ReEncrypt*",
+                        "kms:GenerateDataKey*",
+                        "kms:DescribeKey",
+                    ],
+                    resources=[
+                        self.storage_ingest_connector_dlq.encryption_key.key_arn
+                    ],
+                )
+            )
+
         # EC2 permissions for VPC Lambda functions
         if props.vpc:
             self._asset_sync_engine_lambda.function.add_to_role_policy(
