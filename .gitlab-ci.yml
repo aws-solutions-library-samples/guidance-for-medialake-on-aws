@@ -468,12 +468,12 @@ playwright_e2e_test:
 
     # Test AWS connectivity first
     - echo "Testing AWS connectivity before Playwright execution..."
-    - timeout 30 aws cognito-idp list-user-pools --max-items 1 --region us-east-1 || echo "AWS Cognito connectivity test failed"
+    - timeout 30 aws cognito-idp list-user-pools --max-results 1 --region us-east-1 || echo "AWS Cognito connectivity test failed"
     - timeout 30 aws cloudfront list-distributions --max-items 1 || echo "AWS CloudFront connectivity test failed"
 
-    # Run with verbose output and timeout
+    # Run with timeout and enhanced reporting
     - echo "Executing Playwright test with 30-minute timeout..."
-    - timeout 1800 npx playwright test tests/integration/comprehensive-user-lifecycle-e2e.spec.ts --reporter=html,junit --verbose --timeout=300000 --max-failures=1
+    - timeout 1800 npx playwright test tests/integration/comprehensive-user-lifecycle-e2e.spec.ts --reporter=html,junit --timeout=300000 --max-failures=1
     - echo "Playwright E2E test completed successfully"
   artifacts:
     when: always
