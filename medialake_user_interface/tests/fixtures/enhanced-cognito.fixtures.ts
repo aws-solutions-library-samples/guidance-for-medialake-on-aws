@@ -223,7 +223,13 @@ async function discoverUserPool(
   userPool: CognitoUserPool | null;
   method: "tag-based" | "name-based" | "fallback";
 }> {
+  console.log("[EnhancedCognito] Starting user pool discovery process...");
   const tagFilters = getCognitoTagFilters();
+  console.log(
+    "[EnhancedCognito] Tag filters:",
+    JSON.stringify(tagFilters, null, 2),
+  );
+
   const discoveryMethods = [
     {
       name: "tag-based",
@@ -231,9 +237,25 @@ async function discoverUserPool(
         console.log(
           "[EnhancedCognito] Attempting tag-based user pool discovery...",
         );
-        const pools = await discoveryEngine.discoverByTags(
-          "cognito-user-pool",
-          tagFilters,
+        console.log(
+          "[EnhancedCognito] Calling discoveryEngine.discoverByTags...",
+        );
+
+        const pools = (await Promise.race([
+          discoveryEngine.discoverByTags("cognito-user-pool", tagFilters),
+          new Promise((_, reject) =>
+            setTimeout(
+              () =>
+                reject(
+                  new Error("Tag-based discovery timeout after 60 seconds"),
+                ),
+              60000,
+            ),
+          ),
+        ])) as any[];
+
+        console.log(
+          `[EnhancedCognito] Tag-based discovery completed. Found ${pools.length} pools`,
         );
         if (pools.length === 0) {
           throw new CognitoDiscoveryError(
@@ -498,7 +520,8 @@ export const test = base.extend<EnhancedCognitoFixtures>({
   /**
    * Discovery engine fixture - test scoped for proper Playwright integration
    */
-  cognitoDiscoveryEngine: async ({}, use, testInfo) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  cognitoDiscoveryEngine: async ({ page }, use, testInfo) => {
     const config = createDiscoveryConfig();
     const engine = createResourceDiscoveryEngine(config, testInfo.workerIndex);
 
@@ -530,7 +553,8 @@ export const test = base.extend<EnhancedCognitoFixtures>({
   /**
    * Cognito service adapter fixture
    */
-  cognitoServiceAdapter: async ({}, use) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  cognitoServiceAdapter: async ({ page }, use) => {
     const config = createDiscoveryConfig();
     const adapter = createCognitoServiceAdapter(config);
 
@@ -555,33 +579,68 @@ export const test = base.extend<EnhancedCognitoFixtures>({
       console.log(
         `[EnhancedCognito] Setting up enhanced test user for worker ${testInfo.workerIndex}`,
       );
+      console.log(`[EnhancedCognito] Generated unique email: ${uniqueEmail}`);
 
       let userPool: CognitoUserPool | null = null;
       let discoveryMethod: "tag-based" | "name-based" | "fallback" = "fallback";
 
       try {
         // Discover user pool using enhanced discovery methods
-        const discoveryResult = await discoverUserPool(
-          cognitoDiscoveryEngine,
-          cognitoServiceAdapter,
-        );
+        console.log(`[EnhancedCognito] Starting user pool discovery...`);
+        const discoveryResult = (await Promise.race([
+          discoverUserPool(cognitoDiscoveryEngine, cognitoServiceAdapter),
+          new Promise((_, reject) =>
+            setTimeout(
+              () =>
+                reject(
+                  new Error("User pool discovery timeout after 120 seconds"),
+                ),
+              120000,
+            ),
+          ),
+        ])) as {
+          userPool: CognitoUserPool | null;
+          method: "tag-based" | "name-based" | "fallback";
+        };
+
         userPool = discoveryResult.userPool;
         discoveryMethod = discoveryResult.method;
+        console.log(
+          `[EnhancedCognito] User pool discovery completed: ${userPool?.id} (method: ${discoveryMethod})`,
+        );
 
         if (!userPool) {
           throw new Error("No user pool could be discovered using any method");
         }
 
         // Get password policy and generate appropriate password
+        console.log(
+          `[EnhancedCognito] Getting password policy for user pool: ${userPool.id}`,
+        );
         const passwordPolicy = getUserPoolPasswordPolicy(userPool.id);
         const password = generateSecurePassword(passwordPolicy);
+        console.log(
+          `[EnhancedCognito] Generated password with length: ${password.length}`,
+        );
 
         // Create the test user with permanent password and add to superAdministrators group
-        await cognitoServiceAdapter.createTestUser(
-          userPool.id,
-          uniqueEmail,
-          password,
-          uniqueEmail,
+        console.log(`[EnhancedCognito] Creating test user: ${uniqueEmail}`);
+        await Promise.race([
+          cognitoServiceAdapter.createTestUser(
+            userPool.id,
+            uniqueEmail,
+            password,
+            uniqueEmail,
+          ),
+          new Promise((_, reject) =>
+            setTimeout(
+              () => reject(new Error("User creation timeout after 60 seconds")),
+              60000,
+            ),
+          ),
+        ]);
+        console.log(
+          `[EnhancedCognito] Test user created successfully: ${uniqueEmail}`,
         );
 
         // Get client ID from discovered user pool or fallback to legacy discovery

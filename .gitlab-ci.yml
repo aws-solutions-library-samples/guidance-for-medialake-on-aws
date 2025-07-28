@@ -459,8 +459,21 @@ playwright_e2e_test:
     - echo "AWS identity verified for testing"
   script:
     - echo "Running comprehensive Playwright E2E test against deployed MediaLake infrastructure"
-    - echo "Starting Playwright test execution..."
-    - npx playwright test tests/integration/comprehensive-user-lifecycle-e2e.spec.ts --reporter=html,junit
+    - echo "Starting Playwright test execution with enhanced debugging..."
+
+    # Add debug environment variables
+    - export DEBUG=pw:api,pw:browser*
+    - export PLAYWRIGHT_DEBUG=1
+    - export NODE_ENV=test
+
+    # Test AWS connectivity first
+    - echo "Testing AWS connectivity before Playwright execution..."
+    - timeout 30 aws cognito-idp list-user-pools --max-items 1 --region us-east-1 || echo "AWS Cognito connectivity test failed"
+    - timeout 30 aws cloudfront list-distributions --max-items 1 || echo "AWS CloudFront connectivity test failed"
+
+    # Run with verbose output and timeout
+    - echo "Executing Playwright test with 30-minute timeout..."
+    - timeout 1800 npx playwright test tests/integration/comprehensive-user-lifecycle-e2e.spec.ts --reporter=html,junit --verbose --timeout=300000 --max-failures=1
     - echo "Playwright E2E test completed successfully"
   artifacts:
     when: always

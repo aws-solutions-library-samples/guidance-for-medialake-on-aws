@@ -62,60 +62,94 @@ const test = enhancedCognitoBase.extend<{
    */
   // eslint-disable-next-line prefer-destructuring
   cloudFrontContext: async ({ page }, use, testInfo) => {
-    // eslint-disable-line @typescript-eslint/no-unused-vars
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     console.log(`[E2E Test ${testInfo.title}] Setting up CloudFront context`);
-
-    // Import CloudFront utilities dynamically
-    const { createCloudFrontServiceAdapter } = await import(
-      "../utils/cloudfront-service-adapter"
-    );
-    const { createResourceDiscoveryEngine } = await import(
-      "../utils/aws-resource-finder"
-    );
-    const { STANDARD_TAG_PATTERNS } = await import("../utils/tag-matcher");
-
-    // Create CloudFront discovery configuration
-    const config = {
-      region: AWS_REGION,
-      profile: process.env.AWS_PROFILE || "default",
-      cacheTtlMs: 600000,
-      maxCacheSize: 50,
-      enableFallback: true,
-    };
-
-    // Create discovery engine and adapter
-    const discoveryEngine = createResourceDiscoveryEngine(
-      config,
-      testInfo.workerIndex,
-    );
-    const cloudFrontAdapter = createCloudFrontServiceAdapter(config);
-    discoveryEngine.registerAdapter(cloudFrontAdapter);
-
-    // Discover CloudFront distribution
-    const tagFilters = [
-      STANDARD_TAG_PATTERNS.APPLICATION_TAG,
-      {
-        key: "Environment",
-        values: [ENVIRONMENT],
-        operator: "equals" as const,
-      },
-      STANDARD_TAG_PATTERNS.TESTING_TAG,
-    ];
+    console.log(`[E2E Test] Starting CloudFront discovery process...`);
 
     try {
-      const distributions = await discoveryEngine.discoverByTags(
-        "cloudfront-distribution",
-        tagFilters,
+      // Import CloudFront utilities dynamically
+      console.log(`[E2E Test] Importing CloudFront utilities...`);
+      const { createCloudFrontServiceAdapter } = await import(
+        "../utils/cloudfront-service-adapter"
       );
+      const { createResourceDiscoveryEngine } = await import(
+        "../utils/aws-resource-finder"
+      );
+      const { STANDARD_TAG_PATTERNS } = await import("../utils/tag-matcher");
+      console.log(`[E2E Test] CloudFront utilities imported successfully`);
+
+      // Create CloudFront discovery configuration
+      console.log(`[E2E Test] Creating CloudFront discovery configuration...`);
+      const config = {
+        region: AWS_REGION,
+        profile: process.env.AWS_PROFILE || "default",
+        cacheTtlMs: 600000,
+        maxCacheSize: 50,
+        enableFallback: true,
+      };
+      console.log(
+        `[E2E Test] Configuration created:`,
+        JSON.stringify(config, null, 2),
+      );
+
+      // Create discovery engine and adapter
+      console.log(`[E2E Test] Creating discovery engine and adapter...`);
+      const discoveryEngine = createResourceDiscoveryEngine(
+        config,
+        testInfo.workerIndex,
+      );
+      const cloudFrontAdapter = createCloudFrontServiceAdapter(config);
+      discoveryEngine.registerAdapter(cloudFrontAdapter);
+      console.log(
+        `[E2E Test] Discovery engine and adapter created successfully`,
+      );
+
+      // Discover CloudFront distribution
+      console.log(`[E2E Test] Starting CloudFront distribution discovery...`);
+      const tagFilters = [
+        STANDARD_TAG_PATTERNS.APPLICATION_TAG,
+        {
+          key: "Environment",
+          values: [ENVIRONMENT],
+          operator: "equals" as const,
+        },
+        STANDARD_TAG_PATTERNS.TESTING_TAG,
+      ];
+      console.log(
+        `[E2E Test] Tag filters:`,
+        JSON.stringify(tagFilters, null, 2),
+      );
+
+      console.log(`[E2E Test] Calling discoveryEngine.discoverByTags...`);
+      const distributions = (await Promise.race([
+        discoveryEngine.discoverByTags("cloudfront-distribution", tagFilters),
+        new Promise((_, reject) =>
+          setTimeout(
+            () =>
+              reject(
+                new Error("CloudFront discovery timeout after 60 seconds"),
+              ),
+            60000,
+          ),
+        ),
+      ])) as any[];
+
+      console.log(
+        `[E2E Test] Discovery completed. Found ${distributions.length} distributions`,
+      );
+
       if (distributions.length === 0) {
         throw new Error("No CloudFront distribution found");
       }
 
       const distribution = distributions[0] as any;
+      console.log(`[E2E Test] Using distribution:`, distribution.id);
+
       const primaryDomain =
         distribution.aliases.length > 0
           ? distribution.aliases[0]
           : distribution.domainName;
+      console.log(`[E2E Test] Primary domain:`, primaryDomain);
 
       const testUrls = {
         root: `https://${primaryDomain}`,
@@ -131,12 +165,16 @@ const test = enhancedCognitoBase.extend<{
         discoveryMethod: "tag-based",
       };
 
+      console.log(`[E2E Test] CloudFront context setup completed successfully`);
       await use(context);
 
       // Cleanup
+      console.log(`[E2E Test] Starting CloudFront context cleanup...`);
       await discoveryEngine.cleanup();
+      console.log(`[E2E Test] CloudFront context cleanup completed`);
     } catch (error) {
       console.error(`[E2E Test] CloudFront context setup failed:`, error);
+      console.error(`[E2E Test] Error stack:`, error.stack);
       throw error;
     }
   },
@@ -149,6 +187,11 @@ const test = enhancedCognitoBase.extend<{
       console.log(
         `[E2E Test ${testInfo.title}] Setting up user lifecycle context`,
       );
+      console.log(`[E2E Test] Enhanced Cognito user received:`, {
+        username: enhancedCognitoTestUser.username,
+        userPoolId: enhancedCognitoTestUser.userPoolId,
+        discoveryMethod: enhancedCognitoTestUser.discoveryMethod,
+      });
 
       // Generate test user data for UI operations
       const workerIndex = testInfo.workerIndex;
