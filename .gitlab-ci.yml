@@ -445,9 +445,10 @@ playwright_e2e_test:
     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
       when: on_success
     - when: never
-  needs:
-    - job: medialake_deploy_us_west_2
-      artifacts: false
+  # Commented out for faster testing iteration
+  # needs:
+  #   - job: medialake_deploy_us_west_2
+  #     artifacts: false
   variables:
     AWS_CREDS_TARGET_ROLE: $US_WEST_2_AWS_IAM_ROLE
     AWS_DEFAULT_ACCOUNT: $US_WEST_2_AWS_ACCOUNT_ID
@@ -455,9 +456,13 @@ playwright_e2e_test:
     ACCESS_KEY_ID: $US_WEST_2_ACCESS_KEY
     SECRET_ACCESS_KEY: $US_WEST_2_SECRET_KEY
   before_script:
-    # Install required dependencies
+    # Install required dependencies including system packages for Playwright
     - yum update -y
     - yum install -y python3 python3-pip nodejs npm git jq unzip which findutils
+    # Install system dependencies required by Chromium on Amazon Linux
+    - yum install -y alsa-lib atk cups-libs gtk3 libXcomposite libXcursor libXdamage libXext libXi libXrandr libXScrnSaver libXtst pango at-spi2-atk libXt xorg-x11-server-Xvfb
+    # Install additional dependencies for headless browser operation
+    - yum install -y liberation-fonts dejavu-sans-fonts fontconfig
     # Install AWS CLI
     - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
     - unzip awscliv2.zip
@@ -470,8 +475,8 @@ playwright_e2e_test:
     # Navigate to UI directory and install dependencies
     - cd medialake_user_interface
     - npm install
-    # Install Playwright browsers
-    - npx playwright install --with-deps chromium
+    # Install Playwright browsers without system dependencies (we installed them manually)
+    - npx playwright install chromium
     - echo "Playwright setup completed"
     # Verify AWS access
     - aws sts get-caller-identity

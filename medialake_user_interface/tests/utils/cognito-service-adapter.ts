@@ -13,7 +13,7 @@ import {
   AWSResourceType,
   ResourceDiscoveryConfig,
 } from "./aws-resource-finder.js";
-import { TagFilter, TagMatcher } from "./tag-matcher.js";
+import { TagFilter } from "./tag-matcher.js";
 
 export interface CognitoUserPool extends DiscoveredResource {
   resourceType: "cognito-user-pool";
@@ -83,8 +83,7 @@ export class CognitoServiceAdapter implements ServiceAdapter {
   }
 
   /**
-   * Create a test user in the specified user pool
-   * TODO: Implement with actual AWS SDK when packages are installed
+   * Create a test user in the specified user pool and add to superAdministrators group
    */
   async createTestUser(
     userPoolId: string,
@@ -95,11 +94,96 @@ export class CognitoServiceAdapter implements ServiceAdapter {
     console.log(
       `[CognitoAdapter] Creating test user: ${username} in pool ${userPoolId}`,
     );
-    console.warn(
-      `[CognitoAdapter] Placeholder implementation - would create user with AWS SDK`,
+
+    try {
+      // Use AWS CLI to create user
+      const { execSync } = await import("child_process");
+
+      // Build AWS CLI command for user creation - only add profile if it's not 'default'
+      let createUserCommand = `aws cognito-idp admin-create-user --user-pool-id ${userPoolId} --username '${username}' --user-attributes Name=email,Value='${email}' Name=email_verified,Value=true --message-action SUPPRESS --region ${this.config.region}`;
+      if (process.env.AWS_PROFILE && process.env.AWS_PROFILE !== "default") {
+        createUserCommand = `aws cognito-idp admin-create-user --user-pool-id ${userPoolId} --username '${username}' --user-attributes Name=email,Value='${email}' Name=email_verified,Value=true --message-action SUPPRESS --profile ${process.env.AWS_PROFILE} --region ${this.config.region}`;
+      }
+
+      console.log(
+        `[CognitoAdapter] Creating user with command: ${createUserCommand}`,
+      );
+      execSync(createUserCommand, {
+        encoding: "utf8",
+        stdio: ["pipe", "pipe", "pipe"],
+        timeout: 30000, // 30 second timeout
+      });
+
+      // Set permanent password
+      let setPasswordCommand = `aws cognito-idp admin-set-user-password --user-pool-id ${userPoolId} --username '${username}' --password '${password}' --permanent --region ${this.config.region}`;
+      if (process.env.AWS_PROFILE && process.env.AWS_PROFILE !== "default") {
+        setPasswordCommand = `aws cognito-idp admin-set-user-password --user-pool-id ${userPoolId} --username '${username}' --password '${password}' --permanent --profile ${process.env.AWS_PROFILE} --region ${this.config.region}`;
+      }
+
+      console.log(
+        `[CognitoAdapter] Setting permanent password for user: ${username}`,
+      );
+      execSync(setPasswordCommand, {
+        encoding: "utf8",
+        stdio: ["pipe", "pipe", "pipe"],
+        timeout: 30000, // 30 second timeout
+      });
+
+      // Add user to superAdministrators group
+      await this.addUserToGroup(userPoolId, username, "superAdministrators");
+
+      console.log(
+        `[CognitoAdapter] Successfully created user ${username} and added to superAdministrators group`,
+      );
+    } catch (error: any) {
+      console.error(
+        `[CognitoAdapter] Failed to create user ${username}:`,
+        error.message,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Add a user to a Cognito group
+   */
+  async addUserToGroup(
+    userPoolId: string,
+    username: string,
+    groupName: string,
+  ): Promise<void> {
+    console.log(
+      `[CognitoAdapter] Adding user ${username} to group ${groupName} in pool ${userPoolId}`,
     );
 
-    // Placeholder - actual implementation would use AdminCreateUserCommand and AdminSetUserPasswordCommand
+    try {
+      const { execSync } = await import("child_process");
+
+      // Build AWS CLI command for adding user to group - only add profile if it's not 'default'
+      let addToGroupCommand = `aws cognito-idp admin-add-user-to-group --user-pool-id ${userPoolId} --username '${username}' --group-name ${groupName} --region ${this.config.region}`;
+      if (process.env.AWS_PROFILE && process.env.AWS_PROFILE !== "default") {
+        addToGroupCommand = `aws cognito-idp admin-add-user-to-group --user-pool-id ${userPoolId} --username '${username}' --group-name ${groupName} --profile ${process.env.AWS_PROFILE} --region ${this.config.region}`;
+      }
+
+      console.log(
+        `[CognitoAdapter] Adding user to group with command: ${addToGroupCommand}`,
+      );
+      execSync(addToGroupCommand, {
+        encoding: "utf8",
+        stdio: ["pipe", "pipe", "pipe"],
+        timeout: 30000, // 30 second timeout
+      });
+
+      console.log(
+        `[CognitoAdapter] Successfully added user ${username} to group ${groupName}`,
+      );
+    } catch (error: any) {
+      console.error(
+        `[CognitoAdapter] Failed to add user ${username} to group ${groupName}:`,
+        error.message,
+      );
+      throw error;
+    }
   }
 
   /**

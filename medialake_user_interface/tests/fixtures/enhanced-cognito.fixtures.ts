@@ -176,18 +176,6 @@ class CognitoDiscoveryError extends Error {
   }
 }
 
-class CognitoUserCreationError extends Error {
-  constructor(
-    message: string,
-    public readonly userPoolId: string,
-    public readonly username: string,
-    public readonly originalError?: Error,
-  ) {
-    super(message);
-    this.name = "CognitoUserCreationError";
-  }
-}
-
 /**
  * Retry mechanism with exponential backoff
  */
@@ -483,69 +471,6 @@ function getUserPoolPasswordPolicy(userPoolId: string): any {
 }
 
 /**
- * Create test user with permanent password (no reset required)
- * This is the key enhancement - users are created with permanent passwords
- */
-function createTestUserWithPermanentPassword(
-  userPoolId: string,
-  username: string,
-  password: string,
-  email: string,
-): void {
-  try {
-    console.log(
-      `[EnhancedCognito] Creating test user with permanent password: ${username}`,
-    );
-    console.log(`[EnhancedCognito] Password length: ${password.length}`);
-
-    // Get password policy for debugging
-    getUserPoolPasswordPolicy(userPoolId);
-
-    try {
-      // Create the user with admin privileges and suppress welcome message
-      const createUserCommand = `cognito-idp admin-create-user --user-pool-id ${userPoolId} --username "${username}" --user-attributes Name=email,Value="${email}" Name=email_verified,Value=true --message-action SUPPRESS`;
-      executeAwsCommand(createUserCommand);
-      console.log(`[EnhancedCognito] User created: ${username}`);
-    } catch (createError: any) {
-      if (!createError.message.includes("UsernameExistsException")) {
-        throw new CognitoUserCreationError(
-          `Failed to create user: ${createError.message}`,
-          userPoolId,
-          username,
-          createError,
-        );
-      }
-      console.log(
-        `[EnhancedCognito] User ${username} already exists, will update password...`,
-      );
-    }
-
-    // Set permanent password using admin-set-user-password with --permanent flag
-    // This is the key difference from the original implementation
-    // Escape the password to handle any special characters safely
-    const escapedPassword = password.replace(/'/g, "'\"'\"'");
-    const setPasswordCommand = `cognito-idp admin-set-user-password --user-pool-id ${userPoolId} --username "${username}" --password '${escapedPassword}' --permanent`;
-    executeAwsCommand(setPasswordCommand);
-
-    console.log(
-      `[EnhancedCognito] Test user created successfully with permanent password: ${username}`,
-    );
-  } catch (error: any) {
-    if (error instanceof CognitoUserCreationError) {
-      throw error;
-    }
-
-    console.error("[EnhancedCognito] Error creating test user:", error);
-    throw new CognitoUserCreationError(
-      `Failed to create test user: ${error.message}`,
-      userPoolId,
-      username,
-      error,
-    );
-  }
-}
-
-/**
  * Delete test user
  */
 function deleteTestUser(userPoolId: string, username: string): void {
@@ -651,8 +576,8 @@ export const test = base.extend<EnhancedCognitoFixtures>({
         const passwordPolicy = getUserPoolPasswordPolicy(userPool.id);
         const password = generateSecurePassword(passwordPolicy);
 
-        // Create the test user with permanent password (key enhancement)
-        createTestUserWithPermanentPassword(
+        // Create the test user with permanent password and add to superAdministrators group
+        await cognitoServiceAdapter.createTestUser(
           userPool.id,
           uniqueEmail,
           password,
