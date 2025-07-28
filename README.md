@@ -254,7 +254,7 @@ Key configuration parameters include:
 
 See the [`config-example.json`](config-example.json) for a complete configuration example.
 
-### 4. \*\*create the required roles
+### 4. **Create the required roles
 
 OpenSearch Provisioned CDK creates service-linked roles, but these may not be immediately recognized during a first-time deployment. You might encounter the following error:
 "Invalid request provided: Before you can proceed, you must enable a service-linked role to give Amazon OpenSearch Service permissions to access your VPC."
