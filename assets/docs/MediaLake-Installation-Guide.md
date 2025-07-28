@@ -25,7 +25,6 @@
        - `small` - Suitable for development and testing environments
        - `medium` - Recommended for moderate production workloads
        - `large` - Designed for high-volume production environments
-     - **Embedding Store Options**: Media lake supports both OpenSearch and S3 Vectors as embedding stores for semantic search capabilities. While S3 Vectors provides a cost-effective alternative, it is still under testing. **For production deployments, OpenSearch is recommended** for enhanced reliability and performance.
 
    - **Configure Media Lake Deployment**:
      - **Source Type** (`SourceType`): **Select "Git"** (recommended default) unless specifically instructed to use S3PresignedURL:

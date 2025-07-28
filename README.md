@@ -98,8 +98,6 @@ We recommend creating a **Budget through AWS Cost Explorer** to help manage cost
 
 ### Base Services Cost Table - S3 Vectors Deployment
 
-> **Note:** The S3 Vectors embedding store is a new feature that provides a cost-effective alternative to OpenSearch for vector storage and semantic search capabilities. While this feature is functional and can be used, it is still under testing and development. **For production deployments, we recommend using the OpenSearch embedding store** for enhanced reliability, performance, and full feature support.
-
 | **Service & Usage**                | **How It Relates to Your Team's Usage**                    | **Estimated Monthly Cost (USD)** |
 | ---------------------------------- | ---------------------------------------------------------- | -------------------------------- |
 | **Cognito (Users)**                | 50 active users signing in and using the system each month | \$2.00                           |
