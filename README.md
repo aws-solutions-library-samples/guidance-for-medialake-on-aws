@@ -232,6 +232,7 @@ For development:
 ```bash
 pip install -r requirements-dev.txt
 ```
+
 ### 3. **Configuration Setup**
 
 Create a [`config.json`](config.json) file in the project root with your deployment settings:
@@ -253,7 +254,7 @@ Key configuration parameters include:
 
 See the [`config-example.json`](config-example.json) for a complete configuration example.
 
-### 4. **create the required roles
+### 4. \*\*create the required roles
 
 OpenSearch Provisioned CDK creates service-linked roles, but these may not be immediately recognized during a first-time deployment. You might encounter the following error:
 "Invalid request provided: Before you can proceed, you must enable a service-linked role to give Amazon OpenSearch Service permissions to access your VPC."
@@ -265,6 +266,7 @@ aws iam create-service-linked-role --aws-service-name es.amazonaws.com
 aws iam create-service-linked-role --aws-service-name opensearchservice.amazonaws.com
 aws iam create-service-linked-role --aws-service-name osis.amazonaws.com
 ```
+- **Note**: If you recive an error "An error occurred (InvalidInput) when calling the CreateServiceLinkedRole operation: Service role name XXXXX has been taken in this account, please try a different suffix." this means that the service-linked-role for the service XXXXX already exists and you can move to the next instruction.
 
 ### 5. **Configure AWS account and region**
 
