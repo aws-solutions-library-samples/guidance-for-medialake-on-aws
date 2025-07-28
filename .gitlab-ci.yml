@@ -424,6 +424,7 @@ playwright_e2e_test:
     AWS_CREDS_TARGET_ROLE: $US_WEST_2_AWS_IAM_ROLE
     AWS_DEFAULT_ACCOUNT: $US_WEST_2_AWS_ACCOUNT_ID
     AWS_DEFAULT_REGION: "us-west-2"
+    DEPLOY_REGION: "us-west-2"
     ACCESS_KEY_ID: $US_WEST_2_ACCESS_KEY
     SECRET_ACCESS_KEY: $US_WEST_2_SECRET_KEY
   before_script:
@@ -441,8 +442,8 @@ playwright_e2e_test:
     # Configure AWS credentials for test execution
     - aws configure set aws_access_key_id $ACCESS_KEY_ID
     - aws configure set aws_secret_access_key $SECRET_ACCESS_KEY
-    - aws configure set default.region $AWS_DEFAULT_REGION
-    - echo "AWS credentials configured for testing in region $AWS_DEFAULT_REGION"
+    - aws configure set default.region $DEPLOY_REGION
+    - echo "AWS credentials configured for testing in region $DEPLOY_REGION"
     # Export AWS credentials as environment variables (matching deployment job pattern)
     - export AWS_ACCESS_KEY_ID="$ACCESS_KEY_ID"
     - export AWS_SECRET_ACCESS_KEY="$SECRET_ACCESS_KEY"
@@ -468,7 +469,8 @@ playwright_e2e_test:
 
     # Test AWS connectivity first
     - echo "Testing AWS connectivity before Playwright execution..."
-    - timeout 30 aws cognito-idp list-user-pools --max-results 1 --region us-east-1 || echo "AWS Cognito connectivity test failed"
+    - echo "Testing AWS connectivity in region $DEPLOY_REGION..."
+    - timeout 30 aws cognito-idp list-user-pools --max-results 1 --region $DEPLOY_REGION || echo "AWS Cognito connectivity test failed"
     - timeout 30 aws cloudfront list-distributions --max-items 1 || echo "AWS CloudFront connectivity test failed"
 
     # Run with timeout and enhanced reporting
