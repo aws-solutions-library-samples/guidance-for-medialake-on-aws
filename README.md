@@ -98,6 +98,8 @@ We recommend creating a **Budget through AWS Cost Explorer** to help manage cost
 
 ### Base Services Cost Table - S3 Vectors Deployment
 
+> **Note:** The S3 Vectors embedding store is a new feature that provides a cost-effective alternative to OpenSearch for vector storage and semantic search capabilities. While this feature is functional and can be used, it is still under testing and development. **For production deployments, we recommend using the OpenSearch embedding store** for enhanced reliability, performance, and full feature support.
+
 | **Service & Usage**                | **How It Relates to Your Team's Usage**                    | **Estimated Monthly Cost (USD)** |
 | ---------------------------------- | ---------------------------------------------------------- | -------------------------------- |
 | **Cognito (Users)**                | 50 active users signing in and using the system each month | \$2.00                           |
@@ -298,6 +300,7 @@ Use the emailed credentials to log in to the media lake UI.
 ### 3. **Enable Semantic Search and Integrations**
 
 - Enable and configure semantic search providers (e.g., TwelveLabs) as described in the UI and [MediaLake-Instructions.md](assets/docs/MediaLake-Installation-Guide.md).
+- **Embedding Store Options**: Media lake supports both OpenSearch and S3 Vectors as embedding stores for semantic search. While S3 Vectors provides a cost-effective option, **OpenSearch is recommended for production deployments** due to its enhanced reliability and performance.
 - Import pipelines for enrichment and transcription.
 
 ### 4. **Ingest Media**
