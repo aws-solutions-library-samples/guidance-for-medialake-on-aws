@@ -449,7 +449,7 @@ Media lake supports processing of the following file types through its default p
 - **AVI** - Audio Video Interleave
 - **MKV** - Matroska Video
 - **WEBM** - WebM Video
-- **MXF** - Material Exchange Format 1
+- **MXF** - Material Exchange Format
 
 ### Image Files
 
