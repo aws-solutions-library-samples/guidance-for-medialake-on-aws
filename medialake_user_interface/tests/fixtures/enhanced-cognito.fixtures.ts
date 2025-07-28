@@ -19,7 +19,8 @@ import {
 } from "../utils/cognito-service-adapter.js";
 import { TagFilter, STANDARD_TAG_PATTERNS } from "../utils/tag-matcher.js";
 
-const AWS_REGION = process.env.AWS_REGION || "us-east-1";
+const AWS_REGION =
+  process.env.DEPLOY_REGION || process.env.AWS_REGION || "us-east-1";
 const AWS_PROFILE = process.env.AWS_PROFILE || "default";
 const ENVIRONMENT = process.env.MEDIALAKE_ENV || "dev";
 
