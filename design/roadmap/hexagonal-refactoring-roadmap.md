@@ -17,10 +17,10 @@ This roadmap provides a structured approach to migrating from the current Phase 
 
 ### Phase 1.2 Achievements
 
-- ✅ Repository interfaces established ([`repositories/interfaces.py`](lambdas/ingest/s3/repositories/interfaces.py:1))
-- ✅ Service layer implemented ([`services/asset_service.py`](lambdas/ingest/s3/services/asset_service.py:1))
-- ✅ Dependency injection pattern started ([`asset_processor.py`](lambdas/ingest/s3/asset_processor.py:1))
-- ✅ Domain commands and queries structure ([`domain/commands/`](lambdas/ingest/s3/domain/commands/:1))
+- ✅ Repository interfaces established ([`repositories/interfaces.py`](lambdas/ingest/s3/repositories/interfaces.py))
+- ✅ Service layer implemented ([`services/asset_service.py`](lambdas/ingest/s3/services/asset_service.py))
+- ✅ Dependency injection pattern started ([`asset_processor.py`](lambdas/ingest/s3/asset_processor.py))
+- ✅ Domain commands and queries structure ([`domain/commands/`](lambdas/ingest/s3/domain/commands/))
 
 ### Current Architecture Gaps
 
