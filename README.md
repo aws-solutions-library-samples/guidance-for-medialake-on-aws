@@ -205,8 +205,8 @@ See the [`MediaLake-Installation-Guide.md`](assets/docs/MediaLake-Installation-G
 ### 1. **Clone the repository**
 
 ```bash
-git clone git@github.com:aws-solutions-library-samples/guidance-for-medialake.git
-cd guidance-for-medialake
+git clone https://github.com/aws-solutions-library-samples/guidance-for-medialake-on-aws.git
+cd guidance-for-medialake-on-aws
 ```
 
 ### 2. **Prepare the environment**
@@ -298,6 +298,7 @@ Use the emailed credentials to log in to the media lake UI.
 ### 3. **Enable Semantic Search and Integrations**
 
 - Enable and configure semantic search providers (e.g., TwelveLabs) as described in the UI and [MediaLake-Instructions.md](assets/docs/MediaLake-Installation-Guide.md).
+- **Embedding Store Options**: Media lake supports both OpenSearch and S3 Vectors as embedding stores for semantic search. While S3 Vectors provides a cost-effective option and is currently in preview mode, **OpenSearch is recommended for production deployments** due to its enhanced reliability and performance.
 - Import pipelines for enrichment and transcription.
 
 ### 4. **Ingest Media**
