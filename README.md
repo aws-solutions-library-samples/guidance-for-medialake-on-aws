@@ -230,7 +230,7 @@ npm install
 For development:
 
 ```bash
-pip install -r requirements-dev.txt
+pip install -r requirements-dev.txt 
 ```
 
 ### 3. **Configure AWS account and region**
