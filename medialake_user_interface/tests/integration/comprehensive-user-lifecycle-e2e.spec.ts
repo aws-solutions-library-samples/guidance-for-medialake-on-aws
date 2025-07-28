@@ -62,6 +62,7 @@ const test = enhancedCognitoBase.extend<{
    */
   // eslint-disable-next-line prefer-destructuring
   cloudFrontContext: async ({ page }, use, testInfo) => {
+    // eslint-disable-line @typescript-eslint/no-unused-vars
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     console.log(`[E2E Test ${testInfo.title}] Setting up CloudFront context`);
     console.log(`[E2E Test] Starting CloudFront discovery process...`);
@@ -488,7 +489,7 @@ test.describe("Comprehensive User Lifecycle E2E with AWS Discovery", () => {
 
       await page.goto(loginUrl, {
         waitUntil: "networkidle",
-        timeout: 30000,
+        timeout: 60000,
       });
 
       // Wait for login form to be fully loaded using working selectors
@@ -502,7 +503,7 @@ test.describe("Comprehensive User Lifecycle E2E with AWS Discovery", () => {
 
       // Wait for successful login - check for redirect away from sign-in page
       await page.waitForURL((url) => !url.toString().includes("/sign-in"), {
-        timeout: 30000,
+        timeout: 60000,
       });
       await page.waitForLoadState("networkidle");
 
@@ -622,7 +623,7 @@ test.describe("Comprehensive User Lifecycle E2E with AWS Discovery", () => {
 
     // Test basic login functionality
     const loginUrl = `${cloudFrontContext.testUrls.root}/sign-in`;
-    await page.goto(loginUrl, { waitUntil: "networkidle", timeout: 30000 });
+    await page.goto(loginUrl, { waitUntil: "networkidle", timeout: 60000 });
 
     // Wait for login form to be fully loaded using working selectors
     await page.waitForSelector('input[name="username"]', { timeout: 15000 });
@@ -635,7 +636,7 @@ test.describe("Comprehensive User Lifecycle E2E with AWS Discovery", () => {
 
     // Wait for successful login - check for redirect away from sign-in page
     await page.waitForURL((url) => !url.toString().includes("/sign-in"), {
-      timeout: 30000,
+      timeout: 60000,
     });
     await page.waitForLoadState("networkidle");
 

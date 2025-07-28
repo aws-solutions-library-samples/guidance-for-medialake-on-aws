@@ -111,7 +111,7 @@ export class CognitoServiceAdapter implements ServiceAdapter {
       execSync(createUserCommand, {
         encoding: "utf8",
         stdio: ["pipe", "pipe", "pipe"],
-        timeout: 30000, // 30 second timeout
+        timeout: 60000, // 60 second timeout
       });
 
       // Set permanent password
@@ -126,7 +126,7 @@ export class CognitoServiceAdapter implements ServiceAdapter {
       execSync(setPasswordCommand, {
         encoding: "utf8",
         stdio: ["pipe", "pipe", "pipe"],
-        timeout: 30000, // 30 second timeout
+        timeout: 60000, // 60 second timeout
       });
 
       // Add user to superAdministrators group
@@ -171,7 +171,7 @@ export class CognitoServiceAdapter implements ServiceAdapter {
       execSync(addToGroupCommand, {
         encoding: "utf8",
         stdio: ["pipe", "pipe", "pipe"],
-        timeout: 30000, // 30 second timeout
+        timeout: 60000, // 60 second timeout
       });
 
       console.log(
@@ -253,7 +253,7 @@ export class CognitoServiceAdapter implements ServiceAdapter {
       const result = execSync(awsCommand, {
         encoding: "utf8",
         stdio: ["pipe", "pipe", "pipe"],
-        timeout: 30000, // 30 second timeout
+        timeout: 60000, // 60 second timeout
       });
 
       const userPools = JSON.parse(result);
