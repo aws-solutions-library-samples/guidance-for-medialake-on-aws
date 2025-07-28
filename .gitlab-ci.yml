@@ -458,9 +458,8 @@ playwright_e2e_test:
     - echo "AWS identity verified for testing"
   script:
     - echo "Running comprehensive Playwright E2E test against deployed MediaLake infrastructure"
-    - cd medialake_user_interface
     - echo "Starting Playwright test execution..."
-    - npx playwright test tests/integration/comprehensive-user-lifecycle-e2e.spec.ts --reporter=html --output=test-results
+    - npx playwright test tests/integration/comprehensive-user-lifecycle-e2e.spec.ts --reporter=html,junit
     - echo "Playwright E2E test completed successfully"
   artifacts:
     when: always
@@ -469,7 +468,7 @@ playwright_e2e_test:
       - medialake_user_interface/playwright-report/
     expire_in: 1 week
     reports:
-      junit: medialake_user_interface/test-results/junit.xml
+      junit: medialake_user_interface/test-results/results.xml
   after_script:
     - echo "E2E test execution completed"
     - echo "Test artifacts available in test-results/ and playwright-report/ directories"
