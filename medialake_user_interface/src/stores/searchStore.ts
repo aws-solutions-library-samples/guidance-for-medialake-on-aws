@@ -73,7 +73,10 @@ function convertFiltersToFormState(
   const newMediaTypes = filters.type ? filters.type.split(",") : [];
 
   // Initialize extensions - handle comma-separated list
-  const newExtensions = filters.extension ? filters.extension.split(",") : [];
+  // Convert back to lowercase to match UI button values
+  const newExtensions = filters.extension
+    ? filters.extension.split(",").map((ext) => ext.toLowerCase())
+    : [];
 
   // Initialize file size
   let newMinSizeValue: number | "" = "";

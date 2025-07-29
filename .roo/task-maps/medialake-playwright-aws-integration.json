@@ -1,0 +1,95 @@
+{
+  "project": "MediaLake Playwright AWS Tag-Based Testing Framework",
+  "description": "Extend existing Playwright testing infrastructure to discover AWS resources by tags and perform automated CloudFront login testing",
+  "Phase_1_Architecture": {
+    "1.1_system_design": {
+      "agent": "Architect",
+      "description": "Design architecture for tag-based AWS resource discovery and CloudFront testing integration",
+      "outputs": [
+        "design/architecture/aws-resource-discovery-architecture.md",
+        "design/architecture/cloudfront-testing-flow.md",
+        "design/decisions/tag-based-discovery-strategy.md"
+      ],
+      "validation": "Architecture documents provide clear integration strategy with existing fixtures",
+      "scope": "✓ Tag-based resource discovery patterns ✓ CloudFront integration design ✓ Existing fixture extension strategy ✗ Implementation details ✗ Specific code patterns"
+    }
+  },
+  "Phase_2_Discovery_Utilities": {
+    "2.1_aws_resource_discovery": {
+      "agent": "Code",
+      "dependencies": ["1.1_system_design"],
+      "description": "Create AWS resource discovery utilities for Cognito pools and CloudFront distributions",
+      "outputs": [
+        "medialake_user_interface/tests/fixtures/aws-discovery.fixtures.ts",
+        "medialake_user_interface/tests/utils/aws-resource-finder.ts",
+        "medialake_user_interface/tests/utils/tag-matcher.ts"
+      ],
+      "validation": "Utilities can discover tagged AWS resources and integrate with existing fixture patterns",
+      "scope": "✓ Cognito pool discovery by tags ✓ CloudFront distribution discovery ✓ Tag filtering utilities ✓ AWS SDK integration ✗ Test implementation ✗ UI automation"
+    },
+    "2.2_enhanced_cognito_fixtures": {
+      "agent": "Code",
+      "dependencies": ["2.1_aws_resource_discovery"],
+      "description": "Enhance existing Cognito fixtures to support tag-based pool discovery and no-password-reset user creation",
+      "outputs": [
+        "medialake_user_interface/tests/fixtures/enhanced-cognito.fixtures.ts",
+        "medialake_user_interface/tests/fixtures/cloudfront.fixtures.ts"
+      ],
+      "validation": "Enhanced fixtures maintain backward compatibility while adding tag-based discovery",
+      "scope": "✓ Tag-based Cognito pool discovery ✓ No-password-reset user creation ✓ CloudFront URL discovery ✓ Backward compatibility ✗ Browser automation ✗ Login flow testing"
+    }
+  },
+  "Phase_3_Testing_Framework": {
+    "3.1_cloudfront_login_tests": {
+      "agent": "Code",
+      "dependencies": ["2.2_enhanced_cognito_fixtures"],
+      "description": "Build Playwright test framework for automated CloudFront login testing",
+      "outputs": [
+        "medialake_user_interface/tests/cloudfront/cloudfront-login.spec.ts",
+        "medialake_user_interface/tests/cloudfront/tag-based-discovery.spec.ts"
+      ],
+      "validation": "Tests can discover resources by tags, create users, and perform login automation",
+      "scope": "✓ CloudFront URL discovery and navigation ✓ Automated login flow ✓ Tag-based resource integration ✓ Parallel test safety ✗ Performance testing ✗ Error handling edge cases"
+    },
+    "3.2_integration_validation": {
+      "agent": "Code",
+      "dependencies": ["3.1_cloudfront_login_tests"],
+      "description": "Create comprehensive integration tests and validate end-to-end workflow",
+      "outputs": [
+        "medialake_user_interface/tests/integration/aws-tag-discovery-e2e.spec.ts",
+        "medialake_user_interface/tests/fixtures/README-enhanced.md"
+      ],
+      "validation": "Complete end-to-end workflow from tag discovery to login automation works reliably",
+      "scope": "✓ End-to-end workflow validation ✓ Error handling and edge cases ✓ Documentation updates ✓ Backward compatibility verification ✗ Performance optimization ✗ Production deployment"
+    }
+  },
+  "Phase_4_Documentation": {
+    "4.1_documentation_update": {
+      "agent": "Code",
+      "dependencies": ["3.2_integration_validation"],
+      "description": "Update documentation and create usage examples for the enhanced testing framework",
+      "outputs": [
+        "medialake_user_interface/tests/fixtures/README-enhanced.md",
+        "medialake_user_interface/tests/examples/tag-based-testing-examples.md"
+      ],
+      "validation": "Documentation provides clear guidance for using tag-based AWS resource discovery in tests",
+      "scope": "✓ Updated fixture documentation ✓ Usage examples ✓ Migration guide ✓ Troubleshooting guide ✗ Video tutorials ✗ Advanced configuration"
+    }
+  },
+  "success_criteria": [
+    "Tests can automatically discover Cognito pools with 'Application: medialake' tag",
+    "Tests can create users in discovered pools without password reset requirement",
+    "Tests can discover CloudFront distributions with matching tags",
+    "Tests can navigate to CloudFront URLs and perform automated login",
+    "All functionality integrates seamlessly with existing fixture patterns",
+    "Parallel test execution remains safe and isolated",
+    "Comprehensive documentation and examples are provided"
+  ],
+  "constraints": [
+    "Must maintain backward compatibility with existing tests",
+    "Must follow existing fixture patterns and conventions",
+    "Must support parallel test execution safely",
+    "Must handle AWS credential configuration gracefully",
+    "Must provide clear error messages for missing resources or permissions"
+  ]
+}

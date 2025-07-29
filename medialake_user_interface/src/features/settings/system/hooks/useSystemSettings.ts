@@ -224,7 +224,7 @@ export const useSemanticSearchSettings = () => {
     setApiKeyInput("");
   };
 
-  const handleSaveApiKey = () => {
+  const handleSaveApiKey = async () => {
     if (apiKeyInput && apiKeyInput !== "••••••••••••••••") {
       const providerConfig: SearchProvider = {
         id: settings.current.provider.config?.id || "",
@@ -237,6 +237,7 @@ export const useSemanticSearchSettings = () => {
         isEnabled: true,
       };
 
+      // Update local state first
       setSettings((prev) => ({
         ...prev,
         current: {
@@ -247,8 +248,44 @@ export const useSemanticSearchSettings = () => {
           },
         },
       }));
+
+      // Build embedding store payload
+      const embeddingStorePayload = {
+        type: settings.current.embeddingStore.type,
+        isEnabled: settings.current.isEnabled,
+      };
+
+      // Save to API immediately with the new API key
+      if (isEditingApiKey && providerConfig.id) {
+        // Update existing provider
+        await updateProvider.mutateAsync({
+          apiKey: providerConfig.apiKey,
+          endpoint: providerConfig.endpoint,
+          isEnabled: settings.current.isEnabled,
+          embeddingStore: embeddingStorePayload,
+        });
+      } else {
+        // Create new provider
+        await createProvider.mutateAsync({
+          name: providerConfig.name,
+          type: providerConfig.type,
+          apiKey: providerConfig.apiKey,
+          endpoint: providerConfig.endpoint,
+          isEnabled: settings.current.isEnabled,
+          embeddingStore: embeddingStorePayload,
+        });
+      }
+
+      // Update original to match current (changes saved)
+      setSettings((prev) => ({
+        ...prev,
+        original: prev.current,
+        hasChanges: false,
+      }));
+
+      return true;
     }
-    handleCloseApiKeyDialog();
+    return false;
   };
 
   // Handle save all changes

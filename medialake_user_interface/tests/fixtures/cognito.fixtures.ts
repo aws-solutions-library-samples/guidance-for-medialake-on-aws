@@ -3,7 +3,7 @@ import { execSync } from "child_process";
 import * as crypto from "crypto";
 
 const AWS_REGION = process.env.AWS_REGION || "us-east-1";
-const AWS_PROFILE = process.env.AWS_PROFILE || "medialake-dev4";
+const AWS_PROFILE = process.env.AWS_PROFILE || "default";
 const E2E_TEST_EMAIL = "mne-medialake+e2etest@amazon.com";
 
 // Types for our Cognito fixtures
