@@ -29,11 +29,6 @@ node:
                 - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}
             - effect: Allow
               actions:
-                - s3:GetBucketLocation
-              resources:
-                - "*"
-            - effect: Allow
-              actions:
                 - dynamodb:UpdateItem
                 - dynamodb:GetItem
               resources:
@@ -77,49 +72,6 @@ actions:
               "stability.sd3-5-large-v1:0",
               "stability.stable-image-core-v1:1",
               "stability.stable-image-ultra-v1:1",
-              "twelvelabs.pegasus-1-2-v1:0",
-            ]
-      - in: body
-        name: model_region
-        label: Bedrock Model Region
-        required: true
-        schema:
-          type: select
-          options:
-            [
-              "us-east-1",
-              "us-east-2",
-              "us-west-1",
-              "us-west-2",
-              "af-south-1",
-              "ap-east-1",
-              "ap-south-2",
-              "ap-southeast-3",
-              "ap-southeast-5",
-              "ap-southeast-4",
-              "ap-south-1",
-              "ap-northeast-3",
-              "ap-northeast-2",
-              "ap-southeast-1",
-              "ap-southeast-2",
-              "ap-east-2",
-              "ap-southeast-7",
-              "ap-northeast-1",
-              "ca-central-1",
-              "ca-west-1",
-              "eu-central-1",
-              "eu-west-1",
-              "eu-west-2",
-              "eu-south-1",
-              "eu-west-3",
-              "eu-south-2",
-              "eu-north-1",
-              "eu-central-2",
-              "il-central-1",
-              "mx-central-1",
-              "me-south-1",
-              "me-central-1",
-              "sa-east-1",
             ]
       - in: body
         name: prompt_name
@@ -133,14 +85,13 @@ actions:
               "describe_image",
               "extract_key_points",
               "analyze_sentiment",
-              "structured_recap",
             ]
-      - in: body
-        name: prompt_appendix
-        label: Prompt Appendix
-        required: false
-        schema:
-          type: string
+      # - in: body
+      #   name: custom_prompt
+      #   label: Override Prompt
+      #   required: false
+      #   schema:
+      #     type: string
       - in: body
         name: content_source
         label: Content Source

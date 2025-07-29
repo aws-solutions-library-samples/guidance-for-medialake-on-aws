@@ -1,5 +1,7 @@
+import base64
 import importlib.util
 import json
+import mimetypes
 import os
 from decimal import Decimal
 from typing import Any, Callable, Dict, Union
@@ -18,8 +20,7 @@ logger = Logger()
 tracer = Tracer()
 
 s3 = boto3.resource("s3")
-# Bedrock runtime client will be created with region support in the handler
-bedrock_rt = None
+bedrock_rt = boto3.client("bedrock-runtime")
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(os.environ["MEDIALAKE_ASSET_TABLE"])
 
@@ -70,47 +71,7 @@ DEFAULT_PROMPTS = {
         "4. Key phrases that strongly indicate sentiment\n"
         "Provide your analysis in a structured format suitable for metadata tagging."
     ),
-    "structured_recap": (
-        "**You are a video recapper crafting concise, structured outlines for versatile recap formats.**\n"
-        "Given the content of the provided video, produce a clear, human‑readable outline that includes:\n"
-        "1. **Usage Style:** a brief label describing the type of recap\n"
-        "2. **Hook:** a 1–2 sentence opener to grab attention\n"
-        "3. **Moments:**\n"
-        "   - **Timestamp:** approximate time (e.g., “00:01:23”)\n"
-        "     **Description:** vivid visual summary of the moment\n"
-        "     **Tone:** emotional or pacing guidance\n"
-        "   (repeat for 4–7 key moments)\n"
-        "4. **Voiceover Suggestions:** 1–2 lines of narration corresponding to each moment\n"
-        "5. **Audio Cues:** recommended music style or sound effects\n"
-        "6. **Closing Summary:** a final line that leaves viewers wanting more\n"
-        "Present your response as a structured outline with headings and bullets."
-    ),
 }
-
-
-def _pegasus_builder(
-    instr: str, content: Union[str, ImagePayload, Dict[str, str]]
-) -> Dict[str, Any]:
-    """
-    Builder for TwelveLabs Pegasus 1.2 via Amazon Bedrock.
-    Supports either S3 URI ('s3Location') or base64-encoded video ('base64String').
-    """
-    # Base request structure
-    body = {"inputPrompt": instr, "temperature": 0}
-    if isinstance(content, dict):
-        if "b64" in content:
-            # Base64 payload
-            body["mediaSource"] = {"base64String": content["b64"]}
-        elif "uri" in content:
-            # S3 location payload with bucket owner
-            s3_location = {"uri": content["uri"]}
-            if "bucketOwner" in content:
-                s3_location["bucketOwner"] = content["bucketOwner"]
-            body["mediaSource"] = {"s3Location": s3_location}
-    else:
-        # Simple S3 URI payload (fallback)
-        body["mediaSource"] = {"s3Location": {"uri": content}}
-    return body
 
 
 def _anthropic_builder(instr: str, content: Union[str, ImagePayload]) -> Dict[str, Any]:
@@ -221,7 +182,6 @@ MODEL_BODY_BUILDERS: Dict[str, Callable[..., Dict[str, Any]]] = {
     "meta.llama4": _generic_prompt_builder,
     "pixtral-large": _generic_prompt_builder,
     "mistral.pixtral-large": _generic_prompt_builder,
-    "pegasus": _pegasus_builder,
 }
 
 # === 3) Central body‐builder ===
@@ -371,37 +331,8 @@ def _load_module_from_s3(bucket: str, key: str, alias: str):
 
 def create_request_body(tpl_paths, bucket, event):
     try:
-        # ── Normalize payload.body ──────────────────────────────────────
-        payload = event.get("payload", {})
-        body = payload.get("body") or payload.get("data") or {}
-        payload["body"] = body
-
-        # ── Inject inventory_id or file_s3_uri if missing ────────────────
-        if "inventory_id" not in body and "file_s3_uri" not in body:
-            # Try inventory_id from assets
-            assets = payload.get("assets", [])
-            if assets and assets[0].get("InventoryID"):
-                body["inventory_id"] = assets[0]["InventoryID"]
-            else:
-                # Fallback to proxy S3 URI
-                data = payload.get("data", {})
-                proxy = data.get("proxy")
-                if proxy:
-                    loc = proxy["StorageInfo"]["PrimaryLocation"]
-                    bucket_name = loc.get("Bucket")
-                    # path field or ObjectKey.FullPath
-                    key = loc.get("path") or loc.get("ObjectKey", {}).get("FullPath")
-                    if bucket_name and key:
-                        body["file_s3_uri"] = f"s3://{bucket_name}/{key}"
-
-        # Update event with our enriched payload
-        event["payload"] = payload
-
-        # ── Load and invoke the S3‑hosted mapping module ────────────────────
         mod = _load_module_from_s3(bucket, tpl_paths["request_mapping"], "req_map")
         mapping = mod.translate_event_to_request(event)
-
-        # ── Render the Jinja request template ──────────────────────────────
         tmpl = (
             s3.Object(bucket, tpl_paths["request_template"])
             .get()["Body"]
@@ -410,12 +341,10 @@ def create_request_body(tpl_paths, bucket, event):
         )
         env = Environment(loader=FileSystemLoader("/"), autoescape=True)
         rendered = env.from_string(tmpl).render(variables=mapping)
-
         return json.loads(rendered), mapping
-
     except Exception:
         logger.exception("create_request_body failed")
-        raise
+        raise  # ← propagate
 
 
 def create_response_output(tpl_paths, bucket, result, event, mapping):
@@ -468,22 +397,6 @@ def lambda_handler(event, context):
         if not model_id:
             raise KeyError("MODEL_ID environment variable is required")
 
-        # Get model region if specified, otherwise use default AWS region
-        model_region = (
-            os.getenv("MODEL_REGION")
-            or os.getenv("BEDROCK_REGION")
-            or os.getenv("AWS_REGION")
-        )
-
-        # Create bedrock runtime client with region support
-        bedrock_rt_kwargs = {}
-        if model_region:
-            bedrock_rt_kwargs["region_name"] = model_region
-            logger.info(f"Using Bedrock region: {model_region} for model: {model_id}")
-        else:
-            logger.info(f"Using default region for model: {model_id}")
-        bedrock_rt = boto3.client("bedrock-runtime", **bedrock_rt_kwargs)
-
         # ── Locate content ────────────────────────────────────────────────
         assets = event.get("payload", {}).get("assets", [])
         if not assets:
@@ -509,84 +422,16 @@ def lambda_handler(event, context):
                 if r["Purpose"] == "proxy"
             )
             loc = rep["StorageInfo"]["PrimaryLocation"]
+            raw = get_s3_bytes(loc["Bucket"], loc["ObjectKey"]["FullPath"])
+            b64 = base64.b64encode(raw).decode("utf-8")
+            mime = (
+                mimetypes.guess_type(loc["ObjectKey"]["FullPath"])[0]
+                or "application/octet-stream"
+            )
             fetched_uri = f"s3://{loc['Bucket']}/{loc['ObjectKey']['FullPath']}"
-
-            # Check if we should use S3 URI or fall back to base64
-            # For TwelveLabs Pegasus, S3 bucket must be in same region as inference profile
-            use_s3_uri = True
-
-            # If model region is specified and different from bucket region, use base64
-            if model_region and model_region != os.getenv("AWS_REGION", "us-east-1"):
-                logger.info(
-                    f"Model region {model_region} differs from default region, checking bucket region compatibility"
-                )
-                # For cross-region scenarios, fall back to base64 to avoid region mismatch
-                try:
-                    # Get bucket region
-                    s3_client = boto3.client("s3")
-                    bucket_location = s3_client.get_bucket_location(
-                        Bucket=loc["Bucket"]
-                    )
-                    bucket_region = (
-                        bucket_location.get("LocationConstraint") or "us-east-1"
-                    )
-
-                    if bucket_region != model_region:
-                        logger.info(
-                            f"Bucket region {bucket_region} differs from model region {model_region}, using base64 encoding"
-                        )
-                        use_s3_uri = False
-                except Exception as e:
-                    logger.warning(
-                        f"Could not determine bucket region, falling back to base64: {e}"
-                    )
-                    use_s3_uri = False
-
-            if use_s3_uri:
-                # Use S3 URI approach for same-region scenarios
-                # Get bucket owner - try multiple sources
-                bucket_owner = (
-                    loc.get("BucketOwner")
-                    or os.environ.get("AWS_ACCOUNT_ID")
-                    or context.invoked_function_arn.split(":")[4]
-                    if context
-                    else None
-                )
-
-                if not bucket_owner:
-                    # Extract account ID from the event payload if available
-                    try:
-                        bucket_owner = event.get("payload", {}).get(
-                            "account"
-                        ) or event.get("account")
-                    except:
-                        pass
-
-                if not bucket_owner:
-                    logger.warning(
-                        "Unable to determine AWS account ID, falling back to base64 encoding"
-                    )
-                    use_s3_uri = False
-                else:
-                    s3_content = {"uri": fetched_uri, "bucketOwner": bucket_owner}
-                    body_json = build_bedrock_body(model_id, instr, s3_content).encode(
-                        "utf-8"
-                    )
-
-            if not use_s3_uri:
-                # For cross-region scenarios with large video files, we cannot use base64
-                # due to Bedrock's 100MB payload limit. Raise an informative error.
-                logger.error(
-                    "Cannot process proxy file: S3 URI approach failed due to region mismatch or missing bucket owner"
-                )
-                raise RuntimeError(
-                    f"Unable to process proxy video file. The TwelveLabs Pegasus model requires that "
-                    f"the S3 bucket containing the video file be in the same region as the Bedrock inference profile. "
-                    f"Base64 encoding is not suitable for video files due to size limitations. "
-                    f"Please ensure the S3 bucket and Bedrock model are configured in the same region. "
-                    f"Current model region: {model_region or 'default'}, "
-                    f"S3 URI: {fetched_uri}"
-                )
+            body_json = build_bedrock_body(
+                model_id, instr, {"b64": b64, "mime": mime}
+            ).encode("utf-8")
 
         elif file_uri:
             text = get_file_content(file_uri)
@@ -598,7 +443,7 @@ def lambda_handler(event, context):
 
         try:
             profile_id = get_inference_profile_for_model(
-                model_id, region_name=model_region
+                model_id, region_name=os.getenv("AWS_REGION")
             )
         except (PermissionError, ValueError) as e:
             logger.error("Bedrock setup error", exc_info=e)
@@ -620,20 +465,18 @@ def lambda_handler(event, context):
         if "anthropic" in model_id.lower():
             result = data["content"][0]["text"]
         elif "nova" in model_id.lower():
+            # Nova models return response in 'output' -> 'message' -> 'content' -> [0] -> 'text'
             result = (
                 data.get("output", {})
                 .get("message", {})
                 .get("content", [{}])[0]
                 .get("text", "")
             )
-        elif "message" in data:
-            # Pegasus (and other streaming models) return their output under "message"
-            msg = data["message"]
-            if isinstance(msg, dict):
-                # e.g. { "content": "...", "stopReason": "..." }
-                result = msg.get("content", msg.get("text", json.dumps(msg)))
-            else:
-                result = msg
+            logger.info(
+                f"Nova result extraction: {result[:100]}..."
+                if result
+                else "Nova result is empty"
+            )
         elif "images" in data:
             result = data["images"][0]
         else:

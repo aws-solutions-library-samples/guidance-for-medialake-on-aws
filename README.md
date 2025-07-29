@@ -205,8 +205,8 @@ See the [`MediaLake-Installation-Guide.md`](assets/docs/MediaLake-Installation-G
 ### 1. **Clone the repository**
 
 ```bash
-git clone git@github.com:aws-solutions-library-samples/guidance-for-medialake.git
-cd guidance-for-medialake
+git clone https://github.com/aws-solutions-library-samples/guidance-for-medialake-on-aws.git
+cd guidance-for-medialake-on-aws
 ```
 
 ### 2. **Prepare the environment**
@@ -233,15 +233,7 @@ For development:
 pip install -r requirements-dev.txt
 ```
 
-### 3. **Configure AWS account and region**
-
-Ensure AWS credentials are configured (`aws configure`), and bootstrap your account for CDK:
-
-```bash
-cdk bootstrap --profile <profile> --region <region>
-```
-
-### 4. **Configuration Setup**
+### 3. **Configuration Setup**
 
 Create a [`config.json`](config.json) file in the project root with your deployment settings:
 
@@ -262,7 +254,30 @@ Key configuration parameters include:
 
 See the [`config-example.json`](config-example.json) for a complete configuration example.
 
-### 5. **Deploy using AWS CDK**
+### 4. \*\*Create the required roles
+
+OpenSearch Provisioned CDK creates service-linked roles, but these may not be immediately recognized during a first-time deployment. You might encounter the following error:
+"Invalid request provided: Before you can proceed, you must enable a service-linked role to give Amazon OpenSearch Service permissions to access your VPC."
+
+To make sure this doesn't happens, manually create the required roles using the following AWS CLI commands:
+
+```bash
+aws iam create-service-linked-role --aws-service-name es.amazonaws.com
+aws iam create-service-linked-role --aws-service-name opensearchservice.amazonaws.com
+aws iam create-service-linked-role --aws-service-name osis.amazonaws.com
+```
+
+- **Note**: If you recive an error "An error occurred (InvalidInput) when calling the CreateServiceLinkedRole operation: Service role name XXXXX has been taken in this account, please try a different suffix." this means that the service-linked-role for the service XXXXX already exists and you can move to the next instruction.
+
+### 5. **Configure AWS account and region**
+
+Ensure AWS credentials are configured (`aws configure`), and bootstrap your account for CDK:
+
+```bash
+cdk bootstrap --profile <profile> --region <region>
+```
+
+### 6. **Deploy using AWS CDK**
 
 Deploy all stacks using CDK:
 
@@ -298,6 +313,7 @@ Use the emailed credentials to log in to the media lake UI.
 ### 3. **Enable Semantic Search and Integrations**
 
 - Enable and configure semantic search providers (e.g., TwelveLabs) as described in the UI and [MediaLake-Instructions.md](assets/docs/MediaLake-Installation-Guide.md).
+- **Embedding Store Options**: Media lake supports both OpenSearch and S3 Vectors as embedding stores for semantic search. While S3 Vectors provides a cost-effective option and is currently in preview mode, **OpenSearch is recommended for production deployments** due to its enhanced reliability and performance.
 - Import pipelines for enrichment and transcription.
 
 ### 4. **Ingest Media**
