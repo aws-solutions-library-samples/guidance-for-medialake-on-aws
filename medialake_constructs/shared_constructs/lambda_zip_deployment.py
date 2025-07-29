@@ -1,15 +1,14 @@
-from aws_cdk import (
-    aws_lambda as lambda_,
-    aws_s3_deployment as s3deploy,
-    aws_s3 as s3,
-    Duration,
-)
-from constructs import Construct
 import os
 import shutil
-from pathlib import Path
-from dataclasses import dataclass
 import subprocess
+from dataclasses import dataclass
+from pathlib import Path
+
+from aws_cdk import Duration
+from aws_cdk import aws_lambda as lambda_
+from aws_cdk import aws_s3 as s3
+from aws_cdk import aws_s3_deployment as s3deploy
+from constructs import Construct
 
 
 @dataclass
@@ -28,7 +27,7 @@ class LambdaZipDeployment(Construct):
     ):
         super().__init__(scope, id, **kwargs)
 
-        cdk_root = Path(__file__).resolve().parent.parent.parent
+        Path(__file__).resolve().parent.parent.parent
 
         # Define the relative path to the Lambda source code as a single string
         # lambda_source_path = cdk_root / f"{props.deployment_path}"
@@ -57,7 +56,15 @@ class LambdaZipDeployment(Construct):
         # Install dependencies and create zip if requirements.txt exists
         if os.path.exists(requirements_path):
             subprocess.run(
-                ["pip", "install","--no-cache-dir", "-r", requirements_path, "-t", lambda_package_path],
+                [
+                    "pip",
+                    "install",
+                    "--no-cache-dir",
+                    "-r",
+                    requirements_path,
+                    "-t",
+                    lambda_package_path,
+                ],
                 check=True,
             )
 

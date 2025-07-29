@@ -53,7 +53,7 @@ cdk.context.json
 *.clinerules
 *.cursorrules
 *.cursorignore
-docs/
+/docs/
 cline_docs/
 CLAUDE.md
 *.claude
@@ -77,7 +77,7 @@ Thumbs.db
 dist/
 build/
 out/
-aws-exports.json  
+aws-exports.json
 
 
 # Logs
@@ -143,3 +143,4 @@ s3_bucket_assets/pipeline_nodes/node_templates/utility/debug_input.yaml
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+1scratch

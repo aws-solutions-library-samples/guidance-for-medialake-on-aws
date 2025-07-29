@@ -23,9 +23,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [
             {
               "name": "any",
@@ -67,9 +65,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "video"
-          ],
+          "inputTypes": ["video"],
           "outputTypes": [
             {
               "name": "metadata",
@@ -108,9 +104,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [
             {
               "name": "any",
@@ -150,9 +144,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [],
           "type": "FLOW",
           "configuration": {
@@ -184,9 +176,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [
             {
               "name": "any",
@@ -225,9 +215,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "video"
-          ],
+          "inputTypes": ["video"],
           "outputTypes": [
             {
               "name": "any",
@@ -268,9 +256,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [
             {
               "name": "Completed",
@@ -315,9 +301,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [],
           "type": "FLOW",
           "configuration": {

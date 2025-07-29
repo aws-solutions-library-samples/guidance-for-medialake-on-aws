@@ -1,9 +1,8 @@
-import boto3
-import time
-from typing import Dict, Any, Optional, List
-from datetime import datetime
 import logging
-import os
+import time
+from typing import Any, Dict, List, Optional
+
+import boto3
 from botocore.exceptions import ClientError
 
 logger = logging.getLogger()

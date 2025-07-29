@@ -5,14 +5,10 @@ from functools import lru_cache
 
 # Import boto3 and Key inside handler
 import boto3
-from boto3.dynamodb.conditions import Key
-from botocore.exceptions import ClientError
 
 # Add AWS PowerTools for better tracing and performance measurement
-from aws_lambda_powertools import Logger, Tracer, Metrics
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.utilities.validation import validate
-from aws_lambda_powertools.utilities.parameters import get_parameter, SSMProvider
+from aws_lambda_powertools import Logger, Metrics, Tracer
+from boto3.dynamodb.conditions import Key
 
 logger = Logger()
 tracer = Tracer()
@@ -22,6 +18,7 @@ metrics = Metrics(namespace="MedialakeS3Explorer")
 s3_client = boto3.client("s3")
 dynamodb = boto3.resource("dynamodb")
 
+
 # Cache connector lookups to avoid repeated DB calls
 @lru_cache(maxsize=100)
 def get_connector(connector_id, table_name):
@@ -29,23 +26,28 @@ def get_connector(connector_id, table_name):
     try:
         logger.debug(f"Getting connector {connector_id} from table {table_name}")
         table = dynamodb.Table(table_name)
-        
+
         with tracer.provider.in_subsegment("get_connector_from_dynamodb") as subsegment:
             subsegment.put_annotation("connector_id", connector_id)
-            
+
             start_time = time.time()
             connector_response = table.query(
                 KeyConditionExpression=Key("id").eq(connector_id)
             )
             query_time = (time.time() - start_time) * 1000
-            
-            metrics.add_metric(name="DynamoDBQueryLatency", unit="Milliseconds", value=query_time)
+
+            metrics.add_metric(
+                name="DynamoDBQueryLatency", unit="Milliseconds", value=query_time
+            )
             logger.debug(f"DynamoDB query took {query_time}ms")
-            
-            return connector_response["Items"][0] if connector_response["Items"] else None
+
+            return (
+                connector_response["Items"][0] if connector_response["Items"] else None
+            )
     except Exception as e:
         logger.error(f"Failed to get connector: {str(e)}")
         return None
+
 
 @logger.inject_lambda_context(correlation_id_path="requestContext.requestId")
 @tracer.capture_lambda_handler
@@ -59,12 +61,14 @@ def lambda_handler(event, context):
         continuation_token = event.get("queryStringParameters", {}).get(
             "continuationToken"
         )
-        
-        logger.info(f"S3 Explorer request for connector: {connector_id}, prefix: {prefix}")
+
+        logger.info(
+            f"S3 Explorer request for connector: {connector_id}, prefix: {prefix}"
+        )
 
         # Get table name from environment variable
         table_name = os.environ.get("MEDIALAKE_CONNECTOR_TABLE")
-        
+
         if not table_name:
             logger.error("MEDIALAKE_CONNECTOR_TABLE environment variable not set")
             return {
@@ -104,8 +108,8 @@ def lambda_handler(event, context):
         object_prefix = connector.get("objectPrefix", "")
 
         if not prefix:
-            prefix = object_prefix 
-        
+            prefix = object_prefix
+
         if not bucket:
             logger.warning(f"Bucket not configured for connector {connector_id}")
             return {
@@ -136,22 +140,28 @@ def lambda_handler(event, context):
         with tracer.provider.in_subsegment("list_s3_objects") as subsegment:
             subsegment.put_annotation("bucket", bucket)
             subsegment.put_annotation("prefix", prefix)
-            
+
             start_time = time.time()
             response = s3_client.list_objects_v2(**params)
             end_time = time.time()
-            
+
             # Record the S3 operation latency
             latency = (end_time - start_time) * 1000
-            metrics.add_metric(name="S3ListObjectsLatency", unit="Milliseconds", value=latency)
+            metrics.add_metric(
+                name="S3ListObjectsLatency", unit="Milliseconds", value=latency
+            )
             logger.info(f"S3 list_objects_v2 latency: {latency}ms")
-            
+
             # Count objects returned for metrics
             object_count = len(response.get("Contents", []))
             prefix_count = len(response.get("CommonPrefixes", []))
-            metrics.add_metric(name="S3ObjectsReturned", unit="Count", value=object_count)
-            metrics.add_metric(name="S3PrefixesReturned", unit="Count", value=prefix_count)
-            
+            metrics.add_metric(
+                name="S3ObjectsReturned", unit="Count", value=object_count
+            )
+            metrics.add_metric(
+                name="S3PrefixesReturned", unit="Count", value=prefix_count
+            )
+
             subsegment.put_metadata("object_count", object_count)
             subsegment.put_metadata("prefix_count", prefix_count)
 
@@ -180,7 +190,7 @@ def lambda_handler(event, context):
             "headers": {
                 "Content-Type": "application/json",
                 "Access-Control-Allow-Origin": "*",
-                "Cache-Control": "max-age=60" # Add caching header for frontend
+                "Cache-Control": "max-age=60",  # Add caching header for frontend
             },
             "body": json.dumps(
                 {

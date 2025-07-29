@@ -1,13 +1,12 @@
-import boto3
-import os
-import json
-import ast
 import importlib.util
+import json
+import os
 import re
-from botocore.exceptions import ClientError
-from typing import Dict, Any
-from jinja2 import Environment, FileSystemLoader
+
+import boto3
 from aws_lambda_powertools import Logger, Tracer
+from botocore.exceptions import ClientError
+from jinja2 import Environment, FileSystemLoader
 from lambda_middleware import lambda_middleware
 
 # Initialize Powertools
@@ -15,7 +14,7 @@ logger = Logger()
 tracer = Tracer()
 
 # Initialize AWS clients
-transcribe_client = boto3.client('transcribe')
+transcribe_client = boto3.client("transcribe")
 s3_client = boto3.client("s3")
 
 
@@ -33,7 +32,9 @@ def sanitize_job_name(name: str) -> str:
     return sanitized[:200]
 
 
-def load_and_execute_function_from_s3(bucket: str, key: str, function_name: str, event: dict):
+def load_and_execute_function_from_s3(
+    bucket: str, key: str, function_name: str, event: dict
+):
     try:
         response = s3_client.get_object(Bucket=bucket, Key=f"api_templates/{key}")
         file_content = response["Body"].read().decode("utf-8")
@@ -41,13 +42,17 @@ def load_and_execute_function_from_s3(bucket: str, key: str, function_name: str,
         module = importlib.util.module_from_spec(spec)
         exec(file_content, module.__dict__)
         if not hasattr(module, function_name):
-            raise AttributeError(f"Function '{function_name}' not found in downloaded file.")
+            raise AttributeError(
+                f"Function '{function_name}' not found in downloaded file."
+            )
         return getattr(module, function_name)(event)
     except ClientError as e:
         logger.error(f"S3 error: {e}", exc_info=True)
         raise
     except Exception as e:
-        logger.error(f"Unexpected error during dynamic function load: {e}", exc_info=True)
+        logger.error(
+            f"Unexpected error during dynamic function load: {e}", exc_info=True
+        )
         raise
 
 
@@ -66,7 +71,9 @@ def create_request_body(s3_templates, api_template_bucket, event):
     request_template_path = f"api_templates/{s3_templates['request_template']}"
     mapping_path = s3_templates["mapping_file"]
     request_template = download_s3_object(api_template_bucket, request_template_path)
-    mapping = load_and_execute_function_from_s3(api_template_bucket, mapping_path, function_name, event)
+    mapping = load_and_execute_function_from_s3(
+        api_template_bucket, mapping_path, function_name, event
+    )
     env = Environment(loader=FileSystemLoader("/tmp/"))
     env.filters["jsonify"] = json.dumps
     query_template = env.from_string(request_template)
@@ -74,7 +81,9 @@ def create_request_body(s3_templates, api_template_bucket, event):
 
     # Sanitize job name if present
     if "TranscriptionJobName" in request_body:
-        request_body["TranscriptionJobName"] = sanitize_job_name(request_body["TranscriptionJobName"])
+        request_body["TranscriptionJobName"] = sanitize_job_name(
+            request_body["TranscriptionJobName"]
+        )
 
     return request_body
 
@@ -85,7 +94,10 @@ def create_response_output(s3_templates, api_template_bucket, response_body, eve
     response_mapping_path = s3_templates["response_mapping_file"]
     response_template = download_s3_object(api_template_bucket, response_template_path)
     response_mapping = load_and_execute_function_from_s3(
-        api_template_bucket, response_mapping_path, function_name, {"response_body": response_body, "event": event}
+        api_template_bucket,
+        response_mapping_path,
+        function_name,
+        {"response_body": response_body, "event": event},
     )
     env = Environment(loader=FileSystemLoader("/tmp/"))
     env.filters["jsonify"] = json.dumps
@@ -114,9 +126,7 @@ def lambda_handler(event, context):
     api_template_bucket = os.environ.get("API_TEMPLATE_BUCKET", "medialake-assets")
 
     s3_templates = build_s3_templates_path(
-        service_name="transcribe",
-        resource="transcribe",
-        method="post"
+        service_name="transcribe", resource="transcribe", method="post"
     )
 
     # Create request body
@@ -124,14 +134,19 @@ def lambda_handler(event, context):
     logger.info("Created job settings", extra={"job_settings": job_settings})
 
     # Debugging key fields
-    logger.info("Critical job fields", extra={
-        "TranscriptionJobName": job_settings.get("TranscriptionJobName", ""),
-        "MediaFileUri": job_settings.get("Media", {}).get("MediaFileUri", ""),
-        "MediaFormat": job_settings.get("MediaFormat", ""),
-        "OutputBucketName": job_settings.get("OutputBucketName", ""),
-        "OutputKey": job_settings.get("OutputKey", ""),
-        "DataAccessRoleArn": job_settings.get("JobExecutionSettings", {}).get("DataAccessRoleArn", "")
-    })
+    logger.info(
+        "Critical job fields",
+        extra={
+            "TranscriptionJobName": job_settings.get("TranscriptionJobName", ""),
+            "MediaFileUri": job_settings.get("Media", {}).get("MediaFileUri", ""),
+            "MediaFormat": job_settings.get("MediaFormat", ""),
+            "OutputBucketName": job_settings.get("OutputBucketName", ""),
+            "OutputKey": job_settings.get("OutputKey", ""),
+            "DataAccessRoleArn": job_settings.get("JobExecutionSettings", {}).get(
+                "DataAccessRoleArn", ""
+            ),
+        },
+    )
 
     # Start transcription job
     try:

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, ReactNode } from 'react';
+import React, { createContext, useContext, ReactNode } from "react";
 
 interface TableFilter {
   columnId: string;
@@ -19,7 +19,9 @@ interface TableFiltersContextType {
   onSortChange?: (columnId: string, desc: boolean) => void;
 }
 
-const TableFiltersContext = createContext<TableFiltersContextType | undefined>(undefined);
+const TableFiltersContext = createContext<TableFiltersContextType | undefined>(
+  undefined,
+);
 
 interface TableFiltersProviderProps extends TableFiltersContextType {
   children: ReactNode;
@@ -39,9 +41,11 @@ export const TableFiltersProvider: React.FC<TableFiltersProviderProps> = ({
 export const useTableFilters = () => {
   const context = useContext(TableFiltersContext);
   if (!context) {
-    throw new Error('useTableFilters must be used within a TableFiltersProvider');
+    throw new Error(
+      "useTableFilters must be used within a TableFiltersProvider",
+    );
   }
   return context;
 };
 
-export type { TableFilter, TableSort, TableFiltersContextType }; 
+export type { TableFilter, TableSort, TableFiltersContextType };

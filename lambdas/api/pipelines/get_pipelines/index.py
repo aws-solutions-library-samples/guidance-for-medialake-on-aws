@@ -1,18 +1,17 @@
-import boto3
-import os
+import base64
 import json
+import os
+from typing import Any, Dict
+
+import boto3
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.logging import correlation_paths
-from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
-from aws_lambda_powertools.utilities.data_classes.common import BaseProxyEvent
 from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
-from typing import Dict, Any, List
-from botocore.exceptions import ClientError
+from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import Metrics
-from urllib.parse import parse_qs
-import base64
+from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
+from aws_lambda_powertools.utilities.typing import LambdaContext
+from botocore.exceptions import ClientError
 
 # Initialize Powertools
 logger = Logger()
@@ -44,27 +43,23 @@ table = dynamodb.Table(os.environ["PIPELINES_TABLE_NAME"])
 # Default pagination values
 DEFAULT_PAGE_SIZE = 20
 
+
 class PipelineError(Exception):
     """Custom exception for pipeline errors"""
-
-    pass
 
 
 def extract_event_rule_info(pipeline: dict) -> dict:
     """
     Extract and format event rule information from a pipeline.
-    
+
     Args:
         pipeline: The pipeline object from DynamoDB
-        
+
     Returns:
         A dictionary containing event rule information
     """
-    event_rule_info = {
-        "triggerTypes": ["Event Triggered"],
-        "eventRules": []
-    }
-    
+    event_rule_info = {"triggerTypes": ["Event Triggered"], "eventRules": []}
+
     # Check for Event Triggered (EventBridge rules)
     if "dependentResources" in pipeline:
         for resource_type, resource_value in pipeline.get("dependentResources", []):
@@ -72,7 +67,7 @@ def extract_event_rule_info(pipeline: dict) -> dict:
                 # Add Event Triggered to trigger types if not already there
                 if "Event Triggered" not in event_rule_info["triggerTypes"]:
                     event_rule_info["triggerTypes"].append("Event Triggered")
-                
+
                 # Extract rule name and eventbus name if available
                 rule_info = {}
                 if isinstance(resource_value, dict) and "rule_name" in resource_value:
@@ -83,35 +78,58 @@ def extract_event_rule_info(pipeline: dict) -> dict:
                     rule_info["ruleArn"] = resource_value
                     if isinstance(resource_value, str) and "/" in resource_value:
                         rule_info["ruleName"] = resource_value.split("/")[-1]
-                
+
                 # Try to extract human-friendly information from the rule name
                 if "ruleName" in rule_info:
                     rule_name = rule_info["ruleName"]
-                    
+
                     # Check for default pipeline patterns
                     if "default-image-pipeline" in rule_name:
-                        rule_info["description"] = "Triggers on image files (TIF, JPG, JPEG, PNG, WEBP, GIF, SVG)"
-                        rule_info["fileTypes"] = ["TIF", "JPG", "JPEG", "PNG", "WEBP", "GIF", "SVG"]
+                        rule_info["description"] = (
+                            "Triggers on image files (TIF, JPG, JPEG, PNG, WEBP, GIF, SVG)"
+                        )
+                        rule_info["fileTypes"] = [
+                            "TIF",
+                            "JPG",
+                            "JPEG",
+                            "PNG",
+                            "WEBP",
+                            "GIF",
+                            "SVG",
+                        ]
                         rule_info["eventType"] = "AssetCreated"
                     elif "default-video-pipeline" in rule_name:
-                        rule_info["description"] = "Triggers on video files (MP4, MOV, AVI, MKV, WEBM)"
+                        rule_info["description"] = (
+                            "Triggers on video files (MP4, MOV, AVI, MKV, WEBM)"
+                        )
                         rule_info["fileTypes"] = ["MP4", "MOV", "AVI", "MKV", "WEBM"]
                         rule_info["eventType"] = "AssetCreated"
                     elif "default-audio-pipeline" in rule_name:
-                        rule_info["description"] = "Triggers on audio files (WAV, AIFF, AIF, MP3, PCM, M4A)"
-                        rule_info["fileTypes"] = ["WAV", "AIFF", "AIF", "MP3", "PCM", "M4A"]
+                        rule_info["description"] = (
+                            "Triggers on audio files (WAV, AIFF, AIF, MP3, PCM, M4A)"
+                        )
+                        rule_info["fileTypes"] = [
+                            "WAV",
+                            "AIFF",
+                            "AIF",
+                            "MP3",
+                            "PCM",
+                            "M4A",
+                        ]
                         rule_info["eventType"] = "AssetCreated"
                     elif "pipeline_execution_completed" in rule_name:
-                        rule_info["description"] = "Triggers when another pipeline completes execution"
+                        rule_info["description"] = (
+                            "Triggers when another pipeline completes execution"
+                        )
                         rule_info["eventType"] = "Pipeline Execution Completed"
                     else:
                         rule_info["description"] = f"Custom event rule: {rule_name}"
-                
+
                 event_rule_info["eventRules"].append(rule_info)
-    
+
     # For now, we're only supporting Event Triggered
     # In the future, we can add logic for API Triggered and Manually Triggered
-    
+
     return event_rule_info
 
 
@@ -176,10 +194,10 @@ def get_pipelines(
         for pipeline in s:
             # Extract event rule information
             event_rule_info = extract_event_rule_info(pipeline)
-            
+
             # Update the pipeline type to use the determined trigger types
             pipeline["type"] = ",".join(event_rule_info["triggerTypes"])
-            
+
             # Add event rule information to the pipeline
             pipeline["eventRuleInfo"] = event_rule_info
 
@@ -274,7 +292,7 @@ def lambda_handler(
     """
     try:
         return app.resolve(event, context)
-    except Exception as e:
+    except Exception:
         logger.exception("Error in lambda handler")
         return {
             "statusCode": 500,

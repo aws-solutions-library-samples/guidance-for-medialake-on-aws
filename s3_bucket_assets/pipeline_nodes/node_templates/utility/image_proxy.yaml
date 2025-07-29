@@ -11,7 +11,7 @@ node:
         handler: utility/ImageProxyLambdaDeployment
         runtime: python3.12
         layers:
-          - CairoSvg
+          - ResvgCli
         iam_policy:
           statements:
             - effect: Allow
@@ -41,8 +41,8 @@ node:
               actions:
                 - kms:GenerateDataKey
               resources:
-                - '*'
-                
+                - "*"
+
 actions:
   extract:
     summary: Create an image proxy

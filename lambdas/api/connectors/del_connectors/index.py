@@ -1,12 +1,13 @@
 import json
-import boto3
 import os
 import time
-from botocore.exceptions import ClientError
-from typing import List, Dict, Any
+from typing import Any, List
+
+import boto3
 from aws_lambda_powertools import Logger, Tracer
-from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.event_handler.api_gateway import APIGatewayProxyEvent
+from aws_lambda_powertools.utilities.typing import LambdaContext
+from botocore.exceptions import ClientError
 
 # Initialize AWS Lambda Powertools
 logger = Logger()
@@ -57,7 +58,7 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext):
         iam_role_arn = connector.get("iamRoleArn")
         pipe_arn = connector.get("pipeArn")
         pipe_role_arn = connector.get("pipeRoleArn")
-        
+
         # Validate critical fields
         required_fields = []
         if not bucket_name:
@@ -66,13 +67,19 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext):
             required_fields.append("lambdaArn")
         if not iam_role_arn:
             required_fields.append("iamRoleArn")
-            
+
         if required_fields:
             missing_fields = ", ".join(required_fields)
-            logger.error(f"Invalid connector configuration for ID: {connector_id}, missing: {missing_fields}")
+            logger.error(
+                f"Invalid connector configuration for ID: {connector_id}, missing: {missing_fields}"
+            )
             return {
                 "statusCode": 400,
-                "body": json.dumps({"message": f"Invalid connector configuration: missing {missing_fields}"}),
+                "body": json.dumps(
+                    {
+                        "message": f"Invalid connector configuration: missing {missing_fields}"
+                    }
+                ),
             }
 
         # Create AWS clients in the specified region
@@ -124,7 +131,10 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext):
                 sqs.delete_queue(QueueUrl=queue_url)
                 logger.info(f"Deleted SQS queue {queue_url}")
             except ClientError as e:
-                if e.response["Error"]["Code"] != "AWS.SimpleQueueService.NonExistentQueue":
+                if (
+                    e.response["Error"]["Code"]
+                    != "AWS.SimpleQueueService.NonExistentQueue"
+                ):
                     error_msg = f"Error deleting SQS queue: {str(e)}"
                     logger.error(error_msg)
                     errors.append(error_msg)
@@ -201,9 +211,7 @@ def delete_iam_role(iam_client: Any, role_arn: str) -> None:
         "AttachedPolicies"
     ]
     for policy in attached_policies:
-        iam_client.detach_role_policy(
-            RoleName=role_name, PolicyArn=policy["PolicyArn"]
-        )
+        iam_client.detach_role_policy(RoleName=role_name, PolicyArn=policy["PolicyArn"])
         logger.info(f"Detached policy {policy['PolicyArn']} from role {role_name}")
 
     # Delete all inline policies
@@ -215,7 +223,7 @@ def delete_iam_role(iam_client: Any, role_arn: str) -> None:
     # Remove permission boundary if exists
     try:
         role_info = iam_client.get_role(RoleName=role_name)
-        if 'PermissionsBoundary' in role_info['Role']:
+        if "PermissionsBoundary" in role_info["Role"]:
             iam_client.delete_role_permissions_boundary(RoleName=role_name)
             logger.info(f"Removed permissions boundary from role {role_name}")
     except ClientError as e:
@@ -224,21 +232,24 @@ def delete_iam_role(iam_client: Any, role_arn: str) -> None:
 
     # Remove any instance profiles associated with the role
     try:
-        instance_profiles = iam_client.list_instance_profiles_for_role(RoleName=role_name)["InstanceProfiles"]
+        instance_profiles = iam_client.list_instance_profiles_for_role(
+            RoleName=role_name
+        )["InstanceProfiles"]
         for profile in instance_profiles:
             profile_name = profile["InstanceProfileName"]
             iam_client.remove_role_from_instance_profile(
-                InstanceProfileName=profile_name,
-                RoleName=role_name
+                InstanceProfileName=profile_name, RoleName=role_name
             )
-            logger.info(f"Removed role {role_name} from instance profile {profile_name}")
+            logger.info(
+                f"Removed role {role_name} from instance profile {profile_name}"
+            )
     except ClientError as e:
         if e.response["Error"]["Code"] != "NoSuchEntity":
             logger.warning(f"Error removing role from instance profiles: {str(e)}")
 
     # Wait a bit to ensure all detachments are processed
     time.sleep(2)
-    
+
     # Delete the role
     try:
         iam_client.delete_role(RoleName=role_name)
@@ -253,28 +264,37 @@ def delete_eventbridge_pipe(pipes_client: Any, pipe_arn: str) -> None:
     """Delete an EventBridge Pipe"""
     # Get the pipe name from ARN
     pipe_name = pipe_arn.split("/")[-1]
-    
+
     # Check if pipe exists and get its current state
     try:
         pipe_info = pipes_client.describe_pipe(Name=pipe_name)
-        current_state = pipe_info.get('CurrentState')
-        
+        current_state = pipe_info.get("CurrentState")
+
         # Handle different pipe states
-        if current_state in ['RUNNING', 'STARTING']:
+        if current_state in ["RUNNING", "STARTING"]:
             # Stop the pipe if it's running or starting
             pipes_client.stop_pipe(Name=pipe_name)
             logger.info(f"Stopping EventBridge Pipe {pipe_name}")
-            
+
             # Wait for pipe to stop before deleting
             max_retries = 15  # Increased retries for longer wait time
             for i in range(max_retries):
                 time.sleep(3)  # Wait 3 seconds between checks
                 try:
                     pipe_info = pipes_client.describe_pipe(Name=pipe_name)
-                    if pipe_info.get('CurrentState') in ['STOPPED', 'STOP_FAILED', 'INACTIVE', 'CREATED']:
-                        logger.info(f"EventBridge Pipe {pipe_name} is now in state: {pipe_info.get('CurrentState')}")
+                    if pipe_info.get("CurrentState") in [
+                        "STOPPED",
+                        "STOP_FAILED",
+                        "INACTIVE",
+                        "CREATED",
+                    ]:
+                        logger.info(
+                            f"EventBridge Pipe {pipe_name} is now in state: {pipe_info.get('CurrentState')}"
+                        )
                         break
-                    logger.info(f"Waiting for pipe {pipe_name} to stop. Current state: {pipe_info.get('CurrentState')}")
+                    logger.info(
+                        f"Waiting for pipe {pipe_name} to stop. Current state: {pipe_info.get('CurrentState')}"
+                    )
                 except ClientError as e:
                     if e.response["Error"]["Code"] == "ResourceNotFoundException":
                         logger.info(f"Pipe {pipe_name} no longer exists")
@@ -282,20 +302,26 @@ def delete_eventbridge_pipe(pipes_client: Any, pipe_arn: str) -> None:
                     else:
                         logger.warning(f"Error checking pipe state: {str(e)}")
                         break
-                
+
                 if i == max_retries - 1:
-                    logger.warning(f"Pipe {pipe_name} did not reach stopped state in time, attempting delete anyway")
-        elif current_state in ['CREATING', 'UPDATING', 'DELETING']:
+                    logger.warning(
+                        f"Pipe {pipe_name} did not reach stopped state in time, attempting delete anyway"
+                    )
+        elif current_state in ["CREATING", "UPDATING", "DELETING"]:
             # For these states, we need to wait for the operation to complete
-            logger.info(f"Pipe {pipe_name} is in {current_state} state. Waiting before deletion attempt.")
+            logger.info(
+                f"Pipe {pipe_name} is in {current_state} state. Waiting before deletion attempt."
+            )
             max_retries = 20
             for i in range(max_retries):
                 time.sleep(3)
                 try:
                     pipe_info = pipes_client.describe_pipe(Name=pipe_name)
-                    new_state = pipe_info.get('CurrentState')
-                    if new_state not in ['CREATING', 'UPDATING', 'DELETING']:
-                        logger.info(f"Pipe {pipe_name} state changed from {current_state} to {new_state}")
+                    new_state = pipe_info.get("CurrentState")
+                    if new_state not in ["CREATING", "UPDATING", "DELETING"]:
+                        logger.info(
+                            f"Pipe {pipe_name} state changed from {current_state} to {new_state}"
+                        )
                         break
                 except ClientError as e:
                     if e.response["Error"]["Code"] == "ResourceNotFoundException":
@@ -304,10 +330,12 @@ def delete_eventbridge_pipe(pipes_client: Any, pipe_arn: str) -> None:
                     else:
                         logger.warning(f"Error checking pipe state: {str(e)}")
                         break
-                
+
                 if i == max_retries - 1:
-                    logger.warning(f"Pipe {pipe_name} state remained {current_state} after waiting, attempting delete anyway")
-        
+                    logger.warning(
+                        f"Pipe {pipe_name} state remained {current_state} after waiting, attempting delete anyway"
+                    )
+
         # Delete the pipe with retries
         max_delete_retries = 3
         for i in range(max_delete_retries):
@@ -319,13 +347,18 @@ def delete_eventbridge_pipe(pipes_client: Any, pipe_arn: str) -> None:
                 if e.response["Error"]["Code"] == "ResourceNotFoundException":
                     logger.info(f"Pipe {pipe_name} already deleted")
                     break
-                elif e.response["Error"]["Code"] == "ConflictException" and i < max_delete_retries - 1:
-                    logger.info(f"Pipe {pipe_name} in transition state, retrying deletion in 5 seconds")
+                elif (
+                    e.response["Error"]["Code"] == "ConflictException"
+                    and i < max_delete_retries - 1
+                ):
+                    logger.info(
+                        f"Pipe {pipe_name} in transition state, retrying deletion in 5 seconds"
+                    )
                     time.sleep(5)
                 else:
                     logger.error(f"Failed to delete pipe {pipe_name}: {str(e)}")
                     raise
-    
+
     except ClientError as e:
         if e.response["Error"]["Code"] == "ResourceNotFoundException":
             logger.info(f"Pipe {pipe_name} does not exist, no need to delete")

@@ -1,26 +1,19 @@
 {
-    "compilerOptions": {
-        "target": "es2016",
-        "module": "commonjs",
-        "esModuleInterop": true,
-        "forceConsistentCasingInFileNames": true,
-        "strict": true,
-        "skipLibCheck": true,
-        "outDir": "./dist",
-        "rootDir": "./src",
-        "moduleResolution": "node",
-        "baseUrl": "./",
-        "paths": {
-            "*": [
-                "node_modules/*"
-            ]
-        }
+  "compilerOptions": {
+    "baseUrl": "./",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "outDir": "./dist",
+    "paths": {
+      "*": ["node_modules/*"]
     },
-    "include": [
-        "src/**/*"
-    ],
-    "exclude": [
-        "node_modules",
-        "dist"
-    ]
+    "rootDir": "./src",
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "es2016"
+  },
+  "exclude": ["node_modules", "dist"],
+  "include": ["src/**/*"]
 }

@@ -11,20 +11,15 @@ and associated Lambda functions for managing media settings. It handles:
 """
 
 from dataclasses import dataclass
-from constructs import Construct
-from aws_cdk import (
-    aws_apigateway as api_gateway,
-    aws_iam as iam,
-    aws_secretsmanager as secretsmanager,
-    aws_cognito as cognito,
-    Stack,
-)
-from medialake_constructs.shared_constructs.lam_deployment import LambdaDeployment
 
-from medialake_constructs.shared_constructs.lambda_base import (
-    Lambda,
-    LambdaConfig,
-)
+from aws_cdk import Stack
+from aws_cdk import aws_apigateway as api_gateway
+from aws_cdk import aws_cognito as cognito
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_secretsmanager as secretsmanager
+from constructs import Construct
+
+from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 from .api_gateway_utils import add_cors_options_method
 
@@ -62,7 +57,7 @@ class SettingsConstruct(Construct):
         api_resource (apigateway.IResource): The API Gateway resource to attach to
         cognito_authorizer (apigateway.IAuthorizer): Cognito authorizer for API endpoints
         x_origin_verify_secret (secretsmanager.Secret): Secret for origin verification
-        ingest_event_bus (events.EventBus): EventBus for ingestion events
+        pipelines_event_bus (events.EventBus): EventBus for pipeline events
         iac_assets_bucket (s3.Bucket): S3 bucket for infrastructure assets
         props (settingsProps): Configuration properties for the construct
     """
@@ -76,23 +71,22 @@ class SettingsConstruct(Construct):
         super().__init__(scope, constructor_id)
 
         # Get the current account ID
-        account_id = Stack.of(self).account
+        Stack.of(self).account
 
         # Create settings resource
         settings_resource = props.api_resource.add_resource("settings")
         # Add OPTIONS method to support CORS
         add_cors_options_method(settings_resource)
-        
+
         # Create system settings resource and DynamoDB table
         system_resource = settings_resource.add_resource("system")
         # Add OPTIONS method to support CORS
         add_cors_options_method(system_resource)
-        
-    
+
         # Get the existing system settings table by ARN
         self._system_settings_table_name = props.system_settings_table_name
         self._system_settings_table_arn = props.system_settings_table_arn
-        
+
         # GET /settings/system
         self._get_system_settings_handler = Lambda(
             self,
@@ -127,7 +121,7 @@ class SettingsConstruct(Construct):
             authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
-        
+
         # Create search provider resource
         search_resource = system_resource.add_resource("search")
         # Add OPTIONS method to support CORS
@@ -194,7 +188,7 @@ class SettingsConstruct(Construct):
                 resources=[self._system_settings_table_arn],
             )
         )
-        
+
         # Add permissions to access Secrets Manager
         self._post_search_provider_handler.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -243,7 +237,7 @@ class SettingsConstruct(Construct):
                 resources=[self._system_settings_table_arn],
             )
         )
-        
+
         # Add permissions to access Secrets Manager
         self._put_search_provider_handler.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -264,7 +258,7 @@ class SettingsConstruct(Construct):
             authorization_type=api_gateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
-        
+
         # Create users resource
         settings_users_resource = settings_resource.add_resource("users")
         settings_users_userid_resource = settings_users_resource.add_resource("{id}")
@@ -295,9 +289,9 @@ class SettingsConstruct(Construct):
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=[
-                    "cognito-idp:ListUsers", 
+                    "cognito-idp:ListUsers",
                     "cognito-idp:AdminGetUser",
-                    "cognito-idp:AdminListGroupsForUser"
+                    "cognito-idp:AdminListGroupsForUser",
                 ],
                 resources=[props.cognito_user_pool.user_pool_arn],
             )
@@ -350,7 +344,7 @@ class SettingsConstruct(Construct):
             "SettingsUsersUserDelLambda",
             config=LambdaConfig(
                 name="settings_users_user_del_lambda",
-                iam_role_name="settings_users_user_del_lambda_role",
+                # iam_role_name="settings_users_user_del_lambda_role",
                 entry="lambdas/api/settings/users/rp_userid/del_user",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": (
@@ -383,7 +377,7 @@ class SettingsConstruct(Construct):
             "SettingsUserPutLambda",
             config=LambdaConfig(
                 name="settings_users_user_put_lambda",
-                iam_role_name="settings_users_user_put_lambda_role",
+                # iam_role_name="settings_users_user_put_lambda_role",
                 entry="lambdas/api/settings/users/rp_userid/put_user",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": (
@@ -420,7 +414,7 @@ class SettingsConstruct(Construct):
             "SettingsUsersUserUseridGetLambda",
             config=LambdaConfig(
                 name="user_put",
-                iam_role_name="user_put",
+                # iam_role_name="user_put",
                 entry="lambdas/api/settings/users/user/rp_userid/get_userid",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": (
@@ -493,7 +487,7 @@ class SettingsConstruct(Construct):
         #     authorization_type=api_gateway.AuthorizationType.COGNITO,
         #     authorizer=props.cognito_authorizer,
         # )
-        
+
         # Add CORS support to additional resources
         add_cors_options_method(settings_users_resource)
         add_cors_options_method(settings_users_userid_resource)
@@ -501,7 +495,7 @@ class SettingsConstruct(Construct):
         add_cors_options_method(settings_users_user_userid_resource)
         add_cors_options_method(settings_roles_resource)
         add_cors_options_method(settings_roles_role_resource)
-        
+
     @property
     def system_settings_table_name(self) -> str:
         return self._system_settings_table_name

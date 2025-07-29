@@ -6,49 +6,36 @@ configuration, logging, IAM roles, and other AWS resources. It implements best p
 Lambda deployment including standardized naming conventions and resource validation.
 """
 
-from typing import Dict, Optional, List, Set
-from dataclasses import dataclass
-import re
-import os
-import glob
-from pathlib import Path
 import datetime
+import os
+import re
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Dict, List, Optional
 
-from aws_cdk import (
-    aws_lambda as lambda_,
-    aws_logs as logs,
-    aws_iam as iam,
-    aws_ec2 as ec2,
-    aws_efs as efs,
-    AssetHashType,
-    Stack,
-    RemovalPolicy,
-    Duration,
-    BundlingOutput,
-)
-
+from aws_cdk import Duration, RemovalPolicy, Stack
+from aws_cdk import aws_ec2 as ec2
+from aws_cdk import aws_efs as efs
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_lambda as lambda_
+from aws_cdk import aws_logs as logs
+from aws_cdk.aws_lambda_nodejs import BundlingOptions as NodeJSBundlingOptions
+from aws_cdk.aws_lambda_nodejs import NodejsFunction
 from aws_cdk.aws_lambda_python_alpha import (
+    BundlingOptions,
     PythonFunction,
     PythonLayerVersion,
-    BundlingOptions,
-)
-
-
-from aws_cdk.aws_lambda_nodejs import (
-    NodejsFunction,
-    BundlingOptions as NodeJSBundlingOptions,
-)
-
-from constructs import Construct
-from medialake_constructs.shared_constructs.lambda_layers import (
-    PowertoolsLayer,
-    PowertoolsLayerConfig,
-    PynamoDbLambdaLayer,
 )
 from aws_lambda_powertools import Logger
+from constructs import Construct
 
-
-from config import WORKFLOW_PAYLOAD_TEMP_BUCKET, config as env_config, DIST_PATH
+from config import DIST_PATH
+from config import config as env_config
+from medialake_constructs.shared_constructs.lambda_layers import (
+    CommonLibrariesLayer,
+    PowertoolsLayer,
+    PowertoolsLayerConfig,
+)
 
 # Constants
 DEFAULT_MEMORY_SIZE = 128
@@ -63,19 +50,21 @@ MAX_LOG_GROUP_NAME_LENGTH = 512
 def get_log_retention_from_config() -> logs.RetentionDays:
     """
     Get the log retention setting from config and convert to RetentionDays enum.
-    
+
     Returns:
         logs.RetentionDays: The retention period based on config
     """
     # Access the logging config properly from Pydantic model
     try:
-        if hasattr(env_config, 'logging') and env_config.logging:
-            retention_days = getattr(env_config.logging, 'lambda_cloudwatch_log_retention_days', 180)
+        if hasattr(env_config, "logging") and env_config.logging:
+            retention_days = getattr(
+                env_config.logging, "lambda_cloudwatch_log_retention_days", 180
+            )
         else:
             retention_days = 180  # Default fallback
     except (AttributeError, TypeError):
         retention_days = 180  # Default fallback
-    
+
     # Map days to RetentionDays enum values
     retention_mapping = {
         1: logs.RetentionDays.ONE_DAY,
@@ -96,17 +85,17 @@ def get_log_retention_from_config() -> logs.RetentionDays:
         1827: logs.RetentionDays.FIVE_YEARS,
         3653: logs.RetentionDays.TEN_YEARS,
     }
-    
+
     # Find the closest matching retention period
     if retention_days in retention_mapping:
         return retention_mapping[retention_days]
-    
+
     # Find the closest higher value if exact match not found
     sorted_days = sorted(retention_mapping.keys())
     for days in sorted_days:
         if days >= retention_days:
             return retention_mapping[days]
-    
+
     # If retention_days is higher than any predefined value, use infinite retention
     return logs.RetentionDays.INFINITE
 
@@ -170,7 +159,10 @@ class LambdaConfig:
         entry (Optional[str]): Entry point for the Lambda function code
         memory_size (int): Memory allocation in MB (default: 128)
         timeout_minutes (int): Function timeout in minutes (default: 5)
-        environment_variables (Optional[Dict[str, str]]): Environment variables for the function
+        environment_variables (
+                                   Optional[Dict[str,
+                                   str]]
+                               ): Environment variables for the function
         runtime (lambda_.Runtime): Lambda runtime (default: PYTHON_3_13)
         architecture (lambda_.Architecture): CPU architecture (default: X86_64)
         layers (Optional[List[PythonLayerVersion]]): Lambda layers to attach
@@ -236,6 +228,9 @@ class Lambda(Construct):
         ```
     """
 
+    # Class-level shared layer instances per stack to avoid duplicate layer creation
+    _shared_common_libraries_layers = {}
+
     def __init__(
         self, scope: Construct, construct_id: str, config: LambdaConfig, **kwargs
     ):
@@ -255,17 +250,21 @@ class Lambda(Construct):
 
         logger = Logger()
         logger.debug(f"Initializing Lambda construct with config: {config}")
-        
+
         # Get the actual retention days value for logging
         try:
-            if hasattr(env_config, 'logging') and env_config.logging:
-                config_retention_days = getattr(env_config.logging, 'lambda_cloudwatch_log_retention_days', 180)
+            if hasattr(env_config, "logging") and env_config.logging:
+                config_retention_days = getattr(
+                    env_config.logging, "lambda_cloudwatch_log_retention_days", 180
+                )
             else:
                 config_retention_days = 180
         except (AttributeError, TypeError):
             config_retention_days = 180
-            
-        logger.debug(f"Using log retention from config: {LOG_RETENTION} (based on {config_retention_days} days)")
+
+        logger.debug(
+            f"Using log retention from config: {LOG_RETENTION} (based on {config_retention_days} days)"
+        )
 
         # Validate config values
         if config.memory_size < 128 or config.memory_size > 10240:
@@ -291,7 +290,25 @@ class Lambda(Construct):
         powertools_layer = PowertoolsLayer(
             self, "PowertoolsLayer", config=power_tools_layer_config
         )
-        layer_objects = [powertools_layer.layer]
+
+        # Create or reuse common libraries layer (per-stack singleton pattern)
+        stack_id = stack.stack_name
+        if stack_id not in Lambda._shared_common_libraries_layers:
+            logger.debug(
+                f"Creating shared Common Libraries layer for stack: {stack_id}"
+            )
+            # Use the stack variable that was already created above
+            Lambda._shared_common_libraries_layers[stack_id] = CommonLibrariesLayer(
+                stack, "CommonLibsLayer"
+            )
+        else:
+            logger.debug(
+                f"Reusing existing Common Libraries layer for stack: {stack_id}"
+            )
+
+        common_libraries_layer = Lambda._shared_common_libraries_layers[stack_id]
+
+        layer_objects = [powertools_layer.layer, common_libraries_layer.layer]
 
         # Add layers from config
         if config.layers:
@@ -300,7 +317,9 @@ class Lambda(Construct):
 
         # Create Log Group with retention from config
         log_group_name = f"/aws/lambda/{lambda_function_name}-logs"
-        logger.debug(f"Creating log group: {log_group_name} with retention: {LOG_RETENTION}")
+        logger.debug(
+            f"Creating log group: {log_group_name} with retention: {LOG_RETENTION}"
+        )
         lambda_log_group = logs.LogGroup(
             self,
             "LambdaLogGroup",
@@ -375,8 +394,12 @@ class Lambda(Construct):
 
         # Add reserved concurrent executions if provided
         if config.reserved_concurrent_executions is not None:
-            logger.debug(f"Setting reserved concurrent executions to {config.reserved_concurrent_executions}")
-            common_lambda_props["reserved_concurrent_executions"] = config.reserved_concurrent_executions
+            logger.debug(
+                f"Setting reserved concurrent executions to {config.reserved_concurrent_executions}"
+            )
+            common_lambda_props["reserved_concurrent_executions"] = (
+                config.reserved_concurrent_executions
+            )
 
         # Add environment variables if provided
         if config.environment_variables:
@@ -397,7 +420,9 @@ class Lambda(Construct):
 
         # --- SnapStart: Force new version on each deployment ---
         if config.snap_start:
-            lambda_environment_variables["DEPLOYMENT_TIMESTAMP"] = datetime.datetime.utcnow().isoformat()
+            lambda_environment_variables["DEPLOYMENT_TIMESTAMP"] = (
+                datetime.datetime.utcnow().isoformat()
+            )
         # --- End SnapStart versioning ---
 
         common_lambda_props["environment"] = lambda_environment_variables
@@ -416,13 +441,16 @@ class Lambda(Construct):
                     "Security groups can only be added when a VPC is configured"
                 )
             common_lambda_props["security_groups"] = config.security_groups
-            
+
         # Add filesystem if provided
         if config.filesystem_access_point and config.filesystem_mount_path:
-            logger.debug(f"Adding filesystem with access point and mount path {config.filesystem_mount_path}")
-            common_lambda_props["filesystem"] = lambda_.FileSystem.from_efs_access_point(
-                config.filesystem_access_point,
-                config.filesystem_mount_path
+            logger.debug(
+                f"Adding filesystem with access point and mount path {config.filesystem_mount_path}"
+            )
+            common_lambda_props["filesystem"] = (
+                lambda_.FileSystem.from_efs_access_point(
+                    config.filesystem_access_point, config.filesystem_mount_path
+                )
             )
 
         # Add SnapStart if enabled
@@ -430,38 +458,50 @@ class Lambda(Construct):
             logger.debug("SnapStart enabled for Lambda function")
             # SnapStart is supported for Java 11+, Python 3.12+, and .NET 8+ runtimes
             # SnapStart requires SnapStartConf object, not a simple boolean
-            common_lambda_props["snap_start"] = lambda_.SnapStartConf.ON_PUBLISHED_VERSIONS
-            logger.info(f"SnapStart enabled for {config.runtime.family} function - using ON_PUBLISHED_VERSIONS")
-            
+            common_lambda_props["snap_start"] = (
+                lambda_.SnapStartConf.ON_PUBLISHED_VERSIONS
+            )
+            logger.info(
+                f"SnapStart enabled for {config.runtime.family} function - using ON_PUBLISHED_VERSIONS"
+            )
+
             # Validate runtime support for SnapStart
-            supported_families = [lambda_.RuntimeFamily.JAVA, lambda_.RuntimeFamily.DOTNET_CORE, lambda_.RuntimeFamily.PYTHON]
+            supported_families = [
+                lambda_.RuntimeFamily.JAVA,
+                lambda_.RuntimeFamily.DOTNET_CORE,
+                lambda_.RuntimeFamily.PYTHON,
+            ]
             if config.runtime.family not in supported_families:
-                logger.warning(f"SnapStart requested for runtime {config.runtime.family}. SnapStart is currently supported for Java 11+, Python 3.12+, and .NET 8+ runtimes.")
+                logger.warning(
+                    f"SnapStart requested for runtime {config.runtime.family}. SnapStart is currently supported for Java 11+, Python 3.12+, and .NET 8+ runtimes."
+                )
             elif config.runtime.family == lambda_.RuntimeFamily.PYTHON:
                 # Additional validation for Python - must be 3.12 or later
                 python_version = config.runtime.name
-                if "python3.12" not in python_version.lower() and not any(ver in python_version.lower() for ver in ["python3.13", "python3.14", "python3.15"]):
-                    logger.warning(f"SnapStart requires Python 3.12 or later. Current runtime: {config.runtime.name}")
+                if "python3.12" not in python_version.lower() and not any(
+                    ver in python_version.lower()
+                    for ver in ["python3.13", "python3.14", "python3.15"]
+                ):
+                    logger.warning(
+                        f"SnapStart requires Python 3.12 or later. Current runtime: {config.runtime.name}"
+                    )
                 else:
                     logger.info(f"SnapStart is supported for {config.runtime.name}")
 
         # Create the Lambda function based on runtime
-        logger.info(
-            f"Creating {config.runtime.family} Lambda function with properties"
-        )
+        logger.info(f"Creating {config.runtime.family} Lambda function with properties")
         entry_path = Path(common_lambda_props["entry"])
         logger.debug(f"Lambda entry path: {entry_path}")
 
         try:
             if config.runtime.family == lambda_.RuntimeFamily.NODEJS:
-                # For Node.js, we still collect common libraries for local copying since 
                 # the Node.js bundling process is different
-                common_libs = self._collect_common_libraries(entry_path)
-                logger.debug(f"Found common libraries for Node.js: {common_libs}")
-                self._create_nodejs_function(common_lambda_props, common_libs)
+                self._create_nodejs_function(common_lambda_props)
             else:
                 # Python bundling now handles common libraries via Docker - no local copying needed
-                logger.debug("Using enhanced Docker bundling for Python - common libraries handled automatically")
+                logger.debug(
+                    "Using enhanced Docker bundling for Python - common libraries handled automatically"
+                )
                 self._create_python_function(
                     common_lambda_props, config, entry_path, {}
                 )
@@ -477,73 +517,13 @@ class Lambda(Construct):
             logger.error(f"Failed to create Lambda function: {str(e)}", exc_info=True)
             raise
 
-    def _collect_common_libraries(self, entry_path: Path) -> Dict[str, str]:
-        """
-        Collect common libraries from parent directories.
-        Returns a dictionary mapping file names to their full paths,
-        with more specific (closer to lambda) libraries taking precedence.
-        
-        Note: This method is now only used for Node.js functions. Python functions
-        handle common libraries through enhanced Docker bundling during the build process.
-        """
-        common_libs = {}
-        current_path = entry_path
-
-        # Walk up the directory tree until we reach the lambdas directory
-        while "lambdas" in str(current_path):
-            common_lib_path = current_path / "common_libraries"
-            if common_lib_path.exists():
-                # Collect all files in the common_libraries directory
-                for file_path in common_lib_path.rglob("*"):
-                    if file_path.is_file():
-                        # Use the relative path from common_libraries as the key
-                        rel_path = file_path.relative_to(common_lib_path)
-                        # Only add if we haven't seen this file before (more specific ones take precedence)
-                        if str(rel_path) not in common_libs:
-                            common_libs[str(rel_path)] = str(file_path)
-            current_path = current_path.parent
-
-        return common_libs
-
-    def _copy_common_libraries(
-        self, common_libs: Dict[str, str], target_dir: Path
-    ) -> None:
-        """
-        Copy common libraries to the target directory, flattening the structure.
-        
-        Note: This method is now only used for Node.js functions. Python functions
-        handle common libraries through enhanced Docker bundling to avoid local file copying.
-        """
-        import shutil
-        logger = Logger()
-  
-        logger.debug(f"Ensuring target directory exists: {target_dir}")
-        target_dir.mkdir(parents=True, exist_ok=True)
-
-        # Copy each file
-        for rel_path, source_path in common_libs.items():
-            target_file = Path(rel_path).name
-            target_path = target_dir / target_file
-            logger.debug(f"Copying common library file from {source_path} to {target_path}")
-            try:
-                shutil.copy2(source_path, target_path)
-                logger.debug(f"Successfully copied {source_path} to {target_path}")
-            except Exception as e:
-                logger.error(f"Error copying {source_path} to {target_path}: {e}")
-                raise
-
-
-    def _create_nodejs_function(self, props: dict, common_libs: dict):
+    def _create_nodejs_function(self, props: dict):
         logger = Logger()
 
         # Corrected Node.js specific paths
         props["runtime"] = lambda_.Runtime.NODEJS_20_X
         props["project_root"] = props["entry"]
         props["deps_lock_file_path"] = os.path.join(props["entry"], "lock.json")
-
-        # Copy common libraries to entry directory
-        if common_libs:
-            self._copy_common_libraries(common_libs, Path(props["project_root"]))
 
         # If the deployment is part of a CI/CD pipeline, avoid using PythonFunction as it's relying on DnD
         # CI env var is exposed by Gitlab. TODO: add Github specific env var
@@ -556,7 +536,7 @@ class Lambda(Construct):
             del props["deps_lock_file_path"]
 
             # Add a default index document if not defined
-            if not "." in props["handler"]:
+            if "." not in props["handler"]:
                 props["handler"] = f"index.{props['handler']}"
 
             self._function = lambda_.Function(
@@ -594,64 +574,17 @@ class Lambda(Construct):
                 """
                 set -e
                 echo "Starting Lambda bundling process..."
-                
+
                 # Install requirements if they exist
-                if [ -f requirements.txt ]; then 
+                if [ -f requirements.txt ]; then
                     echo "Installing Python requirements..."
                     pip install --no-cache-dir -r requirements.txt -t /asset-output
                 fi
-                
+
                 # Copy lambda source files
                 echo "Copying Lambda source files..."
                 cp -au . /asset-output
-                
-                # Copy common libraries from various possible locations
-                COMMON_LIBS_COPIED=false
-                
-                # Try different possible paths for common_libraries based on Lambda location depth
-                # For lambdas at root level: ../common_libraries
-                # For lambdas in api/: ../../common_libraries  
-                # For lambdas in api/category/: ../../../common_libraries
-                # For lambdas in api/category/function/: ../../../../common_libraries
-                for path in "/asset-input/../common_libraries" "/asset-input/../../common_libraries" "/asset-input/../../../common_libraries" "/asset-input/../../../../common_libraries" "/asset-input/../../../../../common_libraries"; do
-                    if [ -d "$path" ]; then
-                        echo "Found common libraries at: $path"
-                        echo "Copying common libraries to Lambda bundle..."
-                        
-                        # List files being copied for debugging
-                        echo "Files in common_libraries:"
-                        ls -la "$path"
-                        
-                        # Copy files individually to avoid issues with globbing
-                        for file in "$path"/*; do
-                            if [ -f "$file" ]; then
-                                filename=$(basename "$file")
-                                echo "Copying: $filename"
-                                cp -u "$file" /asset-output/ || echo "Warning: Could not copy $filename"
-                            fi
-                        done
-                        COMMON_LIBS_COPIED=true
-                        break
-                    else
-                        echo "Path not found: $path"
-                    fi
-                done
-                
-                if [ "$COMMON_LIBS_COPIED" = false ]; then
-                    echo "Warning: No common_libraries directory found. Searched paths:"
-                    echo "  - /asset-input/../common_libraries"
-                    echo "  - /asset-input/../../common_libraries" 
-                    echo "  - /asset-input/../../../common_libraries"
-                    echo "  - /asset-input/../../../../common_libraries"
-                    echo "  - /asset-input/../../../../../common_libraries"
-                    echo "Current working directory during build:"
-                    pwd
-                    echo "Directory structure:"
-                    find /asset-input -name "common_libraries" -type d 2>/dev/null || echo "No common_libraries found in asset-input tree"
-                else
-                    echo "Successfully copied common libraries"
-                fi
-                
+
                 echo "Bundling process completed successfully"
                 """,
             ],
@@ -664,7 +597,9 @@ class Lambda(Construct):
             bundling_options = config.python_bundling
 
         # No need to copy common libraries locally since Docker bundling handles it
-        logger.debug("Skipping local common libraries copying - handled by Docker bundling")
+        logger.debug(
+            "Skipping local common libraries copying - handled by Docker bundling"
+        )
 
         # If the deployment is part of a CI/CD pipeline, avoid using PythonFunction as it's relying on DnD
         # CI env var is exposed by Gitlab. TODO: add Github specific env var
@@ -675,7 +610,7 @@ class Lambda(Construct):
             del props["entry"]
 
             # Add a default index document if not defined
-            if not "." in props["handler"]:
+            if "." not in props["handler"]:
                 props["handler"] = f"index.{props['handler']}"
 
             self._function = lambda_.Function(
@@ -729,7 +664,10 @@ class Lambda(Construct):
         Add or update environment variables for the Lambda function while preserving existing ones.
 
         Args:
-            new_variables (Dict[str, str]): Dictionary of new environment variables to add/update
+            new_variables (
+                               Dict[str,
+                               str]
+                           ): Dictionary of new environment variables to add/update
 
         Example:
             lambda_construct.add_environment_variables({
@@ -740,14 +678,10 @@ class Lambda(Construct):
         logger = Logger()
         logger.debug(f"Adding/updating environment variables: {new_variables}")
 
-        # Get current environment variables
-        current_env = dict(self._function.get_environment() or {})
-
-        # Merge new variables with existing ones
-        updated_env = {**current_env, **new_variables}
-
-        # Update the function's environment
-        self._function.add_environment_variables(updated_env)
+        # Add environment variables one by one using the add_environment method
+        # This works for both PythonFunction and regular Function classes
+        for key, value in new_variables.items():
+            self._function.add_environment(key, value)
 
         logger.info(
             f"Successfully updated environment variables for function: {self.function_name}"
@@ -801,4 +735,4 @@ class Lambda(Construct):
         Returns:
             lambda_.Version | None: The versioned Lambda function, or None if not versioned
         """
-        return getattr(self, '_function_version', None)
+        return getattr(self, "_function_version", None)

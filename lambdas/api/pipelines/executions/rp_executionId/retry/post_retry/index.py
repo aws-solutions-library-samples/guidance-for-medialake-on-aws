@@ -1,16 +1,17 @@
-from aws_lambda_powertools import Logger, Tracer, Metrics
+import os
+from datetime import datetime, timedelta
+from typing import Any, Dict, Optional
+
+import boto3
+from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
-from aws_lambda_powertools.utilities.typing import LambdaContext
+from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
-from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
-from pydantic import BaseModel, Field
-import boto3
+from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
-import os
-from typing import Dict, Any, Optional
-from datetime import datetime, timedelta
 from models import PipelineExecution
+from pydantic import BaseModel, Field
 
 # Initialize AWS clients
 sfn = boto3.client("stepfunctions")
@@ -37,31 +38,32 @@ app = APIGatewayRestResolver(cors=cors_config)
 
 class ExecutionNotFoundError(Exception):
     """Raised when execution is not found in DynamoDB"""
-    pass
 
 
 class ExecutionNotRedrivableError(Exception):
     """Raised when execution cannot be redriven"""
-    pass
 
 
 class StepFunctionError(Exception):
     """Raised when Step Function operation fails"""
-    pass
 
 
 class InvalidRetryTypeError(Exception):
     """Raised when invalid retry type is specified"""
-    pass
 
 
 class UnifiedRetryResponse(BaseModel):
     """Response model for unified retry execution"""
+
     status: str = Field(..., description="Status code of the operation")
     message: str = Field(..., description="Response message")
     retry_type: str = Field(..., description="Type of retry performed")
-    new_execution_arn: Optional[str] = Field(None, description="ARN of the new execution (for from_start)")
-    redrive_date: Optional[str] = Field(None, description="Date when execution was redriven (for from_current)")
+    new_execution_arn: Optional[str] = Field(
+        None, description="ARN of the new execution (for from_start)"
+    )
+    redrive_date: Optional[str] = Field(
+        None, description="Date when execution was redriven (for from_current)"
+    )
 
 
 @tracer.capture_method
@@ -81,15 +83,15 @@ def get_execution_details(execution_id: str) -> PipelineExecution:
     try:
         # Query by execution_id since it's the hash key
         executions = list(PipelineExecution.query(execution_id, limit=1))
-        
+
         if not executions:
             logger.error(f"Execution not found: {execution_id}")
             raise ExecutionNotFoundError(f"Execution {execution_id} not found")
 
         execution = executions[0]
         logger.debug(
-            f"Retrieved execution details: {execution.execution_id}", 
-            extra={"execution_id": execution_id}
+            f"Retrieved execution details: {execution.execution_id}",
+            extra={"execution_id": execution_id},
         )
         return execution
 
@@ -112,41 +114,45 @@ def validate_redrive_eligibility(execution: PipelineExecution) -> None:
     """
     execution_arn = execution.execution_arn
     status = execution.status
-    
+
     # Check if execution status is eligible for redrive
     if status == "SUCCEEDED":
         raise ExecutionNotRedrivableError("Cannot redrive successful executions")
-    
+
     # Check if execution is within 14-day redrivable period
     if execution.end_time:
         try:
             end_timestamp = int(execution.end_time)
             end_date = datetime.fromtimestamp(end_timestamp)
             fourteen_days_ago = datetime.now() - timedelta(days=14)
-            
+
             if end_date < fourteen_days_ago:
                 raise ExecutionNotRedrivableError(
                     "Execution is older than 14 days and cannot be redriven"
                 )
         except (ValueError, TypeError):
             logger.warning(f"Could not parse end_time: {execution.end_time}")
-    
+
     # Additional validation by checking execution details from Step Functions
     try:
         sfn_response = sfn.describe_execution(executionArn=execution_arn)
         sfn_status = sfn_response.get("status")
-        
+
         if sfn_status == "SUCCEEDED":
-            raise ExecutionNotRedrivableError("Execution has succeeded and cannot be redriven")
-        
+            raise ExecutionNotRedrivableError(
+                "Execution has succeeded and cannot be redriven"
+            )
+
         # Check if execution is still running
         if sfn_status == "RUNNING":
             raise ExecutionNotRedrivableError("Cannot redrive a running execution")
-            
+
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code")
         if error_code == "ExecutionDoesNotExist":
-            raise ExecutionNotRedrivableError("Execution no longer exists in Step Functions")
+            raise ExecutionNotRedrivableError(
+                "Execution no longer exists in Step Functions"
+            )
         else:
             logger.warning(f"Could not validate execution status: {str(e)}")
 
@@ -167,7 +173,7 @@ def redrive_step_function_execution(execution_arn: str) -> Dict[str, Any]:
     """
     try:
         response = sfn.redrive_execution(executionArn=execution_arn)
-        
+
         logger.info(
             "Successfully redrove execution",
             extra={
@@ -182,13 +188,15 @@ def redrive_step_function_execution(execution_arn: str) -> Dict[str, Any]:
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code")
         error_message = e.response.get("Error", {}).get("Message", str(e))
-        
+
         logger.exception("Failed to redrive Step Function execution")
         metrics.add_metric(name="FailedRedrives", unit="Count", value=1)
-        
+
         # Map AWS errors to user-friendly messages
         if error_code == "ExecutionNotRedrivable":
-            raise ExecutionNotRedrivableError(f"Execution cannot be redriven: {error_message}")
+            raise ExecutionNotRedrivableError(
+                f"Execution cannot be redriven: {error_message}"
+            )
         elif error_code == "ExecutionDoesNotExist":
             raise ExecutionNotRedrivableError("Execution no longer exists")
         elif error_code == "ExecutionLimitExceeded":
@@ -218,12 +226,13 @@ def start_new_execution(execution_arn: str) -> str:
         state_machine_arn = execution_details.get("stateMachineArn")
 
         if not state_machine_arn:
-            raise StepFunctionError("Could not determine state machine ARN from execution details")
+            raise StepFunctionError(
+                "Could not determine state machine ARN from execution details"
+            )
 
         # Start new execution with same input
         response = sfn.start_execution(
-            stateMachineArn=state_machine_arn,
-            input=original_input
+            stateMachineArn=state_machine_arn, input=original_input
         )
 
         new_execution_arn = response["executionArn"]
@@ -242,10 +251,10 @@ def start_new_execution(execution_arn: str) -> str:
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code")
         error_message = e.response.get("Error", {}).get("Message", str(e))
-        
+
         logger.exception("Failed to start new Step Function execution")
         metrics.add_metric(name="FailedStartRetries", unit="Count", value=1)
-        
+
         # Map AWS errors to user-friendly messages
         if error_code == "ExecutionLimitExceeded":
             raise StepFunctionError("Maximum number of concurrent executions reached")
@@ -276,10 +285,16 @@ def handle_unified_retry(execution_id: str) -> Dict[str, Any]:
     """
     try:
         # Get retry type from query parameters
-        retry_type = app.current_event.query_string_parameters.get("type", "from_start") if app.current_event.query_string_parameters else "from_start"
-        
+        retry_type = (
+            app.current_event.query_string_parameters.get("type", "from_start")
+            if app.current_event.query_string_parameters
+            else "from_start"
+        )
+
         if retry_type not in ["from_current", "from_start"]:
-            raise InvalidRetryTypeError(f"Invalid retry type: {retry_type}. Must be 'from_current' or 'from_start'")
+            raise InvalidRetryTypeError(
+                f"Invalid retry type: {retry_type}. Must be 'from_current' or 'from_start'"
+            )
 
         # Get execution details from DynamoDB
         execution = get_execution_details(execution_id)
@@ -290,26 +305,30 @@ def handle_unified_retry(execution_id: str) -> Dict[str, Any]:
         if retry_type == "from_current":
             # Validate if execution can be redriven
             validate_redrive_eligibility(execution)
-            
+
             # Redrive the Step Function execution
             redrive_response = redrive_step_function_execution(execution_arn)
-            
+
             response = UnifiedRetryResponse(
-                status="200", 
+                status="200",
                 message="Execution successfully redriven from current position",
                 retry_type=retry_type,
-                redrive_date=redrive_response.get("redriveDate").isoformat() if redrive_response.get("redriveDate") else None
+                redrive_date=(
+                    redrive_response.get("redriveDate").isoformat()
+                    if redrive_response.get("redriveDate")
+                    else None
+                ),
             )
 
         else:  # from_start
             # Start new execution with same input
             new_execution_arn = start_new_execution(execution_arn)
-            
+
             response = UnifiedRetryResponse(
-                status="200", 
+                status="200",
                 message="New execution started successfully from beginning",
                 retry_type=retry_type,
-                new_execution_arn=new_execution_arn
+                new_execution_arn=new_execution_arn,
             )
 
         return {"statusCode": 200, "body": response.model_dump()}
@@ -325,12 +344,12 @@ def handle_unified_retry(execution_id: str) -> Dict[str, Any]:
     except ExecutionNotRedrivableError as e:
         logger.warning(f"Execution not redrivable: {execution_id} - {str(e)}")
         return {
-            "statusCode": 400, 
+            "statusCode": 400,
             "body": {
-                "status": "400", 
+                "status": "400",
                 "message": str(e),
-                "suggestedAction": "USE_RETRY_FROM_START"
-            }
+                "suggestedAction": "USE_RETRY_FROM_START",
+            },
         }
 
     except StepFunctionError as e:
@@ -356,11 +375,13 @@ def lambda_handler(
     """
     try:
         # Configure PynamoDB model with environment variables
-        PipelineExecution.Meta.table_name = os.environ["PIPELINES_EXECUTIONS_TABLE_NAME"]
+        PipelineExecution.Meta.table_name = os.environ[
+            "PIPELINES_EXECUTIONS_TABLE_NAME"
+        ]
         PipelineExecution.Meta.region = os.environ["AWS_REGION"]
-        
+
         return app.resolve(event, context)
-    except Exception as e:
+    except Exception:
         logger.exception("Unhandled error in lambda handler")
         metrics.add_metric(name="UnhandledErrors", unit="Count", value=1)
         return {

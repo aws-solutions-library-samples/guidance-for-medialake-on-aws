@@ -1,6 +1,7 @@
-import boto3
 import time
-from typing import Dict, Any, List, Tuple
+from typing import Any, Dict, List, Tuple
+
+import boto3
 from aws_lambda_powertools import Logger
 
 # Initialize logger
@@ -66,8 +67,8 @@ def delete_eventbridge_rule(rule_arn: str) -> bool:
         # Extract rule name and event bus name from ARN
         # ARN format: arn:aws:events:region:account-id:rule/event-bus-name/rule-name
         parts = rule_arn.split(":")
-        region = parts[3]
-        account_id = parts[4]
+        parts[3]
+        parts[4]
         rule_path = parts[5].split("/")
 
         if len(rule_path) > 2:
@@ -129,7 +130,9 @@ def delete_iam_role(role_arn: str) -> bool:
         paginator = iam_client.get_paginator("list_attached_role_policies")
         for page in paginator.paginate(RoleName=role_name):
             for policy in page["AttachedPolicies"]:
-                logger.info(f"Detaching policy {policy['PolicyArn']} from role {role_name}")
+                logger.info(
+                    f"Detaching policy {policy['PolicyArn']} from role {role_name}"
+                )
                 iam_client.detach_role_policy(
                     RoleName=role_name, PolicyArn=policy["PolicyArn"]
                 )
@@ -138,8 +141,12 @@ def delete_iam_role(role_arn: str) -> bool:
         paginator = iam_client.get_paginator("list_role_policies")
         for page in paginator.paginate(RoleName=role_name):
             for policy_name in page["PolicyNames"]:
-                logger.info(f"Deleting inline policy {policy_name} from role {role_name}")
-                iam_client.delete_role_policy(RoleName=role_name, PolicyName=policy_name)
+                logger.info(
+                    f"Deleting inline policy {policy_name} from role {role_name}"
+                )
+                iam_client.delete_role_policy(
+                    RoleName=role_name, PolicyName=policy_name
+                )
 
         # Delete the role
         iam_client.delete_role(RoleName=role_name)
@@ -171,10 +178,10 @@ def delete_sqs_queue(queue_arn: str) -> bool:
         logger.info(f"Deleting SQS queue: {queue_name}")
 
         sqs_client = boto3.client("sqs")
-        
+
         # Get the queue URL
         queue_url = f"https://sqs.{region}.amazonaws.com/{account_id}/{queue_name}"
-        
+
         # Delete the queue
         sqs_client.delete_queue(QueueUrl=queue_url)
         logger.info(f"Successfully deleted SQS queue: {queue_name}")
@@ -199,19 +206,25 @@ def delete_event_source_mapping(mapping_uuid: str) -> bool:
 
         lambda_client = boto3.client("lambda")
         lambda_client.delete_event_source_mapping(UUID=mapping_uuid)
-        
+
         # Wait for the event source mapping to be deleted
         max_attempts = 10
         for attempt in range(max_attempts):
             try:
                 lambda_client.get_event_source_mapping(UUID=mapping_uuid)
-                logger.info(f"Event source mapping {mapping_uuid} is still being deleted, waiting... (attempt {attempt+1}/{max_attempts})")
+                logger.info(
+                    f"Event source mapping {mapping_uuid} is still being deleted, waiting... (attempt {attempt+1}/{max_attempts})"
+                )
                 time.sleep(2)
             except lambda_client.exceptions.ResourceNotFoundException:
-                logger.info(f"Successfully deleted event source mapping: {mapping_uuid}")
+                logger.info(
+                    f"Successfully deleted event source mapping: {mapping_uuid}"
+                )
                 return True
-        
-        logger.warning(f"Event source mapping {mapping_uuid} deletion timed out after {max_attempts} attempts")
+
+        logger.warning(
+            f"Event source mapping {mapping_uuid} deletion timed out after {max_attempts} attempts"
+        )
         return False
     except Exception as e:
         logger.error(f"Error deleting event source mapping {mapping_uuid}: {e}")
@@ -219,7 +232,7 @@ def delete_event_source_mapping(mapping_uuid: str) -> bool:
 
 
 def cleanup_pipeline_resources(
-    dependent_resources: List[Tuple[str, str]]
+    dependent_resources: List[Tuple[str, str]],
 ) -> Dict[str, Any]:
     """
     Clean up all AWS resources associated with a pipeline.
@@ -263,21 +276,27 @@ def cleanup_pipeline_resources(
                     results["eventbridge_rules"]["success"].append(resource_arn)
                 else:
                     results["eventbridge_rules"]["failed"].append(resource_arn)
-                    
-            elif resource_type == "iam_role" or resource_type == "lambda_role" or resource_type == "sfn_role" or resource_type == "events_role" or resource_type == "service_role":
+
+            elif (
+                resource_type == "iam_role"
+                or resource_type == "lambda_role"
+                or resource_type == "sfn_role"
+                or resource_type == "events_role"
+                or resource_type == "service_role"
+            ):
                 success = delete_iam_role(resource_arn)
                 if success:
                     results["iam_roles"]["success"].append(resource_arn)
                 else:
                     results["iam_roles"]["failed"].append(resource_arn)
-                    
+
             elif resource_type == "sqs_queue":
                 success = delete_sqs_queue(resource_arn)
                 if success:
                     results["sqs_queues"]["success"].append(resource_arn)
                 else:
                     results["sqs_queues"]["failed"].append(resource_arn)
-                    
+
             elif resource_type == "event_source_mapping":
                 success = delete_event_source_mapping(resource_arn)
                 if success:
@@ -296,7 +315,11 @@ def cleanup_pipeline_resources(
                 f"Error cleaning up resource {resource_type} - {resource_arn}: {e}"
             )
             # Use a default category if the resource type doesn't match any known category
-            category = f"{resource_type}s" if resource_type in ["lambda", "step_function", "eventbridge_rule"] else "other_resources"
+            category = (
+                f"{resource_type}s"
+                if resource_type in ["lambda", "step_function", "eventbridge_rule"]
+                else "other_resources"
+            )
             results[category]["failed"].append(resource_arn)
 
     return results

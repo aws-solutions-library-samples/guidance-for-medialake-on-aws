@@ -1,15 +1,13 @@
-import os
 import json
+import os
 from datetime import datetime
 from decimal import Decimal
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 import boto3
-from aws_lambda_powertools import Logger, Tracer, Metrics
-from aws_lambda_powertools.utilities.typing import LambdaContext
+from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.utilities.data_classes import EventBridgeEvent
-
-from lambda_utils import lambda_handler_decorator, logger, metrics, tracer, handle_error
+from aws_lambda_powertools.utilities.typing import LambdaContext
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Initialize
@@ -19,7 +17,9 @@ table = dynamodb.Table(os.environ["PIPELINES_EXECUTIONS_TABLE_NAME"])
 
 logger = Logger(service="pipelines_executions_event_processor")
 tracer = Tracer(service="pipelines_executions_event_processor")
-metrics = Metrics(service="pipelines_executions_event_processor", namespace="MyApp/Pipelines")
+metrics = Metrics(
+    service="pipelines_executions_event_processor", namespace="MyApp/Pipelines"
+)
 
 
 def convert_to_decimal(obj: Any) -> Any:
@@ -34,7 +34,9 @@ def convert_to_decimal(obj: Any) -> Any:
     return obj
 
 
-def calculate_execution_duration(start_time: Any, end_time: Optional[str] = None) -> Optional[Decimal]:
+def calculate_execution_duration(
+    start_time: Any, end_time: Optional[str] = None
+) -> Optional[Decimal]:
     if not end_time or not start_time:
         return None
     try:
@@ -69,7 +71,9 @@ def parse_nested_metadata(detail_input_str: str) -> Dict[str, Any]:
     try:
         nested = json.loads(detail_input_str)
     except Exception as e:
-        logger.debug(f"parse_nested_metadata: could not parse detail.input as JSON: {e}")
+        logger.debug(
+            f"parse_nested_metadata: could not parse detail.input as JSON: {e}"
+        )
         return nested_fields
 
     detail1 = nested.get("detail", {})
@@ -94,7 +98,9 @@ def parse_nested_metadata(detail_input_str: str) -> Dict[str, Any]:
         nested_fields["dsa_type"] = dsa_type
 
     try:
-        obj_name = dsa["MainRepresentation"]["StorageInfo"]["PrimaryLocation"]["ObjectKey"]["Name"]
+        obj_name = dsa["MainRepresentation"]["StorageInfo"]["PrimaryLocation"][
+            "ObjectKey"
+        ]["Name"]
         nested_fields["object_key_name"] = obj_name
     except KeyError:
         pass
@@ -108,11 +114,13 @@ def parse_nested_metadata(detail_input_str: str) -> Dict[str, Any]:
     return nested_fields
 
 
-def fetch_parent_by_trace_id(trace_id: str, current_execution_id: str) -> Optional[Dict[str, Any]]:
+def fetch_parent_by_trace_id(
+    trace_id: str, current_execution_id: str
+) -> Optional[Dict[str, Any]]:
     try:
         response = table.scan(
             FilterExpression="pipeline_trace_id = :trace_id",
-            ExpressionAttributeValues={":trace_id": trace_id}
+            ExpressionAttributeValues={":trace_id": trace_id},
         )
         for item in response.get("Items", []):
             if item.get("execution_id") != current_execution_id:
@@ -166,9 +174,15 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         # ────────────────────────────────────────
         trace_id = base_item.get("pipeline_trace_id")
         if trace_id:
-            missing_fields = [f for f in ["inventory_id", "dsa_type", "object_key_name"] if f not in base_item]
+            missing_fields = [
+                f
+                for f in ["inventory_id", "dsa_type", "object_key_name"]
+                if f not in base_item
+            ]
             if missing_fields:
-                parent_item = fetch_parent_by_trace_id(trace_id, base_item["execution_id"])
+                parent_item = fetch_parent_by_trace_id(
+                    trace_id, base_item["execution_id"]
+                )
                 if parent_item:
                     for field in missing_fields:
                         if field in parent_item:
@@ -197,18 +211,24 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
 
         metrics.add_metric(name="SuccessfulExecutionUpdates", unit="Count", value=1)
         if base_item.get("duration_seconds") is not None:
-            metrics.add_metric(name="ExecutionDuration", unit="Seconds", value=float(base_item["duration_seconds"]))
+            metrics.add_metric(
+                name="ExecutionDuration",
+                unit="Seconds",
+                value=float(base_item["duration_seconds"]),
+            )
 
         return {
             "statusCode": 200,
-            "body": json.dumps({
-                "message": "Successfully processed execution event",
-                "execution_id": execution_id,
-                "status": status
-            }),
+            "body": json.dumps(
+                {
+                    "message": "Successfully processed execution event",
+                    "execution_id": execution_id,
+                    "status": status,
+                }
+            ),
         }
 
-    except Exception as e:
+    except Exception:
         logger.exception("Error processing execution event")
         metrics.add_metric(name="FailedExecutionUpdates", unit="Count", value=1)
         raise

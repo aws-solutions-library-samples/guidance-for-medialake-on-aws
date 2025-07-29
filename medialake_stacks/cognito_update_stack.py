@@ -9,20 +9,14 @@ applied after the core Cognito resources are created. This includes:
 """
 
 import datetime
-from aws_cdk import (
-    Stack,
-    aws_lambda as lambda_,
-    aws_iam as iam,
-    aws_cognito as cognito,
-    CustomResource,
-    Duration,
-    RemovalPolicy,
-    custom_resources as cr,
-)
-import aws_cdk as cdk
-
-from constructs import Construct
 from dataclasses import dataclass
+
+import aws_cdk as cdk
+from aws_cdk import Stack
+from aws_cdk import aws_cognito as cognito
+from aws_cdk import aws_iam as iam
+from aws_cdk import custom_resources as cr
+from constructs import Construct
 
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
@@ -30,6 +24,7 @@ from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaCon
 @dataclass
 class CognitoUpdateStackProps:
     """Configuration for Cognito Update Stack."""
+
     cognito_user_pool: cognito.IUserPool
     cognito_user_pool_id: str
     cognito_user_pool_arn: str
@@ -39,7 +34,7 @@ class CognitoUpdateStackProps:
 class CognitoUpdateStack(Stack):
     """
     Stack for Cognito User Pool updates and additional trigger configuration.
-    
+
     This stack applies additional configuration to the Cognito User Pool after
     it has been created, including triggers that might conflict if applied
     during the initial user pool creation.
@@ -74,7 +69,7 @@ class CognitoUpdateStack(Stack):
             **common_env_vars,
             "DEBUG_MODE": "true",
         }
-        
+
         self._pre_token_generation_lambda = Lambda(
             self,
             "PreTokenGenerationLambda",
@@ -90,7 +85,7 @@ class CognitoUpdateStack(Stack):
 
         # Grant permissions for the pre-token generation lambda to interact with the auth table
         auth_table_arn = f"arn:aws:dynamodb:{self.region}:{self.account}:table/{props.auth_table_name}"
-        
+
         self._pre_token_generation_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
@@ -113,11 +108,10 @@ class CognitoUpdateStack(Stack):
                 entry="lambdas/custom_resources/auth/cognito_trigger_update",
                 memory_size=256,
                 timeout_minutes=5,
-                environment_variables={},                
-                
+                environment_variables={},
             ),
         )
-        
+
         # Grant permission for the custom resource Lambda to update Cognito
         self._cognito_trigger_update_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -128,14 +122,14 @@ class CognitoUpdateStack(Stack):
                 resources=[props.cognito_user_pool_arn],
             )
         )
-        
+
         # Create a provider for the Cognito trigger updates
         cognito_update_provider = cr.Provider(
             self,
             "CognitoUpdateProvider",
             on_event_handler=self._cognito_trigger_update_lambda.function,  # type: ignore
         )
-        
+
         # Create a custom resource to update the Cognito triggers
         self._cognito_trigger_update = cdk.CustomResource(
             self,
@@ -145,17 +139,19 @@ class CognitoUpdateStack(Stack):
                 "UserPoolId": props.cognito_user_pool_id,
                 # "PreSignupLambdaArn": self._pre_signup_lambda.function.function_arn,  # Commented out for now
                 "PreTokenGenerationLambdaArn": self._pre_token_generation_lambda.function.function_arn,
-                "Timestamp": str(datetime.datetime.now().timestamp()),  # Force update on each deployment
+                "Timestamp": str(
+                    datetime.datetime.now().timestamp()
+                ),  # Force update on each deployment
             },
         )
-        
+
         # TODO: Grant permissions for Cognito to invoke pre-signup Lambda (commented out for now)
         # self._pre_signup_lambda.function.add_permission(
         #     "CognitoInvokePermissionPreSignup",
         #     principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
         #     source_arn=props.cognito_user_pool_arn,
         # )
-        
+
         # Grant permissions for Cognito to invoke the pre-token generation Lambda
         self._pre_token_generation_lambda.function.add_permission(
             "CognitoInvokePermissionPreTokenGeneration",
@@ -168,13 +164,13 @@ class CognitoUpdateStack(Stack):
     # def pre_signup_lambda(self):
     #     """Return the pre-signup Lambda function"""
     #     return self._pre_signup_lambda.function
-        
+
     @property
     def pre_token_generation_lambda(self):
         """Return the pre-token generation Lambda function"""
         return self._pre_token_generation_lambda.function
-        
+
     @property
     def cognito_trigger_update(self):
         """Return the Cognito trigger update custom resource"""
-        return self._cognito_trigger_update 
+        return self._cognito_trigger_update

@@ -1,13 +1,9 @@
 import os
-from aws_cdk import (
-    Stack,
-    aws_lambda as lambda_,
-    BundlingOptions,
-    BundlingOptions,
-    DockerImage,
-)
-from constructs import Construct
 from dataclasses import dataclass
+
+from aws_cdk import AssetHashType, BundlingOptions, DockerImage, Stack
+from aws_cdk import aws_lambda as lambda_
+from constructs import Construct
 
 from .layer_base import LambdaLayer, LambdaLayerConfig
 
@@ -52,6 +48,7 @@ class JinjaLambdaLayer(Construct):
             ),
         )
 
+
 class ZipmergeLayer(Construct):
     def __init__(
         self,
@@ -76,7 +73,9 @@ class ZipmergeLayer(Construct):
                 path=".",  # dummy; all work happens in the container
                 bundling=BundlingOptions(
                     user="root",
-                    image=DockerImage.from_registry("public.ecr.aws/amazonlinux/amazonlinux:2023"),
+                    image=DockerImage.from_registry(
+                        "public.ecr.aws/amazonlinux/amazonlinux:2023"
+                    ),
                     command=[
                         "/bin/bash",
                         "-c",
@@ -98,16 +97,14 @@ class ZipmergeLayer(Construct):
                             # Try alternate path
                             BIN_PATH="$GOPATH/bin/zipmerge"
                         fi
-                        
+
                         mkdir -p /asset-output/bin
                         cp "$BIN_PATH" /asset-output/bin/zipmerge
-                        
+
                         # 3. Ensure the binary is executable
                         chmod 755 /asset-output/bin/zipmerge
-                        """
+                        """,
                     ],
-
-
                 ),
             ),
         )
@@ -162,85 +159,60 @@ class PyMediaInfo(Construct):
         return self.layer_version.layer
 
 
-class CairoSvgLayer(Construct):
+class ResvgCliLayer(Construct):
+    """
+    A Lambda layer shipping the `resvg` CLI compiled from source for Amazon Linux 2023.
+    In CI, you can build once and point to a pre-bundled asset under dist/lambdas/layers/resvg.
+    """
+
     def __init__(self, scope: Construct, id: str, **kwargs):
         super().__init__(scope, id, **kwargs)
 
         if "CI" in os.environ:
-            self.layer = lambda_.LayerVersion(
-                self,
-                "CairoSvgLayer",
-                layer_version_name="cairosvg-layer",
-                compatible_runtimes=[
-                    lambda_.Runtime.PYTHON_3_12,
-                ],
-                description="Layer containing cairosvg depends",
-                code=lambda_.Code.from_asset("dist/lambdas/layers/cairosvg"),
-            )
+            # In CI, use a prebuilt zip under dist/
+            code = lambda_.Code.from_asset("dist/lambdas/layers/resvg")
         else:
-            self.layer = lambda_.LayerVersion(
-                self,
-                "CairoSvgLayer",
-                layer_version_name="cairosvg-layer",
-                compatible_runtimes=[
-                    lambda_.Runtime.PYTHON_3_12,
-                ],
-                description="Layer containing cairosvg dependencies, including native libraries",
-                code=lambda_.Code.from_asset(
-                    path=".",
-                    bundling=BundlingOptions(
-                        command=[
-                            "/bin/bash",
-                            "-c",
-                            """
-                            set -e
-                            # Update packages and install required dependencies using yum
-                            yum update -y && yum install -y cairo-devel pango-devel gdk-pixbuf2-devel libffi-devel pkg-config python3-pip
-                            # Upgrade pip (optional, but often helpful)
-                            python3 -m pip install --upgrade pip
-                            # Install cairosvg and its dependencies into the python folder
-                            python3 -m pip install cairosvg -t /asset-output/python
-                            mkdir -p /asset-output/lib
-                            # Copy native libraries required by CairoSVG and its dependencies
-                            cp -v /usr/lib64/libcairo.so* /asset-output/lib/ || echo "Cairo libraries not found in /usr/lib64"
-                            cp -v /usr/lib64/libpango-1.0.so* /asset-output/lib/ || echo "Pango libraries not found in /usr/lib64"
-                            cp -v /usr/lib64/libgdk_pixbuf-2.0.so* /asset-output/lib/ || echo "gdk-pixbuf libraries not found in /usr/lib64"
-                            cp -v /usr/lib64/libffi.so* /asset-output/lib/ || echo "libffi libraries not found in /usr/lib64"
-
-                            # Additional dependencies as determined by ldd
-                            cp -v /usr/lib64/libpthread.so* /asset-output/lib/ || echo "libpthread not found in /usr/lib64"
-                            cp -v /usr/lib64/libpixman-1.so* /asset-output/lib/ || echo "libpixman not found in /usr/lib64"
-                            cp -v /usr/lib64/libfontconfig.so* /asset-output/lib/ || echo "libfontconfig not found in /usr/lib64"
-                            cp -v /usr/lib64/libfreetype.so* /asset-output/lib/ || echo "libfreetype not found in /usr/lib64"
-                            cp -v /usr/lib64/libEGL.so* /asset-output/lib/ || echo "libEGL not found in /usr/lib64"
-                            cp -v /usr/lib64/libdl.so* /asset-output/lib/ || echo "libdl not found in /usr/lib64"
-                            cp -v /usr/lib64/libpng15.so* /asset-output/lib/ || echo "libpng15 not found in /usr/lib64"
-                            cp -v /usr/lib64/libxcb-shm.so* /asset-output/lib/ || echo "libxcb-shm not found in /usr/lib64"
-                            cp -v /usr/lib64/libxcb.so* /asset-output/lib/ || echo "libxcb not found in /usr/lib64"
-                            cp -v /usr/lib64/libxcb-render.so* /asset-output/lib/ || echo "libxcb-render not found in /usr/lib64"
-                            cp -v /usr/lib64/libXrender.so* /asset-output/lib/ || echo "libXrender not found in /usr/lib64"
-                            cp -v /usr/lib64/libX11.so* /asset-output/lib/ || echo "libX11 not found in /usr/lib64"
-                            cp -v /usr/lib64/libXext.so* /asset-output/lib/ || echo "libXext not found in /usr/lib64"
-                            cp -v /usr/lib64/libz.so* /asset-output/lib/ || echo "libz not found in /usr/lib64"
-                            cp -v /usr/lib64/libGL.so* /asset-output/lib/ || echo "libGL not found in /usr/lib64"
-                            cp -v /usr/lib64/librt.so* /asset-output/lib/ || echo "librt not found in /usr/lib64"
-                            cp -v /usr/lib64/libm.so* /asset-output/lib/ || echo "libm not found in /usr/lib64"
-                            cp -v /usr/lib64/libc.so* /asset-output/lib/ || echo "libc not found in /usr/lib64"
-                            cp -v /usr/lib64/libexpat.so* /asset-output/lib/ || echo "libexpat not found in /usr/lib64"
-                            cp -v /usr/lib64/libuuid.so* /asset-output/lib/ || echo "libuuid not found in /usr/lib64"
-                            cp -v /usr/lib64/libbz2.so* /asset-output/lib/ || echo "libbz2 not found in /usr/lib64"
-                            cp -v /usr/lib64/libGLdispatch.so* /asset-output/lib/ || echo "libGLdispatch not found in /usr/lib64"
-                            cp -v /usr/lib64/libXau.so* /asset-output/lib/ || echo "libXau not found in /usr/lib64"
-                            cp -v /usr/lib64/libGLX.so* /asset-output/lib/ || echo "libGLX not found in /usr/lib64"
-                            """
-                        ],
-                        user="root",
-                        image=DockerImage.from_registry(
-                            "public.ecr.aws/amazonlinux/amazonlinux:2.0.20250305.0-amd64"
-                        ),
+            # Build from source in a container each time
+            code = lambda_.Code.from_asset(
+                path=".",
+                bundling=BundlingOptions(
+                    image=DockerImage.from_registry(
+                        "public.ecr.aws/amazonlinux/amazonlinux:2.0.20250305.0-amd64"
                     ),
+                    user="root",
+                    command=[
+                        "/bin/bash",
+                        "-c",
+                        """
+                        set -euo pipefail
+                        # 1) Install build tools & deps
+                        yum -y update
+                        yum -y install rust cargo fontconfig fontconfig-devel
+
+                        # 2) Install resvg using cargo
+                        cargo install resvg
+
+                        # 3) Package the binary into a layer structure
+                        mkdir -p /asset-output/bin
+                        cp ~/.cargo/bin/resvg /asset-output/bin/
+                        chmod +x /asset-output/bin/resvg
+                        """,
+                    ],
                 ),
             )
+
+        self.layer = lambda_.LayerVersion(
+            self,
+            "ResvgCliLayer",
+            layer_version_name="resvg-cli-layer",
+            description="A Lambda layer containing the resvg CLI (SVG→PNG converter)",
+            compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
+            compatible_architectures=[
+                lambda_.Architecture.X86_64,
+                lambda_.Architecture.ARM_64,
+            ],
+            code=code,
+        )
 
 
 class FFProbeLayer(Construct):
@@ -300,6 +272,7 @@ class FFProbeLayer(Construct):
                 ),
             )
 
+
 class FFmpegLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
         """
@@ -348,13 +321,16 @@ class FFmpegLayer(Construct):
                             cp $TEMP_DIR/ffmpeg.zip /asset-output/
                             cd /
                             rm -rf $TEMP_DIR
-                            """
+                            """,
                         ],
                         user="root",
-                        image=DockerImage.from_registry("public.ecr.aws/amazonlinux/amazonlinux:latest"),
+                        image=DockerImage.from_registry(
+                            "public.ecr.aws/amazonlinux/amazonlinux:latest"
+                        ),
                     ),
                 ),
             )
+
 
 class GoogleCloudStorageLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
@@ -439,3 +415,126 @@ class ShortuuidLayer(Construct):
     @property
     def layer(self) -> lambda_.LayerVersion:
         return self.layer_version.layer
+
+
+# class CustomBoto3Layer(Construct):
+#     """
+#     A Lambda layer containing custom unreleased boto3 SDK.
+#     Uses wheel files for boto3 and botocore packages.
+#     """
+
+#     def __init__(self, scope: Construct, id: str, **kwargs):
+#         super().__init__(scope, id, **kwargs)
+
+#         if "CI" in os.environ:
+#             # In CI, use pre-built layer from dist directory
+#             self.layer = lambda_.LayerVersion(
+#                 self,
+#                 "CustomBoto3Layer",
+#                 layer_version_name="custom-boto3-layer",
+#                 compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
+#                 compatible_architectures=[
+#                     lambda_.Architecture.X86_64,
+#                     lambda_.Architecture.ARM_64,
+#                 ],
+#                 description="A Lambda layer with custom unreleased boto3 SDK",
+#                 code=lambda_.Code.from_asset("dist/lambdas/layers/custom_boto3"),
+#             )
+#         else:
+#             # Build layer from wheel files using Docker bundling
+#             self.layer = lambda_.LayerVersion(
+#                 self,
+#                 "CustomBoto3Layer",
+#                 layer_version_name="custom-boto3-layer",
+#                 compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
+#                 compatible_architectures=[
+#                     lambda_.Architecture.X86_64,
+#                     lambda_.Architecture.ARM_64,
+#                 ],
+#                 description="A Lambda layer with custom unreleased boto3 SDK",
+#                 code=lambda_.Code.from_asset(
+#                     path=".",
+#                     bundling=BundlingOptions(
+#                         image=DockerImage.from_registry("public.ecr.aws/amazonlinux/amazonlinux:2023"),
+#                         user="root",
+#                         command=[
+#                             "/bin/bash",
+#                             "-c",
+#                             """
+#                             set -euo pipefail
+
+#                             # Install Python and pip
+#                             yum -y update && yum -y install python3 python3-pip
+
+#                             # Create layer directory structure
+#                             mkdir -p /asset-output/python
+
+#                             # Install custom boto3 and botocore wheels
+#                             pip3 install \
+#                                 lambdas/layers/custom_boto3/boto3-1.39.4-py3-none-any.whl \
+#                                 lambdas/layers/custom_boto3/botocore-1.39.4-py3-none-any.whl \
+#                                 --target /asset-output/python \
+#                                 --no-deps
+
+#                             # Clean up unnecessary files to reduce layer size
+#                             find /asset-output/python -type d -name "__pycache__" -exec rm -rf {} + || true
+#                             find /asset-output/python -name "*.pyc" -delete || true
+#                             find /asset-output/python -name "*.pyo" -delete || true
+#                             """
+#                         ],
+#                     ),
+#                 ),
+#             )
+
+
+class CommonLibrariesLayer(Construct):
+    """
+    A Lambda layer that bundles shared Python utility modules under the
+    required `python/` directory so that AWS Lambda automatically includes
+    them in PYTHONPATH at runtime.
+
+    We use CDK bundling to wrap the flat `.py` files into the correct
+    directory structure by copying them into `/asset-output/python/`
+    inside a container matching the Lambda Python 3.12 environment.
+    """
+
+    def __init__(
+        self,
+        scope: Construct,
+        id: str,
+        *,
+        entry: str = "lambdas/common_libraries",
+        **kwargs,
+    ):
+        super().__init__(scope, id, **kwargs)
+
+        # Package the layer code from the source directory, hashing on
+        # the source files so updates are detected when any file changes.
+        layer_code = lambda_.Code.from_asset(
+            entry,
+            asset_hash_type=AssetHashType.SOURCE,
+            bundling=BundlingOptions(
+                # Use Lambda-compatible Python 3.12 image for bundling
+                image=DockerImage.from_registry("public.ecr.aws/lambda/python:3.12"),
+                # Override entrypoint to run our custom commands
+                entrypoint=["bash", "-c"],
+                # 1) Create python/ in the output
+                # 2) Copy all Python modules into that folder
+                command=[
+                    "mkdir -p /asset-output/python && cp /asset-input/*.py /asset-output/python/"
+                ],
+                # Run inside the input directory
+                working_directory="/asset-input",
+                # Run as root to avoid permission issues
+                user="root",
+            ),
+        )
+
+        # Define the Lambda layer with the correctly structured code
+        self.layer = lambda_.LayerVersion(
+            self,
+            "CommonLibrariesLayer",
+            code=layer_code,
+            compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
+            description="Common utility libraries for all MediaLake Lambda functions",
+        )

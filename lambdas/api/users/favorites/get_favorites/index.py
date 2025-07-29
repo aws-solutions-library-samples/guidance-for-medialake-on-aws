@@ -1,18 +1,19 @@
-from typing import Dict, Any, Optional, List
+import os
+from typing import Any, Dict, Optional
+
+import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.utilities.parser import parse
-from aws_lambda_powertools.utilities.parser.models import APIGatewayProxyEventModel
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import MetricUnit
-from pydantic import BaseModel, Field
-import boto3
-import os
+from aws_lambda_powertools.utilities.parser.models import APIGatewayProxyEventModel
+from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
-import json
+from pydantic import BaseModel, Field
 
 # Initialize AWS PowerTools
-logger = Logger(service="user-favorites-service", level=os.getenv("LOG_LEVEL", "WARNING"))
+logger = Logger(
+    service="user-favorites-service", level=os.getenv("LOG_LEVEL", "WARNING")
+)
 tracer = Tracer(service="user-favorites-service")
 metrics = Metrics(namespace="medialake", service="users-favorites-get")
 
@@ -45,10 +46,10 @@ def lambda_handler(
         # Extract user ID from Cognito authorizer context
         request_context = event.get("requestContext", {})
         authorizer = request_context.get("authorizer", {})
-        
+
         # Get the user ID directly from the authorizer context
         user_id = authorizer.get("userId")
-        
+
         if not user_id:
             logger.error("Missing user_id in authorizer context")
             metrics.add_metric(
@@ -80,7 +81,9 @@ def lambda_handler(
         )
 
         logger.info("Successfully retrieved user favorites", extra={"user_id": user_id})
-        metrics.add_metric(name="SuccessfulFavoritesLookup", unit=MetricUnit.Count, value=1)
+        metrics.add_metric(
+            name="SuccessfulFavoritesLookup", unit=MetricUnit.Count, value=1
+        )
 
         return {
             "statusCode": 200,
@@ -95,16 +98,18 @@ def lambda_handler(
 
 
 @tracer.capture_method
-def _get_user_favorites(table_name: str, user_id: str, item_type: Optional[str] = None) -> Dict[str, Any]:
+def _get_user_favorites(
+    table_name: str, user_id: str, item_type: Optional[str] = None
+) -> Dict[str, Any]:
     """
     Fetch user favorites from DynamoDB
     """
     try:
         # Format the userId according to the schema
         formatted_user_id = f"USER#{user_id}"
-        
+
         table = dynamodb.Table(table_name)
-        
+
         # If itemType is provided, use GSI1 to filter by itemType
         if item_type:
             # Query using GSI1 to filter by itemType
@@ -113,8 +118,8 @@ def _get_user_favorites(table_name: str, user_id: str, item_type: Optional[str] 
                 "KeyConditionExpression": "userId = :userId AND begins_with(gsi1Sk, :prefix)",
                 "ExpressionAttributeValues": {
                     ":userId": formatted_user_id,
-                    ":prefix": f"ITEM_TYPE#{item_type}#"
-                }
+                    ":prefix": f"ITEM_TYPE#{item_type}#",
+                },
             }
             response = table.query(**query_params)
         else:
@@ -123,44 +128,40 @@ def _get_user_favorites(table_name: str, user_id: str, item_type: Optional[str] 
                 "KeyConditionExpression": "userId = :userId AND begins_with(itemKey, :prefix)",
                 "ExpressionAttributeValues": {
                     ":userId": formatted_user_id,
-                    ":prefix": "FAV#"
-                }
+                    ":prefix": "FAV#",
+                },
             }
             response = table.query(**query_params)
-        
+
         items = response.get("Items", [])
-        
+
         # Process the favorites into a structured format
         favorites = []
-        
+
         for item in items:
             # Extract the reverse timestamp from the itemKey
             # Format: FAV#{item_type}#{reverse_timestamp}
             item_key = item.get("itemKey", "")
             parts = item_key.split("#")
-            
+
             if len(parts) >= 3:
                 reverse_timestamp = parts[2]
-                
+
                 # Create a favorite object
                 favorite = {
                     "favoriteId": reverse_timestamp,
                     "itemId": item.get("itemId"),
                     "itemType": item.get("itemType"),
-                    "addedAt": item.get("addedAt")
+                    "addedAt": item.get("addedAt"),
                 }
-                
+
                 # Add metadata if it exists
                 if "metadata" in item:
                     favorite["metadata"] = item["metadata"]
-                
+
                 favorites.append(favorite)
-        
-        return {
-            "userId": user_id,
-            "favorites": favorites,
-            "count": len(favorites)
-        }
+
+        return {"userId": user_id, "favorites": favorites, "count": len(favorites)}
 
     except ClientError as e:
         logger.error(f"DynamoDB error", extra={"error": str(e)})

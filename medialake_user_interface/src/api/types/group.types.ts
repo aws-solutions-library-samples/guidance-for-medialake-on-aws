@@ -33,7 +33,7 @@ export interface GroupListResponse {
   message: string;
   data: {
     groups: Group[];
-  }
+  };
 }
 
 export interface GroupResponse {
@@ -52,5 +52,5 @@ export interface GroupMembersResponse {
   data: {
     groupId: string;
     members: string[];
-  }
+  };
 }

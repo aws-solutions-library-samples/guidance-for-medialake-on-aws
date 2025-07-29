@@ -1,6 +1,7 @@
 # media-lake-v2/medialake_constructs/shared_constructs/s3_logging.py
 
-from aws_cdk import aws_iam as iam, Stack
+from aws_cdk import Stack
+from aws_cdk import aws_iam as iam
 from aws_cdk import aws_s3 as s3
 from constructs import Construct
 

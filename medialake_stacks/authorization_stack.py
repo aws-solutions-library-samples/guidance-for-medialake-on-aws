@@ -8,49 +8,44 @@ This stack defines the AWS resources for the new authorization system, including
 - IAM roles and permissions
 """
 
-from aws_cdk import (
-    Stack,
-    aws_lambda as lambda_,
-    aws_lambda_event_sources as lambda_event_sources,
-    aws_iam as iam,
-    aws_cognito as cognito,
-    aws_verifiedpermissions as avp,
-    RemovalPolicy,
-    CustomResource,
-    Fn,
-    aws_events as events,
-    aws_events_targets as targets,
-    Duration,
-)
-import aws_cdk as cdk
 import datetime
-
-from constructs import Construct
 from dataclasses import dataclass
 from typing import Any
 
-# DynamoDB table is now created in the Cognito construct
-from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
+import aws_cdk as cdk
+from aws_cdk import CustomResource, Duration, RemovalPolicy, Stack
+from aws_cdk import aws_cognito as cognito
+from aws_cdk import aws_events as events
+from aws_cdk import aws_events_targets as targets
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_lambda as lambda_
+from aws_cdk import aws_lambda_event_sources as lambda_event_sources
+from aws_cdk import aws_verifiedpermissions as avp
+from constructs import Construct
+
+from constants import Lambda as LambdaConstants
 from medialake_constructs.auth.shared_authorizer_construct import (
     SharedAuthorizerConstruct,
     SharedAuthorizerConstructProps,
 )
 
-from config import config
-from constants import Lambda as LambdaConstants
+# DynamoDB table is now created in the Cognito construct
+from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 
 @dataclass
 class AuthorizationStackProps:
     """Configuration for Authorization Stack."""
+
     cognito_user_pool: cognito.UserPool
     cognito_user_pool_client: cognito.UserPoolClient
     cognito_construct: Any
 
+
 class AuthorizationStack(Stack):
     """
     Stack for Authorization resources.
-    
+
     This stack creates the DynamoDB table, AVP Policy Store, Lambda functions,
     and IAM roles for the new authorization system.
     """
@@ -62,7 +57,6 @@ class AuthorizationStack(Stack):
 
         # Get the auth table from the Cognito construct (to avoid circular dependencies)
         self._auth_table = props.cognito_construct.auth_table
-
 
         # 2. Create the AVP Policy Store
         self._policy_store = avp.CfnPolicyStore(
@@ -120,9 +114,9 @@ class AuthorizationStack(Stack):
             definition=avp.CfnPolicy.PolicyDefinitionProperty(
                 static=avp.CfnPolicy.StaticPolicyDefinitionProperty(
                     statement="permit(principal, action, resource);",
-                    description="Default policy that permits all actions"
+                    description="Default policy that permits all actions",
                 )
-            )
+            ),
         )
 
         # Create the shared custom authorizer
@@ -163,7 +157,7 @@ class AuthorizationStack(Stack):
                 environment_variables=common_env_vars,
             ),
         )
-        
+
         self._auth_table.grant_read_data(self._custom_authorizer_lambda.function)
         self._custom_authorizer_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -172,10 +166,12 @@ class AuthorizationStack(Stack):
                     "verifiedpermissions:IsAuthorizedWithToken",
                     "verifiedpermissions:IsAuthorized",
                 ],
-                resources=[f"arn:aws:verifiedpermissions::{cdk.Aws.ACCOUNT_ID}:policy-store/{self._policy_store.attr_policy_store_id}"],
+                resources=[
+                    f"arn:aws:verifiedpermissions::{cdk.Aws.ACCOUNT_ID}:policy-store/{self._policy_store.attr_policy_store_id}"
+                ],
             )
         )
-    
+
         # 4. Create the DynamoDB Stream Lambda for policy synchronization
         self._policy_sync_lambda = Lambda(
             self,
@@ -188,7 +184,7 @@ class AuthorizationStack(Stack):
                 environment_variables=common_env_vars,
             ),
         )
-        
+
         # 5. Create the Auth Table Seeder Lambda for seeding default permission sets
         self._auth_seeder_lambda = Lambda(
             self,
@@ -218,7 +214,7 @@ class AuthorizationStack(Stack):
         # Add the Cognito Identity Source to the AVP Policy Store
         # Get the client ID directly from the cognito construct
         cognito_client_id = props.cognito_user_pool_client.user_pool_client_id
-        
+
         self._identity_source = avp.CfnIdentitySource(
             self,
             "CognitoIdentitySource",
@@ -226,12 +222,12 @@ class AuthorizationStack(Stack):
             configuration=avp.CfnIdentitySource.IdentitySourceConfigurationProperty(
                 cognito_user_pool_configuration=avp.CfnIdentitySource.CognitoUserPoolConfigurationProperty(
                     user_pool_arn=props.cognito_user_pool.user_pool_arn,
-                    client_ids=[cognito_client_id]
+                    client_ids=[cognito_client_id],
                 )
             ),
-            principal_entity_type="MediaLake::User"
-)
-        
+            principal_entity_type="MediaLake::User",
+        )
+
         # Policy Sync Lambda: Permissions to manage policies in AVP
         self._policy_sync_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -243,7 +239,9 @@ class AuthorizationStack(Stack):
                     "verifiedpermissions:GetPolicy",
                     "verifiedpermissions:BatchIsAuthorized",
                 ],
-                resources=[f"arn:aws:verifiedpermissions::{cdk.Aws.ACCOUNT_ID}:policy-store/{self._policy_store.attr_policy_store_id}"],
+                resources=[
+                    f"arn:aws:verifiedpermissions::{cdk.Aws.ACCOUNT_ID}:policy-store/{self._policy_store.attr_policy_store_id}"
+                ],
             )
         )
 
@@ -252,10 +250,10 @@ class AuthorizationStack(Stack):
 
         # Pre-Signup Lambda and trigger configuration is now handled in CognitoUpdateStack
         # This avoids circular dependencies and timing issues
-        
+
         # Auth Table Seeder Lambda: Write access to the auth table
         self._auth_table.grant_read_write_data(self._auth_seeder_lambda.function)
-        
+
         # 9. Create a Custom Resource to seed the default permission sets
         self._auth_seeder_custom_resource = CustomResource(
             self,
@@ -263,23 +261,27 @@ class AuthorizationStack(Stack):
             service_token=self._auth_seeder_lambda.function.function_arn,
             removal_policy=RemovalPolicy.RETAIN,  # Don't remove permission sets on stack deletion
             properties={
-                "timestamp": str(datetime.datetime.now().timestamp()),  # Force update on each deployment
+                "timestamp": str(
+                    datetime.datetime.now().timestamp()
+                ),  # Force update on each deployment
             },
         )
-        
+
         # Lambda warming for custom_authorizer
         # Note: pre_token_generation lambda warming is now handled in CognitoUpdateStack
         events.Rule(
             self,
             "CustomAuthorizerWarmerRule",
-            schedule=events.Schedule.rate(Duration.minutes(LambdaConstants.WARMER_INTERVAL_MINUTES)),
+            schedule=events.Schedule.rate(
+                Duration.minutes(LambdaConstants.WARMER_INTERVAL_MINUTES)
+            ),
             targets=[
                 targets.LambdaFunction(
                     self._custom_authorizer_lambda.function,
-                    event=events.RuleTargetInput.from_object({"lambda_warmer": True})
+                    event=events.RuleTargetInput.from_object({"lambda_warmer": True}),
                 ),
             ],
-            description="Keeps custom_authorizer Lambda warm via scheduled EventBridge rule."
+            description="Keeps custom_authorizer Lambda warm via scheduled EventBridge rule.",
         )
 
     @property
@@ -298,12 +300,12 @@ class AuthorizationStack(Stack):
         return self._policy_sync_lambda.function
 
     # pre_signup_lambda is now handled in CognitoUpdateStack
-        
+
     @property
     def auth_seeder_lambda(self):
         """Return the auth table seeder Lambda function"""
         return self._auth_seeder_lambda.function
-    
+
     @property
     def authorizer_lambda(self):
         """Return the custom authorizer Lambda function"""
@@ -313,4 +315,3 @@ class AuthorizationStack(Stack):
     def shared_authorizer_lambda(self):
         """Return the shared authorizer Lambda function"""
         return self._shared_authorizer.authorizer_lambda
-

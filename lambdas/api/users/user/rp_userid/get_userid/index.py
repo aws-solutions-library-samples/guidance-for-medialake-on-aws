@@ -1,14 +1,14 @@
-from typing import Dict, Any, Optional
+import os
+from typing import Any, Dict
+
+import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.utilities.parser import parse
-from aws_lambda_powertools.utilities.parser.models import APIGatewayProxyEventModel
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import MetricUnit
-from pydantic import BaseModel, Field
-import boto3
-import os
+from aws_lambda_powertools.utilities.parser.models import APIGatewayProxyEventModel
+from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
+from pydantic import BaseModel, Field
 
 # Initialize AWS PowerTools
 logger = Logger(service="user-service", level=os.getenv("LOG_LEVEL", "WARNING"))
@@ -79,7 +79,7 @@ def lambda_handler(
             "body": response.model_dump_json(),
         }
 
-    except Exception as e:
+    except Exception:
         logger.exception("Error processing request")
         metrics.add_metric(name="UnhandledError", unit=MetricUnit.Count, value=1)
         return _create_error_response(500, "Internal server error")

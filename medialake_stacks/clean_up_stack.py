@@ -1,22 +1,18 @@
 from dataclasses import dataclass
-from constructs import Construct
-import aws_cdk as cdk
 
-from aws_cdk import (
-    Stack,
-    CustomResource,
-    RemovalPolicy,
-    aws_iam as iam,
-    aws_events as events,
-    aws_dynamodb as dynamodb,
-    custom_resources as cr,
-)
+from aws_cdk import CustomResource, RemovalPolicy, Stack
+from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_events as events
+from aws_cdk import aws_iam as iam
+from aws_cdk import custom_resources as cr
+from constructs import Construct
+
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 
 @dataclass
 class CleanupStackProps:
-    ingest_event_bus: events.EventBus
+    pipelines_event_bus: events.EventBus
     pipeline_table: dynamodb.TableV2
     connector_table: dynamodb.TableV2
 
@@ -38,6 +34,7 @@ class CleanupStack(Stack):
                 environment_variables={
                     "CONNECTOR_TABLE": props.connector_table.table_name,
                     "PIPELINE_TABLE": props.pipeline_table.table_name,
+                    "VECTOR_BUCKET_NAME": f"medialake-vectors-{Stack.of(self).region}-{Stack.of(self).node.try_get_context('environment') or 'dev'}",
                 },
             ),
         )
@@ -45,19 +42,31 @@ class CleanupStack(Stack):
         props.connector_table.grant_read_write_data(self._clean_up_lambda.function)
         props.pipeline_table.grant_read_write_data(self._clean_up_lambda.function)
 
-
         # Add EventBridge Pipes permissions
+        # ListPipes requires * resource - AWS API limitation for list operations
+        self._clean_up_lambda.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "pipes:ListPipes",
+                ],
+                resources=[
+                    "*"
+                ],  # Required by AWS API - cannot be scoped to specific pipes
+            )
+        )
+
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 actions=[
                     "pipes:DeletePipe",
                     "pipes:DescribePipe",
-                    "pipes:ListPipes",
                     "pipes:StopPipe",
                     "pipes:UntagResource",
-                    "pipes:ListTagsForResource"
+                    "pipes:ListTagsForResource",
                 ],
-                resources=[f"arn:aws:pipes:{Stack.of(self).region}:{Stack.of(self).account}:pipe/*"],
+                resources=[
+                    f"arn:aws:pipes:{Stack.of(self).region}:{Stack.of(self).account}:pipe/*"
+                ],
             )
         )
 
@@ -78,25 +87,16 @@ class CleanupStack(Stack):
             )
         )
 
-        self._clean_up_lambda.lambda_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "lambda:DeleteEventSourceMapping",
-                ],
-                resources=[
-                    f"arn:aws:lambda:{Stack.of(self).region}:{Stack.of(self).account}:event-source-mapping:*"
-                ],
-            )
-        )
-
+        # ListEventSourceMappings requires * resource - AWS API limitation
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=[
                     "lambda:ListEventSourceMappings",
                 ],
-                resources=["*"],
+                resources=[
+                    "*"
+                ],  # Required by AWS API - cannot be scoped to specific resources
             )
         )
 
@@ -172,6 +172,80 @@ class CleanupStack(Stack):
                 ],
                 resources=[
                     f"arn:aws:logs:{Stack.of(self).region}:{Stack.of(self).account}:log-group:*"
+                ],
+            )
+        )
+
+        # Add Secrets Manager permissions
+        # ListSecrets requires * resource - AWS API limitation for list operations
+        self._clean_up_lambda.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "secretsmanager:ListSecrets",
+                ],
+                resources=[
+                    "*"
+                ],  # Required by AWS API - cannot be scoped to specific secrets
+            )
+        )
+
+        self._clean_up_lambda.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "secretsmanager:DeleteSecret",
+                    "secretsmanager:DescribeSecret",
+                ],
+                resources=[
+                    f"arn:aws:secretsmanager:{Stack.of(self).region}:{Stack.of(self).account}:secret:integration/*",
+                    f"arn:aws:secretsmanager:{Stack.of(self).region}:{Stack.of(self).account}:secret:medialake/search/provider/*",
+                ],
+            )
+        )
+
+        # Add Step Functions permissions
+        self._clean_up_lambda.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "states:ListExecutions",
+                    "states:StopExecution",
+                ],
+                resources=[
+                    f"arn:aws:states:{Stack.of(self).region}:{Stack.of(self).account}:stateMachine:*",
+                    f"arn:aws:states:{Stack.of(self).region}:{Stack.of(self).account}:execution:*",
+                ],
+            )
+        )
+
+        # Add S3 Vector Store permissions for cleanup - List operations require * resource
+        self._clean_up_lambda.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "s3vectors:ListVectorBuckets",
+                    "s3vectors:ListIndexes",
+                ],
+                resources=[
+                    "*"
+                ],  # List operations require * resource per AWS API limitations
+            )
+        )
+
+        # Add S3 Vector Store permissions for specific MediaLake resources
+        self._clean_up_lambda.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "s3vectors:GetVectorBucket",
+                    "s3vectors:DeleteVectorBucket",
+                    "s3vectors:GetIndex",
+                    "s3vectors:DeleteIndex",
+                ],
+                resources=[
+                    f"arn:aws:s3vectors:{Stack.of(self).region}:{Stack.of(self).account}:bucket/medialake-vectors-*",
+                    f"arn:aws:s3vectors:{Stack.of(self).region}:{Stack.of(self).account}:bucket/medialake-vectors-*/index/*",
                 ],
             )
         )

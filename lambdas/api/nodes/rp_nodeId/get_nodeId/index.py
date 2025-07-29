@@ -1,10 +1,11 @@
-from lambda_utils import lambda_handler_decorator, logger
 import json
 import os
-import boto3
-from typing import Dict, Any
-from aws_lambda_powertools.utilities.typing import LambdaContext
 from decimal import Decimal
+from typing import Any, Dict
+
+import boto3
+from aws_lambda_powertools.utilities.typing import LambdaContext
+from lambda_utils import lambda_handler_decorator, logger
 
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(os.environ["PIPELINES_NODES_TABLE"])

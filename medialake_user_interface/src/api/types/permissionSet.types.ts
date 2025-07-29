@@ -3,7 +3,7 @@
 export interface Permission {
   action: string;
   resource: string;
-  effect: 'Allow' | 'Deny';
+  effect: "Allow" | "Deny";
   conditions?: Record<string, any>;
 }
 
@@ -36,7 +36,7 @@ export interface PermissionSetListResponse {
   message: string;
   data: {
     permissionSets: PermissionSet[];
-  }
+  };
 }
 
 export interface PermissionSetResponse {

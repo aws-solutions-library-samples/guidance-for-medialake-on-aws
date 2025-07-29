@@ -1,13 +1,11 @@
-from aws_cdk import (
-    aws_s3 as s3,
-    aws_iam as iam,
-    aws_kms as kms,
-    RemovalPolicy,
-    Stack,
-)
+from dataclasses import asdict, dataclass
+from typing import List, Optional
+
+from aws_cdk import RemovalPolicy
+from aws_cdk import aws_kms as kms
+from aws_cdk import aws_s3 as s3
 from constructs import Construct
-from typing import Optional, List
-from dataclasses import dataclass, asdict
+
 from config import config
 
 

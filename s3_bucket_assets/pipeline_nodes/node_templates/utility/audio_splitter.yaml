@@ -31,8 +31,8 @@ node:
               actions:
                 - kms:GenerateDataKey
               resources:
-                - '*'
-                
+                - "*"
+
 actions:
   split:
     summary: Audio Splitter

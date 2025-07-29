@@ -1,0 +1,208 @@
+{
+  "name": "TwelveLabs API Image Embedding to OpenSearch",
+  "description": "Generate TwelveLabs API Image Embeddings to OpenSearch",
+  "active": true,
+  "configuration": {
+    "nodes": [
+      {
+        "id": "dndnode_0",
+        "type": "custom",
+        "position": {
+          "x": 432,
+          "y": 256
+        },
+        "data": {
+          "nodeId": "trigger_image_processing_completed",
+          "label": "Image Processing Completed (trigger)",
+          "description": "This step will trigger after image processing is completed",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [
+            {
+              "name": "image",
+              "description": "Output type: image"
+            }
+          ],
+          "type": "TRIGGER",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "trigger",
+            "parameters": {
+              "Image Type": "",
+              "Prefix": ""
+            },
+            "requestMapping": null,
+            "responseMapping": null
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "dndnode_1",
+        "type": "custom",
+        "position": {
+          "x": 688,
+          "y": 256
+        },
+        "data": {
+          "nodeId": "pre_signed_url",
+          "label": "Presigned URL Generator (generate)",
+          "description": "Generate a pre-signed URL for S3 object access",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [
+            {
+              "name": "presigned_url",
+              "description": "Output type: presigned_url"
+            }
+          ],
+          "type": "UTILITY",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "generate",
+            "parameters": {
+              "URL Validity Duration": "3600"
+            }
+          }
+        },
+        "width": 200,
+        "height": 100
+      },
+      {
+        "id": "dndnode_2",
+        "type": "custom",
+        "position": {
+          "x": 928,
+          "y": 256
+        },
+        "data": {
+          "nodeId": "twelve_labs",
+          "label": "TwelveLabs (post)",
+          "description": "Generate image or audio embeddings",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [],
+          "outputTypes": [],
+          "type": "INTEGRATION",
+          "configuration": {
+            "path": "/embed",
+            "method": "post",
+            "requestMapping": "api_templates/twelvelabs/v1.3/embed/tasks",
+            "responseMapping": "api_templates/twelvelabs/v1.3/embed/tasks",
+            "integrationId": "768a424a-74bb-4d39-a2ed-6e91f6d48b5e",
+            "operationId": "generateImageOrAudioEmbeddings",
+            "parameters": {
+              "nodeId": ""
+            }
+          }
+        },
+        "width": 200,
+        "height": 100
+      },
+      {
+        "id": "dndnode_5",
+        "type": "custom",
+        "position": {
+          "x": 1168,
+          "y": 256
+        },
+        "data": {
+          "nodeId": "embedding_store",
+          "label": "Embedding Store (store)",
+          "description": "Store embeddings in OpenSearch for semantic search",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [],
+          "type": "UTILITY",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "store",
+            "parameters": {
+              "Index Name": "media",
+              "Content Type": "image"
+            }
+          }
+        },
+        "width": 200,
+        "height": 113,
+        "selected": true,
+        "dragging": false
+      }
+    ],
+    "edges": [
+      {
+        "id": "dndnode_0-dndnode_1",
+        "source": "dndnode_0",
+        "target": "dndnode_1",
+        "type": "custom",
+        "data": {
+          "type": "custom",
+          "text": "Connected",
+          "id": "dndnode_0-dndnode_1"
+        },
+        "sourceHandle": "image",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_1-dndnode_2",
+        "source": "dndnode_1",
+        "target": "dndnode_2",
+        "type": "custom",
+        "data": {
+          "type": "custom",
+          "text": "Connected",
+          "id": "dndnode_1-dndnode_2"
+        },
+        "sourceHandle": "presigned_url",
+        "targetHandle": "input-default"
+      },
+      {
+        "source": "dndnode_2",
+        "sourceHandle": "default",
+        "target": "dndnode_5",
+        "targetHandle": "input-any",
+        "id": "dndnode_2-dndnode_5",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        }
+      }
+    ],
+    "settings": {
+      "autoStart": false,
+      "retryAttempts": 3,
+      "timeout": 3600
+    }
+  }
+}

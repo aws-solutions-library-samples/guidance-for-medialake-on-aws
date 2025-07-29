@@ -1,10 +1,10 @@
 {
-"logging": {
+  "logging": {
+    "api_gateway_retention_days": 90,
+    "cloudwatch_retention_days": 90,
     "level": "INFO",
     "retention_days": 90,
     "s3_retention_days": 90,
-    "cloudwatch_retention_days": 90,
-    "waf_retention_days": 90,
-    "api_gateway_retention_days": 90
-}
+    "waf_retention_days": 90
+  }
 }

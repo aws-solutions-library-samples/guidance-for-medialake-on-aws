@@ -23,9 +23,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [
             {
               "name": "any",
@@ -67,9 +65,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "audio"
-          ],
+          "inputTypes": ["audio"],
           "outputTypes": [
             {
               "name": "metadata",
@@ -106,9 +102,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "audio"
-          ],
+          "inputTypes": ["audio"],
           "outputTypes": [
             {
               "name": "status",
@@ -148,9 +142,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [
             {
               "name": "wait_complete",
@@ -187,9 +179,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "audio"
-          ],
+          "inputTypes": ["audio"],
           "outputTypes": [
             {
               "name": "any",
@@ -230,9 +220,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [],
           "type": "FLOW",
           "configuration": {
@@ -264,9 +252,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [
             {
               "name": "Completed",
@@ -311,9 +297,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [],
           "type": "FLOW",
           "configuration": {

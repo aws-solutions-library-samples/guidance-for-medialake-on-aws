@@ -11,26 +11,18 @@ and associated Lambda functions for managing media connectors. It handles:
 """
 
 from dataclasses import dataclass
-from constructs import Construct
-from aws_cdk import (
-    aws_apigateway as api_gateway,
-    aws_dynamodb as dynamodb,
-    aws_iam as iam,
-    aws_cognito as cognito,
-    aws_secretsmanager as secrets_manager,
-    Stack,
-    Duration,
-)
-from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 
-from medialake_constructs.shared_constructs.lambda_base import (
-    Lambda,
-    LambdaConfig,
-)
-from medialake_constructs.shared_constructs.dynamodb import (
-    DynamoDB,
-    DynamoDBProps,
-)
+from aws_cdk import Duration, Stack
+from aws_cdk import aws_apigateway as api_gateway
+from aws_cdk import aws_cognito as cognito
+from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_secretsmanager as secrets_manager
+from constructs import Construct
+
+from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
+from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
+from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 
 @dataclass
@@ -55,9 +47,9 @@ class UsersApi(Construct):
         super().__init__(scope, constructor_id)
 
         from config import config
-        
+
         # Get the current account ID
-        account_id = Stack.of(self).account
+        Stack.of(self).account
 
         self._users_table = DynamoDB(
             self,
@@ -122,7 +114,13 @@ class UsersApi(Construct):
         users_user_id_resources.add_cors_preflight(
             allow_origins=["http://localhost:5173"],
             allow_methods=["GET", "PUT", "OPTIONS", "DELETE", "POST"],
-            allow_headers=["Content-Type", "Authorization", "X-Amz-Date", "X-Api-Key", "X-Amz-Security-Token"],
+            allow_headers=[
+                "Content-Type",
+                "Authorization",
+                "X-Amz-Date",
+                "X-Api-Key",
+                "X-Amz-Security-Token",
+            ],
             allow_credentials=True,
             max_age=Duration.seconds(300),
         )
@@ -215,7 +213,13 @@ class UsersApi(Construct):
         users_user_resource.add_cors_preflight(
             allow_origins=["http://localhost:5173"],
             allow_methods=["GET", "PUT", "OPTIONS", "DELETE", "POST"],
-            allow_headers=["Content-Type", "Authorization", "X-Amz-Date", "X-Api-Key", "X-Amz-Security-Token"],
+            allow_headers=[
+                "Content-Type",
+                "Authorization",
+                "X-Amz-Date",
+                "X-Api-Key",
+                "X-Amz-Security-Token",
+            ],
             allow_credentials=True,
             max_age=Duration.seconds(300),
         )
@@ -368,7 +372,8 @@ class UsersApi(Construct):
 
         # Add CORS support
         add_cors_options_method(users_resource)
-        add_cors_options_method(users_user_resource)
+        # users_user_resource already has CORS configuration through add_cors_preflight
+        # add_cors_options_method(users_user_resource)
         # users_user_id_resources already has CORS configuration through add_cors_preflight
         # add_cors_options_method(users_user_id_resources)
         add_cors_options_method(users_user_id_disableuser_resource)

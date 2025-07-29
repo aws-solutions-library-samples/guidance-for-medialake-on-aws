@@ -1,42 +1,34 @@
 # import json
-from constructs import Construct
-from aws_cdk import (
-    Stack,
-    Fn,
-    Environment,
-    aws_events as events,
-    aws_dynamodb as dynamodb,
-    aws_s3 as s3,
-    aws_ec2 as ec2,
-    aws_kms as kms,
-    Duration,
-    RemovalPolicy,
-    CfnOutput,
-    aws_lambda as lambda_,
-    aws_events_targets as targets,
-)
 import aws_cdk as cdk
+from aws_cdk import CfnOutput, Duration, RemovalPolicy, Stack
+from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_ec2 as ec2
+from aws_cdk import aws_events as events
+from aws_cdk import aws_events_targets as targets
+from aws_cdk import aws_s3 as s3
+from constructs import Construct
 
 from config import config
-from medialake_constructs.shared_constructs.s3_logging import (
-    add_s3_access_logging_policy,
-)
-
-from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
+from constants import Lambda as LambdaConstants
+from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.eventbridge import EventBus, EventBusConfig
-from medialake_constructs.vpc import CustomVpc, CustomVpcProps
-from medialake_constructs.shared_constructs.opensearch_managed_cluster import (
-    OpenSearchCluster,
-    OpenSearchClusterProps,
-)
 from medialake_constructs.shared_constructs.opensearch_ingestion_pipeline import (
     OpenSearchIngestionPipeline,
     OpenSearchIngestionPipelineProps,
 )
-from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
-
-from cdk_nag import AwsSolutionsChecks, NagSuppressions
-from constants import Lambda as LambdaConstants
+from medialake_constructs.shared_constructs.opensearch_managed_cluster import (
+    OpenSearchCluster,
+    OpenSearchClusterProps,
+)
+from medialake_constructs.shared_constructs.s3_logging import (
+    add_s3_access_logging_policy,
+)
+from medialake_constructs.shared_constructs.s3_vectors import (
+    S3VectorCluster,
+    S3VectorClusterProps,
+)
+from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
+from medialake_constructs.vpc import CustomVpc, CustomVpcProps
 
 """
 Base infrastructure stack that sets up core AWS resources for the MediaLake application.
@@ -44,7 +36,7 @@ Base infrastructure stack that sets up core AWS resources for the MediaLake appl
 This stack creates and configures:
 - VPC and networking components
 - OpenSearch cluster
-- S3 buckets for media assets, IAC assets, and DynamoDB exports  
+- S3 buckets for media assets, IAC assets, and DynamoDB exports
 - EventBridge event bus
 - DynamoDB tables for asset management
 - Ingestion pipeline for syncing DynamoDB to OpenSearch
@@ -61,21 +53,32 @@ class BaseInfrastructureStack(Stack):
     Args:
         scope (Construct): CDK construct scope
         construct_id (str): Unique identifier for the stack
-        lambda_warmer (bool): If True, create a warming EventBridge rule (default: False)
+        lambda_warmer (
+                           bool): If True,
+                           create a warming EventBridge rule (default: False
+                       )
         lambda_functions_to_warm (Optional[List[aws_lambda.Function]]): List of Lambda functions to keep warm
         **kwargs: Additional arguments passed to Stack
     """
 
-    def __init__(self, scope: Construct, construct_id: str, lambda_warmer: bool = False, lambda_functions_to_warm=None, **kwargs):
+    def __init__(
+        self,
+        scope: Construct,
+        construct_id: str,
+        lambda_warmer: bool = False,
+        lambda_functions_to_warm=None,
+        **kwargs,
+    ):
         super().__init__(scope, construct_id, **kwargs)
 
         # env = kwargs.get("env")
-        account = Stack.of(self).account
+        Stack.of(self).account
         region = Stack.of(self).region
         opensearch_index_name = "media"
+        s3_vector_index_name = "media-vectors"
         parent_stack = cdk.Stack.of(self)
-        concrete_region = parent_stack.region
-        
+        parent_stack.region
+
         if config.s3.use_existing_buckets:
             # Import existing buckets
             self._access_logs_bucket = S3Bucket(
@@ -198,35 +201,62 @@ class BaseInfrastructureStack(Stack):
 
         # Create OpenSearch managed cluster
         # Calculate the effective availability zone count based on data node count
-        opensearch_settings = config.opensearch_cluster_settings
+        opensearch_settings = config.resolved_opensearch_cluster_settings
         effective_az_count = min(
             opensearch_settings.availability_zone_count,
-            opensearch_settings.data_node_count
+            opensearch_settings.data_node_count,
         )
-        
+
         if config.vpc.use_existing_vpc:
             selected_subnet_ids = config.vpc.existing_vpc.subnet_ids["private"][
-                : effective_az_count
+                :effective_az_count
             ]
         else:
             private_subnets = self._vpc.get_subnet_ids(
                 ec2.SubnetType.PRIVATE_WITH_EGRESS
             )
             selected_subnet_ids = [
-                subnet["subnet_id"]
-                for subnet in private_subnets[
-                    : effective_az_count
-                ]
+                subnet["subnet_id"] for subnet in private_subnets[:effective_az_count]
             ]
+
+        # Create a shorter domain name to comply with OpenSearch 28-character limit
+        # Original format: {resource_prefix}-os-{region}-{environment}
+        # New format: {resource_prefix}-{region_short}-{env_short}
+        region_short = region.replace("-", "")[
+            :8
+        ]  # Remove hyphens and limit to 8 chars
+        env_short = config.environment[:3]  # Limit environment to 3 chars
+        domain_name = f"{config.resource_prefix}-{region_short}-{env_short}"
+
+        # Ensure domain name doesn't exceed 28 characters
+        if len(domain_name) > 28:
+            # Further truncate if needed
+            max_prefix_length = (
+                28 - len(region_short) - len(env_short) - 2
+            )  # 2 for hyphens
+            domain_name = f"{config.resource_prefix[:max_prefix_length]}-{region_short}-{env_short}"
 
         self._opensearch_cluster = OpenSearchCluster(
             self,
             "MediaLakeOpenSearch",
             props=OpenSearchClusterProps(
-                domain_name=f"{config.resource_prefix}-os-{region}-{config.environment}",
+                domain_name=domain_name,
                 vpc=self._vpc.vpc,
                 subnet_ids=selected_subnet_ids,
                 collection_indexes=[opensearch_index_name],
+                security_group=self._security_group,
+            ),
+        )
+
+        # Create S3 Vector cluster
+        self._s3_vector_cluster = S3VectorCluster(
+            self,
+            "MediaLakeS3Vector",
+            props=S3VectorClusterProps(
+                bucket_name=f"{config.resource_prefix}-vectors-{self.account}-{region}-{config.environment}",
+                vector_dimension=1024,
+                collection_indexes=[s3_vector_index_name],
+                vpc=self._vpc.vpc,
                 security_group=self._security_group,
             ),
         )
@@ -278,6 +308,9 @@ class BaseInfrastructureStack(Stack):
                             ],
                             allowed_origins=[
                                 "http://localhost:5173",
+                                "http://localhost:5174",
+                                "http://localhost:3000",
+                                "http://localhost:8080",
                                 "https://*.cloudfront.net",
                             ],
                             allowed_headers=["*"],
@@ -306,16 +339,15 @@ class BaseInfrastructureStack(Stack):
             ),
         )
 
-        self._ingest_event_bus = EventBus(
+        self._pipelines_event_bus = EventBus(
             self,
-            "IngestEventBus",
+            "PipelinesEventBus",
             props=EventBusConfig(
-                bus_name=f"{config.resource_prefix}-ingest-{region}-{config.environment}",
+                bus_name=f"{config.resource_prefix}-pipelines-{region}-{config.environment}",
                 description="event bus",
                 log_all=False,
             ),
         )
-
 
         self._application_service_events_internal_event_bus = EventBus(
             self,
@@ -336,7 +368,7 @@ class BaseInfrastructureStack(Stack):
                 log_all=False,
             ),
         )
-        
+
         # Create a rule to forward all events from internal to external event bus
         # events.Rule(
         #     self,
@@ -350,7 +382,7 @@ class BaseInfrastructureStack(Stack):
         #         events.EventBus(self._application_service_events_external_event_bus.event_bus)
         #     ],
         # )
-           
+
         # Pipeline table
 
         pipeline_table = DynamoDB(
@@ -405,8 +437,6 @@ class BaseInfrastructureStack(Stack):
                 ),
                 projection_type=dynamodb.ProjectionType.ALL,
             )
-
-            
 
             self._asset_table.add_global_secondary_index(
                 index_name="FileHashIndex",
@@ -539,14 +569,18 @@ class BaseInfrastructureStack(Stack):
                     self,
                     f"{fn.node.id}WarmerRule",
                     event_bus=self._application_service_events_internal_event_bus.event_bus,
-                    schedule=events.Schedule.rate(Duration.minutes(LambdaConstants.WARMER_INTERVAL_MINUTES)),
+                    schedule=events.Schedule.rate(
+                        Duration.minutes(LambdaConstants.WARMER_INTERVAL_MINUTES)
+                    ),
                     targets=[
                         targets.LambdaFunction(
                             fn,
-                            event=events.RuleTargetInput.from_object({"lambda_warmer": True})
+                            event=events.RuleTargetInput.from_object(
+                                {"lambda_warmer": True}
+                            ),
                         )
                     ],
-                    description=f"Keeps {fn.function_name} warm via scheduled EventBridge rule."
+                    description=f"Keeps {fn.function_name} warm via scheduled EventBridge rule.",
                 )
 
         # Add outputs for retained resources in prod environment
@@ -629,6 +663,28 @@ class BaseInfrastructureStack(Stack):
             description="Retained OpenSearch Cluster (Endpoint|ARN)",
         )
 
+        # S3 Vector Cluster Outputs
+        CfnOutput(
+            self,
+            "RetainedS3VectorCluster",
+            value=f"{self._s3_vector_cluster.bucket_name}|{self._s3_vector_cluster.bucket_arn}",
+            description="Retained S3 Vector Cluster (Bucket Name|ARN)",
+        )
+
+        CfnOutput(
+            self,
+            "RetainedS3VectorDimension",
+            value=str(self._s3_vector_cluster.vector_dimension),
+            description="Retained S3 Vector Dimension",
+        )
+
+        CfnOutput(
+            self,
+            "RetainedS3VectorIndexes",
+            value=",".join(self._s3_vector_cluster.indexes),
+            description="Retained S3 Vector Indexes",
+        )
+
         # S3 Bucket Outputs
         CfnOutput(
             self,
@@ -652,26 +708,26 @@ class BaseInfrastructureStack(Stack):
         )
 
     @property
-    def ingest_event_bus(self) -> events.EventBus:
+    def pipelines_event_bus(self) -> events.EventBus:
         """
-        Returns the EventBridge event bus used for ingestion events.
+        Returns the EventBridge event bus used for pipeline events.
 
         Returns:
             events.EventBus: The configured EventBridge event bus
         """
 
-        return self._ingest_event_bus.event_bus
+        return self._pipelines_event_bus.event_bus
 
     @property
-    def ingest_event_bus_name(self) -> str:
+    def pipelines_event_bus_name(self) -> str:
         """
-        Returns the name of the ingestion event bus.
+        Returns the name of the pipelines event bus.
 
         Returns:
             str: Name of the EventBridge event bus
         """
 
-        return self._ingest_event_bus.event_bus_name
+        return self._pipelines_event_bus.event_bus_name
 
     @property
     def asset_table(self) -> dynamodb.ITable:
@@ -766,7 +822,7 @@ class BaseInfrastructureStack(Stack):
         Returns the ARN of the S3Path GSI on the asset table.
         """
         return f"{self._asset_table.table_arn}/index/S3PathIndex"
-        
+
     @property
     def collection_dashboards_url(self) -> str:
         """
@@ -851,3 +907,64 @@ class BaseInfrastructureStack(Stack):
             s3.IBucket: S3 bucket object
         """
         return self.access_logs_bucket
+
+    @property
+    def s3_vector_cluster(self) -> "S3VectorCluster":
+        """
+        Returns the S3 Vector cluster.
+
+        Returns:
+            S3VectorCluster: The configured S3 Vector cluster
+        """
+        return self._s3_vector_cluster
+
+    @property
+    def s3_vector_bucket_name(self) -> str:
+        """
+        Returns the name of the S3 Vector bucket.
+
+        Returns:
+            str: Name of the S3 Vector bucket
+        """
+        return self._s3_vector_cluster.bucket_name
+
+    @property
+    def s3_vector_bucket_arn(self) -> str:
+        """
+        Returns the ARN of the S3 Vector bucket.
+
+        Returns:
+            str: ARN of the S3 Vector bucket
+        """
+        return self._s3_vector_cluster.bucket_arn
+
+    @property
+    def s3_vector_dimension(self) -> int:
+        """
+        Returns the vector dimension for S3 Vector indexes.
+
+        Returns:
+            int: Vector dimension
+        """
+        return self._s3_vector_cluster.vector_dimension
+
+    @property
+    def s3_vector_indexes(self) -> list:
+        """
+        Returns the list of S3 Vector indexes.
+
+        Returns:
+            list: List of S3 Vector index names
+        """
+        return self._s3_vector_cluster.indexes
+
+    @property
+    def s3_vector_index_name(self) -> str:
+        """
+        Returns the primary S3 Vector index name.
+
+        Returns:
+            str: Primary S3 Vector index name
+        """
+        indexes = self._s3_vector_cluster.indexes
+        return indexes[0] if indexes else "media-vectors"

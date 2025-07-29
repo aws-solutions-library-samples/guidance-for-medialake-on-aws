@@ -1,26 +1,21 @@
 import hashlib
 from dataclasses import dataclass
-from constructs import Construct
-from aws_cdk import (
-    aws_cognito as cognito,
-    aws_iam as iam,
-    RemovalPolicy,
-    CfnOutput,
-    Stack,
-    custom_resources as cr,
-    Fn,
-    Aws,
-)
-import aws_cdk as cdk
+
+from aws_cdk import CfnOutput, RemovalPolicy, Stack
+from aws_cdk import aws_cognito as cognito
+from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_iam as iam
+from aws_cdk import custom_resources as cr
 from aws_cdk.aws_cognito_identitypool_alpha import (
     IdentityPool,
-    UserPoolAuthenticationProvider,
     IdentityPoolAuthenticationProviders,
+    UserPoolAuthenticationProvider,
 )
-from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
-from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
-from aws_cdk import aws_dynamodb as dynamodb
+from constructs import Construct
+
 from config import config
+from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
+from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 
 @dataclass
@@ -75,16 +70,14 @@ class CognitoConstruct(Construct):
                 dynamodb.GlobalSecondaryIndexPropsV2(
                     index_name="GSI1",
                     partition_key=dynamodb.Attribute(
-                        name="GSI1PK",
-                        type=dynamodb.AttributeType.STRING
+                        name="GSI1PK", type=dynamodb.AttributeType.STRING
                     ),
                     sort_key=dynamodb.Attribute(
-                        name="GSI1SK",
-                        type=dynamodb.AttributeType.STRING
+                        name="GSI1SK", type=dynamodb.AttributeType.STRING
                     ),
-                    projection_type=dynamodb.ProjectionType.ALL
+                    projection_type=dynamodb.ProjectionType.ALL,
                 ),
-            ]
+            ],
         )
         self._auth_table = DynamoDB(self, "AuthorizationTable", self._auth_table_props)
 
@@ -97,10 +90,10 @@ class CognitoConstruct(Construct):
                 entry="lambdas/auth/cognito_trigger",
             ),
         )
-        
+
         # Pre-Token Generation Lambda is now created in CognitoUpdateStack
         # This avoids circular dependencies and timing issues
-        
+
         # Create User Pool using L1 construct, needed for configuration parameters
         user_pool_props = {
             "admin_create_user_config": cognito.CfnUserPool.AdminCreateUserConfigProperty(
@@ -236,24 +229,27 @@ class CognitoConstruct(Construct):
         self._cognito_trigger_lambda.function.add_permission(
             "CognitoInvokePreSignUp",
             principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
-            source_arn=cfn_user_pool.attr_arn
+            source_arn=cfn_user_pool.attr_arn,
         )
-        
+
         # Grant permission for post confirmation lambda
         self._cognito_trigger_lambda.function.add_permission(
             "CognitoInvokePostConfirmation",
             principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
-            source_arn=cfn_user_pool.attr_arn
+            source_arn=cfn_user_pool.attr_arn,
         )
-        
+
         # Pre-token generation lambda permissions are now granted in CognitoUpdateStack
 
         # Using stack name, region, account, and environment ensures uniqueness across different deployments
-        unique_id = hashlib.md5(f"{config.resource_prefix}-{config.primary_region}-{config.account_id}-{config.environment}".encode()).hexdigest()[:16]
-        domain_prefix = f"{config.resource_prefix}-{config.environment.lower()}-{unique_id}"
+        unique_id = hashlib.md5(
+            f"{config.resource_prefix}-{config.primary_region}-{config.account_id}-{config.environment}".encode()
+        ).hexdigest()[:16]
+        domain_prefix = (
+            f"{config.resource_prefix}-{config.environment.lower()}-{unique_id}"
+        )
         self._domain_prefix = domain_prefix
-        
-        
+
         self._domain = self._user_pool.add_domain(
             "CognitoDomain",
             cognito_domain=cognito.CognitoDomainOptions(
@@ -431,12 +427,12 @@ class CognitoConstruct(Construct):
     @property
     def cognito_domain_prefix(self) -> str:
         return self._domain_prefix
-    
+
     @property
     def auth_table(self):
         """Return the authorization table"""
         return self._auth_table.table
-    
+
     @property
     def auth_table_name(self) -> str:
         """Return the authorization table name"""

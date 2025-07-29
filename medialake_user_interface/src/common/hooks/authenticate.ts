@@ -1,32 +1,39 @@
-import { CognitoRefreshToken, AuthenticationDetails, CognitoUser } from 'amazon-cognito-identity-js';
-import { signInWithRedirect } from 'aws-amplify/auth';
-import { useUserPool } from './userpool';
-import { StorageHelper } from '../helpers/storage-helper';
-import { useAwsConfig } from './aws-config-context';
+import {
+  CognitoRefreshToken,
+  AuthenticationDetails,
+  CognitoUser,
+} from "amazon-cognito-identity-js";
+import { signInWithRedirect } from "aws-amplify/auth";
+import { useUserPool } from "./userpool";
+import { StorageHelper } from "../helpers/storage-helper";
+import { useAwsConfig } from "./aws-config-context";
 
 export const useAuthenticate = () => {
   const { userPool, reinitializeUserPool } = useUserPool();
   const awsConfig = useAwsConfig();
 
-  const initiateAuth = async (Email: string, Password: string): Promise<any> => {
+  const initiateAuth = async (
+    Email: string,
+    Password: string,
+  ): Promise<any> => {
     if (!awsConfig) {
-      throw new Error('AWS configuration is not initialized');
+      throw new Error("AWS configuration is not initialized");
     }
 
     // Find SAML provider if configured
     const samlProvider = awsConfig.Auth.identity_providers.find(
-      provider => provider.identity_provider_method === 'saml'
+      (provider) => provider.identity_provider_method === "saml",
     );
 
     // If SAML is configured, redirect to SAML login
     if (samlProvider) {
       try {
         await signInWithRedirect({
-          provider: { custom: samlProvider.identity_provider_name || '' }
+          provider: { custom: samlProvider.identity_provider_name || "" },
         });
-        return { type: 'SAML_REDIRECT' };
+        return { type: "SAML_REDIRECT" };
       } catch (error) {
-        console.error('SAML redirect failed:', error);
+        console.error("SAML redirect failed:", error);
         throw error;
       }
     }
@@ -35,34 +42,37 @@ export const useAuthenticate = () => {
     return authenticate(Email, Password);
   };
 
-  const authenticate = async (Email: string, Password: string): Promise<any> => {
+  const authenticate = async (
+    Email: string,
+    Password: string,
+  ): Promise<any> => {
     // This is now an internal method for Cognito authentication
     if (!userPool) {
       reinitializeUserPool();
-      throw new Error('User pool is not initialized');
+      throw new Error("User pool is not initialized");
     }
 
     return new Promise((resolve, reject) => {
       const user = new CognitoUser({
         Username: Email,
-        Pool: userPool
+        Pool: userPool,
       });
 
       const authDetails = new AuthenticationDetails({
         Username: Email,
-        Password
+        Password,
       });
 
       user.authenticateUser(authDetails, {
         onSuccess: (result) => {
-          console.log(result)
+          console.log(result);
           StorageHelper.setToken(result.getIdToken().getJwtToken());
           StorageHelper.setUsername(result.getIdToken().payload.email);
           StorageHelper.setRefreshToken(result.getRefreshToken().getToken());
-          resolve({ type: 'SUCCESS', result });
+          resolve({ type: "SUCCESS", result });
         },
         newPasswordRequired: (userAttributes) => {
-          resolve({ type: 'NEW_PASSWORD_REQUIRED', user, userAttributes });
+          resolve({ type: "NEW_PASSWORD_REQUIRED", user, userAttributes });
         },
         onFailure: (err) => {
           console.log("login failed", err);
@@ -74,7 +84,11 @@ export const useAuthenticate = () => {
     });
   };
 
-  const changePassword = async (user: CognitoUser, newPassword: string, userAttributes: any): Promise<any> => {
+  const changePassword = async (
+    user: CognitoUser,
+    newPassword: string,
+    userAttributes: any,
+  ): Promise<any> => {
     return new Promise((resolve, reject) => {
       user.completeNewPasswordChallenge(newPassword, userAttributes, {
         onSuccess: (result) => {
@@ -95,18 +109,18 @@ export const useAuthenticate = () => {
   const refreshSession = async (): Promise<any> => {
     if (!userPool) {
       reinitializeUserPool();
-      throw new Error('User pool is not initialized');
+      throw new Error("User pool is not initialized");
     }
     return new Promise((resolve, reject) => {
       const user = userPool.getCurrentUser();
       if (!user) {
-        reject(new Error('No current user'));
+        reject(new Error("No current user"));
         return;
       }
 
       const refreshToken = StorageHelper.getRefreshToken();
       if (!refreshToken) {
-        reject(new Error('No refresh token available'));
+        reject(new Error("No refresh token available"));
         return;
       }
 
@@ -114,10 +128,10 @@ export const useAuthenticate = () => {
 
       user.refreshSession(token, (err, session) => {
         if (err) {
-          console.log('Failed to refresh session:', err);
+          console.log("Failed to refresh session:", err);
           reject(err);
         } else {
-          console.log('Session refreshed successfully');
+          console.log("Session refreshed successfully");
           StorageHelper.setToken(session.getIdToken().getJwtToken());
           StorageHelper.setRefreshToken(session.getRefreshToken().getToken());
           resolve(session);
@@ -129,7 +143,7 @@ export const useAuthenticate = () => {
   const logout = async (): Promise<void> => {
     if (!userPool) {
       reinitializeUserPool();
-      throw new Error('User pool is not initialized');
+      throw new Error("User pool is not initialized");
     }
     const user = userPool.getCurrentUser();
     if (user) {

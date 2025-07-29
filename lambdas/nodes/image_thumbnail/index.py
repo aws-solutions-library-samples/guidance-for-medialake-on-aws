@@ -1,23 +1,76 @@
 # thumbnail_step.py
-import boto3
 import io
-import os
 import json
+import os
+import shutil
+import subprocess
+import tempfile
 from decimal import Decimal
 
-from PIL import Image, ExifTags
-import cairosvg
-
-from botocore.exceptions import ClientError
+import boto3
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from botocore.exceptions import ClientError
 from lambda_middleware import lambda_middleware
+from PIL import ExifTags, Image
 
 logger = Logger()
 tracer = Tracer()
 
 s3 = boto3.client("s3")
 dynamo = boto3.resource("dynamodb").Table(os.environ["MEDIALAKE_ASSET_TABLE"])
+
+
+def convert_svg_to_png(svg_data: bytes) -> bytes:
+    """
+    Convert SVG → PNG using only the resvg CLI.
+    Expects /opt/bin/resvg in your Lambda layer.
+    """
+    # dump SVG to a temp file
+    with tempfile.NamedTemporaryFile(suffix=".svg", delete=False) as svg_file:
+        svg_file.write(svg_data)
+        svg_path = svg_file.name
+
+    # prepare a temp file for the PNG output
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as png_file:
+        png_path = png_file.name
+
+    # ensure our layer bins come first
+    env = os.environ.copy()
+    env["PATH"] = "/opt/bin:" + env.get("PATH", "")
+
+    # verify resvg is present
+    if shutil.which("resvg", path=env["PATH"]) is None:
+        for p in (svg_path, png_path):
+            try:
+                os.unlink(p)
+            except:
+                pass
+        raise RuntimeError("resvg CLI not found in /opt/bin")
+
+    cmd = ["resvg", svg_path, png_path]
+    logger.info(f"Running: {' '.join(cmd)}")
+
+    try:
+        proc = subprocess.run(cmd, env=env, capture_output=True, timeout=30)
+        if proc.returncode != 0:
+            stderr = proc.stderr.decode().strip()
+            raise RuntimeError(f"resvg failed (rc={proc.returncode}): {stderr}")
+
+        if not os.path.exists(png_path) or os.path.getsize(png_path) == 0:
+            raise RuntimeError("resvg did not produce any output")
+
+        with open(png_path, "rb") as f:
+            data = f.read()
+        return data
+
+    finally:
+        # always clean up temp files
+        for p in (svg_path, png_path):
+            try:
+                os.unlink(p)
+            except:
+                pass
 
 
 def get_image_rotation(image):
@@ -122,13 +175,15 @@ def lambda_handler(event, context: LambdaContext):
     inv_id = detail.get("InventoryID") or _raise("Missing InventoryID")
     asset_id = clean_asset_id(inv_id)
 
-    loc = detail["DigitalSourceAsset"]["MainRepresentation"]["StorageInfo"]["PrimaryLocation"]
+    loc = detail["DigitalSourceAsset"]["MainRepresentation"]["StorageInfo"][
+        "PrimaryLocation"
+    ]
     bucket = loc.get("Bucket") or _raise("Missing bucket")
     key = loc.get("ObjectKey", {}).get("FullPath") or _raise("Missing key")
 
     body = s3.get_object(Bucket=bucket, Key=key)["Body"].read()
     if key.lower().endswith(".svg"):
-        body = cairosvg.svg2png(bytestring=body)
+        body = convert_svg_to_png(body)
     img = Image.open(io.BytesIO(body))
 
     width, height = _resolve_dims(width, height, img.width, img.height)
@@ -141,21 +196,23 @@ def lambda_handler(event, context: LambdaContext):
     thumb.save(buf, format=fmt)
     data = buf.getvalue()
 
-    out_bucket = os.environ.get("MEDIA_ASSETS_BUCKET_NAME") or _raise("MEDIA_ASSETS_BUCKET_NAME env-var missing")
+    out_bucket = os.environ.get("MEDIA_ASSETS_BUCKET_NAME") or _raise(
+        "MEDIA_ASSETS_BUCKET_NAME env-var missing"
+    )
     out_key = f"{bucket}/{key.rsplit('.', 1)[0]}_thumbnail.{ext}"
 
     try:
         s3.delete_object(Bucket=out_bucket, Key=out_key)
-        logger.info("Deleted existing thumbnail", extra={"bucket": out_bucket, "key": out_key})
+        logger.info(
+            "Deleted existing thumbnail", extra={"bucket": out_bucket, "key": out_key}
+        )
     except ClientError as err:
-        logger.warning("No existing thumbnail to delete or delete failed", extra={"error": str(err)})
+        logger.warning(
+            "No existing thumbnail to delete or delete failed",
+            extra={"error": str(err)},
+        )
 
-    s3.put_object(
-        Bucket=out_bucket,
-        Key=out_key,
-        Body=data,
-        ContentType=f"image/{ext}"
-    )
+    s3.put_object(Bucket=out_bucket, Key=out_key, Body=data, ContentType=f"image/{ext}")
 
     # update DynamoDB record
     try:
@@ -197,11 +254,13 @@ def lambda_handler(event, context: LambdaContext):
 
     return {
         "statusCode": 200,
-        "body": json.dumps({
-            "bucket": out_bucket,
-            "key": out_key,
-            "mode": "thumbnail",
-            "format": fmt,
-        }),
+        "body": json.dumps(
+            {
+                "bucket": out_bucket,
+                "key": out_key,
+                "mode": "thumbnail",
+                "format": fmt,
+            }
+        ),
         "updatedAsset": updated_item,
     }

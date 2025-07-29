@@ -1,29 +1,20 @@
-from aws_cdk import (
-    Stack,
-    aws_iam as iam,
-    aws_opensearchservice as opensearch,
-    aws_dynamodb as dynamodb,
-    aws_ec2 as ec2,
-    aws_logs as logs,
-    aws_s3 as s3,
-    CustomResource,
-    custom_resources as cr,
-    RemovalPolicy,
-    Fn,
-)
-from datetime import datetime
-from config import config
-from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
-from medialake_constructs.shared_constructs.lambda_base import (
-    Lambda,
-    LambdaConfig,
-)
-
 import json
-from config import config
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Optional
+
+from aws_cdk import CustomResource, RemovalPolicy, Stack
+from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_ec2 as ec2
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_logs as logs
+from aws_cdk import aws_opensearchservice as opensearch
+from aws_cdk import aws_s3 as s3
+from aws_cdk import custom_resources as cr
 from constructs import Construct
-from typing import Optional, List
-from dataclasses import dataclass, field
+
+from config import config
+from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 
 @dataclass

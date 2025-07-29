@@ -1,16 +1,14 @@
-import hashlib
 from dataclasses import dataclass
+from typing import Any, Dict, Optional
+
+from aws_cdk import CfnOutput, Duration, RemovalPolicy, Stack
+from aws_cdk import aws_kms as kms
+from aws_cdk import aws_sqs as sqs
 from constructs import Construct
-from typing import Optional, Dict, Any
-from aws_cdk import (
-    aws_sqs as sqs,
-    aws_kms as kms,
-    RemovalPolicy,
-    Duration,
-    CfnOutput,
-    Stack,
-)
+
 from config import config
+
+
 @dataclass
 class SQSProps:
     queue_name: Optional[str] = None
@@ -39,13 +37,15 @@ class SQSConstruct(Construct):
 
         # Get the region from the stack
         stack = Stack.of(self)
-        region = stack.region
+        stack.region
 
         # Use provided props or create default props
         self.props = props or SQSProps()
 
         # Handle queue name for FIFO queues
-        queue_name = f"{config.resource_prefix}-{self.props.queue_name}-{config.environment}"
+        queue_name = (
+            f"{config.resource_prefix}-{self.props.queue_name}-{config.environment}"
+        )
         if self.props.fifo and queue_name and not queue_name.endswith(".fifo"):
             queue_name = f"{queue_name}.fifo"
 
@@ -64,7 +64,7 @@ class SQSConstruct(Construct):
         if self.props.dead_letter_queue:
             # Use an existing DLQ if provided
             dlq = self.props.dead_letter_queue.get("queue")
-        
+
         # If no DLQ provided but max_receive_count > 0, create a new DLQ
         if dlq is None and self.props.max_receive_count > 0:
             dlq_props = SQSProps(
@@ -76,7 +76,7 @@ class SQSConstruct(Construct):
                 removal_policy=self.props.removal_policy,
                 max_receive_count=0,
             )
-            
+
             dlq_construct = SQSConstruct(
                 self,
                 f"{construct_id}DLQ",
@@ -88,7 +88,8 @@ class SQSConstruct(Construct):
         queue_props = {
             "queue_name": queue_name,
             "fifo": self.props.fifo,
-            "content_based_deduplication": self.props.content_based_deduplication and self.props.fifo,
+            "content_based_deduplication": self.props.content_based_deduplication
+            and self.props.fifo,
             "visibility_timeout": self.props.visibility_timeout,
             "delivery_delay": self.props.delivery_delay,
             "receive_message_wait_time": self.props.receive_message_wait_time,
@@ -119,7 +120,7 @@ class SQSConstruct(Construct):
             value=self._queue.queue_url,
             export_name=f"{construct_id}QueueUrl",
         )
-        
+
         # Output queue ARN
         CfnOutput(
             self,
@@ -127,7 +128,7 @@ class SQSConstruct(Construct):
             value=self._queue.queue_arn,
             export_name=f"{construct_id}QueueArn",
         )
-        
+
         # Store the key for properties
         self._encryption_key = encryption_key
         self._dlq = dlq
@@ -135,23 +136,23 @@ class SQSConstruct(Construct):
     @property
     def queue(self) -> sqs.IQueue:
         return self._queue
-    
+
     @property
     def queue_url(self) -> str:
         return self._queue.queue_url
-    
+
     @property
     def queue_arn(self) -> str:
         return self._queue.queue_arn
-    
+
     @property
     def queue_name(self) -> str:
         return self._queue.queue_name
-    
+
     @property
     def encryption_key(self) -> Optional[kms.IKey]:
         return self._encryption_key
-    
+
     @property
     def dead_letter_queue(self) -> Optional[sqs.IQueue]:
         return self._dlq

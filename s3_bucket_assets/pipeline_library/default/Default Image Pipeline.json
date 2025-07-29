@@ -23,9 +23,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [
             {
               "name": "any",
@@ -67,9 +65,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "image"
-          ],
+          "inputTypes": ["image"],
           "outputTypes": [
             {
               "name": "any",
@@ -108,9 +104,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "image"
-          ],
+          "inputTypes": ["image"],
           "outputTypes": [
             {
               "name": "any",
@@ -149,9 +143,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "image"
-          ],
+          "inputTypes": ["image"],
           "outputTypes": [
             {
               "name": "metadata",
@@ -190,9 +182,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [],
           "type": "FLOW",
           "configuration": {

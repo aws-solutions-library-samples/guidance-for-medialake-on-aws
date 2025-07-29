@@ -1,8 +1,8 @@
 // src/api/types/assignment.types.ts
 
 export interface Assignment {
-  principalId: string;      // User ID or Group ID
-  principalType: 'USER' | 'GROUP';
+  principalId: string; // User ID or Group ID
+  principalType: "USER" | "GROUP";
   permissionSetId: string;
   assignedAt: string;
   assignedBy?: string;
@@ -22,7 +22,7 @@ export interface UserAssignmentListResponse {
       permissionSetName: string;
       assignedAt: string;
     }[];
-  }
+  };
 }
 
 export interface GroupAssignmentListResponse {
@@ -35,7 +35,7 @@ export interface GroupAssignmentListResponse {
       permissionSetName: string;
       assignedAt: string;
     }[];
-  }
+  };
 }
 
 export interface AssignmentResponse {
@@ -43,11 +43,11 @@ export interface AssignmentResponse {
   message: string;
   data: {
     principalId: string;
-    principalType: 'USER' | 'GROUP';
+    principalType: "USER" | "GROUP";
     assignments: {
       permissionSetId: string;
       permissionSetName: string;
       assignedAt: string;
     }[];
-  }
+  };
 }

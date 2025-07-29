@@ -1,18 +1,17 @@
 from dataclasses import dataclass
-from constructs import Construct
-from aws_cdk import (
-    Stack,
-    aws_s3 as s3,
-    aws_cloudfront as cloudfront,
-)
 
-from medialake_constructs.shared_constructs.s3_logging import (
-    add_s3_access_logging_policy,
-    enable_s3_server_access_logging,
-)
+from aws_cdk import Stack
+from aws_cdk import aws_cloudfront as cloudfront
+from aws_cdk import aws_s3 as s3
+from constructs import Construct
+
 from medialake_constructs.cloudfront_logging import (
     CloudFrontLogging,
     CloudFrontLoggingProps,
+)
+from medialake_constructs.shared_constructs.s3_logging import (
+    add_s3_access_logging_policy,
+    enable_s3_server_access_logging,
 )
 
 

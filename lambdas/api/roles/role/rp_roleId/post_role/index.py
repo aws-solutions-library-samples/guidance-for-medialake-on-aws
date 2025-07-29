@@ -1,12 +1,13 @@
-from aws_lambda_powertools import Logger, Tracer, Metrics
-from aws_lambda_powertools.event_handler import APIGatewayRestResolver
-from aws_lambda_powertools.logging import correlation_paths
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.metrics import MetricUnit
-from typing import Dict, Any
-import boto3
 import json
 import os
+from typing import Any, Dict
+
+import boto3
+from aws_lambda_powertools import Logger, Metrics, Tracer
+from aws_lambda_powertools.event_handler import APIGatewayRestResolver
+from aws_lambda_powertools.logging import correlation_paths
+from aws_lambda_powertools.metrics import MetricUnit
+from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
 
 # Initialize PowerTools

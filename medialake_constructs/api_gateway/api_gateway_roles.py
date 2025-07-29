@@ -11,25 +11,17 @@ and associated Lambda functions for managing media connectors. It handles:
 """
 
 from dataclasses import dataclass
-from constructs import Construct
-from aws_cdk import (
-    aws_apigateway as api_gateway,
-    aws_dynamodb as dynamodb,
-    aws_iam as iam,
-    aws_cognito as cognito,
-    aws_secretsmanager as secrets_manager,
-    Stack,
-)
-from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 
-from medialake_constructs.shared_constructs.lambda_base import (
-    Lambda,
-    LambdaConfig,
-)
-from medialake_constructs.shared_constructs.dynamodb import (
-    DynamoDB,
-    DynamoDBProps,
-)
+from aws_cdk import Stack
+from aws_cdk import aws_apigateway as api_gateway
+from aws_cdk import aws_cognito as cognito
+from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_secretsmanager as secrets_manager
+from constructs import Construct
+
+from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
+from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
+from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 
 @dataclass
@@ -55,7 +47,7 @@ class RolesApi(Construct):
         from config import config
 
         # Get the current account ID
-        account_id = Stack.of(self).account
+        Stack.of(self).account
 
         self._roles_table = DynamoDB(
             self,
@@ -90,7 +82,7 @@ class RolesApi(Construct):
                 },
             ),
         )
-        
+
         # Add CORS support
         add_cors_options_method(roles_resource)
         add_cors_options_method(roles_role_resource)

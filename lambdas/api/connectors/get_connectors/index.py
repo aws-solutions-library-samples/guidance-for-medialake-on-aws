@@ -1,12 +1,12 @@
-import os
-import boto3
-from botocore.exceptions import ClientError
 import json
+import os
+
+import boto3
 from aws_lambda_powertools import Logger, Tracer
-from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
+from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
+from aws_lambda_powertools.logging import correlation_paths
+from aws_lambda_powertools.utilities.typing import LambdaContext
 
 tracer = Tracer()
 logger = Logger()

@@ -7,15 +7,15 @@ import boto3
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.config import Config
-from lambda_middleware import lambda_middleware      # keep if still used
+from lambda_middleware import lambda_middleware  # keep if still used
 
 # ── Powertools / logging ────────────────────────────────────────────────────
 logger = Logger()
 tracer = Tracer()
 
 # ── Constants ──────────────────────────────────────────────────────────────
-URL_VALIDITY_DEFAULT = 3_600        # 1 h
-URL_VALIDITY_MAX     = 604_800      # 7 d
+URL_VALIDITY_DEFAULT = 3_600  # 1 h
+URL_VALIDITY_MAX = 604_800  # 7 d
 
 # Signature style & virtual-host addressing are required for every region
 _SIGV4_CFG = Config(
@@ -24,7 +24,7 @@ _SIGV4_CFG = Config(
 )
 
 _ENDPOINT_TMPL = "https://s3.{region}.amazonaws.com"
-_S3_CLIENT_CACHE: dict[str, boto3.client] = {}       # {region → client}
+_S3_CLIENT_CACHE: dict[str, boto3.client] = {}  # {region → client}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -39,8 +39,10 @@ def _get_s3_client_for_bucket(bucket: str) -> boto3.client:
     )
 
     try:
-        region = (generic.get_bucket_location(Bucket=bucket)
-                        .get("LocationConstraint") or "us-east-1")
+        region = (
+            generic.get_bucket_location(Bucket=bucket).get("LocationConstraint")
+            or "us-east-1"
+        )
     except generic.exceptions.NoSuchBucket:
         raise ValueError(f"S3 bucket {bucket!r} does not exist")
 
@@ -55,8 +57,7 @@ def _get_s3_client_for_bucket(bucket: str) -> boto3.client:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-def _pick_representation(assets: list[Dict[str, Any]]
-                          ) -> Tuple[str, str, str]:
+def _pick_representation(assets: list[Dict[str, Any]]) -> Tuple[str, str, str]:
     """
     Apply selection rules on the **first** asset only and return:
     (bucket, key, media_type)
@@ -108,7 +109,11 @@ def _extract_location(payload: Dict[str, Any]) -> Tuple[str, str, str]:
     # 2️⃣  Mapper output
     mapper_item = (payload.get("map") or {}).get("item", {})
     if mapper_item.get("bucket") and mapper_item.get("key"):
-        return mapper_item["bucket"], mapper_item["key"].lstrip("/"), mapper_item.get("mediaType", "")
+        return (
+            mapper_item["bucket"],
+            mapper_item["key"].lstrip("/"),
+            mapper_item.get("mediaType", ""),
+        )
 
     # 3️⃣  Legacy representation-selection
     return _pick_representation(payload.get("assets", []))
@@ -149,7 +154,10 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext):
 
         logger.info(
             "Generated URL for s3://%s/%s (region %s) valid %ss",
-            bucket, key, s3_client.meta.region_name, url_validity,
+            bucket,
+            key,
+            s3_client.meta.region_name,
+            url_validity,
         )
 
         return {

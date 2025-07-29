@@ -1,9 +1,10 @@
+from typing import Any, Dict
+
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
-from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import Metrics
-from typing import Dict, Any
+from aws_lambda_powertools.utilities.typing import LambdaContext
 
 # Initialize Powertools
 logger = Logger()
@@ -27,7 +28,7 @@ def update_review_status(review_id: str) -> Dict[str, Any]:
             "statusCode": 200,
             "body": {"message": "Status update acknowledged", "reviewId": review_id},
         }
-    except Exception as e:
+    except Exception:
         logger.exception("Error processing review status update")
         raise
 
@@ -41,6 +42,6 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
     """
     try:
         return app.resolve(event, context)
-    except Exception as e:
+    except Exception:
         logger.exception("Error in lambda handler")
         return {"statusCode": 500, "body": {"message": "Internal server error"}}
