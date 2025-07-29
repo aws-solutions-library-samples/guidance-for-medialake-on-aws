@@ -99,12 +99,12 @@ export const test = base.extend<S3Fixtures>({
       // 3. Shared credentials file (~/.aws/credentials)
       // 4. Shared config file (~/.aws/config)
       // 5. IAM role (if running on EC2/ECS/etc.)
-      // To use 'medialake-dev4', run tests like:
-      // AWS_PROFILE=medialake-dev4 npx playwright test
+      // To use a specific profile, run tests like:
+      // AWS_PROFILE=your-profile npx playwright test
       const s3Client = new S3Client({ region: AWS_REGION });
 
       // Alternatively, force a profile (less flexible):
-      // const credentials = fromIni({ profile: 'medialake-dev4' });
+      // const credentials = fromIni({ profile: 'your-profile' });
       // const s3Client = new S3Client({ region: AWS_REGION, credentials });
 
       try {
