@@ -382,9 +382,10 @@ sync-to-github:
     - ssh-keyscan github.com >> ~/.ssh/known_hosts
     - git config --global user.email "medialake@amazon.com"
     - git config --global user.name "Media Lake CI"
-    # Capture subject of the latest non-merge commit on the release branch
-    - "export RELEASE_COMMIT_MESSAGE=$(git log -1 --no-merges --pretty=format:%s)"
-    - 'echo "Using commit message: $RELEASE_COMMIT_MESSAGE"'
+    # Capture subject and author of the latest commit on the release branch
+    - "export RELEASE_COMMIT_MESSAGE=$(git log -1 --pretty=format:%s)"
+    - "export RELEASE_COMMIT_AUTHOR='$(git log -1 --pretty=format:%an <%ae>)'"
+    - 'echo "Using commit message: $RELEASE_COMMIT_MESSAGE by $RELEASE_COMMIT_AUTHOR"'
     # Clone GitHub repository to maintain its git history
     - "git clone git@github.com:aws-solutions-library-samples/guidance-for-medialake-on-aws.git github-repo"
     - cd github-repo
