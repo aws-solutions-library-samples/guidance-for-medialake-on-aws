@@ -1,7 +1,7 @@
 // src/permissions/utils/global-permission-cache.ts
 
-import { User } from '../types/permission.types';
-import { AppAbility, createAppAbility } from '../types/ability.types';
+import { User } from "../types/permission.types";
+import { AppAbility, createAppAbility } from "../types/ability.types";
 
 interface SerializedAbility {
   rules: any[];
@@ -29,14 +29,14 @@ interface PermissionCheckCache {
  * This cache is only updated when tokens are refreshed, not on every component mount
  */
 class GlobalPermissionCache {
-  private static CACHE_KEY = 'medialake_global_permission_cache';
-  private static CHECK_CACHE_KEY = 'medialake_permission_checks';
+  private static CACHE_KEY = "medialake_global_permission_cache";
+  private static CHECK_CACHE_KEY = "medialake_permission_checks";
   private static instance: GlobalPermissionCache;
-  
+
   private memoryCache: GlobalCacheData | null = null;
   private checkCache: PermissionCheckCache = {};
   private readonly TTL = 5 * 60 * 1000; // 5 minutes for permission checks
-  
+
   constructor() {
     // Load existing cache from localStorage on initialization
     this.loadFromStorage();
@@ -58,7 +58,7 @@ class GlobalPermissionCache {
     ability: AppAbility,
     permissionSets: any[],
     token: string,
-    expiresIn: number
+    expiresIn: number,
   ): void {
     const serializedAbility = this.serializeAbility(ability);
     const cacheData: GlobalCacheData = {
@@ -67,18 +67,24 @@ class GlobalPermissionCache {
       ability: serializedAbility,
       permissionSets,
       token,
-      expiresAt: Date.now() + (expiresIn * 1000),
-      lastUpdated: Date.now()
+      expiresAt: Date.now() + expiresIn * 1000,
+      lastUpdated: Date.now(),
     };
 
     this.memoryCache = cacheData;
-    
+
     try {
       // Store in localStorage for persistence across page reloads
-      localStorage.setItem(GlobalPermissionCache.CACHE_KEY, JSON.stringify(cacheData));
-      console.log('Global permission cache updated, expires at:', new Date(cacheData.expiresAt).toISOString());
+      localStorage.setItem(
+        GlobalPermissionCache.CACHE_KEY,
+        JSON.stringify(cacheData),
+      );
+      console.log(
+        "Global permission cache updated, expires at:",
+        new Date(cacheData.expiresAt).toISOString(),
+      );
     } catch (error) {
-      console.error('Failed to store global permission cache:', error);
+      console.error("Failed to store global permission cache:", error);
     }
   }
 
@@ -98,7 +104,7 @@ class GlobalPermissionCache {
     if (this.memoryCache && this.isValidCache(this.memoryCache, currentToken)) {
       return {
         ...this.memoryCache,
-        ability: this.deserializeAbility(this.memoryCache.ability)
+        ability: this.deserializeAbility(this.memoryCache.ability),
       };
     }
 
@@ -108,17 +114,17 @@ class GlobalPermissionCache {
       if (!stored) return null;
 
       const cacheData: GlobalCacheData = JSON.parse(stored);
-      
+
       if (this.isValidCache(cacheData, currentToken)) {
         // Restore to memory cache
         this.memoryCache = cacheData;
         return {
           ...cacheData,
-          ability: this.deserializeAbility(cacheData.ability)
+          ability: this.deserializeAbility(cacheData.ability),
         };
       }
     } catch (error) {
-      console.error('Failed to read global permission cache:', error);
+      console.error("Failed to read global permission cache:", error);
     }
 
     return null;
@@ -146,7 +152,7 @@ class GlobalPermissionCache {
   setPermissionCheck(cacheKey: string, result: boolean): void {
     this.checkCache[cacheKey] = {
       result,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
 
     // Clean up old entries periodically
@@ -167,13 +173,13 @@ class GlobalPermissionCache {
   clear(): void {
     this.memoryCache = null;
     this.checkCache = {};
-    
+
     try {
       localStorage.removeItem(GlobalPermissionCache.CACHE_KEY);
       localStorage.removeItem(GlobalPermissionCache.CHECK_CACHE_KEY);
-      console.log('Global permission cache cleared');
+      console.log("Global permission cache cleared");
     } catch (error) {
-      console.error('Failed to clear global permission cache:', error);
+      console.error("Failed to clear global permission cache:", error);
     }
   }
 
@@ -183,14 +189,17 @@ class GlobalPermissionCache {
   updateToken(newToken: string, expiresIn: number): void {
     if (this.memoryCache) {
       this.memoryCache.token = newToken;
-      this.memoryCache.expiresAt = Date.now() + (expiresIn * 1000);
+      this.memoryCache.expiresAt = Date.now() + expiresIn * 1000;
       this.memoryCache.lastUpdated = Date.now();
 
       try {
-        localStorage.setItem(GlobalPermissionCache.CACHE_KEY, JSON.stringify(this.memoryCache));
-        console.log('Token updated in global cache');
+        localStorage.setItem(
+          GlobalPermissionCache.CACHE_KEY,
+          JSON.stringify(this.memoryCache),
+        );
+        console.log("Token updated in global cache");
       } catch (error) {
-        console.error('Failed to update token in cache:', error);
+        console.error("Failed to update token in cache:", error);
       }
     }
   }
@@ -209,20 +218,20 @@ class GlobalPermissionCache {
       hasGlobalCache: cache !== null,
       cacheAge: cache ? Date.now() - cache.lastUpdated : null,
       expiresIn: cache ? cache.expiresAt - Date.now() : null,
-      permissionChecksCount: Object.keys(this.checkCache).length
+      permissionChecksCount: Object.keys(this.checkCache).length,
     };
   }
 
   private isValidCache(cache: GlobalCacheData, currentToken: string): boolean {
     // Check if cache is expired
     if (Date.now() >= cache.expiresAt) {
-      console.log('Global permission cache expired');
+      console.log("Global permission cache expired");
       return false;
     }
 
     // Check if token matches
     if (cache.token !== currentToken) {
-      console.log('Token mismatch in global cache');
+      console.log("Token mismatch in global cache");
       return false;
     }
 
@@ -240,12 +249,14 @@ class GlobalPermissionCache {
         }
       }
 
-      const checkCache = localStorage.getItem(GlobalPermissionCache.CHECK_CACHE_KEY);
+      const checkCache = localStorage.getItem(
+        GlobalPermissionCache.CHECK_CACHE_KEY,
+      );
       if (checkCache) {
         this.checkCache = JSON.parse(checkCache);
       }
     } catch (error) {
-      console.error('Failed to load cache from storage:', error);
+      console.error("Failed to load cache from storage:", error);
     }
   }
 
@@ -259,13 +270,16 @@ class GlobalPermissionCache {
       }
     }
 
-    keysToDelete.forEach(key => delete this.checkCache[key]);
+    keysToDelete.forEach((key) => delete this.checkCache[key]);
 
     // Persist cleaned cache
     try {
-      localStorage.setItem(GlobalPermissionCache.CHECK_CACHE_KEY, JSON.stringify(this.checkCache));
+      localStorage.setItem(
+        GlobalPermissionCache.CHECK_CACHE_KEY,
+        JSON.stringify(this.checkCache),
+      );
     } catch (error) {
-      console.error('Failed to persist permission check cache:', error);
+      console.error("Failed to persist permission check cache:", error);
     }
   }
 
@@ -280,12 +294,12 @@ class GlobalPermissionCache {
   private deserializeAbility(serializedAbility: SerializedAbility): AppAbility {
     // Recreate ability from serialized format
     const ability = createAppAbility();
-    
+
     // Restore the rules
     if (serializedAbility && serializedAbility.rules) {
       ability.update(serializedAbility.rules);
     }
-    
+
     return ability;
   }
 }

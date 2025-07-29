@@ -54,8 +54,8 @@ node:
               actions:
                 - kms:GenerateDataKey
               resources:
-                - '*'
-                
+                - "*"
+
 actions:
   extract:
     summary: Create a video proxy and thumbnail

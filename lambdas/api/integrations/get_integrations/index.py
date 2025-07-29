@@ -1,8 +1,8 @@
 import json
 import os
+from typing import Dict
+
 import boto3
-from typing import Dict, List
-from datetime import datetime
 
 dynamodb = boto3.resource("dynamodb")
 integrations_table = dynamodb.Table(os.environ["INTEGRATIONS_TABLE"])
@@ -10,17 +10,23 @@ pipelines_nodes_table = dynamodb.Table(os.environ["PIPELINES_NODES_TABLE"])
 
 
 def format_integration(item: Dict) -> Dict:
-    node_name = item.get("Node", "").replace("node-", "").replace("-", " ").replace("_", " ").title()
+    # Use the stored Name field if available, otherwise generate from nodeId
+    stored_name = item.get("Name", "")
+    if not stored_name:
+        # Generate name from nodeId by replacing underscores with spaces and title-casing
+        # Use the actual nodeId value as provided (e.g., "twelve_labs" -> "Twelve Labs")
+        stored_name = item.get("Node", "").replace("_", " ").title()
 
     return {
         "id": item.get("ID", ""),
-        "name": node_name,
+        "name": stored_name,
+        "nodeId": item.get("Node", ""),
         "type": item.get("Type", ""),
         "status": item.get("Status", ""),
         "description": item.get("Description", ""),
         "configuration": item.get("Configuration", {}),
-        "createdAt": item.get("CreatedDate", datetime.utcnow().isoformat()),
-        "updatedAt": item.get("ModifiedDate", datetime.utcnow().isoformat()),
+        "createdAt": item.get("CreatedDate", ""),
+        "updatedAt": item.get("ModifiedDate", ""),
     }
 
 

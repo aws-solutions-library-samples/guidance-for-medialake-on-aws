@@ -1,8 +1,9 @@
-import boto3
-import os
 import json
+import os
 import subprocess
 import tempfile
+
+import boto3
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
@@ -71,30 +72,32 @@ def lambda_handler(event, context: LambdaContext):
         s3 = boto3.client("s3")
 
         # Create temporary files for processing
-        with tempfile.NamedTemporaryFile(suffix=".mp3") as temp_input_file, \
-             tempfile.NamedTemporaryFile(suffix=".png") as temp_output_file:
-            
+        with tempfile.NamedTemporaryFile(
+            suffix=".mp3"
+        ) as temp_input_file, tempfile.NamedTemporaryFile(
+            suffix=".png"
+        ) as temp_output_file:
+
             # Download the audio file
             logger.info(f"Downloading audio file from s3://{bucket}/{key}")
             s3.download_file(bucket, key, temp_input_file.name)
-            
+
             # Generate the waveform thumbnail
-            logger.info(f"Generating waveform thumbnail with dimensions {width}x{height}")
-            generate_waveform_thumbnail(
-                temp_input_file.name, 
-                temp_output_file.name,
-                width=width,
-                height=height
+            logger.info(
+                f"Generating waveform thumbnail with dimensions {width}x{height}"
             )
-            
+            generate_waveform_thumbnail(
+                temp_input_file.name, temp_output_file.name, width=width, height=height
+            )
+
             # Upload the thumbnail to S3
             output_key = f"{bucket}/{key.rsplit('.', 1)[0]}_waveform.png"
             logger.info(f"Uploading thumbnail to s3://{output_bucket}/{output_key}")
             s3.upload_file(
-                temp_output_file.name, 
-                output_bucket, 
+                temp_output_file.name,
+                output_bucket,
                 output_key,
-                ExtraArgs={"ContentType": "image/png"}
+                ExtraArgs={"ContentType": "image/png"},
             )
 
         # Create a new representation for the thumbnail
@@ -120,38 +123,56 @@ def lambda_handler(event, context: LambdaContext):
         try:
             logger.info(
                 "Attempting DynamoDB update",
-                extra={"inventory_id": clean_inventory_id, "new_representation": new_representation},
+                extra={
+                    "inventory_id": clean_inventory_id,
+                    "new_representation": new_representation,
+                },
             )
             response = table.update_item(
                 Key={"InventoryID": clean_inventory_id},
                 UpdateExpression="SET #dr = list_append(if_not_exists(#dr, :empty_list), :new_rep)",
                 ExpressionAttributeNames={"#dr": "DerivedRepresentations"},
-                ExpressionAttributeValues={":new_rep": [new_representation], ":empty_list": []},
+                ExpressionAttributeValues={
+                    ":new_rep": [new_representation],
+                    ":empty_list": [],
+                },
                 ReturnValues="UPDATED_NEW",
             )
-            logger.info("DynamoDB update response", extra={"response": response, "inventory_id": clean_inventory_id})
+            logger.info(
+                "DynamoDB update response",
+                extra={"response": response, "inventory_id": clean_inventory_id},
+            )
         except Exception as e:
-            logger.exception("Error updating DynamoDB", extra={"inventory_id": clean_inventory_id, "error": str(e), "error_type": type(e).__name__})
+            logger.exception(
+                "Error updating DynamoDB",
+                extra={
+                    "inventory_id": clean_inventory_id,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                },
+            )
             raise
 
         return {
             "statusCode": 200,
-            "body": json.dumps({
-                "ID": thumbnail_asset_id,
-                "type": "image",
-                "format": "PNG",
-                "Purpose": "waveform",
-                "StorageInfo": {
-                    "PrimaryLocation": {
-                        "StorageType": "s3",
-                        "Bucket": output_bucket,
-                        "path": output_key,
-                        "status": "active",
-                        "ObjectKey": {"FullPath": output_key},
-                    }
-                },
-                "location": {"bucket": output_bucket, "key": output_key},
-            }),
+            "body": json.dumps(
+                {
+                    "ID": thumbnail_asset_id,
+                    "type": "image",
+                    "format": "PNG",
+                    "Purpose": "waveform",
+                    "StorageInfo": {
+                        "PrimaryLocation": {
+                            "StorageType": "s3",
+                            "Bucket": output_bucket,
+                            "path": output_key,
+                            "status": "active",
+                            "ObjectKey": {"FullPath": output_key},
+                        }
+                    },
+                    "location": {"bucket": output_bucket, "key": output_key},
+                }
+            ),
         }
 
     except Exception as e:

@@ -1,6 +1,10 @@
-import { useState, useEffect } from 'react';
-import { formatLocalDateTime, formatRelativeTime, isValidISOString } from '../utils/dateUtils';
-import { useTimezone } from '../../contexts/TimezoneContext';
+import { useState, useEffect } from "react";
+import {
+  formatLocalDateTime,
+  formatRelativeTime,
+  isValidISOString,
+} from "../utils/dateUtils";
+import { useTimezone } from "../../contexts/TimezoneContext";
 
 interface DateFormatOptions {
   showRelative?: boolean;
@@ -11,13 +15,13 @@ interface DateFormatOptions {
 
 export const useDateFormat = (
   isoString: string | undefined,
-  options: DateFormatOptions = {}
+  options: DateFormatOptions = {},
 ) => {
   const {
     showRelative = true,
     showSeconds: initialShowSeconds = false,
     allowSecondsToggle = true,
-    updateInterval = 60000
+    updateInterval = 60000,
   } = options;
 
   // Get timezone from context if available, fallback to browser timezone
@@ -31,11 +35,11 @@ export const useDateFormat = (
   }
 
   const [showSeconds, setShowSeconds] = useState(initialShowSeconds);
-  const [formattedDate, setFormattedDate] = useState<string>('');
+  const [formattedDate, setFormattedDate] = useState<string>("");
 
   useEffect(() => {
     if (!isoString || !isValidISOString(isoString)) {
-      setFormattedDate('Invalid date');
+      setFormattedDate("Invalid date");
       return;
     }
 
@@ -62,16 +66,18 @@ export const useDateFormat = (
 
   const toggleSeconds = () => {
     if (allowSecondsToggle) {
-      setShowSeconds(prev => !prev);
+      setShowSeconds((prev) => !prev);
     }
   };
 
   return {
     formattedDate,
-    absoluteDate: isoString ? formatLocalDateTime(isoString, { showSeconds }) : 'Invalid date',
-    relativeDate: isoString ? formatRelativeTime(isoString) : 'Invalid date',
+    absoluteDate: isoString
+      ? formatLocalDateTime(isoString, { showSeconds })
+      : "Invalid date",
+    relativeDate: isoString ? formatRelativeTime(isoString) : "Invalid date",
     showSeconds,
     toggleSeconds,
-    canToggleSeconds: allowSecondsToggle
+    canToggleSeconds: allowSecondsToggle,
   };
-}; 
+};

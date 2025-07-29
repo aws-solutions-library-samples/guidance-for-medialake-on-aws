@@ -1,22 +1,16 @@
-import os
-import boto3
-import os
 import json
-import logging
+import os
 from datetime import datetime
-from typing import Dict, Any, Optional
-from aws_lambda_powertools.event_handler import APIGatewayRestResolver
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.logging import correlation_paths
-from aws_lambda_powertools.metrics import MetricUnit
-from botocore.exceptions import ClientError
-from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools.logging import correlation_paths
-from aws_lambda_powertools.metrics import MetricUnit
-from aws_lambda_powertools.event_handler.api_gateway import Response
-from botocore.exceptions import ClientError
+from typing import Any, Dict, Optional
 
+import boto3
+from aws_lambda_powertools import Logger, Metrics, Tracer
+from aws_lambda_powertools.event_handler import APIGatewayRestResolver
+from aws_lambda_powertools.event_handler.api_gateway import Response
+from aws_lambda_powertools.logging import correlation_paths
+from aws_lambda_powertools.metrics import MetricUnit
+from aws_lambda_powertools.utilities.typing import LambdaContext
+from botocore.exceptions import ClientError
 
 app = APIGatewayRestResolver()
 dynamodb = boto3.resource("dynamodb")

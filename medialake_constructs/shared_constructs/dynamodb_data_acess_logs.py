@@ -1,17 +1,13 @@
 import json
 import logging
-from aws_cdk import (
-    aws_cloudtrail as cloudtrail,
-    aws_s3 as s3,
-    aws_iam as iam,
-    Stack,
-    RemovalPolicy,
-    Aws,
-    CustomResource,
-    custom_resources as cr,
-)
-from constructs import Construct
 from dataclasses import dataclass
+
+from aws_cdk import Aws, RemovalPolicy
+from aws_cdk import aws_cloudtrail as cloudtrail
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_s3 as s3
+from aws_cdk import custom_resources as cr
+from constructs import Construct
 
 # Configure logging
 logger = logging.getLogger(__name__)

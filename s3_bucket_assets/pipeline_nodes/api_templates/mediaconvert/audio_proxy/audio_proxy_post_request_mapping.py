@@ -14,8 +14,7 @@ def translate_event_to_request(event):
 
         # Pull out bucket/key
         primary_loc = (
-            dsa
-            .get("MainRepresentation", {})
+            dsa.get("MainRepresentation", {})
             .get("StorageInfo", {})
             .get("PrimaryLocation", {})
         )
@@ -39,14 +38,14 @@ def translate_event_to_request(event):
         )
 
         return {
-            "input_bucket":          input_bucket,
-            "input_key":             input_key,
-            "output_bucket":         output_bucket,
-            "output_key":            output_key,
+            "input_bucket": input_bucket,
+            "input_key": input_key,
+            "output_bucket": output_bucket,
+            "output_key": output_key,
             "mediaconvert_role_arn": mediaconvert_role_arn,
-            "mediaconvert_queue_arn":mediaconvert_queue_arn,
-            "inventory_id":          inventory_id,
-            "asset_id":              asset_id,
+            "mediaconvert_queue_arn": mediaconvert_queue_arn,
+            "inventory_id": inventory_id,
+            "asset_id": asset_id,
         }
 
     except Exception as e:
@@ -55,5 +54,5 @@ def translate_event_to_request(event):
 
 def clean_asset_id(input_string: str) -> str:
     parts = input_string.split(":")
-    uuid  = parts[-1] if parts[-1] != "master" else parts[-2]
+    uuid = parts[-1] if parts[-1] != "master" else parts[-2]
     return f"asset:uuid:{uuid}"

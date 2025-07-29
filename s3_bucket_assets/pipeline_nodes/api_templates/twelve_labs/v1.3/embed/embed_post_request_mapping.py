@@ -15,6 +15,7 @@ event = {
 Anything else is considered invalid and triggers a hard failure.
 """
 
+
 def _digital_asset_type(event: dict) -> str:
     """
     Return payload.assets[0].DigitalSourceAsset.Type, lower-cased.
@@ -22,24 +23,14 @@ def _digital_asset_type(event: dict) -> str:
     Raises KeyError if the path is missing so the caller can fail loudly.
     """
     try:
-        return (
-            event["payload"]["assets"][0]
-                 ["DigitalSourceAsset"]["Type"]
-                 .lower()
-        )
+        return event["payload"]["assets"][0]["DigitalSourceAsset"]["Type"].lower()
     except (KeyError, IndexError, TypeError) as exc:
-        raise KeyError(
-            "DigitalSourceAsset.Type missing in payload.assets[0]"
-        ) from exc
+        raise KeyError("DigitalSourceAsset.Type missing in payload.assets[0]") from exc
 
 
 def translate_event_to_request(event: dict) -> dict:
     # ── presigned URL ────────────────────────────────────────────────────────
-    url = (
-        event.get("payload", {})
-             .get("data", {})
-             .get("presignedUrl")
-    )
+    url = event.get("payload", {}).get("data", {}).get("presignedUrl")
     if not url:
         raise KeyError("presignedUrl missing in event.payload.data")
 

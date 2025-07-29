@@ -17,4 +17,3 @@ actions:
     connections:
       incoming:
         type: [any]
-

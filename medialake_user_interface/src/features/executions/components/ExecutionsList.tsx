@@ -1,5 +1,8 @@
-import { formatLocalDateTime, formatRelativeTime } from '@/shared/utils/dateUtils';
-import type { PipelineExecution } from '../types/pipelineExecutions.types';
+import {
+  formatLocalDateTime,
+  formatRelativeTime,
+} from "@/shared/utils/dateUtils";
+import type { PipelineExecution } from "../types/pipelineExecutions.types";
 
 interface ExecutionsListProps {
   executions: PipelineExecution[];
@@ -8,7 +11,7 @@ interface ExecutionsListProps {
 const ExecutionsList: React.FC<ExecutionsListProps> = ({ executions }) => {
   return (
     <div className="space-y-4">
-      {executions.map(execution => (
+      {executions.map((execution) => (
         <div key={execution.execution_id} className="p-4 border rounded-lg">
           <div className="flex flex-col space-y-2">
             <div className="flex items-center space-x-2">
@@ -29,12 +32,17 @@ const ExecutionsList: React.FC<ExecutionsListProps> = ({ executions }) => {
             )}
             <div className="flex items-center space-x-2">
               <span className="font-semibold">Status:</span>
-              <span className={`px-2 py-1 rounded ${
-                execution.status === 'SUCCEEDED' ? 'bg-green-100 text-green-800' :
-                execution.status === 'FAILED' ? 'bg-red-100 text-red-800' :
-                execution.status === 'RUNNING' ? 'bg-blue-100 text-blue-800' :
-                'bg-gray-100 text-gray-800'
-              }`}>
+              <span
+                className={`px-2 py-1 rounded ${
+                  execution.status === "SUCCEEDED"
+                    ? "bg-green-100 text-green-800"
+                    : execution.status === "FAILED"
+                      ? "bg-red-100 text-red-800"
+                      : execution.status === "RUNNING"
+                        ? "bg-blue-100 text-blue-800"
+                        : "bg-gray-100 text-gray-800"
+                }`}
+              >
                 {execution.status}
               </span>
             </div>
@@ -48,4 +56,4 @@ const ExecutionsList: React.FC<ExecutionsListProps> = ({ executions }) => {
   );
 };
 
-export default ExecutionsList; 
+export default ExecutionsList;

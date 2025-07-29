@@ -1,9 +1,10 @@
-import os
 import json
+import os
 import time
-import boto3
 import urllib.request
-from typing import Dict, Any
+from typing import Any, Dict
+
+import boto3
 from botocore.exceptions import ClientError
 
 

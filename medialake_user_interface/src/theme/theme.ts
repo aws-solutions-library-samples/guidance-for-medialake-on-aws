@@ -1,18 +1,30 @@
-import { createTheme, Theme } from '@mui/material/styles';
-import { colorTokens, componentTokens, typography } from './tokens';
-import { alpha } from '@mui/material/styles';
+import { createTheme, Theme } from "@mui/material/styles";
+import { colorTokens, componentTokens, typography } from "./tokens";
+import { alpha } from "@mui/material/styles";
 
-export const createUnifiedTheme = (mode: 'light' | 'dark'): Theme => {
+export const createUnifiedTheme = (mode: "light" | "dark"): Theme => {
   return createTheme({
     palette: {
       mode,
       background: {
-        default: mode === 'light' ? colorTokens.background.default.light : colorTokens.background.default.dark,
-        paper: mode === 'light' ? colorTokens.background.paper.light : colorTokens.background.paper.dark,
+        default:
+          mode === "light"
+            ? colorTokens.background.default.light
+            : colorTokens.background.default.dark,
+        paper:
+          mode === "light"
+            ? colorTokens.background.paper.light
+            : colorTokens.background.paper.dark,
       },
       text: {
-        primary: mode === 'light' ? colorTokens.text.primary.light : colorTokens.text.primary.dark,
-        secondary: mode === 'light' ? colorTokens.text.secondary.light : colorTokens.text.secondary.dark,
+        primary:
+          mode === "light"
+            ? colorTokens.text.primary.light
+            : colorTokens.text.primary.dark,
+        secondary:
+          mode === "light"
+            ? colorTokens.text.secondary.light
+            : colorTokens.text.secondary.dark,
       },
       primary: colorTokens.primary,
       secondary: colorTokens.secondary,
@@ -21,34 +33,44 @@ export const createUnifiedTheme = (mode: 'light' | 'dark'): Theme => {
       success: colorTokens.success,
       info: colorTokens.info,
       action: {
-        active: mode === 'light' ? colorTokens.action.active.light : colorTokens.action.active.dark,
-        hover: mode === 'light' ? colorTokens.action.hover.light : colorTokens.action.hover.dark,
+        active:
+          mode === "light"
+            ? colorTokens.action.active.light
+            : colorTokens.action.active.dark,
+        hover:
+          mode === "light"
+            ? colorTokens.action.hover.light
+            : colorTokens.action.hover.dark,
       },
     },
     typography: {
       fontFamily: typography.fontFamily,
       allVariants: {
-        color: mode === 'light' ? typography.colors.primary.light : typography.colors.primary.dark,
+        color:
+          mode === "light"
+            ? typography.colors.primary.light
+            : typography.colors.primary.dark,
       },
     },
     components: {
       MuiCssBaseline: {
         styleOverrides: {
           body: {
-            scrollbarColor: mode === 'dark' ? '#6b6b6b transparent' : '#959595 transparent',
-            '&::-webkit-scrollbar': {
-              width: '8px',
-              height: '8px',
+            scrollbarColor:
+              mode === "dark" ? "#6b6b6b transparent" : "#959595 transparent",
+            "&::-webkit-scrollbar": {
+              width: "8px",
+              height: "8px",
             },
-            '&::-webkit-scrollbar-track': {
-              background: 'transparent',
+            "&::-webkit-scrollbar-track": {
+              background: "transparent",
             },
-            '&::-webkit-scrollbar-thumb': {
-              background: mode === 'dark' ? '#6b6b6b' : '#959595',
-              borderRadius: '4px',
+            "&::-webkit-scrollbar-thumb": {
+              background: mode === "dark" ? "#6b6b6b" : "#959595",
+              borderRadius: "4px",
             },
-            '&::-webkit-scrollbar-thumb:hover': {
-              background: mode === 'dark' ? '#7b7b7b' : '#858585',
+            "&::-webkit-scrollbar-thumb:hover": {
+              background: mode === "dark" ? "#7b7b7b" : "#858585",
             },
           },
         },
@@ -56,22 +78,22 @@ export const createUnifiedTheme = (mode: 'light' | 'dark'): Theme => {
       MuiButton: {
         styleOverrides: {
           root: {
-            textTransform: 'none',
+            textTransform: "none",
             fontWeight: 500,
-            borderRadius: '4px',
+            borderRadius: "4px",
           },
           contained: ({ theme }) => ({
             backgroundColor: theme.palette.primary.main,
             color: theme.palette.primary.contrastText,
-            '&:hover': {
+            "&:hover": {
               backgroundColor: theme.palette.primary.dark,
-              filter: 'brightness(110%)',
+              filter: "brightness(110%)",
             },
-            '&:active': {
+            "&:active": {
               backgroundColor: theme.palette.primary.dark,
-              filter: 'brightness(90%)',
+              filter: "brightness(90%)",
             },
-            '&.Mui-disabled': {
+            "&.Mui-disabled": {
               backgroundColor: alpha(theme.palette.primary.main, 0.4),
               color: theme.palette.primary.contrastText,
             },
@@ -79,7 +101,7 @@ export const createUnifiedTheme = (mode: 'light' | 'dark'): Theme => {
           outlined: ({ theme }) => ({
             borderColor: theme.palette.primary.main,
             color: theme.palette.primary.main,
-            '&:hover': {
+            "&:hover": {
               backgroundColor: alpha(theme.palette.primary.main, 0.08),
             },
           }),
@@ -88,13 +110,14 @@ export const createUnifiedTheme = (mode: 'light' | 'dark'): Theme => {
       MuiTableCell: {
         styleOverrides: {
           root: ({ theme }) => ({
-            backgroundColor: 'transparent',
+            backgroundColor: "transparent",
             borderColor: alpha(theme.palette.divider, 0.1),
           }),
           head: ({ theme }) => ({
-            backgroundColor: mode === 'dark'
-              ? alpha(colorTokens.background.default.dark, 0.3)
-              : alpha(colorTokens.background.default.light, 0.6),
+            backgroundColor:
+              mode === "dark"
+                ? alpha(colorTokens.background.default.dark, 0.3)
+                : alpha(colorTokens.background.default.light, 0.6),
             fontWeight: 600,
           }),
         },
@@ -102,12 +125,12 @@ export const createUnifiedTheme = (mode: 'light' | 'dark'): Theme => {
       MuiTableRow: {
         styleOverrides: {
           root: ({ theme }) => ({
-            backgroundColor: 'transparent',
-            '&:hover': {
+            backgroundColor: "transparent",
+            "&:hover": {
               backgroundColor: alpha(theme.palette.primary.main, 0.05),
             },
-            '& .MuiTableCell-root': {
-              backgroundColor: 'transparent',
+            "& .MuiTableCell-root": {
+              backgroundColor: "transparent",
             },
           }),
         },
@@ -115,7 +138,7 @@ export const createUnifiedTheme = (mode: 'light' | 'dark'): Theme => {
       MuiPaper: {
         styleOverrides: {
           root: ({ theme }) => ({
-            backgroundImage: 'none',
+            backgroundImage: "none",
             backgroundColor: theme.palette.background.paper,
           }),
         },
@@ -126,7 +149,7 @@ export const createUnifiedTheme = (mode: 'light' | 'dark'): Theme => {
 
 // Amplify UI theme override using the same tokens
 export const amplifyTheme = {
-  name: 'mediaLakeTheme',
+  name: "mediaLakeTheme",
   tokens: {
     colors: {
       background: {
@@ -137,8 +160,8 @@ export const amplifyTheme = {
         interactive: colorTokens.text.primary.dark,
       },
       border: {
-        primary: 'rgba(255, 255, 255, 0.3)',
-        secondary: 'rgba(255, 255, 255, 0.2)',
+        primary: "rgba(255, 255, 255, 0.3)",
+        secondary: "rgba(255, 255, 255, 0.2)",
       },
     },
     components: {

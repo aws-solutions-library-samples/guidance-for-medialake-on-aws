@@ -1,10 +1,13 @@
 // src/permissions/examples/integration-example.tsx
-import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { PermissionProvider } from '../context/permission-context';
-import { Can } from '../components/Can';
-import { PermissionGuard, RoutePermissionGuard } from '../components/PermissionGuard';
-import { usePermission } from '../hooks/usePermission';
+import React from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { PermissionProvider } from "../context/permission-context";
+import { Can } from "../components/Can";
+import {
+  PermissionGuard,
+  RoutePermissionGuard,
+} from "../components/PermissionGuard";
+import { usePermission } from "../hooks/usePermission";
 
 /**
  * Example component showing how to use the Can component for conditional rendering
@@ -16,18 +19,20 @@ function AssetActions({ asset }: { asset: any }) {
       <Can I="view" a="asset" subject={asset}>
         <button>View Details</button>
       </Can>
-      
+
       {/* Show Edit button only if user has 'edit' permission on 'asset' */}
       <Can I="edit" a="asset" subject={asset}>
         <button>Edit</button>
       </Can>
-      
+
       {/* Show Delete button but disable it if user doesn't have 'delete' permission */}
       <Can I="delete" a="asset" subject={asset} passThrough>
         {(allowed) => (
-          <button 
+          <button
             disabled={!allowed}
-            title={!allowed ? "You don't have permission to delete this asset" : ""}
+            title={
+              !allowed ? "You don't have permission to delete this asset" : ""
+            }
           >
             Delete
           </button>
@@ -42,18 +47,16 @@ function AssetActions({ asset }: { asset: any }) {
  */
 function AssetHeader({ asset }: { asset: any }) {
   const { can } = usePermission();
-  
+
   // Check if user can share the asset
-  const canShare = can('share', 'asset', asset);
-  
+  const canShare = can("share", "asset", asset);
+
   return (
     <div className="asset-header">
       <h1>{asset.name}</h1>
-      
+
       {/* Conditionally render share button based on permissions */}
-      {canShare && (
-        <button>Share</button>
-      )}
+      {canShare && <button>Share</button>}
     </div>
   );
 }
@@ -65,7 +68,7 @@ function SettingsPage() {
   return (
     <div className="settings-page">
       <h1>Settings</h1>
-      
+
       {/* Only show user management section if user has 'manage' permission on 'user' */}
       <PermissionGuard action="manage" subject="user">
         <div className="settings-section">
@@ -73,7 +76,7 @@ function SettingsPage() {
           <p>Manage users and permissions</p>
         </div>
       </PermissionGuard>
-      
+
       {/* Only show group management section if user has 'manage' permission on 'group' */}
       <PermissionGuard action="manage" subject="group">
         <div className="settings-section">
@@ -94,28 +97,28 @@ function AppRoutes() {
       {/* Public routes */}
       <Route path="/" element={<div>Home Page</div>} />
       <Route path="/login" element={<div>Login Page</div>} />
-      
+
       {/* Protected routes using RoutePermissionGuard */}
-      <Route 
-        path="/assets" 
+      <Route
+        path="/assets"
         element={
-          <RoutePermissionGuard 
-            permission={{ action: 'view', subject: 'asset' }}
+          <RoutePermissionGuard
+            permission={{ action: "view", subject: "asset" }}
             element={<div>Assets Page</div>}
           />
-        } 
+        }
       />
-      
-      <Route 
-        path="/settings" 
+
+      <Route
+        path="/settings"
         element={
-          <RoutePermissionGuard 
-            permission={{ action: 'manage', subject: 'settings' }}
+          <RoutePermissionGuard
+            permission={{ action: "manage", subject: "settings" }}
             element={<SettingsPage />}
           />
-        } 
+        }
       />
-      
+
       {/* Access denied page */}
       <Route path="/access-denied" element={<div>Access Denied</div>} />
     </Routes>

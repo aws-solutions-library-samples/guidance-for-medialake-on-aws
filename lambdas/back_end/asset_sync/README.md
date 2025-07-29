@@ -1,6 +1,7 @@
 # High-Throughput Asset Sync System: S3 Batch Operations Architecture
 
 ## Overview
+
 The Asset Sync System enables efficient synchronization between S3 buckets and an Asset Management System. It uses S3 Batch Operations to process large numbers of objects (millions+) in a scalable, reliable way. The system automatically determines if objects need ingestion into the Asset Management system and tags them accordingly.
 
 ## Key Components
@@ -54,23 +55,27 @@ The Asset Sync System enables efficient synchronization between S3 buckets and a
 ## Workflow
 
 ### Job Initialization:
+
 - API request received with connector ID and optional prefix or prefixes
 - System maps connector ID to bucket name
 - Job record created in DynamoDB with INITIALIZING status
 - Engine Lambda invoked with job details
 
 ### Manifest Generation:
+
 - Engine Lambda lists objects from bucket/prefix
 - Creates CSV manifest file in results bucket
 - Updates job status to DISCOVERING
 
 ### S3 Batch Operations:
+
 - Engine Lambda creates S3 Batch Operations job using manifest
 - Batch job executes across potentially millions of objects
 - EventBridge monitors batch job status changes
 - When complete, manifest is split into chunks
 
 ### Chunk Processing:
+
 - Chunks are enqueued to SQS for parallel processing
 - Processor Lambda reads chunks and processes objects
 - Updates job status to PROCESSING
@@ -80,12 +85,14 @@ The Asset Sync System enables efficient synchronization between S3 buckets and a
   - If neither exists: PUT action
 
 ### Object Processing:
+
 - Updates object tags (AssetID, InventoryID, etc.)
 - Performs S3 copy operation to trigger event-based ingestion
 - Sends events to ingest event bus for further processing
 - Updates job counters for processed objects
 
 ### Job Completion:
+
 - When all chunks processed, job status updated to COMPLETED
 - Final statistics recorded in job record
 
@@ -103,24 +110,29 @@ The Asset Sync System enables efficient synchronization between S3 buckets and a
 ## Key Optimizations
 
 ### S3 Batch Operations:
+
 - Uses AWS's managed batch processing for listing and handling objects
 - Highly scalable and reliable for millions of objects
 - Native retries and error handling
 
 ### Chunking Strategy:
+
 - Large manifests split into manageable chunks
 - Allows parallel processing across multiple Lambda invocations
 - Improves reliability through smaller work units
 
 ### Dynamic Batch Sizing:
+
 - Adjusts batch sizes based on object sizes and counts
 - Optimizes Lambda execution time and memory usage
 
 ### Retry Logic:
+
 - Exponential backoff for transient errors
 - Detailed failure tracking for debugging
 
 ### State Management:
+
 - Uses DynamoDB for reliable state tracking
 - Supports job recovery and progress monitoring
 
@@ -157,22 +169,27 @@ The Asset Sync System enables efficient synchronization between S3 buckets and a
 ## Monitoring and Troubleshooting
 
 ### CloudWatch Logs:
+
 - Detailed logging at each processing step
 - Structured log format with Lambda context
 
 ### CloudWatch Metrics:
+
 - Custom metrics for object counts, processing rates, errors
 - Alarm configuration for error thresholds
 
 ### S3 Batch Operations Console:
+
 - Monitor batch job status
 - Review completion reports
 
 ### DynamoDB Tables:
+
 - Check job status and metadata
 - Review error records for troubleshooting
 
 ### Common Issues:
+
 - **Permissions**: Check IAM roles for S3, Lambda, DynamoDB access
 - **Timeouts**: Adjust Lambda timeouts for large operations
 - **Memory**: Increase Lambda memory for faster processing
@@ -180,14 +197,16 @@ The Asset Sync System enables efficient synchronization between S3 buckets and a
 ## Scaling Considerations
 
 System handles millions of objects through:
+
 - S3 Batch Operations for initial processing
 - Chunked parallel processing for detailed work
 - SQS queues for load leveling
 - DynamoDB for scalable state storage
 
 ### Concurrency Management:
+
 - Lambda concurrency limits control parallel processing
 - SQS visibility timeout prevents duplicate processing
 - S3 Batch Operations handles its own concurrency optimization
 
-This architecture provides a highly scalable, reliable solution for synchronizing S3 objects with an asset management system while efficiently handling large-scale operations. 
+This architecture provides a highly scalable, reliable solution for synchronizing S3 objects with an asset management system while efficiently handling large-scale operations.

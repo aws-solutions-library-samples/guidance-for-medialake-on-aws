@@ -1,0 +1,5 @@
+#!/bin/bash
+# Chain wrapper for post-commit
+if [ -f "/usr/local/amazon/var/git-defender/hooks/post-commit" ]; then
+    /usr/local/amazon/var/git-defender/hooks/post-commit "$@"
+fi

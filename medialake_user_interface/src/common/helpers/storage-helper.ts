@@ -9,13 +9,13 @@ const USERNAME_KEY = `${PREFIX}-username`;
 const AWS_CONFIG_KEY = `${PREFIX}-aws-config`;
 
 export abstract class StorageHelper {
-  static getTheme(): 'light' | 'dark' {
-    const savedTheme = localStorage.getItem('theme');
-    return (savedTheme === 'dark' ? 'dark' : 'light');
+  static getTheme(): "light" | "dark" {
+    const savedTheme = localStorage.getItem("theme");
+    return savedTheme === "dark" ? "dark" : "light";
   }
 
-  static setTheme(theme: 'light' | 'dark'): void {
-    localStorage.setItem('theme', theme);
+  static setTheme(theme: "light" | "dark"): void {
+    localStorage.setItem("theme", theme);
   }
 
   static getNavigationPanelState(): NavigationPanelState {
@@ -57,7 +57,6 @@ export abstract class StorageHelper {
     localStorage.removeItem(AWS_CONFIG_KEY);
   }
 
-
   static setToken(token: string) {
     localStorage.setItem(TOKEN_KEY, token);
   }
@@ -70,7 +69,6 @@ export abstract class StorageHelper {
     localStorage.removeItem(TOKEN_KEY);
   }
 
-
   static setRefreshToken(token: string) {
     localStorage.setItem(REFRESH_TOKEN_KEY, token);
   }
@@ -82,8 +80,6 @@ export abstract class StorageHelper {
   static clearRefreshToken() {
     localStorage.removeItem(REFRESH_TOKEN_KEY);
   }
-
-
 
   static setUsername(username: string) {
     localStorage.setItem(USERNAME_KEY, username);

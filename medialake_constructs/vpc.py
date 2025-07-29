@@ -1,17 +1,17 @@
-from aws_cdk import (
-    aws_ec2 as ec2,
-    aws_logs as logs,
-    RemovalPolicy,
-)
-from constructs import Construct
-from typing import Optional, Dict, List
 from dataclasses import dataclass
+from typing import Dict, List, Optional
+
+from aws_cdk import RemovalPolicy
+from aws_cdk import aws_ec2 as ec2
+from aws_cdk import aws_logs as logs
+from constructs import Construct
 
 # Import the CDK logger instead of aws_lambda_powertools
 from cdk_logger import get_logger
 from config import config
 
 logger = get_logger("VPC")
+
 
 @dataclass
 class CustomVpcProps:
@@ -95,7 +95,9 @@ class CustomVpc(Construct):
 
             # If the environment is prod, apply a retention policy to the VPC.
             if config.environment == "prod":
-                logger.info("Production environment detected - applying RETAIN removal policy")
+                logger.info(
+                    "Production environment detected - applying RETAIN removal policy"
+                )
                 self.vpc.apply_removal_policy(RemovalPolicy.RETAIN)
                 for subnet in self.vpc.public_subnets + self.vpc.private_subnets:
                     subnet.apply_removal_policy(RemovalPolicy.RETAIN)
@@ -135,7 +137,9 @@ class CustomVpc(Construct):
                         {"subnet_id": subnet_id, "az": "unknown"}
                         for subnet_id in subnet_ids["private"]
                     ]
-                    logger.debug(f"Found {len(subnets)} private subnets in existing VPC")
+                    logger.debug(
+                        f"Found {len(subnets)} private subnets in existing VPC"
+                    )
                     return subnets
                 elif subnet_type == ec2.SubnetType.PUBLIC:
                     subnets = [
@@ -151,7 +155,9 @@ class CustomVpc(Construct):
                         {"subnet_id": subnet.subnet_id, "az": subnet.availability_zone}
                         for subnet in subnets
                     ]
-                    logger.debug(f"Found {len(result)} subnets of type {subnet_type} in new VPC")
+                    logger.debug(
+                        f"Found {len(result)} subnets of type {subnet_type} in new VPC"
+                    )
                     return result
                 elif isinstance(self.vpc, ec2.IVpc):
                     if subnet_type == ec2.SubnetType.PRIVATE_WITH_EGRESS:

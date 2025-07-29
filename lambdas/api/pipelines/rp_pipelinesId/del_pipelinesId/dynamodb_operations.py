@@ -1,4 +1,5 @@
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, Optional
+
 import boto3
 from aws_lambda_powertools import Logger
 

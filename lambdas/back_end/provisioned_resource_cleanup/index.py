@@ -1,14 +1,13 @@
-import time
 import os
+import time
+from typing import Any, List
+
 import boto3
 import cfnresponse
 from botocore.exceptions import ClientError
-from aws_lambda_powertools import Logger, Tracer
-from lambda_utils import lambda_handler_decorator, logger, metrics, tracer, handle_error
-from typing import List, Any
+from lambda_utils import logger, tracer
 
-
-# Initialize AWS clients
+# Initialize AWS clients using regular boto3
 dynamodb = boto3.resource("dynamodb")
 lambda_client = boto3.client("lambda")
 iam = boto3.client("iam")
@@ -17,9 +16,102 @@ sqs = boto3.client("sqs")
 cloudwatch_logs = boto3.client("logs")
 eventbridge = boto3.client("events")
 pipes = boto3.client("pipes")
+secrets_manager = boto3.client("secretsmanager")
 
 # Define log groups to clean up
 LOG_GROUPS_TO_CLEAN = ["/aws/apigateway/medialake-access-logs"]
+
+
+def get_s3_vector_client():
+    """Initialize S3 Vector Store client with custom boto3 SDK."""
+    try:
+        # Import custom boto3 from the layer for S3 Vector operations only
+        # The custom boto3 layer will override the regular boto3 import within this function scope
+        import boto3 as custom_boto3
+
+        session = custom_boto3.Session()
+        client = session.client(
+            "s3vectors", region_name=os.environ.get("AWS_REGION", "us-east-1")
+        )
+        return client
+    except Exception as e:
+        logger.error(f"Failed to initialize S3 Vector client: {str(e)}")
+        return None
+
+
+def delete_s3_vector_indexes(client, bucket_name: str):
+    """Delete all vector indexes in a bucket."""
+    try:
+        # List all indexes in the bucket
+        response = client.list_indexes(vectorBucketName=bucket_name)
+        indexes = response.get("indexes", [])
+
+        for index in indexes:
+            index_name = index.get("indexName")
+            if index_name:
+                try:
+                    client.delete_index(
+                        vectorBucketName=bucket_name, indexName=index_name
+                    )
+                    logger.info(
+                        f"Deleted S3 Vector index {index_name} from bucket {bucket_name}"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to delete S3 Vector index {index_name}: {str(e)}"
+                    )
+
+    except Exception as e:
+        logger.error(
+            f"Failed to list/delete S3 Vector indexes in bucket {bucket_name}: {str(e)}"
+        )
+
+
+def delete_s3_vector_bucket(client, bucket_name: str):
+    """Delete S3 Vector bucket and all its indexes."""
+    try:
+        # First delete all indexes in the bucket
+        delete_s3_vector_indexes(client, bucket_name)
+
+        # Then delete the bucket
+        client.delete_vector_bucket(vectorBucketName=bucket_name)
+        logger.info(f"Deleted S3 Vector bucket {bucket_name}")
+
+    except Exception as e:
+        if "NotFoundException" in str(e) or "NoSuchBucket" in str(e):
+            logger.warning(
+                f"S3 Vector bucket {bucket_name} not found or already deleted"
+            )
+        else:
+            logger.error(f"Failed to delete S3 Vector bucket {bucket_name}: {str(e)}")
+            raise
+
+
+def cleanup_s3_vector_resources():
+    """Clean up S3 Vector Store resources."""
+    try:
+        # Get S3 Vector client
+        s3_vector_client = get_s3_vector_client()
+        if not s3_vector_client:
+            logger.warning(
+                "Could not initialize S3 Vector client, skipping S3 Vector cleanup"
+            )
+            return
+
+        # Get bucket name from environment or use default pattern
+        vector_bucket_name = os.environ.get("VECTOR_BUCKET_NAME")
+        if not vector_bucket_name:
+            # Try to construct bucket name from environment
+            environment = os.environ.get("ENVIRONMENT", "dev")
+            region = os.environ.get("AWS_REGION", "us-east-1")
+            vector_bucket_name = f"medialake-vectors-{region}-{environment}"
+
+        logger.info(f"Cleaning up S3 Vector bucket: {vector_bucket_name}")
+        delete_s3_vector_bucket(s3_vector_client, vector_bucket_name)
+
+    except Exception as e:
+        logger.error(f"Error during S3 Vector cleanup: {str(e)}")
+        # Don't raise the exception to avoid failing the entire cleanup process
 
 
 def delete_lambda_function(function_arn: str):
@@ -112,7 +204,9 @@ def clean_up_connector(item, table):
 
     if "queueUrl" in item:
         try:
-            logger.info(f"Attempting to delete SQS queue from connector with queueUrl: {item['queueUrl']}")
+            logger.info(
+                f"Attempting to delete SQS queue from connector with queueUrl: {item['queueUrl']}"
+            )
             delete_sqs_queue(item["queueUrl"])
         except Exception as e:
             errors.append(f"Error deleting SQS queue: {str(e)}")
@@ -180,33 +274,43 @@ def clean_up_connector(item, table):
 
 def clean_up_pipeline(item, table):
     errors = []
-    
+
     if "dependentResources" in item:
         for resource in item["dependentResources"]:
             try:
                 # Check if resource is a sequence (list or tuple) with at least 2 elements
                 if not isinstance(resource, (list, tuple)) or len(resource) < 2:
-                    logger.warning(f"Invalid resource format: {resource}. Expected [type, identifier]")
+                    logger.warning(
+                        f"Invalid resource format: {resource}. Expected [type, identifier]"
+                    )
                     continue
-                
+
                 resource_type = resource[0]
                 resource_identifier = resource[1]
-                
-                logger.info(f"Cleaning up resource of type {resource_type}: {resource_identifier}")
-                
+
+                logger.info(
+                    f"Cleaning up resource of type {resource_type}: {resource_identifier}"
+                )
+
                 if resource_type == "sqs" or resource_type == "sqs_queue":
-                    logger.info(f"Attempting to delete SQS queue with identifier: {resource_identifier}")
+                    logger.info(
+                        f"Attempting to delete SQS queue with identifier: {resource_identifier}"
+                    )
                     delete_sqs_queue(resource_identifier)
                 elif resource_type == "eventbridge_rule":
                     # Handle the new format where resource_identifier is an ARN string
                     # Format: arn:aws:events:region:account-id:rule/event-bus-name/rule-name
-                    if isinstance(resource_identifier, str) and resource_identifier.startswith("arn:aws:events:"):
+                    if isinstance(
+                        resource_identifier, str
+                    ) and resource_identifier.startswith("arn:aws:events:"):
                         # Parse the ARN to extract rule name and event bus name
                         parts = resource_identifier.split(":")
                         if len(parts) >= 6:
                             rule_path = parts[5]
                             if rule_path.startswith("rule/"):
-                                path_parts = rule_path[5:].split("/", 1)  # Remove 'rule/' prefix and split
+                                path_parts = rule_path[5:].split(
+                                    "/", 1
+                                )  # Remove 'rule/' prefix and split
                                 if len(path_parts) == 2:
                                     event_bus_name = path_parts[0]
                                     rule_name = path_parts[1]
@@ -216,16 +320,32 @@ def clean_up_pipeline(item, table):
                                     rule_name = path_parts[0]
                                     delete_eventbridge_rule(rule_name, "default")
                             else:
-                                logger.warning(f"Invalid EventBridge rule ARN format: {resource_identifier}")
+                                logger.warning(
+                                    f"Invalid EventBridge rule ARN format: {resource_identifier}"
+                                )
                     # Handle the old format where resource_identifier is a dictionary
-                    elif isinstance(resource_identifier, dict) and "rule_name" in resource_identifier and "eventbus_name" in resource_identifier:
+                    elif (
+                        isinstance(resource_identifier, dict)
+                        and "rule_name" in resource_identifier
+                        and "eventbus_name" in resource_identifier
+                    ):
                         delete_eventbridge_rule(
                             resource_identifier["rule_name"],
                             resource_identifier["eventbus_name"],
                         )
                     else:
-                        logger.warning(f"Unrecognized EventBridge rule format: {resource_identifier}")
-                elif resource_type in ["iam_stepfunction_role", "iam_lambda_trigger_role", "iam_role", "lambda_role", "sfn_role", "events_role", "service_role"]:
+                        logger.warning(
+                            f"Unrecognized EventBridge rule format: {resource_identifier}"
+                        )
+                elif resource_type in [
+                    "iam_stepfunction_role",
+                    "iam_lambda_trigger_role",
+                    "iam_role",
+                    "lambda_role",
+                    "sfn_role",
+                    "events_role",
+                    "service_role",
+                ]:
                     delete_iam_role(resource_identifier)
                 elif resource_type == "step_function":
                     delete_step_function(resource_identifier)
@@ -251,9 +371,11 @@ def clean_up_pipeline(item, table):
         error_msg = f"Error deleting pipeline record: {str(e)}"
         logger.error(error_msg)
         errors.append(error_msg)
-    
+
     if errors:
-        logger.error(f"Errors occurred while cleaning up pipeline {item['id']}: {errors}")
+        logger.error(
+            f"Errors occurred while cleaning up pipeline {item['id']}: {errors}"
+        )
     else:
         logger.info(f"Successfully cleaned up pipeline {item['id']}")
 
@@ -261,7 +383,7 @@ def clean_up_pipeline(item, table):
 def delete_sqs_queue(queue_identifier):
     """
     Delete an SQS queue.
-    
+
     Args:
         queue_identifier: Either a queue URL or queue ARN
     """
@@ -275,14 +397,20 @@ def delete_sqs_queue(queue_identifier):
                 region = parts[3]
                 account_id = parts[4]
                 queue_name = parts[5]
-                
+
                 # Construct the queue URL
-                queue_url = f"https://sqs.{region}.amazonaws.com/{account_id}/{queue_name}"
-                logger.info(f"Converting SQS ARN to URL: {queue_identifier} -> {queue_url}")
+                queue_url = (
+                    f"https://sqs.{region}.amazonaws.com/{account_id}/{queue_name}"
+                )
+                logger.info(
+                    f"Converting SQS ARN to URL: {queue_identifier} -> {queue_url}"
+                )
             else:
                 logger.error(f"Invalid SQS ARN format: {queue_identifier}")
                 raise ValueError(f"Invalid SQS ARN format: {queue_identifier}")
-        elif queue_identifier.startswith("https://sqs.") or queue_identifier.startswith("http://sqs."):
+        elif queue_identifier.startswith("https://sqs.") or queue_identifier.startswith(
+            "http://sqs."
+        ):
             # It's already a queue URL
             queue_url = queue_identifier
             logger.info(f"Using provided SQS queue URL: {queue_url}")
@@ -290,8 +418,10 @@ def delete_sqs_queue(queue_identifier):
             # Backward compatibility: assume it might be a queue URL in a different format
             # or try to use it as-is
             queue_url = queue_identifier
-            logger.info(f"Using queue identifier as-is (backward compatibility): {queue_url}")
-        
+            logger.info(
+                f"Using queue identifier as-is (backward compatibility): {queue_url}"
+            )
+
         sqs.delete_queue(QueueUrl=queue_url)
         logger.info(f"Successfully deleted SQS queue: {queue_url}")
     except ClientError as e:
@@ -349,26 +479,32 @@ def delete_event_bus_and_rules(event_bus_name):
 def delete_step_function(state_machine_arn):
     try:
         sfn = boto3.client("stepfunctions")
-        
+
         # Check if there are any running executions
         try:
             # List executions
-            paginator = sfn.get_paginator('list_executions')
+            paginator = sfn.get_paginator("list_executions")
             for page in paginator.paginate(stateMachineArn=state_machine_arn):
-                for execution in page['executions']:
-                    if execution['status'] in ['RUNNING', 'PENDING']:
+                for execution in page["executions"]:
+                    if execution["status"] in ["RUNNING", "PENDING"]:
                         # Stop running executions
                         try:
-                            logger.info(f"Stopping execution {execution['executionArn']}")
+                            logger.info(
+                                f"Stopping execution {execution['executionArn']}"
+                            )
                             sfn.stop_execution(
-                                executionArn=execution['executionArn'],
-                                cause="Cleanup during stack deletion"
+                                executionArn=execution["executionArn"],
+                                cause="Cleanup during stack deletion",
                             )
                         except Exception as stop_error:
-                            logger.warning(f"Failed to stop execution {execution['executionArn']}: {str(stop_error)}")
+                            logger.warning(
+                                f"Failed to stop execution {execution['executionArn']}: {str(stop_error)}"
+                            )
         except Exception as list_error:
-            logger.warning(f"Error listing executions for {state_machine_arn}: {str(list_error)}")
-        
+            logger.warning(
+                f"Error listing executions for {state_machine_arn}: {str(list_error)}"
+            )
+
         # Delete the state machine
         sfn.delete_state_machine(stateMachineArn=state_machine_arn)
         logger.info(f"Deleted Step Function {state_machine_arn}")
@@ -386,7 +522,7 @@ def delete_event_source_mapping(uuid):
         try:
             lambda_client.delete_event_source_mapping(UUID=uuid)
             logger.info(f"Deleted event source mapping {uuid}")
-            
+
             # Wait for the mapping to be fully deleted
             wait_attempts = 5
             for wait_attempt in range(wait_attempts):
@@ -397,16 +533,23 @@ def delete_event_source_mapping(uuid):
                     if wait_attempt < wait_attempts - 1:
                         time.sleep(2)
                     else:
-                        logger.warning(f"Event source mapping {uuid} still exists after waiting")
+                        logger.warning(
+                            f"Event source mapping {uuid} still exists after waiting"
+                        )
                 except ClientError as wait_error:
-                    if wait_error.response["Error"]["Code"] == "ResourceNotFoundException":
+                    if (
+                        wait_error.response["Error"]["Code"]
+                        == "ResourceNotFoundException"
+                    ):
                         # Mapping is gone, we can return
-                        logger.info(f"Confirmed deletion of event source mapping {uuid}")
+                        logger.info(
+                            f"Confirmed deletion of event source mapping {uuid}"
+                        )
                         return
                     else:
                         # Some other error occurred
                         raise
-            
+
             return
         except ClientError as e:
             if e.response["Error"]["Code"] == "ResourceNotFoundException":
@@ -502,30 +645,32 @@ def delete_eventbridge_pipe(pipe_arn):
     try:
         # Get the pipe name from ARN
         pipe_name = pipe_arn.split("/")[-1]
-        
+
         # Check if pipe exists and get its current state
         try:
             pipe_info = pipes.describe_pipe(Name=pipe_name)
-            current_state = pipe_info.get('CurrentState')
-            
+            current_state = pipe_info.get("CurrentState")
+
             # If pipe is running, stop it first
-            if current_state == 'RUNNING':
+            if current_state == "RUNNING":
                 pipes.stop_pipe(Name=pipe_name)
                 logger.info(f"Stopped EventBridge Pipe {pipe_name}")
-                
+
                 # Wait for pipe to stop before deleting
                 max_retries = 10
                 for i in range(max_retries):
                     time.sleep(2)  # Wait 2 seconds between checks
                     pipe_info = pipes.describe_pipe(Name=pipe_name)
-                    if pipe_info.get('CurrentState') != 'RUNNING':
+                    if pipe_info.get("CurrentState") != "RUNNING":
                         break
                     if i == max_retries - 1:
-                        logger.warning(f"Pipe {pipe_name} did not stop in time, attempting delete anyway")
+                        logger.warning(
+                            f"Pipe {pipe_name} did not stop in time, attempting delete anyway"
+                        )
         except ClientError as e:
             if e.response["Error"]["Code"] != "ResourceNotFoundException":
                 raise
-        
+
         # Delete the pipe
         pipes.delete_pipe(Name=pipe_name)
         logger.info(f"Deleted EventBridge Pipe {pipe_name}")
@@ -533,6 +678,76 @@ def delete_eventbridge_pipe(pipe_arn):
         if e.response["Error"]["Code"] != "ResourceNotFoundException":
             raise
         logger.warning(f"EventBridge Pipe {pipe_arn} already deleted")
+
+
+def delete_secrets_manager_secrets():
+    """Delete secrets from Secrets Manager that match specific patterns"""
+    try:
+        # Define the patterns to match
+        patterns = [
+            "integration/",  # Matches integration/{uuid}/api-key
+            "medialake/search/provider/",  # Matches medialake/search/provider/{uuid}
+        ]
+
+        logger.info("Starting cleanup of Secrets Manager secrets")
+
+        # List all secrets
+        paginator = secrets_manager.get_paginator("list_secrets")
+        deleted_count = 0
+
+        for page in paginator.paginate():
+            for secret in page.get("SecretList", []):
+                secret_name = secret["Name"]
+
+                # Check if the secret matches any of our patterns
+                should_delete = False
+                for pattern in patterns:
+                    if secret_name.startswith(pattern):
+                        # Additional validation for integration pattern
+                        if pattern == "integration/":
+                            # Should match: integration/{uuid}/api-key
+                            parts = secret_name.split("/")
+                            if len(parts) == 3 and parts[2] == "api-key":
+                                should_delete = True
+                                break
+                        elif pattern == "medialake/search/provider/":
+                            # Should match: medialake/search/provider/{uuid}
+                            parts = secret_name.split("/")
+                            if len(parts) == 4:  # medialake/search/provider/{uuid}
+                                should_delete = True
+                                break
+
+                if should_delete:
+                    try:
+                        # Delete the secret immediately (force delete without recovery window)
+                        secrets_manager.delete_secret(
+                            SecretId=secret_name, ForceDeleteWithoutRecovery=True
+                        )
+                        logger.info(f"Deleted secret: {secret_name}")
+                        deleted_count += 1
+                    except ClientError as e:
+                        if e.response["Error"]["Code"] == "ResourceNotFoundException":
+                            logger.warning(f"Secret {secret_name} already deleted")
+                        elif e.response["Error"]["Code"] == "InvalidRequestException":
+                            logger.warning(
+                                f"Secret {secret_name} already scheduled for deletion"
+                            )
+                        else:
+                            logger.error(
+                                f"Error deleting secret {secret_name}: {str(e)}"
+                            )
+                    except Exception as e:
+                        logger.error(
+                            f"Unexpected error deleting secret {secret_name}: {str(e)}"
+                        )
+
+        logger.info(
+            f"Completed Secrets Manager cleanup. Deleted {deleted_count} secrets"
+        )
+
+    except Exception as e:
+        logger.error(f"Error during Secrets Manager cleanup: {str(e)}")
+        raise
 
 
 @tracer.capture_lambda_handler
@@ -557,19 +772,31 @@ def lambda_handler(event, context):
             logger.info("Starting cleanup of CloudWatch log groups")
             delete_cloudwatch_log_groups(LOG_GROUPS_TO_CLEAN)
 
+            # Clean up Secrets Manager secrets
+            logger.info("Starting cleanup of Secrets Manager secrets")
+            delete_secrets_manager_secrets()
+
+            # Clean up S3 Vector Store resources
+            logger.info("Starting cleanup of S3 Vector Store resources")
+            cleanup_s3_vector_resources()
+
             # Additional cleanup for any orphaned resources
             try:
                 # Check for orphaned EventBridge pipes
                 logger.info("Checking for orphaned EventBridge pipes")
-                pipes_paginator = pipes.get_paginator('list_pipes')
+                pipes_paginator = pipes.get_paginator("list_pipes")
                 for page in pipes_paginator.paginate():
-                    for pipe in page.get('Pipes', []):
-                        if 'medialake' in pipe['Name'].lower():
+                    for pipe in page.get("Pipes", []):
+                        if "medialake" in pipe["Name"].lower():
                             try:
-                                logger.info(f"Cleaning up orphaned EventBridge pipe: {pipe['Name']}")
-                                delete_eventbridge_pipe(pipe['Arn'])
+                                logger.info(
+                                    f"Cleaning up orphaned EventBridge pipe: {pipe['Name']}"
+                                )
+                                delete_eventbridge_pipe(pipe["Arn"])
                             except Exception as e:
-                                logger.error(f"Error cleaning up orphaned pipe {pipe['Name']}: {str(e)}")
+                                logger.error(
+                                    f"Error cleaning up orphaned pipe {pipe['Name']}: {str(e)}"
+                                )
             except Exception as e:
                 logger.error(f"Error during orphaned resource cleanup: {str(e)}")
 

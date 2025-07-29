@@ -1,13 +1,13 @@
-from typing import Dict, Any
+import os
+from typing import Any, Dict
+
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import MetricUnit
-from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
-from aws_lambda_powertools.utilities.validation import validator
+from aws_lambda_powertools.utilities.typing import LambdaContext
 from pydantic import BaseModel
-import os
 
 # Initialize PowerTools
 logger = Logger(service="user-profile-service", level=os.getenv("LOG_LEVEL", "WARNING"))

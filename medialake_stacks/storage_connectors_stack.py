@@ -1,24 +1,15 @@
-from aws_cdk import (
-    Stack,
-    RemovalPolicy,
-    Duration,
-)
-import aws_cdk as cdk
-
-from constructs import Construct
 from dataclasses import dataclass
 
-from medialake_constructs.sqs import (
-    SQSConstruct,
-    SQSProps,
-)
-from config import config
+import aws_cdk as cdk
+from aws_cdk import Duration, RemovalPolicy
+from constructs import Construct
+
+from medialake_constructs.sqs import SQSConstruct, SQSProps
 
 
 @dataclass
 class StorageConnectorsStackProps:
     """Configuration for Storage Connectors Stack."""
-    pass
 
 
 class StorageConnectorsStack(cdk.NestedStack):
@@ -46,11 +37,11 @@ class StorageConnectorsStack(cdk.NestedStack):
     @property
     def storage_ingest_connector_dlq_url(self) -> str:
         return self.storage_ingest_connector_dlq.queue_url
-        
+
     @property
     def storage_ingest_connector_dlq_arn(self) -> str:
         return self.storage_ingest_connector_dlq.queue_arn
-        
+
     @property
     def storage_ingest_connector_dlq_name(self) -> str:
         return self.storage_ingest_connector_dlq.queue_name

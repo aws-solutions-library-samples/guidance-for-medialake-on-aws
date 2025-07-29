@@ -2,195 +2,195 @@
   "Comment": "Pipeline Creation State Machine",
   "StartAt": "ValidatePipelineDefinition",
   "States": {
-    "ValidatePipelineDefinition": {
-      "Type": "Task",
-      "Resource": "${ValidatePipelineLambdaArn}",
-      "Next": "CheckPipelineValidity",
-      "Retry": [
-        {
-          "ErrorEquals": ["States.TaskFailed"],
-          "IntervalSeconds": 2,
-          "MaxAttempts": 3,
-          "BackoffRate": 2
-        }
-      ],
+    "BuildStepFunctionDefinition": {
       "Catch": [
         {
           "ErrorEquals": ["States.ALL"],
-          "ResultPath": "$.error",
-          "Next": "FailState"
-        }
-      ]
-    },
-    "CheckPipelineValidity": {
-      "Type": "Choice",
-      "Choices": [
-        {
-          "Variable": "$.isValid",
-          "BooleanEquals": false,
-          "Next": "FailState"
+          "Next": "FailState",
+          "ResultPath": "$.error"
         }
       ],
-      "Default": "CheckExistingPipeline"
+      "Next": "CreateStepFunction",
+      "Resource": "${BuildStepFunctionDefinitionLambdaArn}",
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": ["States.TaskFailed"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3
+        }
+      ],
+      "Type": "Task"
     },
     "CheckExistingPipeline": {
-      "Type": "Task",
-      "Resource": "${CheckExistingPipelineLambdaArn}",
-      "Next": "PipelineExistsChoice",
-      "Retry": [
-        {
-          "ErrorEquals": ["States.TaskFailed"],
-          "IntervalSeconds": 2,
-          "MaxAttempts": 3,
-          "BackoffRate": 2
-        }
-      ],
       "Catch": [
         {
           "ErrorEquals": ["States.ALL"],
-          "ResultPath": "$.error",
-          "Next": "FailState"
+          "Next": "FailState",
+          "ResultPath": "$.error"
         }
-      ]
+      ],
+      "Next": "PipelineExistsChoice",
+      "Resource": "${CheckExistingPipelineLambdaArn}",
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": ["States.TaskFailed"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3
+        }
+      ],
+      "Type": "Task"
     },
-    "PipelineExistsChoice": {
-      "Type": "Choice",
+    "CheckPipelineValidity": {
       "Choices": [
         {
-          "Variable": "$.pipelineExists",
-          "BooleanEquals": true,
-          "Next": "CleanupExistingResources"
+          "BooleanEquals": false,
+          "Next": "FailState",
+          "Variable": "$.isValid"
         }
       ],
-      "Default": "CreateLambdaFunctions"
+      "Default": "CheckExistingPipeline",
+      "Type": "Choice"
     },
     "CleanupExistingResources": {
-      "Type": "Task",
-      "Resource": "${CleanupExistingResourcesLambdaArn}",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "FailState",
+          "ResultPath": "$.error"
+        }
+      ],
       "Next": "CreateLambdaFunctions",
+      "Resource": "${CleanupExistingResourcesLambdaArn}",
       "Retry": [
         {
+          "BackoffRate": 2,
           "ErrorEquals": ["States.TaskFailed"],
           "IntervalSeconds": 2,
-          "MaxAttempts": 3,
-          "BackoffRate": 2
+          "MaxAttempts": 3
         }
       ],
-      "Catch": [
-        {
-          "ErrorEquals": ["States.ALL"],
-          "ResultPath": "$.error",
-          "Next": "FailState"
-        }
-      ]
-    },
-    "CreateLambdaFunctions": {
-      "Type": "Task",
-      "Resource": "${CreateLambdaFunctionsLambdaArn}",
-      "Next": "BuildStepFunctionDefinition",
-      "Retry": [
-        {
-          "ErrorEquals": ["States.TaskFailed"],
-          "IntervalSeconds": 2,
-          "MaxAttempts": 3,
-          "BackoffRate": 2
-        }
-      ],
-      "Catch": [
-        {
-          "ErrorEquals": ["States.ALL"],
-          "ResultPath": "$.error",
-          "Next": "FailState"
-        }
-      ]
-    },
-    "BuildStepFunctionDefinition": {
-      "Type": "Task",
-      "Resource": "${BuildStepFunctionDefinitionLambdaArn}",
-      "Next": "CreateStepFunction",
-      "Retry": [
-        {
-          "ErrorEquals": ["States.TaskFailed"],
-          "IntervalSeconds": 2,
-          "MaxAttempts": 3,
-          "BackoffRate": 2
-        }
-      ],
-      "Catch": [
-        {
-          "ErrorEquals": ["States.ALL"],
-          "ResultPath": "$.error",
-          "Next": "FailState"
-        }
-      ]
-    },
-    "CreateStepFunction": {
-      "Type": "Task",
-      "Resource": "${CreateStepFunctionLambdaArn}",
-      "Next": "CreateEventBridgeRules",
-      "Retry": [
-        {
-          "ErrorEquals": ["States.TaskFailed"],
-          "IntervalSeconds": 2,
-          "MaxAttempts": 3,
-          "BackoffRate": 2
-        }
-      ],
-      "Catch": [
-        {
-          "ErrorEquals": ["States.ALL"],
-          "ResultPath": "$.error",
-          "Next": "FailState"
-        }
-      ]
+      "Type": "Task"
     },
     "CreateEventBridgeRules": {
-      "Type": "Task",
-      "Resource": "${CreateEventBridgeRulesLambdaArn}",
-      "Next": "StorePipelineInfo",
-      "Retry": [
-        {
-          "ErrorEquals": ["States.TaskFailed"],
-          "IntervalSeconds": 2,
-          "MaxAttempts": 3,
-          "BackoffRate": 2
-        }
-      ],
       "Catch": [
         {
           "ErrorEquals": ["States.ALL"],
-          "ResultPath": "$.error",
-          "Next": "FailState"
+          "Next": "FailState",
+          "ResultPath": "$.error"
         }
-      ]
+      ],
+      "Next": "StorePipelineInfo",
+      "Resource": "${CreateEventBridgeRulesLambdaArn}",
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": ["States.TaskFailed"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3
+        }
+      ],
+      "Type": "Task"
+    },
+    "CreateLambdaFunctions": {
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "FailState",
+          "ResultPath": "$.error"
+        }
+      ],
+      "Next": "BuildStepFunctionDefinition",
+      "Resource": "${CreateLambdaFunctionsLambdaArn}",
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": ["States.TaskFailed"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3
+        }
+      ],
+      "Type": "Task"
+    },
+    "CreateStepFunction": {
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "FailState",
+          "ResultPath": "$.error"
+        }
+      ],
+      "Next": "CreateEventBridgeRules",
+      "Resource": "${CreateStepFunctionLambdaArn}",
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": ["States.TaskFailed"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3
+        }
+      ],
+      "Type": "Task"
+    },
+    "FailState": {
+      "Cause": "Pipeline creation failed. Check the execution history for details.",
+      "Error": "PipelineCreationFailed",
+      "Type": "Fail"
+    },
+    "PipelineExistsChoice": {
+      "Choices": [
+        {
+          "BooleanEquals": true,
+          "Next": "CleanupExistingResources",
+          "Variable": "$.pipelineExists"
+        }
+      ],
+      "Default": "CreateLambdaFunctions",
+      "Type": "Choice"
     },
     "StorePipelineInfo": {
-      "Type": "Task",
-      "Resource": "${StorePipelineInfoLambdaArn}",
-      "Next": "SuccessState",
-      "Retry": [
-        {
-          "ErrorEquals": ["States.TaskFailed"],
-          "IntervalSeconds": 2,
-          "MaxAttempts": 3,
-          "BackoffRate": 2
-        }
-      ],
       "Catch": [
         {
           "ErrorEquals": ["States.ALL"],
-          "ResultPath": "$.error",
-          "Next": "FailState"
+          "Next": "FailState",
+          "ResultPath": "$.error"
         }
-      ]
+      ],
+      "Next": "SuccessState",
+      "Resource": "${StorePipelineInfoLambdaArn}",
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": ["States.TaskFailed"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3
+        }
+      ],
+      "Type": "Task"
     },
     "SuccessState": {
       "Type": "Succeed"
     },
-    "FailState": {
-      "Type": "Fail",
-      "Error": "PipelineCreationFailed",
-      "Cause": "Pipeline creation failed. Check the execution history for details."
+    "ValidatePipelineDefinition": {
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "FailState",
+          "ResultPath": "$.error"
+        }
+      ],
+      "Next": "CheckPipelineValidity",
+      "Resource": "${ValidatePipelineLambdaArn}",
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": ["States.TaskFailed"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3
+        }
+      ],
+      "Type": "Task"
     }
   }
 }

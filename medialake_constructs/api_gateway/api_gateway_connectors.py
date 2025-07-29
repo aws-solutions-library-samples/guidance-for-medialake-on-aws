@@ -11,51 +11,60 @@ and associated Lambda functions for managing media connectors. It handles:
 """
 
 from dataclasses import dataclass
-from config import config
-from constructs import Construct
-from aws_cdk import (
-    aws_apigateway as apigateway,
-    aws_iam as iam,
-    aws_lambda as lambda_,
-    aws_dynamodb as dynamodb,
-    aws_s3 as s3,
-    aws_secretsmanager as secretsmanager,
-    aws_ssm as ssm,
-    Stack,
-    aws_stepfunctions as sfn,
-)
-from medialake_constructs.shared_constructs.lam_deployment import LambdaDeployment
-from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 
-from medialake_constructs.shared_constructs.lambda_base import (
-    Lambda,
-    LambdaConfig,
-)
+from aws_cdk import Stack
+from aws_cdk import aws_apigateway as apigateway
+from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_lambda as lambda_
+from aws_cdk import aws_s3 as s3
+from aws_cdk import aws_secretsmanager as secretsmanager
+from aws_cdk import aws_ssm as ssm
+from constructs import Construct
+
+from config import config
+from constants import DynamoDB as DynamoDBConstants
+from constants import EnvVars
+from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 from medialake_constructs.shared_constructs.dynamodb import (
     DynamoDB as DynamoDBConstruct,
+)
+from medialake_constructs.shared_constructs.dynamodb import (
     DynamoDBProps,
 )
-
+from medialake_constructs.shared_constructs.lam_deployment import LambdaDeployment
+from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 from medialake_constructs.shared_constructs.lambda_layers import (
     IngestMediaProcessorLayer,
 )
-from constants import DynamoDB as DynamoDBConstants, EnvVars
 
 
 @dataclass
 class ConnectorsProps:
     asset_table: dynamodb.TableV2
     iac_assets_bucket: s3.IBucket
+    media_assets_bucket: s3.IBucket  # Added for cross-bucket deletion permissions
     asset_table_file_hash_index_arn: str
     asset_table_asset_id_index_arn: str
     asset_table_s3_path_index_arn: str
     asset_sync_job_table: dynamodb.TableV2
     asset_sync_engine_lambda: lambda_.Function
-    ingest_event_bus: str | None
+    open_search_endpoint: str
+    opensearch_index: str
+    pipelines_event_bus: str | None
+    vpc_subnet_ids: str
+    security_group_id: str
+
+    # S3 Vector Store configuration
+    s3_vector_bucket_name: str
+    s3_vector_index_name: str = "media-vectors"
+
+    # Optional fields
     api_resource: str | None = None
     cognito_authorizer: str | None = None
     x_origin_verify_secret: secretsmanager.Secret | None = None
-
+    system_settings_table_name: str | None = None
+    system_settings_table_arn: str | None = None
 
 
 class ConnectorsConstruct(Construct):
@@ -223,7 +232,7 @@ class ConnectorsConstruct(Construct):
             "ConnectorTableNameParameter",
             parameter_name=f"/{config.resource_prefix}/connector-table-name",
             string_value=self.connectors_table.table.table_name,
-            description="MediaLake Connector Table Name"
+            description="MediaLake Connector Table Name",
         )
 
         # Create connectors resource
@@ -322,7 +331,7 @@ class ConnectorsConstruct(Construct):
                     "iam:ListRolePolicies",
                     "iam:GetRolePolicy",
                     "iam:ListInstanceProfilesForRole",
-                    "iam:GetRole"
+                    "iam:GetRole",
                 ],
                 resources=[f"arn:aws:iam::{account_id}:role/*"],
             )
@@ -352,7 +361,7 @@ class ConnectorsConstruct(Construct):
                 resources=[f"arn:aws:sqs:*:{account_id}:*"],
             )
         )
-        
+
         # Add EventBridge Pipes permissions
         connectors_del_lambda.function.role.add_to_policy(
             iam.PolicyStatement(
@@ -363,7 +372,7 @@ class ConnectorsConstruct(Construct):
                     "pipes:StopPipe",
                     "pipes:TagResource",
                     "pipes:UntagResource",
-                    "pipes:ListTagsForResource"
+                    "pipes:ListTagsForResource",
                 ],
                 resources=[f"arn:aws:pipes:{scope.region}:{account_id}:pipe/*"],
             )
@@ -391,6 +400,32 @@ class ConnectorsConstruct(Construct):
             "IngestMediaProcessorLayer",
         )
 
+        # Prepare environment variables
+        env_vars = {
+            "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+            "MEDIALAKE_CONNECTOR_TABLE": self.connectors_table.table_arn,
+            "S3_CONNECTOR_LAMBDA": self.lambda_deployment.deployment_key,
+            "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
+            "MEDIA_ASSETS_BUCKET": props.media_assets_bucket.bucket.bucket_name,  # Added for cross-bucket deletion
+            "INGEST_MEDIA_PROCESSOR_LAYER": ingest_media_processor_layer.layer.layer_version_arn,
+            "PIPELINES_EVENT_BUS": props.pipelines_event_bus,
+            "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
+            "MEDIALAKE_ASSET_TABLE_FILE_HASH_INDEX": props.asset_table_file_hash_index_arn,
+            "MEDIALAKE_ASSET_TABLE_ASSET_ID_INDEX": props.asset_table_asset_id_index_arn,
+            "MEDIALAKE_ASSET_TABLE_S3_PATH_INDEX": props.asset_table_s3_path_index_arn,
+            "RESOURCE_PREFIX": config.resource_prefix,
+            "RESOURCE_APPLICATION_TAG": config.resource_application_tag,
+            "REGION": config.primary_region,
+            "OPENSEARCH_ENDPOINT": props.open_search_endpoint,
+            "OPENSEARCH_INDEX": props.opensearch_index,
+            "INDEX_NAME": props.opensearch_index,
+            "OPENSEARCH_VPC_SUBNET_IDS": props.vpc_subnet_ids,
+            "OPENSEARCH_SECURITY_GROUP_ID": props.security_group_id,
+            # S3 Vector Store configuration
+            "VECTOR_BUCKET_NAME": props.s3_vector_bucket_name,
+            "VECTOR_INDEX_NAME": props.s3_vector_index_name,
+        }
+
         connector_s3_post_lambda = Lambda(
             self,
             "ConnectorS3PostLambda",
@@ -398,21 +433,7 @@ class ConnectorsConstruct(Construct):
                 name="connectors_s3_post",
                 entry="lambdas/api/connectors/s3/post_s3",
                 memory_size=256,
-                environment_variables={
-                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
-                    "MEDIALAKE_CONNECTOR_TABLE": self.connectors_table.table_arn,
-                    "S3_CONNECTOR_LAMBDA": self.lambda_deployment.deployment_key,
-                    "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
-                    "INGEST_MEDIA_PROCESSOR_LAYER": ingest_media_processor_layer.layer.layer_version_arn,
-                    "INGEST_EVENT_BUS": props.ingest_event_bus.event_bus_name,
-                    "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
-                    "MEDIALAKE_ASSET_TABLE_FILE_HASH_INDEX": props.asset_table_file_hash_index_arn,
-                    "MEDIALAKE_ASSET_TABLE_ASSET_ID_INDEX": props.asset_table_asset_id_index_arn,
-                    "MEDIALAKE_ASSET_TABLE_S3_PATH_INDEX": props.asset_table_s3_path_index_arn,
-                    "RESOURCE_PREFIX": config.resource_prefix,
-                    "RESOURCE_APPLICATION_TAG": config.resource_application_tag,
-                    "REGION": config.primary_region,
-                },
+                environment_variables=env_vars,
             ),
         )
 
@@ -465,6 +486,44 @@ class ConnectorsConstruct(Construct):
             )
         )
 
+        # Add EC2 permissions for VPC Lambda creation
+        connector_s3_post_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "ec2:CreateNetworkInterface",
+                    "ec2:DescribeNetworkInterfaces",
+                    "ec2:DeleteNetworkInterface",
+                    "ec2:AttachNetworkInterface",
+                    "ec2:DetachNetworkInterface",
+                ],
+                resources=[
+                    f"arn:aws:ec2:{scope.region}:{account_id}:network-interface/*",
+                    f"arn:aws:ec2:{scope.region}:{account_id}:subnet/*",
+                    f"arn:aws:ec2:{scope.region}:{account_id}:security-group/*",
+                ],
+            )
+        )
+
+        # These EC2 actions are used by Lambda when deploying it into a VPC.
+        # They allow the Lambda service to look up network configuration like VPCs, subnets, and security groups.
+        #
+        # These are **read-only** (describe) actions and do not allow modifying or deleting anything.
+        # Because of how AWS permissions work, "describe" actions **cannot** be restricted to specific ARNs.
+        # AWS requires that the `resources` field be set to `"*"` for these actions, since they operate across the account.
+        #
+        # It's safe to include these permissions because they only allow the Lambda to retrieve network info,
+        # which is necessary for it to be deployed into a VPC.
+        connector_s3_post_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "ec2:DescribeSecurityGroups",
+                    "ec2:DescribeSubnets",
+                    "ec2:DescribeVpcs",
+                ],
+                resources=["*"],  # Describe actions require * resource
+            )
+        )
+
         # Update IAM/S3 policy with account-specific ARNs
         connector_s3_post_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -509,6 +568,22 @@ class ConnectorsConstruct(Construct):
             )
         )
 
+        # Add S3 Vector Store permissions for connector S3 post Lambda
+        connector_s3_post_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3vectors:ListVectors",
+                    "s3vectors:GetVectors",  # Required when returnMetadata=True
+                    "s3vectors:DeleteVectors",
+                    "s3vectors:QueryVectors",
+                ],
+                resources=[
+                    f"arn:aws:s3vectors:{Stack.of(self).region}:{Stack.of(self).account}:bucket/{props.s3_vector_bucket_name}",
+                    f"arn:aws:s3vectors:{Stack.of(self).region}:{Stack.of(self).account}:bucket/{props.s3_vector_bucket_name}/*",
+                ],
+            )
+        )
+
         # Grant permissions correctly
         props.iac_assets_bucket.bucket.grant_read_write(
             connector_s3_post_lambda.function
@@ -550,7 +625,7 @@ class ConnectorsConstruct(Construct):
                     "events:PutRule",
                     "events:PutTargets",
                     "events:DeleteRule",
-                    "events:RemoveTargets"
+                    "events:RemoveTargets",
                 ],
                 resources=[
                     f"arn:aws:events:{scope.region}:{account_id}:rule/*",
@@ -571,7 +646,7 @@ class ConnectorsConstruct(Construct):
                     "pipes:UpdatePipe",
                     "pipes:TagResource",
                     "pipes:UntagResource",
-                    "pipes:ListTagsForResource"
+                    "pipes:ListTagsForResource",
                 ],
                 resources=[f"arn:aws:pipes:{scope.region}:{account_id}:pipe/*"],
             )
@@ -594,6 +669,8 @@ class ConnectorsConstruct(Construct):
                     "X_ORIGIN_VERIFY_SECRET_ARN": (
                         props.x_origin_verify_secret.secret_arn
                     ),
+                    "SYSTEM_SETTINGS_TABLE_NAME": props.system_settings_table_name
+                    or "",
                 },
             ),
         )
@@ -605,13 +682,25 @@ class ConnectorsConstruct(Construct):
             )
         )
 
+        # Grant DynamoDB read permissions for system settings table
+        if props.system_settings_table_arn:
+            connector_s3_get_lambda.function.role.add_to_policy(
+                iam.PolicyStatement(
+                    actions=[
+                        "dynamodb:GetItem",
+                        "dynamodb:Query",
+                    ],
+                    resources=[props.system_settings_table_arn],
+                )
+            )
+
         connector_s3_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(connector_s3_get_lambda.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
-        
+
         s3_sync_connector_resource = connector_id_resource.add_resource("sync")
 
         self._connector_sync_lambda = Lambda(
@@ -629,24 +718,29 @@ class ConnectorsConstruct(Construct):
                     "ENGINE_FUNCTION_ARN": props.asset_sync_engine_lambda.function_arn,
                 },
             ),
-        )   
-        self.connectors_table.table.grant_read_data(self._connector_sync_lambda.function)
-        props.asset_sync_job_table.grant_read_write_data(self._connector_sync_lambda.function)
-        props.asset_sync_engine_lambda.grant_invoke(self._connector_sync_lambda.function)
-        
+        )
+        self.connectors_table.table.grant_read_data(
+            self._connector_sync_lambda.function
+        )
+        props.asset_sync_job_table.grant_read_write_data(
+            self._connector_sync_lambda.function
+        )
+        props.asset_sync_engine_lambda.grant_invoke(
+            self._connector_sync_lambda.function
+        )
+
         s3_sync_connector_resource.add_method(
             "POST",
             apigateway.LambdaIntegration(self._connector_sync_lambda.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
-        
+
         # Create s3 explorer resource with path parameter
         s3_explorer_resource = connector_s3_resource.add_resource("explorer")
         s3_explorer_connector_resource = s3_explorer_resource.add_resource(
             "{connector_id}"
         )
-
 
         s3_explorer_get_lambda = Lambda(
             self,
@@ -697,14 +791,66 @@ class ConnectorsConstruct(Construct):
         )
 
         self.connectors_table.table.grant_read_data(s3_explorer_get_lambda.function)
-        
-        # Add CORS support to child API resources (not root)
-        add_cors_options_method(connectors_resource)
-        add_cors_options_method(connector_id_resource)
-        add_cors_options_method(connector_s3_resource)
-        add_cors_options_method(s3_sync_connector_resource)
-        add_cors_options_method(s3_explorer_resource)
-        add_cors_options_method(s3_explorer_connector_resource)
+
+        # Create storage/s3/buckets resource for get_buckets endpoint
+        storage_resource = props.api_resource.root.add_resource("storage")
+        storage_s3_resource = storage_resource.add_resource("s3")
+        storage_buckets_resource = storage_s3_resource.add_resource("buckets")
+
+        # Create get_buckets Lambda function
+        get_buckets_lambda = Lambda(
+            self,
+            "GetBucketsLambda",
+            config=LambdaConfig(
+                name="get_buckets",
+                entry="lambdas/api/storage/s3/buckets/get_buckets",
+                environment_variables={
+                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+                    "SYSTEM_SETTINGS_TABLE_NAME": props.system_settings_table_name
+                    or "",
+                },
+            ),
+        )
+
+        # Grant S3 list buckets permission
+        get_buckets_lambda.function.role.add_to_policy(
+            iam.PolicyStatement(
+                actions=["s3:ListAllMyBuckets"],
+                resources=["*"],
+            )
+        )
+
+        # Grant DynamoDB read permissions for system settings table
+        if props.system_settings_table_arn:
+            get_buckets_lambda.function.role.add_to_policy(
+                iam.PolicyStatement(
+                    actions=[
+                        "dynamodb:GetItem",
+                        "dynamodb:Query",
+                    ],
+                    resources=[props.system_settings_table_arn],
+                )
+            )
+
+        # Add GET method to buckets resource
+        storage_buckets_resource.add_method(
+            "GET",
+            apigateway.LambdaIntegration(get_buckets_lambda.function),
+            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer,
+        )
+
+        # Store reference to get_buckets lambda for external configuration
+        self._get_buckets_lambda = get_buckets_lambda
+
+        # CORS support is handled by default_cors_preflight_options at the API Gateway level
+        # No need to manually add OPTIONS methods as they're automatically added to all resources
+        # add_cors_options_method(connectors_resource)
+        # add_cors_options_method(connector_id_resource)
+        # add_cors_options_method(connector_s3_resource)
+        # add_cors_options_method(s3_sync_connector_resource)
+        # add_cors_options_method(s3_explorer_resource)
+        # add_cors_options_method(s3_explorer_connector_resource)
 
         aws_resource = props.api_resource.root.add_resource("aws")
         regions_resource = aws_resource.add_resource("regions")
@@ -716,13 +862,13 @@ class ConnectorsConstruct(Construct):
                 name="regions-get",
                 entry="lambdas/api/aws/get_regions",
                 environment_variables={
-                     "X_ORIGIN_VERIFY_SECRET_ARN": (
+                    "X_ORIGIN_VERIFY_SECRET_ARN": (
                         props.x_origin_verify_secret.secret_arn
                     ),
                 },
             ),
         )
-        
+
         # Grant permission to describe regions
         get_regions_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -730,14 +876,16 @@ class ConnectorsConstruct(Construct):
                 resources=["*"],
             )
         )
-        
+
         regions_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(get_regions_lambda.function),
             authorization_type=apigateway.AuthorizationType.COGNITO,
             authorizer=props.cognito_authorizer,
         )
-        
+
+        # CORS support is handled by default_cors_preflight_options at the API Gateway level
+        # No need to manually add OPTIONS methods as they're automatically added to all resources
         add_cors_options_method(aws_resource)
         add_cors_options_method(regions_resource)
         add_cors_options_method(connector_id_resource)
@@ -749,7 +897,11 @@ class ConnectorsConstruct(Construct):
     @property
     def connector_table(self) -> dynamodb.TableV2:
         return self.connectors_table.table
-    
+
     @property
     def connector_sync_lambda(self) -> lambda_.Function:
         return self._connector_sync_lambda.function
+
+    @property
+    def get_buckets_lambda(self) -> lambda_.Function:
+        return self._get_buckets_lambda.function

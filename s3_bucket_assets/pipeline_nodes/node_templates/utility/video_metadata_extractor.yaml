@@ -27,7 +27,7 @@ node:
               actions:
                 - s3:GetObject
               resources:
-                - '*'
+                - "*"
             - effect: Allow
               actions:
                 - dynamodb:GetItem
@@ -44,15 +44,14 @@ node:
               actions:
                 - kms:GenerateDataKey
               resources:
-                - '*'
-                
+                - "*"
+
 actions:
   extract:
     summary: Extract video metadata
     description: Extract metadata from an video file stored in S3
     operationId: extractVideoMetadata
     parameters:
-
       - in: body
         name: S3 File Location
         required: true

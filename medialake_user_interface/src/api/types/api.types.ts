@@ -90,7 +90,7 @@ export interface RoleListResponse {
   message: string;
   data: {
     roles: Role[];
-  }
+  };
 }
 
 export interface RoleResponse {
@@ -98,7 +98,7 @@ export interface RoleResponse {
   message: string;
   data: {
     role: Role;
-  }
+  };
 }
 
 export interface ApiError {
@@ -124,7 +124,7 @@ export interface CreateConnectorRequest {
   configuration: {
     connectorType?: string;
     bucket?: string;
-    s3IntegrationMethod?: 's3Notifications' | 'eventbridge';
+    s3IntegrationMethod?: "s3Notifications" | "eventbridge";
     region?: string;
     objectPrefix?: string | string[];
     [key: string]: string | string[] | undefined;
@@ -188,7 +188,6 @@ export interface SingleConnectorResponse {
   status: number;
   message: string;
   data: ConnectorResponse;
-
 }
 
 // export interface ConnectorResponse {
@@ -230,7 +229,7 @@ export interface S3BucketResponse {
   message: string;
   data: {
     buckets: string[];
-  }
+  };
 }
 
 export interface S3Object {
@@ -251,14 +250,14 @@ export interface S3ListObjectsResponse {
   nextContinuationToken?: string;
 }
 
-export interface Connector extends ConnectorResponse { }
+export interface Connector extends ConnectorResponse {}
 
 export interface ConnectorListResponse {
   status: string;
   message: string;
   data: {
     connectors: ConnectorResponse[];
-  }
+  };
 }
 
 export interface Integration {
@@ -274,7 +273,7 @@ export interface UserListResponse {
   message: string;
   data: {
     users: User[];
-  }
+  };
 }
 
 export interface UserResponse {
@@ -282,11 +281,11 @@ export interface UserResponse {
   message: string;
   data: {
     user: User;
-  }
+  };
 }
 
 // AWS Specific Types
 export interface AWSRegion {
-    value: string;
-    label: string;
+  value: string;
+  label: string;
 }

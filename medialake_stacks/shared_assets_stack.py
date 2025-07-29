@@ -1,13 +1,14 @@
 from dataclasses import dataclass
-from constructs import Construct
-from aws_cdk import Stack
-from aws_cdk import (
-    aws_dynamodb as dynamodb,
-    aws_s3 as s3,
-)
 
-from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
+from aws_cdk import Stack
+from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_s3 as s3
+from constructs import Construct
+
 from config import config
+from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
+
+
 @dataclass
 class SharedAssetsStackProps:
     asset_table: dynamodb.TableV2
@@ -16,12 +17,18 @@ class SharedAssetsStackProps:
 
 class SharedAssetsStack(Stack):
 
-    def __init__(self, scope: Construct, construct_id: str, props: SharedAssetsStackProps, **kwargs):
+    def __init__(
+        self,
+        scope: Construct,
+        construct_id: str,
+        props: SharedAssetsStackProps,
+        **kwargs,
+    ):
         super().__init__(scope, construct_id, **kwargs)
 
-        env = kwargs.get("env")
-        account = Stack.of(self).account
-        region = Stack.of(self).region
+        kwargs.get("env")
+        Stack.of(self).account
+        Stack.of(self).region
 
         # Create Assets Table
         assets_table_props = DynamoDBProps(
@@ -35,21 +42,17 @@ class SharedAssetsStack(Stack):
                 dynamodb.GlobalSecondaryIndexPropsV2(
                     index_name="GSI-Time",
                     partition_key=dynamodb.Attribute(
-                        name="GSI-Time-PK",
-                        type=dynamodb.AttributeType.STRING
+                        name="GSI-Time-PK", type=dynamodb.AttributeType.STRING
                     ),
                     sort_key=dynamodb.Attribute(
-                        name="GSI-Time-SK",
-                        type=dynamodb.AttributeType.STRING
-                    )
+                        name="GSI-Time-SK", type=dynamodb.AttributeType.STRING
+                    ),
                 )
-            ]
+            ],
         )
-        
+
         self.assets_table = DynamoDB(
-            self, 
-            "AssetsTable", 
-            props=assets_table_props
+            self, "AssetsTable", props=assets_table_props
         ).table
 
         # Create Derivatives Table
@@ -64,21 +67,17 @@ class SharedAssetsStack(Stack):
                 dynamodb.GlobalSecondaryIndexPropsV2(
                     index_name="GSI-Time",
                     partition_key=dynamodb.Attribute(
-                        name="GSI-Time-PK",
-                        type=dynamodb.AttributeType.STRING
+                        name="GSI-Time-PK", type=dynamodb.AttributeType.STRING
                     ),
                     sort_key=dynamodb.Attribute(
-                        name="GSI-Time-SK",
-                        type=dynamodb.AttributeType.STRING
-                    )
+                        name="GSI-Time-SK", type=dynamodb.AttributeType.STRING
+                    ),
                 )
-            ]
+            ],
         )
-        
+
         self.derivatives_table = DynamoDB(
-            self, 
-            "DerivativesTable", 
-            props=derivatives_table_props
+            self, "DerivativesTable", props=derivatives_table_props
         ).table
 
         # Create Components Table
@@ -93,19 +92,15 @@ class SharedAssetsStack(Stack):
                 dynamodb.GlobalSecondaryIndexPropsV2(
                     index_name="GSI-Path",
                     partition_key=dynamodb.Attribute(
-                        name="GSI-Path-PK",
-                        type=dynamodb.AttributeType.STRING
+                        name="GSI-Path-PK", type=dynamodb.AttributeType.STRING
                     ),
                     sort_key=dynamodb.Attribute(
-                        name="GSI-Path-SK",
-                        type=dynamodb.AttributeType.STRING
-                    )
+                        name="GSI-Path-SK", type=dynamodb.AttributeType.STRING
+                    ),
                 )
-            ]
+            ],
         )
 
         self.components_table = DynamoDB(
-            self, 
-            "ComponentsTable", 
-            props=components_table_props
+            self, "ComponentsTable", props=components_table_props
         ).table

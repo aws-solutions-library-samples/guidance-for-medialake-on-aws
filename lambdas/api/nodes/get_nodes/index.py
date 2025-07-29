@@ -1,14 +1,15 @@
-import os
 import json
+import os
+from typing import Any, Dict
+
 import boto3
-from typing import Dict, Any
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler.api_gateway import (
     APIGatewayRestResolver,
     CORSConfig,
 )
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from lambda_utils import handle_error, lambda_handler_decorator
+from lambda_utils import handle_error
 
 # Initialize AWS services
 dynamodb = boto3.resource("dynamodb")

@@ -1,11 +1,18 @@
-import React, { useState } from 'react';
-import { Box, Button, Container, Paper, Typography, Alert } from '@mui/material';
-import { S3UploaderModal } from '../features/upload';
-import { useFeatureFlag } from '../contexts/FeatureFlagsContext';
+import React, { useState } from "react";
+import {
+  Box,
+  Button,
+  Container,
+  Paper,
+  Typography,
+  Alert,
+} from "@mui/material";
+import { S3UploaderModal } from "../features/upload";
+import { useFeatureFlag } from "../contexts/FeatureFlagsContext";
 
 const UploadDemo: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const isFileUploadEnabled = useFeatureFlag('file-upload-enabled', true);
+  const isFileUploadEnabled = useFeatureFlag("file-upload-enabled", true);
 
   const handleOpenModal = () => {
     setIsModalOpen(true);
@@ -16,7 +23,7 @@ const UploadDemo: React.FC = () => {
   };
 
   const handleUploadComplete = (files: any[]) => {
-    console.log('Upload completed for files:', files);
+    console.log("Upload completed for files:", files);
   };
 
   // If file upload is disabled, show a message
@@ -28,7 +35,8 @@ const UploadDemo: React.FC = () => {
             S3 Upload System
           </Typography>
           <Alert severity="info" sx={{ mt: 2 }}>
-            The file upload feature is currently disabled. Please contact your administrator for more information.
+            The file upload feature is currently disabled. Please contact your
+            administrator for more information.
           </Alert>
         </Paper>
       </Container>
@@ -42,29 +50,38 @@ const UploadDemo: React.FC = () => {
           S3 Upload System
         </Typography>
         <Typography variant="body1" paragraph>
-          This demo showcases an Uppy-based upload system with dynamic S3 connector selection and presigned URL generation.
+          This demo showcases an Uppy-based upload system with dynamic S3
+          connector selection and presigned URL generation.
         </Typography>
         <Typography variant="body1" paragraph>
           Features:
         </Typography>
         <Box component="ul">
           <Box component="li">
-            <Typography>Dynamic S3 connector selection from available connectors</Typography>
+            <Typography>
+              Dynamic S3 connector selection from available connectors
+            </Typography>
           </Box>
           <Box component="li">
-            <Typography>File validation with S3-compatible filename regex</Typography>
+            <Typography>
+              File validation with S3-compatible filename regex
+            </Typography>
           </Box>
           <Box component="li">
-            <Typography>Content type restriction to audio, video, HLS, and MPEG-DASH</Typography>
+            <Typography>
+              Content type restriction to audio, video, HLS, and MPEG-DASH
+            </Typography>
           </Box>
           <Box component="li">
-            <Typography>Automatic multipart upload for files larger than 100MB</Typography>
+            <Typography>
+              Automatic multipart upload for files larger than 100MB
+            </Typography>
           </Box>
           <Box component="li">
             <Typography>Support for 5 concurrent uploads</Typography>
           </Box>
         </Box>
-        <Box sx={{ mt: 4, textAlign: 'center' }}>
+        <Box sx={{ mt: 4, textAlign: "center" }}>
           <Button
             variant="contained"
             color="primary"

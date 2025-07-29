@@ -1,9 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
-import { apiClient } from '@/api/apiClient';
-import { API_ENDPOINTS } from '@/api/endpoints';
-import { logger } from '@/common/helpers/logger';
-import { QUERY_KEYS } from '@/api/queryKeys';
-import axios from 'axios';
+import { useQuery } from "@tanstack/react-query";
+import { apiClient } from "@/api/apiClient";
+import { API_ENDPOINTS } from "@/api/endpoints";
+import { logger } from "@/common/helpers/logger";
+import { QUERY_KEYS } from "@/api/queryKeys";
+import axios from "axios";
 
 export interface FieldInfo {
   name: string;
@@ -35,38 +35,40 @@ export const useSearchFields = () => {
       try {
         const response = await apiClient.get<SearchFieldsResponseType>(
           `${API_ENDPOINTS.SEARCH}/fields`,
-          { signal }
+          { signal },
         );
 
         // Check if the response status is not a success (2xx)
-        if (response.data?.status && !response.data.status.startsWith('2')) {
-          const error = new Error(response.data.message || 'Search fields request failed') as SearchFieldsError;
+        if (response.data?.status && !response.data.status.startsWith("2")) {
+          const error = new Error(
+            response.data.message || "Search fields request failed",
+          ) as SearchFieldsError;
           error.apiResponse = response.data;
           throw error;
         }
 
         if (!response.data?.data?.availableFields) {
-          throw new Error('Invalid search fields response structure');
+          throw new Error("Invalid search fields response structure");
         }
 
         return response.data;
       } catch (error) {
-        logger.error('Search fields error:', error);
-        
+        logger.error("Search fields error:", error);
+
         // Handle axios errors
         if (axios.isAxiosError(error) && error.response?.data) {
           const apiError = new Error(
-            error.response.data.message || 'Search fields request failed'
+            error.response.data.message || "Search fields request failed",
           ) as SearchFieldsError;
           apiError.apiResponse = error.response.data;
           throw apiError;
         }
-        
+
         // Rethrow the error to be handled by the component
         throw error;
       }
     },
     staleTime: 1000 * 60 * 5, // Cache for 5 minutes
-    gcTime: 1000 * 60 * 10 // Keep unused data for 10 minutes
+    gcTime: 1000 * 60 * 10, // Keep unused data for 10 minutes
   });
 };

@@ -1,6 +1,6 @@
-import React from 'react';
-import { Box } from '@mui/material';
-import BatchOperations from './BatchOperations';
+import React from "react";
+import { Box } from "@mui/material";
+import BatchOperations from "./BatchOperations";
 
 interface BatchOperationsWrapperProps {
   selectedAssets: Array<{
@@ -23,10 +23,10 @@ const BatchOperationsWrapper: React.FC<BatchOperationsWrapperProps> = ({
   onBatchShare,
   isDownloadLoading,
   onClearSelection,
-  onRemoveItem
+  onRemoveItem,
 }) => {
   return (
-    <Box sx={{ height: '100%' }}>
+    <Box sx={{ height: "100%" }}>
       {selectedAssets.length > 0 && (
         <BatchOperations
           selectedAssets={selectedAssets}

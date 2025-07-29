@@ -3,24 +3,21 @@ export interface NavigationPanelState {
   collapsedSections?: Record<number, boolean>;
 }
 
-
 export enum SearchType {
   ASSETS = "assets",
   TITLE = "title",
   RIGHTS = "rights",
-  QC = "qc"
+  QC = "qc",
 }
-
 
 export enum AssetType {
   VIDEO = "video",
   CLIP = "clip",
 }
 
-
 export interface Query {
   query: string;
-  search_types: SearchType[]
+  search_types: SearchType[];
 }
 
 export interface SearchResult {
@@ -36,7 +33,7 @@ export interface SearchResult {
     Titles: {
       title: TitleItem[];
     };
-  }
+  };
 }
 
 export interface RightItem {
@@ -68,12 +65,11 @@ export interface VideoItem {
   sourceLocation: {
     bucket: string;
     path: string;
-
   };
   score: number;
   timecode: string;
-  frameRate: number,
-  frameCount: number,
+  frameRate: number;
+  frameCount: number;
   type: string;
   startTime?: number;
   endTime?: number;
@@ -90,7 +86,6 @@ export interface ClipItem {
   type: string;
 }
 
-
 export interface Asset {
   score: number;
   recordId: string;
@@ -99,12 +94,12 @@ export interface Asset {
     type: string;
     name: string;
     startTime?: number;
-    endTime?: number
+    endTime?: number;
     dateCreated: string;
     sourceLocation: {
       bucket: string;
       path: string;
-    }
+    };
     encoding: {
       Video?: {
         Duration?: number;
@@ -121,7 +116,7 @@ export interface Asset {
         Duration?: number;
       };
     };
-  }
+  };
 }
 
 export interface TitleItem {
@@ -157,7 +152,6 @@ export interface TitleItem {
   totalNumberOfEpisodes?: number;
   seasonNumber?: string;
   embedding: any[];
-
 }
 
 export interface Review {

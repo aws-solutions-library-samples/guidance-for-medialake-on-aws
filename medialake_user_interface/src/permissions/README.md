@@ -31,18 +31,26 @@ The new system implements a three-tier caching strategy:
 ```typescript
 class GlobalPermissionCache {
   // Stores complete user, permissions, and ability data
-  setGlobalCache(user, customPermissions, ability, permissionSets, token, expiresIn)
-  
+  setGlobalCache(
+    user,
+    customPermissions,
+    ability,
+    permissionSets,
+    token,
+    expiresIn,
+  );
+
   // Retrieves cached data if valid
-  getGlobalCache(currentToken)
-  
+  getGlobalCache(currentToken);
+
   // Caches individual permission check results
-  setPermissionCheck(cacheKey, result)
-  getPermissionCheck(cacheKey)
+  setPermissionCheck(cacheKey, result);
+  getPermissionCheck(cacheKey);
 }
 ```
 
 **Features:**
+
 - Singleton pattern ensures single source of truth
 - Automatic cache expiration based on JWT token expiry
 - Memory + localStorage persistence
@@ -51,6 +59,7 @@ class GlobalPermissionCache {
 #### 2. Updated Permission Context ([`permission-context.tsx`](context/permission-context.tsx))
 
 **Key Changes:**
+
 - Uses global cache instead of clearing caches frequently
 - Only updates cache when tokens are refreshed, not on every mount
 - Loads from global cache on initialization
@@ -59,6 +68,7 @@ class GlobalPermissionCache {
 #### 3. Optimized Permission Guard ([`PermissionGuard.tsx`](components/PermissionGuard.tsx))
 
 **Key Changes:**
+
 - **Removed cache clearing on mount** - This was the primary performance bottleneck
 - Relies on global cache for consistent permission state
 - Reduced logging overhead
@@ -66,6 +76,7 @@ class GlobalPermissionCache {
 #### 4. Enhanced Permission Hook ([`usePermission.ts`](hooks/usePermission.ts))
 
 **Key Changes:**
+
 - Uses global permission check cache
 - Eliminated extensive debug logging
 - Faster permission check resolution
@@ -74,6 +85,7 @@ class GlobalPermissionCache {
 #### 5. Streamlined Can Component ([`Can.tsx`](components/Can.tsx))
 
 **Key Changes:**
+
 - Removed excessive console logging
 - Optimized rendering logic
 - Better performance for conditional rendering
@@ -81,6 +93,7 @@ class GlobalPermissionCache {
 ## Performance Improvements
 
 ### Before Optimization
+
 - Cache cleared on every `PermissionGuard` mount
 - Cache cleared on every token refresh
 - Extensive logging on every permission check
@@ -88,6 +101,7 @@ class GlobalPermissionCache {
 - No persistence across page reloads
 
 ### After Optimization
+
 - **Global cache loaded once** on app initialization
 - **Cache preserved** during navigation and token refresh
 - **Minimal logging** for production performance
@@ -107,13 +121,13 @@ graph TD
     F --> G[Store in Global Cache]
     G --> H[App Ready]
     D --> H
-    
+
     I[Permission Check] --> J{Check Cache}
     J -->|Hit| K[Return Cached Result]
     J -->|Miss| L[Perform Check]
     L --> M[Cache Result]
     M --> N[Return Result]
-    
+
     O[Token Refresh] --> P[Update Token in Cache]
     P --> Q[Preserve Permissions]
 ```
@@ -121,13 +135,15 @@ graph TD
 ## Usage Examples
 
 ### Checking Permissions
+
 ```typescript
 // In any component
 const { can } = usePermission();
-const allowed = can('read', 'assets'); // Uses global cache
+const allowed = can("read", "assets"); // Uses global cache
 ```
 
 ### Conditional Rendering
+
 ```typescript
 // Optimized Can component
 <Can I="edit" a="users">
@@ -136,6 +152,7 @@ const allowed = can('read', 'assets'); // Uses global cache
 ```
 
 ### Route Protection
+
 ```typescript
 // PermissionGuard no longer clears cache
 <PermissionGuard action="view" subject="dashboard">
@@ -153,17 +170,19 @@ console.log({
   hasGlobalCache: stats.hasGlobalCache,
   cacheAge: stats.cacheAge,
   expiresIn: stats.expiresIn,
-  permissionChecksCount: stats.permissionChecksCount
+  permissionChecksCount: stats.permissionChecksCount,
 });
 ```
 
 ## Migration Notes
 
 ### Breaking Changes
+
 - Old `permissionCache` and `PermissionTokenCache` are replaced by `globalPermissionCache`
 - Cache clearing behavior has changed - caches are now preserved during normal operations
 
 ### Backward Compatibility
+
 - All existing permission checking APIs remain the same
 - Component interfaces unchanged
 - No changes required in consuming components
@@ -171,6 +190,7 @@ console.log({
 ## Configuration
 
 ### Cache TTL Settings
+
 ```typescript
 // Permission check cache TTL (default: 5 minutes)
 private readonly TTL = 5 * 60 * 1000;
@@ -180,11 +200,12 @@ private readonly TTL = 5 * 60 * 1000;
 ```
 
 ### Storage Keys
+
 ```typescript
 // Global cache storage
 private static CACHE_KEY = 'medialake_global_permission_cache';
 
-// Permission checks storage  
+// Permission checks storage
 private static CHECK_CACHE_KEY = 'medialake_permission_checks';
 ```
 
@@ -200,6 +221,7 @@ To verify the caching system is working:
 ## Performance Metrics
 
 Expected improvements:
+
 - **50-80% reduction** in permission-related API calls
 - **Faster page load times** due to cached permissions
 - **Reduced "checking permissions" delays**

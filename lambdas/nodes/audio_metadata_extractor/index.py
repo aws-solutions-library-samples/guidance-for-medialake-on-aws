@@ -1,10 +1,9 @@
+import decimal
 import json
 import os
 import re
 import subprocess
-import decimal
 from decimal import Decimal
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
 
@@ -20,11 +19,12 @@ tracer = Tracer()
 SIGNED_URL_TIMEOUT = 60
 TABLE_NAME = os.environ["MEDIALAKE_ASSET_TABLE"]
 
-s3_client   = boto3.client("s3")
-dynamodb    = boto3.resource("dynamodb")
+s3_client = boto3.client("s3")
+dynamodb = boto3.resource("dynamodb")
 asset_table = dynamodb.Table(TABLE_NAME)
 
 TMP_DIR = Path("/tmp")
+
 
 # ── helper: strip Decimal → int/float ──────────────────────────────
 def _strip_decimals(obj):
@@ -35,6 +35,7 @@ def _strip_decimals(obj):
     if isinstance(obj, decimal.Decimal):
         return int(obj) if obj % 1 == 0 else float(obj)
     return obj
+
 
 # ── helper: convert all numbers to Decimal for DynamoDB ────────────
 def _decimalize(obj: Any) -> Any:
@@ -47,42 +48,79 @@ def _decimalize(obj: Any) -> Any:
         return Decimal(str(obj))
     return obj
 
+
 # ── helpers: field sanitization ────────────────────────────────────
 def _sanitize_field_name(field_name: str) -> str:
     sanitized = field_name.replace("@", "").replace("#", "")
-    sanitized = re.sub(r'(?<!^)(?=[A-Z])', '_', sanitized)
+    sanitized = re.sub(r"(?<!^)(?=[A-Z])", "_", sanitized)
     sanitized = sanitized.lower()
-    sanitized = re.sub(r'[^a-z0-9_]', '_', sanitized)
-    sanitized = re.sub(r'_+', '_', sanitized).strip('_')
+    sanitized = re.sub(r"[^a-z0-9_]", "_", sanitized)
+    sanitized = re.sub(r"_+", "_", sanitized).strip("_")
     if sanitized and sanitized[0].isdigit():
         sanitized = f"field_{sanitized}"
     return sanitized or "unknown_field"
 
+
 def _should_be_duration_field(field_name: str) -> bool:
     field_lower = field_name.lower()
     duration_patterns = [
-        'duration','time','length','runtime','play','playback','total','media','stream','file','track'
+        "duration",
+        "time",
+        "length",
+        "runtime",
+        "play",
+        "playback",
+        "total",
+        "media",
+        "stream",
+        "file",
+        "track",
     ]
     if any(p in field_lower for p in duration_patterns):
         return True
-    time_suffixes = ['_ts','_time','_duration','_length','_runtime']
+    time_suffixes = ["_ts", "_time", "_duration", "_length", "_runtime"]
     return any(suffix in field_lower for suffix in time_suffixes)
+
 
 def _should_be_numeric_field(field_name: str) -> bool:
     if _should_be_duration_field(field_name):
         return False
     field_lower = field_name.lower()
     numeric_patterns = [
-        'rate','bitrate','framerate','samplerate',
-        'count','number','channels','channel',
-        'size','width','height','filesize',
-        'index','id','level','profile',
-        'fps','delay','stream_size'
+        "rate",
+        "bitrate",
+        "framerate",
+        "samplerate",
+        "count",
+        "number",
+        "channels",
+        "channel",
+        "size",
+        "width",
+        "height",
+        "filesize",
+        "index",
+        "id",
+        "level",
+        "profile",
+        "fps",
+        "delay",
+        "stream_size",
     ]
     if any(p in field_lower for p in numeric_patterns):
         return True
-    numeric_indicators = ['_rate','_count','_size','_width','_height','_fps','_id','_index']
+    numeric_indicators = [
+        "_rate",
+        "_count",
+        "_size",
+        "_width",
+        "_height",
+        "_fps",
+        "_id",
+        "_index",
+    ]
     return any(ind in field_lower for ind in numeric_indicators)
+
 
 def _sanitize_field_value(value: Any, field_name: str = "") -> Any:
     if isinstance(value, (dict, list)):
@@ -96,27 +134,45 @@ def _sanitize_field_value(value: Any, field_name: str = "") -> Any:
         return value
     if isinstance(value, str) and _should_be_numeric_field(field_name):
         try:
-            return float(value) if '.' in value else int(value)
+            return float(value) if "." in value else int(value)
         except Exception:
             pass
     return str(value)
 
+
 # ── helpers: analysis tools ────────────────────────────────────────
 def run_ffprobe(file_path: str) -> Dict[str, Any]:
-    cmd = ["/opt/bin/ffprobe", "-v", "error",
-           "-show_streams", "-show_format", "-print_format", "json", file_path]
+    cmd = [
+        "/opt/bin/ffprobe",
+        "-v",
+        "error",
+        "-show_streams",
+        "-show_format",
+        "-print_format",
+        "json",
+        file_path,
+    ]
     res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if res.returncode:
         raise RuntimeError("ffprobe failed: " + res.stderr.decode())
     return json.loads(res.stdout.decode())
 
+
 def run_mediainfo(file_path: str) -> Dict[str, Any]:
     return json.loads(MediaInfo.parse(file_path, output="JSON"))
 
+
 def merge_metadata(ff: Dict, mi: Dict) -> Dict[str, Any]:
     merged = {"general": {}, "video": [], "audio": []}
-    ff_fmt  = ff.get("format", {})
-    mi_gen  = next((t for t in mi.get("media", {}).get("track", []) if t.get("@type") == "General"), {})
+    ff_fmt = ff.get("format", {})
+    mi_gen = next(
+        (
+            t
+            for t in mi.get("media", {}).get("track", [])
+            if t.get("@type") == "General"
+        ),
+        {},
+    )
     merged_gen = {k: v for k, v in ff_fmt.items() if k != "streams"}
     for k, v in mi_gen.items():
         if v and merged_gen.get(k) != v:
@@ -124,7 +180,7 @@ def merge_metadata(ff: Dict, mi: Dict) -> Dict[str, Any]:
     merged["general"] = merged_gen
 
     ff_streams = ff.get("streams", [])
-    mi_tracks  = mi.get("media", {}).get("track", [])
+    mi_tracks = mi.get("media", {}).get("track", [])
     video_ff = [s for s in ff_streams if s.get("codec_type") == "video"]
     audio_ff = [s for s in ff_streams if s.get("codec_type") == "audio"]
     video_mi = [t for t in mi_tracks if t.get("@type") == "Video"]
@@ -135,7 +191,7 @@ def merge_metadata(ff: Dict, mi: Dict) -> Dict[str, Any]:
         if i < len(video_mi):
             for k, v in video_mi[i].items():
                 if v and not merged_v.get(k):
-                    key   = _sanitize_field_name(k)
+                    key = _sanitize_field_name(k)
                     merged_v[key] = _sanitize_field_value(v, key)
         merged["video"].append(merged_v)
 
@@ -144,17 +200,19 @@ def merge_metadata(ff: Dict, mi: Dict) -> Dict[str, Any]:
         if i < len(audio_mi):
             for k, v in audio_mi[i].items():
                 if v and not merged_a.get(k):
-                    key   = _sanitize_field_name(k)
+                    key = _sanitize_field_name(k)
                     merged_a[key] = _sanitize_field_value(v, key)
         merged["audio"].append(merged_a)
 
     return merged
 
+
 # ── helpers: ID sanitisation ───────────────────────────────────────
 def clean_asset_id(val: str) -> str:
     parts = val.split(":")
-    uuid  = parts[-2] if parts[-1] == "master" else parts[-1]
+    uuid = parts[-2] if parts[-1] == "master" else parts[-1]
     return f"asset:uuid:{uuid}"
+
 
 # ── handler ────────────────────────────────────────────────────────
 @lambda_middleware(event_bus_name=os.getenv("EVENT_BUS_NAME", "default-event-bus"))
@@ -176,33 +234,35 @@ def lambda_handler(event, context):
         inv_id = clean_asset_id(inv_raw)
 
         # download
-        src    = asset["DigitalSourceAsset"]["MainRepresentation"]
+        src = asset["DigitalSourceAsset"]["MainRepresentation"]
         bucket = src["StorageInfo"]["PrimaryLocation"]["Bucket"]
-        key    = src["StorageInfo"]["PrimaryLocation"]["ObjectKey"]["FullPath"]
-        local  = TMP_DIR / Path(key).name
+        key = src["StorageInfo"]["PrimaryLocation"]["ObjectKey"]["FullPath"]
+        local = TMP_DIR / Path(key).name
         s3_client.download_file(bucket, key, str(local))
         steps.setdefault(inv_id, {})["S3_download"] = "Success"
 
         # analyse
-        ff = run_ffprobe(str(local));  steps[inv_id]["FFProbe"]  = "Success"
-        mi = run_mediainfo(str(local)); steps[inv_id]["MediaInfo"] = "Success"
+        ff = run_ffprobe(str(local))
+        steps[inv_id]["FFProbe"] = "Success"
+        mi = run_mediainfo(str(local))
+        steps[inv_id]["MediaInfo"] = "Success"
         merged = merge_metadata(ff, mi)
 
         # extract audio spec
         first_audio = merged.get("audio", [{}])[0]
         audio_specs[inv_id] = {
-            "Duration":   first_audio.get("duration"),
-            "Codec":      first_audio.get("codec_name"),
+            "Duration": first_audio.get("duration"),
+            "Codec": first_audio.get("codec_name"),
             "SampleRate": first_audio.get("sample_rate"),
-            "Channels":   first_audio.get("channels"),
+            "Channels": first_audio.get("channels"),
         }
 
         # fetch existing metadata, merge and decimalize
         existing_emb = (
             asset_table.get_item(Key={"InventoryID": inv_id})
-                       .get("Item", {})
-                       .get("Metadata", {})
-                       .get("EmbeddedMetadata", {})
+            .get("Item", {})
+            .get("Metadata", {})
+            .get("EmbeddedMetadata", {})
         )
         merged_emb = {**existing_emb, "audio": merged.get("audio", [])}
         merged_emb_decimal = _decimalize(merged_emb)
@@ -224,10 +284,12 @@ def lambda_handler(event, context):
     # strip Decimal objects before returning
     return {
         "statusCode": 200,
-        "body": json.dumps({
-            "message":      "Process completed successfully",
-            "steps":        _strip_decimals(steps),
-            "audio_specs":  _strip_decimals(audio_specs),
-            "updatedAsset": _strip_decimals(updated_assets),
-        }),
+        "body": json.dumps(
+            {
+                "message": "Process completed successfully",
+                "steps": _strip_decimals(steps),
+                "audio_specs": _strip_decimals(audio_specs),
+                "updatedAsset": _strip_decimals(updated_assets),
+            }
+        ),
     }

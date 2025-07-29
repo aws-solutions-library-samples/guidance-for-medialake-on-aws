@@ -1,16 +1,15 @@
-import os
 import json
+import os
 import re
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 import boto3
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from pymediainfo import MediaInfo
-
 from lambda_middleware import lambda_middleware  # your decorator
+from pymediainfo import MediaInfo
 
 # ─── constants ──────────────────────────────────────────────────────────
 SIGNED_URL_TIMEOUT = 60
@@ -20,8 +19,8 @@ TMP_DIR = Path("/tmp")
 logger = Logger()
 tracer = Tracer()
 
-s3          = boto3.client("s3")
-dynamodb    = boto3.resource("dynamodb")
+s3 = boto3.client("s3")
+dynamodb = boto3.resource("dynamodb")
 asset_table = dynamodb.Table(os.environ["MEDIALAKE_ASSET_TABLE"])
 
 
@@ -29,8 +28,16 @@ asset_table = dynamodb.Table(os.environ["MEDIALAKE_ASSET_TABLE"])
 def run_ffprobe(file_path: str) -> Dict[str, Any]:
     """Return ffprobe JSON for a file, raise on error."""
     result = subprocess.run(
-        [FFPROBE_BIN, "-v", "error", "-show_streams", "-show_format",
-         "-print_format", "json", file_path],
+        [
+            FFPROBE_BIN,
+            "-v",
+            "error",
+            "-show_streams",
+            "-show_format",
+            "-print_format",
+            "json",
+            file_path,
+        ],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
@@ -50,7 +57,11 @@ def merge_metadata(ff: Dict, mi: Dict) -> Dict[str, Any]:
     # general
     ff_general = {k: v for k, v in ff.get("format", {}).items() if k != "streams"}
     mi_general = next(
-        (t for t in mi.get("media", {}).get("track", []) if t.get("@type") == "General"),
+        (
+            t
+            for t in mi.get("media", {}).get("track", [])
+            if t.get("@type") == "General"
+        ),
         {},
     )
     merged["general"] = {**ff_general, **mi_general}
@@ -58,8 +69,12 @@ def merge_metadata(ff: Dict, mi: Dict) -> Dict[str, Any]:
     # streams
     ff_video = [s for s in ff.get("streams", []) if s.get("codec_type") == "video"]
     ff_audio = [s for s in ff.get("streams", []) if s.get("codec_type") == "audio"]
-    mi_video = [t for t in mi.get("media", {}).get("track", []) if t.get("@type") == "Video"]
-    mi_audio = [t for t in mi.get("media", {}).get("track", []) if t.get("@type") == "Audio"]
+    mi_video = [
+        t for t in mi.get("media", {}).get("track", []) if t.get("@type") == "Video"
+    ]
+    mi_audio = [
+        t for t in mi.get("media", {}).get("track", []) if t.get("@type") == "Audio"
+    ]
 
     for i, stream in enumerate(ff_video):
         extra = mi_video[i] if i < len(mi_video) else {}
@@ -79,7 +94,12 @@ def clean_asset_id(asset_id: str) -> str:
 
 def sanitize_metadata(data: Dict[str, Any]) -> Dict[str, Any]:
     def is_blob(s: Any) -> bool:
-        return isinstance(s, str) and len(s) > 100 and re.fullmatch(r"[A-Za-z0-9+/]+={0,2}", s or "")
+        return (
+            isinstance(s, str)
+            and len(s) > 100
+            and re.fullmatch(r"[A-Za-z0-9+/]+={0,2}", s or "")
+        )
+
     def walk(o: Any):
         if isinstance(o, dict):
             return {k: walk(v) for k, v in o.items() if not is_blob(v)}
@@ -90,6 +110,7 @@ def sanitize_metadata(data: Dict[str, Any]) -> Dict[str, Any]:
         if isinstance(o, str) and o.startswith("0000-00-00"):
             return None
         return o
+
     return walk(data)
 
 
@@ -121,9 +142,9 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext):
 
         for asset in assets:
             inv_id = clean_asset_id(asset["InventoryID"])
-            src    = asset["DigitalSourceAsset"]["MainRepresentation"]
+            src = asset["DigitalSourceAsset"]["MainRepresentation"]
             bucket = src["StorageInfo"]["PrimaryLocation"]["Bucket"]
-            key    = src["StorageInfo"]["PrimaryLocation"]["ObjectKey"]["FullPath"]
+            key = src["StorageInfo"]["PrimaryLocation"]["ObjectKey"]["FullPath"]
             local_file = TMP_DIR / Path(key).name
 
             # 1. Download from S3
@@ -135,7 +156,7 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext):
             mi = run_mediainfo(str(local_file))
             steps[inv_id]["Metadata_probe"] = "Success"
 
-            merged    = merge_metadata(ff, mi)
+            merged = merge_metadata(ff, mi)
             sanitized = sanitize_metadata(merged)
 
             # 3. Update DynamoDB
@@ -157,19 +178,21 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext):
             v0 = merged.get("video", [{}])[0]
             video_specs[inv_id] = {
                 "Resolution": {"Width": v0.get("width"), "Height": v0.get("height")},
-                "Codec":      v0.get("codec_name"),
-                "BitRate":    v0.get("bit_rate"),
-                "FrameRate":  v0.get("r_frame_rate"),
+                "Codec": v0.get("codec_name"),
+                "BitRate": v0.get("bit_rate"),
+                "FrameRate": v0.get("r_frame_rate"),
             }
 
         return {
             "statusCode": 200,
-            "body": json.dumps({
-                "message":       "Process completed successfully",
-                "steps":         steps,
-                "video_specs":   video_specs,
-                "updatedAsset":  updated_assets,
-            }),
+            "body": json.dumps(
+                {
+                    "message": "Process completed successfully",
+                    "steps": steps,
+                    "video_specs": video_specs,
+                    "updatedAsset": updated_assets,
+                }
+            ),
         }
 
     except Exception as exc:

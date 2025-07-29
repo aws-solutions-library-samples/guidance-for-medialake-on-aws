@@ -9,93 +9,98 @@ Parameters:
     AllowedValues:
       - Git
       - S3PresignedURL
-  
+
   GitRepositoryUrl:
-    Description: URL of the public Git repository (if Git source type is selected)
+    Description: URL of the public Git repository (e.g., https://github.com/username/repository.git)
     Type: String
-    Default: ''
-  
-  GitBranch:
-    Description: Branch name to use from the Git repository
-    Type: String
-    Default: main
-  
+    Default: 'https://github.com/aws-solutions-library-samples/guidance-for-medialake'
+
   S3PresignedURL:
     Description: Presigned URL for downloading the CDK code ZIP (if S3PresignedURL source type is selected)
     Type: String
     Default: ''
-  
-  PipelineName:
-    Description: Name of the CodePipeline
-    Type: String
-    Default: CDKDeploymentPipeline
-  
-  NodejsVersion:
-    Description: Node.js version to use for frontend
-    Type: String
-    Default: 20
-    AllowedValues:
-      - 18
-      - 20
-      - 22
-  
+
   InitialUserEmail:
-    Description: Initial Cognito user email
+    Description: Initial Media Lake administrator user email
     Type: String
     AllowedPattern: '[^@]+@[^@]+\.[^@]+'
-  
-  ProjectEnvironment:
-    Description: Project environment (dev, prod, ...)
+
+  InitialUserFirstName:
+    Description: Initial Media Lake administrator first name
+    Type: String
+    MinLength: 1
+    MaxLength: 50
+    AllowedPattern: '^[a-zA-Z\s\-\.]+$'
+
+  InitialUserLastName:
+    Description: Initial Media Lake administrator last name
+    Type: String
+    MinLength: 1
+    MaxLength: 50
+    AllowedPattern: '^[a-zA-Z\s\-\.]+$'
+
+  MediaLakeEnvironmentName:
+    Description: Media Lake environment name (dev, prd, ...)
     Type: String
     MinLength: 1
     MaxLength: 10
     AllowedPattern: ^[a-zA-Z0-9]*$
     Default: dev
 
+  OpenSearchDeploymentSize:
+    Description: OpenSearch deployment size
+    Type: String
+    Default: small
+    AllowedValues:
+      - small
+      - medium
+      - large
+
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
       -
         Label:
-          default: MediaLake Source Code Origin
+          default: Initial Media Lake User
+        Parameters:
+          - InitialUserEmail
+          - InitialUserFirstName
+          - InitialUserLastName
+      -
+        Label:
+          default: Media Lake Configuration
+        Parameters:
+          - MediaLakeEnvironmentName
+          - OpenSearchDeploymentSize
+      -
+        Label:
+          default: Media Lake Deployment Configuration
         Parameters:
           - SourceType
           - GitRepositoryUrl
-          - GitBranch
           - S3PresignedURL
-      -
-        Label:
-          default: CDK Build Customization
-        Parameters:
-          - PipelineName
-          - NodejsVersion
-          - ProjectEnvironment
-      -
-        Label:
-          default: Amazon Cognito / Amazon Simple Notification Service
-        Parameters:
-          - InitialUserEmail
     ParameterLabels:
-      PipelineName:
-        default: CodePipeline Pipeline Name
       InitialUserEmail:
         default: Email
-      NodejsVersion:
-        default: Nodejs Version
-      ProjectEnvironment:
-        default: Project Environment
+      InitialUserFirstName:
+        default: First Name
+      InitialUserLastName:
+        default: Last Name
+      MediaLakeEnvironmentName:
+        default: Media Lake Environment Name
+      OpenSearchDeploymentSize:
+        default: OpenSearch Deployment Size
       SourceType:
         default: Source Type
       GitRepositoryUrl:
-        default: Git Repository Url
-      GitBranch:
-        default: Git Branch
+        default: Git Repository URL
       S3PresignedURL:
         default: S3 Presigned URL
 
 Conditions:
   IsGitSource: !Equals [!Ref SourceType, 'Git']
   IsS3PresignedURLSource: !Equals [!Ref SourceType, 'S3PresignedURL']
+  NeedsInitialSourcePackage: !Or [!Equals [!Ref SourceType, 'Git'], !Equals [!Ref SourceType, 'S3PresignedURL']]
 
 Resources:
   # Add the Service Linked Role Manager resources first
@@ -111,15 +116,15 @@ Resources:
           import boto3
           import cfnresponse
           import logging
-          
+
           logger = logging.getLogger()
           logger.setLevel(logging.INFO)
-          
+
           def check_and_create_role(service_name):
               """Check if service-linked role exists and create if it doesn't"""
               iam = boto3.client('iam')
               role_name = f"AWSServiceRoleFor{service_name.split('.')[0].upper()}"
-              
+
               try:
                   # Check if role exists
                   iam.get_role(RoleName=role_name)
@@ -141,19 +146,19 @@ Resources:
               except Exception as e:
                   logger.error(f"Error checking role {role_name}: {str(e)}")
                   return False
-          
+
           def handler(event, context):
               logger.info(f"Received event: {event}")
-              
+
               # List of services that need service-linked roles
               services = [
                   'es.amazonaws.com',
                   'opensearchservice.amazonaws.com',
                   'osis.amazonaws.com'
               ]
-              
+
               response_data = {}
-              
+
               if event['RequestType'] in ['Create', 'Update']:
                   success = True
                   for service in services:
@@ -161,7 +166,7 @@ Resources:
                           success = False
                           response_data['Error'] = f"Failed to create role for {service}"
                           break
-                  
+
                   status = cfnresponse.SUCCESS if success else cfnresponse.FAILED
                   cfnresponse.send(event, context, status, response_data)
               else:
@@ -227,7 +232,7 @@ Resources:
                   - 's3:GetObject'
                   - 's3:PutObject'
                   - 's3:GetObjectVersion'
-                Resource: 
+                Resource:
                   - !Sub 'arn:aws:s3:::${ArtifactBucket}/*'
               - Effect: Allow
                 Action:
@@ -257,7 +262,7 @@ Resources:
               Service: codebuild.amazonaws.com
             Action: 'sts:AssumeRole'
       ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/AdministratorAccess'  # Note: In production, use a more restricted policy based on your CDK stack requirements
+        - 'arn:aws:iam::aws:policy/AdministratorAccess'
 
   CodePipelineServiceRole:
     Type: 'AWS::IAM::Role'
@@ -284,7 +289,7 @@ Resources:
                   - 's3:GetObjectVersion'
                   - 's3:GetBucketVersioning'
                   - 's3:ListBucket'
-                Resource: 
+                Resource:
                   - !Sub 'arn:aws:s3:::${ArtifactBucket}'
                   - !Sub 'arn:aws:s3:::${ArtifactBucket}/*'
 
@@ -309,22 +314,22 @@ Resources:
               NoncurrentDays: 1
             ExpiredObjectDeleteMarker: true
 
-  # Initial source package for S3-based pipeline
+  # Initial source package for S3-based and Git-based pipelines
   InitialSourcePackage:
     Type: 'Custom::S3InitialFile'
-    Condition: IsS3PresignedURLSource
+    Condition: NeedsInitialSourcePackage
     Properties:
       ServiceToken: !GetAtt InitialSourceFunction.Arn
       BucketName: !Ref ArtifactBucket
       SourceKey: 'source-package.zip'
       Content: !Sub |
-        This is a source placeholder for the ${PipelineName} pipeline.
+        This is a source placeholder for the MediaLakeCDKPipeline pipeline.
         Created on ${AWS::StackName} in ${AWS::Region}.
         Timestamp: ${AWS::AccountId}
 
   InitialSourceFunction:
     Type: 'AWS::Lambda::Function'
-    Condition: IsS3PresignedURLSource
+    Condition: NeedsInitialSourcePackage
     Properties:
       Handler: index.handler
       Role: !GetAtt LambdaExecutionRole.Arn
@@ -337,7 +342,7 @@ Resources:
           import io
           import zipfile
           import time
-          
+
           def handler(event, context):
               if event['RequestType'] in ['Create', 'Update']:
                   try:
@@ -345,7 +350,7 @@ Resources:
                       bucket_name = event['ResourceProperties']['BucketName']
                       source_key = event['ResourceProperties']['SourceKey']
                       content = event['ResourceProperties']['Content']
-                      
+
                       # Create a simple ZIP file in memory
                       buffer = io.BytesIO()
                       with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as z:
@@ -353,16 +358,16 @@ Resources:
                           z.writestr('README.md', content)
                           # Add a timestamp file
                           z.writestr('timestamp.txt', str(time.time()))
-                      
+
                       buffer.seek(0)
-                      
+
                       # Upload the ZIP file to S3
                       s3.put_object(
                           Bucket=bucket_name,
                           Key=source_key,
                           Body=buffer.getvalue()
                       )
-                      
+
                       response_data = {'Message': 'Initial source package created'}
                       cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
                   except Exception as e:
@@ -374,7 +379,7 @@ Resources:
 
   LambdaExecutionRole:
     Type: 'AWS::IAM::Role'
-    Condition: IsS3PresignedURLSource
+    Condition: NeedsInitialSourcePackage
     Properties:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
@@ -396,11 +401,66 @@ Resources:
                 Resource: !Sub 'arn:aws:s3:::${ArtifactBucket}/*'
 
   # CodeBuild Projects
+  # Git Clone Project for public repositories
+  GitCloneProject:
+    Type: 'AWS::CodeBuild::Project'
+    Condition: IsGitSource
+    DependsOn:
+      - ServiceLinkedRoleManager
+      - InitialSourcePackage
+    Properties:
+      Name: 'MediaLakeCDKPipeline-GitClone'
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
+        EnvironmentVariables:
+          - Name: GIT_REPOSITORY_URL
+            Value: !Ref GitRepositoryUrl
+          - Name: GIT_BRANCH
+            Value: main
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: !Sub |
+          version: 0.2
+          phases:
+            install:
+              runtime-versions:
+                python: 3.12
+              commands:
+                - 'echo "Installing git"'
+                - 'yum update -y'
+                - 'yum install -y git'
+            build:
+              commands:
+                - 'echo "Cloning repository from $GIT_REPOSITORY_URL"'
+                - 'echo "Branch: $GIT_BRANCH"'
+                - 'git clone --depth 1 --branch $GIT_BRANCH $GIT_REPOSITORY_URL source/'
+                - 'echo "Listing cloned content structure"'
+                - 'find source -type d | sort'
+                - 'echo "Copying files to working directory"'
+                - 'cp -r source/* .'
+                - 'echo "Directory structure after copy"'
+                - 'find . -maxdepth 3 -type d | sort'
+            post_build:
+              commands:
+                - 'echo "Git clone completed"'
+          artifacts:
+            files:
+              - "**/*"
+              - "!source/**/*"
+
   DownloadSourceProject:
     Type: 'AWS::CodeBuild::Project'
     Condition: IsS3PresignedURLSource
+    DependsOn:
+      - ServiceLinkedRoleManager
+      - InitialSourcePackage
     Properties:
-      Name: !Sub '${PipelineName}-DownloadSource'
+      Name: 'MediaLakeCDKPipeline-DownloadSource'
       ServiceRole: !GetAtt CodeBuildServiceRole.Arn
       Artifacts:
         Type: CODEPIPELINE
@@ -418,19 +478,19 @@ Resources:
                 python: 3.12
             build:
               commands:
-                - echo "Downloading source code from presigned URL"
-                - curl -L "${S3PresignedURL}" -o source-code.zip
-                - mkdir -p source
-                - unzip -o source-code.zip -d source/
-                - echo "Listing downloaded content structure"
-                - find source -type d | sort
-                - echo "Copying files to working directory"
-                - cp -r source/* .
-                - echo "Directory structure after copy"
-                - find . -maxdepth 3 -type d | sort
+                - 'echo "Downloading source code from presigned URL"'
+                - 'curl -L "${S3PresignedURL}" -o source-code.zip'
+                - 'mkdir -p source'
+                - 'unzip -o source-code.zip -d source/'
+                - 'echo "Listing downloaded content structure"'
+                - 'find source -type d | sort'
+                - 'echo "Copying files to working directory"'
+                - 'cp -r source/* .'
+                - 'echo "Directory structure after copy"'
+                - 'find . -maxdepth 3 -type d | sort'
             post_build:
               commands:
-                - echo "Download completed"
+                - 'echo "Download completed"'
           artifacts:
             files:
               - '**/*'
@@ -441,7 +501,7 @@ Resources:
     Type: 'AWS::CodeBuild::Project'
     DependsOn: ServiceLinkedRoleManager
     Properties:
-      Name: !Sub '${PipelineName}-BuildProject'
+      Name: 'MediaLakeCDKPipeline-BuildProject'
       ServiceRole: !GetAtt CodeBuildServiceRole.Arn
       Artifacts:
         Type: CODEPIPELINE
@@ -463,15 +523,15 @@ Resources:
             install:
               runtime-versions:
                 python: 3.12
-                nodejs: ${NodejsVersion}
+                nodejs: 20
               commands:
                 - echo "Installing dependencies"
                 - yum install jq
                 - npm install -g aws-cdk
                 - npm install -g esbuild
                 - pip install -U pip
-                - export CDK_DIR=$(if [ -d "./medialake-2-12-25/cdk" ]; then echo "./medialake-2-12-25/cdk"; elif [ -d "./cdk" ]; then echo "./cdk"; else find . -type f -name "cdk.json" -o -name "app.py" | grep -v "node_modules" | head -1 | xargs dirname; fi)
-                - export FRONTEND_DIR=$(if [ -d "./medialake-2-12-25/medialake_user_interface" ]; then echo "./medialake-2-12-25/medialake_user_interface"; elif [ -d "./medialake_user_interface" ]; then echo "./medialake_user_interface"; elif [ -d "./medialake-2-12-25/frontend" ]; then echo "./medialake-2-12-25/frontend"; elif [ -d "./frontend" ]; then echo "./frontend"; else find . -name "package.json" -not -path "*/node_modules/*" | head -1 | xargs dirname; fi)
+                - export CDK_DIR=$(if [ -d "./cdk" ]; then echo "./cdk"; else find . -type f -name "cdk.json" -o -name "app.py" | grep -v "node_modules" | head -1 | xargs dirname; fi)
+                - export FRONTEND_DIR=$(if [ -d "./medialake_user_interface" ]; then echo "./medialake_user_interface"; elif [ -d "./frontend" ]; then echo "./frontend"; else find . -name "package.json" -not -path "*/node_modules/*" | head -1 | xargs dirname; fi)
                 - echo "CDK directory $CDK_DIR"
                 - echo "Frontend directory $FRONTEND_DIR"
                 - if [ -z "$CDK_DIR" ]; then echo "Could not find CDK directory"; exit 1; fi
@@ -487,10 +547,13 @@ Resources:
                 - echo "Preparing config file"
                 - cd $CODEBUILD_SRC_DIR/$CDK_DIR
                 - if [ -f "config.json" ]; then echo "Using existing config file"; else echo "Creating config file"; cp .cicd/config.json-template config.json; fi
-                - echo "$( jq --arg e "${ProjectEnvironment}" '.environment = $e' config.json )" > config.json
+                - echo "$( jq --arg e "${MediaLakeEnvironmentName}" '.environment = $e' config.json )" > config.json
                 - echo "$( jq --arg a "${AWS::AccountId}" '.account_id = $a' config.json )" > config.json
                 - echo "$( jq --arg r "${AWS::Region}" '.primary_region = $r' config.json )" > config.json
                 - echo "$( jq --arg u "${InitialUserEmail}" '.initial_user.email = $u' config.json )" > config.json
+                - echo "$( jq --arg f "${InitialUserFirstName}" '.initial_user.first_name = $f' config.json )" > config.json
+                - echo "$( jq --arg l "${InitialUserLastName}" '.initial_user.last_name = $l' config.json )" > config.json
+                - echo "$( jq --arg s "${OpenSearchDeploymentSize}" '.opensearch_deployment_size = $s' config.json )" > config.json
             build:
               commands:
                 - echo "Building frontend"
@@ -508,8 +571,8 @@ Resources:
                 - bash .cicd/build_ffprobe.sh
                 - echo "Building FFmpeg"
                 - bash .cicd/build_ffmpeg.sh
-                - echo "Building CairoSVG"
-                - bash .cicd/build_cairosvg.sh
+                - echo "Building RSSVG"
+                - bash .cicd/build_resvg.sh
                 # - cdk synth || (echo "CDK synth failed" && find . -name "cdk.json" -o -name "app.py" | grep -v "node_modules")
                 - echo "CDK synthesis"
                 - cdk synth || (echo "CDK synth failed" && exit 1)
@@ -520,12 +583,13 @@ Resources:
             files:
               - "**/*"
             base-directory: '.'
+      TimeoutInMinutes: 120
 
   DeployProject:
     Type: 'AWS::CodeBuild::Project'
     DependsOn: ServiceLinkedRoleManager
     Properties:
-      Name: !Sub '${PipelineName}-DeployProject'
+      Name: 'MediaLakeCDKPipeline-DeployProject'
       ServiceRole: !GetAtt CDKDeployRole.Arn
       Artifacts:
         Type: CODEPIPELINE
@@ -546,13 +610,13 @@ Resources:
             install:
               runtime-versions:
                 python: 3.12
-                nodejs: ${NodejsVersion}
+                nodejs: 20
               commands:
                 - echo Installing dependencies
                 - npm install -g aws-cdk
                 - pip install -U pip
                 - echo "Locating CDK directory"
-                - export CDK_DIR=$(if [ -d "./medialake-2-12-25/cdk" ]; then echo "./medialake-2-12-25/cdk"; elif [ -d "./cdk" ]; then echo "./cdk"; else find . -type f -name "cdk.json" -o -name "app.py" | grep -v "node_modules" | head -1 | xargs dirname; fi)
+                - export CDK_DIR=$(if [ -d "./cdk" ]; then echo "./cdk"; else find . -type f -name "cdk.json" -o -name "app.py" | grep -v "node_modules" | head -1 | xargs dirname; fi)
                 - echo "CDK directory $CDK_DIR"
                 - if [ -z "$CDK_DIR" ]; then echo "Could not find CDK directory"; exit 1; fi
                 - cd $CDK_DIR
@@ -564,11 +628,7 @@ Resources:
                 # Bootstrap current region
                 - cdk bootstrap
                 # Also bootstrap us-east-1 if we're not already in that region
-                - |
-                  if [ "${AWS::Region}" != "us-east-1" ]; then
-                    echo "Also bootstrapping us-east-1 for CloudFront WAF deployment"
-                    cdk bootstrap aws://${AWS::AccountId}/us-east-1
-                  fi
+                - 'if [ "${AWS::Region}" != "us-east-1" ]; then echo "Also bootstrapping us-east-1 for CloudFront WAF deployment"; cdk bootstrap aws://${AWS::AccountId}/us-east-1; fi'
                 # Deploy all stacks
                 - cdk deploy --all --require-approval never || (echo "CDK deploy failed" && exit 1)
             post_build:
@@ -578,68 +638,19 @@ Resources:
             files:
               - "**/*"
             base-directory: '.'
+      TimeoutInMinutes: 120
 
   # Pipeline with Git Source
   GitSourcePipeline:
     Type: 'AWS::CodePipeline::Pipeline'
     Condition: IsGitSource
+    DependsOn:
+      - InitialSourcePackage
+      - GitCloneProject
+      - BuildProject
+      - DeployProject
     Properties:
-      Name: !Ref PipelineName
-      RoleArn: !GetAtt CodePipelineServiceRole.Arn
-      ArtifactStore:
-        Type: S3
-        Location: !Ref ArtifactBucket
-      Stages:
-        - Name: Source
-          Actions:
-            - Name: Source
-              ActionTypeId:
-                Category: Source
-                Owner: AWS
-                Provider: CodeStarSourceConnection
-                Version: '1'
-              Configuration:
-                ConnectionArn: !ImportValue GitHubConnection  # Note: You need to create a connection to GitHub in the CodeStar connections and export its ARN
-                FullRepositoryId: !Ref GitRepositoryUrl
-                BranchName: !Ref GitBranch
-                OutputArtifactFormat: 'CODE_ZIP'
-              OutputArtifacts:
-                - Name: SourceCode
-        
-        - Name: Build
-          Actions:
-            - Name: BuildCode
-              ActionTypeId:
-                Category: Build
-                Owner: AWS
-                Provider: CodeBuild
-                Version: '1'
-              Configuration:
-                ProjectName: !Ref BuildProject
-              InputArtifacts:
-                - Name: SourceCode
-              OutputArtifacts:
-                - Name: BuildOutput
-        
-        - Name: Deploy
-          Actions:
-            - Name: DeployCDK
-              ActionTypeId:
-                Category: Build
-                Owner: AWS
-                Provider: CodeBuild
-                Version: '1'
-              Configuration:
-                ProjectName: !Ref DeployProject
-              InputArtifacts:
-                - Name: BuildOutput
-
-  # Pipeline with S3 PresignedURL Source
-  S3SourcePipeline:
-    Type: 'AWS::CodePipeline::Pipeline'
-    Condition: IsS3PresignedURLSource
-    Properties:
-      Name: !Ref PipelineName
+      Name: MediaLakeCDKPipeline
       RoleArn: !GetAtt CodePipelineServiceRole.Arn
       ArtifactStore:
         Type: S3
@@ -659,22 +670,22 @@ Resources:
                 PollForSourceChanges: true
               OutputArtifacts:
                 - Name: PlaceholderSource
-        
-        - Name: Download
+
+        - Name: Clone
           Actions:
-            - Name: DownloadFromPresignedURL
+            - Name: CloneFromGitHub
               ActionTypeId:
                 Category: Build
                 Owner: AWS
                 Provider: CodeBuild
                 Version: '1'
               Configuration:
-                ProjectName: !Ref DownloadSourceProject
+                ProjectName: !Ref GitCloneProject
               InputArtifacts:
                 - Name: PlaceholderSource
               OutputArtifacts:
                 - Name: SourceCode
-        
+
         - Name: Build
           Actions:
             - Name: BuildCode
@@ -689,7 +700,81 @@ Resources:
                 - Name: SourceCode
               OutputArtifacts:
                 - Name: BuildOutput
-        
+
+        - Name: Deploy
+          Actions:
+            - Name: DeployCDK
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref DeployProject
+              InputArtifacts:
+                - Name: BuildOutput
+
+  # Pipeline with S3 PresignedURL Source
+  S3SourcePipeline:
+    Type: 'AWS::CodePipeline::Pipeline'
+    Condition: IsS3PresignedURLSource
+    DependsOn:
+      - InitialSourcePackage
+      - DownloadSourceProject
+      - BuildProject
+      - DeployProject
+    Properties:
+      Name: MediaLakeCDKPipeline
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactBucket
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: Source
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: S3
+                Version: '1'
+              Configuration:
+                S3Bucket: !Ref ArtifactBucket
+                S3ObjectKey: 'source-package.zip'
+                PollForSourceChanges: true
+              OutputArtifacts:
+                - Name: PlaceholderSource
+
+        - Name: Download
+          Actions:
+            - Name: DownloadFromPresignedURL
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref DownloadSourceProject
+              InputArtifacts:
+                - Name: PlaceholderSource
+              OutputArtifacts:
+                - Name: SourceCode
+
+        - Name: Build
+          Actions:
+            - Name: BuildCode
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref BuildProject
+              InputArtifacts:
+                - Name: SourceCode
+              OutputArtifacts:
+                - Name: BuildOutput
+
         - Name: Deploy
           Actions:
             - Name: DeployCDK
@@ -724,40 +809,40 @@ Resources:
           import boto3
           import cfnresponse
           import logging
-          
+
           logger = logging.getLogger()
           logger.setLevel(logging.INFO)
-          
+
           def delete_bucket_contents(bucket_name):
               """Delete all objects and object versions from the bucket"""
               try:
                   s3 = boto3.resource('s3')
                   bucket = s3.Bucket(bucket_name)
-                  
+
                   # Delete all object versions
                   logger.info(f"Deleting all object versions from {bucket_name}")
                   bucket.object_versions.all().delete()
-                  
+
                   # Delete all objects (in case versioning is not enabled)
                   logger.info(f"Deleting all objects from {bucket_name}")
                   bucket.objects.all().delete()
-                  
+
                   return True
               except Exception as e:
                   logger.error(f"Error emptying bucket {bucket_name}: {str(e)}")
                   return False
-          
+
           def handler(event, context):
               logger.info(f"Received event: {json.dumps(event)}")
-              
+
               # Extract the bucket name from the event
               bucket_name = event['ResourceProperties']['BucketName']
               response_data = {}
-              
+
               if event['RequestType'] == 'Delete':
                   logger.info(f"Emptying bucket {bucket_name}")
                   success = delete_bucket_contents(bucket_name)
-                  
+
                   if success:
                       logger.info(f"Successfully emptied bucket {bucket_name}")
                       cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
@@ -802,11 +887,11 @@ Resources:
 Outputs:
   PipelineUrl:
     Description: URL to the CodePipeline console
-    Value: !If 
+    Value: !If
       - IsGitSource
       - !Sub https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${GitSourcePipeline}
       - !Sub https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${S3SourcePipeline}
-  
+
   ArtifactBucketName:
     Description: Name of the S3 bucket used to store pipeline artifacts
     Value: !Ref ArtifactBucket

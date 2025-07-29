@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   Dialog,
   DialogTitle,
@@ -6,9 +6,9 @@ import {
   DialogActions,
   Button,
   Typography,
-  Box
-} from '@mui/material';
-import WarningIcon from '@mui/icons-material/Warning';
+  Box,
+} from "@mui/material";
+import WarningIcon from "@mui/icons-material/Warning";
 
 interface PipelineUpdateConfirmationDialogProps {
   open: boolean;
@@ -16,19 +16,18 @@ interface PipelineUpdateConfirmationDialogProps {
   onConfirm: () => void;
 }
 
-export const PipelineUpdateConfirmationDialog: React.FC<PipelineUpdateConfirmationDialogProps> = ({
-  open,
-  onClose,
-  onConfirm
-}) => {
+export const PipelineUpdateConfirmationDialog: React.FC<
+  PipelineUpdateConfirmationDialogProps
+> = ({ open, onClose, onConfirm }) => {
   return (
     <Dialog open={open} onClose={onClose}>
       <DialogTitle>Update Pipeline</DialogTitle>
       <DialogContent>
-        <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 2 }}>
+        <Box sx={{ display: "flex", alignItems: "flex-start", mb: 2 }}>
           <WarningIcon color="warning" sx={{ mr: 1, mt: 0.5 }} />
           <Typography variant="body1">
-            <strong>Warning:</strong> Updating a pipeline while executions are processing might interrupt those executions.
+            <strong>Warning:</strong> Updating a pipeline while executions are
+            processing might interrupt those executions.
           </Typography>
         </Box>
         <Typography variant="body2" color="text.secondary">
@@ -37,11 +36,7 @@ export const PipelineUpdateConfirmationDialog: React.FC<PipelineUpdateConfirmati
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
-        <Button 
-          onClick={onConfirm} 
-          color="primary" 
-          variant="contained"
-        >
+        <Button onClick={onConfirm} color="primary" variant="contained">
           Update Pipeline
         </Button>
       </DialogActions>

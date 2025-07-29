@@ -1,0 +1,5 @@
+#!/bin/bash
+# Chain wrapper for prepare-commit-msg
+if [ -f "/usr/local/amazon/var/git-defender/hooks/prepare-commit-msg" ]; then
+    /usr/local/amazon/var/git-defender/hooks/prepare-commit-msg "$@"
+fi

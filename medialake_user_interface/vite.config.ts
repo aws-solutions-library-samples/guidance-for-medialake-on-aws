@@ -1,16 +1,16 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import path from 'path'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
 
 export default defineConfig({
-    plugins: [react()],
-    define: {
-        global: 'globalThis',
+  plugins: [react()],
+  define: {
+    global: "globalThis",
+  },
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+      "./runtimeConfig": "./runtimeConfig.browser",
     },
-    resolve: {
-        alias: {
-            '@': path.resolve(__dirname, './src'),
-            './runtimeConfig': './runtimeConfig.browser',
-        },
-    }
+  },
 });

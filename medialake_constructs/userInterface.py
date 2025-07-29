@@ -1,36 +1,34 @@
+import json
 import os
 import shutil
-import sys
 import subprocess
-import json
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Dict, List, Optional
 
+import jsii
 from aws_cdk import (
-    aws_s3 as s3,
-    aws_iam as iam,
-    aws_logs as logs,
-    aws_cloudfront as cloudfront,
-    aws_s3_deployment as s3deploy,
-    aws_secretsmanager as secretsmanager,
-    aws_cloudfront_origins as origins,
-    aws_wafv2 as wafv2,
-    aws_cognito as cognito,
-    Duration,
-    RemovalPolicy,
-    ILocalBundling,
     BundlingOptions,
     DockerImage,
+    Duration,
+    ILocalBundling,
+    RemovalPolicy,
     Stack,
-    aws_lambda as lambda_,
-    custom_resources as cr,
 )
+from aws_cdk import aws_cloudfront as cloudfront
+from aws_cdk import aws_cloudfront_origins as origins
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_logs as logs
+from aws_cdk import aws_s3 as s3
+from aws_cdk import aws_s3_deployment as s3deploy
+from aws_cdk import aws_secretsmanager as secretsmanager
+from aws_cdk import custom_resources as cr
 from constructs import Construct
 
-from dataclasses import dataclass, field
-from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
-from typing import List, Dict, Optional
 from config import config
-import jsii
-from pathlib import Path
+from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
+
 
 @jsii.implements(ILocalBundling)
 class LocalBundling:
@@ -123,7 +121,7 @@ class UIConstructProps:
 
 
 class UIConstruct(Construct):
-    
+
     def __init__(
         self,
         scope: Construct,
@@ -156,7 +154,7 @@ class UIConstruct(Construct):
                 secret_string_template="{}",
             ),
         )
-        
+
         self.user_interface_waf_log_group = logs.LogGroup(
             self,
             "WafLogGroup",
@@ -164,7 +162,6 @@ class UIConstruct(Construct):
             retention=logs.RetentionDays.ONE_WEEK,
             removal_policy=RemovalPolicy.DESTROY,
         )
-
 
         # Enhanced security headers policy
         ui_response_headers_policy = cloudfront.ResponseHeadersPolicy(
@@ -417,7 +414,9 @@ class UIConstruct(Construct):
         )
 
         print(f"Cognito domain prefix: {props.cognito_domain_prefix}")
-        print(f"Cognito domain: {config.resource_prefix}-{config.environment}-{props.cognito_domain_prefix}.auth.{stack.region}.amazoncognito.com")
+        print(
+            f"Cognito domain: {config.resource_prefix}-{config.environment}-{props.cognito_domain_prefix}.auth.{stack.region}.amazoncognito.com"
+        )
         # Get SAML provider if configured
         saml_provider = next(
             (
@@ -427,11 +426,10 @@ class UIConstruct(Construct):
             ),
             None,
         )
-        
+
         # Check if there's a SAML provider and extract the name safely
-        saml_provider_name = ""
-        if saml_provider and hasattr(saml_provider, 'identity_provider_name'):
-            saml_provider_name = saml_provider.identity_provider_name
+        if saml_provider and hasattr(saml_provider, "identity_provider_name"):
+            saml_provider.identity_provider_name
 
         config_content = {
             "region": stack.region,
@@ -462,10 +460,9 @@ class UIConstruct(Construct):
                             "responseType": "code",
                             "redirectSignIn": f"https://{self.cloudfront_distribution.distribution_domain_name}/",
                             "redirectSignOut": f"https://{self.cloudfront_distribution.distribution_domain_name}/sign-in",
-
-                        }
-                    }
-                }
+                        },
+                    },
+                },
             },
             "API": {
                 "REST": {
@@ -473,51 +470,60 @@ class UIConstruct(Construct):
                         "endpoint": f"https://{self.cloudfront_distribution.distribution_domain_name}/{props.api_gateway_stage}"
                     }
                 }
-            }
+            },
         }
-        
-        
+
         config_resource = cr.AwsCustomResource(
             self,
             "ConfigResource",
             on_create=cr.AwsSdkCall(
-                service='S3',
-                action='putObject',
+                service="S3",
+                action="putObject",
                 parameters={
-                    'Bucket': medialake_ui_s3_bucket.bucket.bucket_name,
-                    'Key': 'aws-exports.json',
-                    'Body': json.dumps(config_content),
-                    'ContentType': 'application/json'
+                    "Bucket": medialake_ui_s3_bucket.bucket.bucket_name,
+                    "Key": "aws-exports.json",
+                    "Body": json.dumps(config_content),
+                    "ContentType": "application/json",
                 },
-                physical_resource_id=cr.PhysicalResourceId.of(f"{config.resource_prefix}-aws-exports-json")
+                physical_resource_id=cr.PhysicalResourceId.of(
+                    f"{config.resource_prefix}-aws-exports-json"
+                ),
             ),
             on_update=cr.AwsSdkCall(
-                service='S3',
-                action='putObject',
+                service="S3",
+                action="putObject",
                 parameters={
-                    'Bucket': medialake_ui_s3_bucket.bucket.bucket_name,
-                    'Key': 'aws-exports.json',
-                    'Body': json.dumps(config_content),
-                    'ContentType': 'application/json'
+                    "Bucket": medialake_ui_s3_bucket.bucket.bucket_name,
+                    "Key": "aws-exports.json",
+                    "Body": json.dumps(config_content),
+                    "ContentType": "application/json",
                 },
-                physical_resource_id=cr.PhysicalResourceId.of(f"{config.resource_prefix}-aws-exports-json")
-            ),
-            policy=cr.AwsCustomResourcePolicy.from_statements([
-                iam.PolicyStatement(
-                    actions=['s3:PutObject'],
-                    resources=[medialake_ui_s3_bucket.bucket.arn_for_objects('aws-exports.json')]
+                physical_resource_id=cr.PhysicalResourceId.of(
+                    f"{config.resource_prefix}-aws-exports-json"
                 ),
-                # KMS permissions
-                iam.PolicyStatement(
-                    actions=[
-                        'kms:Decrypt',
-                        'kms:GenerateDataKey',
-                        'kms:GenerateDataKeyWithoutPlaintext',
-                        'kms:DescribeKey'
-                    ],
-                    resources=['*']
-                )
-            ])
+            ),
+            policy=cr.AwsCustomResourcePolicy.from_statements(
+                [
+                    iam.PolicyStatement(
+                        actions=["s3:PutObject"],
+                        resources=[
+                            medialake_ui_s3_bucket.bucket.arn_for_objects(
+                                "aws-exports.json"
+                            )
+                        ],
+                    ),
+                    # KMS permissions
+                    iam.PolicyStatement(
+                        actions=[
+                            "kms:Decrypt",
+                            "kms:GenerateDataKey",
+                            "kms:GenerateDataKeyWithoutPlaintext",
+                            "kms:DescribeKey",
+                        ],
+                        resources=["*"],
+                    ),
+                ]
+            ),
         )
 
         _ = cr.AwsCustomResource(
@@ -537,7 +543,7 @@ class UIConstruct(Construct):
                         f"https://{self.cloudfront_distribution.distribution_domain_name}/sign-in",
                         f"https://localhost:5173",
                         f"https://localhost:5173/",
-                        f"https://localhost:5173/login"
+                        f"https://localhost:5173/login",
                     ],
                     "LogoutURLs": [
                         f"https://{props.cognito_domain_prefix}.auth.{Stack.of(self).region}.amazoncognito.com",
@@ -548,34 +554,35 @@ class UIConstruct(Construct):
                         f"https://{self.cloudfront_distribution.distribution_domain_name}/sign-in",
                         f"https://localhost:5173",
                         f"https://localhost:5173/",
-                        f"https://localhost:5173/login"
+                        f"https://localhost:5173/login",
                     ],
                     "AllowedOAuthFlows": ["code", "implicit"],
                     "AllowedOAuthScopes": ["email", "openid", "profile"],
                     "AllowedOAuthFlowsUserPoolClient": True,
-                    "SupportedIdentityProviders": ["COGNITO"] + [
-                        provider.identity_provider_name 
-                        for provider in config.authZ.identity_providers 
+                    "SupportedIdentityProviders": ["COGNITO"]
+                    + [
+                        provider.identity_provider_name
+                        for provider in config.authZ.identity_providers
                         if provider.identity_provider_method == "saml"
                     ],
                 },
-                physical_resource_id=cr.PhysicalResourceId.of(f"{config.resource_prefix}-cognito-callback-urls-update"),
+                physical_resource_id=cr.PhysicalResourceId.of(
+                    f"{config.resource_prefix}-cognito-callback-urls-update"
+                ),
             ),
             policy=cr.AwsCustomResourcePolicy.from_sdk_calls(
                 resources=cr.AwsCustomResourcePolicy.ANY_RESOURCE
             ),
         )
-        
+
         # Add dependencies
         config_resource.node.add_dependency(self.cloudfront_distribution)
         config_resource.node.add_dependency(medialake_ui_s3_bucket)
 
-                # deploy assets to S3
+        # deploy assets to S3
         if "CI" in os.environ and "CODEBUILD_BUILD_ID" in os.environ:
             dist_path = Path(props.app_path).parent / "assets/dist"
-            asset = s3deploy.Source.asset(
-                str(dist_path)
-            )
+            asset = s3deploy.Source.asset(str(dist_path))
         else:
             asset = s3deploy.Source.asset(
                 props.app_path,
@@ -594,7 +601,7 @@ class UIConstruct(Construct):
             distribution=self.cloudfront_distribution,
             distribution_paths=["/*"],
             memory_limit=1024,
-            exclude=["aws-exports.json"]
+            exclude=["aws-exports.json"],
         )
 
     @property
