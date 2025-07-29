@@ -1077,7 +1077,8 @@ const PipelineEditorContent = () => {
                   type: "custom",
                 };
               }
-              // Add arrow markers to imported edges
+              // Add arrow markers and animation to imported edges
+              edge.animated = true;
               edge.markerEnd = {
                 type: MarkerType.ArrowClosed,
                 width: 20,
@@ -1398,6 +1399,7 @@ const PipelineEditorContent = () => {
             source: edge.source,
             target: edge.target,
             type: edge.type || "custom",
+            animated: true,
             markerEnd: {
               type: MarkerType.ArrowClosed,
               width: 20,
@@ -1461,6 +1463,7 @@ const PipelineEditorContent = () => {
               target: newConnection.target,
               sourceHandle: newConnection.sourceHandle,
               targetHandle: newConnection.targetHandle,
+              animated: true,
               markerEnd: {
                 type: MarkerType.ArrowClosed,
                 width: 20,
@@ -1539,6 +1542,7 @@ const PipelineEditorContent = () => {
         ...connection,
         id: `${connection.source}-${connection.target}`,
         type: "custom",
+        animated: true,
         markerEnd: {
           type: MarkerType.ArrowClosed,
           width: 20,
