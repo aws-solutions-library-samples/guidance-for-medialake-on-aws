@@ -50,23 +50,19 @@ actions:
     operationId: createImageThumbnail
     parameters:
       - in: body
-        name: output_bucket
-        required: true
-        schema:
-          type: string
-          description: S3 bucket name for output
-      - in: body
         name: width
         required: false
         schema:
           type: integer
           description: Width of the thumbnail in pixels
+          default: 200
       - in: body
         name: height
         required: false
         schema:
           type: integer
           description: Height of the thumbnail in pixels
+          default: 113
       - in: body
         name: crop
         required: false

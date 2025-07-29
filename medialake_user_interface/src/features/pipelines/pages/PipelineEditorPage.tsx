@@ -73,7 +73,6 @@ import {
   Sidebar,
   NodeConfigurationForm,
   PipelineToolbar,
-  // JobStatusNode
 } from "../components/PipelineEditor";
 import type { PipelineToolbarProps } from "../components/PipelineEditor/PipelineToolbar";
 import IntegrationValidationDialog from "../components/IntegrationValidationDialog";
@@ -82,7 +81,6 @@ import {
   RightSidebarProvider,
   useRightSidebar,
 } from "@/components/common/RightSidebar/SidebarContext";
-// import { JOB_STATUS_NODE_TYPE } from '../components/PipelineEditor/jobStatusNodeUtils';
 
 // Define the custom node data type
 interface CustomNodeData {
@@ -101,7 +99,6 @@ interface CustomNodeData {
 
 const nodeTypes = {
   custom: CustomNode,
-  // jobStatusNode: JobStatusNode
 };
 
 const edgeTypes = {
@@ -223,7 +220,13 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
           }
 
           // Preserve default value if it exists (API uses 'default', but our type uses 'defaultValue')
-          if ((param as any).default !== undefined) {
+          if (param.schema?.default !== undefined) {
+            parameterData.defaultValue = param.schema.default;
+            console.log(
+              `[PipelineEditorPage] Found default value for ${param.name}:`,
+              param.schema.default,
+            );
+          } else if ((param as any).default !== undefined) {
             parameterData.defaultValue = (param as any).default;
             console.log(
               `[PipelineEditorPage] Found default value for ${param.name}:`,
@@ -1562,7 +1565,6 @@ const PipelineEditorContent = () => {
       updateIdCounter(nodes);
 
       // Check if this is our special job status node
-      // const isJobStatusNode = nodeData.customNodeType === 'jobStatusNode';
 
       const newReactFlowNode: Node<CustomNodeData> = {
         id: getId(),
@@ -1615,32 +1617,19 @@ const PipelineEditorContent = () => {
         },
       }));
 
-      // Determine whether configuration parameters exist
+      // Determine whether configuration parameters exist or if it's an integration node
       const parameters = newReactFlowNode.data.configuration?.parameters;
       const hasParameters = parameters && Object.keys(parameters).length > 0;
+      const isIntegrationNode = newReactFlowNode.data.type === "INTEGRATION";
 
-      console.log("[PipelineEditorPage] Node configuration check:", {
-        nodeId: nodeData.id,
-        nodeType: nodeData.type,
-        configuration: newReactFlowNode.data.configuration,
-        parameters: parameters,
-        hasParameters: hasParameters,
-        parameterKeys: parameters ? Object.keys(parameters) : [],
-      });
-
-      if (hasParameters) {
-        // If parameters exist, open the configuration dialog
-        console.log(
-          "[PipelineEditorPage] Opening configuration dialog for node:",
-          nodeData.id,
-        );
+      if (hasParameters || isIntegrationNode) {
+        // If parameters exist or it's an integration node, open the configuration dialog
         setSelectedNode(nodeWithHandlers);
         setIsNodeConfigOpen(true);
       } else {
         // No configuration needed—skip opening the dialog
         console.log(
-          "[PipelineEditorPage] Node has no configuration parameters; skipping config dialog for:",
-          nodeData.id,
+          "Node has no configuration parameters and is not an integration node; skipping config dialog.",
         );
       }
 
