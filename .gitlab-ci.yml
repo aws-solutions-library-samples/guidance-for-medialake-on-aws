@@ -394,11 +394,16 @@ sync-to-github:
     - rm -f secrets.txt
     - rm -rf docs/
     - rm -rf .roo/
+    - rm -rf design/
     - rm -f setup-dev.sh
     - rm -f manage-hooks.sh
     - rm -f fix.sh
     - rm -f .roomodes
     - rm -f .pre-commit-config.yaml
+    - rm -f .secrets.baseline
+    - rm -f .gitlab-ci.yml
+    - rm -f .gitattributes
+    - rm -f .flake8
     - rm -rf .githooks/
     - git add -A
     - git commit -m "$RELEASE_COMMIT_MESSAGE" --allow-empty
