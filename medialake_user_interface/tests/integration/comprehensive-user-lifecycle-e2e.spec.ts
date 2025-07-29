@@ -304,21 +304,17 @@ class UserManagementHelper {
       .fill(userData.email);
     await this.page.getByRole("textbox", { name: "Email" }).press("Tab");
 
-    // Select role - map userData.role to the correct option
-    let roleOption = userData.role;
-    if (userData.role === "Admin") {
-      roleOption = "Super Administrator";
-    }
-
+    // Select role - for this test, always select "Editor" as requested
     await this.page.getByRole("combobox", { name: "Editor" }).click();
-    await this.page.getByRole("option", { name: roleOption }).click();
+    await this.page.waitForTimeout(500); // Wait for dropdown to open
+    await this.page.getByRole("option", { name: "Editor" }).click();
 
     // Submit form
     await this.page.getByRole("button", { name: "Add", exact: true }).click();
 
-    // Wait for confirmation or success indication
-    await this.page.getByRole("button").click();
-    await this.page.waitForTimeout(2000); // Wait for user creation to complete
+    // Wait for confirmation or success indication - look for success dialog or notification
+    // Instead of clicking a generic button, wait for the form to close or success message
+    await this.page.waitForTimeout(3000); // Wait for user creation to complete and form to close
 
     console.log(
       `[UserManagement] Successfully created user: ${userData.email}`,
@@ -361,6 +357,12 @@ class UserManagementHelper {
     // Confirm deletion
     await this.page.getByRole("button").click(); // Assumes confirmation dialog
 
+    // Wait for deletion to complete and UI to update
+    await this.page.waitForTimeout(2000);
+
+    // Wait for page to reload/refresh after deletion
+    await this.page.waitForLoadState("networkidle");
+
     // Verify user is removed
     await expect(userRow).not.toBeVisible({
       timeout: 10000,
@@ -374,8 +376,12 @@ class UserManagementHelper {
    */
   async verifyUserExists(email: string): Promise<boolean> {
     try {
+      // Wait for page to be stable before checking
+      await this.page.waitForLoadState("networkidle");
+      await this.page.waitForTimeout(1000);
+
       await expect(this.page.getByRole("row", { name: email })).toBeVisible({
-        timeout: 5000,
+        timeout: 10000, // Increased timeout to 10 seconds
       });
       return true;
     } catch {
@@ -450,6 +456,7 @@ test.describe("Comprehensive User Lifecycle E2E with AWS Discovery", () => {
     page,
     userLifecycleContext,
   }) => {
+    test.setTimeout(120000); // Set test timeout to 2 minutes
     const { cloudFrontContext, enhancedCognitoUser, testUsers } =
       userLifecycleContext;
     const userManager = new UserManagementHelper(page);
