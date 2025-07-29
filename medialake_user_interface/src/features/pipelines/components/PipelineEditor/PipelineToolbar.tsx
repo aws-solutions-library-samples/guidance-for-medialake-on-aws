@@ -1303,30 +1303,17 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
           }
         }
 
-        // Special handling for Audio Splitter node to ensure it's properly connected to the Map node
+        // Generic handling for connections to Map nodes - ensure targetHandle is set
         if (
-          sourceNode &&
-          sourceNode.data &&
-          sourceNode.data.id === "audio_splitter" &&
           targetNode &&
           targetNode.data &&
-          targetNode.data.id === "map"
+          targetNode.data.id === "map" &&
+          !edge.targetHandle
         ) {
+          edge.targetHandle = "input-any";
           console.log(
-            "Ensuring Audio Splitter to Map connection is properly set up",
+            'Set targetHandle to "input-any" for Map node connection',
           );
-
-          // Make sure the Audio Splitter has the correct sourceHandle
-          if (!edge.sourceHandle) {
-            edge.sourceHandle = "audio";
-            console.log('Set sourceHandle to "audio" for Audio Splitter node');
-          }
-
-          // Make sure the Map node has the correct targetHandle
-          if (!edge.targetHandle) {
-            edge.targetHandle = "input-any";
-            console.log('Set targetHandle to "input-any" for Map node');
-          }
         }
       });
     }
