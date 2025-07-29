@@ -20,6 +20,7 @@ import ReactFlow, {
   Connection,
   Node,
   reconnectEdge,
+  MarkerType,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import {
@@ -1076,6 +1077,12 @@ const PipelineEditorContent = () => {
                   type: "custom",
                 };
               }
+              // Add arrow markers to imported edges
+              edge.markerEnd = {
+                type: MarkerType.ArrowClosed,
+                width: 20,
+                height: 20,
+              };
               return edge;
             });
 
@@ -1391,6 +1398,11 @@ const PipelineEditorContent = () => {
             source: edge.source,
             target: edge.target,
             type: edge.type || "custom",
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              width: 20,
+              height: 20,
+            },
             data: edge.data,
             // Include sourceHandle and targetHandle if they exist in the edge data
             ...(edgeWithHandles.sourceHandle && {
@@ -1449,6 +1461,11 @@ const PipelineEditorContent = () => {
               target: newConnection.target,
               sourceHandle: newConnection.sourceHandle,
               targetHandle: newConnection.targetHandle,
+              markerEnd: {
+                type: MarkerType.ArrowClosed,
+                width: 20,
+                height: 20,
+              },
             };
           }
           return edge;
@@ -1522,6 +1539,11 @@ const PipelineEditorContent = () => {
         ...connection,
         id: `${connection.source}-${connection.target}`,
         type: "custom",
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          width: 20,
+          height: 20,
+        },
         data: {
           text: "Connected",
         },
