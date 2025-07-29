@@ -397,6 +397,7 @@ sync-to-github:
     - rm -rf design/
     - rm -f setup-dev.sh
     - rm -f manage-hooks.sh
+    - rm -f .gitleaksignore
     - rm -f fix.sh
     - rm -f .roomodes
     - rm -f .pre-commit-config.yaml
