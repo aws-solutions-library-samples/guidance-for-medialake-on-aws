@@ -431,10 +431,8 @@ playwright_e2e_test:
     # Install required dependencies including system packages for Playwright
     - yum update -y
     - yum install -y python3 python3-pip nodejs npm git jq unzip which findutils
-    # Install system dependencies required by Chromium on Amazon Linux
-    - yum install -y alsa-lib atk cups-libs gtk3 libXcomposite libXcursor libXdamage libXext libXi libXrandr libXScrnSaver libXtst pango at-spi2-atk libXt xorg-x11-server-Xvfb
-    # Install additional dependencies for headless browser operation
-    - yum install -y liberation-fonts dejavu-sans-fonts fontconfig
+    # Install minimal system dependencies for headless Chromium
+    - yum install -y alsa-lib atk cups-libs gtk3 libXcomposite libXdamage libXext libXrandr libXScrnSaver libXtst pango at-spi2-atk xorg-x11-server-Xvfb fontconfig
     # Install AWS CLI
     - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
     - unzip awscliv2.zip
@@ -460,22 +458,18 @@ playwright_e2e_test:
     - echo "AWS identity verified for testing"
   script:
     - echo "Running comprehensive Playwright E2E test against deployed MediaLake infrastructure"
-    - echo "Starting Playwright test execution with enhanced debugging..."
+    - echo "Starting Playwright test execution..."
 
-    # Add debug environment variables
-    - export DEBUG=pw:api,pw:browser*
-    - export PLAYWRIGHT_DEBUG=1
+    # Set minimal environment variables for CI
     - export NODE_ENV=test
 
-    # Test AWS connectivity first
-    - echo "Testing AWS connectivity before Playwright execution..."
-    - echo "Testing AWS connectivity in region $DEPLOY_REGION..."
-    - timeout 30 aws cognito-idp list-user-pools --max-results 1 --region $DEPLOY_REGION || echo "AWS Cognito connectivity test failed"
-    - timeout 30 aws cloudfront list-distributions --max-items 1 || echo "AWS CloudFront connectivity test failed"
+    # Quick AWS connectivity verification
+    - echo "Verifying AWS connectivity..."
+    - aws sts get-caller-identity --region $DEPLOY_REGION
 
-    # Run with timeout and enhanced reporting
-    - echo "Executing Playwright test with 30-minute timeout..."
-    - timeout 1800 npx playwright test tests/integration/comprehensive-user-lifecycle-e2e.spec.ts --reporter=html,junit --timeout=300000 --max-failures=1
+    # Run with optimized settings for CI
+    - echo "Executing Playwright test with optimized CI settings..."
+    - timeout 1200 npx playwright test tests/integration/comprehensive-user-lifecycle-e2e.spec.ts --reporter=junit --timeout=180000 --max-failures=1 --workers=1
     - echo "Playwright E2E test completed successfully"
   artifacts:
     when: always
