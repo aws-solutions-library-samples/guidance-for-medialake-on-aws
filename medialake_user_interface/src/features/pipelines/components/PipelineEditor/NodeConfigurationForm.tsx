@@ -25,6 +25,7 @@ const mapParameterTypeToFormType = (
     case "boolean":
       return "switch";
     case "number":
+    case "integer":
       return "number";
     case "select":
       return "select";
@@ -176,6 +177,7 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> =
                 label: param.label || key,
                 required: param.required || false,
                 description: param.description || "",
+                defaultValue: param.defaultValue, // Preserve defaultValue from PipelineEditorPage transformation
               };
 
               // Handle select parameters specifically
@@ -613,12 +615,12 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> =
           // Check for default in different possible locations
           // The API response structure might vary, so we need to check multiple locations
           let defaultValue =
-            param.default !== undefined
-              ? param.default
-              : param.schema?.default !== undefined
-                ? param.schema.default
-                : param.defaultValue !== undefined
-                  ? param.defaultValue
+            param.defaultValue !== undefined
+              ? param.defaultValue
+              : param.default !== undefined
+                ? param.default
+                : param.schema?.default !== undefined
+                  ? param.schema.default
                   : param.default_value !== undefined
                     ? param.default_value
                     : undefined;
@@ -628,18 +630,6 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> =
             `[NodeConfigurationForm] Raw parameter object:`,
             JSON.stringify(param),
           );
-
-          // Hardcode default values for specific parameters since they're not being properly passed
-          if (
-            node.nodeId === "pre_signed_url" &&
-            param.name === "URL Validity Duration"
-          ) {
-            defaultValue = 3600;
-            console.log(
-              `[NodeConfigurationForm] Hardcoding default value for ${param.name} to:`,
-              defaultValue,
-            );
-          }
 
           console.log(
             `[NodeConfigurationForm] Default value for ${paramName}:`,
