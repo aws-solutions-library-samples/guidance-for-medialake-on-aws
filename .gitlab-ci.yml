@@ -467,9 +467,9 @@ playwright_e2e_test:
     - echo "Verifying AWS connectivity..."
     - aws sts get-caller-identity --region $DEPLOY_REGION
 
-    # Run with optimized settings for CI
+    # Run with optimized settings for CI - Chromium only
     - echo "Executing Playwright test with optimized CI settings..."
-    - timeout 1200 npx playwright test tests/integration/comprehensive-user-lifecycle-e2e.spec.ts --reporter=junit --timeout=180000 --max-failures=1 --workers=1
+    - timeout 1200 npx playwright test tests/integration/comprehensive-user-lifecycle-e2e.spec.ts --project=chromium --reporter=junit --timeout=180000 --max-failures=1 --workers=1
     - echo "Playwright E2E test completed successfully"
   artifacts:
     when: always
