@@ -381,16 +381,15 @@ sync-to-github:
     - chmod 600 ~/.ssh/id_rsa
     - ssh-keyscan github.com >> ~/.ssh/known_hosts
     - git config --global user.email "medialake@amazon.com"
-    - git config --global user.name "MediaLake CI"
-    # Get the release commit message from current GitLab workspace
-    - RELEASE_COMMIT_MESSAGE=$(git log -1 --pretty=format:"%s")
-    - echo "Release commit message: $RELEASE_COMMIT_MESSAGE"
+    - git config --global user.name "Media Lake CI"
+    - "RELEASE_COMMIT_MESSAGE=$(git log -1 --pretty=format:%s)"
+    - 'echo "Release commit message: $RELEASE_COMMIT_MESSAGE"'
     # Clone GitHub repository to maintain its git history
-    - git clone git@github.com:aws-solutions-library-samples/guidance-for-medialake-on-aws.git github-repo
+    - "git clone git@github.com:aws-solutions-library-samples/guidance-for-medialake-on-aws.git github-repo"
     - cd github-repo
-    - echo "Current GitHub main commit:" && git log --oneline -1
-    # Copy all files from GitLab workspace (excluding .git) and delete files that don't exist in GitLab
-    - rsync -av --delete --exclude='.git' ../ ./
+    - 'echo "Current GitHub main commit:" && git log --oneline -1'
+    # Copy all files from GitLab workspace (excluding .git) and delete files that do not exist in GitLab
+    - "rsync -av --delete --exclude=.git ../ ./"
     # Remove files that shouldn't be in the public GitHub repository
     - rm -f secrets.txt
     - rm -rf docs/
@@ -406,6 +405,8 @@ sync-to-github:
     - rm -f .gitattributes
     - rm -f .flake8
     - rm -rf .githooks/
+    - rm -rf medialake_user_interface/test-results/
+    - rm -rf medialake_user_interface/playwright-report/
     # Stage all changes and commit
     - git add -A
     - git commit -m "$RELEASE_COMMIT_MESSAGE" --allow-empty
