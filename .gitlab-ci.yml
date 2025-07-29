@@ -469,8 +469,8 @@ playwright_e2e_test:
 
     # Run with optimized settings for CI - Chromium only
     - echo "Executing Playwright test with optimized CI settings..."
-    - export PLAYWRIGHT_JUNIT_OUTPUT_FILE=test-results/results.xml
-    - timeout 1200 npx playwright test tests/integration/comprehensive-user-lifecycle-e2e.spec.ts --project=chromium --reporter=junit --reporter=html --timeout=180000 --max-failures=1 --workers=1
+    - mkdir -p test-results
+    - timeout 1200 npx playwright test tests/integration/comprehensive-user-lifecycle-e2e.spec.ts --project=chromium --reporter=junit --reporter=html --output-dir=test-results --timeout=180000 --max-failures=1 --workers=1
     - echo "Playwright E2E test completed successfully"
 
     # Ensure test results are in the expected location

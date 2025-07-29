@@ -114,10 +114,15 @@ export class CognitoServiceAdapter implements ServiceAdapter {
         timeout: 60000, // 60 second timeout
       });
 
-      // Set permanent password
-      let setPasswordCommand = `aws cognito-idp admin-set-user-password --user-pool-id ${userPoolId} --username '${username}' --password '${password}' --permanent --region ${this.config.region}`;
+      // Set permanent password - use proper shell escaping
+      const escapeShellArg = (arg: string): string => {
+        // Escape single quotes by ending the quoted string, adding an escaped quote, and starting a new quoted string
+        return `'${arg.replace(/'/g, "'\"'\"'")}'`;
+      };
+
+      let setPasswordCommand = `aws cognito-idp admin-set-user-password --user-pool-id ${escapeShellArg(userPoolId)} --username ${escapeShellArg(username)} --password ${escapeShellArg(password)} --permanent --region ${this.config.region}`; // pragma: allowlist secret
       if (process.env.AWS_PROFILE && process.env.AWS_PROFILE !== "default") {
-        setPasswordCommand = `aws cognito-idp admin-set-user-password --user-pool-id ${userPoolId} --username '${username}' --password '${password}' --permanent --profile ${process.env.AWS_PROFILE} --region ${this.config.region}`;
+        setPasswordCommand = `aws cognito-idp admin-set-user-password --user-pool-id ${escapeShellArg(userPoolId)} --username ${escapeShellArg(username)} --password ${escapeShellArg(password)} --permanent --profile ${process.env.AWS_PROFILE} --region ${this.config.region}`; // pragma: allowlist secret
       }
 
       console.log(
