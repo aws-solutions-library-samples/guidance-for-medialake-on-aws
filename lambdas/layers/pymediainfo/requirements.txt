@@ -1,0 +1,1 @@
+pymediainfo-lambda==0.0.13

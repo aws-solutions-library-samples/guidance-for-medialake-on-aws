@@ -1,0 +1,26 @@
+{
+  "advanced-permissions-enabled": {
+    "value": true,
+    "variant": "off"
+  },
+  "chat-enabled": {
+    "value": false,
+    "variant": "off"
+  },
+  "file-upload-enabled": {
+    "value": false,
+    "variant": "off"
+  },
+  "notification-enabled": {
+    "value": false,
+    "variant": "off"
+  },
+  "search-multi-select-enabled": {
+    "value": false,
+    "variant": "off"
+  },
+  "user-favorites-enabled": {
+    "value": false,
+    "variant": "off"
+  }
+}

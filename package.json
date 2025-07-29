@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "@casl/ability": "^6.7.3",
+    "@casl/react": "^5.0.0",
+    "cdk": "^2.164.1"
+  },
+  "scripts": {
+    "dev": "cd medialake_user_interface && npm run dev"
+  }
+}
