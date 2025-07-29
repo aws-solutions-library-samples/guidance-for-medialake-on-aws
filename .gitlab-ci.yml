@@ -469,8 +469,17 @@ playwright_e2e_test:
 
     # Run with optimized settings for CI - Chromium only
     - echo "Executing Playwright test with optimized CI settings..."
-    - timeout 1200 npx playwright test tests/integration/comprehensive-user-lifecycle-e2e.spec.ts --project=chromium --reporter=junit --timeout=180000 --max-failures=1 --workers=1
+    - export PLAYWRIGHT_JUNIT_OUTPUT_FILE=test-results/results.xml
+    - timeout 1200 npx playwright test tests/integration/comprehensive-user-lifecycle-e2e.spec.ts --project=chromium --reporter=junit --reporter=html --timeout=180000 --max-failures=1 --workers=1
     - echo "Playwright E2E test completed successfully"
+
+    # Ensure test results are in the expected location
+    - echo "Verifying test artifacts..."
+    - ls -la test-results/ || echo "No test-results directory found"
+    - ls -la playwright-report/ || echo "No playwright-report directory found"
+    - find . -name "*.xml" -type f || echo "No XML files found"
+    - echo "Contents of test-results directory:"
+    - ls -la test-results/ 2>/dev/null || echo "test-results directory not accessible"
   artifacts:
     when: always
     paths:
@@ -478,7 +487,7 @@ playwright_e2e_test:
       - medialake_user_interface/playwright-report/
     expire_in: 1 week
     reports:
-      junit: medialake_user_interface/test-results/results.xml
+      junit: medialake_user_interface/test-results/*.xml
   after_script:
     - echo "E2E test execution completed"
     - echo "Test artifacts available in test-results/ and playwright-report/ directories"
