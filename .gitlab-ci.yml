@@ -382,19 +382,15 @@ sync-to-github:
     - ssh-keyscan github.com >> ~/.ssh/known_hosts
     - git config --global user.email "medialake@amazon.com"
     - git config --global user.name "MediaLake CI"
-
     # Get the release commit message from current GitLab workspace
     - RELEASE_COMMIT_MESSAGE=$(git log -1 --pretty=format:"%s")
     - echo "Release commit message: $RELEASE_COMMIT_MESSAGE"
-
     # Clone GitHub repository to maintain its git history
     - git clone git@github.com:aws-solutions-library-samples/guidance-for-medialake-on-aws.git github-repo
     - cd github-repo
     - echo "Current GitHub main commit:" && git log --oneline -1
-
     # Copy all files from GitLab workspace (excluding .git) and delete files that don't exist in GitLab
     - rsync -av --delete --exclude='.git' ../ ./
-
     # Remove files that shouldn't be in the public GitHub repository
     - rm -f secrets.txt
     - rm -rf docs/
@@ -410,12 +406,10 @@ sync-to-github:
     - rm -f .gitattributes
     - rm -f .flake8
     - rm -rf .githooks/
-
     # Stage all changes and commit
     - git add -A
     - git commit -m "$RELEASE_COMMIT_MESSAGE" --allow-empty
     - echo "New commit created:" && git log --oneline -1
-
     # Push to GitHub main branch
     - git push origin main
 
@@ -426,8 +420,6 @@ playwright_e2e_test:
     - arch:amd64
     - size:large
   rules:
-    - if: $CI_COMMIT_REF_NAME == "stable"
-      when: on_success
     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
       when: on_success
     - when: never
