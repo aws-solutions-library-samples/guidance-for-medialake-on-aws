@@ -541,8 +541,8 @@ def create_lambda_function(
                         **common_env_vars,  # Include common env vars
                         "WORKFLOW_STEP_NAME": function_name,
                         "IS_LAST_STEP": os.environ.get("IS_LAST_STEP", "false"),
-                        "REQUEST_TEMPLATES_PATH": request_templates_path,
-                        "RESPONSE_TEMPLATES_PATH": response_templates_path,
+                        "REQUEST_TEMPLATES_PATH": request_templates_path or "",
+                        "RESPONSE_TEMPLATES_PATH": response_templates_path or "",
                         "API_SERVICE_URL": api_service_url,
                         "API_SERVICE_RESOURCE": (
                             node.data.configuration.get("path", "")

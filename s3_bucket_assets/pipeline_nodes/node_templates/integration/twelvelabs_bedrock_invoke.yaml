@@ -4,11 +4,11 @@ node:
   title: TwelveLabs Bedrock Invoke
   description: Submit async embedding job to TwelveLabs Marengo 2.7 on Bedrock
   version: 1.0.0
-  type: utility
+  type: integration
   integration:
     config:
       lambda:
-        handler: utility/TwelveLabsBedrockInvokeLambdaDeployment
+        handler: integration/TwelveLabsBedrockInvokeLambdaDeployment
         runtime: python3.12
         iam_policy:
           statements:
@@ -69,8 +69,14 @@ actions:
         default: "us-east-1"
         schema:
           type: string
-    x-requestMapping: utility/twelvelabs_bedrock_invoke/invoke/
-    x-responseMapping: utility/twelvelabs_bedrock_invoke/invoke/
+      - in: body
+        name: S3 Output Bucket
+        required: false
+        default: "${EXTERNAL_PAYLOAD_BUCKET}"
+        schema:
+          type: string
+    x-requestMapping: integration/twelvelabs_bedrock_invoke/invoke/
+    x-responseMapping: integration/twelvelabs_bedrock_invoke/invoke/
     connections:
       incoming:
         type: [video, text, image, any]

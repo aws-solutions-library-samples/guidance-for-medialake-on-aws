@@ -72,7 +72,7 @@
               "description": "Output type: invocation_arn"
             }
           ],
-          "type": "UTILITY",
+          "type": "INTEGRATION",
           "configuration": {
             "path": "",
             "operationId": "",
@@ -113,7 +113,7 @@
               "description": "Output type: status"
             }
           ],
-          "type": "UTILITY",
+          "type": "INTEGRATION",
           "configuration": {
             "path": "",
             "operationId": "",
@@ -228,7 +228,7 @@
               "description": "Output type: embeddings"
             }
           ],
-          "type": "UTILITY",
+          "type": "INTEGRATION",
           "configuration": {
             "path": "",
             "operationId": "",

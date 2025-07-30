@@ -4,11 +4,11 @@ node:
   title: TwelveLabs Bedrock Status
   description: Check status of TwelveLabs Bedrock async embedding job
   version: 1.0.0
-  type: utility
+  type: integration
   integration:
     config:
       lambda:
-        handler: utility/TwelveLabsBedrockStatusLambdaDeployment
+        handler: integration/TwelveLabsBedrockStatusLambdaDeployment
         runtime: python3.12
         iam_policy:
           statements:
@@ -37,8 +37,8 @@ actions:
     description: Check if TwelveLabs Bedrock embedding job is complete by polling S3
     operationId: checkJobStatus
     parameters: []
-    x-requestMapping: utility/twelvelabs_bedrock_status/check_status/
-    x-responseMapping: utility/twelvelabs_bedrock_status/check_status/
+    x-requestMapping: integration/twelvelabs_bedrock_status/check_status/
+    x-responseMapping: integration/twelvelabs_bedrock_status/check_status/
     connections:
       incoming:
         type: [invocation_arn, any]

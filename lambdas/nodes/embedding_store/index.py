@@ -241,8 +241,8 @@ def _get_segment_bounds(payload: Dict[str, Any]) -> Tuple[int, int]:
 # ─────────────────────────────────────────────────────────────────────────────
 # Early-exit helpers
 def _bad_request(msg: str):
-    logger.warning(msg)
-    return {"statusCode": 400, "body": json.dumps({"error": msg})}
+    logger.error(msg)
+    raise RuntimeError(msg)
 
 
 def _ok_no_op(vector_len: int, asset_id: Optional[str]):

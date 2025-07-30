@@ -4,11 +4,11 @@ node:
   title: TwelveLabs Bedrock Results
   description: Retrieve embeddings from completed TwelveLabs Bedrock async job
   version: 1.0.0
-  type: utility
+  type: integration
   integration:
     config:
       lambda:
-        handler: utility/TwelveLabsBedrockResultsLambdaDeployment
+        handler: integration/TwelveLabsBedrockResultsLambdaDeployment
         runtime: python3.12
         iam_policy:
           statements:
@@ -37,8 +37,8 @@ actions:
     description: Retrieve and parse embedding results from completed TwelveLabs Bedrock job
     operationId: getEmbeddings
     parameters: []
-    x-requestMapping: utility/twelvelabs_bedrock_results/get_results/
-    x-responseMapping: utility/twelvelabs_bedrock_results/get_results/
+    x-requestMapping: integration/twelvelabs_bedrock_results/get_results/
+    x-responseMapping: integration/twelvelabs_bedrock_results/get_results/
     connections:
       incoming:
         type: [invocation_arn, any]
