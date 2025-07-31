@@ -93,7 +93,6 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
 
                     processed_embedding = {
                         "float": embedding_float32,  # embedding store expects "float" field
-                        "embedding": embedding_float32,  # keep for backward compatibility
                         "dimension": len(embedding_float32),
                         "input_type": input_type,
                     }
@@ -112,10 +111,9 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
 
                     processed_embedding = {
                         "float": embedding_float32,  # embedding store expects "float" field
-                        "embedding": embedding_float32,  # keep for backward compatibility
                         "dimension": len(embedding_float32),
-                        "start_sec": start_sec,
-                        "end_sec": end_sec,
+                        "start_offset_sec": start_sec,  # embedding store expects "start_offset_sec"
+                        "end_offset_sec": end_sec,  # embedding store expects "end_offset_sec"
                         "embedding_option": embedding_option,
                         "segment_index": i,
                         "input_type": input_type,

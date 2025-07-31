@@ -234,8 +234,10 @@ def _get_segment_bounds(payload: Dict[str, Any]) -> Tuple[int, int]:
         if start is not None and end is not None:
             return int(start), int(end)
 
-    logger.warning("Segment bounds not found – defaulting to 0-0")
-    return 0, 0
+    logger.error("Segment bounds not found – this indicates a data structure mismatch")
+    raise RuntimeError(
+        "Segment bounds not found – expected 'start_offset_sec'/'start_time' and 'end_offset_sec'/'end_time' fields"
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
