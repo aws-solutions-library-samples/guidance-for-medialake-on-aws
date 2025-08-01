@@ -83,6 +83,12 @@ import {
   useRightSidebar,
 } from "@/components/common/RightSidebar/SidebarContext";
 
+const EDGE_ANIMATION_SPEED_SEC = 2;
+const edgeStyle = (speed = EDGE_ANIMATION_SPEED_SEC) => ({
+  animation: `dashdraw ${speed}s linear infinite`,
+  strokeDasharray: 5,
+});
+
 // Define the custom node data type
 interface CustomNodeData {
   label: string;
@@ -171,9 +177,9 @@ const convertToPipelineNode = (node: Node<CustomNodeData>): PipelineNode => ({
   },
   positionAbsolute: node.positionAbsolute
     ? {
-        x: node.positionAbsolute.x.toString(),
-        y: node.positionAbsolute.y.toString(),
-      }
+      x: node.positionAbsolute.x.toString(),
+      y: node.positionAbsolute.y.toString(),
+    }
     : undefined,
   selected: node.selected,
   dragging: node.dragging,
@@ -1098,8 +1104,8 @@ const PipelineEditorContent = () => {
                 // Fix icon if needed
                 icon:
                   node.data.icon &&
-                  typeof node.data.icon === "object" &&
-                  node.data.icon.props
+                    typeof node.data.icon === "object" &&
+                    node.data.icon.props
                     ? getNodeIcon(node.data.type)
                     : node.data.icon,
               };
@@ -1238,8 +1244,8 @@ const PipelineEditorContent = () => {
             // Fix the icon property to ensure it's properly rendered
             icon:
               node.data.icon &&
-              typeof node.data.icon === "object" &&
-              node.data.icon.props
+                typeof node.data.icon === "object" &&
+                node.data.icon.props
                 ? getNodeIcon(node.data.type)
                 : node.data.icon,
           },
@@ -1400,6 +1406,7 @@ const PipelineEditorContent = () => {
             target: edge.target,
             type: edge.type || "custom",
             animated: true,
+            style: edgeStyle(),
             markerEnd: {
               type: MarkerType.ArrowClosed,
               width: 20,
@@ -1464,6 +1471,7 @@ const PipelineEditorContent = () => {
               sourceHandle: newConnection.sourceHandle,
               targetHandle: newConnection.targetHandle,
               animated: true,
+              style: edgeStyle(),
               markerEnd: {
                 type: MarkerType.ArrowClosed,
                 width: 20,
@@ -1543,6 +1551,7 @@ const PipelineEditorContent = () => {
         id: `${connection.source}-${connection.target}`,
         type: "custom",
         animated: true,
+        style: edgeStyle(),
         markerEnd: {
           type: MarkerType.ArrowClosed,
           width: 20,
@@ -1885,9 +1894,9 @@ const PipelineEditorContent = () => {
           // Check if the imported flow has an active property
           const importedActive =
             importedNodes.length > 0 &&
-            importedNodes[0].data &&
-            importedNodes[0].data.flow &&
-            importedNodes[0].data.flow.active !== undefined
+              importedNodes[0].data &&
+              importedNodes[0].data.flow &&
+              importedNodes[0].data.flow.active !== undefined
               ? importedNodes[0].data.flow.active
               : undefined;
 
@@ -1925,14 +1934,14 @@ const PipelineEditorContent = () => {
         onDelete={
           pipelineId && pipelineId !== "new"
             ? () => {
-                // Open delete dialog
-                setDeleteDialog({
-                  open: true,
-                  pipelineId: pipelineId,
-                  pipelineName: formData.name,
-                  userInput: "",
-                });
-              }
+              // Open delete dialog
+              setDeleteDialog({
+                open: true,
+                pipelineId: pipelineId,
+                pipelineName: formData.name,
+                userInput: "",
+              });
+            }
             : undefined
         }
       />
@@ -2141,7 +2150,7 @@ const PipelineEditorContent = () => {
                 setApiStatusModalAction("Delete Failed");
                 setApiStatusModalMessage(
                   error.message ||
-                    "An error occurred while deleting the pipeline.",
+                  "An error occurred while deleting the pipeline.",
                 );
               });
           });

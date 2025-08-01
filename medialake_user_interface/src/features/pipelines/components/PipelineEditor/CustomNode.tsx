@@ -339,7 +339,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
                     style={{
                       background:
                         typeof inputType === "string"
-                          ? "#555"
+                          ? "#2B6CB0"
                           : (inputType as InputType).name === "Completed"
                             ? "#4CAF50"
                             : (inputType as InputType).name === "In Progress"
@@ -348,9 +348,9 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
                                 ? "#F44336"
                                 : "#555",
                       width: "12px",
-                      height: "12px",
-                      border: "2px solid #fff",
-                      borderRadius: "6px",
+                      height: "16px",
+                      border: "1px solid #fff",
+                      borderRadius: "2px",
                     }}
                   />
                 </Tooltip>
@@ -456,10 +456,10 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
                             ? "#2196F3"
                             : output.name === "Fail"
                               ? "#F44336"
-                              : "#555",
+                              : "#2B6CB0",
                       width: "12px",
                       height: "12px",
-                      border: "2px solid #fff",
+                      border: "1px solid #fff",
                       borderRadius: "5px",
                     }}
                   />
