@@ -209,7 +209,9 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
             type:
               param.schema.type === "string"
                 ? "text"
-                : (param.schema.type as "number" | "boolean" | "select"),
+                : param.schema.type === "integer"
+                  ? "number"
+                  : (param.schema.type as "number" | "boolean" | "select"),
             required: param.required || false,
             description: param.description,
           };
@@ -242,10 +244,14 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
       } else if (method.parameters && typeof method.parameters === "object") {
         // Single object format (like S3 Vector Store)
         const param = method.parameters as any;
-        const paramName = param.name || "parameter";
+        const paramName = param.name;
 
-        // Handle object type parameters with nested properties
-        if (
+        // Skip processing if paramName is undefined or empty
+        if (!paramName) {
+          console.log("[PipelineEditorPage] Skipping parameter with no name");
+          // Set parameters to empty object and continue
+          parameters = {};
+        } else if (
           param.schema &&
           param.schema.type === "object" &&
           param.schema.properties
@@ -259,7 +265,9 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
                 type:
                   propSchema.type === "string"
                     ? "text"
-                    : (propSchema.type as "number" | "boolean" | "select"),
+                    : propSchema.type === "integer"
+                      ? "number"
+                      : (propSchema.type as "number" | "boolean" | "select"),
                 required: param.schema.required?.includes(propName) || false,
                 description: propSchema.description || "",
               };
@@ -280,7 +288,9 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
             type:
               param.schema?.type === "string"
                 ? "text"
-                : (param.schema?.type as "number" | "boolean" | "select"),
+                : param.schema?.type === "integer"
+                  ? "number"
+                  : (param.schema?.type as "number" | "boolean" | "select"),
             required: param.required || false,
             description: param.description || param.schema?.description || "",
           };
@@ -385,7 +395,9 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
               type:
                 param.schema?.type === "string"
                   ? "text"
-                  : (param.schema?.type as "number" | "boolean" | "select"),
+                  : param.schema?.type === "integer"
+                    ? "number"
+                    : (param.schema?.type as "number" | "boolean" | "select"),
               required: param.required || false,
               description: param.description,
             };
@@ -418,7 +430,9 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
                   type:
                     propSchema.type === "string"
                       ? "text"
-                      : (propSchema.type as "number" | "boolean" | "select"),
+                      : propSchema.type === "integer"
+                        ? "number"
+                        : (propSchema.type as "number" | "boolean" | "select"),
                   required: param.schema.required?.includes(propName) || false,
                   description: propSchema.description || "",
                 };
@@ -437,7 +451,9 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
               type:
                 param.schema?.type === "string"
                   ? "text"
-                  : (param.schema?.type as "number" | "boolean" | "select"),
+                  : param.schema?.type === "integer"
+                    ? "number"
+                    : (param.schema?.type as "number" | "boolean" | "select"),
               required: param.required || false,
               description: param.description || param.schema?.description || "",
             };

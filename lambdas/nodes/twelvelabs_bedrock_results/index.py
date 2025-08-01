@@ -79,6 +79,25 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
             if not embeddings_data or len(embeddings_data) == 0:
                 raise RuntimeError("No embedding data found in response")
 
+            # Extract asset information from the input event to preserve for embedding store
+            assets = payload.get("assets", [])
+            asset_id = None
+            inventory_id = None
+
+            # Try to get asset_id from assets array
+            if assets and len(assets) > 0:
+                asset = assets[0]
+                asset_id = asset.get("InventoryID") or asset.get(
+                    "DigitalSourceAsset", {}
+                ).get("ID")
+                inventory_id = asset.get("InventoryID")
+
+            # Fallback to map.item if available
+            map_item = payload.get("map", {}).get("item", {})
+            if not asset_id and map_item.get("inventory_id"):
+                asset_id = map_item["inventory_id"]
+                inventory_id = map_item["inventory_id"]
+
             # Process embeddings based on input type
             processed_embeddings = []
 
@@ -96,10 +115,43 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                         "dimension": len(embedding_float32),
                         "input_type": input_type,
                     }
+
+                    # Add asset information if available
+                    if asset_id:
+                        processed_embedding["asset_id"] = asset_id
+                    if inventory_id:
+                        processed_embedding["inventory_id"] = inventory_id
+
                     processed_embeddings.append(processed_embedding)
 
-            elif input_type in ["video", "image"]:
-                # For video/image, there can be multiple embeddings with time segments
+            elif input_type == "image":
+                # For images, return a single embedding object (not an array)
+                if len(embeddings_data) > 0:
+                    embedding_obj = embeddings_data[
+                        0
+                    ]  # Take the first (and typically only) embedding
+                    embedding_vector = embedding_obj.get("embedding", [])
+                    embedding_option = embedding_obj.get("embeddingOption", "unknown")
+
+                    # Ensure embedding is float32 format (convert to list of floats)
+                    embedding_float32 = [float(x) for x in embedding_vector]
+
+                    processed_embedding = {
+                        "float": embedding_float32,  # embedding store expects "float" field
+                        "embedding_scope": "image",  # Use embedding_scope for images
+                    }
+
+                    # Add asset information if available
+                    if asset_id:
+                        processed_embedding["asset_id"] = asset_id
+                    if inventory_id:
+                        processed_embedding["inventory_id"] = inventory_id
+
+                    # For images, return single object instead of array
+                    processed_embeddings = processed_embedding
+
+            elif input_type in ["video", "audio"]:
+                # For video/audio, there can be multiple embeddings with time segments
                 for i, embedding_obj in enumerate(embeddings_data):
                     embedding_vector = embedding_obj.get("embedding", [])
                     start_sec = embedding_obj.get("startSec", 0.0)
@@ -116,8 +168,16 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                         "end_offset_sec": end_sec,  # embedding store expects "end_offset_sec"
                         "embedding_option": embedding_option,
                         "segment_index": i,
+                        "embedding_scope": "clip",
                         "input_type": input_type,
                     }
+
+                    # Add asset information if available
+                    if asset_id:
+                        processed_embedding["asset_id"] = asset_id
+                    if inventory_id:
+                        processed_embedding["inventory_id"] = inventory_id
+
                     processed_embeddings.append(processed_embedding)
 
             # For middleware compatibility, return just the embeddings list

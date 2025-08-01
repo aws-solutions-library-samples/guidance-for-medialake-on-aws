@@ -1,6 +1,6 @@
 {
   "name": "TwelveLabs Bedrock Video Embedding to S3 Vectors",
-  "description": "Generate video embeddings using TwelveLabs Marengo 2.7 on Bedrock and store in S3 Vectors",
+  "description": "",
   "active": true,
   "configuration": {
     "nodes": [
@@ -23,7 +23,9 @@
             },
             "_owner": null
           },
-          "inputTypes": ["any"],
+          "inputTypes": [
+            "any"
+          ],
           "outputTypes": [
             {
               "name": "video",
@@ -47,128 +49,11 @@
         "height": 113
       },
       {
-        "id": "dndnode_1",
+        "id": "dndnode_5",
         "type": "custom",
         "position": {
-          "x": 560,
-          "y": 208
-        },
-        "data": {
-          "nodeId": "twelvelabs_bedrock_invoke",
-          "label": "TwelveLabs Bedrock Invoke (invoke)",
-          "description": "Submit async embedding job to TwelveLabs Marengo 2.7 on Bedrock",
-          "icon": {
-            "key": null,
-            "ref": null,
-            "props": {
-              "size": 20
-            },
-            "_owner": null
-          },
-          "inputTypes": ["video", "text", "image", "any"],
-          "outputTypes": [
-            {
-              "name": "invocation_arn",
-              "description": "Output type: invocation_arn"
-            }
-          ],
-          "type": "INTEGRATION",
-          "configuration": {
-            "path": "",
-            "operationId": "",
-            "method": "invoke",
-            "parameters": {
-              "Model ID": "twelvelabs.marengo-embed-2-7-v1:0",
-              "Input Type": "video",
-              "Region": "us-east-1"
-            }
-          }
-        },
-        "width": 200,
-        "height": 113
-      },
-      {
-        "id": "dndnode_2",
-        "type": "custom",
-        "position": {
-          "x": 800,
-          "y": 208
-        },
-        "data": {
-          "nodeId": "twelvelabs_bedrock_status",
-          "label": "TwelveLabs Bedrock Status (check_status)",
-          "description": "Check status of TwelveLabs Bedrock async embedding job",
-          "icon": {
-            "key": null,
-            "ref": null,
-            "props": {
-              "size": 20
-            },
-            "_owner": null
-          },
-          "inputTypes": ["invocation_arn", "any"],
-          "outputTypes": [
-            {
-              "name": "status",
-              "description": "Output type: status"
-            }
-          ],
-          "type": "INTEGRATION",
-          "configuration": {
-            "path": "",
-            "operationId": "",
-            "method": "check_status",
-            "parameters": {}
-          }
-        },
-        "width": 200,
-        "height": 113
-      },
-      {
-        "id": "dndnode_3",
-        "type": "custom",
-        "position": {
-          "x": 1040,
-          "y": 208
-        },
-        "data": {
-          "nodeId": "choice",
-          "label": "Choice",
-          "description": "This step will branch the workflow based on a condition",
-          "icon": {
-            "key": null,
-            "ref": null,
-            "props": {
-              "size": 20
-            },
-            "_owner": null
-          },
-          "inputTypes": ["any"],
-          "outputTypes": [
-            {
-              "name": "Completed",
-              "description": "Path taken when condition evaluates to true"
-            },
-            {
-              "name": "In Progress",
-              "description": "Path taken when condition evaluates to false"
-            }
-          ],
-          "type": "FLOW",
-          "configuration": {
-            "method": "choice",
-            "parameters": {}
-          }
-        },
-        "width": 200,
-        "height": 113
-      },
-      {
-        "id": "dndnode_4",
-        "type": "custom",
-        "position": {
-          "x": 800,
-          "y": 368
+          "x": 640,
+          "y": 400
         },
         "data": {
           "nodeId": "wait",
@@ -182,7 +67,9 @@
             },
             "_owner": null
           },
-          "inputTypes": ["any"],
+          "inputTypes": [
+            "any"
+          ],
           "outputTypes": [
             {
               "name": "any",
@@ -195,85 +82,8 @@
             "operationId": "",
             "method": "wait",
             "parameters": {
-              "Duration": 30
+              "Duration": "15"
             }
-          }
-        },
-        "width": 200,
-        "height": 113
-      },
-      {
-        "id": "dndnode_5",
-        "type": "custom",
-        "position": {
-          "x": 1280,
-          "y": 208
-        },
-        "data": {
-          "nodeId": "twelvelabs_bedrock_results",
-          "label": "TwelveLabs Bedrock Results (get_results)",
-          "description": "Retrieve embeddings from completed TwelveLabs Bedrock async job",
-          "icon": {
-            "key": null,
-            "ref": null,
-            "props": {
-              "size": 20
-            },
-            "_owner": null
-          },
-          "inputTypes": ["invocation_arn", "any"],
-          "outputTypes": [
-            {
-              "name": "embeddings",
-              "description": "Output type: embeddings"
-            }
-          ],
-          "type": "INTEGRATION",
-          "configuration": {
-            "path": "",
-            "operationId": "",
-            "method": "get_results",
-            "parameters": {}
-          }
-        },
-        "width": 200,
-        "height": 113
-      },
-      {
-        "id": "dndnode_6",
-        "type": "custom",
-        "position": {
-          "x": 1520,
-          "y": 208
-        },
-        "data": {
-          "nodeId": "s3_vector_store",
-          "label": "S3 Vector Store (store)",
-          "description": "Store vector embeddings in S3 with metadata",
-          "icon": {
-            "key": null,
-            "ref": null,
-            "props": {
-              "size": 20
-            },
-            "_owner": null
-          },
-          "inputTypes": ["any"],
-          "outputTypes": [
-            {
-              "name": "vector",
-              "description": "Output type: vector"
-            }
-          ],
-          "type": "UTILITY",
-          "configuration": {
-            "method": "store",
-            "parameters": {
-              "Vector Bucket Name": "${VECTOR_BUCKET_NAME}",
-              "Index Name": "${INDEX_NAME}"
-            },
-            "path": "",
-            "operationId": ""
           }
         },
         "width": 200,
@@ -283,8 +93,54 @@
         "id": "dndnode_7",
         "type": "custom",
         "position": {
-          "x": 1760,
-          "y": 208
+          "x": 944,
+          "y": 560
+        },
+        "data": {
+          "nodeId": "map",
+          "label": "Map (map)",
+          "description": "This step will iterate over an array of items and execute the same steps for each item",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [
+            {
+              "name": "Processor",
+              "description": "json payload item processor"
+            },
+            {
+              "name": "Next",
+              "description": "output to the next node"
+            }
+          ],
+          "type": "FLOW",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "map",
+            "parameters": {
+              "ConcurrencyLimit": 1,
+              "ItemsPath": "$.payload.externalTaskStatus"
+            }
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "dndnode_8",
+        "type": "custom",
+        "position": {
+          "x": 1184,
+          "y": 704
         },
         "data": {
           "nodeId": "success",
@@ -298,7 +154,9 @@
             },
             "_owner": null
           },
-          "inputTypes": ["any"],
+          "inputTypes": [
+            "any"
+          ],
           "outputTypes": [],
           "type": "FLOW",
           "configuration": {
@@ -308,112 +166,364 @@
         },
         "width": 200,
         "height": 113
+      },
+      {
+        "id": "dndnode_10",
+        "type": "custom",
+        "position": {
+          "x": 320,
+          "y": 400
+        },
+        "data": {
+          "nodeId": "choice",
+          "label": "Choice",
+          "description": "This step will branch the workflow based on a condition",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [
+            {
+              "name": "Completed",
+              "description": "Path taken when condition evaluates to true"
+            },
+            {
+              "name": "In Progress",
+              "description": "Path taken when condition evaluates to false"
+            },
+            {
+              "name": "Fail",
+              "description": "Path taken when condition evaluates to false"
+            }
+          ],
+          "type": "FLOW",
+          "configuration": {
+            "method": "choice",
+            "parameters": {}
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "dndnode_11",
+        "type": "custom",
+        "position": {
+          "x": 672,
+          "y": 560
+        },
+        "data": {
+          "nodeId": "fail",
+          "label": "Fail (fail)",
+          "description": "This step will end the state machine execution with a failure status",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [],
+          "type": "FLOW",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "fail",
+            "parameters": {
+              "Error": "Failed",
+              "Cause": "Flow step failed"
+            }
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "dndnode_14",
+        "type": "custom",
+        "position": {
+          "x": 592,
+          "y": 208
+        },
+        "data": {
+          "nodeId": "twelvelabs_bedrock_invoke",
+          "label": "TwelveLabs Bedrock Invoke (invoke)",
+          "description": "Start async embedding generation using TwelveLabs Marengo 2.7 on Bedrock",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "video",
+            "text",
+            "image",
+            "any"
+          ],
+          "outputTypes": [
+            {
+              "name": "invocation_arn",
+              "description": "Output type: invocation_arn"
+            }
+          ],
+          "type": "INTEGRATION",
+          "configuration": {
+            "integrationId": "36737648-07d8-459b-b11e-9cd71bb6632d",
+            "path": "",
+            "operationId": "",
+            "method": "invoke",
+            "parameters": {
+              "Input Type": ""
+            }
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "dndnode_15",
+        "type": "custom",
+        "position": {
+          "x": 848,
+          "y": 208
+        },
+        "data": {
+          "nodeId": "twelvelabs_bedrock_status",
+          "label": "TwelveLabs Bedrock Status",
+          "description": "Check if TwelveLabs Bedrock embedding job is complete by polling S3",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "invocation_arn",
+            "any"
+          ],
+          "outputTypes": [
+            {
+              "name": "status",
+              "description": "Output type: status"
+            }
+          ],
+          "type": "INTEGRATION",
+          "configuration": {
+            "method": "check_status",
+            "parameters": {}
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "dndnode_16",
+        "type": "custom",
+        "position": {
+          "x": 944,
+          "y": 400
+        },
+        "data": {
+          "nodeId": "twelvelabs_bedrock_results",
+          "label": "TwelveLabs Bedrock Results",
+          "description": "Retrieve and parse embedding results from completed TwelveLabs Bedrock job",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "invocation_arn",
+            "any"
+          ],
+          "outputTypes": [
+            {
+              "name": "embeddings",
+              "description": "Output type: embeddings"
+            }
+          ],
+          "type": "INTEGRATION",
+          "configuration": {
+            "method": "get_results",
+            "parameters": {}
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "dndnode_23",
+        "type": "custom",
+        "position": {
+          "x": 1200,
+          "y": 560
+        },
+        "data": {
+          "nodeId": "s3_vector_store",
+          "label": "S3 Vectors (store)",
+          "description": "Store vector embeddings in S3 with metadata",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [],
+          "type": "UTILITY",
+          "configuration": {
+            "method": "store",
+            "parameters": {
+              "Vector Bucket Name": "${VECTOR_BUCKET_NAME}",
+              "Index Name": "${INDEX_NAME}"
+            },
+            "path": "",
+            "operationId": ""
+          }
+        },
+        "width": 200,
+        "height": 100,
+        "selected": true,
+        "dragging": false
       }
     ],
     "edges": [
       {
-        "id": "dndnode_0-dndnode_1",
-        "source": "dndnode_0",
-        "target": "dndnode_1",
+        "id": "dndnode_7-dndnode_8",
+        "source": "dndnode_7",
+        "target": "dndnode_8",
         "type": "custom",
         "data": {
           "type": "custom",
           "text": "Connected",
-          "id": "dndnode_0-dndnode_1"
+          "id": "dndnode_7-dndnode_8"
         },
-        "sourceHandle": "video",
-        "targetHandle": "input-video"
-      },
-      {
-        "id": "dndnode_1-dndnode_2",
-        "source": "dndnode_1",
-        "target": "dndnode_2",
-        "type": "custom",
-        "data": {
-          "type": "custom",
-          "text": "Connected",
-          "id": "dndnode_1-dndnode_2"
-        },
-        "sourceHandle": "invocation_arn",
-        "targetHandle": "input-invocation_arn"
-      },
-      {
-        "id": "dndnode_2-dndnode_3",
-        "source": "dndnode_2",
-        "target": "dndnode_3",
-        "type": "custom",
-        "data": {
-          "type": "custom",
-          "text": "Connected",
-          "id": "dndnode_2-dndnode_3"
-        },
-        "sourceHandle": "status",
+        "sourceHandle": "Next",
         "targetHandle": "input-any"
       },
       {
-        "id": "dndnode_3-dndnode_5",
-        "source": "dndnode_3",
+        "id": "reactflow__edge-dndnode_10In Progress-dndnode_5input-any",
+        "source": "dndnode_10",
         "target": "dndnode_5",
         "type": "custom",
         "data": {
           "type": "custom",
           "text": "Connected",
-          "id": "dndnode_3-dndnode_5"
-        },
-        "sourceHandle": "Completed",
-        "targetHandle": "input-invocation_arn"
-      },
-      {
-        "id": "dndnode_3-dndnode_4",
-        "source": "dndnode_3",
-        "target": "dndnode_4",
-        "type": "custom",
-        "data": {
-          "type": "custom",
-          "text": "Connected",
-          "id": "dndnode_3-dndnode_4"
+          "id": "dndnode_4-dndnode_5"
         },
         "sourceHandle": "In Progress",
         "targetHandle": "input-any"
       },
       {
-        "id": "dndnode_4-dndnode_2",
-        "source": "dndnode_4",
-        "target": "dndnode_2",
+        "id": "dndnode_10-dndnode_11",
+        "source": "dndnode_10",
+        "target": "dndnode_11",
         "type": "custom",
         "data": {
-          "type": "custom",
-          "text": "Connected",
-          "id": "dndnode_4-dndnode_2"
+          "text": "Connected"
         },
-        "sourceHandle": "any",
+        "sourceHandle": "Fail",
         "targetHandle": "input-any"
       },
       {
-        "id": "dndnode_5-dndnode_6",
-        "source": "dndnode_5",
-        "target": "dndnode_6",
+        "id": "dndnode_14-dndnode_15",
+        "source": "dndnode_14",
+        "target": "dndnode_15",
         "type": "custom",
         "data": {
-          "type": "custom",
-          "text": "Connected",
-          "id": "dndnode_5-dndnode_6"
+          "text": "Connected"
+        },
+        "sourceHandle": "invocation_arn",
+        "targetHandle": "input-invocation_arn"
+      },
+      {
+        "id": "dndnode_15-dndnode_10",
+        "source": "dndnode_15",
+        "target": "dndnode_10",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "status",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_16-dndnode_7",
+        "source": "dndnode_16",
+        "target": "dndnode_7",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
         },
         "sourceHandle": "embeddings",
         "targetHandle": "input-any"
       },
       {
-        "id": "dndnode_6-dndnode_7",
-        "source": "dndnode_6",
-        "target": "dndnode_7",
+        "id": "dndnode_0-dndnode_14",
+        "source": "dndnode_0",
+        "target": "dndnode_14",
         "type": "custom",
         "data": {
-          "type": "custom",
-          "text": "Connected",
-          "id": "dndnode_6-dndnode_7"
+          "text": "Connected"
         },
-        "sourceHandle": "vector",
-        "targetHandle": "input-any"
+        "sourceHandle": "video",
+        "targetHandle": "input-video"
+      },
+      {
+        "id": "dndnode_5-dndnode_15",
+        "source": "dndnode_5",
+        "target": "dndnode_15",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "any",
+        "targetHandle": "input-invocation_arn"
+      },
+      {
+        "id": "dndnode_10-dndnode_16",
+        "source": "dndnode_10",
+        "target": "dndnode_16",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "Completed",
+        "targetHandle": "input-invocation_arn"
+      },
+      {
+        "source": "dndnode_7",
+        "sourceHandle": "Processor",
+        "target": "dndnode_23",
+        "targetHandle": "input-any",
+        "id": "dndnode_7-dndnode_23",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        }
       }
     ],
     "settings": {

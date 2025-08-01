@@ -679,41 +679,34 @@ def create_lambda_role(
                     PolicyArn="arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
                 )
 
-                # For embedding_store utility node, also attach VPC access policy and OpenSearch permissions
-                if node_id == "embedding_store":
-                    logger.info(
-                        f"Attaching AWSLambdaVPCAccessExecutionRole to {role_name} for embedding_store"
+                # Check if VPC access is needed based on YAML config
+                try:
+                    lambda_config = (
+                        yaml_data.get("node", {})
+                        .get("integration", {})
+                        .get("config", {})
+                        .get("lambda", {})
                     )
-                    iam.attach_role_policy(
-                        RoleName=role_name,
-                        PolicyArn="arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole",
-                    )
+                    if not lambda_config:
+                        # Also check utility nodes
+                        lambda_config = (
+                            yaml_data.get("node", {})
+                            .get("utility", {})
+                            .get("config", {})
+                            .get("lambda", {})
+                        )
 
-                    # Add managed OpenSearch permissions
-                    opensearch_policy = {
-                        "Version": "2012-10-17",
-                        "Statement": [
-                            {
-                                "Effect": "Allow",
-                                "Action": [
-                                    "es:ESHttpGet",
-                                    "es:ESHttpPut",
-                                    "es:ESHttpPost",
-                                    "es:ESHttpHead",
-                                    "es:ESHttpDelete",
-                                ],
-                                "Resource": "*",
-                            }
-                        ],
-                    }
-
-                    logger.info(
-                        f"Adding OpenSearch permissions to {role_name} for embedding_store"
-                    )
-                    iam.put_role_policy(
-                        RoleName=role_name,
-                        PolicyName="OpenSearchAccess",
-                        PolicyDocument=json.dumps(opensearch_policy),
+                    if lambda_config and lambda_config.get("vpc", False):
+                        logger.info(
+                            f"Attaching AWSLambdaVPCAccessExecutionRole to {role_name} for VPC access"
+                        )
+                        iam.attach_role_policy(
+                            RoleName=role_name,
+                            PolicyArn="arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole",
+                        )
+                except Exception as e:
+                    logger.warning(
+                        f"Error checking VPC configuration for IAM role {role_name}: {e}"
                     )
 
                 # Create and attach our custom execution policy

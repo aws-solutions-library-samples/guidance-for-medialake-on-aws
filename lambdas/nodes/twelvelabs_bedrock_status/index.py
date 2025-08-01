@@ -50,6 +50,7 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         invocation_arn = job_info.get("invocation_arn")
         s3_bucket = job_info.get("s3_bucket")
         output_location = job_info.get("output_location")
+        input_type = job_info.get("input_type")
 
         if not all([invocation_arn, s3_bucket, output_location]):
             raise RuntimeError(
@@ -83,6 +84,7 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                         "s3_bucket": s3_bucket,
                         "output_location": output_location,
                         "output_file_key": output_file_key,
+                        "input_type": input_type,
                         "status": "completed",
                         "message": "Embedding job completed successfully",
                         # Force override external job metadata
@@ -103,6 +105,7 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                         "s3_bucket": s3_bucket,
                         "output_location": output_location,
                         "error_file_key": error_file_key,
+                        "input_type": input_type,
                         "status": "failed",
                         "message": "Embedding job failed",
                         # Force override external job metadata
@@ -120,6 +123,7 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                         "invocation_arn": invocation_arn,
                         "s3_bucket": s3_bucket,
                         "output_location": output_location,
+                        "input_type": input_type,
                         "status": "in_progress",
                         "message": "Embedding job is still in progress",
                         # Force override external job metadata
@@ -137,6 +141,7 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                     "invocation_arn": invocation_arn,
                     "s3_bucket": s3_bucket,
                     "output_location": output_location,
+                    "input_type": input_type,
                     "status": "in_progress",
                     "message": "Embedding job is still in progress - no output files found yet",
                     # Force override external job metadata
@@ -155,6 +160,7 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                 "invocation_arn": invocation_arn,
                 "s3_bucket": s3_bucket,
                 "output_location": output_location,
+                "input_type": input_type,
                 "status": "in_progress",
                 "message": f"Unable to check S3 status: {str(s3_error)}",
                 # Force override external job metadata

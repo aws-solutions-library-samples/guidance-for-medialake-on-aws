@@ -58,12 +58,6 @@ actions:
         schema:
           type: string
       - in: body
-        name: Input Type
-        required: true
-        schema:
-          type: string
-          enum: ["video", "text", "image"]
-      - in: body
         name: Region
         required: false
         default: "us-east-1"
@@ -79,6 +73,6 @@ actions:
     x-responseMapping: integration/twelvelabs_bedrock_invoke/invoke/
     connections:
       incoming:
-        type: [video, text, image, any]
+        type: [video, audio, image]
       outgoing:
         type: [invocation_arn]

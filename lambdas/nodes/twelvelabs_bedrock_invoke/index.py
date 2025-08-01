@@ -28,15 +28,18 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
     try:
         # Extract parameters from event
         payload = event.get("payload", {})
-        parameters = event.get("parameters", {})
 
-        # Get configuration
-        model_id = parameters.get("Model ID", "twelvelabs.marengo-embed-2-7-v1:0")
-        input_type = parameters.get("Input Type", "video")
-        region = parameters.get("Region", "us-east-1")
-        s3_output_bucket = parameters.get(
-            "S3 Output Bucket", os.environ.get("EXTERNAL_PAYLOAD_BUCKET")
-        )
+        # Get configuration from environment variables (set during pipeline deployment)
+        model_id = os.environ.get("MODEL_ID", "twelvelabs.marengo-embed-2-7-v1:0")
+        region = os.environ.get("REGION", "us-east-1")
+        s3_output_bucket = os.environ.get("EXTERNAL_PAYLOAD_BUCKET")
+
+        # Get input type from environment variable set during pipeline deployment
+        input_type = os.environ.get("CONNECTION_INPUT_TYPE")
+        if not input_type:
+            raise RuntimeError(
+                "CONNECTION_INPUT_TYPE environment variable not set. This should be configured during pipeline deployment based on the incoming connection type."
+            )
 
         logger.info(
             "Configuration",
@@ -47,21 +50,6 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                 "s3_output_bucket": s3_output_bucket,
             },
         )
-
-        # Auto-detect input type from MediaLake payload if not explicitly set or if default
-        if input_type == "video" and "assets" in payload and len(payload["assets"]) > 0:
-            asset = payload["assets"][0]
-            if "DigitalSourceAsset" in asset:
-                asset_type = asset["DigitalSourceAsset"].get("Type", "").lower()
-                if asset_type == "image":
-                    input_type = "image"
-                elif asset_type == "audio":
-                    input_type = "audio"
-                # video remains as video
-                logger.info(
-                    "Auto-detected input type",
-                    extra={"detected_input_type": input_type, "asset_type": asset_type},
-                )
 
         # Initialize clients with region
         bedrock_runtime = boto3.client("bedrock-runtime", region_name=region)
@@ -261,42 +249,66 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
             output_prefix = "imageEmbedding"
 
         elif input_type == "audio":
-            # Try multiple possible payload structures for audio S3 location
+            # Always get audio URI from assets[0]['DerivedRepresentations'] with proxy purpose
             audio_uri = None
 
-            if "s3_location" in payload:
-                audio_uri = payload["s3_location"]
-            elif "uri" in payload:
-                audio_uri = payload["uri"]
-            elif "s3Uri" in payload:
-                audio_uri = payload["s3Uri"]
-            elif "bucket" in payload and "key" in payload:
-                audio_uri = f"s3://{payload['bucket']}/{payload['key']}"
-            elif "Bucket" in payload and "Key" in payload:
-                audio_uri = f"s3://{payload['Bucket']}/{payload['Key']}"
-            elif "location" in payload:
-                audio_uri = payload["location"]
-            elif "file_location" in payload:
-                audio_uri = payload["file_location"]
-            # Check MediaLake data structure (from pipeline output)
-            elif "data" in payload and isinstance(payload["data"], dict):
-                data = payload["data"]
-                if "bucket" in data and "key" in data:
-                    audio_uri = f"s3://{data['bucket']}/{data['key']}"
-            # Check MediaLake assets structure
-            elif "assets" in payload and len(payload["assets"]) > 0:
-                asset = payload["assets"][0]
-                if (
-                    "DigitalSourceAsset" in asset
-                    and "MainRepresentation" in asset["DigitalSourceAsset"]
-                ):
-                    storage_info = asset["DigitalSourceAsset"]["MainRepresentation"][
-                        "StorageInfo"
-                    ]["PrimaryLocation"]
-                    bucket = storage_info.get("Bucket")
-                    key = storage_info["ObjectKey"]["FullPath"]
-                    if bucket and key:
-                        audio_uri = f"s3://{bucket}/{key}"
+            # Check MediaLake nested structure first (detail.payload.assets)
+            assets_to_check = []
+            if (
+                "detail" in payload
+                and "payload" in payload["detail"]
+                and "assets" in payload["detail"]["payload"]
+            ):
+                assets_to_check = payload["detail"]["payload"]["assets"]
+            elif "assets" in payload:
+                assets_to_check = payload["assets"]
+
+            if assets_to_check and len(assets_to_check) > 0:
+                asset = assets_to_check[0]
+
+                # Always look for proxy DerivedRepresentations
+                if "DerivedRepresentations" in asset:
+                    for rep in asset["DerivedRepresentations"]:
+                        if rep.get("Type") == "Audio" and rep.get("Purpose") == "proxy":
+                            if (
+                                "StorageInfo" in rep
+                                and "PrimaryLocation" in rep["StorageInfo"]
+                            ):
+                                primary_loc = rep["StorageInfo"]["PrimaryLocation"]
+                                if (
+                                    "Bucket" in primary_loc
+                                    and "ObjectKey" in primary_loc
+                                ):
+                                    bucket = primary_loc["Bucket"]
+                                    key = primary_loc["ObjectKey"].get("FullPath", "")
+                                    if bucket and key:
+                                        audio_uri = f"s3://{bucket}/{key}"
+                                        logger.info(
+                                            f"Found MediaLake proxy DerivedRepresentation: bucket={bucket}, key={key}"
+                                        )
+                                        break
+
+            # Fallback to other payload structures if assets approach didn't work
+            if not audio_uri:
+                if "s3_location" in payload:
+                    audio_uri = payload["s3_location"]
+                elif "uri" in payload:
+                    audio_uri = payload["uri"]
+                elif "s3Uri" in payload:
+                    audio_uri = payload["s3Uri"]
+                elif "bucket" in payload and "key" in payload:
+                    audio_uri = f"s3://{payload['bucket']}/{payload['key']}"
+                elif "Bucket" in payload and "Key" in payload:
+                    audio_uri = f"s3://{payload['Bucket']}/{payload['Key']}"
+                elif "location" in payload:
+                    audio_uri = payload["location"]
+                elif "file_location" in payload:
+                    audio_uri = payload["file_location"]
+                # Check MediaLake data structure (from pipeline output)
+                elif "data" in payload and isinstance(payload["data"], dict):
+                    data = payload["data"]
+                    if "bucket" in data and "key" in data:
+                        audio_uri = f"s3://{data['bucket']}/{data['key']}"
 
             if not audio_uri:
                 logger.error(
