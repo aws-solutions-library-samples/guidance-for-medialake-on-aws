@@ -23,9 +23,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [
             {
               "name": "any",
@@ -64,9 +62,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [
             {
               "name": "Processor",
@@ -110,9 +106,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [],
           "type": "FLOW",
           "configuration": {
@@ -142,9 +136,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [],
           "type": "UTILITY",
           "configuration": {
@@ -179,9 +171,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [
             {
               "name": "Completed",
@@ -224,9 +214,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [],
           "type": "FLOW",
           "configuration": {
@@ -261,10 +249,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "invocation_arn",
-            "any"
-          ],
+          "inputTypes": ["invocation_arn", "any"],
           "outputTypes": [
             {
               "name": "status",
@@ -299,10 +284,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "invocation_arn",
-            "any"
-          ],
+          "inputTypes": ["invocation_arn", "any"],
           "outputTypes": [
             {
               "name": "embeddings",
@@ -337,9 +319,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "any"
-          ],
+          "inputTypes": ["any"],
           "outputTypes": [
             {
               "name": "audio",
@@ -380,11 +360,7 @@
             },
             "_owner": null
           },
-          "inputTypes": [
-            "video",
-            "audio",
-            "image"
-          ],
+          "inputTypes": ["video", "audio", "image"],
           "outputTypes": [
             {
               "name": "invocation_arn",
