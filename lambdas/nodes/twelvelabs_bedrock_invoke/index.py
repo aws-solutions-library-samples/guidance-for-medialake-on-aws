@@ -5,6 +5,7 @@ from typing import Any, Dict
 import boto3
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from bedrock_utils import BEDROCK_RETRY_CONFIGS, bedrock_start_async_invoke_with_retry
 from lambda_middleware import lambda_middleware
 
 # Powertools / logging
@@ -326,9 +327,9 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         else:
             raise RuntimeError(f"Unsupported input type: {input_type}")
 
-        # Start async invoke
+        # Start async invoke with retry logic
         logger.info(
-            "Starting Bedrock async invoke",
+            "Starting Bedrock async invoke with retry protection",
             extra={
                 "model_id": model_id,
                 "input_type": input_type,
@@ -337,14 +338,18 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
             },
         )
 
-        response = bedrock_runtime.start_async_invoke(
-            modelId=model_id,
-            modelInput=model_input,
-            outputDataConfig={
+        # Use the retry-enabled function from bedrock_utils
+        # Using 'default' config which provides reasonable retry behavior
+        response = bedrock_start_async_invoke_with_retry(
+            bedrock_client=bedrock_runtime,
+            model_id=model_id,
+            model_input=model_input,
+            output_data_config={
                 "s3OutputDataConfig": {
                     "s3Uri": f"s3://{s3_output_bucket}/{output_prefix}"
                 }
             },
+            config=BEDROCK_RETRY_CONFIGS["default"],
         )
 
         invocation_arn = response["invocationArn"]
@@ -386,5 +391,12 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
 
     except Exception as e:
         logger.exception("Error in TwelveLabs Bedrock Invoke")
+
+        # Provide more specific error information for throttling issues
         error_msg = f"Error in TwelveLabs Bedrock Invoke: {str(e)}"
+
+        # Check if this is a throttling-related error from our bedrock_utils
+        if "BedrockThrottlingError" in str(type(e)) or "Max retries exceeded" in str(e):
+            error_msg = f"TwelveLabs Bedrock Invoke failed due to persistent throttling: {str(e)}. This indicates the service is experiencing high load. Consider implementing request rate limiting or trying again later."
+
         raise RuntimeError(error_msg) from e
