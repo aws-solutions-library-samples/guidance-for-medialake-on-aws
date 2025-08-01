@@ -290,7 +290,6 @@
               "Region": "us-east-1",
               "S3 Output Bucket": "${EXTERNAL_PAYLOAD_BUCKET}"
             },
-            "integrationId": "36737648-07d8-459b-b11e-9cd71bb6632d",
             "path": "",
             "operationId": ""
           },
