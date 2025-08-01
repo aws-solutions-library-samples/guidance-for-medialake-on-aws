@@ -221,6 +221,14 @@ class NodesStack(cdk.NestedStack):
             code_path=["lambdas", "nodes", "audio_splitter"],
         )
 
+        self.video_splitter_lambda_deployment = LambdaDeployment(
+            self,
+            "VideoSplitterLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "video_splitter"],
+        )
+
         self.s3_vector_store_lambda_deployment = LambdaDeployment(
             self,
             "S3VectorStoreLambdaDeployment",
