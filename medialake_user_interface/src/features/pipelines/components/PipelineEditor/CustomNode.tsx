@@ -8,6 +8,7 @@ import {
 } from "reactflow";
 import { Box, Typography, IconButton, Tooltip } from "@mui/material";
 import { FaCog, FaTrash } from "react-icons/fa";
+import { RotateRight } from "@mui/icons-material";
 
 const HANDLE_CONNECT_RADIUS = 50;
 
@@ -139,7 +140,9 @@ export interface CustomNodeData {
   configuration?: any; // Node configuration
   onDelete?: (id: string) => void;
   onConfigure?: (id: string) => void;
+  onRotate?: (id: string, rotation: number) => void;
   type?: string; // Node type (e.g., 'TRIGGER', 'INTEGRATION', 'FLOW')
+  rotation?: number; // Rotation angle in degrees (0, 90, 180, 270)
 }
 
 const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
@@ -161,6 +164,121 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
   );
 
   useOnSelectionChange({ onChange });
+
+  // Rotation state - use data.rotation or default to 0
+  const currentRotation = data.rotation || 0;
+
+  // Handle rotation
+  const handleRotate = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    const newRotation = (currentRotation + 90) % 360;
+    data.onRotate?.(id, newRotation);
+  };
+
+  // Helper function to get handle position based on rotation
+  const getHandlePosition = (originalPosition: Position, rotation: number): Position => {
+    const rotationMap = {
+      0: { [Position.Left]: Position.Left, [Position.Right]: Position.Right, [Position.Top]: Position.Top, [Position.Bottom]: Position.Bottom },
+      90: { [Position.Left]: Position.Bottom, [Position.Right]: Position.Top, [Position.Top]: Position.Left, [Position.Bottom]: Position.Right },
+      180: { [Position.Left]: Position.Right, [Position.Right]: Position.Left, [Position.Top]: Position.Bottom, [Position.Bottom]: Position.Top },
+      270: { [Position.Left]: Position.Top, [Position.Right]: Position.Bottom, [Position.Top]: Position.Right, [Position.Bottom]: Position.Left },
+    };
+    return rotationMap[rotation as keyof typeof rotationMap]?.[originalPosition] || originalPosition;
+  };
+
+  // Helper function to get handle container styles based on rotation
+  const getHandleContainerStyles = (isInput: boolean, rotation: number) => {
+    const baseStyles = {
+      position: "absolute" as const,
+      display: "flex",
+      flexDirection: "column" as const,
+      justifyContent: (isInput ? inputTypes.length : outputTypes.length) === 1 ? "center" as const : "space-evenly" as const,
+      zIndex: 10, // Ensure handles are above the node content
+    };
+
+    switch (rotation) {
+      case 0:
+        return {
+          ...baseStyles,
+          [isInput ? "left" : "right"]: 3,
+          top: 0,
+          height: "100%",
+        };
+      case 90:
+        return {
+          ...baseStyles,
+          [isInput ? "bottom" : "top"]: -6, // Move handles outside the node boundary but not too far
+          left: 0,
+          width: "100%",
+          flexDirection: "row" as const,
+        };
+      case 180:
+        return {
+          ...baseStyles,
+          [isInput ? "right" : "left"]: 3,
+          top: 0,
+          height: "100%",
+        };
+      case 270:
+        return {
+          ...baseStyles,
+          [isInput ? "top" : "bottom"]: -6, // Move handles outside the node boundary but not too far
+          left: 0,
+          width: "100%",
+          flexDirection: "row" as const,
+        };
+      default:
+        return {
+          ...baseStyles,
+          [isInput ? "left" : "right"]: 3,
+          top: 0,
+          height: "100%",
+        };
+    }
+  };
+
+  // Helper function to get handle item styles based on rotation
+  const getHandleItemStyles = (rotation: number) => {
+    const baseStyles = {
+      position: "relative" as const,
+      display: "flex",
+      alignItems: "center",
+      zIndex: 15, // Ensure handle items are above everything
+    };
+
+    switch (rotation) {
+      case 0:
+        return {
+          ...baseStyles,
+          height: "24px",
+          ml: "-6px",
+        };
+      case 90:
+        return {
+          ...baseStyles,
+          width: "24px",
+          mt: "-6px", // Keep handle items positioned to extend the connection point
+        };
+      case 180:
+        return {
+          ...baseStyles,
+          height: "24px",
+          mr: "-6px",
+        };
+      case 270:
+        return {
+          ...baseStyles,
+          width: "24px",
+          mb: "-6px", // Keep handle items positioned to extend the connection point
+        };
+      default:
+        return {
+          ...baseStyles,
+          height: "24px",
+          ml: "-6px",
+        };
+    }
+  };
 
   // Debug logging
   // console.log('[CustomNode] Input types:', data.inputTypes);
@@ -265,6 +383,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
           : "",
         padding: "2px",
         transition: "all 0.3s linear",
+        zIndex: currentRotation === 90 || currentRotation === 270 ? 1 : 5, // Lower z-index when handles are on top/bottom
       }}
       onFocus={(e) => setSelected(true)}
     >
@@ -282,6 +401,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
           position: "relative",
           boxShadow: 2,
           cursor: "pointer",
+          zIndex: currentRotation === 90 || currentRotation === 270 ? 1 : 5, // Lower z-index when handles are on top/bottom
           "&:hover": {
             boxShadow: 3,
             "& .node-actions": {
@@ -297,28 +417,11 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
       >
         {/* Input handles */}
         {!isTriggerNode && (
-          <Box
-            sx={{
-              position: "absolute",
-              left: 3,
-              top: 0,
-              height: "100%",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent:
-                inputTypes.length === 1 ? "center" : "space-evenly",
-            }}
-          >
+          <Box sx={getHandleContainerStyles(true, currentRotation)}>
             {inputTypes.map((inputType, index) => (
               <Box
                 key={`input-${index}`}
-                sx={{
-                  position: "relative",
-                  height: "24px",
-                  display: "flex",
-                  alignItems: "center",
-                  ml: "-6px",
-                }}
+                sx={getHandleItemStyles(currentRotation)}
               >
                 <Tooltip
                   title={
@@ -329,7 +432,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
                 >
                   <Handle
                     type="target"
-                    position={Position.Left}
+                    position={getHandlePosition(Position.Left, currentRotation)}
                     id={`input-${
                       typeof inputType === "string"
                         ? inputType
@@ -351,6 +454,8 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
                       height: "16px",
                       border: "1px solid #fff",
                       borderRadius: "2px",
+                      transform: `rotate(${-currentRotation}deg)`,
+                      transformOrigin: "center center",
                     }}
                   />
                 </Tooltip>
@@ -401,6 +506,15 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
                 <FaCog size={14} />
               </IconButton>
             )}
+            <Tooltip title={`Rotate (${currentRotation}°)`}>
+              <IconButton
+                size="small"
+                onClick={handleRotate}
+                sx={{ p: 0.5 }}
+              >
+                <RotateRight sx={{ fontSize: 14 }} />
+              </IconButton>
+            </Tooltip>
             <IconButton size="small" onClick={handleDelete} sx={{ p: 0.5 }}>
               <FaTrash size={14} />
             </IconButton>
@@ -414,30 +528,11 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
         typeof outputTypes[0] === "object" &&
         "name" in (outputTypes[0] as any) ? (
           // Multiple output types as objects with name/description
-          <Box
-            sx={{
-              position: "absolute",
-              right: 3,
-              top: 0,
-              height: "100%",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent:
-                (outputTypes as OutputType[]).length === 1
-                  ? "center"
-                  : "space-evenly",
-            }}
-          >
+          <Box sx={getHandleContainerStyles(false, currentRotation)}>
             {(outputTypes as OutputType[]).map((output, index) => (
               <Box
                 key={output.name}
-                sx={{
-                  position: "relative",
-                  height: "24px",
-                  display: "flex",
-                  alignItems: "center",
-                  mr: "-6px",
-                }}
+                sx={getHandleItemStyles(currentRotation)}
               >
                 {/* <Typography variant="caption" sx={{ mr: 1, fontSize: '0.7rem' }}>
                                 {output.name}
@@ -445,7 +540,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
                 <Tooltip title={output.name}>
                   <Handle
                     type="source"
-                    position={Position.Right}
+                    position={getHandlePosition(Position.Right, currentRotation)}
                     id={output.name}
                     isConnectable={isConnectable}
                     style={{
@@ -461,6 +556,8 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
                       height: "12px",
                       border: "1px solid #fff",
                       borderRadius: "5px",
+                      transform: `rotate(${-currentRotation}deg)`,
+                      transformOrigin: "center center",
                     }}
                   />
                 </Tooltip>

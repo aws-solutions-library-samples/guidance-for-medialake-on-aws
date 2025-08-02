@@ -21,6 +21,7 @@ import ReactFlow, {
   Node,
   reconnectEdge,
   MarkerType,
+  useUpdateNodeInternals,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import {
@@ -101,7 +102,9 @@ interface CustomNodeData {
   configuration?: any;
   onDelete?: (id: string) => void;
   onConfigure?: (id: string) => void;
+  onRotate?: (id: string, rotation: number) => void;
   type?: string; // Node type (e.g., 'TRIGGER', 'INTEGRATION', 'FLOW')
+  rotation?: number; // Rotation angle in degrees (0, 90, 180, 270)
 }
 
 const nodeTypes = {
@@ -655,6 +658,7 @@ const PipelineEditorContent = () => {
   );
   const { screenToFlowPosition } = useReactFlow();
   const reactFlowInstance = useReactFlow();
+  const updateNodeInternals = useUpdateNodeInternals();
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
   const [errorType, setErrorType] = useState<"trigger" | "compatibility">(
     "compatibility",
@@ -989,6 +993,34 @@ const PipelineEditorContent = () => {
       }
     },
     [nodes],
+  );
+
+  const onRotateNode = useCallback(
+    (nodeId: string, rotation: number) => {
+      // 1. Update the node's rotation
+      setNodes((nds) =>
+        nds.map((node) =>
+          node.id === nodeId
+            ? { ...node, data: { ...node.data, rotation } }
+            : node
+        )
+      );
+
+      // 2. Tell React Flow to recalc all the edge handles for this node
+      updateNodeInternals(nodeId);
+
+      // 3. Update pipeline configuration
+      setFormData((prev) => ({
+        ...prev,
+        configuration: {
+          ...prev.configuration,
+          nodes: prev.configuration.nodes.map((n) =>
+            n.id === nodeId ? { ...n, rotation } : n
+          ),
+        },
+      }));
+    },
+    [setNodes, setFormData, updateNodeInternals]
   );
 
   // Debug pipeline object
@@ -1355,6 +1387,8 @@ const PipelineEditorContent = () => {
             configuration: node.data.configuration,
             onDelete: onDeleteNode,
             onConfigure: onConfigureNode,
+            onRotate: onRotateNode,
+            rotation: (node.data as any).rotation || 0,
           },
           // Preserve width and height
           width:
@@ -1433,7 +1467,7 @@ const PipelineEditorContent = () => {
       pipelineInitialized.current = true;
       console.log("[PipelineEditorPage] Pipeline initialized");
     }
-  }, [pipeline, onDeleteNode, onConfigureNode, setNodes, setEdges]);
+  }, [pipeline, onDeleteNode, onConfigureNode, onRotateNode, setNodes, setEdges]);
 
   // Update existing nodes with handlers
   React.useEffect(() => {
@@ -1444,10 +1478,11 @@ const PipelineEditorContent = () => {
           ...node.data,
           onDelete: onDeleteNode,
           onConfigure: onConfigureNode,
+          onRotate: onRotateNode,
         },
       })),
     );
-  }, [onDeleteNode, onConfigureNode, setNodes]);
+  }, [onDeleteNode, onConfigureNode, onRotateNode, setNodes]);
 
   // Handle edge reconnection start
   const onReconnectStart = useCallback(() => {
@@ -1633,6 +1668,7 @@ const PipelineEditorContent = () => {
           ...newReactFlowNode.data,
           onDelete: onDeleteNode,
           onConfigure: onConfigureNode,
+          onRotate: onRotateNode,
         },
       };
 
@@ -1688,7 +1724,7 @@ const PipelineEditorContent = () => {
       // setSelectedNode(nodeWithHandlers);
       // setIsNodeConfigOpen(true);
     },
-    [screenToFlowPosition, setNodes, onDeleteNode, onConfigureNode],
+    [screenToFlowPosition, setNodes, onDeleteNode, onConfigureNode, onRotateNode],
   );
 
   const handleNodeConfigClose = useCallback(() => {
