@@ -28,6 +28,57 @@ const CustomEdge: React.FC<EdgeProps> = ({
     const sourceNode = flow.getNode(source ?? "");
 
     /**
+     * Calculate a point on the bezier curve at a given percentage (0-1)
+     * This ensures the label stays on the actual curve path
+     */
+    const getBezierPoint = useCallback((t: number) => {
+        // For a cubic bezier curve, we need the control points
+        // getBezierPath creates a curve, but we need to calculate our own point
+        const dx = targetX - sourceX;
+        const dy = targetY - sourceY;
+        
+        // Calculate control points based on the source and target positions
+        let controlPoint1X = sourceX;
+        let controlPoint1Y = sourceY;
+        let controlPoint2X = targetX;
+        let controlPoint2Y = targetY;
+        
+        // Adjust control points based on handle positions (similar to getBezierPath logic)
+        if (sourcePosition === Position.Right) {
+            controlPoint1X = sourceX + Math.abs(dx) * 0.5;
+        } else if (sourcePosition === Position.Left) {
+            controlPoint1X = sourceX - Math.abs(dx) * 0.5;
+        } else if (sourcePosition === Position.Top) {
+            controlPoint1Y = sourceY - Math.abs(dy) * 0.5;
+        } else if (sourcePosition === Position.Bottom) {
+            controlPoint1Y = sourceY + Math.abs(dy) * 0.5;
+        }
+        
+        if (targetPosition === Position.Right) {
+            controlPoint2X = targetX + Math.abs(dx) * 0.5;
+        } else if (targetPosition === Position.Left) {
+            controlPoint2X = targetX - Math.abs(dx) * 0.5;
+        } else if (targetPosition === Position.Top) {
+            controlPoint2Y = targetY - Math.abs(dy) * 0.5;
+        } else if (targetPosition === Position.Bottom) {
+            controlPoint2Y = targetY + Math.abs(dy) * 0.5;
+        }
+        
+        // Cubic bezier formula: B(t) = (1-t)³P₀ + 3(1-t)²tP₁ + 3(1-t)t²P₂ + t³P₃
+        const x = Math.pow(1 - t, 3) * sourceX +
+                  3 * Math.pow(1 - t, 2) * t * controlPoint1X +
+                  3 * (1 - t) * Math.pow(t, 2) * controlPoint2X +
+                  Math.pow(t, 3) * targetX;
+                  
+        const y = Math.pow(1 - t, 3) * sourceY +
+                  3 * Math.pow(1 - t, 2) * t * controlPoint1Y +
+                  3 * (1 - t) * Math.pow(t, 2) * controlPoint2Y +
+                  Math.pow(t, 3) * targetY;
+                  
+        return { x, y };
+    }, [sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition]);
+
+    /**
      * Get the choice label for the edge
      * @returns The output handle name (Completed, Fail, In Progress)
      */
@@ -106,31 +157,36 @@ const CustomEdge: React.FC<EdgeProps> = ({
                 <FlashOn sx={{fontSize: "15px"}} />{sourceNode?.data?.type}
               </Typography>
             </EdgeLabelRenderer>}
-            {sourceNode?.data?.type === "FLOW" && sourceNode?.data?.nodeId === "choice" && <EdgeLabelRenderer>
-              <Typography
-                variant={"caption"}
-                className="button-edge__label nodrag nopan"
-                style={{
-                  position: 'absolute',
-                  transform: 'translate(-50%, -50%)',
-                  pointerEvents: 'all',
-                  left: labelX,
-                  top: labelY,
-                  padding: '2px 6px 2px 6px',
-                  fontSize: 10,
-                  fontWeight: 600,
-                  backgroundColor: getChoiceLabelColor(),
-                  color: "#fff",
-                  userSelect: 'none',
-                  borderRadius: "4px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                  {getChoiceLabel()}
-              </Typography>
-            </EdgeLabelRenderer>}
+            {sourceNode?.data?.type === "FLOW" && sourceNode?.data?.nodeId === "choice" && (() => {
+              const labelPoint = getBezierPoint(0.25);
+              return (
+                <EdgeLabelRenderer>
+                  <Typography
+                    variant={"caption"}
+                    className="button-edge__label nodrag nopan"
+                    style={{
+                      position: 'absolute',
+                      transform: 'translate(-50%, -50%)',
+                      pointerEvents: 'all',
+                      left: labelPoint.x,
+                      top: labelPoint.y,
+                      padding: '2px 6px 2px 6px',
+                      fontSize: 10,
+                      fontWeight: 600,
+                      backgroundColor: getChoiceLabelColor(),
+                      color: "#fff",
+                      userSelect: 'none',
+                      borderRadius: "4px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                      {getChoiceLabel()}
+                  </Typography>
+                </EdgeLabelRenderer>
+              );
+            })()}
 
             {data?.text && (
                 <Box

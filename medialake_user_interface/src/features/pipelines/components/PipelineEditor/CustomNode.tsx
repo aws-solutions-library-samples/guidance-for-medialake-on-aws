@@ -200,38 +200,38 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
       case 0:
         return {
           ...baseStyles,
-          [isInput ? "left" : "right"]: 3,
-          top: 0,
+          [isInput ? "left" : "right"]: -3, // 50% on edge (12px handle, so -6px centers it)
+          top: -5,
           height: "100%",
         };
       case 90:
         return {
           ...baseStyles,
-          [isInput ? "bottom" : "top"]: -6, // Move handles outside the node boundary but not too far
-          left: 0,
+          [isInput ? "bottom" : "top"]: -3, // 50% on edge (16px handle height, so -8px centers it)
+          left: -5,
           width: "100%",
           flexDirection: "row" as const,
         };
       case 180:
         return {
           ...baseStyles,
-          [isInput ? "right" : "left"]: 3,
-          top: 0,
+          [isInput ? "right" : "left"]: -3, // 50% on edge (12px handle, so -6px centers it)
+          top: -5,
           height: "100%",
         };
       case 270:
         return {
           ...baseStyles,
-          [isInput ? "top" : "bottom"]: -6, // Move handles outside the node boundary but not too far
-          left: 0,
+          [isInput ? "top" : "bottom"]: -3, // 50% on edge (16px handle height, so -8px centers it)
+          left: -5,
           width: "100%",
           flexDirection: "row" as const,
         };
       default:
         return {
           ...baseStyles,
-          [isInput ? "left" : "right"]: 3,
-          top: 0,
+          [isInput ? "left" : "right"]: -3,
+          top: -5,
           height: "100%",
         };
     }
@@ -243,6 +243,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
       position: "relative" as const,
       display: "flex",
       alignItems: "center",
+      justifyContent: "center",
       zIndex: 15, // Ensure handle items are above everything
     };
 
@@ -251,31 +252,31 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
         return {
           ...baseStyles,
           height: "24px",
-          ml: "-6px",
+          width: "12px",
         };
       case 90:
         return {
           ...baseStyles,
           width: "24px",
-          mt: "-6px", // Keep handle items positioned to extend the connection point
+          height: "12px",
         };
       case 180:
         return {
           ...baseStyles,
           height: "24px",
-          mr: "-6px",
+          width: "12px",
         };
       case 270:
         return {
           ...baseStyles,
           width: "24px",
-          mb: "-6px", // Keep handle items positioned to extend the connection point
+          height: "12px",
         };
       default:
         return {
           ...baseStyles,
           height: "24px",
-          ml: "-6px",
+          width: "12px",
         };
     }
   };
