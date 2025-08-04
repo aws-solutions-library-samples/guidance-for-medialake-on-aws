@@ -176,14 +176,40 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
   };
 
   // Helper function to get handle position based on rotation
-  const getHandlePosition = (originalPosition: Position, rotation: number): Position => {
+  const getHandlePosition = (
+    originalPosition: Position,
+    rotation: number,
+  ): Position => {
     const rotationMap = {
-      0: { [Position.Left]: Position.Left, [Position.Right]: Position.Right, [Position.Top]: Position.Top, [Position.Bottom]: Position.Bottom },
-      90: { [Position.Left]: Position.Bottom, [Position.Right]: Position.Top, [Position.Top]: Position.Left, [Position.Bottom]: Position.Right },
-      180: { [Position.Left]: Position.Right, [Position.Right]: Position.Left, [Position.Top]: Position.Bottom, [Position.Bottom]: Position.Top },
-      270: { [Position.Left]: Position.Top, [Position.Right]: Position.Bottom, [Position.Top]: Position.Right, [Position.Bottom]: Position.Left },
+      0: {
+        [Position.Left]: Position.Left,
+        [Position.Right]: Position.Right,
+        [Position.Top]: Position.Top,
+        [Position.Bottom]: Position.Bottom,
+      },
+      90: {
+        [Position.Left]: Position.Bottom,
+        [Position.Right]: Position.Top,
+        [Position.Top]: Position.Left,
+        [Position.Bottom]: Position.Right,
+      },
+      180: {
+        [Position.Left]: Position.Right,
+        [Position.Right]: Position.Left,
+        [Position.Top]: Position.Bottom,
+        [Position.Bottom]: Position.Top,
+      },
+      270: {
+        [Position.Left]: Position.Top,
+        [Position.Right]: Position.Bottom,
+        [Position.Top]: Position.Right,
+        [Position.Bottom]: Position.Left,
+      },
     };
-    return rotationMap[rotation as keyof typeof rotationMap]?.[originalPosition] || originalPosition;
+    return (
+      rotationMap[rotation as keyof typeof rotationMap]?.[originalPosition] ||
+      originalPosition
+    );
   };
 
   // Helper function to get handle container styles based on rotation
@@ -192,7 +218,10 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
       position: "absolute" as const,
       display: "flex",
       flexDirection: "column" as const,
-      justifyContent: (isInput ? inputTypes.length : outputTypes.length) === 1 ? "center" as const : "space-evenly" as const,
+      justifyContent:
+        (isInput ? inputTypes.length : outputTypes.length) === 1
+          ? ("center" as const)
+          : ("space-evenly" as const),
       zIndex: 10, // Ensure handles are above the node content
     };
 
@@ -508,11 +537,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
               </IconButton>
             )}
             <Tooltip title={`Rotate (${currentRotation}°)`}>
-              <IconButton
-                size="small"
-                onClick={handleRotate}
-                sx={{ p: 0.5 }}
-              >
+              <IconButton size="small" onClick={handleRotate} sx={{ p: 0.5 }}>
                 <RotateRight sx={{ fontSize: 14 }} />
               </IconButton>
             </Tooltip>
@@ -531,17 +556,17 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
           // Multiple output types as objects with name/description
           <Box sx={getHandleContainerStyles(false, currentRotation)}>
             {(outputTypes as OutputType[]).map((output, index) => (
-              <Box
-                key={output.name}
-                sx={getHandleItemStyles(currentRotation)}
-              >
+              <Box key={output.name} sx={getHandleItemStyles(currentRotation)}>
                 {/* <Typography variant="caption" sx={{ mr: 1, fontSize: '0.7rem' }}>
                                 {output.name}
                             </Typography> */}
                 <Tooltip title={output.name}>
                   <Handle
                     type="source"
-                    position={getHandlePosition(Position.Right, currentRotation)}
+                    position={getHandlePosition(
+                      Position.Right,
+                      currentRotation,
+                    )}
                     id={output.name}
                     isConnectable={isConnectable}
                     style={{

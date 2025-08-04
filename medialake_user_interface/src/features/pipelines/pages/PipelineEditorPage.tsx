@@ -180,9 +180,9 @@ const convertToPipelineNode = (node: Node<CustomNodeData>): PipelineNode => ({
   },
   positionAbsolute: node.positionAbsolute
     ? {
-      x: node.positionAbsolute.x.toString(),
-      y: node.positionAbsolute.y.toString(),
-    }
+        x: node.positionAbsolute.x.toString(),
+        y: node.positionAbsolute.y.toString(),
+      }
     : undefined,
   selected: node.selected,
   dragging: node.dragging,
@@ -1002,8 +1002,8 @@ const PipelineEditorContent = () => {
         nds.map((node) =>
           node.id === nodeId
             ? { ...node, data: { ...node.data, rotation } }
-            : node
-        )
+            : node,
+        ),
       );
 
       // 2. Tell React Flow to recalc all the edge handles for this node
@@ -1015,12 +1015,12 @@ const PipelineEditorContent = () => {
         configuration: {
           ...prev.configuration,
           nodes: prev.configuration.nodes.map((n) =>
-            n.id === nodeId ? { ...n, rotation } : n
+            n.id === nodeId ? { ...n, rotation } : n,
           ),
         },
       }));
     },
-    [setNodes, setFormData, updateNodeInternals]
+    [setNodes, setFormData, updateNodeInternals],
   );
 
   // Debug pipeline object
@@ -1136,8 +1136,8 @@ const PipelineEditorContent = () => {
                 // Fix icon if needed
                 icon:
                   node.data.icon &&
-                    typeof node.data.icon === "object" &&
-                    node.data.icon.props
+                  typeof node.data.icon === "object" &&
+                  node.data.icon.props
                     ? getNodeIcon(node.data.type)
                     : node.data.icon,
               };
@@ -1276,8 +1276,8 @@ const PipelineEditorContent = () => {
             // Fix the icon property to ensure it's properly rendered
             icon:
               node.data.icon &&
-                typeof node.data.icon === "object" &&
-                node.data.icon.props
+              typeof node.data.icon === "object" &&
+              node.data.icon.props
                 ? getNodeIcon(node.data.type)
                 : node.data.icon,
           },
@@ -1467,7 +1467,14 @@ const PipelineEditorContent = () => {
       pipelineInitialized.current = true;
       console.log("[PipelineEditorPage] Pipeline initialized");
     }
-  }, [pipeline, onDeleteNode, onConfigureNode, onRotateNode, setNodes, setEdges]);
+  }, [
+    pipeline,
+    onDeleteNode,
+    onConfigureNode,
+    onRotateNode,
+    setNodes,
+    setEdges,
+  ]);
 
   // Update existing nodes with handlers
   React.useEffect(() => {
@@ -1724,7 +1731,13 @@ const PipelineEditorContent = () => {
       // setSelectedNode(nodeWithHandlers);
       // setIsNodeConfigOpen(true);
     },
-    [screenToFlowPosition, setNodes, onDeleteNode, onConfigureNode, onRotateNode],
+    [
+      screenToFlowPosition,
+      setNodes,
+      onDeleteNode,
+      onConfigureNode,
+      onRotateNode,
+    ],
   );
 
   const handleNodeConfigClose = useCallback(() => {
@@ -1930,9 +1943,9 @@ const PipelineEditorContent = () => {
           // Check if the imported flow has an active property
           const importedActive =
             importedNodes.length > 0 &&
-              importedNodes[0].data &&
-              importedNodes[0].data.flow &&
-              importedNodes[0].data.flow.active !== undefined
+            importedNodes[0].data &&
+            importedNodes[0].data.flow &&
+            importedNodes[0].data.flow.active !== undefined
               ? importedNodes[0].data.flow.active
               : undefined;
 
@@ -1970,14 +1983,14 @@ const PipelineEditorContent = () => {
         onDelete={
           pipelineId && pipelineId !== "new"
             ? () => {
-              // Open delete dialog
-              setDeleteDialog({
-                open: true,
-                pipelineId: pipelineId,
-                pipelineName: formData.name,
-                userInput: "",
-              });
-            }
+                // Open delete dialog
+                setDeleteDialog({
+                  open: true,
+                  pipelineId: pipelineId,
+                  pipelineName: formData.name,
+                  userInput: "",
+                });
+              }
             : undefined
         }
       />
@@ -2186,7 +2199,7 @@ const PipelineEditorContent = () => {
                 setApiStatusModalAction("Delete Failed");
                 setApiStatusModalMessage(
                   error.message ||
-                  "An error occurred while deleting the pipeline.",
+                    "An error occurred while deleting the pipeline.",
                 );
               });
           });
