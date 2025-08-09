@@ -72,6 +72,41 @@ def sanitize_function_name(pipeline_name, node_label, version):
     return sanitized_name
 
 
+def get_lambda_config_with_defaults(lambda_config: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Extract Lambda configuration parameters from YAML with fallback defaults.
+
+    Args:
+        lambda_config: Lambda configuration from YAML
+
+    Returns:
+        Dictionary with Lambda configuration parameters including:
+        - memory_size: Memory allocation in MB (default: 1024)
+        - ephemeral_storage_size: Ephemeral storage size in MB (default: 10240)
+        - timeout: Function timeout in seconds (default: 300)
+    """
+    # Extract parameters with defaults matching current hardcoded values
+    memory_size = lambda_config.get("memory_size", 1024)
+    ephemeral_storage = lambda_config.get("ephemeral_storage", 10240)
+    timeout = lambda_config.get("timeout", 300)
+
+    # Validate parameters within AWS Lambda limits
+    memory_size = max(128, min(10240, int(memory_size)))
+    ephemeral_storage = max(512, min(10240, int(ephemeral_storage)))
+    timeout = max(1, min(900, int(timeout)))
+
+    logger.info(
+        f"Lambda configuration: memory_size={memory_size}MB, "
+        f"ephemeral_storage={ephemeral_storage}MB, timeout={timeout}s"
+    )
+
+    return {
+        "memory_size": memory_size,
+        "ephemeral_storage_size": ephemeral_storage,
+        "timeout": timeout,
+    }
+
+
 def read_yaml_from_s3(bucket: str, key: str) -> Dict[str, Any]:
     """
     Read and parse a YAML file from S3.
@@ -453,6 +488,10 @@ def create_lambda_function(
     zip_file_key = get_zip_file_key(IAC_ASSETS_BUCKET, zip_file_prefix)
 
     runtime = lambda_config["runtime"].lower()
+
+    # Extract configurable Lambda parameters with defaults
+    config_params = get_lambda_config_with_defaults(lambda_config)
+
     role_arn = create_lambda_role(
         pipeline_name, node.data.id, yaml_data, operation_id, function_name
     )
@@ -486,9 +525,11 @@ def create_lambda_function(
                 create_function_params = {
                     "FunctionName": function_name,
                     "Runtime": runtime,
-                    "MemorySize": 1024,
-                    "EphemeralStorage": {"Size": 10240},
-                    "Timeout": 300,
+                    "MemorySize": config_params["memory_size"],
+                    "EphemeralStorage": {
+                        "Size": config_params["ephemeral_storage_size"]
+                    },
+                    "Timeout": config_params["timeout"],
                     "Role": role_arn,
                     "Handler": "index.lambda_handler",
                     "Code": {"S3Bucket": IAC_ASSETS_BUCKET, "S3Key": zip_file_key},

@@ -1,4 +1,5 @@
 import hashlib
+import json
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -178,6 +179,36 @@ class OpenSearchCluster(Construct):
             retention=logs.RetentionDays.ONE_WEEK,
             removal_policy=RemovalPolicy.DESTROY,
         )
+
+        # --------------------------------------------------------------------------
+        # Explicitly grant the OpenSearch Service principal permission to create log
+        # streams and put log events in our CloudWatch log groups before the domain
+        # is provisioned. We use a CfnResourcePolicy + DependsOn to avoid the race
+        # where the domain validates its logging config before the policy exists.
+        # --------------------------------------------------------------------------
+        policy_doc = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {"Service": "es.amazonaws.com"},
+                    "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+                    "Resource": [
+                        f"{app_log_group.log_group_arn}:*",
+                        f"{slow_search_log_group.log_group_arn}:*",
+                        f"{slow_index_log_group.log_group_arn}:*",
+                    ],
+                }
+            ],
+        }
+
+        log_policy = logs.CfnResourcePolicy(
+            self,
+            "AllowOpenSearchToCWLogsPolicy",
+            policy_name="AllowOpenSearchPublishing",
+            policy_document=json.dumps(policy_doc),
+        )
+
         for lg in (app_log_group, slow_search_log_group, slow_index_log_group):
             grant_opensearch_access(lg)
 
@@ -291,6 +322,10 @@ class OpenSearchCluster(Construct):
                 ),
                 access_policies=access_policy,
             )
+
+            # THIS is the magic: ensure the policy exists first
+            self.domain.node.add_dependency(log_policy)
+
             # Retain domain on stack destroy if in prod
             if config.environment == "prod":
                 self.domain.apply_removal_policy(RemovalPolicy.RETAIN)
