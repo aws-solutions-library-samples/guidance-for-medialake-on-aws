@@ -212,6 +212,12 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
     );
   };
 
+  const getEdgeOffsetStyle = (position: Position) => {
+    if (position === Position.Top) return { top: -6 }; // use -7 if your border is 2px
+    if (position === Position.Bottom) return { bottom: -6 }; // use -7 if your border is 2px
+    return {};
+  };
+
   // Helper function to get handle container styles based on rotation
   const getHandleContainerStyles = (isInput: boolean, rotation: number) => {
     const baseStyles = {
@@ -236,7 +242,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
       case 90:
         return {
           ...baseStyles,
-          [isInput ? "bottom" : "top"]: -3, // 50% on edge (16px handle height, so -8px centers it)
+          [isInput ? "bottom" : "top"]: -5, // 50% on edge (16px handle height, so -8px centers it)
           left: -5,
           width: "100%",
           flexDirection: "row" as const,
@@ -251,7 +257,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
       case 270:
         return {
           ...baseStyles,
-          [isInput ? "top" : "bottom"]: -3, // 50% on edge (16px handle height, so -8px centers it)
+          [isInput ? "top" : "bottom"]: -5, // 50% on edge (16px handle height, so -8px centers it)
           left: -5,
           width: "100%",
           flexDirection: "row" as const,
@@ -403,7 +409,16 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
       ? [{ name: "default" } as OutputType]
       : data.outputTypes;
 
-  // File 1 has an extra outer wrapper Box with gradient border when selected
+  const inputPos = getHandlePosition(Position.Left, currentRotation);
+  const outputPos = getHandlePosition(Position.Right, currentRotation);
+
+  const edgeNudge = (pos: Position) =>
+    pos === Position.Top
+      ? { top: -2 }
+      : pos === Position.Bottom
+        ? { bottom: -2 }
+        : {};
+
   return (
     <Box
       sx={{
@@ -462,7 +477,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
                 >
                   <Handle
                     type="target"
-                    position={getHandlePosition(Position.Left, currentRotation)}
+                    position={inputPos}
                     id={`input-${
                       typeof inputType === "string"
                         ? inputType
@@ -557,16 +572,10 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
           <Box sx={getHandleContainerStyles(false, currentRotation)}>
             {(outputTypes as OutputType[]).map((output, index) => (
               <Box key={output.name} sx={getHandleItemStyles(currentRotation)}>
-                {/* <Typography variant="caption" sx={{ mr: 1, fontSize: '0.7rem' }}>
-                                {output.name}
-                            </Typography> */}
                 <Tooltip title={output.name}>
                   <Handle
                     type="source"
-                    position={getHandlePosition(
-                      Position.Right,
-                      currentRotation,
-                    )}
+                    position={outputPos}
                     id={output.name}
                     isConnectable={isConnectable}
                     style={{
@@ -584,6 +593,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
                       borderRadius: "5px",
                       transform: `rotate(${-currentRotation}deg)`,
                       transformOrigin: "center center",
+                      ...edgeNudge(outputPos),
                     }}
                   />
                 </Tooltip>
