@@ -23,12 +23,48 @@ const CustomEdge: React.FC<EdgeProps> = ({
   style = {},
   markerEnd,
 }) => {
+  // Adjust coordinates for better connection centering
+  const getAdjustedCoordinates = () => {
+    let adjustedSourceX = sourceX;
+    let adjustedSourceY = sourceY;
+    let adjustedTargetX = targetX;
+    let adjustedTargetY = targetY;
+
+    // For vertical connections, apply small horizontal offset to center better
+    if (targetPosition === Position.Top || targetPosition === Position.Bottom) {
+      adjustedTargetX = targetX + 2;
+    }
+
+    if (sourcePosition === Position.Top || sourcePosition === Position.Bottom) {
+      adjustedSourceX = sourceX + 2;
+    }
+
+    // For horizontal connections, apply small vertical offset to center better with rectangular handles
+    if (targetPosition === Position.Left || targetPosition === Position.Right) {
+      adjustedTargetY = targetY + 2; // Increased upward adjustment for better gap
+    }
+
+    if (sourcePosition === Position.Left || sourcePosition === Position.Right) {
+      adjustedSourceY = sourceY + 2; // Increased upward adjustment for better gap
+    }
+
+    return {
+      adjustedSourceX,
+      adjustedSourceY,
+      adjustedTargetX,
+      adjustedTargetY,
+    };
+  };
+
+  const { adjustedSourceX, adjustedSourceY, adjustedTargetX, adjustedTargetY } =
+    getAdjustedCoordinates();
+
   const [edgePath, labelX, labelY] = getBezierPath({
-    sourceX,
-    sourceY,
+    sourceX: adjustedSourceX,
+    sourceY: adjustedSourceY,
     sourcePosition,
-    targetX,
-    targetY,
+    targetX: adjustedTargetX,
+    targetY: adjustedTargetY,
     targetPosition,
   });
   const flow = useReactFlow();
@@ -42,52 +78,59 @@ const CustomEdge: React.FC<EdgeProps> = ({
     (t: number) => {
       // For a cubic bezier curve, we need the control points
       // getBezierPath creates a curve, but we need to calculate our own point
-      const dx = targetX - sourceX;
-      const dy = targetY - sourceY;
+      const dx = adjustedTargetX - adjustedSourceX;
+      const dy = adjustedTargetY - adjustedSourceY;
 
       // Calculate control points based on the source and target positions
-      let controlPoint1X = sourceX;
-      let controlPoint1Y = sourceY;
-      let controlPoint2X = targetX;
-      let controlPoint2Y = targetY;
+      let controlPoint1X = adjustedSourceX;
+      let controlPoint1Y = adjustedSourceY;
+      let controlPoint2X = adjustedTargetX;
+      let controlPoint2Y = adjustedTargetY;
 
       // Adjust control points based on handle positions (similar to getBezierPath logic)
       if (sourcePosition === Position.Right) {
-        controlPoint1X = sourceX + Math.abs(dx) * 0.5;
+        controlPoint1X = adjustedSourceX + Math.abs(dx) * 0.5;
       } else if (sourcePosition === Position.Left) {
-        controlPoint1X = sourceX - Math.abs(dx) * 0.5;
+        controlPoint1X = adjustedSourceX - Math.abs(dx) * 0.5;
       } else if (sourcePosition === Position.Top) {
-        controlPoint1Y = sourceY - Math.abs(dy) * 0.5;
+        controlPoint1Y = adjustedSourceY - Math.abs(dy) * 0.5;
       } else if (sourcePosition === Position.Bottom) {
-        controlPoint1Y = sourceY + Math.abs(dy) * 0.5;
+        controlPoint1Y = adjustedSourceY + Math.abs(dy) * 0.5;
       }
 
       if (targetPosition === Position.Right) {
-        controlPoint2X = targetX + Math.abs(dx) * 0.5;
+        controlPoint2X = adjustedTargetX + Math.abs(dx) * 0.5;
       } else if (targetPosition === Position.Left) {
-        controlPoint2X = targetX - Math.abs(dx) * 0.5;
+        controlPoint2X = adjustedTargetX - Math.abs(dx) * 0.5;
       } else if (targetPosition === Position.Top) {
-        controlPoint2Y = targetY - Math.abs(dy) * 0.5;
+        controlPoint2Y = adjustedTargetY - Math.abs(dy) * 0.5;
       } else if (targetPosition === Position.Bottom) {
-        controlPoint2Y = targetY + Math.abs(dy) * 0.5;
+        controlPoint2Y = adjustedTargetY + Math.abs(dy) * 0.5;
       }
 
       // Cubic bezier formula: B(t) = (1-t)³P₀ + 3(1-t)²tP₁ + 3(1-t)t²P₂ + t³P₃
       const x =
-        Math.pow(1 - t, 3) * sourceX +
+        Math.pow(1 - t, 3) * adjustedSourceX +
         3 * Math.pow(1 - t, 2) * t * controlPoint1X +
         3 * (1 - t) * Math.pow(t, 2) * controlPoint2X +
-        Math.pow(t, 3) * targetX;
+        Math.pow(t, 3) * adjustedTargetX;
 
       const y =
-        Math.pow(1 - t, 3) * sourceY +
+        Math.pow(1 - t, 3) * adjustedSourceY +
         3 * Math.pow(1 - t, 2) * t * controlPoint1Y +
         3 * (1 - t) * Math.pow(t, 2) * controlPoint2Y +
-        Math.pow(t, 3) * targetY;
+        Math.pow(t, 3) * adjustedTargetY;
 
       return { x, y };
     },
-    [sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition],
+    [
+      adjustedSourceX,
+      adjustedSourceY,
+      adjustedTargetX,
+      adjustedTargetY,
+      sourcePosition,
+      targetPosition,
+    ],
   );
 
   /**

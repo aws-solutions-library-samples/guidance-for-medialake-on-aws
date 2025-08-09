@@ -1121,6 +1121,8 @@ const PipelineEditorContent = () => {
                 type: MarkerType.ArrowClosed,
                 width: 20,
                 height: 20,
+                refX: 19,
+                refY: 10,
               };
               return edge;
             });
@@ -1445,6 +1447,8 @@ const PipelineEditorContent = () => {
               type: MarkerType.ArrowClosed,
               width: 20,
               height: 20,
+              refX: 19,
+              refY: 10,
             },
             data: edge.data,
             // Include sourceHandle and targetHandle if they exist in the edge data
@@ -1518,6 +1522,8 @@ const PipelineEditorContent = () => {
                 type: MarkerType.ArrowClosed,
                 width: 20,
                 height: 20,
+                refX: 19,
+                refY: 10,
               },
             };
           }
@@ -1598,6 +1604,8 @@ const PipelineEditorContent = () => {
           type: MarkerType.ArrowClosed,
           width: 20,
           height: 20,
+          refX: 19,
+          refY: 10,
         },
         data: {
           text: "Connected",
