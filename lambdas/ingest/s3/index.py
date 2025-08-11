@@ -1877,7 +1877,7 @@ def handler(event: Dict, context: LambdaContext) -> Dict:
             TableName=os.environ["ASSETS_TABLE"]
         )
         logger.debug(
-            f"DynamoDB table info available - Table Status: {dynamo_client.describe_table(TableName=table_name).get('Table', {}).get('TableStatus')}"
+            f"DynamoDB table info available - Table Status: {dynamodb_client.describe_table(TableName=os.environ['ASSETS_TABLE']).get('Table', {}).get('TableStatus')}"
         )
     except Exception as e:
         logger.error(f"Error accessing DynamoDB table: {str(e)}")
