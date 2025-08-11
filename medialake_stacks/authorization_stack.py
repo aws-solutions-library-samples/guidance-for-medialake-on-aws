@@ -23,6 +23,7 @@ from aws_cdk import aws_lambda_event_sources as lambda_event_sources
 from aws_cdk import aws_verifiedpermissions as avp
 from constructs import Construct
 
+from constants import DynamoDB
 from constants import Lambda as LambdaConstants
 from medialake_constructs.auth.shared_authorizer_construct import (
     SharedAuthorizerConstruct,
@@ -119,6 +120,10 @@ class AuthorizationStack(Stack):
             ),
         )
 
+        # Get API keys table information
+        api_keys_table_name = DynamoDB.api_keys_table_name()
+        api_keys_table_arn = f"arn:aws:dynamodb:{cdk.Aws.REGION}:{cdk.Aws.ACCOUNT_ID}:table/{api_keys_table_name}"
+
         # Create the shared custom authorizer
         self._shared_authorizer = SharedAuthorizerConstruct(
             self,
@@ -128,6 +133,8 @@ class AuthorizationStack(Stack):
                 avp_policy_store_id=self._policy_store.attr_policy_store_id,
                 avp_policy_store_arn=f"arn:aws:verifiedpermissions::{cdk.Aws.ACCOUNT_ID}:policy-store/{self._policy_store.attr_policy_store_id}",
                 cognito_user_pool_id=props.cognito_user_pool.user_pool_id,
+                api_keys_table_name=api_keys_table_name,
+                api_keys_table_arn=api_keys_table_arn,
             ),
         )
 

@@ -22,6 +22,8 @@ class SettingsApiStackProps:
     x_origin_verify_secret: secretsmanager.Secret
     system_settings_table_name: str
     system_settings_table_arn: str
+    api_keys_table_name: str
+    api_keys_table_arn: str
 
 
 class SettingsApiStack(cdk.NestedStack):
@@ -59,5 +61,7 @@ class SettingsApiStack(cdk.NestedStack):
                 x_origin_verify_secret=props.x_origin_verify_secret,
                 system_settings_table_name=props.system_settings_table_name,
                 system_settings_table_arn=props.system_settings_table_arn,
+                api_keys_table_name=props.api_keys_table_name,
+                api_keys_table_arn=props.api_keys_table_arn,
             ),
         )

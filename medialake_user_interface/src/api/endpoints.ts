@@ -30,6 +30,12 @@ export const API_ENDPOINTS = {
     UPDATE: (id: string) => `/permissions/${id}`,
     DELETE: (id: string) => `/permissions/${id}`,
   },
+  API_KEYS: {
+    BASE: "/settings/api-keys",
+    GET: (id: string) => `/settings/api-keys/${id}`,
+    UPDATE: (id: string) => `/settings/api-keys/${id}`,
+    DELETE: (id: string) => `/settings/api-keys/${id}`,
+  },
   GROUPS: {
     BASE: "/groups",
     GET: (id: string) => `/groups/${id}`,

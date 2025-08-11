@@ -141,6 +141,7 @@ class DynamoDB:
     ASSET_SYNC_JOB_TABLE = "asset-sync-job"
     ASSET_SYNC_CHUNK_TABLE = "asset-sync-chunk"
     ASSET_SYNC_ERROR_TABLE = "asset-sync-error"
+    API_KEYS_TABLE = "api-keys"  # pragma: allowlist secret
 
     # Default capacity
     DEFAULT_READ_CAPACITY = 5
@@ -171,6 +172,12 @@ class DynamoDB:
     def connector_table_arn(region: str, account: str) -> str:
         """Get the full connector table ARN"""
         return f"arn:aws:dynamodb:{region}:{account}:table/{DynamoDB.connector_table_name()}"
+
+    @staticmethod
+    def api_keys_table_name(environment: str = None) -> str:
+        """Get the full API keys table name with prefix and environment"""
+        env = environment or config.environment
+        return f"{config.resource_prefix}_{DynamoDB.API_KEYS_TABLE}_table_{env}"
 
 
 # CloudFront constants

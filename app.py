@@ -278,6 +278,8 @@ class MediaLakeStack(cdk.Stack):
                 x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
                 system_settings_table_name=settings_stack.system_settings_table_name,
                 system_settings_table_arn=settings_stack.system_settings_table_arn,
+                api_keys_table_name=settings_stack.api_keys_table_name,
+                api_keys_table_arn=settings_stack.api_keys_table_arn,
             ),
         )
 

@@ -84,6 +84,12 @@ DEFAULT_PERMISSION_SETS = [
                 "regions": {"edit": True},
                 "connectors": {"edit": True, "delete": True, "create": True},
                 "permissions": {"edit": True, "delete": True, "create": True},
+                "api-keys": {
+                    "create": True,
+                    "view": True,
+                    "edit": True,
+                    "delete": True,
+                },
             },
         },
     },
@@ -297,10 +303,46 @@ def update_handler(event: Dict[str, Any], context: Any) -> None:
         event: CloudFormation Custom Resource event
         context: Lambda context
     """
-    logger.info("Update operation - skipping seeding to preserve existing data")
-    # For updates, we skip seeding to avoid overwriting existing custom groups,
-    # permission sets, and user assignments that may have been created after initial deployment
-    logger.info("No action taken on UPDATE event to preserve user customizations")
+    logger.info("Creating default groups and permission sets")
+
+    # Seed groups first
+    group_success_count = 0
+    group_failure_count = 0
+
+    for group in DEFAULT_GROUPS:
+        if seed_group(group):
+            group_success_count += 1
+        else:
+            group_failure_count += 1
+
+    logger.info(
+        f"Group seeding completed: {group_success_count} succeeded, {group_failure_count} failed"
+    )
+
+    # Then seed permission sets
+    ps_success_count = 0
+    ps_failure_count = 0
+
+    for permission_set in DEFAULT_PERMISSION_SETS:
+        if seed_permission_set(permission_set):
+            ps_success_count += 1
+        else:
+            ps_failure_count += 1
+
+    logger.info(
+        f"Permission set seeding completed: {ps_success_count} succeeded, {ps_failure_count} failed"
+    )
+
+    total_success = group_success_count + ps_success_count
+    total_failure = group_failure_count + ps_failure_count
+    logger.info(
+        f"Total seeding completed: {total_success} succeeded, {total_failure} failed"
+    )
+
+    # logger.info("Update operation - skipping seeding to preserve existing data")
+    # # For updates, we skip seeding to avoid overwriting existing custom groups,
+    # # permission sets, and user assignments that may have been created after initial deployment
+    # logger.info("No action taken on UPDATE event to preserve user customizations")
 
 
 @helper.delete

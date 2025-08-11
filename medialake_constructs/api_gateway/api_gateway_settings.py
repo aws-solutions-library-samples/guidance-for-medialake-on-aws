@@ -35,6 +35,8 @@ class SettingsConstructProps:
     cognito_app_client: str
     system_settings_table_name: str
     system_settings_table_arn: str
+    api_keys_table_name: str
+    api_keys_table_arn: str
 
 
 class SettingsConstruct(Construct):
@@ -495,6 +497,215 @@ class SettingsConstruct(Construct):
         add_cors_options_method(settings_users_user_userid_resource)
         add_cors_options_method(settings_roles_resource)
         add_cors_options_method(settings_roles_role_resource)
+
+        # Create API keys resource
+        api_keys_resource = settings_resource.add_resource("api-keys")
+        api_key_id_resource = api_keys_resource.add_resource("{id}")
+
+        # Add OPTIONS method to support CORS
+        add_cors_options_method(api_keys_resource)
+        add_cors_options_method(api_key_id_resource)
+
+        # GET /settings/api-keys - List all API keys
+        self._get_api_keys_handler = Lambda(
+            self,
+            "GetApiKeysHandler",
+            config=LambdaConfig(
+                name="get_api_keys",
+                entry="lambdas/api/settings/api_keys/get_api_keys",
+                environment_variables={
+                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+                    "API_KEYS_TABLE": props.api_keys_table_name,
+                    "METRICS_NAMESPACE": "MediaLake",
+                },
+            ),
+        )
+
+        self._get_api_keys_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "dynamodb:Scan",
+                    "dynamodb:Query",
+                ],
+                resources=[props.api_keys_table_arn],
+            )
+        )
+
+        api_keys_resource.add_method(
+            "GET",
+            api_gateway.LambdaIntegration(self._get_api_keys_handler.function),
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer,
+        )
+
+        # POST /settings/api-keys - Create new API key
+        self._post_api_keys_handler = Lambda(
+            self,
+            "PostApiKeysHandler",
+            config=LambdaConfig(
+                name="post_api_keys",
+                entry="lambdas/api/settings/api_keys/post_api_keys",
+                environment_variables={
+                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+                    "API_KEYS_TABLE": props.api_keys_table_name,
+                    "METRICS_NAMESPACE": "MediaLake",
+                },
+            ),
+        )
+
+        self._post_api_keys_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "dynamodb:PutItem",
+                    "dynamodb:GetItem",
+                ],
+                resources=[props.api_keys_table_arn],
+            )
+        )
+
+        # Add Secrets Manager permissions for creating API keys
+        self._post_api_keys_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "secretsmanager:CreateSecret",
+                    "secretsmanager:TagResource",
+                ],
+                resources=["*"],
+            )
+        )
+
+        api_keys_resource.add_method(
+            "POST",
+            api_gateway.LambdaIntegration(self._post_api_keys_handler.function),
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer,
+        )
+
+        # GET /settings/api-keys/{id} - Get single API key
+        self._get_api_key_handler = Lambda(
+            self,
+            "GetApiKeyHandler",
+            config=LambdaConfig(
+                name="get_api_key",
+                entry="lambdas/api/settings/api_keys/get_api_key",
+                environment_variables={
+                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+                    "API_KEYS_TABLE": props.api_keys_table_name,
+                    "METRICS_NAMESPACE": "MediaLake",
+                },
+            ),
+        )
+
+        self._get_api_key_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "dynamodb:GetItem",
+                ],
+                resources=[props.api_keys_table_arn],
+            )
+        )
+
+        api_key_id_resource.add_method(
+            "GET",
+            api_gateway.LambdaIntegration(self._get_api_key_handler.function),
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer,
+        )
+
+        # PUT /settings/api-keys/{id} - Update API key
+        self._put_api_key_handler = Lambda(
+            self,
+            "PutApiKeyHandler",
+            config=LambdaConfig(
+                name="put_api_key",
+                entry="lambdas/api/settings/api_keys/put_api_key",
+                environment_variables={
+                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+                    "API_KEYS_TABLE": props.api_keys_table_name,
+                    "METRICS_NAMESPACE": "MediaLake",
+                },
+            ),
+        )
+
+        self._put_api_key_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "dynamodb:GetItem",
+                    "dynamodb:UpdateItem",
+                ],
+                resources=[props.api_keys_table_arn],
+            )
+        )
+
+        # Add Secrets Manager permissions for updating API keys
+        self._put_api_key_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "secretsmanager:GetSecretValue",
+                    "secretsmanager:UpdateSecret",
+                    "secretsmanager:PutSecretValue",
+                ],
+                resources=["*"],
+            )
+        )
+
+        api_key_id_resource.add_method(
+            "PUT",
+            api_gateway.LambdaIntegration(self._put_api_key_handler.function),
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer,
+        )
+
+        # DELETE /settings/api-keys/{id} - Delete API key
+        self._delete_api_key_handler = Lambda(
+            self,
+            "DeleteApiKeyHandler",
+            config=LambdaConfig(
+                name="delete_api_key",
+                entry="lambdas/api/settings/api_keys/delete_api_key",
+                environment_variables={
+                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+                    "API_KEYS_TABLE": props.api_keys_table_name,
+                    "METRICS_NAMESPACE": "MediaLake",
+                },
+            ),
+        )
+
+        self._delete_api_key_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "dynamodb:GetItem",
+                    "dynamodb:DeleteItem",
+                ],
+                resources=[props.api_keys_table_arn],
+            )
+        )
+
+        # Add Secrets Manager permissions for deleting API keys
+        self._delete_api_key_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "secretsmanager:DeleteSecret",
+                    "secretsmanager:GetSecretValue",
+                ],
+                resources=["*"],
+            )
+        )
+
+        api_key_id_resource.add_method(
+            "DELETE",
+            api_gateway.LambdaIntegration(self._delete_api_key_handler.function),
+            authorization_type=api_gateway.AuthorizationType.COGNITO,
+            authorizer=props.cognito_authorizer,
+        )
 
     @property
     def system_settings_table_name(self) -> str:

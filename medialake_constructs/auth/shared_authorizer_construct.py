@@ -23,6 +23,8 @@ class SharedAuthorizerConstructProps:
     avp_policy_store_id: str
     avp_policy_store_arn: str
     cognito_user_pool_id: str
+    api_keys_table_name: str
+    api_keys_table_arn: str
 
 
 class SharedAuthorizerConstruct(Construct):
@@ -43,6 +45,7 @@ class SharedAuthorizerConstruct(Construct):
             "AUTH_TABLE_NAME": props.auth_table_name,
             "AVP_POLICY_STORE_ID": props.avp_policy_store_id,
             "COGNITO_USER_POOL_ID": props.cognito_user_pool_id,
+            "API_KEYS_TABLE_NAME": props.api_keys_table_name,
             "DEBUG_MODE": "true",  # Temporarily enabled for debugging user creation issue
             "NAMESPACE": "MediaLake",
             "TOKEN_TYPE": "identityToken",
@@ -71,6 +74,47 @@ class SharedAuthorizerConstruct(Construct):
                     "verifiedpermissions:IsAuthorized",
                 ],
                 resources=[props.avp_policy_store_arn],
+            )
+        )
+
+        # Grant permissions to access API keys table
+        self._authorizer_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "dynamodb:GetItem",
+                    "dynamodb:Query",
+                ],
+                resources=[props.api_keys_table_arn],
+            )
+        )
+
+        # Grant permissions to access Secrets Manager for API key validation
+        self._authorizer_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "secretsmanager:GetSecretValue",
+                ],
+                resources=[
+                    f"arn:aws:secretsmanager:{cdk.Aws.REGION}:{cdk.Aws.ACCOUNT_ID}:secret:medialake/api-keys/*"
+                ],
+            )
+        )
+
+        # Grant KMS permissions if secrets are encrypted (using default AWS managed key)
+        self._authorizer_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "kms:Decrypt",
+                ],
+                resources=["*"],  # For AWS managed keys
+                conditions={
+                    "StringEquals": {
+                        "kms:ViaService": f"secretsmanager.{cdk.Aws.REGION}.amazonaws.com"
+                    }
+                },
             )
         )
 
