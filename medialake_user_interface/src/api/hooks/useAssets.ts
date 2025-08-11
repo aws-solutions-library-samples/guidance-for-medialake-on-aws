@@ -8,6 +8,16 @@ import { useFeatureFlag } from "@/utils/featureFlags";
 import { useSnackbar, closeSnackbar } from "notistack";
 import { useAuth } from "@/common/hooks/auth-context";
 
+interface Clip {
+  score: number | null;
+  start_timecode: string;
+  end_timecode: string;
+  timestamp: string;
+  type: string;
+  embedding_scope: string;
+  embedding_option: string;
+}
+
 interface Asset {
   asset: {
     InventoryID: string;
@@ -75,6 +85,7 @@ interface Asset {
         IPTC: any;
       };
     };
+    clips?: Clip[];
   };
 }
 

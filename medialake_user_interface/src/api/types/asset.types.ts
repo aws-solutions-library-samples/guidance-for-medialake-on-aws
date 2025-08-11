@@ -51,6 +51,16 @@ export interface RelatedVersionsResponse {
   };
 }
 
+export interface Clip {
+  score: number | null;
+  start_timecode: string;
+  end_timecode: string;
+  timestamp: string;
+  type: string;
+  embedding_scope: string;
+  embedding_option: string;
+}
+
 export interface Asset {
   InventoryID: string;
   DigitalSourceAsset: {
@@ -109,6 +119,7 @@ export interface Asset {
     URL?: string;
   }>;
   Metadata?: any;
+  clips?: Clip[];
   relatedVersionsData?: RelatedVersionsResponse;
 }
 
