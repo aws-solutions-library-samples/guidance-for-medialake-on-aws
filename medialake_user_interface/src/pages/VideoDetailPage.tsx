@@ -1022,7 +1022,7 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
         onAddComment={handleAddComment}
         videoViewerRef={videoViewerRef}
         assetId={assetData?.data?.asset?.InventoryID}
-        asset={asset}
+        asset={assetData?.data?.asset}
         assetType={assetType}
         searchTerm={effectiveSearchTerm}
       />

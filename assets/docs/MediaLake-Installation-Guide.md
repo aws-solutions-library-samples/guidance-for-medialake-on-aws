@@ -121,6 +121,7 @@ After deployment, you'll need to configure storage connectors to connect media l
 
 - **Enable Semantic Search**:
   - Configure your semantic search provider in media lake.
+  - **Embedding Store Selection**: Media lake supports both OpenSearch and S3 Vectors as embedding stores. While S3 Vectors offers a cost-effective option and is currently in preview mode, **For production deployments, OpenSearch is recommended** for enhanced reliability and performance.
   - Add and configure the **Twelve Labs** integration.
 
 - **Import Processing Pipelines**:
