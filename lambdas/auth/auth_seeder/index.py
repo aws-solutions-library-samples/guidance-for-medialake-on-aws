@@ -79,11 +79,26 @@ DEFAULT_PERMISSION_SETS = [
             "collections": {"create": True, "view": True, "edit": True, "delete": True},
             "settings": {
                 "users": {"edit": True, "view": True, "delete": True, "create": True},
-                "system": {"edit": True},
-                "integrations": {"edit": True, "view": True, "delete": True},
-                "regions": {"edit": True},
-                "connectors": {"edit": True, "delete": True, "create": True},
-                "permissions": {"edit": True, "delete": True, "create": True},
+                "system": {"edit": True, "view": True},
+                "integrations": {
+                    "edit": True,
+                    "view": True,
+                    "delete": True,
+                    "create": True,
+                },
+                "regions": {"edit": True, "view": True},
+                "connectors": {
+                    "edit": True,
+                    "view": True,
+                    "delete": True,
+                    "create": True,
+                },
+                "permissions": {
+                    "edit": True,
+                    "view": True,
+                    "delete": True,
+                    "create": True,
+                },
                 "api-keys": {
                     "create": True,
                     "view": True,
@@ -195,12 +210,15 @@ def seed_group(group: Dict[str, Any]) -> bool:
         return False
 
 
-def seed_permission_set(permission_set: Dict[str, Any]) -> bool:
+def seed_permission_set(
+    permission_set: Dict[str, Any], force_update: bool = False
+) -> bool:
     """
     Seed a permission set into the DynamoDB authorization table.
 
     Args:
         permission_set: Permission set definition
+        force_update: If True, update existing system permission sets
 
     Returns:
         True if successful, False otherwise
@@ -212,33 +230,67 @@ def seed_permission_set(permission_set: Dict[str, Any]) -> bool:
         # Generate timestamps
         current_time = datetime.datetime.now().isoformat()
 
-        # Prepare DynamoDB item
-        item = {
-            "PK": f"{PREFIX_PERMISSION_SET}{permission_set['id']}",
-            "SK": PREFIX_METADATA,
-            "name": permission_set["name"],
-            "description": permission_set["description"],
-            "isSystem": permission_set["isSystem"],
-            "permissions": permission_set["permissions"],
-            "createdAt": current_time,
-            "updatedAt": current_time,
-        }
-
-        # Add effectiveRole if present
-        if "effectiveRole" in permission_set:
-            item["effectiveRole"] = permission_set["effectiveRole"]
-
         # Check if the permission set already exists
-        response = table.get_item(Key={"PK": item["PK"], "SK": item["SK"]})
+        pk = f"{PREFIX_PERMISSION_SET}{permission_set['id']}"
+        response = table.get_item(Key={"PK": pk, "SK": PREFIX_METADATA})
 
         if "Item" in response:
-            logger.info(
-                f"Permission set {permission_set['id']} already exists, skipping to preserve existing data"
-            )
-            # Skip updating existing permission sets to preserve any customizations
+            existing_item = response["Item"]
+
+            # Only update if it's a system permission set and force_update is True
+            if force_update and permission_set.get("isSystem", False):
+                logger.info(
+                    f"Force updating system permission set {permission_set['id']}"
+                )
+
+                # Preserve original creation time
+                created_at = existing_item.get("createdAt", current_time)
+
+                # Prepare updated DynamoDB item
+                item = {
+                    "PK": pk,
+                    "SK": PREFIX_METADATA,
+                    "name": permission_set["name"],
+                    "description": permission_set["description"],
+                    "isSystem": permission_set["isSystem"],
+                    "permissions": permission_set["permissions"],
+                    "createdAt": created_at,
+                    "updatedAt": current_time,
+                }
+
+                # Add effectiveRole if present
+                if "effectiveRole" in permission_set:
+                    item["effectiveRole"] = permission_set["effectiveRole"]
+
+                # Update the item
+                table.put_item(Item=item)
+                logger.info(
+                    f"Successfully updated system permission set {permission_set['id']}"
+                )
+            else:
+                logger.info(
+                    f"Permission set {permission_set['id']} already exists, skipping to preserve existing data"
+                )
             return True
         else:
             logger.info(f"Creating permission set {permission_set['id']}")
+
+            # Prepare DynamoDB item
+            item = {
+                "PK": pk,
+                "SK": PREFIX_METADATA,
+                "name": permission_set["name"],
+                "description": permission_set["description"],
+                "isSystem": permission_set["isSystem"],
+                "permissions": permission_set["permissions"],
+                "createdAt": current_time,
+                "updatedAt": current_time,
+            }
+
+            # Add effectiveRole if present
+            if "effectiveRole" in permission_set:
+                item["effectiveRole"] = permission_set["effectiveRole"]
+
             # Create a new item
             table.put_item(Item=item)
 
@@ -278,7 +330,7 @@ def create_handler(event: Dict[str, Any], context: Any) -> None:
     ps_failure_count = 0
 
     for permission_set in DEFAULT_PERMISSION_SETS:
-        if seed_permission_set(permission_set):
+        if seed_permission_set(permission_set, force_update=False):
             ps_success_count += 1
         else:
             ps_failure_count += 1
@@ -319,12 +371,13 @@ def update_handler(event: Dict[str, Any], context: Any) -> None:
         f"Group seeding completed: {group_success_count} succeeded, {group_failure_count} failed"
     )
 
-    # Then seed permission sets
+    # Then seed permission sets with force update for system permission sets
     ps_success_count = 0
     ps_failure_count = 0
 
     for permission_set in DEFAULT_PERMISSION_SETS:
-        if seed_permission_set(permission_set):
+        # Force update system permission sets on updates to ensure they have latest permissions
+        if seed_permission_set(permission_set, force_update=True):
             ps_success_count += 1
         else:
             ps_failure_count += 1
