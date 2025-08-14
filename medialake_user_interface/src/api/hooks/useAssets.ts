@@ -8,16 +8,6 @@ import { useFeatureFlag } from "@/utils/featureFlags";
 import { useSnackbar, closeSnackbar } from "notistack";
 import { useAuth } from "@/common/hooks/auth-context";
 
-interface Clip {
-  score: number | null;
-  start_timecode: string;
-  end_timecode: string;
-  timestamp: string;
-  type: string;
-  embedding_scope: string;
-  embedding_option: string;
-}
-
 interface Asset {
   asset: {
     InventoryID: string;
@@ -85,7 +75,6 @@ interface Asset {
         IPTC: any;
       };
     };
-    clips?: Clip[];
   };
 }
 
@@ -436,7 +425,7 @@ export const useRenameAsset = (onError?: (message: string) => void) => {
 export const useRelatedVersions = (
   assetId: string,
   page: number = 1,
-  pageSize: number = 50,
+  pageSize: number = 20,
 ) => {
   console.log(
     "useRelatedVersions - Called with assetId:",
@@ -455,7 +444,7 @@ export const useRelatedVersions = (
           params: {
             page,
             pageSize,
-            min_score: 0.01,
+            min_score: 0.6,
           },
         },
       );
