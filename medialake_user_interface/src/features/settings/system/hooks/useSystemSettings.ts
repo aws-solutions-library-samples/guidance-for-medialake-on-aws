@@ -79,7 +79,9 @@ export const useSemanticSearchSettings = () => {
       const providerType =
         fetchedProvider.type === "twelvelabs-bedrock"
           ? "twelvelabs-bedrock"
-          : "twelvelabs-api";
+          : fetchedProvider.type === "coactive"
+            ? "coactive"
+            : "twelvelabs-api";
 
       const initialSettings: SemanticSearchSettings = {
         isEnabled: fetchedProvider.isEnabled || false,
@@ -126,10 +128,39 @@ export const useSemanticSearchSettings = () => {
 
   // Handle provider type change
   const handleProviderTypeChange = (
-    providerType: "twelvelabs-api" | "twelvelabs-bedrock",
+    providerType: "twelvelabs-api" | "twelvelabs-bedrock" | "coactive",
   ) => {
     if (providerType === "twelvelabs-api") {
-      // Open API key dialog for Twelve Labs API
+      // Update provider type first, then open API key dialog
+      setSettings((prev) => ({
+        ...prev,
+        current: {
+          ...prev.current,
+          provider: {
+            type: "twelvelabs-api",
+            config: null,
+          },
+        },
+      }));
+      setIsEditingApiKey(false);
+      setApiKeyInput("");
+      setIsApiKeyDialogOpen(true);
+    } else if (providerType === "coactive") {
+      // Update provider type first, then open API key dialog
+      setSettings((prev) => ({
+        ...prev,
+        current: {
+          ...prev.current,
+          provider: {
+            type: "coactive",
+            config: null,
+          },
+          // For Coactive, we don't use embedding stores, so set to a default
+          embeddingStore: {
+            type: "opensearch", // This won't be used but needed for type consistency
+          },
+        },
+      }));
       setIsEditingApiKey(false);
       setApiKeyInput("");
       setIsApiKeyDialogOpen(true);
@@ -226,16 +257,40 @@ export const useSemanticSearchSettings = () => {
 
   const handleSaveApiKey = async () => {
     if (apiKeyInput && apiKeyInput !== "••••••••••••••••") {
-      const providerConfig: SearchProvider = {
-        id: settings.current.provider.config?.id || "",
-        name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.name,
-        type: "twelvelabs",
-        apiKey: apiKeyInput,
-        endpoint:
-          SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.defaultEndpoint,
-        isConfigured: true,
-        isEnabled: true,
-      };
+      // Determine which provider we're configuring based on current selection
+      const currentProviderType = settings.current.provider.type;
+
+      let providerConfig: SearchProvider;
+      let providerTypeForState:
+        | "twelvelabs-api"
+        | "twelvelabs-bedrock"
+        | "coactive";
+
+      if (currentProviderType === "coactive") {
+        providerConfig = {
+          id: settings.current.provider.config?.id || "",
+          name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.COACTIVE.name,
+          type: "coactive",
+          apiKey: apiKeyInput,
+          endpoint: SYSTEM_SETTINGS_CONFIG.PROVIDERS.COACTIVE.defaultEndpoint,
+          isConfigured: true,
+          isEnabled: true,
+        };
+        providerTypeForState = "coactive";
+      } else {
+        // Default to TwelveLabs API
+        providerConfig = {
+          id: settings.current.provider.config?.id || "",
+          name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.name,
+          type: "twelvelabs",
+          apiKey: apiKeyInput,
+          endpoint:
+            SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.defaultEndpoint,
+          isConfigured: true,
+          isEnabled: true,
+        };
+        providerTypeForState = "twelvelabs-api";
+      }
 
       // Update local state first
       setSettings((prev) => ({
@@ -243,7 +298,7 @@ export const useSemanticSearchSettings = () => {
         current: {
           ...prev.current,
           provider: {
-            type: "twelvelabs-api",
+            type: providerTypeForState,
             config: providerConfig,
           },
         },
@@ -256,16 +311,23 @@ export const useSemanticSearchSettings = () => {
       };
 
       // Save to API immediately with the new API key
-      if (isEditingApiKey && providerConfig.id) {
-        // Update existing provider
+      // Check if there's already a provider configured (any provider)
+      const hasExistingProvider =
+        settings.original.provider.config?.isConfigured ||
+        settings.original.provider.config?.id;
+
+      if (hasExistingProvider) {
+        // Update existing provider (supports type switching now)
         await updateProvider.mutateAsync({
+          name: providerConfig.name,
+          type: providerConfig.type,
           apiKey: providerConfig.apiKey,
           endpoint: providerConfig.endpoint,
           isEnabled: settings.current.isEnabled,
           embeddingStore: embeddingStorePayload,
         });
       } else {
-        // Create new provider
+        // Create new provider (first time setup)
         await createProvider.mutateAsync({
           name: providerConfig.name,
           type: providerConfig.type,
@@ -301,7 +363,8 @@ export const useSemanticSearchSettings = () => {
 
       if (
         current.provider.config &&
-        current.provider.type === "twelvelabs-api"
+        (current.provider.type === "twelvelabs-api" ||
+          current.provider.type === "coactive")
       ) {
         if (isEditingApiKey && current.provider.config.id) {
           // Update existing provider

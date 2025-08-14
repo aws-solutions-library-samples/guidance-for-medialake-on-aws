@@ -1,0 +1,604 @@
+{
+  "name": "Coactive API Video Ingestion Pipeline",
+  "description": "Ingest video assets into Coactive for semantic search and analysis",
+  "active": true,
+  "configuration": {
+    "nodes": [
+      {
+        "id": "dndnode_0",
+        "type": "custom",
+        "position": {
+          "x": 432,
+          "y": 256
+        },
+        "data": {
+          "nodeId": "trigger_video_processing_completed",
+          "label": "Video Processing Completed (trigger)",
+          "description": "This step will trigger after video processing is completed",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [
+            {
+              "name": "video",
+              "description": "Output type: video"
+            }
+          ],
+          "type": "TRIGGER",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "trigger",
+            "parameters": {
+              "Video Type": "",
+              "Prefix": ""
+            },
+            "requestMapping": null,
+            "responseMapping": null
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "dndnode_1",
+        "type": "custom",
+        "position": {
+          "x": 688,
+          "y": 256
+        },
+        "data": {
+          "nodeId": "coactive",
+          "label": "Coactive Dataset Validation (get)",
+          "description": "Validate that Coactive dataset exists and is ready",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [],
+          "outputTypes": [],
+          "type": "INTEGRATION",
+          "configuration": {
+            "path": "/datasets/{dataset_id}",
+            "method": "get",
+            "requestMapping": "api_templates/coactive/api/v1/datasets/dataset_id",
+            "responseMapping": "api_templates/coactive/api/v1/datasets/dataset_id",
+            "integrationId": "coactive-integration-id",
+            "operationId": "getDataset",
+            "parameters": {
+              "dataset_id": ""
+            }
+          }
+        },
+        "width": 200,
+        "height": 100
+      },
+      {
+        "id": "dndnode_2",
+        "type": "custom",
+        "position": {
+          "x": 688,
+          "y": 400
+        },
+        "data": {
+          "nodeId": "choice",
+          "label": "Dataset Ready Check",
+          "description": "Check if dataset is ready for ingestion",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [
+            {
+              "name": "Ready",
+              "description": "Dataset is ready for ingestion"
+            },
+            {
+              "name": "Create Dataset",
+              "description": "Need to create dataset first"
+            },
+            {
+              "name": "Fail",
+              "description": "Dataset validation failed"
+            }
+          ],
+          "type": "FLOW",
+          "configuration": {
+            "method": "choice",
+            "parameters": {}
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "dndnode_3",
+        "type": "custom",
+        "position": {
+          "x": 688,
+          "y": 544
+        },
+        "data": {
+          "nodeId": "coactive",
+          "label": "Coactive Dataset Creation (post)",
+          "description": "Create a new Coactive dataset",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [],
+          "outputTypes": [],
+          "type": "INTEGRATION",
+          "configuration": {
+            "path": "/datasets",
+            "method": "post",
+            "requestMapping": "api_templates/coactive/api/v1/datasets",
+            "responseMapping": "api_templates/coactive/api/v1/datasets",
+            "integrationId": "coactive-integration-id",
+            "operationId": "createDataset",
+            "parameters": {
+              "nodeId": ""
+            }
+          }
+        },
+        "width": 200,
+        "height": 100
+      },
+      {
+        "id": "dndnode_4",
+        "type": "custom",
+        "position": {
+          "x": 944,
+          "y": 256
+        },
+        "data": {
+          "nodeId": "pre_signed_url",
+          "label": "Generate Presigned URL",
+          "description": "Generate presigned URL for asset access",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [
+            {
+              "name": "presigned_url",
+              "description": "Output type: presigned_url"
+            }
+          ],
+          "type": "UTILITY",
+          "configuration": {
+            "path": "/generate",
+            "method": "post",
+            "requestMapping": "utility/pre_signed_url/generate/",
+            "responseMapping": "utility/pre_signed_url/generate/",
+            "operationId": "generatePresignedUrl",
+            "parameters": {
+              "URL Validity Duration": 3600
+            }
+          }
+        },
+        "width": 200,
+        "height": 100
+      },
+      {
+        "id": "dndnode_5",
+        "type": "custom",
+        "position": {
+          "x": 1200,
+          "y": 256
+        },
+        "data": {
+          "nodeId": "coactive",
+          "label": "Coactive Asset Ingestion (post)",
+          "description": "Ingest video assets into Coactive",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [],
+          "outputTypes": [],
+          "type": "INTEGRATION",
+          "configuration": {
+            "path": "/ingestion/assets",
+            "method": "post",
+            "requestMapping": "api_templates/coactive/api/v1/ingestion/assets",
+            "responseMapping": "api_templates/coactive/api/v1/ingestion/assets",
+            "integrationId": "coactive-integration-id",
+            "operationId": "ingestAssets",
+            "parameters": {
+              "nodeId": ""
+            }
+          }
+        },
+        "width": 200,
+        "height": 100
+      },
+      {
+        "id": "dndnode_6",
+        "type": "custom",
+        "position": {
+          "x": 1200,
+          "y": 400
+        },
+        "data": {
+          "nodeId": "wait",
+          "label": "Wait (wait)",
+          "description": "Wait before checking ingestion status",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [
+            {
+              "name": "any",
+              "description": "Output type: any"
+            }
+          ],
+          "type": "FLOW",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "wait",
+            "parameters": {
+              "Duration": 15
+            }
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "dndnode_7",
+        "type": "custom",
+        "position": {
+          "x": 1456,
+          "y": 256
+        },
+        "data": {
+          "nodeId": "coactive",
+          "label": "Coactive Status Check (get)",
+          "description": "Check the status of video asset ingestion",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [],
+          "outputTypes": [],
+          "type": "INTEGRATION",
+          "configuration": {
+            "path": "/ingestion/videos/{asset_id}/status",
+            "method": "get",
+            "requestMapping": "api_templates/coactive/api/v1/ingestion/videos/status",
+            "responseMapping": "api_templates/coactive/api/v1/ingestion/videos/status",
+            "integrationId": "coactive-integration-id",
+            "operationId": "getVideoAssetStatus",
+            "parameters": {
+              "asset_id": ""
+            }
+          }
+        },
+        "width": 200,
+        "height": 100
+      },
+      {
+        "id": "dndnode_8",
+        "type": "custom",
+        "position": {
+          "x": 1456,
+          "y": 400
+        },
+        "data": {
+          "nodeId": "choice",
+          "label": "Ingestion Status Check",
+          "description": "Check if ingestion is completed",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [
+            {
+              "name": "Completed",
+              "description": "Ingestion completed successfully"
+            },
+            {
+              "name": "In Progress",
+              "description": "Ingestion still in progress"
+            },
+            {
+              "name": "Failed",
+              "description": "Ingestion failed"
+            }
+          ],
+          "type": "FLOW",
+          "configuration": {
+            "method": "choice",
+            "parameters": {}
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "dndnode_9",
+        "type": "custom",
+        "position": {
+          "x": 1712,
+          "y": 256
+        },
+        "data": {
+          "nodeId": "success",
+          "label": "Success",
+          "description": "Coactive ingestion completed successfully",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [],
+          "type": "FLOW",
+          "configuration": {
+            "method": "success",
+            "parameters": {}
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "dndnode_10",
+        "type": "custom",
+        "position": {
+          "x": 1712,
+          "y": 544
+        },
+        "data": {
+          "nodeId": "fail",
+          "label": "Fail (fail)",
+          "description": "Coactive ingestion failed",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [],
+          "type": "FLOW",
+          "configuration": {
+            "method": "fail",
+            "parameters": {
+              "Error": "Coactive Ingestion Failed",
+              "Cause": "Video asset ingestion into Coactive failed"
+            },
+            "path": "",
+            "operationId": ""
+          }
+        },
+        "width": 200,
+        "height": 113
+      }
+    ],
+    "edges": [
+      {
+        "id": "dndnode_0-dndnode_1",
+        "source": "dndnode_0",
+        "target": "dndnode_1",
+        "type": "custom",
+        "data": {
+          "type": "custom",
+          "text": "Validate Dataset",
+          "id": "dndnode_0-dndnode_1"
+        },
+        "sourceHandle": "video",
+        "targetHandle": "input-default"
+      },
+      {
+        "id": "dndnode_1-dndnode_2",
+        "source": "dndnode_1",
+        "target": "dndnode_2",
+        "type": "custom",
+        "data": {
+          "text": "Dataset Check",
+          "id": "dndnode_1-dndnode_2",
+          "type": "custom"
+        },
+        "sourceHandle": "default",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_2-dndnode_4",
+        "source": "dndnode_2",
+        "target": "dndnode_4",
+        "type": "custom",
+        "data": {
+          "text": "Dataset Ready",
+          "id": "dndnode_2-dndnode_4",
+          "type": "custom"
+        },
+        "sourceHandle": "Ready",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_2-dndnode_3",
+        "source": "dndnode_2",
+        "target": "dndnode_3",
+        "type": "custom",
+        "data": {
+          "text": "Create Dataset",
+          "id": "dndnode_2-dndnode_3",
+          "type": "custom"
+        },
+        "sourceHandle": "Create Dataset",
+        "targetHandle": "input-default"
+      },
+      {
+        "id": "dndnode_3-dndnode_4",
+        "source": "dndnode_3",
+        "target": "dndnode_4",
+        "type": "custom",
+        "data": {
+          "text": "Dataset Created",
+          "id": "dndnode_3-dndnode_4",
+          "type": "custom"
+        },
+        "sourceHandle": "default",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_4-dndnode_5",
+        "source": "dndnode_4",
+        "target": "dndnode_5",
+        "type": "custom",
+        "data": {
+          "text": "URL Generated",
+          "id": "dndnode_4-dndnode_5",
+          "type": "custom"
+        },
+        "sourceHandle": "presigned_url",
+        "targetHandle": "input-default"
+      },
+      {
+        "id": "dndnode_5-dndnode_6",
+        "source": "dndnode_5",
+        "target": "dndnode_6",
+        "type": "custom",
+        "data": {
+          "text": "Ingestion Started",
+          "id": "dndnode_5-dndnode_6",
+          "type": "custom"
+        },
+        "sourceHandle": "default",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_6-dndnode_7",
+        "source": "dndnode_6",
+        "target": "dndnode_7",
+        "type": "custom",
+        "data": {
+          "text": "Check Status",
+          "id": "dndnode_6-dndnode_7",
+          "type": "custom"
+        },
+        "sourceHandle": "any",
+        "targetHandle": "input-default"
+      },
+      {
+        "id": "dndnode_7-dndnode_8",
+        "source": "dndnode_7",
+        "target": "dndnode_8",
+        "type": "custom",
+        "data": {
+          "text": "Status Retrieved",
+          "id": "dndnode_7-dndnode_8",
+          "type": "custom"
+        },
+        "sourceHandle": "default",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_8-dndnode_9",
+        "source": "dndnode_8",
+        "target": "dndnode_9",
+        "type": "custom",
+        "data": {
+          "text": "Completed",
+          "id": "dndnode_8-dndnode_9",
+          "type": "custom"
+        },
+        "sourceHandle": "Completed",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_8-dndnode_6",
+        "source": "dndnode_8",
+        "target": "dndnode_6",
+        "type": "custom",
+        "data": {
+          "text": "In Progress",
+          "id": "dndnode_8-dndnode_6",
+          "type": "custom"
+        },
+        "sourceHandle": "In Progress",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_8-dndnode_10",
+        "source": "dndnode_8",
+        "target": "dndnode_10",
+        "type": "custom",
+        "data": {
+          "text": "Failed",
+          "id": "dndnode_8-dndnode_10",
+          "type": "custom"
+        },
+        "sourceHandle": "Failed",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_2-dndnode_10",
+        "source": "dndnode_2",
+        "target": "dndnode_10",
+        "type": "custom",
+        "data": {
+          "text": "Validation Failed",
+          "id": "dndnode_2-dndnode_10",
+          "type": "custom"
+        },
+        "sourceHandle": "Fail",
+        "targetHandle": "input-any"
+      }
+    ],
+    "settings": {
+      "trigger": "video_processing_completed"
+    }
+  }
+}

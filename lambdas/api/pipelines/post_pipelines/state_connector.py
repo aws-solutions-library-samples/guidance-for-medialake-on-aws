@@ -220,7 +220,12 @@ class StateConnector:
 
         # Fall back to the original logic if we don't have identified true/false targets
         # Check if this is a conditional edge (has a sourceHandle)
-        if source_handle in ["condition_true", "condition_true_output", "Completed"]:
+        if source_handle in [
+            "condition_true",
+            "condition_true_output",
+            "Completed",
+            "True",
+        ]:
             # This is the "true" path from the Choice
             if "Choices" in source_state and source_state["Choices"]:
                 # Replace the placeholder with the actual target
@@ -240,6 +245,7 @@ class StateConnector:
             "condition_false",
             "condition_false_output",
             "In Progress",
+            "False",
         ]:
             # This is the "false" path from the Choice (Default)
             if "Default" in source_state and "__PLACEHOLDER__" in str(

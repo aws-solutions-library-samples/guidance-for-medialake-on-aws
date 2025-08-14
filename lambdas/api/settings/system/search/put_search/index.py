@@ -32,7 +32,14 @@ def update_search_provider():
         body = app.current_event.json_body
 
         # Manual validation of request body
-        allowed_fields = ["name", "apiKey", "endpoint", "isEnabled", "embeddingStore"]
+        allowed_fields = [
+            "name",
+            "type",
+            "apiKey",
+            "endpoint",
+            "isEnabled",
+            "embeddingStore",
+        ]
         for field in body:
             if field not in allowed_fields:
                 return {
@@ -108,8 +115,12 @@ def update_search_provider():
 
         # Add fields to update
         if "name" in body:
-            update_expression_parts.append("name = :name")
+            update_expression_parts.append("#name = :name")
             expression_attribute_values[":name"] = body["name"]
+
+        if "type" in body:
+            update_expression_parts.append("#type = :type")
+            expression_attribute_values[":type"] = body["type"]
 
         if "endpoint" in body:
             update_expression_parts.append("endpoint = :endpoint")
@@ -127,12 +138,24 @@ def update_search_provider():
         # Update search provider
         update_expression = " , ".join(update_expression_parts)
 
-        response = system_settings_table.update_item(
-            Key={"PK": "SYSTEM_SETTINGS", "SK": "SEARCH_PROVIDER"},
-            UpdateExpression=update_expression,
-            ExpressionAttributeValues=expression_attribute_values,
-            ReturnValues="ALL_NEW",
-        )
+        # Prepare expression attribute names for reserved words
+        expression_attribute_names = {}
+        if "name" in body:
+            expression_attribute_names["#name"] = "name"
+        if "type" in body:
+            expression_attribute_names["#type"] = "type"
+
+        update_params = {
+            "Key": {"PK": "SYSTEM_SETTINGS", "SK": "SEARCH_PROVIDER"},
+            "UpdateExpression": update_expression,
+            "ExpressionAttributeValues": expression_attribute_values,
+            "ReturnValues": "ALL_NEW",
+        }
+
+        if expression_attribute_names:
+            update_params["ExpressionAttributeNames"] = expression_attribute_names
+
+        response = system_settings_table.update_item(**update_params)
 
         # Get updated item
         updated_provider = response.get("Attributes", {})
