@@ -5,7 +5,11 @@
     "Inputs": [
       {
         "FileInput": "s3://{{ variables.input_bucket }}/{{ variables.input_key }}",
-        "AudioSelectors": { "Audio Selector 1": { "DefaultSelection": "DEFAULT" } },
+        "AudioSelectors": {
+          "Audio Selector 1": {
+            "DefaultSelection": "DEFAULT"
+          }
+        },
         "VideoSelector": {}
       }
     ],
@@ -18,7 +22,11 @@
           "FileGroupSettings": {
             "Destination": "s3://{{ variables.output_bucket }}/{{ variables.output_key }}",
             "DestinationSettings": {
-              "S3Settings": { "AccessControl": { "CannedAcl": "BUCKET_OWNER_FULL_CONTROL" } }
+              "S3Settings": {
+                "AccessControl": {
+                  "CannedAcl": "BUCKET_OWNER_FULL_CONTROL"
+                }
+              }
             }
           }
         },
@@ -26,25 +34,32 @@
           {
             "NameModifier": "_proxy",
             "VideoDescription": {
+              "Width": 640,
+              "Height": 360,
               "CodecSettings": {
                 "Codec": "H_264",
                 "H264Settings": {
                   "RateControlMode": "QVBR",
+                  "QualityTuningLevel": "MULTI_PASS_HQ",
+                  "QvbrSettings": {
+                    "QvbrQualityLevel": {{ variables.proxy_qvbr_quality | default(6) }}
+                  },
+                  {% if variables.proxy_max_avg_kbps is defined %}
+                  "MaxAverageBitrate": {{ variables.proxy_max_avg_kbps * 1000 }},
+                  {% endif %}
                   "SceneChangeDetect": "TRANSITION_DETECTION",
-                  "MaxBitrate": 2000000
+                  "MaxBitrate": {{ (variables.proxy_max_kbps | default(900)) * 1000 }}
                 }
-              },
-              "Width": 640,
-              "Height": 360
+              }
             },
             "AudioDescriptions": [
               {
                 "CodecSettings": {
                   "Codec": "AAC",
                   "AacSettings": {
-                    "Bitrate": 96000,
+                    "Bitrate": {{ (variables.proxy_audio_kbps | default(64)) * 1000 }},
                     "CodingMode": "CODING_MODE_2_0",
-                    "SampleRate": 48000
+                    "SampleRate": 44100
                   }
                 }
               }
@@ -66,6 +81,8 @@
             "NameModifier": "_thumbnail",
             "Extension": "jpg",
             "VideoDescription": {
+              "Width": {{ variables.thumbnail_width }},
+              "Height": {{ variables.thumbnail_height }},
               "CodecSettings": {
                 "Codec": "FRAME_CAPTURE",
                 "FrameCaptureSettings": {
@@ -79,9 +96,7 @@
                   "MaxCaptures": 1,
                   "Quality": 80
                 }
-              },
-              "Width": {{ variables.thumbnail_width }},
-              "Height": {{ variables.thumbnail_height }}
+              }
             },
             "ContainerSettings": { "Container": "RAW" }
           }
