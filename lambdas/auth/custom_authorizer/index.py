@@ -1369,6 +1369,21 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
     try:
         # First, check for API key authentication
         headers = event.get("headers", {})
+
+        # Log all headers for debugging (production-safe)
+        if ENVIRONMENT != "prod":
+            logger.info(
+                f"All request headers: {json.dumps(headers)}",
+                extra={"correlation_id": correlation_id},
+            )
+        else:
+            # In production, only log header names (not values)
+            header_names = list(headers.keys()) if headers else []
+            logger.info(
+                f"Request header names: {header_names}",
+                extra={"correlation_id": correlation_id},
+            )
+
         api_key = extract_api_key_from_header(headers)
 
         # Then check for JWT token
