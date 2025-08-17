@@ -43,6 +43,7 @@ import "./VideoViewer.css";
 
 import addMakerDiv from "../asset/AssetSidebar";
 import { createTimecodePlaceholder } from "@/utils/placeholderSvg";
+import { useVideoKeyboardShortcuts } from "./useVideoKeyboardShortcuts";
 
 import { filter } from "rxjs";
 import { randomHexColor } from "./utils";
@@ -504,16 +505,6 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
       setShortcutsAnchor(null);
     };
 
-    const SHORTCUTS: string[] = [
-      "Space / K – Play/Pause",
-      "J – Rewind 10 s",
-      "L – Fast-forward 10 s",
-      "← / → – Step 5 s backward/forward",
-      "↑ / ↓ – Volume up/down",
-      "F – Toggle fullscreen",
-      "M – Mute/Unmute",
-    ];
-
     const volumeHoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const lastNonZeroVolumeRef = useRef(100);
 
@@ -565,6 +556,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
       setVolume: setPlayerVolume,
       mute,
       unmute,
+      setPlaybackRate,
       toggleFullscreen,
       removeSafeZone,
       clearSafeZones,
@@ -638,6 +630,39 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
       rafId = requestAnimationFrame(tick);
       return () => cancelAnimationFrame(rafId);
     }, [omakaseRef, videoSrc]);
+
+    // Use keyboard shortcuts hook
+    const {
+      SHORTCUTS,
+      toggleTransport,
+      currentPlaybackRate,
+      isShuttlingReverse,
+    } = useVideoKeyboardShortcuts({
+      play,
+      pause,
+      seek,
+      setPlaybackRate,
+      mute,
+      unmute,
+      toggleFullscreen,
+      isPlaying,
+      currentTime,
+      duration,
+      volume,
+      muted,
+      setPlayerVolume,
+      setVolumeState: setVolumeState,
+      setMuted,
+      setIsVolumeHovered,
+      lastNonZeroVolumeRef,
+      volumeHoverTimeoutRef,
+      markerLaneRef,
+      customCallbacks,
+      omakaseRef,
+      onFullscreenChange,
+      onMute,
+      onUnmute,
+    });
 
     // Expose the "hello" method via the ref.
     useImperativeHandle(
@@ -779,102 +804,8 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
       setIsSmtpeFormat(!isSmtpeFormat);
     };
 
-    useEffect(() => {
-      const handleKeyDown = (event: KeyboardEvent) => {
-        if (
-          (event.target as HTMLElement).tagName === "INPUT" ||
-          (event.target as HTMLElement).tagName === "TEXTAREA"
-        ) {
-          return;
-        }
-
-        switch (event.key) {
-          case " ": // Space or K toggles play/pause
-          case "k":
-          case "K":
-            event.preventDefault();
-            handlePlayPause();
-            break;
-          case "j": // rewind 10 s
-          case "J":
-            event.preventDefault();
-            seek(Math.max(currentTime - 10, 0));
-            break;
-          case "l": // fast‑forward 10 s
-          case "L":
-            event.preventDefault();
-            seek(Math.min(currentTime + 10, duration));
-            break;
-          case "ArrowLeft": // step back 5 s
-            event.preventDefault();
-            seek(Math.max(currentTime - 5, 0));
-            break;
-          case "ArrowRight": // step forward 5 s
-            event.preventDefault();
-            seek(Math.min(currentTime + 5, duration));
-            break;
-          case "ArrowUp": // volume up 10 %
-            event.preventDefault();
-            {
-              const newVol = Math.min(volume + 10, 100); // or Math.max(volume - 10, 0)
-              setPlayerVolume(newVol);
-              setVolumeState(newVol);
-              if (newVol > 0) {
-                lastNonZeroVolumeRef.current = newVol;
-                if (muted) {
-                  unmute();
-                  setMuted(false);
-                }
-              } else {
-                setMuted(true);
-              }
-              // show slider and hide after 1.5 s
-              setIsVolumeHovered(true);
-              if (volumeHoverTimeoutRef.current) {
-                clearTimeout(volumeHoverTimeoutRef.current);
-              }
-              volumeHoverTimeoutRef.current = setTimeout(() => {
-                setIsVolumeHovered(false);
-              }, 1500);
-            }
-            break;
-          case "ArrowDown": // volume down 10 %
-            event.preventDefault();
-            {
-              const newVol = Math.max(volume - 10, 0);
-              setPlayerVolume(newVol);
-              setVolumeState(newVol);
-              setMuted(newVol === 0);
-              setIsVolumeHovered(true);
-              if (volumeHoverTimeoutRef.current) {
-                clearTimeout(volumeHoverTimeoutRef.current);
-              }
-              volumeHoverTimeoutRef.current = setTimeout(() => {
-                setIsVolumeHovered(false);
-              }, 1500);
-            }
-            break;
-          case "m": // toggle mute/unmute
-          case "M":
-            event.preventDefault();
-            handleMuteToggle();
-            break;
-          case "f": // fullscreen
-          case "F":
-            event.preventDefault();
-            handleFullscreenToggle();
-            break;
-        }
-      };
-
-      document.addEventListener("keydown", handleKeyDown);
-      return () => {
-        document.removeEventListener("keydown", handleKeyDown);
-        if (volumeHoverTimeoutRef.current) {
-          clearTimeout(volumeHoverTimeoutRef.current);
-        }
-      };
-    }, [currentTime, duration, volume, muted]);
+    // Make the play/pause icon reflect reverse "movement" too
+    const transportMoving = isPlaying || isShuttlingReverse;
 
     return (
       <Stack
@@ -978,7 +909,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
                 "&:hover": { bgcolor: "rgba(255, 255, 255, 0.1)" },
               }}
             >
-              {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
+              {transportMoving ? <PauseIcon /> : <PlayArrowIcon />}
             </IconButton>
             <Typography
               variant="caption"
