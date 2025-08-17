@@ -1,6 +1,6 @@
 def translate_event_to_request(event):
     """
-    Map MediaLake event to URL parameters for Coactive dataset creation
+    Map MediaLake event to URL parameters for Coactive dataset listing
     Uses placeholder-based URL construction to ensure correct API domain
     """
     # Return subdomain mapping to use correct API domain (api.coactive.ai)

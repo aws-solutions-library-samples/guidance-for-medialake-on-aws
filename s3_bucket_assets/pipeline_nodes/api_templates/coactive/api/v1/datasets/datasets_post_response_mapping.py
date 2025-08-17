@@ -1,13 +1,13 @@
 # datasets_post_response_mapping.py
-import json
 from typing import Any, Dict
 
 
-def translate_response_to_output(
+def translate_event_to_request(
     response_body_and_event: Dict[str, Any],
 ) -> Dict[str, Any]:
     """
     Process Coactive dataset creation response and handle errors.
+    This function is called by the Lambda handler for response mapping.
 
     Args:
         response_body_and_event: Dictionary containing 'response_body' and 'event'
@@ -21,45 +21,24 @@ def translate_response_to_output(
     response_body = response_body_and_event.get("response_body", {})
     response_body_and_event.get("event", {})
 
-    # Check if the API call failed
-    status_code = response_body.get("statusCode", 200)
+    # The response_body IS the direct Coactive API response
+    # No need to check statusCode or unwrap body - that's handled by the Lambda middleware
 
-    if status_code != 200:
-        # API call failed - raise error to stop Step Functions execution
-        body = response_body.get("body", "{}")
+    # Validate we have a response
+    if not response_body:
+        raise RuntimeError("No response received from Coactive API")
 
-        # Try to parse the error details
-        try:
-            if isinstance(body, str):
-                error_details = json.loads(body)
-            else:
-                error_details = body
-        except json.JSONDecodeError:
-            error_details = {"error": "Unknown error", "details": str(body)}
+    # Check if this is an error response (would contain 'error' or 'detail' fields)
+    if "error" in response_body or "detail" in response_body:
+        error_msg = response_body.get("error") or response_body.get(
+            "detail", "Unknown error"
+        )
+        raise RuntimeError(f"Coactive API error: {error_msg}")
 
-        error_message = f"Coactive API call failed with status {status_code}"
-        if "error" in error_details:
-            error_message += f": {error_details['error']}"
-        if "details" in error_details:
-            error_message += f" - {error_details['details']}"
-        elif "detail" in error_details:
-            error_message += f" - {error_details['detail']}"
-
-        raise RuntimeError(error_message)
-
-    # Parse successful response
-    try:
-        if isinstance(response_body.get("body"), str):
-            response_data = json.loads(response_body["body"])
-        else:
-            response_data = response_body.get("body", {})
-    except json.JSONDecodeError as e:
-        raise RuntimeError(f"Failed to parse Coactive API response: {str(e)}")
-
-    # Extract dataset information
-    dataset_id = response_data.get("datasetId")
-    dataset_name = response_data.get("name")
-    dataset_status = response_data.get("status")
+    # Extract dataset information directly from response_body
+    dataset_id = response_body.get("datasetId")
+    dataset_name = response_body.get("name")
+    dataset_status = response_body.get("status")
 
     if not dataset_id:
         raise RuntimeError("No dataset ID returned from Coactive API")
@@ -69,5 +48,5 @@ def translate_response_to_output(
         "dataset_id": dataset_id,
         "dataset_name": dataset_name,
         "dataset_status": dataset_status,
-        "coactive_response": response_data,
+        "coactive_response": response_body,
     }

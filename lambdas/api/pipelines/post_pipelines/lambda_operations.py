@@ -446,6 +446,9 @@ def create_lambda_function(
     request_templates_path = node.data.configuration.get("requestMapping")
     response_templates_path = node.data.configuration.get("responseMapping")
 
+    # Initialize flag to detect if custom URL processing is needed
+    needs_custom_url = False
+
     try:
         if (
             node.data.type.lower() == "integration"
@@ -474,6 +477,13 @@ def create_lambda_function(
 
             logger.info(f"Using API service URL: {api_service_url}")
             logger.info(f"Using API path: {api_path}")
+
+            # Check if the API service URL contains variables (like {subdomain})
+            if api_service_url and "{" in api_service_url and "}" in api_service_url:
+                needs_custom_url = True
+                logger.info(
+                    f"Detected variables in API service URL: {api_service_url}, enabling custom URL processing"
+                )
 
     except Exception as e:
         logger.warning(
@@ -625,7 +635,11 @@ def create_lambda_function(
                             else os.environ.get("API_AUTH_TYPE", "")
                         ),
                         "API_SERVICE_NAME": node.data.id,
-                        "API_CUSTOM_URL": os.environ.get("API_CUSTOM_URL", "false"),
+                        "API_CUSTOM_URL": (
+                            "true"
+                            if needs_custom_url
+                            else os.environ.get("API_CUSTOM_URL", "false")
+                        ),
                         "API_CUSTOM_CODE": custom_code_enabled,
                     }
 

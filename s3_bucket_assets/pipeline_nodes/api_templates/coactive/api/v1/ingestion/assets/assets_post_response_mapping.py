@@ -3,7 +3,7 @@ import json
 from typing import Any, Dict
 
 
-def translate_response_to_output(
+def translate_event_to_request(
     response_body_and_event: Dict[str, Any],
 ) -> Dict[str, Any]:
     """
@@ -47,14 +47,8 @@ def translate_response_to_output(
 
         raise RuntimeError(error_message)
 
-    # Parse successful response
-    try:
-        if isinstance(response_body.get("body"), str):
-            response_data = json.loads(response_body["body"])
-        else:
-            response_data = response_body.get("body", {})
-    except json.JSONDecodeError as e:
-        raise RuntimeError(f"Failed to parse Coactive API response: {str(e)}")
+    # The response_body is already the parsed JSON response from Coactive
+    response_data = response_body
 
     # Extract key information from Coactive response
     job_id = response_data.get("id")
@@ -72,13 +66,16 @@ def translate_response_to_output(
     # Process individual asset results
     asset_results = []
     for asset_detail in assets_info:
+        asset_id = asset_detail.get("asset_id")
         asset = asset_detail.get("asset", {})
+        error = asset_detail.get("error")
+
         asset_results.append(
             {
-                "coactive_asset_id": asset.get("asset_id"),
+                "coactive_asset_id": asset_id,
                 "source_path": asset.get("source_path"),
                 "medialake_uuid": asset.get("metadata", {}).get("medialake_uuid"),
-                "error": asset.get("error"),
+                "error": error,
             }
         )
 
@@ -95,10 +92,28 @@ def translate_response_to_output(
         message = f"Partial success: {total_assets - errored_assets} submitted, {errored_assets} failed"
 
     return {
-        "message": message,
+        # External job tracking for pipeline middleware
+        "externalJobId": job_id,
+        "externalJobStatus": "Started",
+        "externalJobResult": {
+            "message": message,
+            "dataset_id": dataset_id,
+            "total_assets": total_assets,
+            "processed_assets": processed_assets,
+            "errored_assets": errored_assets,
+            "created_at": created_dt,
+            "asset_results": asset_results,
+            "coactive_response": response_data,
+        },
+        # Template variables for Jinja rendering
+        "task_id": job_id,
         "job_id": job_id,
-        "dataset_id": dataset_id,
         "ingestion_status": status,
+        "processed_assets": processed_assets,  # For template: {{ processed_assets }}
+        "assets_processed": processed_assets,  # For template: {{ assets_processed }}
+        # Keep all original data for backward compatibility
+        "message": message,
+        "dataset_id": dataset_id,
         "total_assets": total_assets,
         "processed_assets": processed_assets,
         "errored_assets": errored_assets,

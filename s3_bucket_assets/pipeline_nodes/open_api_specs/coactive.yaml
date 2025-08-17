@@ -12,7 +12,8 @@ tags:
   - name: Status Monitoring
 
 servers:
-  - url: https://app.coactive.ai/api/v1
+  - url: https://{subdomain}.coactive.ai/
+    path: api/v1
     description: Production API Server
     x-server-environment: Production
 
@@ -34,25 +35,24 @@ components:
 
 paths:
   /datasets:
+    get:
+      summary: List all datasets
+      description: Lists all available datasets to check if MediaLake_Dataset exists
+      operationId: listDatasets
+      tags:
+        - Dataset Management
+      x-requestMapping: api/v1/datasets
+      x-responseMapping: api/v1/datasets
+      security:
+        - bearerAuth: []
     post:
       summary: Create a new dataset
       description: Creates a new dataset in Coactive for asset ingestion
       operationId: createDataset
       tags:
         - Dataset Management
-      x-requestMapping: api_templates/coactive/api/v1/datasets
-      x-responseMapping: api_templates/coactive/api/v1/datasets
-      security:
-        - bearerAuth: []
-  /datasets/{dataset_id}:
-    get:
-      summary: Get dataset information
-      description: Retrieves information about a specific dataset
-      operationId: getDataset
-      tags:
-        - Dataset Management
-      x-requestMapping: api_templates/coactive/api/v1/datasets/dataset_id
-      x-responseMapping: api_templates/coactive/api/v1/datasets/dataset_id
+      x-requestMapping: api/v1/datasets
+      x-responseMapping: api/v1/datasets
       security:
         - bearerAuth: []
   /ingestion/assets:
@@ -62,8 +62,8 @@ paths:
       operationId: ingestAssets
       tags:
         - Asset Ingestion
-      x-requestMapping: api_templates/coactive/api/v1/ingestion/assets
-      x-responseMapping: api_templates/coactive/api/v1/ingestion/assets
+      x-requestMapping: api/v1/ingestion/assets
+      x-responseMapping: api/v1/ingestion/assets
       security:
         - bearerAuth: []
   /ingestion/videos/{asset_id}/status:
@@ -73,8 +73,8 @@ paths:
       operationId: getVideoAssetStatus
       tags:
         - Status Monitoring
-      x-requestMapping: api_templates/coactive/api/v1/ingestion/videos/status
-      x-responseMapping: api_templates/coactive/api/v1/ingestion/videos/status
+      x-requestMapping: api/v1/ingestion/videos/status
+      x-responseMapping: api/v1/ingestion/videos/status
       security:
         - bearerAuth: []
   /ingestion/images/{asset_id}/status:
@@ -84,7 +84,7 @@ paths:
       operationId: getImageAssetStatus
       tags:
         - Status Monitoring
-      x-requestMapping: api_templates/coactive/api/v1/ingestion/images/status
-      x-responseMapping: api_templates/coactive/api/v1/ingestion/images/status
+      x-requestMapping: api/v1/ingestion/images/status
+      x-responseMapping: api/v1/ingestion/images/status
       security:
         - bearerAuth: []

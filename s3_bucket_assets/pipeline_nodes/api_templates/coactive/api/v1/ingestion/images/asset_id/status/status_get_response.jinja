@@ -1,0 +1,12 @@
+{
+    "status": "{{ variables.status }}",
+    "progress": {{ variables.progress | default(0) }},
+    "message": "{{ variables.message | default('') }}",
+    "completed_at": "{{ variables.completed_at | default('') }}",
+    "externalJobId": "{{ variables.externalJobId }}",
+    "externalJobStatus": "{{ variables.externalJobStatus }}"
+    {% if variables.externalJobResult %}
+    ,
+    "externalJobResult": "{{ variables.externalJobResult }}"
+    {% endif %}
+}

@@ -2,7 +2,6 @@ import ast
 import importlib.util
 import json
 import os
-import re
 import sys
 import time
 from typing import Any, Dict, Optional
@@ -456,14 +455,57 @@ def load_custom_modules(api_template_bucket: str, custom_code_paths: list):
     Load custom code modules from S3 and make them available for import
     """
     loaded_modules = {}
+    logger.info(f"=== CUSTOM CODE LOADING DEBUG ===")
+    logger.info(f"Bucket: {api_template_bucket}")
+    logger.info(f"Custom code paths: {custom_code_paths}")
+
     for module_path in custom_code_paths:
         try:
             logger.info(f"Loading custom code module from: {module_path}")
+            logger.info(f"Full S3 path: s3://{api_template_bucket}/{module_path}")
+
+            # Check if the object exists first
+            try:
+                s3_client.head_object(Bucket=api_template_bucket, Key=module_path)
+                logger.info(f"✓ S3 object exists: {module_path}")
+            except ClientError as head_error:
+                logger.error(f"✗ S3 object does not exist: {module_path}")
+                logger.error(f"Head object error: {head_error}")
+
+                # List objects in the parent directory for debugging
+                try:
+                    parent_path = "/".join(module_path.split("/")[:-1]) + "/"
+                    logger.info(f"Listing objects in parent directory: {parent_path}")
+                    list_response = s3_client.list_objects_v2(
+                        Bucket=api_template_bucket, Prefix=parent_path, MaxKeys=20
+                    )
+                    if "Contents" in list_response:
+                        logger.info(
+                            f"Found {len(list_response['Contents'])} objects in {parent_path}:"
+                        )
+                        for obj in list_response["Contents"]:
+                            logger.info(
+                                f"  - {obj['Key']} (size: {obj['Size']}, modified: {obj['LastModified']})"
+                            )
+                    else:
+                        logger.info(f"No objects found in {parent_path}")
+                except Exception as list_error:
+                    logger.error(f"Error listing parent directory: {list_error}")
+
+                raise head_error
+
             response = s3_client.get_object(Bucket=api_template_bucket, Key=module_path)
             file_content = response["Body"].read().decode("utf-8")
+            logger.info(
+                f"✓ Successfully downloaded file: {len(file_content)} characters"
+            )
+            logger.info(
+                f"File content preview (first 200 chars): {file_content[:200]}..."
+            )
 
             # Extract module name from path (e.g., "coactive/shared/coactive_auth.py" -> "coactive_auth")
             module_name = module_path.split("/")[-1].replace(".py", "")
+            logger.info(f"Module name extracted: {module_name}")
 
             spec = importlib.util.spec_from_loader(module_name, loader=None)
             module = importlib.util.module_from_spec(spec)
@@ -473,10 +515,51 @@ def load_custom_modules(api_template_bucket: str, custom_code_paths: list):
             sys.modules[module_name] = module
             loaded_modules[module_name] = module
 
-            logger.info(f"Successfully loaded custom code module: {module_name}")
-        except Exception as e:
-            logger.error(f"Error loading custom code module {module_path}: {str(e)}")
+            # Log available functions in the module
+            available_functions = [
+                name
+                for name in dir(module)
+                if callable(getattr(module, name)) and not name.startswith("_")
+            ]
+            logger.info(f"✓ Successfully loaded custom code module: {module_name}")
+            logger.info(f"Available functions in {module_name}: {available_functions}")
+
+        except ClientError as e:
+            error_code = e.response["Error"]["Code"]
+            error_message = e.response["Error"]["Message"]
+            logger.error(f"✗ AWS S3 ClientError loading {module_path}:")
+            logger.error(f"  Error Code: {error_code}")
+            logger.error(f"  Error Message: {error_message}")
+            logger.error(f"  Bucket: {api_template_bucket}")
+            logger.error(f"  Key: {module_path}")
+
+            # Additional debugging for NoSuchKey errors
+            if error_code == "NoSuchKey":
+                logger.error(f"NoSuchKey Debug Info:")
+                logger.error(
+                    f"  - Verify the file exists at: s3://{api_template_bucket}/{module_path}"
+                )
+                logger.error(
+                    f"  - Check if the bucket name is correct: {api_template_bucket}"
+                )
+                logger.error(f"  - Check if the key path is correct: {module_path}")
+                logger.error(
+                    f"  - Verify Lambda has s3:GetObject permission on arn:aws:s3:::{api_template_bucket}/*"
+                )
+
             raise
+        except Exception as e:
+            logger.error(
+                f"✗ Unexpected error loading custom code module {module_path}: {str(e)}"
+            )
+            logger.error(f"Error type: {type(e).__name__}")
+            import traceback
+
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            raise
+
+    logger.info(f"=== CUSTOM CODE LOADING COMPLETE ===")
+    logger.info(f"Total modules loaded: {len(loaded_modules)}")
 
     return loaded_modules
 
@@ -486,38 +569,105 @@ def load_and_execute_pre_request_custom_code(api_template_bucket: str, event: di
     Execute pre-request custom code (before API call)
     """
     try:
+        logger.info("=== PRE-REQUEST CUSTOM CODE EXECUTION ===")
+
         # Check for PRE_CUSTOM_CODE first, then fall back to legacy CUSTOM_CODE
         pre_custom_code_location = os.environ.get("PRE_CUSTOM_CODE")
+        legacy_custom_code_location = os.environ.get("CUSTOM_CODE")
+
+        logger.info(f"PRE_CUSTOM_CODE environment variable: {pre_custom_code_location}")
+        logger.info(
+            f"CUSTOM_CODE environment variable (legacy): {legacy_custom_code_location}"
+        )
+
         if not pre_custom_code_location:
             # Fall back to legacy CUSTOM_CODE for backward compatibility
-            pre_custom_code_location = os.environ.get("CUSTOM_CODE")
+            pre_custom_code_location = legacy_custom_code_location
+            if pre_custom_code_location:
+                logger.info(f"Using legacy CUSTOM_CODE: {pre_custom_code_location}")
 
         if pre_custom_code_location:
             custom_code_paths = [
                 path.strip() for path in pre_custom_code_location.split(",")
             ]
             logger.info(f"Loading pre-request custom code modules: {custom_code_paths}")
+            logger.info(f"API template bucket: {api_template_bucket}")
+
             loaded_modules = load_custom_modules(api_template_bucket, custom_code_paths)
+            logger.info(
+                f"Successfully loaded {len(loaded_modules)} modules: {list(loaded_modules.keys())}"
+            )
 
             # Look for process_api_request in the loaded modules
+            process_api_request_found = False
             for module_name, module in loaded_modules.items():
+                logger.info(
+                    f"Checking module '{module_name}' for process_api_request function..."
+                )
+
                 if hasattr(module, "process_api_request"):
-                    logger.info(f"Found process_api_request in module: {module_name}")
-                    custom_function = getattr(module, "process_api_request")
-                    result = custom_function(event)
-                    return result
+                    logger.info(f"✓ Found process_api_request in module: {module_name}")
+                    process_api_request_found = True
+
+                    try:
+                        custom_function = getattr(module, "process_api_request")
+                        logger.info(f"Executing process_api_request from {module_name}")
+                        logger.info(
+                            f"Input event keys: {list(event.keys()) if isinstance(event, dict) else 'Not a dict'}"
+                        )
+
+                        result = custom_function(event)
+
+                        logger.info(
+                            f"✓ process_api_request execution completed successfully"
+                        )
+                        logger.info(f"Result type: {type(result)}")
+                        if isinstance(result, dict):
+                            logger.info(f"Result keys: {list(result.keys())}")
+                            if "headers" in result:
+                                logger.info(
+                                    f"Headers added by custom code: {result['headers']}"
+                                )
+
+                        return result
+
+                    except Exception as func_error:
+                        logger.error(
+                            f"✗ Error executing process_api_request in {module_name}: {str(func_error)}"
+                        )
+                        import traceback
+
+                        logger.error(f"Traceback: {traceback.format_exc()}")
+                        raise
+                else:
+                    available_functions = [
+                        name
+                        for name in dir(module)
+                        if callable(getattr(module, name)) and not name.startswith("_")
+                    ]
+                    logger.info(
+                        f"✗ No process_api_request in {module_name}. Available functions: {available_functions}"
+                    )
 
             # If no process_api_request found in loaded modules, return original event
-            logger.info(
-                "No process_api_request function found in loaded modules, returning original event"
-            )
+            if not process_api_request_found:
+                logger.warning(
+                    f"No process_api_request function found in any of the loaded modules: {list(loaded_modules.keys())}"
+                )
+                logger.info("Returning original event unchanged")
+
             return event
 
         # No custom code specified, return original event
         logger.info("No pre-request custom code specified, returning original event")
         return event
+
     except Exception as e:
-        logger.error(f"Error in pre-request custom code execution: {str(e)}")
+        logger.error(f"✗ Error in pre-request custom code execution: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise
 
 
@@ -629,10 +779,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             api_service_method=api_service_method,
         )
     except ValueError as e:
-        return {
-            "statusCode": 500,
-            "body": f"Error building S3 template paths: {str(e)}",
-        }
+        raise RuntimeError(f"Error building S3 template paths: {str(e)}")
 
     request_headers = request_header_creation()
     logger.info(f"Request headers are: {request_headers}")
@@ -651,7 +798,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         request_body = None
 
     try:
-        if api_service_resource and re.search(r"{\w+}", api_service_resource):
+        if api_custom_url:
             api_full_url = create_custom_url(s3_templates, api_template_bucket, event)
         else:
             api_full_url = build_full_url(
@@ -660,7 +807,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 api_service_path=api_service_path,
             )
     except ValueError as e:
-        return {"statusCode": 500, "body": f"Error building URL: {str(e)}"}
+        raise RuntimeError(f"Error building URL: {str(e)}")
 
     try:
         # Execute pre-request custom code if available (for authentication, etc.)
@@ -684,10 +831,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     request_headers.update(event["headers"])
             except Exception as e:
                 logger.error(f"Error executing pre-request custom code: {str(e)}")
-                return {
-                    "statusCode": 500,
-                    "body": f"Error executing pre-request custom code: {str(e)}",
-                }
+                raise RuntimeError(f"Error executing pre-request custom code: {str(e)}")
 
         api_response = make_api_call(
             url=api_full_url,
@@ -700,40 +844,11 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         response_body = json.loads(api_response["body"])
 
         # Check if custom code file exists and use it, otherwise fall back to standard response mapping
-        custom_code_exists = False
-        if "custom_code_file" in s3_templates:
-            try:
-                # Add api_templates/ prefix to match the actual S3 path structure
-                custom_code_path = f"api_templates/{s3_templates['custom_code_file']}"
-                # Try to check if the custom code file exists in S3
-                s3_client.head_object(Bucket=api_template_bucket, Key=custom_code_path)
-                custom_code_exists = True
-                logger.info(f"Custom code file found: {custom_code_path}")
-                # Update the s3_templates dict with the correct path for later use
-                s3_templates["custom_code_file"] = custom_code_path
-            except Exception as e:
-                logger.info(
-                    f"No custom code file found: api_templates/{s3_templates['custom_code_file']} - {str(e)}"
-                )
-                custom_code_exists = False
-
-        if api_custom_code or custom_code_exists:
-            try:
-                logger.info("Executing custom code for response processing")
-                response_output = load_and_execute_custom_code(
-                    api_template_bucket, s3_templates, response_body, event
-                )
-            except Exception as e:
-                logger.error(f"Error executing custom code: {str(e)}")
-                return {
-                    "statusCode": 500,
-                    "body": f"Error executing custom code: {str(e)}",
-                }
-        else:
-            logger.info("Using standard response mapping")
-            response_output = create_response_output(
-                s3_templates, api_template_bucket, response_body, event
-            )
+        # Use standard response mapping for all integrations
+        logger.info("Using standard response mapping")
+        response_output = create_response_output(
+            s3_templates, api_template_bucket, response_body, event
+        )
 
         truncated = _truncate_floats(response_output, max_items=10)
         logger.info(
