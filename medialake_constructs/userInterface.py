@@ -219,9 +219,12 @@ class UIConstruct(Construct):
                 access_control_allow_credentials=False,
                 access_control_allow_headers=[
                     "Authorization",
+                    "authorization",
                     "Content-Type",
                     "x-api-key",
                     "X-Api-Key",
+                    "X-Amz-Date",
+                    "X-Amz-Security-Token",
                     "X-Forwarded-User",
                 ],
                 access_control_allow_methods=[
@@ -367,8 +370,6 @@ class UIConstruct(Construct):
                 "Content-Type",
                 "X-API-Key",
                 "x-api-key",
-                "X-Amz-Date",
-                "X-Amz-Security-Token",
                 "X-Forwarded-User",
                 "Cache-Control",
                 "Pragma",
