@@ -50,11 +50,19 @@ class UnifiedSearchOrchestrator:
         try:
             # Get search provider configurations from DynamoDB
             provider_configs = self._get_search_provider_configs()
+            self.logger.info(f"Found {len(provider_configs)} provider configurations")
 
             for config_data in provider_configs:
                 try:
+                    self.logger.info(
+                        f"Processing provider config: {config_data.get('provider', 'unknown')}"
+                    )
                     config = create_search_provider_config(config_data)
                     provider = self.provider_factory.create_provider(config)
+
+                    self.logger.info(
+                        f"Created provider instance for: {config.provider}"
+                    )
 
                     if provider.is_available():
                         self._providers[config.provider] = provider
@@ -77,6 +85,8 @@ class UnifiedSearchOrchestrator:
                     self.logger.error(
                         f"Failed to initialize provider {config_data.get('provider', 'unknown')}: {str(e)}"
                     )
+
+            self.logger.info(f"Total providers loaded: {len(self._providers)}")
 
         except Exception as e:
             self.logger.error(
@@ -104,35 +114,46 @@ class UnifiedSearchOrchestrator:
             # Fall back to checking for individual provider configurations
             configs = []
 
-            # Check for Coactive configuration
+            # Check for Coactive configuration with correct DynamoDB key
             coactive_response = system_settings_table.get_item(
-                Key={"PK": "SYSTEM_SETTINGS", "SK": "COACTIVE_SEARCH"}
+                Key={"PK": "SYSTEM_SETTINGS", "SK": "SEARCH_PROVIDER"}
+            )
+
+            self.logger.info(
+                f"DynamoDB response for SEARCH_PROVIDER: {coactive_response}"
             )
 
             if coactive_response.get("Item") and coactive_response["Item"].get(
                 "isEnabled"
             ):
+                item = coactive_response["Item"]
+                # Map the DynamoDB record structure to expected config format
                 coactive_config = {
-                    "provider": "coactive",
+                    "provider": item.get(
+                        "type", "coactive"
+                    ),  # Use 'type' field from DB
                     "provider_location": "external",
                     "architecture": "external_semantic_service",
                     "capabilities": {
                         "media": ["video", "audio", "image"],
                         "semantic": True,
                     },
-                    "dataset_id": coactive_response["Item"].get("datasetId"),
-                    "endpoint": coactive_response["Item"].get("endpoint"),
+                    "dataset_id": item.get(
+                        "datasetId"
+                    ),  # Now populated by PUT endpoint when Coactive dataset is created
+                    "endpoint": item.get("endpoint"),
                     "auth": {
                         "type": "bearer",
-                        "token": self._get_coactive_api_key(
-                            coactive_response["Item"].get("secretArn")
-                        ),
+                        "secret_arn": item.get("secretArn"),
                     },
-                    "metadata_mapping": coactive_response["Item"].get(
-                        "metadataMapping", {}
-                    ),
+                    "metadata_mapping": item.get("metadataMapping", {}),
+                    "name": item.get("name", "Coactive AI"),
+                    "id": item.get("id"),
                 }
                 configs.append(coactive_config)
+                self.logger.info(
+                    f"Found Coactive configuration: {item.get('name', 'Coactive AI')}"
+                )
 
             return configs
 
@@ -205,13 +226,18 @@ class UnifiedSearchOrchestrator:
 
                 return response
             else:
-                # Fall back to legacy system
-                return self._execute_legacy_search(query_params)
+                # No suitable provider found - raise error instead of fallback
+                available_providers = (
+                    list(self._providers.keys()) if self._providers else []
+                )
+                error_msg = f"No suitable search provider found for query. Available providers: {available_providers}"
+                self.logger.error(error_msg)
+                raise RuntimeError(error_msg)
 
         except Exception as e:
             self.logger.error(f"Unified search failed: {str(e)}")
-            # Fall back to legacy system on error
-            return self._execute_legacy_search(query_params)
+            # Re-raise the error instead of falling back to legacy system
+            raise RuntimeError(f"Search system failure: {str(e)}")
 
     def _select_provider(self, query: SearchQuery) -> Optional[BaseSearchProvider]:
         """
@@ -281,20 +307,15 @@ class UnifiedSearchOrchestrator:
             result = self._convert_search_hit_to_medialake_format(hit)
             results.append(result)
 
-        # Create search metadata
+        # Create search metadata in expected MediaLake format
         search_metadata = {
             "totalResults": search_result.total_results,
             "page": (query.page_offset // query.page_size) + 1,
             "pageSize": query.page_size,
             "searchTerm": query.query_text,
-            "provider": search_result.provider,
-            "architecture": search_result.architecture_type.value,
-            "providerLocation": search_result.provider_location.value,
-            "tookMs": search_result.took_ms,
+            "facets": search_result.facets if search_result.facets else None,
+            "suggestions": None,
         }
-
-        if search_result.facets:
-            search_metadata["facets"] = search_result.facets
 
         return {
             "status": "200",
@@ -304,29 +325,58 @@ class UnifiedSearchOrchestrator:
 
     def _convert_search_hit_to_medialake_format(self, hit: SearchHit) -> Dict[str, Any]:
         """Convert SearchHit to MediaLake result format"""
-        result = {
-            "score": hit.score,
-            "InventoryID": hit.asset_id,
-            "mediaType": hit.media_type.value,
-        }
-
-        # Add source data
+        # Return the OpenSearch record exactly as it is
         if hit.source:
-            result.update(hit.source)
+            result = hit.source.copy()
 
-        # Add highlights if present
-        if hit.highlights:
-            result["highlights"] = hit.highlights
+            # Add presigned URLs for thumbnails and proxies
+            self._add_presigned_urls(result)
 
-        # Add clips if present
-        if hit.clips:
-            result["clips"] = hit.clips
+            return result
+        else:
+            # Fallback if no source data
+            return {"InventoryID": hit.asset_id}
 
-        # Add provider metadata
-        if hit.provider_metadata:
-            result["providerMetadata"] = hit.provider_metadata
+    def _add_presigned_urls(self, result: Dict[str, Any]) -> None:
+        """Add presigned URLs for thumbnail and proxy representations"""
+        try:
+            # Import here to avoid circular imports
+            from search_utils import generate_presigned_url
 
-        return result
+            derived_representations = result.get("DerivedRepresentations", [])
+            thumbnail_url = None
+            proxy_url = None
+
+            # Process derived representations for thumbnails and proxies
+            for representation in derived_representations:
+                purpose = representation.get("Purpose")
+                rep_storage_info = representation.get("StorageInfo", {}).get(
+                    "PrimaryLocation", {}
+                )
+
+                if rep_storage_info.get("StorageType") == "s3":
+                    presigned_url = generate_presigned_url(
+                        bucket=rep_storage_info.get("Bucket", ""),
+                        key=rep_storage_info.get("ObjectKey", {}).get("FullPath", ""),
+                    )
+
+                    if purpose == "thumbnail":
+                        thumbnail_url = presigned_url
+                    elif purpose == "proxy":
+                        proxy_url = presigned_url
+
+                if thumbnail_url and proxy_url:
+                    break
+
+            # Add URLs to result
+            if thumbnail_url:
+                result["thumbnailUrl"] = thumbnail_url
+            if proxy_url:
+                result["proxyUrl"] = proxy_url
+
+        except Exception as e:
+            self.logger.warning(f"Failed to generate presigned URLs: {str(e)}")
+            # Continue without URLs rather than failing the entire request
 
     def _execute_legacy_search(self, query_params: Dict[str, Any]) -> Dict[str, Any]:
         """Execute search using legacy embedding store system"""

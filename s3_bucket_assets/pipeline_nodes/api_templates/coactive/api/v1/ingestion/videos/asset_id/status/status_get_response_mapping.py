@@ -17,6 +17,7 @@ def translate_event_to_request(response_body_and_event):
         "failed": ("Failed", "Failed"),
         "error": ("Failed", "Failed"),
         "processing": ("Started", "InProgress"),
+        "processing_started": ("Started", "InProgress"),  # Add missing status mapping
         "pending": ("Started", "Pending"),
     }
 

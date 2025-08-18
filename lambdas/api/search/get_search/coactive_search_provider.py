@@ -2,13 +2,13 @@
 Coactive search provider implementation for external semantic service architecture.
 """
 
+import http.client
 import json
 import os
 import time
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import boto3
-import requests
 from opensearchpy import (
     OpenSearch,
     RequestsAWSV4SignerAuth,
@@ -65,11 +65,15 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
         """Check if Coactive provider is available and properly configured"""
         try:
             # Check required configuration
+            # Note: dataset_id is optional for search operations - can search across all datasets
             if not self.config.dataset_id:
-                self.logger.warning("Coactive dataset_id not configured")
-                return False
+                self.logger.info(
+                    "Coactive dataset_id not configured - will search across all available datasets"
+                )
 
-            if not self.config.auth or not self.config.auth.get("token"):
+            # Check if we can retrieve the auth token from Secrets Manager
+            auth_token = self._get_auth_token()
+            if not auth_token:
                 self.logger.warning("Coactive auth token not configured")
                 return False
 
@@ -93,16 +97,102 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
             self.logger.warning(f"Coactive availability check failed: {str(e)}")
             return False
 
+    def _get_auth_token(self) -> Optional[str]:
+        """Get JWT access token by exchanging personal token with Coactive API"""
+        try:
+            self.logger.info(f"Auth config: {self.config.auth}")
+
+            if not self.config.auth or not self.config.auth.get("secret_arn"):
+                self.logger.warning(
+                    f"No secret_arn found in auth config. Auth: {self.config.auth}"
+                )
+                # Try to get token directly from config (for backward compatibility)
+                if self.config.auth and self.config.auth.get("token"):
+                    self.logger.info("Found token directly in config")
+                    return self.config.auth.get("token")
+                return None
+
+            secret_arn = self.config.auth.get("secret_arn")
+            self.logger.info(f"Retrieving personal token from secret ARN: {secret_arn}")
+
+            secretsmanager = boto3.client("secretsmanager")
+            response = secretsmanager.get_secret_value(SecretId=secret_arn)
+
+            if response and "SecretString" in response:
+                import json
+
+                secret_data = json.loads(response["SecretString"])
+                self.logger.info(f"Secret data keys: {list(secret_data.keys())}")
+                # Get the personal token using the x-api-key format
+                personal_token = secret_data.get("x-api-key")
+                if not personal_token:
+                    self.logger.warning(
+                        f"No valid personal token key found in secret. Available keys: {list(secret_data.keys())}"
+                    )
+                    return None
+
+                self.logger.info(
+                    "Successfully retrieved personal token, exchanging for JWT access token"
+                )
+
+                # Exchange personal token for JWT access token using the working pattern
+                import http.client
+                import json as json_lib
+
+                try:
+                    conn = http.client.HTTPSConnection("api.coactive.ai")
+                    headers = {
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {personal_token}",
+                    }
+                    payload = {"grant_type": "refresh_token"}
+                    body = json_lib.dumps(payload)
+
+                    self.logger.info("Making authentication request to /api/v0/login")
+                    conn.request("POST", "/api/v0/login", body=body, headers=headers)
+                    auth_response = conn.getresponse()
+                    response_data = auth_response.read().decode("utf-8")
+                    conn.close()
+
+                    if auth_response.status != 200:
+                        self.logger.error(
+                            f"Authentication failed: {auth_response.status} - {response_data}"
+                        )
+                        return None
+
+                    auth_data = json_lib.loads(response_data)
+                    access_token = auth_data.get("access_token")
+
+                    if not access_token:
+                        self.logger.error(f"No access_token in response: {auth_data}")
+                        return None
+
+                    self.logger.info(
+                        "Successfully obtained JWT access token from Coactive API"
+                    )
+                    return access_token
+
+                except Exception as auth_e:
+                    self.logger.error(
+                        f"Failed to exchange personal token for JWT: {str(auth_e)}"
+                    )
+                    return None
+
+        except Exception as e:
+            self.logger.error(f"Failed to get Coactive auth token: {str(e)}")
+
+        return None
+
     def execute_external_search(self, query: SearchQuery) -> SearchResult:
         """Execute search against Coactive API"""
         start_time = time.time()
 
         try:
-            # Build Coactive request payload
-            payload = self._build_coactive_payload(query)
+            # Build Coactive request parameters (not payload for GET request)
+            params = self._build_coactive_params(query)
 
             # Make request to Coactive API
-            response = self._make_coactive_request(payload)
+            response = self._make_coactive_request(params)
 
             # Convert Coactive response to SearchResult
             search_result = self._convert_coactive_response(response, query)
@@ -129,38 +219,16 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
                 provider_location=ProviderLocation.EXTERNAL,
             )
 
-    def _build_coactive_payload(self, query: SearchQuery) -> Dict[str, Any]:
-        """Build Coactive API request payload"""
-        # Build metadata_filters from unified filters
-        metadata_filters = []
-
-        if query.filters:
-            for filter_item in query.filters:
-                key = filter_item.get("key")
-                operator = filter_item.get("operator")
-                value = filter_item.get("value")
-
-                # Map MediaLake field names to Coactive metadata field names
-                mapped_key = self._map_field_name(key)
-
-                # Convert operator format
-                coactive_operator = self._map_operator(operator)
-
-                metadata_filters.append(
-                    {"key": mapped_key, "operator": coactive_operator, "value": value}
-                )
-
-        payload = {
-            "query": query.query_text,
+    def _build_coactive_params(self, query: SearchQuery) -> Dict[str, Any]:
+        """Build Coactive API request parameters matching working example"""
+        # Build parameters according to working Coactive search example
+        params = {
             "dataset_id": self.config.dataset_id,
-            "offset": query.page_offset,
-            "limit": min(query.page_size, 200),  # enforce max 200
+            "query": query.query_text,  # Use 'query' not 'text_query' for GET requests
         }
 
-        if metadata_filters:
-            payload["metadata_filters"] = metadata_filters
-
-        return payload
+        self.logger.info(f"Built Coactive params: {params}")
+        return params
 
     def _map_field_name(self, field_name: str) -> str:
         """Map MediaLake field names to Coactive metadata field names"""
@@ -192,69 +260,159 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
 
         return operator_mappings.get(operator, operator)
 
-    def _make_coactive_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """Make HTTP request to Coactive API"""
-        endpoint = self.config.endpoint or "https://app.coactive.ai/api/v1/search"
+    def _make_coactive_request(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Make HTTP request to Coactive API using GET with query parameters"""
+        # Use the correct Coactive search endpoint based on working example
+        endpoint = "https://app.coactive.ai/api/v1/search"
+
+        # Get auth token from Secrets Manager
+        auth_token = self._get_auth_token()
+        if not auth_token:
+            raise Exception("Coactive auth token not available")
 
         headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.config.auth['token']}",
+            "Authorization": f"Bearer {auth_token}",
         }
 
         self.logger.info(f"Making Coactive API request to {endpoint}")
-        self.logger.debug(f"Coactive request payload: {json.dumps(payload, indent=2)}")
+        self.logger.debug(f"Coactive request params: {json.dumps(params, indent=2)}")
 
-        response = requests.post(endpoint, headers=headers, json=payload, timeout=30)
+        # Use GET request with query parameters (matching working example)
+        # Parse the URL to extract host and path
+        from urllib.parse import urlencode, urlparse
 
-        if response.status_code != 200:
-            raise Exception(
-                f"Coactive API error: {response.status_code} - {response.text}"
-            )
+        parsed_url = urlparse(endpoint)
+        host = parsed_url.netloc
+        path = parsed_url.path
 
-        return response.json()
+        # Build query string
+        query_string = urlencode(params)
+        full_path = f"{path}?{query_string}"
+
+        self.logger.info(f"Making request to {host}{full_path}")
+
+        # Make HTTP request using http.client
+        conn = http.client.HTTPSConnection(host)
+        conn.request("GET", full_path, headers=headers)
+        response = conn.getresponse()
+        response_data = response.read().decode("utf-8")
+        conn.close()
+
+        if response.status != 200:
+            raise Exception(f"Coactive API error: {response.status} - {response_data}")
+
+        return json.loads(response_data)
 
     def _convert_coactive_response(
         self, response: Dict[str, Any], query: SearchQuery
     ) -> SearchResult:
-        """Convert Coactive API response to SearchResult"""
-        results = response.get("results", [])
+        """Convert Coactive API response to SearchResult with proper MediaLake format"""
+        # Based on working example, results are in 'data' field
+        results = response.get("data", [])
         total_count = response.get("total_count", len(results))
 
-        hits = []
+        self.logger.info(f"Processing {len(results)} Coactive search results")
+
+        # Group results by MediaLake asset UUID to create proper clips structure
+        assets_with_clips = {}
         max_score = 0.0
 
         for result in results:
-            # Extract asset information from Coactive result
-            metadata = result.get("metadata", {})
-            score = float(result.get("score", 0.0))
+            # Extract MediaLake UUID from different locations based on media type
+            medialake_uuid = None
+            coactive_metadata = {}
 
+            # For images: UUID is directly in metadata
+            if result.get("metadata", {}).get("medialake_uuid"):
+                medialake_uuid = result["metadata"]["medialake_uuid"]
+                coactive_metadata = result.get("metadata", {})
+
+            # For videos: UUID is in video.metadata, with timing info in shot
+            elif result.get("video", {}).get("metadata", {}).get("medialake_uuid"):
+                medialake_uuid = result["video"]["metadata"]["medialake_uuid"]
+                coactive_metadata = result["video"].get("metadata", {})
+
+                # Add timing information for video clips
+                if result.get("shot"):
+                    coactive_metadata.update(
+                        {
+                            "start_time_ms": result["shot"].get("startTimeMs", 0),
+                            "end_time_ms": result["shot"].get("endTimeMs", 0),
+                            "timestamp_ms": result.get("timestamp", 0),
+                            "shot_id": result["shot"].get("shotId"),
+                        }
+                    )
+
+                # Add Coactive video ID
+                if result.get("video", {}).get("coactiveVideoId"):
+                    coactive_metadata["coactive_video_id"] = result["video"][
+                        "coactiveVideoId"
+                    ]
+
+            if not medialake_uuid:
+                self.logger.warning(
+                    f"No MediaLake UUID found in Coactive result: {result}"
+                )
+                continue
+
+            # Calculate score (default to 1.0 if not provided)
+            score = float(result.get("relevance_score") or result.get("score", 1.0))
             if score > max_score:
                 max_score = score
 
-            # Get MediaLake asset ID from metadata
-            asset_id = metadata.get("medialake_uuid") or metadata.get("asset_id", "")
+            # Group clips by asset UUID
+            if medialake_uuid not in assets_with_clips:
+                assets_with_clips[medialake_uuid] = {
+                    "asset_id": medialake_uuid,
+                    "clips": [],
+                    "max_score": score,
+                }
+            else:
+                # Update max score for this asset
+                if score > assets_with_clips[medialake_uuid]["max_score"]:
+                    assets_with_clips[medialake_uuid]["max_score"] = score
 
-            # Determine media type
-            media_type_str = metadata.get("media_type", "video")
+            # Create clip data
+            clip_data = {
+                "score": score,
+                "coactive_metadata": coactive_metadata,
+                "coactive_result": result,  # Store full result for debugging
+            }
+
+            assets_with_clips[medialake_uuid]["clips"].append(clip_data)
+
+        self.logger.info(f"Grouped results into {len(assets_with_clips)} unique assets")
+
+        # Convert to SearchHit format
+        hits = []
+        for asset_uuid, asset_data in assets_with_clips.items():
+            # Determine media type from first clip
+            first_clip = asset_data["clips"][0] if asset_data["clips"] else {}
+            media_type_str = first_clip.get("coactive_metadata", {}).get(
+                "media_type", "video"
+            )
             try:
                 media_type = MediaType(media_type_str.lower())
             except ValueError:
                 media_type = MediaType.VIDEO  # default fallback
 
-            # Create SearchHit
             hit = SearchHit(
-                asset_id=asset_id,
-                score=score,
-                source=metadata,  # Store Coactive metadata in source
+                asset_id=asset_uuid,
+                score=asset_data["max_score"],
+                source=asset_data,  # Store grouped clips data
                 media_type=media_type,
                 provider_metadata={
-                    "coactive_id": result.get("id"),
-                    "coactive_url": result.get("url"),
-                    "coactive_thumbnail": result.get("thumbnail_url"),
+                    "provider": "coactive",
+                    "clips_count": len(asset_data["clips"]),
                 },
             )
-
             hits.append(hit)
+
+        # Sort hits by score
+        hits.sort(key=lambda x: x.score, reverse=True)
+
+        self.logger.info(f"Created {len(hits)} SearchHits with max_score: {max_score}")
 
         return SearchResult(
             hits=hits,
@@ -298,20 +456,85 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
                 medialake_source = medialake_lookup.get(hit.asset_id)
 
                 if medialake_source:
-                    # Merge Coactive metadata with MediaLake data
-                    enriched_source = self._merge_metadata(
-                        hit.source, medialake_source, query
-                    )
+                    # Use the MediaLake OpenSearch record as the base
+                    enriched_source = medialake_source.copy()
+
+                    # For videos, add clips array with proper structure
+                    if (
+                        hit.media_type.value == "video"
+                        and isinstance(hit.source, dict)
+                        and "clips" in hit.source
+                    ):
+                        clips = []
+                        for clip_data in hit.source["clips"]:
+                            coactive_metadata = clip_data.get("coactive_metadata", {})
+
+                            # Extract asset information from MediaLake source
+                            digital_source_asset = enriched_source.get(
+                                "DigitalSourceAsset", {}
+                            )
+                            main_rep = digital_source_asset.get(
+                                "MainRepresentation", {}
+                            )
+                            storage_info = main_rep.get("StorageInfo", {})
+                            primary_location = storage_info.get("PrimaryLocation", {})
+                            object_key = primary_location.get("ObjectKey", {})
+                            file_info = primary_location.get("FileInfo", {})
+
+                            # Create clip with required structure and proper asset information
+                            clip = {
+                                "DigitalSourceAsset": {
+                                    "ID": digital_source_asset.get("ID", hit.asset_id)
+                                },
+                                "score": clip_data.get("score", hit.score),
+                                "assetType": digital_source_asset.get("Type", ""),
+                                "format": main_rep.get("Format", ""),
+                                "objectName": object_key.get("Name", ""),
+                                "fullPath": object_key.get("FullPath", ""),
+                                "bucket": primary_location.get("Bucket", ""),
+                                "fileSize": file_info.get("Size", 0),
+                                "createdAt": file_info.get("CreateDate", ""),
+                                "embedding_scope": "clip",
+                                "type": "video",
+                                "embedding_option": "visual-text",
+                            }
+
+                            # Add timing information from Coactive
+                            if coactive_metadata.get("start_time_ms") is not None:
+                                # Convert milliseconds to timecode format (simplified)
+                                start_ms = coactive_metadata["start_time_ms"]
+                                end_ms = coactive_metadata["end_time_ms"]
+
+                                # Simple conversion to HH:MM:SS:FF format (assuming 30fps)
+                                def ms_to_timecode(ms):
+                                    total_seconds = ms // 1000
+                                    frames = (ms % 1000) * 30 // 1000
+                                    hours = total_seconds // 3600
+                                    minutes = (total_seconds % 3600) // 60
+                                    seconds = total_seconds % 60
+                                    return f"{hours:02d}:{minutes:02d}:{seconds:02d}:{frames:02d}"
+
+                                clip["start_timecode"] = ms_to_timecode(start_ms)
+                                clip["end_timecode"] = ms_to_timecode(end_ms)
+                                clip["timestamp"] = digital_source_asset.get(
+                                    "CreateDate", ""
+                                )
+
+                            clips.append(clip)
+
+                        enriched_source["clips"] = clips
+                    else:
+                        # For non-video assets, ensure clips is an empty array
+                        enriched_source["clips"] = []
 
                     # Update the hit with enriched data
                     hit.source = enriched_source
                     enriched_hits.append(hit)
                 else:
-                    # Keep original hit if no MediaLake data found
+                    # Discard hits without MediaLake data
                     self.logger.warning(
-                        f"No MediaLake data found for asset {hit.asset_id}"
+                        f"Discarding result - no MediaLake data found for asset {hit.asset_id}"
                     )
-                    enriched_hits.append(hit)
 
             # Update results with enriched hits
             results.hits = enriched_hits
@@ -338,7 +561,7 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
             client = self._get_opensearch_client()
             index_name = os.environ["OPENSEARCH_INDEX"]
 
-            # Build query for specific asset IDs
+            # Build query for specific asset IDs using match queries (same as S3VectorEmbeddingStore)
             should_clauses = [
                 {"match": {"InventoryID": asset_id}} for asset_id in asset_ids
             ]
@@ -360,25 +583,23 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
                 "size": len(asset_ids),
             }
 
-            # Apply field selection if specified
-            if query.fields:
-                opensearch_query["_source"] = {"includes": query.fields}
-            else:
-                # Default fields for UI
-                opensearch_query["_source"] = {
-                    "includes": [
-                        "InventoryID",
-                        "DigitalSourceAsset",
-                        "DerivedRepresentations",
-                        "FileHash",
-                        "Metadata",
-                    ]
-                }
+            # For MediaLake enrichment, we always need complete records
+            # Ignore any field restrictions from the original query
+            # This ensures we get all the MediaLake asset structure needed for the response
 
             response = client.search(body=opensearch_query, index=index_name)
             hits = response.get("hits", {}).get("hits", [])
 
             self.logger.info(f"Fetched MediaLake metadata for {len(hits)} assets")
+
+            # Debug: Log what fields are actually returned
+            if hits:
+                sample_hit = hits[0]
+                source_keys = list(sample_hit.get("_source", {}).keys())
+                self.logger.info(f"OpenSearch returned fields: {source_keys}")
+                self.logger.info(
+                    f"Sample record structure: {sample_hit.get('_source', {})}"
+                )
 
             return hits
 
@@ -386,13 +607,107 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
             self.logger.error(f"Failed to fetch MediaLake metadata: {str(e)}")
             return []
 
+    def _create_medialake_result_with_clips(
+        self,
+        hit: SearchHit,
+        medialake_source: Dict[str, Any],
+        query: SearchQuery,
+    ) -> Dict[str, Any]:
+        """Create MediaLake result with clips array from Coactive data"""
+        # Start with MediaLake asset data as base (similar to process_search_hit)
+        digital_source_asset = medialake_source.get("DigitalSourceAsset", {})
+        main_rep = digital_source_asset.get("MainRepresentation", {})
+        storage_info = main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
+        object_key = storage_info.get("ObjectKey", {})
+
+        # Create base result structure matching MediaLake format
+        result = {
+            "DigitalSourceAsset": digital_source_asset,
+            "score": hit.score,
+            # Add standard MediaLake fields
+            "assetType": digital_source_asset.get("Type", ""),
+            "format": main_rep.get("Format", ""),
+            "objectName": object_key.get("Name", ""),
+            "fullPath": object_key.get("FullPath", ""),
+            "bucket": storage_info.get("Bucket", ""),
+        }
+
+        # Handle file size
+        file_size = storage_info.get("FileSize", 0)
+        if not file_size and "FileInfo" in storage_info:
+            file_size = storage_info.get("FileInfo", {}).get("Size", 0)
+        result["fileSize"] = file_size
+
+        # Handle creation date
+        created_date = storage_info.get("CreateDate", "")
+        if not created_date and "FileInfo" in storage_info:
+            created_date = storage_info.get("FileInfo", {}).get("CreateDate", "")
+        if not created_date:
+            created_date = digital_source_asset.get("CreateDate", "")
+        result["createdAt"] = created_date
+
+        # Include consolidated metadata if available
+        if "Metadata" in medialake_source and "Consolidated" in medialake_source.get(
+            "Metadata", {}
+        ):
+            result["consolidatedMetadata"] = medialake_source["Metadata"][
+                "Consolidated"
+            ]
+
+        # Create clips array from Coactive results
+        clips = []
+        coactive_data = hit.source  # This contains our grouped clips data
+
+        if isinstance(coactive_data, dict) and "clips" in coactive_data:
+            for clip_data in coactive_data["clips"]:
+                # Create clip structure similar to process_clip but with Coactive timing data
+                clip = {
+                    "DigitalSourceAsset": digital_source_asset,
+                    "score": clip_data.get("score", 0.0),
+                    # Copy standard fields from parent asset
+                    "assetType": result["assetType"],
+                    "format": result["format"],
+                    "objectName": result["objectName"],
+                    "fullPath": result["fullPath"],
+                    "bucket": result["bucket"],
+                    "fileSize": result["fileSize"],
+                    "createdAt": result["createdAt"],
+                }
+
+                # Add Coactive-specific timing metadata for video clips
+                coactive_metadata = clip_data.get("coactive_metadata", {})
+                if coactive_metadata.get("start_time_ms") is not None:
+                    clip["startTimeMs"] = coactive_metadata["start_time_ms"]
+                    clip["endTimeMs"] = coactive_metadata["end_time_ms"]
+                    clip["timestampMs"] = coactive_metadata.get("timestamp_ms", 0)
+                    clip["shotId"] = coactive_metadata.get("shot_id")
+
+                # Add consolidated metadata to clips too
+                if "consolidatedMetadata" in result:
+                    clip["consolidatedMetadata"] = result["consolidatedMetadata"]
+
+                # Store Coactive metadata for debugging/reference
+                clip["coactiveMetadata"] = coactive_metadata
+
+                clips.append(clip)
+
+        # Sort clips by score (highest first)
+        clips.sort(key=lambda x: x.get("score", 0), reverse=True)
+        result["clips"] = clips
+
+        self.logger.info(
+            f"Created MediaLake result for asset {hit.asset_id} with {len(clips)} clips"
+        )
+
+        return result
+
     def _merge_metadata(
         self,
         coactive_metadata: Dict[str, Any],
         medialake_source: Dict[str, Any],
         query: SearchQuery,
     ) -> Dict[str, Any]:
-        """Merge Coactive metadata with MediaLake source data"""
+        """Legacy method - kept for backward compatibility"""
         # Start with MediaLake data as base
         merged = medialake_source.copy()
 

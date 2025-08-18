@@ -1,137 +1,15 @@
 {
   "name": "Coactive API Video Ingestion Pipeline",
-  "description": "Ingest video assets into Coactive for semantic search and analysis",
+  "description": "",
   "active": true,
   "configuration": {
     "nodes": [
       {
-        "id": "dndnode_0",
-        "type": "custom",
-        "position": {
-          "x": 432,
-          "y": 256
-        },
-        "data": {
-          "nodeId": "trigger_video_processing_completed",
-          "label": "Video Processing Completed (trigger)",
-          "description": "This step will trigger after video processing is completed",
-          "icon": {
-            "key": null,
-            "ref": null,
-            "props": {
-              "size": 20
-            },
-            "_owner": null
-          },
-          "inputTypes": ["any"],
-          "outputTypes": [
-            {
-              "name": "video",
-              "description": "Output type: video"
-            }
-          ],
-          "type": "TRIGGER",
-          "configuration": {
-            "path": "",
-            "operationId": "",
-            "method": "trigger",
-            "parameters": {
-              "Video Type": "",
-              "Prefix": ""
-            },
-            "requestMapping": null,
-            "responseMapping": null
-          }
-        },
-        "width": 200,
-        "height": 113
-      },
-      {
-        "id": "dndnode_1",
-        "type": "custom",
-        "position": {
-          "x": 688,
-          "y": 256
-        },
-        "data": {
-          "nodeId": "coactive",
-          "label": "Coactive Dataset Validation (get)",
-          "description": "Validate that Coactive dataset exists and is ready",
-          "icon": {
-            "key": null,
-            "ref": null,
-            "props": {
-              "size": 20
-            },
-            "_owner": null
-          },
-          "inputTypes": [],
-          "outputTypes": [],
-          "type": "INTEGRATION",
-          "configuration": {
-            "path": "/datasets/{dataset_id}",
-            "method": "get",
-            "requestMapping": "api_templates/coactive/api/v1/datasets/dataset_id",
-            "responseMapping": "api_templates/coactive/api/v1/datasets/dataset_id",
-            "integrationId": "coactive-integration-id",
-            "operationId": "getDataset",
-            "parameters": {
-              "dataset_id": ""
-            }
-          }
-        },
-        "width": 200,
-        "height": 100
-      },
-      {
-        "id": "dndnode_2",
-        "type": "custom",
-        "position": {
-          "x": 688,
-          "y": 400
-        },
-        "data": {
-          "nodeId": "choice",
-          "label": "Dataset Ready Check",
-          "description": "Check if dataset is ready for ingestion",
-          "icon": {
-            "key": null,
-            "ref": null,
-            "props": {
-              "size": 20
-            },
-            "_owner": null
-          },
-          "inputTypes": ["any"],
-          "outputTypes": [
-            {
-              "name": "Ready",
-              "description": "Dataset is ready for ingestion"
-            },
-            {
-              "name": "Create Dataset",
-              "description": "Need to create dataset first"
-            },
-            {
-              "name": "Fail",
-              "description": "Dataset validation failed"
-            }
-          ],
-          "type": "FLOW",
-          "configuration": {
-            "method": "choice",
-            "parameters": {}
-          }
-        },
-        "width": 200,
-        "height": 113
-      },
-      {
         "id": "dndnode_3",
         "type": "custom",
         "position": {
-          "x": 688,
-          "y": 544
+          "x": 496,
+          "y": 784
         },
         "data": {
           "nodeId": "coactive",
@@ -153,26 +31,27 @@
             "method": "post",
             "requestMapping": "api_templates/coactive/api/v1/datasets",
             "responseMapping": "api_templates/coactive/api/v1/datasets",
-            "integrationId": "coactive-integration-id",
+            "integrationId": "10c5a379-ad98-4cfb-8420-dc8c50ad3fce",
             "operationId": "createDataset",
             "parameters": {
               "nodeId": ""
             }
-          }
+          },
+          "rotation": 0
         },
-        "width": 200,
-        "height": 100
+        "width": 204,
+        "height": 95
       },
       {
         "id": "dndnode_4",
         "type": "custom",
         "position": {
-          "x": 944,
-          "y": 256
+          "x": 720,
+          "y": 544
         },
         "data": {
           "nodeId": "pre_signed_url",
-          "label": "Generate Presigned URL",
+          "label": "Generate Presigned URL (post)",
           "description": "Generate presigned URL for asset access",
           "icon": {
             "key": null,
@@ -182,7 +61,9 @@
             },
             "_owner": null
           },
-          "inputTypes": ["any"],
+          "inputTypes": [
+            "any"
+          ],
           "outputTypes": [
             {
               "name": "presigned_url",
@@ -192,61 +73,25 @@
           "type": "UTILITY",
           "configuration": {
             "path": "/generate",
-            "method": "post",
-            "requestMapping": "utility/pre_signed_url/generate/",
-            "responseMapping": "utility/pre_signed_url/generate/",
             "operationId": "generatePresignedUrl",
-            "parameters": {
-              "URL Validity Duration": 3600
-            }
-          }
-        },
-        "width": 200,
-        "height": 100
-      },
-      {
-        "id": "dndnode_5",
-        "type": "custom",
-        "position": {
-          "x": 1200,
-          "y": 256
-        },
-        "data": {
-          "nodeId": "coactive",
-          "label": "Coactive Asset Ingestion (post)",
-          "description": "Ingest video assets into Coactive",
-          "icon": {
-            "key": null,
-            "ref": null,
-            "props": {
-              "size": 20
-            },
-            "_owner": null
-          },
-          "inputTypes": [],
-          "outputTypes": [],
-          "type": "INTEGRATION",
-          "configuration": {
-            "path": "/ingestion/assets",
             "method": "post",
-            "requestMapping": "api_templates/coactive/api/v1/ingestion/assets",
-            "responseMapping": "api_templates/coactive/api/v1/ingestion/assets",
-            "integrationId": "coactive-integration-id",
-            "operationId": "ingestAssets",
             "parameters": {
-              "nodeId": ""
-            }
-          }
+              "URL Validity Duration": "3600"
+            },
+            "requestMapping": "utility/pre_signed_url/generate/",
+            "responseMapping": "utility/pre_signed_url/generate/"
+          },
+          "rotation": 0
         },
-        "width": 200,
-        "height": 100
+        "width": 204,
+        "height": 95
       },
       {
         "id": "dndnode_6",
         "type": "custom",
         "position": {
           "x": 1200,
-          "y": 400
+          "y": 32
         },
         "data": {
           "nodeId": "wait",
@@ -260,7 +105,9 @@
             },
             "_owner": null
           },
-          "inputTypes": ["any"],
+          "inputTypes": [
+            "any"
+          ],
           "outputTypes": [
             {
               "name": "any",
@@ -273,24 +120,269 @@
             "operationId": "",
             "method": "wait",
             "parameters": {
-              "Duration": 15
+              "Duration": "15"
             }
-          }
+          },
+          "rotation": 0
         },
-        "width": 200,
-        "height": 113
+        "width": 204,
+        "height": 95
       },
       {
-        "id": "dndnode_7",
+        "id": "dndnode_9",
         "type": "custom",
         "position": {
-          "x": 1456,
-          "y": 256
+          "x": 896,
+          "y": 704
+        },
+        "data": {
+          "nodeId": "success",
+          "label": "Success",
+          "description": "Coactive ingestion completed successfully",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [],
+          "type": "FLOW",
+          "configuration": {
+            "method": "success",
+            "parameters": {}
+          },
+          "rotation": 0
+        },
+        "width": 204,
+        "height": 95
+      },
+      {
+        "id": "dndnode_10",
+        "type": "custom",
+        "position": {
+          "x": 1152,
+          "y": 704
+        },
+        "data": {
+          "nodeId": "fail",
+          "label": "Fail (fail)",
+          "description": "Coactive ingestion failed",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [],
+          "type": "FLOW",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "fail",
+            "parameters": {
+              "Error": "Coactive Ingestion Failed",
+              "Cause": "Image asset ingestion into Coactive failed"
+            }
+          },
+          "rotation": 0
+        },
+        "width": 204,
+        "height": 94
+      },
+      {
+        "id": "dndnode_12",
+        "type": "custom",
+        "position": {
+          "x": 304,
+          "y": 544
+        },
+        "data": {
+          "nodeId": "conditional",
+          "label": "Conditional (conditional) (conditional) (conditional)",
+          "description": "This step will branch the workflow into two paths based on a boolean condition evaluation",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [
+            {
+              "name": "True",
+              "description": "Path taken when condition evaluates to true"
+            },
+            {
+              "name": "False",
+              "description": "Path taken when condition evaluates to false"
+            }
+          ],
+          "type": "FLOW",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "conditional",
+            "parameters": {
+              "Condition": "true",
+              "Variable": "$.payload.data.dataset_exists"
+            }
+          },
+          "rotation": 0
+        },
+        "width": 204,
+        "height": 119
+      },
+      {
+        "id": "dndnode_15",
+        "type": "custom",
+        "position": {
+          "x": 304,
+          "y": 320
         },
         "data": {
           "nodeId": "coactive",
-          "label": "Coactive Status Check (get)",
-          "description": "Check the status of video asset ingestion",
+          "label": "Coactive (get)",
+          "description": "List all datasets",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [],
+          "outputTypes": [],
+          "type": "INTEGRATION",
+          "configuration": {
+            "path": "/datasets",
+            "method": "get",
+            "requestMapping": "api/v1/ingestion/videos/status",
+            "responseMapping": "api/v1/ingestion/videos/status",
+            "integrationId": "10c5a379-ad98-4cfb-8420-dc8c50ad3fce",
+            "operationId": "listDatasets",
+            "parameters": {}
+          },
+          "rotation": 0
+        },
+        "width": 204,
+        "height": 94
+      },
+      {
+        "id": "dndnode_16",
+        "type": "custom",
+        "position": {
+          "x": 992,
+          "y": 256
+        },
+        "data": {
+          "nodeId": "choice",
+          "label": "Choice",
+          "description": "This step will branch the workflow based on a condition",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [
+            {
+              "name": "Completed",
+              "description": "Path taken when condition evaluates to true"
+            },
+            {
+              "name": "In Progress",
+              "description": "Path taken when condition evaluates to false"
+            },
+            {
+              "name": "Fail",
+              "description": "Path taken when condition evaluates to false"
+            }
+          ],
+          "type": "FLOW",
+          "configuration": {
+            "method": "choice",
+            "parameters": {}
+          },
+          "rotation": 0
+        },
+        "width": 204,
+        "height": 119
+      },
+      {
+        "id": "dndnode_17",
+        "type": "custom",
+        "position": {
+          "x": 304,
+          "y": 112
+        },
+        "data": {
+          "nodeId": "trigger_video_processing_completed",
+          "label": "Video Processing Completed (trigger)",
+          "description": "This step will trigger after video processing is completed",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": [
+            "any"
+          ],
+          "outputTypes": [
+            {
+              "name": "video",
+              "description": "Output type: video"
+            }
+          ],
+          "type": "TRIGGER",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "trigger",
+            "parameters": {
+              "Prefix": ""
+            },
+            "requestMapping": null,
+            "responseMapping": null
+          },
+          "rotation": 0
+        },
+        "width": 204,
+        "height": 119
+      },
+      {
+        "id": "dndnode_18",
+        "type": "custom",
+        "position": {
+          "x": 704,
+          "y": 64
+        },
+        "data": {
+          "nodeId": "coactive",
+          "label": "Coactive (get)",
+          "description": "Get video asset ingestion status",
           "icon": {
             "key": null,
             "ref": null,
@@ -305,72 +397,28 @@
           "configuration": {
             "path": "/ingestion/videos/{asset_id}/status",
             "method": "get",
-            "requestMapping": "api_templates/coactive/api/v1/ingestion/videos/status",
-            "responseMapping": "api_templates/coactive/api/v1/ingestion/videos/status",
-            "integrationId": "coactive-integration-id",
+            "requestMapping": "api/v1/ingestion/videos/status",
+            "responseMapping": "api/v1/ingestion/videos/status",
+            "integrationId": "10c5a379-ad98-4cfb-8420-dc8c50ad3fce",
             "operationId": "getVideoAssetStatus",
-            "parameters": {
-              "asset_id": ""
-            }
-          }
-        },
-        "width": 200,
-        "height": 100
-      },
-      {
-        "id": "dndnode_8",
-        "type": "custom",
-        "position": {
-          "x": 1456,
-          "y": 400
-        },
-        "data": {
-          "nodeId": "choice",
-          "label": "Ingestion Status Check",
-          "description": "Check if ingestion is completed",
-          "icon": {
-            "key": null,
-            "ref": null,
-            "props": {
-              "size": 20
-            },
-            "_owner": null
-          },
-          "inputTypes": ["any"],
-          "outputTypes": [
-            {
-              "name": "Completed",
-              "description": "Ingestion completed successfully"
-            },
-            {
-              "name": "In Progress",
-              "description": "Ingestion still in progress"
-            },
-            {
-              "name": "Failed",
-              "description": "Ingestion failed"
-            }
-          ],
-          "type": "FLOW",
-          "configuration": {
-            "method": "choice",
             "parameters": {}
-          }
+          },
+          "rotation": 0
         },
-        "width": 200,
-        "height": 113
+        "width": 204,
+        "height": 95
       },
       {
-        "id": "dndnode_9",
+        "id": "dndnode_19",
         "type": "custom",
         "position": {
-          "x": 1712,
-          "y": 256
+          "x": 720,
+          "y": 304
         },
         "data": {
-          "nodeId": "success",
-          "label": "Success",
-          "description": "Coactive ingestion completed successfully",
+          "nodeId": "coactive",
+          "label": "Coactive (post) (post)",
+          "description": "Ingest assets from public URLs",
           "icon": {
             "key": null,
             "ref": null,
@@ -379,226 +427,310 @@
             },
             "_owner": null
           },
-          "inputTypes": ["any"],
+          "inputTypes": [],
           "outputTypes": [],
-          "type": "FLOW",
+          "type": "INTEGRATION",
           "configuration": {
-            "method": "success",
+            "path": "/ingestion/assets",
+            "method": "post",
+            "requestMapping": "api/v1/ingestion/assets",
+            "responseMapping": "api/v1/ingestion/assets",
+            "integrationId": "10c5a379-ad98-4cfb-8420-dc8c50ad3fce",
+            "operationId": "ingestAssets",
             "parameters": {}
-          }
-        },
-        "width": 200,
-        "height": 113
-      },
-      {
-        "id": "dndnode_10",
-        "type": "custom",
-        "position": {
-          "x": 1712,
-          "y": 544
-        },
-        "data": {
-          "nodeId": "fail",
-          "label": "Fail (fail)",
-          "description": "Coactive ingestion failed",
-          "icon": {
-            "key": null,
-            "ref": null,
-            "props": {
-              "size": 20
-            },
-            "_owner": null
           },
-          "inputTypes": ["any"],
-          "outputTypes": [],
-          "type": "FLOW",
-          "configuration": {
-            "method": "fail",
-            "parameters": {
-              "Error": "Coactive Ingestion Failed",
-              "Cause": "Video asset ingestion into Coactive failed"
-            },
-            "path": "",
-            "operationId": ""
-          }
+          "rotation": 0
         },
-        "width": 200,
-        "height": 113
+        "width": 204,
+        "height": 95
       }
     ],
     "edges": [
-      {
-        "id": "dndnode_0-dndnode_1",
-        "source": "dndnode_0",
-        "target": "dndnode_1",
-        "type": "custom",
-        "data": {
-          "type": "custom",
-          "text": "Validate Dataset",
-          "id": "dndnode_0-dndnode_1"
-        },
-        "sourceHandle": "video",
-        "targetHandle": "input-default"
-      },
-      {
-        "id": "dndnode_1-dndnode_2",
-        "source": "dndnode_1",
-        "target": "dndnode_2",
-        "type": "custom",
-        "data": {
-          "text": "Dataset Check",
-          "id": "dndnode_1-dndnode_2",
-          "type": "custom"
-        },
-        "sourceHandle": "default",
-        "targetHandle": "input-any"
-      },
-      {
-        "id": "dndnode_2-dndnode_4",
-        "source": "dndnode_2",
-        "target": "dndnode_4",
-        "type": "custom",
-        "data": {
-          "text": "Dataset Ready",
-          "id": "dndnode_2-dndnode_4",
-          "type": "custom"
-        },
-        "sourceHandle": "Ready",
-        "targetHandle": "input-any"
-      },
-      {
-        "id": "dndnode_2-dndnode_3",
-        "source": "dndnode_2",
-        "target": "dndnode_3",
-        "type": "custom",
-        "data": {
-          "text": "Create Dataset",
-          "id": "dndnode_2-dndnode_3",
-          "type": "custom"
-        },
-        "sourceHandle": "Create Dataset",
-        "targetHandle": "input-default"
-      },
       {
         "id": "dndnode_3-dndnode_4",
         "source": "dndnode_3",
         "target": "dndnode_4",
         "type": "custom",
+        "animated": true,
+        "style": {
+          "animation": "dashdraw 2s linear infinite",
+          "strokeDasharray": 5
+        },
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 20,
+          "height": 20,
+          "refX": 19,
+          "refY": 10
+        },
         "data": {
+          "type": "custom",
           "text": "Dataset Created",
-          "id": "dndnode_3-dndnode_4",
-          "type": "custom"
+          "id": "dndnode_3-dndnode_4"
         },
         "sourceHandle": "default",
         "targetHandle": "input-any"
       },
       {
-        "id": "dndnode_4-dndnode_5",
-        "source": "dndnode_4",
-        "target": "dndnode_5",
+        "id": "dndnode_12-dndnode_3",
+        "source": "dndnode_12",
+        "target": "dndnode_3",
         "type": "custom",
-        "data": {
-          "text": "URL Generated",
-          "id": "dndnode_4-dndnode_5",
-          "type": "custom"
+        "animated": true,
+        "style": {
+          "animation": "dashdraw 2s linear infinite",
+          "strokeDasharray": 5
         },
-        "sourceHandle": "presigned_url",
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 20,
+          "height": 20,
+          "refX": 19,
+          "refY": 10
+        },
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "False",
         "targetHandle": "input-default"
       },
       {
-        "id": "dndnode_5-dndnode_6",
-        "source": "dndnode_5",
-        "target": "dndnode_6",
+        "id": "dndnode_12-dndnode_4",
+        "source": "dndnode_12",
+        "target": "dndnode_4",
         "type": "custom",
+        "animated": true,
+        "style": {
+          "animation": "dashdraw 2s linear infinite",
+          "strokeDasharray": 5
+        },
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 20,
+          "height": 20,
+          "refX": 19,
+          "refY": 10
+        },
         "data": {
-          "text": "Ingestion Started",
-          "id": "dndnode_5-dndnode_6",
-          "type": "custom"
+          "text": "Connected"
+        },
+        "sourceHandle": "True",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_15-dndnode_12",
+        "source": "dndnode_15",
+        "target": "dndnode_12",
+        "type": "custom",
+        "animated": true,
+        "style": {
+          "animation": "dashdraw 2s linear infinite",
+          "strokeDasharray": 5
+        },
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 20,
+          "height": 20,
+          "refX": 19,
+          "refY": 10
+        },
+        "data": {
+          "text": "Connected"
         },
         "sourceHandle": "default",
         "targetHandle": "input-any"
       },
       {
-        "id": "dndnode_6-dndnode_7",
-        "source": "dndnode_6",
-        "target": "dndnode_7",
+        "id": "dndnode_16-dndnode_10",
+        "source": "dndnode_16",
+        "target": "dndnode_10",
         "type": "custom",
-        "data": {
-          "text": "Check Status",
-          "id": "dndnode_6-dndnode_7",
-          "type": "custom"
+        "animated": true,
+        "style": {
+          "animation": "dashdraw 2s linear infinite",
+          "strokeDasharray": 5
         },
-        "sourceHandle": "any",
-        "targetHandle": "input-default"
-      },
-      {
-        "id": "dndnode_7-dndnode_8",
-        "source": "dndnode_7",
-        "target": "dndnode_8",
-        "type": "custom",
-        "data": {
-          "text": "Status Retrieved",
-          "id": "dndnode_7-dndnode_8",
-          "type": "custom"
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 20,
+          "height": 20,
+          "refX": 19,
+          "refY": 10
         },
-        "sourceHandle": "default",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "Fail",
         "targetHandle": "input-any"
       },
       {
-        "id": "dndnode_8-dndnode_9",
-        "source": "dndnode_8",
+        "id": "dndnode_16-dndnode_9",
+        "source": "dndnode_16",
         "target": "dndnode_9",
         "type": "custom",
+        "animated": true,
+        "style": {
+          "animation": "dashdraw 2s linear infinite",
+          "strokeDasharray": 5
+        },
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 20,
+          "height": 20,
+          "refX": 19,
+          "refY": 10
+        },
         "data": {
-          "text": "Completed",
-          "id": "dndnode_8-dndnode_9",
-          "type": "custom"
+          "text": "Connected"
         },
         "sourceHandle": "Completed",
         "targetHandle": "input-any"
       },
       {
-        "id": "dndnode_8-dndnode_6",
-        "source": "dndnode_8",
+        "id": "dndnode_16-dndnode_6",
+        "source": "dndnode_16",
         "target": "dndnode_6",
         "type": "custom",
+        "animated": true,
+        "style": {
+          "animation": "dashdraw 2s linear infinite",
+          "strokeDasharray": 5
+        },
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 20,
+          "height": 20,
+          "refX": 19,
+          "refY": 10
+        },
         "data": {
-          "text": "In Progress",
-          "id": "dndnode_8-dndnode_6",
-          "type": "custom"
+          "text": "Connected"
         },
         "sourceHandle": "In Progress",
         "targetHandle": "input-any"
       },
       {
-        "id": "dndnode_8-dndnode_10",
-        "source": "dndnode_8",
-        "target": "dndnode_10",
+        "id": "dndnode_17-dndnode_15",
+        "source": "dndnode_17",
+        "target": "dndnode_15",
         "type": "custom",
-        "data": {
-          "text": "Failed",
-          "id": "dndnode_8-dndnode_10",
-          "type": "custom"
+        "animated": true,
+        "style": {
+          "animation": "dashdraw 2s linear infinite",
+          "strokeDasharray": 5
         },
-        "sourceHandle": "Failed",
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 20,
+          "height": 20,
+          "refX": 19,
+          "refY": 10
+        },
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "video",
+        "targetHandle": "input-default"
+      },
+      {
+        "id": "reactflow__edge-dndnode_4presigned_url-dndnode_19input-default",
+        "source": "dndnode_4",
+        "target": "dndnode_19",
+        "type": "custom",
+        "animated": true,
+        "style": {
+          "animation": "dashdraw 2s linear infinite",
+          "strokeDasharray": 5
+        },
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 20,
+          "height": 20,
+          "refX": 19,
+          "refY": 10
+        },
+        "data": {
+          "type": "custom",
+          "text": "URL Generated",
+          "id": "dndnode_4-dndnode_5"
+        },
+        "sourceHandle": "presigned_url",
+        "targetHandle": "input-default"
+      },
+      {
+        "id": "reactflow__edge-dndnode_18default-dndnode_16input-any",
+        "source": "dndnode_18",
+        "target": "dndnode_16",
+        "type": "custom",
+        "animated": true,
+        "style": {
+          "animation": "dashdraw 2s linear infinite",
+          "strokeDasharray": 5
+        },
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 20,
+          "height": 20,
+          "refX": 19,
+          "refY": 10
+        },
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "default",
         "targetHandle": "input-any"
       },
       {
-        "id": "dndnode_2-dndnode_10",
-        "source": "dndnode_2",
-        "target": "dndnode_10",
+        "id": "reactflow__edge-dndnode_19default-dndnode_18input-default",
+        "source": "dndnode_19",
+        "target": "dndnode_18",
         "type": "custom",
-        "data": {
-          "text": "Validation Failed",
-          "id": "dndnode_2-dndnode_10",
-          "type": "custom"
+        "animated": true,
+        "style": {
+          "animation": "dashdraw 2s linear infinite",
+          "strokeDasharray": 5
         },
-        "sourceHandle": "Fail",
-        "targetHandle": "input-any"
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 20,
+          "height": 20,
+          "refX": 19,
+          "refY": 10
+        },
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "default",
+        "targetHandle": "input-default"
+      },
+      {
+        "id": "reactflow__edge-dndnode_6any-dndnode_18input-default",
+        "source": "dndnode_6",
+        "target": "dndnode_18",
+        "type": "custom",
+        "animated": true,
+        "style": {
+          "animation": "dashdraw 2s linear infinite",
+          "strokeDasharray": 5
+        },
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 20,
+          "height": 20,
+          "refX": 19,
+          "refY": 10
+        },
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "any",
+        "targetHandle": "input-default"
       }
     ],
     "settings": {
-      "trigger": "video_processing_completed"
+      "autoStart": false,
+      "retryAttempts": 3,
+      "timeout": 3600
     }
   }
 }

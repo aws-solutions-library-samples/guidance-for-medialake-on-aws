@@ -1,3 +1,4 @@
+import http.client
 import json
 import os
 from datetime import datetime
@@ -19,6 +20,163 @@ secretsmanager = boto3.client("secretsmanager")
 
 # Initialize API Gateway resolver
 app = APIGatewayRestResolver()
+
+
+def create_coactive_dataset(api_key: str, endpoint: str) -> dict:
+    """
+    Create or find existing MediaLake_Dataset in Coactive and return the dataset information
+
+    Args:
+        api_key: Coactive personal token
+        endpoint: Coactive API endpoint (not used, we use correct hosts)
+
+    Returns:
+        dict: Dataset information including datasetId
+
+    Raises:
+        Exception: If dataset creation/lookup fails
+    """
+    try:
+        # Step 1: Authenticate to get access token (following working script pattern)
+        auth_conn = http.client.HTTPSConnection("api.coactive.ai", timeout=30)
+
+        login_payload = {"grant_type": "refresh_token"}
+        login_data = json.dumps(login_payload)
+
+        logger.info("Authenticating with Coactive API using personal token")
+        auth_conn.request(
+            "POST",
+            "/api/v0/login",
+            body=login_data,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "User-Agent": "MediaLake/1.0",
+            },
+        )
+
+        login_response = auth_conn.getresponse()
+        login_response_data = login_response.read().decode("utf-8")
+        auth_conn.close()
+
+        if login_response.status != 200:
+            raise Exception(
+                f"Coactive authentication failed: {login_response.status} - {login_response_data}"
+            )
+
+        login_json = json.loads(login_response_data)
+        access_token = login_json.get("access_token")
+        if not access_token:
+            raise Exception("No access token received from Coactive authentication")
+
+        logger.info("Successfully obtained Coactive access token")
+
+        # Step 2: Check if MediaLake_Dataset already exists (following working script pattern)
+        logger.info("Checking for existing MediaLake_Dataset")
+        dataset_conn = http.client.HTTPSConnection("app.coactive.ai", timeout=30)
+
+        # List datasets to find existing MediaLake_Dataset
+        dataset_conn.request(
+            "GET",
+            "/api/v1/datasets?limit=100",
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
+                "User-Agent": "MediaLake/1.0",
+            },
+        )
+
+        list_response = dataset_conn.getresponse()
+        list_response_data = list_response.read().decode("utf-8")
+
+        if list_response.status == 200:
+            list_json = json.loads(list_response_data)
+            datasets = list_json.get("data", [])
+
+            # Look for existing MediaLake_Dataset (case insensitive)
+            for dataset in datasets:
+                if dataset.get("name", "").lower() == "medialake_dataset":
+                    dataset_id = dataset.get("datasetId")
+                    logger.info(
+                        f"Found existing MediaLake_Dataset with ID: {dataset_id}"
+                    )
+                    dataset_conn.close()
+                    return dataset
+
+        # Step 3: Create dataset if it doesn't exist
+        dataset_payload = {
+            "name": "MediaLake_Dataset",
+            "description": "MediaLake unified search dataset for semantic search operations",
+            "encoder": "multimodal-tx-large3",
+        }
+        dataset_data = json.dumps(dataset_payload)
+
+        logger.info("Creating new MediaLake_Dataset in Coactive")
+        dataset_conn.request(
+            "POST",
+            "/api/v1/datasets",
+            body=dataset_data,
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
+                "User-Agent": "MediaLake/1.0",
+            },
+        )
+
+        create_response = dataset_conn.getresponse()
+        create_response_data = create_response.read().decode("utf-8")
+        dataset_conn.close()
+
+        if create_response.status != 200:
+            raise Exception(
+                f"Coactive dataset creation failed: {create_response.status} - {create_response_data}"
+            )
+
+        dataset_info = json.loads(create_response_data)
+        logger.info(
+            f"Successfully created Coactive dataset: {dataset_info.get('datasetId')}"
+        )
+
+        return dataset_info
+
+    except http.client.HTTPException as e:
+        logger.error(f"HTTP error during Coactive dataset operation: {str(e)}")
+        raise Exception(f"HTTP error during Coactive dataset operation: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error with Coactive dataset: {str(e)}")
+        raise
+
+
+def get_coactive_api_key(secret_arn: str) -> str:
+    """
+    Retrieve Coactive API key from AWS Secrets Manager
+
+    Args:
+        secret_arn: ARN of the secret containing the API key
+
+    Returns:
+        str: The API key
+    """
+    try:
+        response = secretsmanager.get_secret_value(SecretId=secret_arn)
+        secret_string = response["SecretString"]
+
+        # Try to parse as JSON first
+        try:
+            secret_data = json.loads(secret_string)
+            # Look for common key names
+            return (
+                secret_data.get("x-api-key")
+                or secret_data.get("apiKey")
+                or secret_data.get("personalToken")
+            )
+        except json.JSONDecodeError:
+            # If not JSON, assume it's a plain text API key
+            return secret_string
+
+    except Exception as e:
+        logger.error(f"Error retrieving Coactive API key: {str(e)}")
+        raise Exception(f"Failed to retrieve Coactive API key: {str(e)}")
 
 
 @app.put("/settings/system/search")
@@ -81,6 +239,29 @@ def update_search_provider():
                 "data": {},
             }
 
+        # Handle Coactive dataset creation
+        coactive_dataset_id = None
+        if body.get("type") == "coactive" and "apiKey" in body:
+            try:
+                logger.info("Coactive provider detected - creating MediaLake_Dataset")
+                dataset_info = create_coactive_dataset(
+                    api_key=body["apiKey"],
+                    endpoint=body.get(
+                        "endpoint", "https://app.coactive.ai/api/v1/search"
+                    ),
+                )
+                coactive_dataset_id = dataset_info.get("datasetId")
+                logger.info(
+                    f"Successfully created Coactive dataset with ID: {coactive_dataset_id}"
+                )
+            except Exception as e:
+                logger.error(f"Failed to create Coactive dataset: {str(e)}")
+                return {
+                    "status": "error",
+                    "message": f"Failed to create Coactive dataset: {str(e)}",
+                    "data": {},
+                }
+
         # Update the secret if API key is provided
         if "apiKey" in body:
             # Get the existing secret ARN
@@ -129,6 +310,11 @@ def update_search_provider():
         if "isEnabled" in body:
             update_expression_parts.append("isEnabled = :isEnabled")
             expression_attribute_values[":isEnabled"] = body["isEnabled"]
+
+        # Add datasetId if Coactive dataset was created
+        if coactive_dataset_id:
+            update_expression_parts.append("datasetId = :datasetId")
+            expression_attribute_values[":datasetId"] = coactive_dataset_id
 
         # Add secretArn to update expression if it was created
         if "secretArn" in existing_provider and "secretArn" not in existing_provider:
