@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useGeneratePresignedUrl } from "../../api/hooks/usePresignedUrl";
 import {
@@ -455,43 +455,136 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
     }
   };
 
-  // Helper function to convert timecode to seconds
+  // Helper function to convert timecode to seconds using actual asset frame rate
   const timecodeToSeconds = (timecode: string): number => {
     // Split the timecode into components
     const [hours, minutes, seconds, frames] = timecode.split(":").map(Number);
 
-    // Assuming 25 frames per second (adjust if different)
-    const framesPerSecond = 25;
+    // Extract frame rate from asset metadata
+    let framesPerSecond = 25; // Default fallback
+
+    try {
+      // Try to get frame rate from video metadata
+      const videoMetadata = asset?.Metadata?.EmbeddedMetadata?.video;
+      if (videoMetadata && Array.isArray(videoMetadata) && videoMetadata[0]) {
+        const frameRate = videoMetadata[0].FrameRate;
+        if (frameRate && typeof frameRate === "string") {
+          framesPerSecond = parseFloat(frameRate);
+        } else if (frameRate && typeof frameRate === "number") {
+          framesPerSecond = frameRate;
+        }
+      }
+
+      // Also try general metadata as fallback
+      if (framesPerSecond === 25) {
+        const generalMetadata = asset?.Metadata?.EmbeddedMetadata?.general;
+        if (generalMetadata?.FrameRate) {
+          const frameRate = generalMetadata.FrameRate;
+          if (typeof frameRate === "string") {
+            framesPerSecond = parseFloat(frameRate);
+          } else if (typeof frameRate === "number") {
+            framesPerSecond = frameRate;
+          }
+        }
+      }
+
+      console.log(
+        `Using frame rate: ${framesPerSecond} FPS for timecode conversion`,
+      );
+    } catch (error) {
+      console.warn(
+        "Could not extract frame rate from asset metadata, using default 25 FPS",
+        error,
+      );
+    }
 
     // Convert to seconds
     return hours * 3600 + minutes * 60 + seconds + frames / framesPerSecond;
   };
 
-  useEffect(() => {
-    if (
-      !videoViewerRef?.current ||
-      !asset?.clips ||
-      !Array.isArray(asset.clips)
-    )
-      return;
+  // Retry mechanism for marker creation
+  const createMarkersWithRetry = useCallback(
+    (retryCount = 0) => {
+      const maxRetries = 15;
+      const retryDelay = 1000; // 1 second
 
-    // Skip if markers have already been created from clips
-    if (clipsMarkersCreated) {
-      console.log("Clips markers already created, skipping");
-      return;
-    }
-
-    const timer = setTimeout(() => {
       try {
         const lane = videoViewerRef.current?.getMarkerLane();
         if (!lane) {
-          console.warn("Marker lane is not available");
-          return;
+          if (retryCount < maxRetries) {
+            console.log(
+              `Marker lane not available, retrying in ${retryDelay}ms (attempt ${retryCount + 1}/${maxRetries})`,
+            );
+
+            // Try to force timeline settlement on every few attempts
+            if (retryCount % 3 === 2) {
+              console.log(
+                "Attempting to trigger timeline layout settlement...",
+              );
+              try {
+                // Force timeline resize/settlement
+                const timelineElement =
+                  document.getElementById("omakase-timeline");
+                if (timelineElement) {
+                  // Trigger multiple events that might cause timeline settlement
+                  const resizeEvent = new Event("resize");
+                  window.dispatchEvent(resizeEvent);
+
+                  // Also try to trigger a resize observer manually
+                  setTimeout(() => {
+                    const rect = timelineElement.getBoundingClientRect();
+                    console.log(
+                      `Timeline element dimensions: ${rect.width}x${rect.height}`,
+                    );
+                  }, 100);
+                }
+              } catch (error) {
+                console.warn("Error triggering timeline settlement:", error);
+              }
+            }
+
+            setTimeout(() => {
+              createMarkersWithRetry(retryCount + 1);
+            }, retryDelay);
+            return;
+          } else {
+            console.error("Failed to get marker lane after maximum retries");
+            return;
+          }
         }
 
-        const firstThreeClips = asset.clips.slice(0, 3);
+        // Filter for visual-text clips only, then sort by score (highest first) and take the top 3
+        const visualTextClips = asset.clips
+          .filter(
+            (clip) =>
+              clip.embedding_option === "visual-text" &&
+              clip.score !== null &&
+              clip.score !== undefined,
+          )
+          .sort((a, b) => (b.score || 0) - (a.score || 0));
 
-        firstThreeClips.forEach((clip, index) => {
+        const topThreeClips = visualTextClips.slice(0, 3);
+
+        console.log(
+          "All visual-text clips with scores:",
+          visualTextClips.map((clip) => ({
+            start: clip.start_timecode,
+            end: clip.end_timecode,
+            score: clip.score,
+            embedding_option: clip.embedding_option,
+          })),
+        );
+        console.log(
+          "Selected top 3 visual-text clips:",
+          topThreeClips.map((clip) => ({
+            start: clip.start_timecode,
+            end: clip.end_timecode,
+            score: clip.score,
+            embedding_option: clip.embedding_option,
+          })),
+        );
+
+        topThreeClips.forEach((clip, index) => {
           // Convert timecodes to seconds
           const startSeconds = timecodeToSeconds(clip.start_timecode);
           const endSeconds = timecodeToSeconds(clip.end_timecode);
@@ -578,14 +671,58 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
 
         // Mark that we've created markers from clips
         setClipsMarkersCreated(true);
-        console.log("Clips markers created and flag set");
+        console.log("Clips markers created successfully");
       } catch (error) {
-        console.error("Error adding clip markers:", error);
+        console.error("Error creating markers from clips:", error);
+        if (retryCount < maxRetries) {
+          console.log(
+            `Retrying marker creation in ${retryDelay}ms (attempt ${retryCount + 1}/${maxRetries})`,
+          );
+          setTimeout(() => {
+            createMarkersWithRetry(retryCount + 1);
+          }, retryDelay);
+        }
       }
-    }, 1000);
+    },
+    [
+      asset?.clips,
+      videoViewerRef,
+      timecodeToSeconds,
+      setMarkers,
+      setMarkerNames,
+      setClipsMarkersCreated,
+      searchTerm,
+    ],
+  );
 
-    return () => clearTimeout(timer);
-  }, [videoViewerRef, asset, clipsMarkersCreated, setClipsMarkersCreated]);
+  useEffect(() => {
+    if (
+      !videoViewerRef?.current ||
+      !asset?.clips ||
+      !Array.isArray(asset.clips)
+    )
+      return;
+
+    // Skip if markers have already been created from clips
+    if (clipsMarkersCreated) {
+      console.log("Clips markers already created, skipping");
+      return;
+    }
+
+    // Start marker creation with retry mechanism after a short delay
+    const timer = setTimeout(() => {
+      createMarkersWithRetry();
+    }, 2000); // Wait 2 seconds for the video player to initialize
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [
+    asset?.clips,
+    videoViewerRef,
+    clipsMarkersCreated,
+    createMarkersWithRetry,
+  ]);
 
   return (
     <Box sx={{ p: 2 }}>
@@ -602,6 +739,14 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
       {markers.map((marker, index) => (
         <Box
           key={marker.id}
+          onClick={() => {
+            if (videoViewerRef?.current?.seek) {
+              videoViewerRef.current.seek(marker.timeObservation.start);
+              console.log(
+                `Seeking to clip start time: ${marker.timeObservation.start}s`,
+              );
+            }
+          }}
           sx={{
             mt: 2,
             p: 2,
@@ -610,6 +755,14 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
             borderRadius: 1,
             border: `1px solid ${alpha(marker.style.color, 0.2)}`,
             position: "relative",
+            cursor: "pointer",
+            transition: "all 0.2s ease-in-out",
+            "&:hover": {
+              bgcolor: alpha(marker.style.color, 0.15),
+              border: `1px solid ${alpha(marker.style.color, 0.4)}`,
+              transform: "translateY(-1px)",
+              boxShadow: `0 4px 8px ${alpha(marker.style.color, 0.2)}`,
+            },
           }}
         >
           <Box

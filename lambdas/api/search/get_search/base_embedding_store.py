@@ -118,7 +118,26 @@ class BaseEmbeddingStore(ABC):
                 res.text_embedding is not None
                 and res.text_embedding.segments is not None
             ):
-                embedding = list(res.text_embedding.segments[0].embeddings_float)
+                seg = res.text_embedding.segments[0]
+
+                vec = (
+                    getattr(seg, "float_", None)  # current SDK field (v1.3)
+                    or getattr(
+                        seg, "embeddings_float", None
+                    )  # legacy field used in older examples
+                    # optional extra fallbacks if you want to be defensive:
+                    or getattr(seg, "values", None)
+                    or getattr(seg, "vector", None)
+                )
+
+                if not vec:
+                    # one-time debug can help confirm the actual keys:
+                    # logger.info(f"Segment keys: {list(getattr(seg, 'model_dump', lambda: {})().keys())}")
+                    raise Exception(
+                        "Embedding vector missing on Twelve Labs response segment"
+                    )
+
+                embedding = list(vec)
                 if not all(isinstance(x, (int, float)) for x in embedding):
                     raise Exception("Invalid embedding format")
 
