@@ -330,20 +330,6 @@ class UIConstruct(Construct):
             enable_accept_encoding_brotli=True,
         )
 
-        # Create a custom cache policy for API requests that properly handles Authorization header
-        api_cache_policy = cloudfront.CachePolicy(
-            self,
-            "APICachePolicy",
-            comment="Cache policy for API requests that forwards Authorization header",
-            default_ttl=Duration.seconds(0),
-            min_ttl=Duration.seconds(0),
-            max_ttl=Duration.seconds(0),
-            cookie_behavior=cloudfront.CacheCookieBehavior.none(),
-            query_string_behavior=cloudfront.CacheQueryStringBehavior.all(),
-            enable_accept_encoding_gzip=True,
-            enable_accept_encoding_brotli=True,
-        )
-
         # Create a custom origin request policy for API requests that includes X-API-Key header
         api_origin_request_policy = cloudfront.OriginRequestPolicy(
             self,
@@ -408,7 +394,7 @@ class UIConstruct(Construct):
                         origin_ssl_protocols=[cloudfront.OriginSslPolicy.TLS_V1_2],
                         protocol_policy=cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
                     ),
-                    cache_policy=api_cache_policy,
+                    cache_policy=cloudfront.CachePolicy.CACHING_DISABLED,
                     response_headers_policy=api_response_headers_policy,
                     allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,
                     origin_request_policy=api_origin_request_policy,
