@@ -556,7 +556,7 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
     def _fetch_medialake_metadata(
         self, asset_ids: List[str], query: SearchQuery
     ) -> List[Dict[str, Any]]:
-        """Fetch MediaLake metadata from OpenSearch"""
+        """Fetch MediaLake metadata from OpenSearch with filter support"""
         try:
             client = self._get_opensearch_client()
             index_name = os.environ["OPENSEARCH_INDEX"]
@@ -578,10 +578,19 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
                             }
                         ],
                         "must_not": [{"term": {"embedding_scope": "clip"}}],
+                        "filter": [],
                     }
                 },
                 "size": len(asset_ids),
             }
+
+            # Apply filters from the original query to the enrichment
+            filters_to_add = self._build_filters_from_query(query)
+            if filters_to_add:
+                opensearch_query["query"]["bool"]["filter"].extend(filters_to_add)
+                self.logger.info(
+                    f"Applied {len(filters_to_add)} filters to MediaLake enrichment query"
+                )
 
             # For MediaLake enrichment, we always need complete records
             # Ignore any field restrictions from the original query
@@ -590,7 +599,9 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
             response = client.search(body=opensearch_query, index=index_name)
             hits = response.get("hits", {}).get("hits", [])
 
-            self.logger.info(f"Fetched MediaLake metadata for {len(hits)} assets")
+            self.logger.info(
+                f"Fetched MediaLake metadata for {len(hits)} assets (after filters)"
+            )
 
             # Debug: Log what fields are actually returned
             if hits:
@@ -606,6 +617,97 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
         except Exception as e:
             self.logger.error(f"Failed to fetch MediaLake metadata: {str(e)}")
             return []
+
+    def _build_filters_from_query(self, query: SearchQuery) -> List[Dict[str, Any]]:
+        """Build OpenSearch filters from SearchQuery unified filters"""
+        filters = []
+
+        if not query.filters:
+            return filters
+
+        # Process unified filters from SearchQuery
+        for filter_item in query.filters:
+            filter_key = filter_item.get("key")
+            filter_operator = filter_item.get("operator")
+            filter_value = filter_item.get("value")
+
+            if not filter_key or not filter_operator:
+                continue
+
+            # Map filter keys to OpenSearch field paths
+            opensearch_field = self._map_filter_field_to_opensearch(filter_key)
+
+            # Build OpenSearch filter based on operator
+            if filter_operator == "==" or filter_operator == "term":
+                filters.append({"term": {opensearch_field: filter_value}})
+
+            elif filter_operator == "in":
+                if isinstance(filter_value, list):
+                    filters.append({"terms": {opensearch_field: filter_value}})
+                else:
+                    # Single value, treat as term
+                    filters.append({"term": {opensearch_field: filter_value}})
+
+            elif filter_operator == "range":
+                if isinstance(filter_value, dict):
+                    range_query = {"range": {opensearch_field: {}}}
+                    if "gte" in filter_value:
+                        range_query["range"][opensearch_field]["gte"] = filter_value[
+                            "gte"
+                        ]
+                    if "lte" in filter_value:
+                        range_query["range"][opensearch_field]["lte"] = filter_value[
+                            "lte"
+                        ]
+                    if "gt" in filter_value:
+                        range_query["range"][opensearch_field]["gt"] = filter_value[
+                            "gt"
+                        ]
+                    if "lt" in filter_value:
+                        range_query["range"][opensearch_field]["lt"] = filter_value[
+                            "lt"
+                        ]
+                    filters.append(range_query)
+
+            elif filter_operator in [">=", "gte"]:
+                filters.append({"range": {opensearch_field: {"gte": filter_value}}})
+
+            elif filter_operator in ["<=", "lte"]:
+                filters.append({"range": {opensearch_field: {"lte": filter_value}}})
+
+            elif filter_operator in [">", "gt"]:
+                filters.append({"range": {opensearch_field: {"gt": filter_value}}})
+
+            elif filter_operator in ["<", "lt"]:
+                filters.append({"range": {opensearch_field: {"lt": filter_value}}})
+
+        return filters
+
+    def _map_filter_field_to_opensearch(self, filter_key: str) -> str:
+        """Map unified filter field names to OpenSearch field paths"""
+        # Field mappings from unified filter format to OpenSearch paths
+        field_mappings = {
+            # Media type filters
+            "mediaType": "DigitalSourceAsset.Type",
+            "DigitalSourceAsset.Type": "DigitalSourceAsset.Type",
+            # Format/extension filters
+            "format": "DigitalSourceAsset.MainRepresentation.Format",
+            "extension": "DigitalSourceAsset.MainRepresentation.Format",
+            "DigitalSourceAsset.MainRepresentation.Format": "DigitalSourceAsset.MainRepresentation.Format",
+            # File size filters
+            "fileSize": "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size",
+            "asset_size": "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size",
+            # Date filters
+            "createdAt": "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate",
+            "ingested_date": "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate",
+            # Bucket filters
+            "bucket": "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket",
+            # Object name filters
+            "objectName": "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name",
+            "fileName": "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name",
+        }
+
+        return field_mappings.get(filter_key, filter_key)
 
     def _create_medialake_result_with_clips(
         self,
