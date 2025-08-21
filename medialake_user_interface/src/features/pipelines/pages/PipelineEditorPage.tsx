@@ -876,7 +876,7 @@ const PipelineEditorContent = () => {
         pipeline,
       );
       setFormData({
-        name: pipeline.name,
+        name: pipeline.name || "",
         description: pipeline.description || "",
         active: pipeline.active !== false, // Use pipeline active state or default to true
         configuration: pipeline.configuration || {

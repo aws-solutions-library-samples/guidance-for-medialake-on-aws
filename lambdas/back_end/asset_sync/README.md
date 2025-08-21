@@ -164,7 +164,7 @@ The Asset Sync System enables efficient synchronization between S3 buckets and a
 - `ENGINE_FUNCTION_ARN`: ARN of engine Lambda
 - `BATCH_OPERATIONS_ROLE_ARN`: ARN of S3 batch operations role
 - `STATUS_TOPIC_ARN`: SNS topic ARN for status notifications
-- `INGEST_EVENT_BUS_NAME`: EventBridge bus for ingest events
+- `PIPELINES_EVENT_BUS_NAME`: EventBridge bus for ingest events
 
 ## Monitoring and Troubleshooting
 
