@@ -34,8 +34,8 @@ class IntegrationsEnvironmentStackProps:
     x_origin_verify_secret: secretsmanager.Secret
     cognito_user_pool: cognito.UserPool
     pipelines_nodes_table: dynamodb.TableV2
-    post_pipelines_lambda: Lambda = None
     shared_authorizer_lambda: lambda_.Function
+    post_pipelines_lambda: Lambda = None
 
 
 class IntegrationsEnvironmentStack(cdk.NestedStack):
