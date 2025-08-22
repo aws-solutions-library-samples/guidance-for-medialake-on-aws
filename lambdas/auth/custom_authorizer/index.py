@@ -1327,15 +1327,32 @@ def generate_api_key_context(api_key_item: Dict[str, Any]) -> Dict[str, Any]:
     )
 
     # Create synthetic claims that backend Lambdas expect
-    claims = {
-        "sub": f"ApiKey::{api_key_item['id']}",
-        "username": api_key_item["name"],
-        "cognito:username": api_key_item["name"],
-        "auth_type": "api_key",
-        "api_key_id": api_key_item["id"],
-        "permissions": permissions,  # Keep original permissions for reference
-        "customPermissions": custom_permissions,  # Add flattened permissions for CASL
-    }
+    try:
+        claims = {
+            "sub": f"ApiKey::{api_key_item.get('id', 'unknown')}",
+            "username": api_key_item.get("name", "Unknown"),
+            "cognito:username": api_key_item.get("name", "Unknown"),
+            "auth_type": "api_key",
+            "api_key_id": api_key_item.get("id", "unknown"),
+            "permissions": permissions,  # Keep original permissions for reference
+            "customPermissions": custom_permissions,  # Add flattened permissions for CASL
+        }
+    except Exception as claims_err:
+        logger.error(f"Error creating claims: {str(claims_err)}")
+        # Fall back to basic claims
+        claims = {
+            "sub": "ApiKey::unknown",
+            "username": "Unknown",
+            "cognito:username": "Unknown",
+            "auth_type": "api_key",
+            "api_key_id": "unknown",
+            "permissions": {},
+            "customPermissions": [],
+        }
+
+    logger.info(f"Generated claims type: {type(claims)}")
+    logger.info(f"Generated claims keys: {list(claims.keys())}")
+    logger.info(f"Generated claims sub: {claims.get('sub', 'Not found')}")
 
     return claims
 
@@ -1465,6 +1482,12 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                 # Generate synthetic claims for API key
                 try:
                     parsed_token = generate_api_key_context(api_key_item)
+                    # Verify that parsed_token is a dictionary
+                    if not isinstance(parsed_token, dict):
+                        logger.warning(
+                            f"generate_api_key_context returned non-dict: {type(parsed_token)}"
+                        )
+                        raise Exception("generate_api_key_context returned non-dict")
                 except Exception as context_err:
                     logger.error(
                         f"Error generating API key context: {str(context_err)}",
@@ -1472,11 +1495,11 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                     )
                     # Fall back to basic claims if context generation fails
                     parsed_token = {
-                        "sub": f"ApiKey::{api_key_item['id']}",
+                        "sub": f"ApiKey::{api_key_item.get('id', 'unknown')}",
                         "username": api_key_item.get("name", "Unknown"),
                         "cognito:username": api_key_item.get("name", "Unknown"),
                         "auth_type": "api_key",
-                        "api_key_id": api_key_item["id"],
+                        "api_key_id": api_key_item.get("id", "unknown"),
                         "permissions": {},
                         "customPermissions": [],
                     }
@@ -1504,7 +1527,7 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                     "reason": "API key authenticated",
                     "principal": {
                         "entityType": "ApiKey",
-                        "entityId": api_key_item["id"],
+                        "entityId": api_key_item.get("id", "unknown"),
                     },
                 }
 
@@ -1534,12 +1557,12 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                                 "reason": f"API key lacks required permission: {required_permission}",
                                 "principal": {
                                     "entityType": "ApiKey",
-                                    "entityId": api_key_item["id"],
+                                    "entityId": api_key_item.get("id", "unknown"),
                                 },
                             }
 
                         logger.info(
-                            f"Permission check for API key {api_key_item['id']}: "
+                            f"Permission check for API key {api_key_item.get('id', 'unknown')}: "
                             f"required={required_permission}, granted={is_authorized}",
                             extra={"correlation_id": correlation_id},
                         )
@@ -1555,7 +1578,7 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
 
                         if not permissions:
                             logger.warning(
-                                f"API key {api_key_item['id']} has no permissions for unspecified action: {action_id}",
+                                f"API key {api_key_item.get('id', 'unknown')} has no permissions for unspecified action: {action_id}",
                                 extra={"correlation_id": correlation_id},
                             )
                             is_authorized = False
@@ -1564,7 +1587,7 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                                 "reason": "API key has no permissions defined",
                                 "principal": {
                                     "entityType": "ApiKey",
-                                    "entityId": api_key_item["id"],
+                                    "entityId": api_key_item.get("id", "unknown"),
                                 },
                             }
                         else:
@@ -1577,7 +1600,22 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                             )
 
                 # Extract principal ID
-                principal_id = parsed_token["sub"]
+                try:
+                    if isinstance(parsed_token, dict):
+                        principal_id = parsed_token.get(
+                            "sub", f"ApiKey::{api_key_item.get('id', 'unknown')}"
+                        )
+                    else:
+                        logger.warning(
+                            f"parsed_token is not a dictionary, type: {type(parsed_token)}"
+                        )
+                        principal_id = f"ApiKey::{api_key_item.get('id', 'unknown')}"
+                except Exception as principal_err:
+                    logger.error(
+                        f"Error extracting principal ID: {str(principal_err)}",
+                        extra={"correlation_id": correlation_id},
+                    )
+                    principal_id = f"ApiKey::{api_key_item.get('id', 'unknown')}"
 
                 logger.info(
                     f"Using principal ID: {principal_id}",
@@ -1589,7 +1627,19 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
 
                 # Include all claims in the context for backend Lambdas
                 try:
-                    context_claims = {k: str(v) for k, v in parsed_token.items()}
+                    if isinstance(parsed_token, dict):
+                        context_claims = {k: str(v) for k, v in parsed_token.items()}
+                    else:
+                        logger.warning(
+                            f"parsed_token is not a dictionary, type: {type(parsed_token)}"
+                        )
+                        context_claims = {
+                            "actionId": action_id,
+                            "userId": principal_id,
+                            "username": "Unknown",
+                            "sub": "Unknown",
+                            "requestId": correlation_id,
+                        }
                 except Exception as claims_err:
                     logger.error(
                         f"Error converting claims to strings: {str(claims_err)}",
@@ -1599,34 +1649,99 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                     context_claims = {
                         "actionId": action_id,
                         "userId": principal_id,
-                        "username": parsed_token.get("username", "Unknown"),
-                        "sub": parsed_token.get("sub", "Unknown"),
+                        "username": "Unknown",
+                        "sub": "Unknown",
                         "requestId": correlation_id,
                     }
 
+                # Add debug logging for parsed_token
+                logger.info(f"parsed_token type: {type(parsed_token)}")
+                logger.info(
+                    f"parsed_token keys: {list(parsed_token.keys()) if isinstance(parsed_token, dict) else 'Not a dict'}"
+                )
+                logger.info(
+                    f"parsed_token username: {parsed_token.get('username', 'Not found') if isinstance(parsed_token, dict) else 'Not a dict'}"
+                )
+                logger.info(
+                    f"parsed_token sub: {parsed_token.get('sub', 'Not found') if isinstance(parsed_token, dict) else 'Not a dict'}"
+                )
+
+                # Add debug logging for context_claims
+                logger.info(f"context_claims type: {type(context_claims)}")
+                logger.info(f"context_claims content: {context_claims}")
+
+                # Create context with error handling
+                try:
+                    # Safely unpack context_claims
+                    additional_claims = {}
+                    if isinstance(context_claims, dict):
+                        for key, value in context_claims.items():
+                            try:
+                                additional_claims[key] = str(value)
+                            except Exception as claim_err:
+                                logger.warning(
+                                    f"Error converting claim {key}: {str(claim_err)}"
+                                )
+                                additional_claims[key] = "Error converting value"
+
+                    context = {
+                        "actionId": action_id,
+                        "userId": principal_id,
+                        "username": (
+                            parsed_token.get("username", "")
+                            if isinstance(parsed_token, dict)
+                            else "Unknown"
+                        ),
+                        "sub": (
+                            parsed_token.get("sub", "")
+                            if isinstance(parsed_token, dict)
+                            else "Unknown"
+                        ),
+                        "requestId": correlation_id,
+                        "claims": json.dumps(
+                            context_claims, default=str
+                        ),  # Stringify claims for context with fallback
+                        **additional_claims,  # Also include individual claim fields
+                    }
+                except Exception as context_err:
+                    logger.error(
+                        f"Error creating context: {str(context_err)}",
+                        extra={"correlation_id": correlation_id},
+                    )
+                    # Fall back to basic context if creation fails
+                    context = {
+                        "actionId": action_id,
+                        "userId": principal_id,
+                        "username": "Unknown",
+                        "sub": "Unknown",
+                        "requestId": correlation_id,
+                        "claims": "{}",
+                    }
+
+                # Validate that all context values are strings (API Gateway requirement)
+                validated_context = {}
+                for key, value in context.items():
+                    try:
+                        validated_context[key] = str(value)
+                    except Exception as str_err:
+                        logger.warning(
+                            f"Error converting context value {key} to string: {str_err}"
+                        )
+                        validated_context[key] = "Error converting value"
+
                 policy = {
-                    "principalId": principal_id,
+                    "principalId": str(principal_id),
                     "policyDocument": {
                         "Version": "2012-10-17",
                         "Statement": [
                             {
                                 "Action": "execute-api:Invoke",
-                                "Effect": effect,
-                                "Resource": method_arn,
+                                "Effect": str(effect),
+                                "Resource": str(method_arn),
                             }
                         ],
                     },
-                    "context": {
-                        "actionId": action_id,
-                        "userId": principal_id,
-                        "username": parsed_token.get("username", ""),
-                        "sub": parsed_token.get("sub", ""),
-                        "requestId": correlation_id,
-                        "claims": json.dumps(
-                            context_claims, default=str
-                        ),  # Stringify claims for context with fallback
-                        **context_claims,  # Also include individual claim fields
-                    },
+                    "context": validated_context,
                 }
 
                 # Record execution time and result
@@ -1640,6 +1755,12 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                     name=f"request.result_{effect.lower()}",
                     unit=MetricUnit.Count,
                     value=1,
+                )
+
+                # Log the policy response before returning
+                logger.info(
+                    f"Returning API key policy response: {json.dumps(policy, default=str)}",
+                    extra={"correlation_id": correlation_id},
                 )
 
                 return policy
@@ -1757,6 +1878,12 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                 name=f"request.result_{effect.lower()}", unit=MetricUnit.Count, value=1
             )
 
+            # Log the policy response before returning
+            logger.info(
+                f"Returning JWT policy response: {json.dumps(policy, default=str)}",
+                extra={"correlation_id": correlation_id},
+            )
+
             return policy
 
         except Exception as e:
@@ -1794,6 +1921,12 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                 name="request.result_deny", unit=MetricUnit.Count, value=1
             )
 
+            # Log the error policy response before returning
+            logger.info(
+                f"Returning JWT error policy response: {json.dumps(policy, default=str)}",
+                extra={"correlation_id": correlation_id},
+            )
+
             return policy
 
     except Exception as e:
@@ -1823,6 +1956,12 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
             name="request.latency", unit=MetricUnit.Milliseconds, value=execution_time
         )
         metrics.add_metric(name="request.result_deny", unit=MetricUnit.Count, value=1)
+
+        # Log the final error policy response before returning
+        logger.info(
+            f"Returning final error policy response: {json.dumps(policy, default=str)}",
+            extra={"correlation_id": correlation_id},
+        )
 
         return policy
 
