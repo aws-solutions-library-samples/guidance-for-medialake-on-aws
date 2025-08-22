@@ -11,6 +11,7 @@ from constructs import Construct
 
 from config import config
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
+from medialake_constructs.shared_constructs.lambda_layers import SearchLayer
 from medialake_constructs.sqs import SQSConstruct, SQSProps
 
 
@@ -66,6 +67,9 @@ class AssetTableStream(Construct):
             ),
         )
 
+        # Create search layer for opensearch-py and requests_aws4auth dependencies
+        search_layer = SearchLayer(self, "SearchLayer")
+
         # Create the asset table stream Lambda
         self._asset_sync_engine_lambda = Lambda(
             self,
@@ -76,6 +80,7 @@ class AssetTableStream(Construct):
                 timeout_minutes=15,
                 vpc=props.vpc,
                 security_groups=[props.security_group],
+                layers=[search_layer.layer],
                 environment_variables={
                     "OS_DOMAIN_REGION": props.opensearch_cluster_region,
                     "OPENSEARCH_ENDPOINT": props.opensearch_cluster_domain_endpoint,

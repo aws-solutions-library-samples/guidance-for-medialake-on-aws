@@ -15,7 +15,7 @@ from constants import Lambda as LambdaConstants
 #     OpenSearchIngestionPipeline,
 #     OpenSearchIngestionPipelineProps,
 # )
-from medialake_constructs.shared_constructs.asset_table_stream import (
+from medialake_constructs.asset_table_stream import (
     AssetTableStream,
     AssetTableStreamProps,
 )

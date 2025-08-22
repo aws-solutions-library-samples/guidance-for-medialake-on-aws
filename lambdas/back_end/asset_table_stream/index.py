@@ -24,14 +24,14 @@ SQS_URL = os.environ["SQS_URL"]
 deserializer = TypeDeserializer()
 
 
-def retry_with_backoff(max_retries=156, base_delay=5, max_delay=5):
+def retry_with_backoff(max_retries=156, base_delay=1, max_delay=60):
     """
-    Decorator that implements retry logic with constant delay.
+    Decorator that implements retry logic with exponential backoff.
 
     Args:
-        max_retries: Maximum number of retry attempts (default: 156 for 13 minutes)
-        base_delay: Delay in seconds between retries (default: 5s)
-        max_delay: Maximum delay in seconds between retries (default: 5s)
+        max_retries: Maximum number of retry attempts (default: 156)
+        base_delay: Initial delay in seconds between retries (default: 1s)
+        max_delay: Maximum delay in seconds between retries (default: 60s)
     """
 
     def decorator(func):
@@ -46,11 +46,21 @@ def retry_with_backoff(max_retries=156, base_delay=5, max_delay=5):
                     last_exception = e
 
                     if attempt == max_retries:
-                        # Last attempt failed, re-raise the exception
+                        # Last attempt failed, log error and re-raise the exception
+                        logger.error(
+                            f"All {max_retries + 1} retry attempts failed for function {func.__name__}",
+                            extra={
+                                "function": func.__name__,
+                                "total_attempts": max_retries + 1,
+                                "final_error": str(e),
+                                "error_type": type(e).__name__,
+                            },
+                        )
                         raise e
 
-                    # Use constant delay of 5 seconds
-                    delay = base_delay
+                    # Implement exponential backoff: delay = base_delay * (2 ** attempt)
+                    # Cap at max_delay to prevent excessive wait times
+                    delay = min(base_delay * (2**attempt), max_delay)
 
                     logger.warning(
                         f"Attempt {attempt + 1} failed, retrying in {delay}s",
@@ -102,13 +112,13 @@ opensearch_client = OpenSearch(
 )
 
 
-@retry_with_backoff(max_retries=156, base_delay=5, max_delay=5)
+@retry_with_backoff(max_retries=10, base_delay=1, max_delay=30)
 def opensearch_delete_document(document_id):
     """Delete a document from OpenSearch with retry logic."""
     return opensearch_client.delete(index=INDEX, id=document_id)
 
 
-@retry_with_backoff(max_retries=156, base_delay=5, max_delay=5)
+@retry_with_backoff(max_retries=10, base_delay=1, max_delay=30)
 def opensearch_index_document(document_id, document):
     """Index a document in OpenSearch with retry logic."""
     return opensearch_client.index(
@@ -116,7 +126,7 @@ def opensearch_index_document(document_id, document):
     )
 
 
-@retry_with_backoff(max_retries=156, base_delay=5, max_delay=5)
+@retry_with_backoff(max_retries=10, base_delay=1, max_delay=30)
 def opensearch_update_document(document_id, partial_doc):
     """Update a document in OpenSearch with retry logic."""
     try:
@@ -171,7 +181,7 @@ def lambda_handler(event, context):
                     )
                 except Exception as e:
                     logger.error(
-                        "Failed to delete document after 156 retries; sending to SQS",
+                        "Failed to delete document after all retries; sending to SQS",
                         extra={
                             "document_id": document_id,
                             "error": str(e),
@@ -209,7 +219,7 @@ def lambda_handler(event, context):
                     )
                 except Exception as e:
                     logger.error(
-                        "Failed to index document after 156 retries; sending to SQS",
+                        "Failed to index document after all retries; sending to SQS",
                         extra={
                             "document_id": document_id,
                             "error": str(e),
@@ -252,7 +262,7 @@ def lambda_handler(event, context):
                     )
                 except Exception as e:
                     logger.error(
-                        "Failed to update document after 156 retries; sending to SQS",
+                        "Failed to update document after all retries; sending to SQS",
                         extra={
                             "document_id": document_id,
                             "error": str(e),
