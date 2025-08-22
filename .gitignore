@@ -130,6 +130,7 @@ coverage/
 aws-exports.json
 config.json
 config.json.bkp
+config-saks.json
 *.jinja2-tmp
 
 dev-2.sh
