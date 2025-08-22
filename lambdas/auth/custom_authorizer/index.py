@@ -1382,7 +1382,7 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
     if is_lambda_warmer_event(event):
         return {"warmed": True}
     start_time = time.time()
-    correlation_id = context.aws_request_id
+    correlation_id = str(context.aws_request_id)
 
     logger.info(
         "========== CUSTOM AUTHORIZER INVOKED ==========",
@@ -1684,19 +1684,19 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                 # Create context with error handling - simplified approach
                 try:
                     context = {
-                        "actionId": action_id,
-                        "userId": principal_id,
+                        "actionId": str(action_id),
+                        "userId": str(principal_id),
                         "username": (
-                            parsed_token.get("username", "")
+                            str(parsed_token.get("username", ""))
                             if isinstance(parsed_token, dict)
                             else "Unknown"
                         ),
                         "sub": (
-                            parsed_token.get("sub", "")
+                            str(parsed_token.get("sub", ""))
                             if isinstance(parsed_token, dict)
                             else "Unknown"
                         ),
-                        "requestId": correlation_id,
+                        "requestId": str(correlation_id),
                         "claims": json.dumps(
                             context_claims, default=str
                         ),  # Stringify claims for context with fallback
@@ -1708,11 +1708,11 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                     )
                     # Fall back to basic context if creation fails
                     context = {
-                        "actionId": action_id,
-                        "userId": principal_id,
+                        "actionId": str(action_id),
+                        "userId": str(principal_id),
                         "username": "Unknown",
                         "sub": "Unknown",
-                        "requestId": correlation_id,
+                        "requestId": str(correlation_id),
                         "claims": "{}",
                     }
 
@@ -1759,6 +1759,15 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                 logger.info(
                     f"Returning API key policy response: {json.dumps(policy, default=str)}",
                     extra={"correlation_id": correlation_id},
+                )
+
+                # Additional debug logging for policy structure
+                logger.info(f"Policy principalId type: {type(policy['principalId'])}")
+                logger.info(
+                    f"Policy context types: {[(k, type(v)) for k, v in policy['context'].items()]}"
+                )
+                logger.info(
+                    f"Policy context values: {[(k, repr(v)) for k, v in policy['context'].items()]}"
                 )
 
                 return policy
@@ -1823,17 +1832,14 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
             # Create context with error handling
             try:
                 context = {
-                    "actionId": action_id,
-                    "userId": principal_id,
-                    "username": parsed_token.get("cognito:username", ""),
-                    "sub": parsed_token.get("sub", ""),
-                    "requestId": correlation_id,
+                    "actionId": str(action_id),
+                    "userId": str(principal_id),
+                    "username": str(parsed_token.get("cognito:username", "")),
+                    "sub": str(parsed_token.get("sub", "")),
+                    "requestId": str(correlation_id),
                     "claims": json.dumps(
                         parsed_token, default=str
                     ),  # Stringify claims for context with fallback
-                    **{
-                        k: str(v) for k, v in parsed_token.items()
-                    },  # Include individual claim fields
                 }
             except Exception as context_err:
                 logger.error(
@@ -1842,23 +1848,23 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                 )
                 # Fall back to basic context if creation fails
                 context = {
-                    "actionId": action_id,
-                    "userId": principal_id,
-                    "username": parsed_token.get("cognito:username", ""),
-                    "sub": parsed_token.get("sub", ""),
-                    "requestId": correlation_id,
+                    "actionId": str(action_id),
+                    "userId": str(principal_id),
+                    "username": "Unknown",
+                    "sub": "Unknown",
+                    "requestId": str(correlation_id),
                     "claims": "{}",
                 }
 
             policy = {
-                "principalId": principal_id,
+                "principalId": str(principal_id),
                 "policyDocument": {
                     "Version": "2012-10-17",
                     "Statement": [
                         {
                             "Action": "execute-api:Invoke",
-                            "Effect": effect,
-                            "Resource": method_arn,
+                            "Effect": str(effect),
+                            "Resource": str(method_arn),
                         }
                     ],
                 },
@@ -1901,11 +1907,11 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                         {
                             "Action": "execute-api:Invoke",
                             "Effect": "Deny",
-                            "Resource": method_arn,
+                            "Resource": str(method_arn),
                         }
                     ],
                 },
-                "context": {"error": str(e), "requestId": correlation_id},
+                "context": {"error": str(e), "requestId": str(correlation_id)},
             }
 
             # Record execution time
@@ -1941,11 +1947,11 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                     {
                         "Action": "execute-api:Invoke",
                         "Effect": "Deny",
-                        "Resource": method_arn,
+                        "Resource": str(method_arn),
                     }
                 ],
             },
-            "context": {"error": str(e), "requestId": correlation_id},
+            "context": {"error": str(e), "requestId": str(correlation_id)},
         }
 
         # Record execution time

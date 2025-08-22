@@ -16,7 +16,7 @@ class ApiGatewayNodesProps:
 
     api_resource: apigateway.IResource
     x_origin_verify_secret: secretsmanager.Secret
-    cognito_authorizer: apigateway.IAuthorizer
+    authorizer: apigateway.IAuthorizer
     pipelines_nodes_table: dynamodb.TableV2
 
 
@@ -55,8 +55,8 @@ class ApiGatewayNodesConstruct(Construct):
         unconfigured_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(self._get_nodeId_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # GET /nodes
@@ -78,8 +78,8 @@ class ApiGatewayNodesConstruct(Construct):
         nodes_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(self._get_nodes_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # integration ID specific endpoints
@@ -90,8 +90,8 @@ class ApiGatewayNodesConstruct(Construct):
         node_id_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(self._get_nodeId_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # GET /nodes/{id}/methods
@@ -99,8 +99,8 @@ class ApiGatewayNodesConstruct(Construct):
         node_methods_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(self._get_nodeId_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # Add CORS support

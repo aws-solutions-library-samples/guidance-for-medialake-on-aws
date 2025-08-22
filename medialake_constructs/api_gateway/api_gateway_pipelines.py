@@ -45,7 +45,7 @@ class ApiGatewayPipelinesProps:
     iac_assets_bucket: s3.IBucket
     media_assets_bucket: S3Bucket
     x_origin_verify_secret: secretsmanager.Secret
-    cognito_authorizer: apigateway.IAuthorizer
+    authorizer: apigateway.IAuthorizer
     get_pipelines_executions_lambda: lambda_.IFunction
     post_retry_pipelines_executions_lambda: lambda_.IFunction
     mediaconvert_queue_arn: str = None
@@ -232,8 +232,8 @@ class ApiGatewayPipelinesConstruct(Construct):
         pipelines_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(self._get_pipelines_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         ## Pipelines
@@ -519,8 +519,8 @@ class ApiGatewayPipelinesConstruct(Construct):
         pipelines_resource.add_method(
             "POST",
             apigateway.LambdaIntegration(self._post_pipelines_async_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # Add status endpoint
@@ -528,8 +528,8 @@ class ApiGatewayPipelinesConstruct(Construct):
         pipelines_status_resource.add_resource("{executionArn}").add_method(
             "GET",
             apigateway.LambdaIntegration(self._post_pipelines_async_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # Add get pipeline by ID endpoint - use a different name to avoid conflicts
@@ -538,8 +538,8 @@ class ApiGatewayPipelinesConstruct(Construct):
         ).add_method(
             "GET",
             apigateway.LambdaIntegration(self._post_pipelines_async_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # DELETE /api/pipelines - now handled by the comprehensive del_pipelinesId handler
@@ -581,8 +581,8 @@ class ApiGatewayPipelinesConstruct(Construct):
         # pipeline_id_resource.add_method(
         #     "DELETE",
         #     apigateway.LambdaIntegration(self._delete_pipelines_handler.function),
-        #     authorization_type=apigateway.AuthorizationType.COGNITO,
-        #     authorizer=props.cognito_authorizer,
+        #     authorization_type=apigateway.AuthorizationType.CUSTOM,
+        #     authorizer=props.authorizer,
         # )
 
         # GET /api/pipelines/{pipelineId}
@@ -611,8 +611,8 @@ class ApiGatewayPipelinesConstruct(Construct):
         pipeline_id_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(self._get_pipeline_id_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # PUT /api/pipelines/{pipelineId}
@@ -650,8 +650,8 @@ class ApiGatewayPipelinesConstruct(Construct):
         pipeline_id_resource.add_method(
             "PUT",
             apigateway.LambdaIntegration(self._put_pipeline_id_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # DELETE /pipelines/{pipelineId}
@@ -776,8 +776,8 @@ class ApiGatewayPipelinesConstruct(Construct):
         pipeline_id_resource.add_method(
             "DELETE",
             apigateway.LambdaIntegration(self._del_pipeline_id_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         pipelines_executions_resource = pipelines_resource.add_resource("executions")
@@ -786,8 +786,8 @@ class ApiGatewayPipelinesConstruct(Construct):
         pipelines_executions_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(props.get_pipelines_executions_lambda),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # Add new execution ID resource and retry endpoint
@@ -801,8 +801,8 @@ class ApiGatewayPipelinesConstruct(Construct):
         retry_resource.add_method(
             "POST",
             apigateway.LambdaIntegration(props.post_retry_pipelines_executions_lambda),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # Add CORS support to all pipeline API resources

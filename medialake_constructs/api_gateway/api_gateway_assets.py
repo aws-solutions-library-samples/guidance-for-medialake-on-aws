@@ -40,7 +40,7 @@ class AssetsProps:
 
     asset_table: dynamodb.TableV2
     api_resource: api_gateway.IResource
-    cognito_authorizer: api_gateway.IAuthorizer
+    authorizer: api_gateway.IAuthorizer
     x_origin_verify_secret: secretsmanager.Secret
     open_search_endpoint: str
     opensearch_index: str
@@ -133,8 +133,8 @@ class AssetsConstruct(Construct):
         self._assets_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(get_assets_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
         # /{id} Lambda
         get_asset_lambda = Lambda(
@@ -331,8 +331,8 @@ class AssetsConstruct(Construct):
                     )
                 ],
             ),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
             method_responses=[
                 api_gateway.MethodResponse(
                     status_code="200",
@@ -358,8 +358,8 @@ class AssetsConstruct(Construct):
                     )
                 ],
             ),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
             method_responses=[
                 api_gateway.MethodResponse(
                     status_code="200",
@@ -440,8 +440,8 @@ class AssetsConstruct(Construct):
                     )
                 ],
             ),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
             method_responses=[
                 api_gateway.MethodResponse(
                     status_code="200",
@@ -510,8 +510,8 @@ class AssetsConstruct(Construct):
                     )
                 ],
             ),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
             method_responses=[
                 api_gateway.MethodResponse(
                     status_code="200",
@@ -595,8 +595,8 @@ class AssetsConstruct(Construct):
                     )
                 ],
             ),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
             method_responses=[
                 api_gateway.MethodResponse(
                     status_code="200",
@@ -684,8 +684,8 @@ class AssetsConstruct(Construct):
         related_versions_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(related_versions_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         related_versions_lambda.function.add_to_role_policy(
@@ -768,8 +768,8 @@ class AssetsConstruct(Construct):
                     )
                 ],
             ),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
             method_responses=[
                 api_gateway.MethodResponse(
                     status_code="200",
@@ -2024,32 +2024,32 @@ class AssetsConstruct(Construct):
         bulk_resource.add_method(
             "POST",
             api_gateway.LambdaIntegration(self._kickoff_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # GET /assets/download/bulk/{jobId} - Get job status
         job_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(self._status_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # PUT /assets/download/bulk/{jobId} - Mark job as downloaded
         job_resource.add_method(
             "PUT",
             api_gateway.LambdaIntegration(self._mark_downloaded_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # DELETE /assets/download/bulk/{jobId} - Delete job and cleanup resources
         job_resource.add_method(
             "DELETE",
             api_gateway.LambdaIntegration(self._delete_bulk_download_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # GET /assets/download/bulk/user - List user's bulk download jobs
@@ -2057,8 +2057,8 @@ class AssetsConstruct(Construct):
         user_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(self._status_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # Add CORS support to bulk download API resources

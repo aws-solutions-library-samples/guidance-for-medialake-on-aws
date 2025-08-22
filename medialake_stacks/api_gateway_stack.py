@@ -63,6 +63,7 @@ class ApiGatewayStackProps:
     waf_acl_arn: str
     user_table: dynamodb.TableV2
     s3_vector_bucket_name: str
+    shared_authorizer_lambda: lambda_.Function
 
 
 class ApiGatewayStack(cdk.NestedStack):
@@ -84,12 +85,8 @@ class ApiGatewayStack(cdk.NestedStack):
             root_resource_id=root_resource_id,
         )
 
-        self._api_gateway_authorizer = apigateway.CognitoUserPoolsAuthorizer(
-            self,
-            "ApiGatewayAuthorizer",
-            identity_source="method.request.header.Authorization",
-            cognito_user_pools=[props.user_pool],
-        )
+        # Use the shared custom authorizer from the authorization stack
+        self._api_gateway_authorizer = props.shared_authorizer_lambda
 
         self._connectors_api_gateway = ConnectorsConstruct(
             self,
@@ -102,7 +99,7 @@ class ApiGatewayStack(cdk.NestedStack):
                 iac_assets_bucket=props.iac_assets_bucket,
                 media_assets_bucket=props.media_assets_bucket,  # Added for cross-bucket deletion
                 api_resource=api,
-                cognito_authorizer=self._api_gateway_authorizer,
+                authorizer=self._api_gateway_authorizer,
                 x_origin_verify_secret=props.x_origin_verify_secret,
                 pipelines_event_bus=props.pipelines_event_bus.event_bus_name,
                 asset_sync_job_table=props.asset_sync_job_table,
@@ -127,7 +124,7 @@ class ApiGatewayStack(cdk.NestedStack):
                 asset_table=props.asset_table,
                 media_assets_bucket=props.media_assets_bucket,
                 api_resource=api,
-                cognito_authorizer=self._api_gateway_authorizer,
+                authorizer=self._api_gateway_authorizer,
                 x_origin_verify_secret=props.x_origin_verify_secret,
                 open_search_endpoint=props.collection_endpoint,
                 open_search_arn=props.collection_arn,
@@ -145,7 +142,7 @@ class ApiGatewayStack(cdk.NestedStack):
             props=AssetsProps(
                 asset_table=props.asset_table,
                 api_resource=api,
-                cognito_authorizer=self._api_gateway_authorizer,
+                authorizer=self._api_gateway_authorizer,
                 x_origin_verify_secret=props.x_origin_verify_secret,
                 open_search_endpoint=props.collection_endpoint,
                 opensearch_index="media",
@@ -163,7 +160,7 @@ class ApiGatewayStack(cdk.NestedStack):
             props=ApiGatewayNodesProps(
                 api_resource=api,
                 x_origin_verify_secret=props.x_origin_verify_secret,
-                cognito_authorizer=self._api_gateway_authorizer,
+                authorizer=self._api_gateway_authorizer,
                 pipelines_nodes_table=props.pipelines_nodes_table,
             ),
         )

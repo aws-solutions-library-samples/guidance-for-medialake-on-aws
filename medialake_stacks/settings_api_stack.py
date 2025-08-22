@@ -4,6 +4,7 @@ import aws_cdk as cdk
 from aws_cdk import Fn
 from aws_cdk import aws_apigateway as apigateway
 from aws_cdk import aws_cognito as cognito
+from aws_cdk import aws_lambda as lambda_
 from aws_cdk import aws_secretsmanager as secretsmanager
 from constructs import Construct
 
@@ -24,6 +25,7 @@ class SettingsApiStackProps:
     system_settings_table_arn: str
     api_keys_table_name: str
     api_keys_table_arn: str
+    shared_authorizer_lambda: lambda_.Function
 
 
 class SettingsApiStack(cdk.NestedStack):
@@ -42,25 +44,18 @@ class SettingsApiStack(cdk.NestedStack):
             root_resource_id=root_resource_id,
         )
 
-        self._settings_api_authorizer = apigateway.CognitoUserPoolsAuthorizer(
-            self,
-            "SettingsApiAuthorizer",
-            identity_source="method.request.header.Authorization",
-            cognito_user_pools=[props.cognito_user_pool],
-        )
-
         # Create Settings construct
         self._settings_construct = SettingsConstruct(
             self,
             "SettingsApiGateway",
             props=SettingsConstructProps(
                 api_resource=api.root,
-                cognito_authorizer=self._settings_api_authorizer,
+                authorizer=props.shared_authorizer_lambda,
                 cognito_user_pool=props.cognito_user_pool,
                 cognito_app_client=props.cognito_app_client,
                 x_origin_verify_secret=props.x_origin_verify_secret,
                 system_settings_table_name=props.system_settings_table_name,
-                system_settings_table_arn=props.system_settings_table_arn,
+                system_settings_table_arn=props.system_settings_arn,
                 api_keys_table_name=props.api_keys_table_name,
                 api_keys_table_arn=props.api_keys_table_arn,
             ),

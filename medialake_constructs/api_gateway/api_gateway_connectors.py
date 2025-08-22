@@ -61,7 +61,7 @@ class ConnectorsProps:
 
     # Optional fields
     api_resource: str | None = None
-    cognito_authorizer: str | None = None
+    authorizer: str | None = None
     x_origin_verify_secret: secretsmanager.Secret | None = None
     system_settings_table_name: str | None = None
     system_settings_table_arn: str | None = None
@@ -261,8 +261,8 @@ class ConnectorsConstruct(Construct):
         connectors_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(connectors_get_lambda.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         connectors_del_lambda = Lambda(
@@ -387,8 +387,8 @@ class ConnectorsConstruct(Construct):
                     "application/json": '{ "connector_id": "$input.params(\'connector_id\')" }'
                 },
             ),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # Create s3connector resource and Lambda function
@@ -655,8 +655,8 @@ class ConnectorsConstruct(Construct):
         connector_s3_resource.add_method(
             "POST",
             apigateway.LambdaIntegration(connector_s3_post_lambda.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         connector_s3_get_lambda = Lambda(
@@ -697,8 +697,8 @@ class ConnectorsConstruct(Construct):
         connector_s3_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(connector_s3_get_lambda.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         s3_sync_connector_resource = connector_id_resource.add_resource("sync")
@@ -732,8 +732,8 @@ class ConnectorsConstruct(Construct):
         s3_sync_connector_resource.add_method(
             "POST",
             apigateway.LambdaIntegration(self._connector_sync_lambda.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # Create s3 explorer resource with path parameter
@@ -786,8 +786,8 @@ class ConnectorsConstruct(Construct):
         s3_explorer_connector_resource.add_method(
             "GET",
             s3_explorer_integration,
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         self.connectors_table.table.grant_read_data(s3_explorer_get_lambda.function)
@@ -836,8 +836,8 @@ class ConnectorsConstruct(Construct):
         storage_buckets_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(get_buckets_lambda.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # Store reference to get_buckets lambda for external configuration
@@ -880,8 +880,8 @@ class ConnectorsConstruct(Construct):
         regions_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(get_regions_lambda.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # CORS support is handled by default_cors_preflight_options at the API Gateway level

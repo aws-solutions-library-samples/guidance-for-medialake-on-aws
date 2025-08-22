@@ -35,6 +35,7 @@ class IntegrationsEnvironmentStackProps:
     cognito_user_pool: cognito.UserPool
     pipelines_nodes_table: dynamodb.TableV2
     post_pipelines_lambda: Lambda = None
+    shared_authorizer_lambda: lambda_.Function
 
 
 class IntegrationsEnvironmentStack(cdk.NestedStack):
@@ -61,12 +62,8 @@ class IntegrationsEnvironmentStack(cdk.NestedStack):
             root_resource_id=root_resource_id,
         )
 
-        self._api_authorizer = apigateway.CognitoUserPoolsAuthorizer(
-            self,
-            "IntegrationsApiAuthorizer",
-            identity_source="method.request.header.Authorization",
-            cognito_user_pools=[props.cognito_user_pool],
-        )
+        # Use the shared custom authorizer
+        self._api_authorizer = props.shared_authorizer_lambda
 
         # Create Integrations API Gateway construct
         self._integrations_stack = ApiGatewayIntegrationsConstruct(

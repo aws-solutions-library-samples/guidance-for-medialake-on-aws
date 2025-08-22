@@ -68,6 +68,7 @@ class PipelineStackProps:
     s3_vector_bucket_name: str
     s3_vector_index_name: str = "media-vectors"
     s3_vector_dimension: int = 1024
+    shared_authorizer_lambda: lambda_.Function
 
 
 class PipelineStack(cdk.NestedStack):
@@ -90,12 +91,8 @@ class PipelineStack(cdk.NestedStack):
             root_resource_id=root_resource_id,
         )
 
-        self._api_authorizer = apigateway.CognitoUserPoolsAuthorizer(
-            self,
-            "PipelineStackApiAuthorizer",
-            identity_source="method.request.header.Authorization",
-            cognito_user_pools=[props.cognito_user_pool],
-        )
+        # Use the shared custom authorizer
+        self._api_authorizer = props.shared_authorizer_lambda
 
         self._pipelines_executions_stack = PipelinesExecutionsStack(
             self,

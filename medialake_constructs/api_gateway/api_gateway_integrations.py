@@ -19,7 +19,7 @@ class ApiGatewayIntegrationsProps:
 
     api_resource: apigateway.IResource
     x_origin_verify_secret: secretsmanager.Secret
-    cognito_authorizer: apigateway.IAuthorizer
+    authorizer: apigateway.IAuthorizer
     pipelines_nodes_table: dynamodb.TableV2
 
 
@@ -92,8 +92,8 @@ class ApiGatewayIntegrationsConstruct(Construct):
         integrations_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(self._get_integrations_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # POST /integrations
@@ -132,8 +132,8 @@ class ApiGatewayIntegrationsConstruct(Construct):
         integrations_resource.add_method(
             "POST",
             apigateway.LambdaIntegration(self._post_integrations_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # integration ID specific endpoints
@@ -180,8 +180,8 @@ class ApiGatewayIntegrationsConstruct(Construct):
         integration_id_resource.add_method(
             "PUT",
             apigateway.LambdaIntegration(self._put_integration_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # DELETE /integrations/{id}
@@ -225,8 +225,8 @@ class ApiGatewayIntegrationsConstruct(Construct):
         integration_id_resource.add_method(
             "DELETE",
             apigateway.LambdaIntegration(self._delete_integration_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # Add CORS support

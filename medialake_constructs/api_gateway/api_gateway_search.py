@@ -20,7 +20,7 @@ class SearchProps:
     asset_table: dynamodb.TableV2
     media_assets_bucket: S3Bucket
     api_resource: apigateway.IResource
-    cognito_authorizer: apigateway.IAuthorizer
+    authorizer: apigateway.IAuthorizer
     x_origin_verify_secret: secretsmanager.Secret
     open_search_endpoint: str
     open_search_arn: str
@@ -167,8 +167,8 @@ class SearchConstruct(Construct):
         search_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(search_get_lambda.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # Add CORS support
@@ -223,8 +223,8 @@ class SearchConstruct(Construct):
         fields_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(search_fields_lambda.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         add_cors_options_method(search_resource)

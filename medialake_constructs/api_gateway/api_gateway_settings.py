@@ -30,7 +30,7 @@ class SettingsConstructProps:
 
     x_origin_verify_secret: secretsmanager.Secret
     api_resource: api_gateway.IResource
-    cognito_authorizer: api_gateway.IAuthorizer
+    authorizer: api_gateway.IAuthorizer
     cognito_user_pool: cognito.UserPool
     cognito_app_client: str
     system_settings_table_name: str
@@ -57,7 +57,7 @@ class SettingsConstruct(Construct):
         scope (Construct): The scope in which to define this construct
         constructor_id (str): The scoped construct ID
         api_resource (apigateway.IResource): The API Gateway resource to attach to
-        cognito_authorizer (apigateway.IAuthorizer): Cognito authorizer for API endpoints
+        authorizer (apigateway.IAuthorizer): Custom authorizer for API endpoints
         x_origin_verify_secret (secretsmanager.Secret): Secret for origin verification
         pipelines_event_bus (events.EventBus): EventBus for pipeline events
         iac_assets_bucket (s3.Bucket): S3 bucket for infrastructure assets
@@ -120,8 +120,8 @@ class SettingsConstruct(Construct):
         system_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(self._get_system_settings_handler.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # Create search provider resource
@@ -159,8 +159,8 @@ class SettingsConstruct(Construct):
         search_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(self._get_search_provider_handler.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # POST /settings/system/search
@@ -209,8 +209,8 @@ class SettingsConstruct(Construct):
         search_resource.add_method(
             "POST",
             api_gateway.LambdaIntegration(self._post_search_provider_handler.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # PUT /settings/system/search
@@ -257,8 +257,8 @@ class SettingsConstruct(Construct):
         search_resource.add_method(
             "PUT",
             api_gateway.LambdaIntegration(self._put_search_provider_handler.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # Create users resource
@@ -302,8 +302,8 @@ class SettingsConstruct(Construct):
         settings_users_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(settings_users_get_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         settings_roles_get_lambda = Lambda(
@@ -337,8 +337,8 @@ class SettingsConstruct(Construct):
         settings_roles_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(settings_roles_get_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         settings_user_del_lambda = Lambda(
@@ -370,8 +370,8 @@ class SettingsConstruct(Construct):
         settings_users_userid_resource.add_method(
             "DELETE",
             api_gateway.LambdaIntegration(settings_user_del_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         settings_user_put_lambda = Lambda(
@@ -407,8 +407,8 @@ class SettingsConstruct(Construct):
         settings_users_userid_resource.add_method(
             "PUT",
             api_gateway.LambdaIntegration(settings_user_put_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         settings_users_user_userid_get_lambda = Lambda(
@@ -446,8 +446,8 @@ class SettingsConstruct(Construct):
             api_gateway.LambdaIntegration(
                 settings_users_user_userid_get_lambda.function
             ),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # settings_users_user_post_lambda = Lambda(
@@ -486,8 +486,8 @@ class SettingsConstruct(Construct):
         # settings_users_user_resource.add_method(
         #     "POST",
         #     api_gateway.LambdaIntegration(settings_users_user_post_lambda.function),
-        #     authorization_type=api_gateway.AuthorizationType.COGNITO,
-        #     authorizer=props.cognito_authorizer,
+        #     authorization_type=api_gateway.AuthorizationType.CUSTOM,
+        #     authorizer=props.authorizer,
         # )
 
         # Add CORS support to additional resources
@@ -535,8 +535,8 @@ class SettingsConstruct(Construct):
         api_keys_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(self._get_api_keys_handler.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # POST /settings/api-keys - Create new API key
@@ -580,8 +580,8 @@ class SettingsConstruct(Construct):
         api_keys_resource.add_method(
             "POST",
             api_gateway.LambdaIntegration(self._post_api_keys_handler.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # GET /settings/api-keys/{id} - Get single API key
@@ -612,8 +612,8 @@ class SettingsConstruct(Construct):
         api_key_id_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(self._get_api_key_handler.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # PUT /settings/api-keys/{id} - Update API key
@@ -658,8 +658,8 @@ class SettingsConstruct(Construct):
         api_key_id_resource.add_method(
             "PUT",
             api_gateway.LambdaIntegration(self._put_api_key_handler.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # DELETE /settings/api-keys/{id} - Delete API key
@@ -703,8 +703,8 @@ class SettingsConstruct(Construct):
         api_key_id_resource.add_method(
             "DELETE",
             api_gateway.LambdaIntegration(self._delete_api_key_handler.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
     @property

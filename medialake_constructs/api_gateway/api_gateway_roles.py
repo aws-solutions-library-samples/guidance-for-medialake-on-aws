@@ -28,7 +28,7 @@ from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaCon
 class RolesApiProps:
     x_origin_verify_secret: secrets_manager.Secret
     api_resource: api_gateway.IResource
-    cognito_authorizer: api_gateway.IAuthorizer
+    authorizer: api_gateway.IAuthorizer
     cognito_user_pool: cognito.UserPool
 
 

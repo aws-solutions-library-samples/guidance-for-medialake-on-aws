@@ -25,7 +25,7 @@ class ReviewsApiProps:
 
     asset_table: dynamodb.TableV2
     api_resource: apigateway.IResource
-    cognito_authorizer: apigateway.IAuthorizer
+    authorizer: apigateway.IAuthorizer
     x_origin_verify_secret: secretsmanager.Secret
 
 
@@ -84,8 +84,8 @@ class ReviewsApiConstruct(Construct):
                     )
                 ],
             ),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
             method_responses=[
                 apigateway.MethodResponse(
                     status_code="200",
@@ -126,8 +126,8 @@ class ReviewsApiConstruct(Construct):
                     )
                 ],
             ),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
             method_responses=[
                 apigateway.MethodResponse(
                     status_code="200",
@@ -168,8 +168,8 @@ class ReviewsApiConstruct(Construct):
                     )
                 ],
             ),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
             method_responses=[
                 apigateway.MethodResponse(
                     status_code="200",

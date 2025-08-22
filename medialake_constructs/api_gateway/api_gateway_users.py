@@ -29,7 +29,7 @@ from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaCon
 class UsersApiProps:
     x_origin_verify_secret: secrets_manager.Secret
     api_resource: api_gateway.IResource
-    cognito_authorizer: api_gateway.IAuthorizer
+    authorizer: api_gateway.IAuthorizer
     cognito_user_pool: cognito.UserPool
 
 
@@ -128,8 +128,8 @@ class UsersApi(Construct):
         users_user_id_resources.add_method(
             "GET",
             api_gateway_get_user_id_integration,
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         users_user_id_put_lambda = Lambda(
@@ -189,8 +189,8 @@ class UsersApi(Construct):
         users_user_id_resources.add_method(
             "PUT",
             api_gateway_put_users_user_id_integration,
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         users_user_post_lambda = Lambda(
@@ -227,8 +227,8 @@ class UsersApi(Construct):
         users_user_resource.add_method(
             "POST",
             api_gateway.LambdaIntegration(users_user_post_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         self._users_table.table.grant_read_data(users_user_post_lambda.function)
@@ -308,8 +308,8 @@ class UsersApi(Construct):
         users_user_id_disableuser_resource.add_method(
             "POST",
             api_post_users_user_id_disableuser_integration,
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         users_user_id_enableuser_resource = users_user_id_resources.add_resource(
@@ -366,8 +366,8 @@ class UsersApi(Construct):
         users_user_id_enableuser_resource.add_method(
             "POST",
             api_post_users_user_id_enableuser_integration,
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # Add CORS support
