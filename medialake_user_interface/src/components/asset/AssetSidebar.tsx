@@ -1365,8 +1365,9 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
 
       lane.addMarker(periodMarker);
 
-      // Use the same default name format, allowing duplicates
-      const defaultName = `Marker ${markers.length + 1}`;
+      // Use the same default name format, counting only user markers
+      const userMarkerCount = markers.filter((m) => m.type === "user").length;
+      const defaultName = `Marker ${userMarkerCount + 1}`;
 
       // Add default name for the new marker
       setMarkerNames((prev) => ({
@@ -2168,7 +2169,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
           ) : (
             markers
               .filter((m) => m.type === "user")
-              .sort((a, b) => a.timeObservation.start - b.timeObservation.start) // Sort by timeline position
+              .sort((a, b) => b.id.localeCompare(a.id)) // Sort by ID descending (newest first)
               .map((marker, index) => (
                 <Box
                   key={marker.id}
