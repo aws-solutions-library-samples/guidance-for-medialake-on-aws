@@ -7,11 +7,14 @@ This construct creates a single custom authorizer that can be shared across mult
 from dataclasses import dataclass
 
 import aws_cdk as cdk
-from aws_cdk import CfnOutput
+from aws_cdk import CfnOutput, Duration
+from aws_cdk import aws_events as events
+from aws_cdk import aws_events_targets as targets
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_lambda as lambda_
 from constructs import Construct
 
+from constants import Lambda as LambdaConstants
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 
@@ -141,6 +144,22 @@ class SharedAuthorizerConstruct(Construct):
             "SharedAuthorizerLambdaName",
             value=self._authorizer_lambda.function.function_name,
             export_name="MediaLake-SharedAuthorizerLambdaName",
+        )
+
+        # Lambda warming for shared custom authorizer
+        events.Rule(
+            self,
+            "SharedAuthorizerWarmerRule",
+            schedule=events.Schedule.rate(
+                Duration.minutes(LambdaConstants.WARMER_INTERVAL_MINUTES)
+            ),
+            targets=[
+                targets.LambdaFunction(
+                    self._authorizer_lambda.function,
+                    event=events.RuleTargetInput.from_object({"lambda_warmer": True}),
+                ),
+            ],
+            description="Keeps shared custom authorizer Lambda warm via scheduled EventBridge rule.",
         )
 
     @property

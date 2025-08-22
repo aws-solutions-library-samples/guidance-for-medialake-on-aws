@@ -1187,6 +1187,18 @@ def validate_api_key_permissions(
         # Get permissions from API key
         permissions = api_key_item.get("permissions", {})
 
+        # Add debug logging
+        logger.info(
+            f"API key permissions type: {type(permissions)}, value: {permissions}"
+        )
+
+        # Ensure permissions is a dictionary
+        if not isinstance(permissions, dict):
+            logger.warning(
+                f"API key permissions is not a dictionary, type: {type(permissions)}"
+            )
+            permissions = {}
+
         if not permissions:
             logger.warning(
                 f"API key {api_key_item['id']} has no permissions defined",
@@ -1259,6 +1271,14 @@ def generate_api_key_context(api_key_item: Dict[str, Any]) -> Dict[str, Any]:
     # Get permissions from API key item
     permissions = api_key_item.get("permissions", {})
 
+    # Add debug logging to understand the permissions structure
+    logger.info(f"Permissions type: {type(permissions)}, value: {permissions}")
+
+    # Ensure permissions is a dictionary
+    if not isinstance(permissions, dict):
+        logger.warning(f"Permissions is not a dictionary, type: {type(permissions)}")
+        permissions = {}
+
     # Transform nested permission structure to flat format expected by CASL
     custom_permissions = []
 
@@ -1269,23 +1289,35 @@ def generate_api_key_context(api_key_item: Dict[str, Any]) -> Dict[str, Any]:
     #   }
     # }
     def flatten_permissions(obj, prefix=""):
-        for key, value in obj.items():
-            if isinstance(value, dict):
-                # Check if this is a leaf node with boolean values (actions)
-                if all(isinstance(v, bool) for v in value.values()):
-                    # This is an action level - add permissions for each True action
-                    for action, enabled in value.items():
-                        if enabled:
-                            permission_key = f"{prefix}.{key}" if prefix else key
-                            custom_permissions.append(f"{permission_key}:{action}")
-                else:
-                    # This is a nested resource - recurse
-                    new_prefix = f"{prefix}.{key}" if prefix else key
-                    flatten_permissions(value, new_prefix)
-            elif isinstance(value, bool) and value:
-                # Direct boolean permission
-                permission_key = f"{prefix}.{key}" if prefix else key
-                custom_permissions.append(f"{permission_key}:view")  # Default to view
+        try:
+            if not isinstance(obj, dict):
+                logger.warning(
+                    f"flatten_permissions called with non-dict object: {type(obj)}"
+                )
+                return
+
+            for key, value in obj.items():
+                if isinstance(value, dict):
+                    # Check if this is a leaf node with boolean values (actions)
+                    if all(isinstance(v, bool) for v in value.values()):
+                        # This is an action level - add permissions for each True action
+                        for action, enabled in value.items():
+                            if enabled:
+                                permission_key = f"{prefix}.{key}" if prefix else key
+                                custom_permissions.append(f"{permission_key}:{action}")
+                    else:
+                        # This is a nested resource - recurse
+                        new_prefix = f"{prefix}.{key}" if prefix else key
+                        flatten_permissions(value, new_prefix)
+                elif isinstance(value, bool) and value:
+                    # Direct boolean permission
+                    permission_key = f"{prefix}.{key}" if prefix else key
+                    custom_permissions.append(
+                        f"{permission_key}:view"
+                    )  # Default to view
+        except Exception as e:
+            logger.error(f"Error in flatten_permissions: {str(e)}")
+            logger.error(f"Object: {obj}, prefix: {prefix}")
 
     if permissions:
         flatten_permissions(permissions)
@@ -1431,7 +1463,23 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                 api_key_item = validate_api_key(api_key, correlation_id)
 
                 # Generate synthetic claims for API key
-                parsed_token = generate_api_key_context(api_key_item)
+                try:
+                    parsed_token = generate_api_key_context(api_key_item)
+                except Exception as context_err:
+                    logger.error(
+                        f"Error generating API key context: {str(context_err)}",
+                        extra={"correlation_id": correlation_id},
+                    )
+                    # Fall back to basic claims if context generation fails
+                    parsed_token = {
+                        "sub": f"ApiKey::{api_key_item['id']}",
+                        "username": api_key_item.get("name", "Unknown"),
+                        "cognito:username": api_key_item.get("name", "Unknown"),
+                        "auth_type": "api_key",
+                        "api_key_id": api_key_item["id"],
+                        "permissions": {},
+                        "customPermissions": [],
+                    }
 
                 # Extract HTTP method and resource path
                 http_method = (
@@ -1498,6 +1546,13 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                     else:
                         # No specific permission required - check if API key has any permissions
                         permissions = api_key_item.get("permissions", {})
+
+                        # Add debug logging for permissions
+                        logger.info(
+                            f"API key permissions for unspecified action: {permissions}"
+                        )
+                        logger.info(f"Permissions type: {type(permissions)}")
+
                         if not permissions:
                             logger.warning(
                                 f"API key {api_key_item['id']} has no permissions for unspecified action: {action_id}",
@@ -1533,7 +1588,21 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                 effect = "Allow" if is_authorized else "Deny"
 
                 # Include all claims in the context for backend Lambdas
-                context_claims = {k: str(v) for k, v in parsed_token.items()}
+                try:
+                    context_claims = {k: str(v) for k, v in parsed_token.items()}
+                except Exception as claims_err:
+                    logger.error(
+                        f"Error converting claims to strings: {str(claims_err)}",
+                        extra={"correlation_id": correlation_id},
+                    )
+                    # Fall back to basic context if claims conversion fails
+                    context_claims = {
+                        "actionId": action_id,
+                        "userId": principal_id,
+                        "username": parsed_token.get("username", "Unknown"),
+                        "sub": parsed_token.get("sub", "Unknown"),
+                        "requestId": correlation_id,
+                    }
 
                 policy = {
                     "principalId": principal_id,
@@ -1554,8 +1623,8 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                         "sub": parsed_token.get("sub", ""),
                         "requestId": correlation_id,
                         "claims": json.dumps(
-                            context_claims
-                        ),  # Stringify claims for context
+                            context_claims, default=str
+                        ),  # Stringify claims for context with fallback
                         **context_claims,  # Also include individual claim fields
                     },
                 }
@@ -1632,6 +1701,36 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
             # Generate policy based on authorization decision
             effect = "Allow" if is_authorized else "Deny"
 
+            # Create context with error handling
+            try:
+                context = {
+                    "actionId": action_id,
+                    "userId": principal_id,
+                    "username": parsed_token.get("cognito:username", ""),
+                    "sub": parsed_token.get("sub", ""),
+                    "requestId": correlation_id,
+                    "claims": json.dumps(
+                        parsed_token, default=str
+                    ),  # Stringify claims for context with fallback
+                    **{
+                        k: str(v) for k, v in parsed_token.items()
+                    },  # Include individual claim fields
+                }
+            except Exception as context_err:
+                logger.error(
+                    f"Error creating context: {str(context_err)}",
+                    extra={"correlation_id": correlation_id},
+                )
+                # Fall back to basic context if creation fails
+                context = {
+                    "actionId": action_id,
+                    "userId": principal_id,
+                    "username": parsed_token.get("cognito:username", ""),
+                    "sub": parsed_token.get("sub", ""),
+                    "requestId": correlation_id,
+                    "claims": "{}",
+                }
+
             policy = {
                 "principalId": principal_id,
                 "policyDocument": {
@@ -1644,17 +1743,7 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                         }
                     ],
                 },
-                "context": {
-                    "actionId": action_id,
-                    "userId": principal_id,
-                    "username": parsed_token.get("cognito:username", ""),
-                    "sub": parsed_token.get("sub", ""),
-                    "requestId": correlation_id,
-                    "claims": json.dumps(parsed_token),  # Stringify claims for context
-                    **{
-                        k: str(v) for k, v in parsed_token.items()
-                    },  # Include individual claim fields
-                },
+                "context": context,
             }
 
             # Record execution time and result
