@@ -56,11 +56,8 @@ def create_shared_custom_authorizer(
         scope,
         authorizer_id,
         handler=authorizer_lambda,
-        identity_sources=[
-            "method.request.header.Authorization",  # JWT token
-            "method.request.header.x-api-key",  # API key
-        ],
-        results_cache_ttl=Duration.minutes(cache_ttl_minutes),
+        identity_sources=[],
+        results_cache_ttl=Duration.seconds(0),
     )
 
 
