@@ -14,6 +14,10 @@ def translate_event_to_request(response_body_and_event):
     # Unified mapping (status → (externalJobStatus, externalJobResult)) following MediaConvert pattern
     status_mapping = {
         "completed": ("Completed", "Success"),
+        "keyframe_generation_completed": (
+            "Completed",
+            "Success",
+        ),  # Coactive issue. Will be removed when fixed.
         "failed": ("Failed", "Failed"),
         "error": ("Failed", "Failed"),
         "processing": ("Started", "InProgress"),
