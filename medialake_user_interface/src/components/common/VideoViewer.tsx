@@ -25,11 +25,16 @@ import {
   Stack,
   Slider,
   Box,
+  ListItem,
+  List,
+  ListItemText,
+  Popover,
   Typography,
   Paper,
 } from "@mui/material";
 
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import PauseIcon from "@mui/icons-material/Pause";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import VolumeOffIcon from "@mui/icons-material/VolumeOff";
@@ -38,6 +43,7 @@ import "./VideoViewer.css";
 
 import addMakerDiv from "../asset/AssetSidebar";
 import { createTimecodePlaceholder } from "@/utils/placeholderSvg";
+import { useVideoKeyboardShortcuts } from "./useVideoKeyboardShortcuts";
 
 import { filter } from "rxjs";
 import { randomHexColor } from "./utils";
@@ -93,6 +99,8 @@ const useOmakasePlayer = (
   const playerRef = useRef<OmakasePlayer | null>(null);
   const [playerVolume, setPlayerVolume] = useState(1);
 
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const callbacksRef = useRef(callbacks);
   useEffect(() => {
     callbacksRef.current = callbacks;
@@ -103,6 +111,9 @@ const useOmakasePlayer = (
 
   const initializePlayer = useCallback(() => {
     if (!containerRef.current) return;
+
+    // Reset marker lane state when initializing a new player
+    markerLaneRef.current = null;
 
     const player = new OmakasePlayer({
       playerHTMLElementId: containerRef.current.id,
@@ -195,7 +206,14 @@ const useOmakasePlayer = (
 
     player.video.onVideoLoaded$.pipe(filter((video) => !!video)).subscribe({
       next: () => {
-        createTimelineLanes();
+        try {
+          createTimelineLanes();
+        } catch (error) {
+          console.error("Error creating timeline lanes:", error);
+        }
+      },
+      error: (error) => {
+        console.error("Error in video loaded subscription:", error);
       },
     });
 
@@ -203,22 +221,59 @@ const useOmakasePlayer = (
       markerLane1();
     };
 
-    const markerLane1 = () => {
-      const markerLane = new MarkerLane({
-        style: { ...TIMELINE_STYLE_DARK, height: 25 },
-      });
-      const lane = player.timeline!.addTimelineLane(markerLane);
-      markerLaneRef.current = lane;
-      const periodMarker = new PeriodMarker({
-        timeObservation: { start: 200, end: 300 },
-        editable: true,
-        style: { ...PERIOD_MARKER_STYLE },
-      });
+    const markerLane1 = (retryCount = 0) => {
+      const maxRetries = 3;
+      const retryDelay = 1000; // 1 second
+
+      try {
+        if (!player.timeline) {
+          console.warn("Timeline not available for marker lane creation");
+          if (retryCount < maxRetries) {
+            console.log(
+              `Retrying marker lane creation in ${retryDelay}ms (attempt ${retryCount + 1}/${maxRetries})`,
+            );
+            retryTimeoutRef.current = setTimeout(() => {
+              markerLane1(retryCount + 1);
+            }, retryDelay);
+            return;
+          } else {
+            console.error("Failed to create marker lane after maximum retries");
+            return;
+          }
+        }
+
+        const markerLane = new MarkerLane({
+          style: { ...TIMELINE_STYLE_DARK, height: 25 },
+        });
+        const lane = player.timeline.addTimelineLane(markerLane);
+        markerLaneRef.current = lane;
+
+        console.log("Marker lane created successfully");
+      } catch (error) {
+        console.error("Error creating marker lane:", error);
+        markerLaneRef.current = null;
+
+        if (retryCount < maxRetries) {
+          console.log(
+            `Retrying marker lane creation in ${retryDelay}ms (attempt ${retryCount + 1}/${maxRetries})`,
+          );
+          retryTimeoutRef.current = setTimeout(() => {
+            markerLane1(retryCount + 1);
+          }, retryDelay);
+        } else {
+          console.error("Failed to create marker lane after maximum retries");
+        }
+      }
     };
 
     return () => {
       subscriptions.forEach((subscription) => subscription.unsubscribe());
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
       playerRef.current = null;
+      // Cleanup handled by individual subscriptions and refs
     };
   }, [videoSrc, containerRef, markerLaneRef]);
 
@@ -439,6 +494,23 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
     const [isSmtpeFormat, setIsSmtpeFormat] = useState(true);
     const [isVolumeHovered, setIsVolumeHovered] = useState(false);
 
+    const [shortcutsAnchor, setShortcutsAnchor] = useState<null | HTMLElement>(
+      null,
+    );
+    const openShortcuts = Boolean(shortcutsAnchor);
+    const handleOpenShortcuts = (event: React.MouseEvent<HTMLElement>) => {
+      setShortcutsAnchor(event.currentTarget);
+    };
+    const handleCloseShortcuts = () => {
+      setShortcutsAnchor(null);
+    };
+
+    const volumeHoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const lastNonZeroVolumeRef = useRef(100);
+
+    // state near other useStates in VideoViewer
+    const [uiTime, setUiTime] = useState(0);
+
     const customCallbacks = useMemo<Partial<VideoViewerProps>>(
       () => ({
         onPlay: () => {
@@ -484,12 +556,14 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
       setVolume: setPlayerVolume,
       mute,
       unmute,
+      setPlaybackRate,
       toggleFullscreen,
       removeSafeZone,
       clearSafeZones,
       currentTime,
       duration,
       setCurrentTime,
+      playerRef: omakaseRef, // get the internal ref from the hook
     } = useOmakasePlayer(
       videoSrc,
       playerContainerRef,
@@ -497,12 +571,112 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
       markerLaneRef,
     );
 
+    // reset UI time when the source changes (optional but nice)
+    useEffect(() => {
+      setUiTime(0);
+    }, [videoSrc]);
+
+    // smoothing RAF — use the INTERNAL ref from the hook
+    useEffect(() => {
+      const videoEl = omakaseRef.current?.video.getHTMLVideoElement();
+      if (!videoEl) return;
+
+      let rafId: number;
+      let lastMediaTime = videoEl.currentTime;
+      let coastStart = 0;
+      const COAST_MS = 250; // small smoothing window
+      const EPS = 1 / 120; // ~8.3ms, treat smaller deltas as "stalled"
+
+      const bufferedEndNear = (t: number) => {
+        const r = videoEl.buffered;
+        for (let i = 0; i < r.length; i++) {
+          if (r.start(i) - 0.5 <= t && t <= r.end(i) + 0.5) return r.end(i);
+        }
+        return t;
+      };
+
+      const tick = (now: number) => {
+        const playing = !videoEl.paused && !videoEl.ended;
+        const mediaTime = videoEl.currentTime;
+        let target = mediaTime;
+
+        const mediaDelta = mediaTime - lastMediaTime;
+
+        // if playing and time didn't advance meaningfully, coast a bit
+        if (playing && mediaDelta < EPS) {
+          if (coastStart === 0) coastStart = now;
+          const elapsed = Math.min(now - coastStart, COAST_MS);
+          target =
+            lastMediaTime + (elapsed / 1000) * (videoEl.playbackRate || 1);
+
+          // don't "paint" into unbuffered territory
+          const be = bufferedEndNear(lastMediaTime);
+          target = Math.min(target, be - 0.033); // ~2 frames at 60fps
+        } else {
+          coastStart = 0;
+        }
+
+        // clamp to duration
+        const dur = Number.isFinite(videoEl.duration)
+          ? videoEl.duration
+          : target;
+        target = Math.max(0, Math.min(target, dur));
+
+        setUiTime(target);
+        lastMediaTime = mediaTime;
+        rafId = requestAnimationFrame(tick);
+      };
+
+      rafId = requestAnimationFrame(tick);
+      return () => cancelAnimationFrame(rafId);
+    }, [omakaseRef, videoSrc]);
+
+    // Use keyboard shortcuts hook
+    const {
+      SHORTCUTS,
+      toggleTransport,
+      currentPlaybackRate,
+      isShuttlingReverse,
+    } = useVideoKeyboardShortcuts({
+      play,
+      pause,
+      seek,
+      setPlaybackRate,
+      mute,
+      unmute,
+      toggleFullscreen,
+      isPlaying,
+      currentTime,
+      duration,
+      volume,
+      muted,
+      setPlayerVolume,
+      setVolumeState: setVolumeState,
+      setMuted,
+      setIsVolumeHovered,
+      lastNonZeroVolumeRef,
+      volumeHoverTimeoutRef,
+      markerLaneRef,
+      customCallbacks,
+      omakaseRef,
+      onFullscreenChange,
+      onMute,
+      onUnmute,
+    });
+
     // Expose the "hello" method via the ref.
     useImperativeHandle(
       ref,
       () => ({
         hello: () => {
-          if (markerLaneRef.current) {
+          if (!markerLaneRef.current) {
+            console.warn(
+              "Marker lane is not available yet. Video may still be loading.",
+            );
+            return null;
+          }
+
+          try {
             const periodMarker = new PeriodMarker({
               timeObservation: { start: currentTime, end: currentTime + 5 },
               editable: true,
@@ -512,13 +686,24 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
               },
             });
             markerLaneRef.current.addMarker(periodMarker);
-            customCallbacks.onMarkerAdd(currentTime);
+            customCallbacks.onMarkerAdd?.(currentTime);
 
             console.log("playeref", playerRef);
             return periodMarker;
+          } catch (error) {
+            console.error("Error adding marker:", error);
+            return null;
           }
         },
-        getMarkerLane: () => markerLaneRef.current,
+        getMarkerLane: () => {
+          if (markerLaneRef.current) {
+            return markerLaneRef.current;
+          }
+          console.warn(
+            "Marker lane is not available yet. Video may still be loading.",
+          );
+          return null;
+        },
         getCurrentTime: () => currentTime,
         formatToTimecode: (time: number) => {
           const hours = Math.floor(time / 3600);
@@ -533,7 +718,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
         },
         seek: (time: number) => seek(time),
       }),
-      [currentTime, customCallbacks, playerRef],
+      [currentTime, customCallbacks, omakaseRef],
     );
 
     const handlePlayPause = () => {
@@ -544,38 +729,49 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
       }
     };
 
+    // when dragging, move *ui* time only; commit seeks real media time
     const handleSeekChange = (_: Event, newValue: number | number[]) => {
       if (typeof newValue === "number") {
-        setCurrentTime(newValue);
+        setUiTime(newValue);
       }
     };
-
     const handleSeekCommitted = (
       _: Event | SyntheticEvent,
       newValue: number | number[],
     ) => {
-      if (typeof newValue === "number") {
-        seek(newValue);
-      }
+      if (typeof newValue === "number") seek(newValue);
     };
-
     const handleVolumeChange = (event: Event, newValue: number | number[]) => {
       if (typeof newValue === "number") {
         setPlayerVolume(newValue);
         setVolumeState(newValue);
-        setMuted(newValue === 0);
+        if (newValue > 0) {
+          lastNonZeroVolumeRef.current = newValue; // remember
+          if (muted) {
+            unmute();
+            setMuted(false);
+          } // auto-unmute when raising volume
+        } else {
+          setMuted(true); // volume 0 => show muted icon
+        }
       }
     };
 
     const handleMuteToggle = () => {
       if (muted) {
+        // unmute: restore last non-zero volume if current is 0
         unmute();
-        setPlayerVolume(volume);
+        if (volume === 0) {
+          const restore = lastNonZeroVolumeRef.current || 100;
+          setPlayerVolume(restore);
+          setVolumeState(restore);
+        }
         setMuted(false);
         onUnmute?.();
       } else {
+        // mute: keep current volume for later restore
+        if (volume > 0) lastNonZeroVolumeRef.current = volume;
         mute();
-        setPlayerVolume(0);
         setMuted(true);
         onMute?.();
       }
@@ -608,6 +804,9 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
       setIsSmtpeFormat(!isSmtpeFormat);
     };
 
+    // Make the play/pause icon reflect reverse "movement" too
+    const transportMoving = isPlaying || isShuttlingReverse;
+
     return (
       <Stack
         spacing={0}
@@ -618,6 +817,33 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
           overflow: "hidden",
         }}
       >
+        <Popover
+          open={openShortcuts}
+          anchorEl={shortcutsAnchor}
+          onClose={handleCloseShortcuts}
+          anchorOrigin={{
+            vertical: "top",
+            horizontal: "center",
+          }}
+          transformOrigin={{
+            vertical: "bottom",
+            horizontal: "center",
+          }}
+        >
+          <Box sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              Keyboard Shortcuts
+            </Typography>
+            <List dense>
+              {SHORTCUTS.map((line) => (
+                <ListItem key={line}>
+                  <ListItemText primary={line} />
+                </ListItem>
+              ))}
+            </List>
+          </Box>
+        </Popover>
+
         <Box
           onClick={onClickEvent}
           ref={playerContainerRef}
@@ -647,7 +873,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
         >
           <Box sx={{ px: 2, pt: 1 }}>
             <Slider
-              value={currentTime}
+              value={uiTime}
               min={0}
               max={duration}
               step={0.1}
@@ -683,7 +909,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
                 "&:hover": { bgcolor: "rgba(255, 255, 255, 0.1)" },
               }}
             >
-              {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
+              {transportMoving ? <PauseIcon /> : <PlayArrowIcon />}
             </IconButton>
             <Typography
               variant="caption"
@@ -722,15 +948,20 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
                 elevation={4}
                 sx={{
                   position: "absolute",
-                  bottom: "100%",
+                  bottom: "calc(100% + 8px)",
                   left: "50%",
-                  transform: "translateX(-50%)",
-                  visibility: "hidden",
-                  opacity: 0,
+                  transform: "translate(calc(-50% - 8px), 0)", // keep the Paper where you liked it
+                  visibility: isVolumeHovered ? "visible" : "hidden",
+                  opacity: isVolumeHovered ? 1 : 0,
                   transition: "opacity 0.2s, visibility 0.2s",
                   p: 1,
                   bgcolor: "rgba(0, 0, 0, 0.9)",
-                  mb: 1,
+
+                  // center the slider inside
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  lineHeight: 0, // avoid baseline gap from inline blocks
                 }}
               >
                 <Tooltip
@@ -746,12 +977,14 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
                     max={100}
                     onChange={handleVolumeChange}
                     onChangeCommitted={(_, newValue) => {
-                      if (typeof newValue === "number") {
+                      if (typeof newValue === "number")
                         setPlayerVolume(newValue);
-                      }
                     }}
                     sx={{
                       height: 100,
+                      m: 0, // remove margins
+                      p: 0, // remove padding
+                      mt: -4, // optional tiny nudge up (~4px). Tweak to taste or remove.
                       "& .MuiSlider-rail": { opacity: 0.3 },
                       "& .MuiSlider-track": { border: "none" },
                     }}
@@ -768,6 +1001,16 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
               }}
             >
               <FullscreenIcon />
+            </IconButton>
+            <IconButton
+              onClick={handleOpenShortcuts}
+              size="small"
+              sx={{
+                color: "white",
+                "&:hover": { bgcolor: "rgba(255, 255, 255, 0.1)" },
+              }}
+            >
+              <HelpOutlineIcon />
             </IconButton>
           </Stack>
         </Paper>
