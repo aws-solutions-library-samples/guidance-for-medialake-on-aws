@@ -1628,7 +1628,18 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                 # Include all claims in the context for backend Lambdas
                 try:
                     if isinstance(parsed_token, dict):
-                        context_claims = {k: str(v) for k, v in parsed_token.items()}
+                        # Convert claims to proper JSON-serializable values
+                        context_claims = {}
+                        for k, v in parsed_token.items():
+                            if isinstance(v, (dict, list)):
+                                # Convert complex objects to JSON strings
+                                context_claims[k] = json.dumps(v, default=str)
+                            elif isinstance(v, (str, int, float, bool)) or v is None:
+                                # Keep primitive types as-is
+                                context_claims[k] = v
+                            else:
+                                # Convert everything else to string
+                                context_claims[k] = str(v)
                     else:
                         logger.warning(
                             f"parsed_token is not a dictionary, type: {type(parsed_token)}"
@@ -1670,20 +1681,8 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                 logger.info(f"context_claims type: {type(context_claims)}")
                 logger.info(f"context_claims content: {context_claims}")
 
-                # Create context with error handling
+                # Create context with error handling - simplified approach
                 try:
-                    # Safely unpack context_claims
-                    additional_claims = {}
-                    if isinstance(context_claims, dict):
-                        for key, value in context_claims.items():
-                            try:
-                                additional_claims[key] = str(value)
-                            except Exception as claim_err:
-                                logger.warning(
-                                    f"Error converting claim {key}: {str(claim_err)}"
-                                )
-                                additional_claims[key] = "Error converting value"
-
                     context = {
                         "actionId": action_id,
                         "userId": principal_id,
@@ -1701,7 +1700,6 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                         "claims": json.dumps(
                             context_claims, default=str
                         ),  # Stringify claims for context with fallback
-                        **additional_claims,  # Also include individual claim fields
                     }
                 except Exception as context_err:
                     logger.error(
