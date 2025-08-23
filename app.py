@@ -147,7 +147,6 @@ class MediaLakeStack(cdk.Stack):
                 # x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
                 cognito_user_pool=props.cognito_stack.user_pool,
                 auth_table=props.authorization_stack.auth_table,
-                shared_authorizer_lambda=props.authorization_stack.shared_authorizer,
             ),
         )
         groups_stack.add_dependency(props.authorization_stack)
@@ -301,7 +300,6 @@ class MediaLakeStack(cdk.Stack):
                 x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
                 cognito_user_pool=props.cognito_stack.user_pool,
                 auth_table=props.authorization_stack.auth_table,
-                shared_authorizer_lambda=props.authorization_stack.shared_authorizer,
             ),
         )
 
