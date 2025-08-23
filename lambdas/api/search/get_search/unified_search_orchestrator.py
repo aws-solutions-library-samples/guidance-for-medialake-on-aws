@@ -232,7 +232,12 @@ class UnifiedSearchOrchestrator:
                     self.logger.info(
                         "Executing keyword search using OpenSearch directly"
                     )
-                    return self._execute_opensearch_keyword_search(query_params)
+                    result = self._execute_opensearch_search(query_params)
+
+                    # Add presigned URLs to keyword search results (same as semantic search)
+                    self._add_presigned_urls_to_search_results(result)
+
+                    return result
                 else:
                     # For semantic searches, we need a configured provider
                     available_providers = (
@@ -291,24 +296,12 @@ class UnifiedSearchOrchestrator:
                 )
                 return self._default_provider
 
-        # For keyword search, check if we have any configured providers that can handle it
+        # For keyword search, always use OpenSearch directly (no external providers)
         else:
-            for provider in self._providers.values():
-                if (
-                    provider.architecture == SearchArchitectureType.PROVIDER_PLUS_STORE
-                    and provider.validate_query(query)
-                ):
-                    self.logger.info(
-                        f"Selected provider+store for keyword: {provider.config.provider}"
-                    )
-                    return provider
-
-            # Use default provider if available for keyword search
-            if self._default_provider and self._default_provider.validate_query(query):
-                self.logger.info(
-                    f"Using default provider for keyword search: {self._default_provider.config.provider}"
-                )
-                return self._default_provider
+            self.logger.info(
+                "Keyword search requested - bypassing all providers to use OpenSearch directly"
+            )
+            return None
 
         # No provider found - this is fine for keyword search (uses OpenSearch directly)
         # but problematic for semantic search
@@ -402,9 +395,37 @@ class UnifiedSearchOrchestrator:
             self.logger.warning(f"Failed to generate presigned URLs: {str(e)}")
             # Continue without URLs rather than failing the entire request
 
-    def _execute_legacy_search(self, query_params: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute search using legacy OpenSearch-based system"""
-        self.logger.info("Falling back to legacy OpenSearch-based search system")
+    def _add_presigned_urls_to_search_results(
+        self, search_response: Dict[str, Any]
+    ) -> None:
+        """Add presigned URLs to all results in a search response"""
+        try:
+            # Navigate to the results array in the search response
+            results = search_response.get("data", {}).get("results", [])
+
+            if not results:
+                self.logger.debug("No results found to add presigned URLs to")
+                return
+
+            # Process each result to add presigned URLs
+            for result in results:
+                self._add_presigned_urls(result)
+
+            self.logger.info(
+                f"Added presigned URLs to {len(results)} keyword search results"
+            )
+
+        except Exception as e:
+            self.logger.warning(
+                f"Failed to add presigned URLs to search results: {str(e)}"
+            )
+            # Continue without URLs rather than failing the entire request
+
+    def _execute_opensearch_search(
+        self, query_params: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Execute search using OpenSearch-based system for keyword search"""
+        self.logger.info("Executing keyword search using OpenSearch directly")
 
         try:
             # Import here to avoid circular imports

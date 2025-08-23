@@ -552,6 +552,10 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
             # Update results with enriched hits
             results.hits = enriched_hits
 
+            # Update total_results to reflect the actual number of results after filtering
+            # This ensures the UI shows the correct count instead of the original Coactive count
+            results.total_results = len(enriched_hits)
+
             enrichment_time = int((time.time() - start_time) * 1000)
             self.logger.info(
                 f"MediaLake enrichment completed in {enrichment_time}ms for {len(enriched_hits)} hits"
