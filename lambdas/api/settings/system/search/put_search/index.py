@@ -1,6 +1,7 @@
 import http.client
 import json
 import os
+import uuid
 from datetime import datetime
 
 import boto3
@@ -232,12 +233,26 @@ def update_search_provider():
             Key={"PK": "SYSTEM_SETTINGS", "SK": "SEARCH_PROVIDER"}
         ).get("Item")
 
-        if not existing_provider:
-            return {
-                "status": "error",
-                "message": "Search provider not found. Use POST to create a new one.",
-                "data": {},
-            }
+        # If no provider exists, we'll create a new one (upsert behavior)
+        is_creating_new = not existing_provider
+
+        if is_creating_new:
+            # Validate required fields for creation
+            required_fields = ["name", "type", "apiKey"]
+            for field in required_fields:
+                if field not in body:
+                    return {
+                        "status": "error",
+                        "message": f"Missing required field for creation: {field}",
+                        "data": {},
+                    }
+
+            # Create a unique identifier for the new provider
+            provider_id = str(uuid.uuid4())
+            logger.info(f"Creating new search provider with ID: {provider_id}")
+        else:
+            provider_id = existing_provider.get("id")
+            logger.info(f"Updating existing search provider with ID: {provider_id}")
 
         # Handle Coactive dataset creation
         coactive_dataset_id = None
@@ -262,89 +277,135 @@ def update_search_provider():
                     "data": {},
                 }
 
-        # Update the secret if API key is provided
+        # Handle secret creation/update if API key is provided
+        secret_arn = None
         if "apiKey" in body:
-            # Get the existing secret ARN
-            secret_arn = existing_provider.get("secretArn")
-
-            if secret_arn:
-                # Update the secret
-                secret_value = json.dumps({"x-api-key": body["apiKey"]})
-
-                secretsmanager.update_secret(
-                    SecretId=secret_arn,
-                    Description=f"API key for {existing_provider['name']} search provider",
-                    SecretString=secret_value,
-                )
-            else:
-                # Create a new secret if one doesn't exist
-                secret_name = f"medialake/search/provider/{existing_provider['id']}"
+            if is_creating_new:
+                # Create a new secret for the new provider
+                secret_name = f"medialake/search/provider/{provider_id}"
                 secret_value = json.dumps({"x-api-key": body["apiKey"]})
 
                 secret_response = secretsmanager.create_secret(
                     Name=secret_name,
-                    Description=f"API key for {existing_provider['name']} search provider",
+                    Description=f"API key for {body['name']} search provider",
                     SecretString=secret_value,
                 )
+                secret_arn = secret_response["ARN"]
+                logger.info(f"Created new secret with ARN: {secret_arn}")
+            else:
+                # Update existing secret or create if it doesn't exist
+                existing_secret_arn = existing_provider.get("secretArn")
 
-                # Add the secret ARN to the update expression
-                existing_provider["secretArn"] = secret_response["ARN"]
+                if existing_secret_arn:
+                    # Update the existing secret
+                    secret_value = json.dumps({"x-api-key": body["apiKey"]})
 
-        # Prepare update expression
-        update_expression_parts = ["SET updatedAt = :updatedAt"]
-        expression_attribute_values = {":updatedAt": datetime.utcnow().isoformat()}
+                    secretsmanager.update_secret(
+                        SecretId=existing_secret_arn,
+                        Description=f"API key for {existing_provider['name']} search provider",
+                        SecretString=secret_value,
+                    )
+                    secret_arn = existing_secret_arn
+                    logger.info(f"Updated existing secret: {secret_arn}")
+                else:
+                    # Create a new secret if one doesn't exist
+                    secret_name = f"medialake/search/provider/{existing_provider['id']}"
+                    secret_value = json.dumps({"x-api-key": body["apiKey"]})
 
-        # Add fields to update
-        if "name" in body:
-            update_expression_parts.append("#name = :name")
-            expression_attribute_values[":name"] = body["name"]
+                    secret_response = secretsmanager.create_secret(
+                        Name=secret_name,
+                        Description=f"API key for {existing_provider['name']} search provider",
+                        SecretString=secret_value,
+                    )
+                    secret_arn = secret_response["ARN"]
+                    logger.info(
+                        f"Created new secret for existing provider: {secret_arn}"
+                    )
 
-        if "type" in body:
-            update_expression_parts.append("#type = :type")
-            expression_attribute_values[":type"] = body["type"]
+        # Handle DynamoDB operation (create or update)
+        now = datetime.utcnow().isoformat()
 
-        if "endpoint" in body:
-            update_expression_parts.append("endpoint = :endpoint")
-            expression_attribute_values[":endpoint"] = body["endpoint"]
+        if is_creating_new:
+            # Create new search provider item
+            search_provider_item = {
+                "PK": "SYSTEM_SETTINGS",
+                "SK": "SEARCH_PROVIDER",
+                "id": provider_id,
+                "name": body["name"],
+                "type": body["type"],
+                "endpoint": body.get("endpoint"),
+                "isEnabled": body.get("isEnabled", True),
+                "createdAt": now,
+                "updatedAt": now,
+            }
 
-        if "isEnabled" in body:
-            update_expression_parts.append("isEnabled = :isEnabled")
-            expression_attribute_values[":isEnabled"] = body["isEnabled"]
+            # Add secret ARN if created
+            if secret_arn:
+                search_provider_item["secretArn"] = secret_arn
 
-        # Add datasetId if Coactive dataset was created
-        if coactive_dataset_id:
-            update_expression_parts.append("datasetId = :datasetId")
-            expression_attribute_values[":datasetId"] = coactive_dataset_id
+            # Add datasetId if Coactive dataset was created
+            if coactive_dataset_id:
+                search_provider_item["datasetId"] = coactive_dataset_id
 
-        # Add secretArn to update expression if it was created
-        if "secretArn" in existing_provider and "secretArn" not in existing_provider:
-            update_expression_parts.append("secretArn = :secretArn")
-            expression_attribute_values[":secretArn"] = existing_provider["secretArn"]
+            # Save to DynamoDB
+            system_settings_table.put_item(Item=search_provider_item)
+            updated_provider = search_provider_item
+            logger.info(f"Created new search provider: {provider_id}")
+        else:
+            # Prepare update expression for existing provider
+            update_expression_parts = ["SET updatedAt = :updatedAt"]
+            expression_attribute_values = {":updatedAt": now}
 
-        # Update search provider
-        update_expression = " , ".join(update_expression_parts)
+            # Add fields to update
+            if "name" in body:
+                update_expression_parts.append("#name = :name")
+                expression_attribute_values[":name"] = body["name"]
 
-        # Prepare expression attribute names for reserved words
-        expression_attribute_names = {}
-        if "name" in body:
-            expression_attribute_names["#name"] = "name"
-        if "type" in body:
-            expression_attribute_names["#type"] = "type"
+            if "type" in body:
+                update_expression_parts.append("#type = :type")
+                expression_attribute_values[":type"] = body["type"]
 
-        update_params = {
-            "Key": {"PK": "SYSTEM_SETTINGS", "SK": "SEARCH_PROVIDER"},
-            "UpdateExpression": update_expression,
-            "ExpressionAttributeValues": expression_attribute_values,
-            "ReturnValues": "ALL_NEW",
-        }
+            if "endpoint" in body:
+                update_expression_parts.append("endpoint = :endpoint")
+                expression_attribute_values[":endpoint"] = body["endpoint"]
 
-        if expression_attribute_names:
-            update_params["ExpressionAttributeNames"] = expression_attribute_names
+            if "isEnabled" in body:
+                update_expression_parts.append("isEnabled = :isEnabled")
+                expression_attribute_values[":isEnabled"] = body["isEnabled"]
 
-        response = system_settings_table.update_item(**update_params)
+            # Add datasetId if Coactive dataset was created
+            if coactive_dataset_id:
+                update_expression_parts.append("datasetId = :datasetId")
+                expression_attribute_values[":datasetId"] = coactive_dataset_id
 
-        # Get updated item
-        updated_provider = response.get("Attributes", {})
+            # Add secretArn if it was created/updated
+            if secret_arn:
+                update_expression_parts.append("secretArn = :secretArn")
+                expression_attribute_values[":secretArn"] = secret_arn
+
+            # Update search provider
+            update_expression = " , ".join(update_expression_parts)
+
+            # Prepare expression attribute names for reserved words
+            expression_attribute_names = {}
+            if "name" in body:
+                expression_attribute_names["#name"] = "name"
+            if "type" in body:
+                expression_attribute_names["#type"] = "type"
+
+            update_params = {
+                "Key": {"PK": "SYSTEM_SETTINGS", "SK": "SEARCH_PROVIDER"},
+                "UpdateExpression": update_expression,
+                "ExpressionAttributeValues": expression_attribute_values,
+                "ReturnValues": "ALL_NEW",
+            }
+
+            if expression_attribute_names:
+                update_params["ExpressionAttributeNames"] = expression_attribute_names
+
+            response = system_settings_table.update_item(**update_params)
+            updated_provider = response.get("Attributes", {})
+            logger.info(f"Updated existing search provider: {provider_id}")
 
         # Remove DynamoDB specific attributes for response
         if updated_provider:
@@ -410,9 +471,10 @@ def update_search_provider():
                 updated_embedding_store = {"type": "opensearch", "isEnabled": True}
 
         # Prepare response
+        action_message = "created" if is_creating_new else "updated"
         return {
             "status": "success",
-            "message": "Search settings updated successfully",
+            "message": f"Search settings {action_message} successfully",
             "data": {
                 "searchProvider": updated_provider,
                 "embeddingStore": updated_embedding_store,

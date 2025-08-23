@@ -145,3 +145,6 @@ s3_bucket_assets/pipeline_nodes/node_templates/utility/debug_input.yaml
 /blob-report/
 /playwright/.cache/
 1scratch
+
+
+*.lp5

@@ -300,9 +300,22 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
         conn.close()
 
         if response.status != 200:
+            self.logger.error(f"Coactive API error response: {response_data}")
             raise Exception(f"Coactive API error: {response.status} - {response_data}")
 
-        return json.loads(response_data)
+        # Log the raw response from Coactive
+        self.logger.info(f"Raw Coactive API response: {response_data}")
+
+        try:
+            parsed_response = json.loads(response_data)
+            self.logger.info(
+                f"Parsed Coactive response structure: {json.dumps(parsed_response, indent=2)}"
+            )
+            return parsed_response
+        except json.JSONDecodeError as e:
+            self.logger.error(f"Failed to parse Coactive response as JSON: {e}")
+            self.logger.error(f"Raw response that failed to parse: {response_data}")
+            raise Exception(f"Invalid JSON response from Coactive API: {e}")
 
     def _convert_coactive_response(
         self, response: Dict[str, Any], query: SearchQuery

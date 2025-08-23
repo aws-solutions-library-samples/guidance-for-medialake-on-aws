@@ -226,30 +226,39 @@ class UnifiedSearchOrchestrator:
 
                 return response
             else:
-                # No suitable provider found - raise error instead of fallback
-                available_providers = (
-                    list(self._providers.keys()) if self._providers else []
-                )
-                error_msg = f"No suitable search provider found for query. Available providers: {available_providers}"
-                self.logger.error(error_msg)
-                raise RuntimeError(error_msg)
+                # No suitable provider found - handle based on search type
+                if search_query.search_type.value == "keyword":
+                    # Keyword search always works with OpenSearch directly
+                    self.logger.info(
+                        "Executing keyword search using OpenSearch directly"
+                    )
+                    return self._execute_opensearch_keyword_search(query_params)
+                else:
+                    # For semantic searches, we need a configured provider
+                    available_providers = (
+                        list(self._providers.keys()) if self._providers else []
+                    )
+                    error_msg = f"No suitable search provider found for semantic search. Available providers: {available_providers}"
+                    self.logger.error(error_msg)
+                    raise RuntimeError(error_msg)
 
         except Exception as e:
             self.logger.error(f"Unified search failed: {str(e)}")
-            # Re-raise the error instead of falling back to legacy system
+            # Re-raise the error - no fallback needed since keyword search is handled directly
             raise RuntimeError(f"Search system failure: {str(e)}")
 
     def _select_provider(self, query: SearchQuery) -> Optional[BaseSearchProvider]:
         """
         Select the most appropriate provider for the given query.
+        Note: Keyword search doesn't require a provider - it uses OpenSearch directly.
 
         Args:
             query: SearchQuery object
 
         Returns:
-            Selected provider or None if no suitable provider found
+            Selected provider or None (None for keyword search means use OpenSearch directly)
         """
-        # For semantic search, prefer external semantic services
+        # For semantic search, we need a configured provider
         if query.search_type.value == "semantic":
             # Look for external semantic service providers first
             for provider in self._providers.values():
@@ -275,7 +284,14 @@ class UnifiedSearchOrchestrator:
                     )
                     return provider
 
-        # For keyword search, prefer provider+store
+            # Use default provider if available for semantic search
+            if self._default_provider and self._default_provider.validate_query(query):
+                self.logger.info(
+                    f"Using default provider for semantic search: {self._default_provider.config.provider}"
+                )
+                return self._default_provider
+
+        # For keyword search, check if we have any configured providers that can handle it
         else:
             for provider in self._providers.values():
                 if (
@@ -287,14 +303,22 @@ class UnifiedSearchOrchestrator:
                     )
                     return provider
 
-        # Use default provider if available
-        if self._default_provider and self._default_provider.validate_query(query):
-            self.logger.info(
-                f"Using default provider: {self._default_provider.config.provider}"
-            )
-            return self._default_provider
+            # Use default provider if available for keyword search
+            if self._default_provider and self._default_provider.validate_query(query):
+                self.logger.info(
+                    f"Using default provider for keyword search: {self._default_provider.config.provider}"
+                )
+                return self._default_provider
 
-        self.logger.warning("No suitable provider found for query")
+        # No provider found - this is fine for keyword search (uses OpenSearch directly)
+        # but problematic for semantic search
+        if query.search_type.value == "semantic":
+            self.logger.warning("No suitable provider found for semantic search")
+        else:
+            self.logger.info(
+                "No provider configured for keyword search - will use OpenSearch directly"
+            )
+
         return None
 
     def _convert_to_medialake_response(
@@ -379,21 +403,72 @@ class UnifiedSearchOrchestrator:
             # Continue without URLs rather than failing the entire request
 
     def _execute_legacy_search(self, query_params: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute search using legacy embedding store system"""
-        self.logger.info("Falling back to legacy search system")
+        """Execute search using legacy OpenSearch-based system"""
+        self.logger.info("Falling back to legacy OpenSearch-based search system")
 
         try:
-            # Import and use existing search logic
+            # Import here to avoid circular imports
+            import os
+            import sys
+
+            # Add current directory to path for imports
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            if current_dir not in sys.path:
+                sys.path.insert(0, current_dir)
+
+            # Import the legacy search components
             from index import SearchParams, perform_search
 
-            # Convert query params to legacy SearchParams
-            params = SearchParams(**query_params)
+            # Convert query params to legacy SearchParams, handling missing optional fields
+            search_params = {}
+
+            # Required parameter
+            search_params["q"] = query_params.get("q", "")
+
+            # Optional parameters with defaults
+            search_params["page"] = int(query_params.get("page", 1))
+            search_params["pageSize"] = int(query_params.get("pageSize", 50))
+            search_params["min_score"] = float(query_params.get("min_score", 0.01))
+            search_params["semantic"] = (
+                query_params.get("semantic", "false").lower() == "true"
+            )
+
+            # Handle optional filter parameters
+            if "filters" in query_params:
+                search_params["filters"] = query_params["filters"]
+            if "search_fields" in query_params:
+                search_params["search_fields"] = query_params["search_fields"]
+            if "type" in query_params:
+                search_params["type"] = query_params["type"]
+            if "extension" in query_params:
+                search_params["extension"] = query_params["extension"]
+            if "LargerThan" in query_params:
+                search_params["LargerThan"] = query_params["LargerThan"]
+            if "asset_size_lte" in query_params:
+                search_params["asset_size_lte"] = query_params["asset_size_lte"]
+            if "asset_size_gte" in query_params:
+                search_params["asset_size_gte"] = query_params["asset_size_gte"]
+            if "ingested_date_lte" in query_params:
+                search_params["ingested_date_lte"] = query_params["ingested_date_lte"]
+            if "ingested_date_gte" in query_params:
+                search_params["ingested_date_gte"] = query_params["ingested_date_gte"]
+            if "filename" in query_params:
+                search_params["filename"] = query_params["filename"]
+            if "storageIdentifier" in query_params:
+                search_params["storageIdentifier"] = query_params["storageIdentifier"]
+
+            # Create SearchParams object
+            params = SearchParams(**search_params)
 
             # Execute legacy search
-            return perform_search(params)
+            result = perform_search(params)
+
+            self.logger.info("Legacy search completed successfully")
+            return result
 
         except Exception as e:
             self.logger.error(f"Legacy search fallback failed: {str(e)}")
+            self.logger.exception("Full traceback for legacy search failure")
 
             # Return empty result as last resort
             return {
@@ -402,8 +477,8 @@ class UnifiedSearchOrchestrator:
                 "data": {
                     "searchMetadata": {
                         "totalResults": 0,
-                        "page": 1,
-                        "pageSize": 50,
+                        "page": int(query_params.get("page", 1)),
+                        "pageSize": int(query_params.get("pageSize", 50)),
                         "searchTerm": query_params.get("q", ""),
                     },
                     "results": [],

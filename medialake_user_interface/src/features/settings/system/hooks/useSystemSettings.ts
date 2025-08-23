@@ -116,7 +116,8 @@ export const useSemanticSearchSettings = () => {
   }, [settings.current, settings.original]);
 
   // Handle toggle change
-  const handleToggleChange = (enabled: boolean) => {
+  const handleToggleChange = async (enabled: boolean) => {
+    // Update local state first
     setSettings((prev) => ({
       ...prev,
       current: {
@@ -124,6 +125,60 @@ export const useSemanticSearchSettings = () => {
         isEnabled: enabled,
       },
     }));
+
+    // Only call API if a provider record already exists in the database
+    // This happens after the first POST creation
+    const hasExistingProvider =
+      settings.original.provider.config?.isConfigured ||
+      settings.original.provider.config?.id;
+
+    if (hasExistingProvider) {
+      try {
+        const { current } = settings;
+
+        // Build embedding store payload
+        const embeddingStorePayload = {
+          type: current.embeddingStore.type,
+          isEnabled: enabled,
+        };
+
+        // Save the isEnabled status to deactivate/activate the provider
+        await updateProvider.mutateAsync({
+          isEnabled: enabled,
+          embeddingStore: embeddingStorePayload,
+        });
+
+        // Update original settings to reflect the saved change
+        setSettings((prev) => ({
+          ...prev,
+          original: {
+            ...prev.original,
+            isEnabled: enabled,
+          },
+          hasChanges:
+            JSON.stringify({
+              ...prev.current,
+              isEnabled: enabled,
+            }) !==
+            JSON.stringify({
+              ...prev.original,
+              isEnabled: enabled,
+            }),
+        }));
+      } catch (error) {
+        console.error("Error saving isEnabled status:", error);
+        // Revert the local state change if the API call failed
+        setSettings((prev) => ({
+          ...prev,
+          current: {
+            ...prev.current,
+            isEnabled: !enabled, // Revert to previous state
+          },
+        }));
+        throw error; // Re-throw to allow the UI to handle the error
+      }
+    }
+    // If no existing provider, just update local state (no API call)
   };
 
   // Handle provider type change
