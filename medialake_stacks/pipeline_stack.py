@@ -64,7 +64,7 @@ class PipelineStackProps:
     collection_endpoint: str
     mediaconvert_queue_arn: str
     mediaconvert_role_arn: str
-    shared_authorizer_lambda: lambda_.Function
+    shared_authorizer_lambda: apigateway.IAuthorizer
     # S3 Vector configuration
     s3_vector_bucket_name: str
     s3_vector_index_name: str = "media-vectors"

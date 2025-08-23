@@ -271,3 +271,8 @@ class AuthorizationStack(Stack):
     def shared_authorizer_lambda(self):
         """Return the shared authorizer Lambda function"""
         return self._shared_authorizer.authorizer_lambda
+
+    @property
+    def shared_authorizer(self):
+        """Return the shared API Gateway authorizer"""
+        return self._shared_authorizer.api_gateway_authorizer

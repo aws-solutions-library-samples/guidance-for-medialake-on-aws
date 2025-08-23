@@ -18,10 +18,6 @@ from aws_cdk import aws_secretsmanager as secrets_manager
 from constructs import Construct
 
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
-from medialake_constructs.auth.authorizer_utils import (
-    create_shared_custom_authorizer,
-    ensure_shared_authorizer_permissions,
-)
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 
@@ -33,6 +29,7 @@ class PermissionsStackProps:
     x_origin_verify_secret: secrets_manager.Secret
     cognito_user_pool: cognito.UserPool
     auth_table: dynamodb.TableV2
+    shared_authorizer_lambda: apigateway.IAuthorizer
 
 
 class PermissionsStack(cdk.NestedStack):
@@ -48,13 +45,11 @@ class PermissionsStack(cdk.NestedStack):
     ):
         super().__init__(scope, id, **kwargs)
 
-        # Use the shared custom authorizer
+        # Use the shared custom authorizer from props
+        self._api_authorizer = props.shared_authorizer_lambda
+
+        # Get API Gateway information
         api_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
-
-        self._api_authorizer = create_shared_custom_authorizer(
-            self, "PermissionsCustomApiAuthorizer", api_gateway_id=api_id
-        )
-
         root_resource_id = Fn.import_value("MediaLakeApiGatewayCore-RootResourceId")
 
         api = apigateway.RestApi.from_rest_api_attributes(
@@ -63,9 +58,6 @@ class PermissionsStack(cdk.NestedStack):
             rest_api_id=api_id,
             root_resource_id=root_resource_id,
         )
-
-        # Ensure the shared authorizer has permissions for this API Gateway
-        ensure_shared_authorizer_permissions(self, "Permissions", api)
 
         # Create the base permissions resource
         permissions_resource = api.root.add_resource("permissions")

@@ -5,7 +5,6 @@ from aws_cdk import Fn
 from aws_cdk import aws_apigateway as apigateway
 from aws_cdk import aws_cognito as cognito
 from aws_cdk import aws_dynamodb as dynamodb
-from aws_cdk import aws_lambda as lambda_
 from aws_cdk import aws_secretsmanager as secretsmanager
 from constructs import Construct
 
@@ -24,7 +23,7 @@ class UsersGroupsStackProps:
     x_origin_verify_secret: secretsmanager.Secret
     auth_table_name: str
     avp_policy_store_id: str
-    shared_authorizer_lambda: lambda_.Function
+    shared_authorizer_lambda: apigateway.IAuthorizer
 
 
 class UsersGroupsStack(cdk.NestedStack):

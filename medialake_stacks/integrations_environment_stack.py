@@ -34,7 +34,7 @@ class IntegrationsEnvironmentStackProps:
     x_origin_verify_secret: secretsmanager.Secret
     cognito_user_pool: cognito.UserPool
     pipelines_nodes_table: dynamodb.TableV2
-    shared_authorizer_lambda: lambda_.Function
+    shared_authorizer_lambda: apigateway.IAuthorizer
     post_pipelines_lambda: Lambda = None
 
 

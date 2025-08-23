@@ -135,7 +135,7 @@ class MediaLakeStack(cdk.Stack):
                 x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
                 auth_table_name=props.authorization_stack._auth_table.table_name,
                 avp_policy_store_id=props.authorization_stack._policy_store.attr_policy_store_id,
-                shared_authorizer_lambda=props.authorization_stack.shared_authorizer_lambda,
+                shared_authorizer_lambda=props.authorization_stack.shared_authorizer,
             ),
         )
         users_groups_roles_stack.add_dependency(props.authorization_stack)
@@ -147,6 +147,7 @@ class MediaLakeStack(cdk.Stack):
                 # x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
                 cognito_user_pool=props.cognito_stack.user_pool,
                 auth_table=props.authorization_stack.auth_table,
+                shared_authorizer_lambda=props.authorization_stack.shared_authorizer,
             ),
         )
         groups_stack.add_dependency(props.authorization_stack)
@@ -218,7 +219,7 @@ class MediaLakeStack(cdk.Stack):
                 waf_acl_arn=props.api_gateway_core_stack.waf_acl_arn,
                 user_table=users_groups_roles_stack.user_table,
                 s3_vector_bucket_name=props.base_infrastructure.s3_vector_bucket_name,
-                shared_authorizer_lambda=props.authorization_stack.shared_authorizer_lambda,
+                shared_authorizer_lambda=props.authorization_stack.shared_authorizer,
             ),
         )
 
@@ -236,7 +237,7 @@ class MediaLakeStack(cdk.Stack):
                 pipelines_nodes_table=nodes_stack.pipelines_nodes_table,
                 # We'll need to update this after pipeline_stack is created
                 post_pipelines_lambda=None,
-                shared_authorizer_lambda=props.authorization_stack.shared_authorizer_lambda,
+                shared_authorizer_lambda=props.authorization_stack.shared_authorizer,
             ),
         )
 
@@ -267,7 +268,7 @@ class MediaLakeStack(cdk.Stack):
                 s3_vector_bucket_name=props.base_infrastructure.s3_vector_bucket_name,
                 s3_vector_index_name=props.base_infrastructure.s3_vector_index_name,
                 s3_vector_dimension=props.base_infrastructure.s3_vector_dimension,
-                shared_authorizer_lambda=props.authorization_stack.shared_authorizer_lambda,
+                shared_authorizer_lambda=props.authorization_stack.shared_authorizer,
             ),
         )
 
@@ -287,7 +288,7 @@ class MediaLakeStack(cdk.Stack):
                 system_settings_table_arn=settings_stack.system_settings_table_arn,
                 api_keys_table_name=settings_stack.api_keys_table_name,
                 api_keys_table_arn=settings_stack.api_keys_table_arn,
-                shared_authorizer_lambda=props.authorization_stack.shared_authorizer_lambda,
+                shared_authorizer_lambda=props.authorization_stack.shared_authorizer,
             ),
         )
 
@@ -300,6 +301,7 @@ class MediaLakeStack(cdk.Stack):
                 x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
                 cognito_user_pool=props.cognito_stack.user_pool,
                 auth_table=props.authorization_stack.auth_table,
+                shared_authorizer_lambda=props.authorization_stack.shared_authorizer,
             ),
         )
 

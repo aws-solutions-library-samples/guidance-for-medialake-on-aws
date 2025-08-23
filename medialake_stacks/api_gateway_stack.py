@@ -63,7 +63,7 @@ class ApiGatewayStackProps:
     waf_acl_arn: str
     user_table: dynamodb.TableV2
     s3_vector_bucket_name: str
-    shared_authorizer_lambda: lambda_.Function
+    shared_authorizer_lambda: apigateway.IAuthorizer
 
 
 class ApiGatewayStack(cdk.NestedStack):

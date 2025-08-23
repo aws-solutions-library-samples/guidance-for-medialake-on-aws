@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 import aws_cdk as cdk
 from aws_cdk import CfnOutput, Duration
+from aws_cdk import aws_apigateway as apigateway
 from aws_cdk import aws_events as events
 from aws_cdk import aws_events_targets as targets
 from aws_cdk import aws_iam as iam
@@ -121,6 +122,15 @@ class SharedAuthorizerConstruct(Construct):
             )
         )
 
+        # Create the API Gateway authorizer that wraps the Lambda function
+        self._api_gateway_authorizer = apigateway.RequestAuthorizer(
+            self,
+            "SharedCustomAuthorizer",
+            handler=self._authorizer_lambda.function,
+            identity_sources=[],
+            results_cache_ttl=Duration.seconds(0),
+        )
+
         # Add resource-based policy to allow API Gateway to invoke this Lambda
         # This allows any API Gateway in the account to invoke this authorizer
         self._authorizer_lambda.function.add_permission(
@@ -166,3 +176,8 @@ class SharedAuthorizerConstruct(Construct):
     def authorizer_lambda(self) -> lambda_.Function:
         """Return the shared authorizer Lambda function"""
         return self._authorizer_lambda.function
+
+    @property
+    def api_gateway_authorizer(self) -> apigateway.IAuthorizer:
+        """Return the API Gateway authorizer"""
+        return self._api_gateway_authorizer

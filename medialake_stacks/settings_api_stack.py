@@ -4,7 +4,6 @@ import aws_cdk as cdk
 from aws_cdk import Fn
 from aws_cdk import aws_apigateway as apigateway
 from aws_cdk import aws_cognito as cognito
-from aws_cdk import aws_lambda as lambda_
 from aws_cdk import aws_secretsmanager as secretsmanager
 from constructs import Construct
 
@@ -25,7 +24,7 @@ class SettingsApiStackProps:
     system_settings_table_arn: str
     api_keys_table_name: str
     api_keys_table_arn: str
-    shared_authorizer_lambda: lambda_.Function
+    shared_authorizer_lambda: apigateway.IAuthorizer
 
 
 class SettingsApiStack(cdk.NestedStack):
