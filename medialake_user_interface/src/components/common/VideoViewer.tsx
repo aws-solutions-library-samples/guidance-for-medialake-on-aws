@@ -25,30 +25,28 @@ import {
   Stack,
   Slider,
   Box,
-  ListItem,
-  List,
-  ListItemText,
   Popover,
   Typography,
   Paper,
+  Chip,
+  Grid,
+  Divider,
+  Button,
 } from "@mui/material";
 
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
-import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
+import KeyboardAltIcon from "@mui/icons-material/KeyboardAlt";
 import PauseIcon from "@mui/icons-material/Pause";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import VolumeOffIcon from "@mui/icons-material/VolumeOff";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import "./VideoViewer.css";
 
-import addMakerDiv from "../asset/AssetSidebar";
 import { createTimecodePlaceholder } from "@/utils/placeholderSvg";
 import { useVideoKeyboardShortcuts } from "./useVideoKeyboardShortcuts";
 
 import { filter } from "rxjs";
 import { randomHexColor } from "./utils";
-import { start } from "repl";
-import { Currency } from "lucide-react";
 
 export interface VideoViewerProps {
   videoSrc: string;
@@ -829,18 +827,195 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
             vertical: "bottom",
             horizontal: "center",
           }}
+          PaperProps={{
+            sx: {
+              borderRadius: 2,
+              boxShadow: "0 8px 32px rgba(0, 0, 0, 0.12)",
+              border: "1px solid rgba(255, 255, 255, 0.1)",
+              backdropFilter: "blur(10px)",
+              maxWidth: 500,
+            },
+          }}
         >
-          <Box sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
+          <Box sx={{ p: 3 }}>
+            <Typography
+              variant="h5"
+              gutterBottom
+              sx={{
+                fontWeight: 600,
+                mb: 2,
+                background: "linear-gradient(45deg, #2196F3, #21CBF3)",
+                backgroundClip: "text",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}
+            >
               Keyboard Shortcuts
             </Typography>
-            <List dense>
-              {SHORTCUTS.map((line) => (
-                <ListItem key={line}>
-                  <ListItemText primary={line} />
-                </ListItem>
-              ))}
-            </List>
+
+            <Typography
+              variant="caption"
+              sx={{
+                color: "text.secondary",
+                mb: 3,
+                display: "block",
+                fontStyle: "italic",
+              }}
+            >
+              Click any shortcut below to execute the action
+            </Typography>
+
+            {Object.entries(
+              SHORTCUTS.reduce(
+                (acc, shortcut) => {
+                  if (!acc[shortcut.category]) {
+                    acc[shortcut.category] = [];
+                  }
+                  acc[shortcut.category].push(shortcut);
+                  return acc;
+                },
+                {} as Record<string, typeof SHORTCUTS>,
+              ),
+            ).map(([category, shortcuts], categoryIndex) => (
+              <Box
+                key={category}
+                sx={{
+                  mb:
+                    categoryIndex <
+                    Object.keys(
+                      SHORTCUTS.reduce(
+                        (acc, shortcut) => {
+                          if (!acc[shortcut.category]) {
+                            acc[shortcut.category] = [];
+                          }
+                          acc[shortcut.category].push(shortcut);
+                          return acc;
+                        },
+                        {} as Record<string, typeof SHORTCUTS>,
+                      ),
+                    ).length -
+                      1
+                      ? 2
+                      : 0,
+                }}
+              >
+                <Typography
+                  variant="subtitle2"
+                  sx={{
+                    fontWeight: 600,
+                    color: "text.secondary",
+                    mb: 1,
+                    textTransform: "uppercase",
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  {category}
+                </Typography>
+
+                <Grid container spacing={1}>
+                  {shortcuts.map((shortcut, index) => (
+                    <Grid item xs={12} key={`${category}-${index}`}>
+                      <Button
+                        fullWidth
+                        variant="text"
+                        onClick={() => {
+                          try {
+                            shortcut.action();
+                          } catch (error) {
+                            console.error(
+                              "Error executing shortcut action:",
+                              error,
+                            );
+                          }
+                        }}
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          py: 1,
+                          px: 1.5,
+                          borderRadius: 1,
+                          textTransform: "none",
+                          color: "inherit",
+                          cursor: "pointer",
+                          "&:hover": {
+                            backgroundColor: "action.hover",
+                            transform: "translateY(-1px)",
+                            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
+                          },
+                          transition: "all 0.2s ease-in-out",
+                        }}
+                      >
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            flex: 1,
+                            color: "text.primary",
+                            fontWeight: 500,
+                            textAlign: "left",
+                          }}
+                        >
+                          {shortcut.description}
+                        </Typography>
+
+                        <Box sx={{ display: "flex", gap: 0.5 }}>
+                          {shortcut.keys.map((key, keyIndex) => (
+                            <React.Fragment key={keyIndex}>
+                              <Chip
+                                label={key}
+                                size="small"
+                                sx={{
+                                  height: 24,
+                                  fontSize: "0.75rem",
+                                  fontWeight: 600,
+                                  backgroundColor: "grey.100",
+                                  color: "grey.800",
+                                  border: "1px solid",
+                                  borderColor: "grey.300",
+                                  boxShadow: "0 1px 2px rgba(0, 0, 0, 0.1)",
+                                  "& .MuiChip-label": {
+                                    px: 1,
+                                  },
+                                  pointerEvents: "none",
+                                }}
+                              />
+                              {keyIndex < shortcut.keys.length - 1 && (
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    alignSelf: "center",
+                                    color: "text.secondary",
+                                    mx: 0.5,
+                                    pointerEvents: "none",
+                                  }}
+                                >
+                                  /
+                                </Typography>
+                              )}
+                            </React.Fragment>
+                          ))}
+                        </Box>
+                      </Button>
+                    </Grid>
+                  ))}
+                </Grid>
+
+                {categoryIndex <
+                  Object.keys(
+                    SHORTCUTS.reduce(
+                      (acc, shortcut) => {
+                        if (!acc[shortcut.category]) {
+                          acc[shortcut.category] = [];
+                        }
+                        acc[shortcut.category].push(shortcut);
+                        return acc;
+                      },
+                      {} as Record<string, typeof SHORTCUTS>,
+                    ),
+                  ).length -
+                    1 && <Divider sx={{ mt: 1.5 }} />}
+              </Box>
+            ))}
           </Box>
         </Popover>
 
@@ -1010,7 +1185,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
                 "&:hover": { bgcolor: "rgba(255, 255, 255, 0.1)" },
               }}
             >
-              <HelpOutlineIcon />
+              <KeyboardAltIcon />
             </IconButton>
           </Stack>
         </Paper>
