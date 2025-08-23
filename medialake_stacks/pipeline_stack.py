@@ -107,7 +107,7 @@ class PipelineStack(cdk.NestedStack):
             "PipelinesApiGateway",
             props=ApiGatewayPipelinesProps(
                 api_resource=api.root,
-                cognito_authorizer=self._api_authorizer,
+                authorizer=self._api_authorizer,
                 x_origin_verify_secret=props.x_origin_verify_secret,
                 asset_table=props.asset_table,
                 connector_table=props.connector_table,

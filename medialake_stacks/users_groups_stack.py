@@ -179,7 +179,7 @@ class UsersGroupsStack(cdk.NestedStack):
             "UsersApiGateway",
             props=UsersApiProps(
                 api_resource=api.root,
-                cognito_authorizer=self._cognito_user_pool_authorizer,
+                authorizer=self._cognito_user_pool_authorizer,
                 cognito_user_pool=props.cognito_user_pool,
                 x_origin_verify_secret=props.x_origin_verify_secret,
             ),
@@ -191,7 +191,7 @@ class UsersGroupsStack(cdk.NestedStack):
             "UPSFApi",
             props=UPSFApiProps(
                 api_resource=api.root,
-                cognito_authorizer=self._cognito_user_pool_authorizer,
+                authorizer=self._cognito_user_pool_authorizer,
                 cognito_user_pool=props.cognito_user_pool,
                 x_origin_verify_secret=props.x_origin_verify_secret,
                 user_table=self._user_table.table,
