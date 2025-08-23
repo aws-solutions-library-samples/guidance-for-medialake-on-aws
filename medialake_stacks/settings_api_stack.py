@@ -55,7 +55,7 @@ class SettingsApiStack(cdk.NestedStack):
                 cognito_app_client=props.cognito_app_client,
                 x_origin_verify_secret=props.x_origin_verify_secret,
                 system_settings_table_name=props.system_settings_table_name,
-                system_settings_table_arn=props.system_settings_arn,
+                system_settings_table_arn=props.system_settings_table_arn,
                 api_keys_table_name=props.api_keys_table_name,
                 api_keys_table_arn=props.api_keys_table_arn,
             ),
