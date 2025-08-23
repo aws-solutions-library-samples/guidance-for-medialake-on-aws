@@ -8,7 +8,9 @@ import time
 from typing import Any, Dict, List, Optional
 
 import boto3
+from bedrock_twelvelabs_search_provider import BedrockTwelveLabsSearchProvider
 from coactive_search_provider import CoactiveSearchProvider
+from twelvelabs_api_search_provider import TwelveLabsAPISearchProvider
 from unified_search_models import (
     SearchArchitectureType,
     SearchHit,
@@ -41,6 +43,12 @@ class UnifiedSearchOrchestrator:
         """Initialize and register all available search providers"""
         # Register provider classes
         self.provider_factory.register_provider("coactive", CoactiveSearchProvider)
+        self.provider_factory.register_provider(
+            "bedrock_twelvelabs", BedrockTwelveLabsSearchProvider
+        )
+        self.provider_factory.register_provider(
+            "twelvelabs_api", TwelveLabsAPISearchProvider
+        )
 
         # Load provider configurations and create instances
         self._load_provider_configurations()
@@ -127,32 +135,95 @@ class UnifiedSearchOrchestrator:
                 "isEnabled"
             ):
                 item = coactive_response["Item"]
+                provider_type = item.get("type", "coactive")
+
                 # Map the DynamoDB record structure to expected config format
-                coactive_config = {
-                    "provider": item.get(
-                        "type", "coactive"
-                    ),  # Use 'type' field from DB
-                    "provider_location": "external",
-                    "architecture": "external_semantic_service",
-                    "capabilities": {
-                        "media": ["video", "audio", "image"],
-                        "semantic": True,
-                    },
-                    "dataset_id": item.get(
-                        "datasetId"
-                    ),  # Now populated by PUT endpoint when Coactive dataset is created
-                    "endpoint": item.get("endpoint"),
-                    "auth": {
-                        "type": "bearer",
-                        "secret_arn": item.get("secretArn"),
-                    },
-                    "metadata_mapping": item.get("metadataMapping", {}),
-                    "name": item.get("name", "Coactive AI"),
-                    "id": item.get("id"),
-                }
-                configs.append(coactive_config)
+                if provider_type == "coactive":
+                    provider_config = {
+                        "provider": "coactive",
+                        "provider_location": "external",
+                        "architecture": "external_semantic_service",
+                        "capabilities": {
+                            "media": ["video", "audio", "image"],
+                            "semantic": True,
+                        },
+                        "dataset_id": item.get("datasetId"),
+                        "endpoint": item.get("endpoint"),
+                        "auth": {
+                            "type": "bearer",
+                            "secret_arn": item.get("secretArn"),
+                        },
+                        "metadata_mapping": item.get("metadataMapping", {}),
+                        "name": item.get("name", "Coactive AI"),
+                        "id": item.get("id"),
+                    }
+                elif provider_type == "bedrock twelvelabs":
+                    provider_config = {
+                        "provider": "bedrock_twelvelabs",
+                        "provider_location": "internal",
+                        "architecture": "provider_plus_store",
+                        "capabilities": {
+                            "media": ["video", "audio", "image"],
+                            "semantic": True,
+                        },
+                        "endpoint": item.get("endpoint"),
+                        "auth": {
+                            "type": "bedrock",
+                            "secret_arn": item.get("secretArn"),
+                        },
+                        "store": "opensearch",  # Default to opensearch for bedrock
+                        "metadata_mapping": item.get("metadataMapping", {}),
+                        "name": item.get("name", "Bedrock TwelveLabs"),
+                        "id": item.get("id"),
+                    }
+                elif provider_type == "twelvelabs":
+                    provider_config = {
+                        "provider": "twelvelabs_api",
+                        "provider_location": "external",
+                        "architecture": "provider_plus_store",
+                        "capabilities": {
+                            "media": ["video", "audio", "image"],
+                            "semantic": True,
+                        },
+                        "endpoint": item.get(
+                            "endpoint", "https://api.twelvelabs.io/v1"
+                        ),
+                        "auth": {
+                            "type": "api_key",
+                            "secret_arn": item.get("secretArn"),
+                        },
+                        "store": "opensearch",  # Default to opensearch for twelvelabs api
+                        "metadata_mapping": item.get("metadataMapping", {}),
+                        "name": item.get("name", "TwelveLabs API"),
+                        "id": item.get("id"),
+                    }
+                else:
+                    # For unknown types, try to infer from the type string
+                    self.logger.warning(
+                        f"Unknown provider type: {provider_type}, attempting to infer configuration"
+                    )
+                    provider_config = {
+                        "provider": provider_type,  # Use the type as-is for the provider name
+                        "provider_location": "external",
+                        "architecture": "external_semantic_service",
+                        "capabilities": {
+                            "media": ["video", "audio", "image"],
+                            "semantic": True,
+                        },
+                        "dataset_id": item.get("datasetId"),
+                        "endpoint": item.get("endpoint"),
+                        "auth": {
+                            "type": "bearer",
+                            "secret_arn": item.get("secretArn"),
+                        },
+                        "metadata_mapping": item.get("metadataMapping", {}),
+                        "name": item.get("name", f"Unknown Provider ({provider_type})"),
+                        "id": item.get("id"),
+                    }
+
+                configs.append(provider_config)
                 self.logger.info(
-                    f"Found Coactive configuration: {item.get('name', 'Coactive AI')}"
+                    f"Found {provider_type} configuration: {provider_config.get('name')}"
                 )
 
             return configs
