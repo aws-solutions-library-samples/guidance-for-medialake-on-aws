@@ -28,6 +28,7 @@ from medialake_constructs.api_gateway.api_gateway_search import (
     SearchConstruct,
     SearchProps,
 )
+from medialake_constructs.auth.authorizer_utils import create_shared_custom_authorizer
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket
 
 
@@ -63,7 +64,6 @@ class ApiGatewayStackProps:
     waf_acl_arn: str
     user_table: dynamodb.TableV2
     s3_vector_bucket_name: str
-    shared_authorizer_lambda: apigateway.IAuthorizer
 
 
 class ApiGatewayStack(cdk.NestedStack):
@@ -85,8 +85,11 @@ class ApiGatewayStack(cdk.NestedStack):
             root_resource_id=root_resource_id,
         )
 
-        # Use the shared custom authorizer from the authorization stack
-        self._api_gateway_authorizer = props.shared_authorizer_lambda
+        # Use the shared custom authorizer
+        api_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
+        self._api_gateway_authorizer = create_shared_custom_authorizer(
+            self, "ApiGatewayCustomAuthorizer", api_gateway_id=api_id
+        )
 
         self._connectors_api_gateway = ConnectorsConstruct(
             self,

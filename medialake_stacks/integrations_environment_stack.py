@@ -18,6 +18,7 @@ from medialake_constructs.api_gateway.api_gateway_integrations import (
     ApiGatewayIntegrationsConstruct,
     ApiGatewayIntegrationsProps,
 )
+from medialake_constructs.auth.authorizer_utils import create_shared_custom_authorizer
 from medialake_constructs.shared_constructs.default_environment import (
     DefaultEnvironment,
     DefaultEnvironmentProps,
@@ -34,7 +35,6 @@ class IntegrationsEnvironmentStackProps:
     x_origin_verify_secret: secretsmanager.Secret
     cognito_user_pool: cognito.UserPool
     pipelines_nodes_table: dynamodb.TableV2
-    shared_authorizer_lambda: apigateway.IAuthorizer
     post_pipelines_lambda: Lambda = None
 
 
@@ -63,7 +63,10 @@ class IntegrationsEnvironmentStack(cdk.NestedStack):
         )
 
         # Use the shared custom authorizer
-        self._api_authorizer = props.shared_authorizer_lambda
+        api_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
+        self._api_authorizer = create_shared_custom_authorizer(
+            self, "IntegrationsCustomApiAuthorizer", api_gateway_id=api_id
+        )
 
         # Create Integrations API Gateway construct
         self._integrations_stack = ApiGatewayIntegrationsConstruct(

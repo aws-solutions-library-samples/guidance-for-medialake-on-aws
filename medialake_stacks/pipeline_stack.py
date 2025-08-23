@@ -26,6 +26,7 @@ from medialake_constructs.api_gateway.api_gateway_pipelines import (
     ApiGatewayPipelinesConstruct,
     ApiGatewayPipelinesProps,
 )
+from medialake_constructs.auth.authorizer_utils import create_shared_custom_authorizer
 from medialake_stacks.pipelines_executions_stack import (
     PipelinesExecutionsStack,
     PipelinesExecutionsStackProps,
@@ -64,7 +65,6 @@ class PipelineStackProps:
     collection_endpoint: str
     mediaconvert_queue_arn: str
     mediaconvert_role_arn: str
-    shared_authorizer_lambda: apigateway.IAuthorizer
     # S3 Vector configuration
     s3_vector_bucket_name: str
     s3_vector_index_name: str = "media-vectors"
@@ -92,7 +92,10 @@ class PipelineStack(cdk.NestedStack):
         )
 
         # Use the shared custom authorizer
-        self._api_authorizer = props.shared_authorizer_lambda
+        api_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
+        self._api_authorizer = create_shared_custom_authorizer(
+            self, "PipelineCustomApiAuthorizer", api_gateway_id=api_id
+        )
 
         self._pipelines_executions_stack = PipelinesExecutionsStack(
             self,

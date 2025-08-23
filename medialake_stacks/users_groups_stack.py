@@ -11,6 +11,7 @@ from constructs import Construct
 from config import config
 from medialake_constructs.api_gateway.api_gateway_upsf import UPSFApi, UPSFApiProps
 from medialake_constructs.api_gateway.api_gateway_users import UsersApi, UsersApiProps
+from medialake_constructs.auth.authorizer_utils import create_shared_custom_authorizer
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 
 
@@ -23,7 +24,6 @@ class UsersGroupsStackProps:
     x_origin_verify_secret: secretsmanager.Secret
     auth_table_name: str
     avp_policy_store_id: str
-    shared_authorizer_lambda: apigateway.IAuthorizer
 
 
 class UsersGroupsStack(cdk.NestedStack):
@@ -49,7 +49,10 @@ class UsersGroupsStack(cdk.NestedStack):
         )
 
         # Use the shared custom authorizer
-        self._cognito_user_pool_authorizer = props.shared_authorizer_lambda
+        api_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
+        self._cognito_user_pool_authorizer = create_shared_custom_authorizer(
+            self, "UsersGroupsCustomApiAuthorizer", api_gateway_id=api_id
+        )
 
         # 1. User Table
         user_table_props = DynamoDBProps(

@@ -11,6 +11,7 @@ from medialake_constructs.api_gateway.api_gateway_settings import (
     SettingsConstruct,
     SettingsConstructProps,
 )
+from medialake_constructs.auth.authorizer_utils import create_shared_custom_authorizer
 
 
 @dataclass
@@ -24,7 +25,6 @@ class SettingsApiStackProps:
     system_settings_table_arn: str
     api_keys_table_name: str
     api_keys_table_arn: str
-    shared_authorizer_lambda: apigateway.IAuthorizer
 
 
 class SettingsApiStack(cdk.NestedStack):
@@ -43,13 +43,19 @@ class SettingsApiStack(cdk.NestedStack):
             root_resource_id=root_resource_id,
         )
 
+        # Use the shared custom authorizer
+        api_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
+        self._api_authorizer = create_shared_custom_authorizer(
+            self, "SettingsCustomApiAuthorizer", api_gateway_id=api_id
+        )
+
         # Create Settings construct
         self._settings_construct = SettingsConstruct(
             self,
             "SettingsApiGateway",
             props=SettingsConstructProps(
                 api_resource=api.root,
-                authorizer=props.shared_authorizer_lambda,
+                authorizer=self._api_authorizer,
                 cognito_user_pool=props.cognito_user_pool,
                 cognito_app_client=props.cognito_app_client,
                 x_origin_verify_secret=props.x_origin_verify_secret,
