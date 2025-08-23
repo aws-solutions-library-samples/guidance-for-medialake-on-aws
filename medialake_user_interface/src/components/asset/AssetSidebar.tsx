@@ -324,7 +324,11 @@ const EditableTimecode: React.FC<{
         value={editValue}
         onChange={(e) => setEditValue(e.target.value)}
         onBlur={handleSaveEdit}
-        onKeyDown={handleKeyPress}
+        onKeyDown={(e) => {
+          // Prevent video player keyboard shortcuts when editing timecode
+          e.stopPropagation();
+          handleKeyPress(e);
+        }}
         autoFocus
         sx={{
           "& .MuiInputBase-input": {
@@ -2234,6 +2238,10 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                           );
                         }}
                         onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => {
+                          // Prevent video player keyboard shortcuts when editing marker title
+                          e.stopPropagation();
+                        }}
                         sx={{
                           fontWeight: 600,
                           fontStyle: "italic",
