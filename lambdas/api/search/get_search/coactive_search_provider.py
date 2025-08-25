@@ -320,18 +320,28 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
     def _convert_coactive_response(
         self, response: Dict[str, Any], query: SearchQuery
     ) -> SearchResult:
-        """Convert Coactive API response to SearchResult with proper MediaLake format"""
+        """
+        Convert Coactive API response to SearchResult with proper MediaLake format.
+
+        Coactive returns results in relevance order but doesn't provide explicit ranking scores.
+        This method converts the positional order to a 0.0-1.0 ranking score where:
+        - First result gets 1.0 (highest relevance)
+        - Subsequent results get progressively lower scores using exponential decay
+        - Minimum score is 0.1 to maintain meaningful differences
+        """
         # Based on working example, results are in 'data' field
         results = response.get("data", [])
         total_count = response.get("total_count", len(results))
 
-        self.logger.info(f"Processing {len(results)} Coactive search results")
+        self.logger.info(
+            f"Processing {len(results)} Coactive search results with order-based ranking conversion"
+        )
 
         # Group results by MediaLake asset UUID to create proper clips structure
         assets_with_clips = {}
         max_score = 0.0
 
-        for result in results:
+        for index, result in enumerate(results):
             # Extract MediaLake UUID from different locations based on media type
             medialake_uuid = None
             coactive_metadata = {}
@@ -369,8 +379,21 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
                 )
                 continue
 
-            # Calculate score (default to 1.0 if not provided)
-            score = float(result.get("relevance_score") or result.get("score", 1.0))
+            # Convert order-based ranking to 0.0-1.0 score
+            # First result gets 1.0, subsequent results get progressively lower scores
+            if len(results) > 1:
+                # Use exponential decay to create meaningful score differences
+                # This ensures first result gets 1.0, and scores decrease meaningfully
+                ranking_score = max(0.1, 1.0 - (index * 0.8 / (len(results) - 1)))
+            else:
+                ranking_score = 1.0
+
+            # Keep original score for reference but use ranking score for sorting
+            original_score = float(
+                result.get("relevance_score") or result.get("score", ranking_score)
+            )
+            score = ranking_score
+
             if score > max_score:
                 max_score = score
 
@@ -386,9 +409,11 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
                 if score > assets_with_clips[medialake_uuid]["max_score"]:
                     assets_with_clips[medialake_uuid]["max_score"] = score
 
-            # Create clip data
+            # Create clip data with both ranking score and original score
             clip_data = {
-                "score": score,
+                "score": score,  # Use ranking score for sorting
+                "original_score": original_score,  # Keep original for reference
+                "ranking_position": index + 1,  # 1-based position for debugging
                 "coactive_metadata": coactive_metadata,
                 "coactive_result": result,  # Store full result for debugging
             }
@@ -396,6 +421,22 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
             assets_with_clips[medialake_uuid]["clips"].append(clip_data)
 
         self.logger.info(f"Grouped results into {len(assets_with_clips)} unique assets")
+
+        # Log ranking conversion for debugging
+        if results:
+            self.logger.info("Coactive ranking conversion applied:")
+            for index, result in enumerate(results[:5]):  # Log first 5 for debugging
+                ranking_score = (
+                    max(0.1, 1.0 - (index * 0.8 / (len(results) - 1)))
+                    if len(results) > 1
+                    else 1.0
+                )
+                original_score = result.get("relevance_score") or result.get(
+                    "score", "N/A"
+                )
+                self.logger.info(
+                    f"  Position {index + 1}: original_score={original_score} -> ranking_score={ranking_score:.3f}"
+                )
 
         # Convert to SearchHit format
         hits = []
@@ -479,7 +520,13 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
                         and "clips" in hit.source
                     ):
                         clips = []
-                        for clip_data in hit.source["clips"]:
+                        # Sort clips by ranking score to maintain Coactive's order
+                        sorted_clips = sorted(
+                            hit.source["clips"],
+                            key=lambda x: x.get("score", 0),
+                            reverse=True,
+                        )
+                        for clip_data in sorted_clips:
                             coactive_metadata = clip_data.get("coactive_metadata", {})
 
                             # Extract asset information from MediaLake source
