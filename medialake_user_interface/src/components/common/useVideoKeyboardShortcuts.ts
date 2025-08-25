@@ -100,7 +100,7 @@ export const useVideoKeyboardShortcuts = ({
   // Wrap play and pause with logging
   const play = useCallback(() => {
     console.log(
-      `🎬 PLAY() called from keyboard shortcuts - Stack:`,
+      `PLAY() called from keyboard shortcuts - Stack:`,
       new Error().stack?.split("\n").slice(1, 4).join("\n"),
     );
     originalPlay();
@@ -108,7 +108,7 @@ export const useVideoKeyboardShortcuts = ({
 
   const pause = useCallback(() => {
     console.log(
-      `⏸️ PAUSE() called from keyboard shortcuts - Stack:`,
+      `PAUSE() called from keyboard shortcuts - Stack:`,
       new Error().stack?.split("\n").slice(1, 4).join("\n"),
     );
     originalPause();
@@ -122,13 +122,13 @@ export const useVideoKeyboardShortcuts = ({
     const htmlVideoElement = omakasePlayer?.video?.htmlVideoElement;
 
     if (htmlVideoElement) {
-      console.log(`🎯 INITIALIZING video element to prevent focus conflicts`);
+      console.log(`INITIALIZING video element to prevent focus conflicts`);
       // Disable tabindex to prevent focus
       htmlVideoElement.setAttribute("tabindex", "-1");
       // Remove any existing focus
       htmlVideoElement.blur();
       console.log(
-        `✅ VIDEO ELEMENT configured to prevent native keyboard controls`,
+        `VIDEO ELEMENT configured to prevent native keyboard controls`,
       );
     }
   }, [omakaseRef]);
@@ -237,17 +237,17 @@ export const useVideoKeyboardShortcuts = ({
     const callCount = ++toggleCallCountRef.current;
 
     console.log(
-      `🎯 TOGGLE TRANSPORT CALLED #${callCount} - Time since last: ${timeSinceLastToggle}ms`,
+      `TOGGLE TRANSPORT CALLED #${callCount} - Time since last: ${timeSinceLastToggle}ms`,
     );
     console.log(
-      `🎯 Call stack:`,
+      `Call stack:`,
       new Error().stack?.split("\n").slice(1, 4).join("\n"),
     );
 
     // Prevent rapid toggles within 150ms
     if (timeSinceLastToggle < 150) {
       console.log(
-        `❌ Ignoring rapid toggle #${callCount}, time since last: ${timeSinceLastToggle}ms`,
+        `Ignoring rapid toggle #${callCount}, time since last: ${timeSinceLastToggle}ms`,
       );
       return;
     }
@@ -256,7 +256,7 @@ export const useVideoKeyboardShortcuts = ({
 
     // Check if we're in shuttle mode first
     if (isShuttlingReverseRef.current) {
-      console.log(`🛑 Stopping shuttle mode (call #${callCount})`);
+      console.log(`Stopping shuttle mode (call #${callCount})`);
       applyShuttleSpeed(0);
       return;
     }
@@ -265,7 +265,7 @@ export const useVideoKeyboardShortcuts = ({
     const videoElement = omakaseRef?.current?.video?.htmlVideoElement;
     const actuallyPlaying = videoElement ? !videoElement.paused : isPlaying;
 
-    console.log(`🎯 TOGGLE STATE CHECK #${callCount}:`);
+    console.log(` TOGGLE STATE CHECK #${callCount}:`);
     console.log(`  - isPlaying prop: ${isPlaying}`);
     console.log(`  - isPlayingRef: ${isPlayingRef.current}`);
     console.log(`  - video.paused: ${videoElement?.paused}`);
@@ -273,12 +273,12 @@ export const useVideoKeyboardShortcuts = ({
     console.log(`  - timeSinceLastToggle: ${timeSinceLastToggle}ms`);
 
     if (actuallyPlaying) {
-      console.log(`⏸️ PAUSING video (call #${callCount})`);
+      console.log(`PAUSING video (call #${callCount})`);
       pause();
 
       // Prevent focus-related issues by removing focus from video element
       const preventFocusIssues = () => {
-        console.log(`🎯 PREVENTING focus-related keyboard conflicts`);
+        console.log(`PREVENTING focus-related keyboard conflicts`);
         const omakasePlayer = omakaseRef?.current;
         const htmlVideoElement = omakasePlayer?.video?.htmlVideoElement;
 
@@ -287,12 +287,12 @@ export const useVideoKeyboardShortcuts = ({
           htmlVideoElement.blur();
           // Disable tabindex to prevent future focus
           htmlVideoElement.setAttribute("tabindex", "-1");
-          console.log(`✅ REMOVED focus from video element`);
+          console.log(`REMOVED focus from video element`);
         }
       };
       preventFocusIssues();
     } else {
-      console.log(`▶️ PLAYING video (call #${callCount})`);
+      console.log(`PLAYING video (call #${callCount})`);
       play();
     }
   }, [play, pause, applyShuttleSpeed, isPlaying]);
