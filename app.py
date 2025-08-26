@@ -4,6 +4,9 @@ import os
 from dataclasses import dataclass
 
 import aws_cdk as cdk
+from aws_cdk import Fn
+from aws_cdk import aws_apigateway as apigateway
+from aws_cdk import aws_secretsmanager as secretsmanager
 from constructs import Construct
 
 from cdk_logger import CDKLogger, get_logger
@@ -36,7 +39,6 @@ from medialake_stacks.integrations_environment_stack import (
     IntegrationsEnvironmentStackProps,
 )
 from medialake_stacks.nodes_stack import NodesStack, NodesStackProps
-from medialake_stacks.permissions_stack import PermissionsStack, PermissionsStackProps
 from medialake_stacks.pipeline_stack import PipelineStack, PipelineStackProps
 from medialake_stacks.settings_api_stack import SettingsApiStack, SettingsApiStackProps
 from medialake_stacks.settings_stack import SettingsStack, SettingsStackProps
@@ -114,41 +116,106 @@ authorization_stack = AuthorizationStack(
 authorization_stack.add_dependency(cognito_stack)
 
 
+# Create a separate resource collector that doesn't create circular dependencies
+class ApiResourceCollector:
+    """Collects API resources from various stacks without creating circular dependencies."""
+
+    def __init__(self):
+        self.resources = []
+
+    def add_resource(self, resource):
+        """Add a resource to the collection."""
+        if resource is not None:
+            self.resources.append(resource)
+            print(
+                f"Resource collector: Added resource {type(resource).__name__} (total: {len(self.resources)})"
+            )
+        else:
+            print("Resource collector: Skipping None resource")
+
+    def get_resources(self):
+        """Get all collected resources."""
+        valid_resources = [r for r in self.resources if r is not None]
+        print(
+            f"Resource collector: Returning {len(valid_resources)} valid resources out of {len(self.resources)} total"
+        )
+        return valid_resources.copy()
+
+    def get_resource_count(self):
+        """Get the count of collected resources."""
+        return len(self.resources)
+
+    # TODO: Remove debug prints once implementation is working
+
+
+# Create the collector before the stacks
+api_resource_collector = ApiResourceCollector()
+
+
+# Create a resource importer to break circular dependencies
+class ResourceImporter:
+
+    @staticmethod
+    def get_rest_api():
+        """Get the REST API from CloudFormation export."""
+        # We need to return the actual RestApi object, not just the ID
+        # This will be handled by the individual stacks that need it
+        raise NotImplementedError(
+            "get_rest_api() should not be called directly. Use get_rest_api_id() instead."
+        )
+
+    @staticmethod
+    def get_rest_api_id():
+        """Get the REST API ID from CloudFormation export."""
+        return Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
+
+    @staticmethod
+    def get_root_resource_id():
+        """Get the root resource ID from CloudFormation export."""
+        return Fn.import_value("MediaLakeApiGatewayCore-RootResourceId")
+
+    @staticmethod
+    def get_x_origin_verify_secret_arn():
+        """Get the X-Origin verify secret ARN from CloudFormation export."""
+        return Fn.import_value("MediaLakeApiGatewayCore-XOriginVerifySecretArn")
+
+    @staticmethod
+    def get_waf_acl_arn():
+        """Get the WAF ACL ARN from CloudFormation export."""
+        return Fn.import_value("MediaLakeApiGatewayCore-ApiGatwayWAFACLARN")
+
+
 @dataclass
 class MediaLakeStackProps:
-    api_gateway_core_stack: ApiGatewayCoreStack
+    # api_gateway_core_stack: ApiGatewayCoreStack  # Removed to break circular dependency
     base_infrastructure: BaseInfrastructureStack
     authorization_stack: AuthorizationStack
     cognito_stack: CognitoStack
+    resource_collector: ApiResourceCollector
 
 
 class MediaLakeStack(cdk.Stack):
     def __init__(self, scope: Construct, id: str, props: MediaLakeStackProps, **kwargs):
         super().__init__(scope, id, **kwargs)
 
-        users_groups_roles_stack = UsersGroupsStack(
-            self,
-            "MediaLakeUsersGroupsRolesStack",
-            props=UsersGroupsStackProps(
-                cognito_user_pool=props.cognito_stack.user_pool,
-                cognito_app_client=props.cognito_stack.user_pool_client,
-                x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
-                auth_table_name=props.authorization_stack._auth_table.table_name,
-                avp_policy_store_id=props.authorization_stack._policy_store.attr_policy_store_id,
-            ),
-        )
-        users_groups_roles_stack.add_dependency(props.authorization_stack)
+        # NOTE: This stack no longer depends on api_gateway_core_stack directly.
+        # Instead, it imports resources from CloudFormation exports to break circular dependencies.
+        # See ResourceImporter class for details.
 
-        groups_stack = GroupsStack(
+        # Create shared RestApi and Secret objects to avoid circular dependencies
+        # These will be passed to all child stacks that need them
+        self.shared_rest_api = apigateway.RestApi.from_rest_api_attributes(
             self,
-            "MediaLakeGroupsStack",
-            props=GroupsStackProps(
-                # x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
-                cognito_user_pool=props.cognito_stack.user_pool,
-                auth_table=props.authorization_stack.auth_table,
-            ),
+            "SharedRestApi",
+            rest_api_id=ResourceImporter.get_rest_api_id(),
+            root_resource_id=ResourceImporter.get_root_resource_id(),
         )
-        groups_stack.add_dependency(props.authorization_stack)
+
+        self.shared_x_origin_secret = secretsmanager.Secret.from_secret_name_v2(
+            self,
+            "SharedXOriginSecret",
+            ResourceImporter.get_x_origin_verify_secret_arn(),
+        )
 
         nodes_stack = NodesStack(
             self,
@@ -209,16 +276,56 @@ class MediaLakeStack(cdk.Stack):
                 asset_sync_job_table=asset_sync_stack.asset_sync_job_table,
                 asset_sync_engine_lambda=asset_sync_stack.asset_sync_engine_lambda,
                 system_settings_table=settings_stack.system_settings_table_name,
-                rest_api=props.api_gateway_core_stack.rest_api,
-                x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
+                auth_table_name=props.authorization_stack._auth_table.table_name,
+                avp_policy_store_id=props.authorization_stack._policy_store.attr_policy_store_id,
+                avp_policy_store_arn=f"arn:aws:verifiedpermissions::{cdk.Aws.ACCOUNT_ID}:policy-store/{props.authorization_stack._policy_store.attr_policy_store_id}",
+                api_keys_table_arn=settings_stack.api_keys_table_arn,
+                cognito_user_pool_id=props.cognito_stack.user_pool_id,
+                api_keys_table_name=settings_stack.api_keys_table_name,
+                rest_api_id=ResourceImporter.get_rest_api_id(),  # Pass the ID instead of the object
+                x_origin_verify_secret_arn=ResourceImporter.get_x_origin_verify_secret_arn(),  # Pass the ARN instead of the object
                 user_pool=props.cognito_stack.user_pool,
                 identity_pool=props.cognito_stack.identity_pool,
                 user_pool_client=props.cognito_stack.user_pool_client,
-                waf_acl_arn=props.api_gateway_core_stack.waf_acl_arn,
-                user_table=users_groups_roles_stack.user_table,
+                waf_acl_arn=ResourceImporter.get_waf_acl_arn(),  # Use importer instead of direct access
+                # user_table=users_groups_roles_stack.user_table,
                 s3_vector_bucket_name=props.base_infrastructure.s3_vector_bucket_name,
             ),
         )
+
+        users_groups_roles_stack = UsersGroupsStack(
+            self,
+            "MediaLakeUsersGroupsRolesStack",
+            props=UsersGroupsStackProps(
+                cognito_user_pool=props.cognito_stack.user_pool,
+                cognito_app_client=props.cognito_stack.user_pool_client,
+                x_origin_verify_secret=self.shared_x_origin_secret,
+                auth_table_name=props.authorization_stack._auth_table.table_name,
+                avp_policy_store_id=props.authorization_stack._policy_store.attr_policy_store_id,
+                authorizer=api_gateway_stack.authorizer,
+                api_resource=self.shared_rest_api,
+            ),
+        )
+        users_groups_roles_stack.add_dependency(props.authorization_stack)
+
+        # Store reference to users_groups_roles_stack
+        self._users_groups_roles_stack = users_groups_roles_stack
+
+        groups_stack = GroupsStack(
+            self,
+            "MediaLakeGroups",
+            props=GroupsStackProps(
+                # x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
+                cognito_user_pool=props.cognito_stack.user_pool,
+                auth_table=props.authorization_stack.auth_table,
+                authorizer=api_gateway_stack.authorizer,
+                api_resource=self.shared_rest_api,  # Use shared object
+            ),
+        )
+        groups_stack.add_dependency(props.authorization_stack)
+
+        # Store reference to groups_stack
+        self._groups_stack = groups_stack
 
         # Add dependency to ensure authorization stack is created before API Gateway stack
         api_gateway_stack.add_dependency(props.authorization_stack)
@@ -228,14 +335,17 @@ class MediaLakeStack(cdk.Stack):
             self,
             "MediaLakeIntegrationsEnvironment",
             props=IntegrationsEnvironmentStackProps(
-                api_resource=props.api_gateway_core_stack.rest_api,
+                api_resource=self.shared_rest_api,
                 cognito_user_pool=props.cognito_stack.user_pool,
-                x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
+                x_origin_verify_secret=self.shared_x_origin_secret,
                 pipelines_nodes_table=nodes_stack.pipelines_nodes_table,
-                # We'll need to update this after pipeline_stack is created
                 post_pipelines_lambda=None,
+                authorizer=api_gateway_stack.authorizer,
             ),
         )
+
+        # Store reference to integrations_stack
+        self._integrations_stack = integrations_stack
 
         pipeline_stack = PipelineStack(
             self,
@@ -256,7 +366,7 @@ class MediaLakeStack(cdk.Stack):
                 security_group=props.base_infrastructure.security_group,
                 pipelines_event_bus=props.base_infrastructure.pipelines_event_bus,
                 media_assets_bucket=props.base_infrastructure.media_assets_s3_bucket,
-                x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
+                x_origin_verify_secret=self.shared_x_origin_secret,
                 collection_endpoint=props.base_infrastructure.collection_endpoint,
                 mediaconvert_queue_arn=nodes_stack.mediaconvert_queue_arn,
                 mediaconvert_role_arn=nodes_stack.mediaconvert_role_arn,
@@ -264,8 +374,13 @@ class MediaLakeStack(cdk.Stack):
                 s3_vector_bucket_name=props.base_infrastructure.s3_vector_bucket_name,
                 s3_vector_index_name=props.base_infrastructure.s3_vector_index_name,
                 s3_vector_dimension=props.base_infrastructure.s3_vector_dimension,
+                authorizer=api_gateway_stack.authorizer,
+                api_resource=self.shared_rest_api,
             ),
         )
+
+        # Store reference to pipeline_stack
+        self._pipeline_stack = pipeline_stack
 
         # Now that pipeline_stack is created, configure the integrations stack with the pipeline lambda
         integrations_stack.set_post_pipelines_lambda(
@@ -276,9 +391,13 @@ class MediaLakeStack(cdk.Stack):
             self,
             "MediaLakeSettingsApi",
             props=SettingsApiStackProps(
+                authorizer=api_gateway_stack.authorizer.authorizer_id,
+                # Use shared RestApi object instead of creating new one
+                api_resource=self.shared_rest_api,
                 cognito_user_pool=props.cognito_stack.user_pool,
                 cognito_app_client=props.cognito_stack.user_pool_client_id,
-                x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
+                # Use shared Secret object instead of creating new one
+                x_origin_verify_secret=self.shared_x_origin_secret,
                 system_settings_table_name=settings_stack.system_settings_table_name,
                 system_settings_table_arn=settings_stack.system_settings_table_arn,
                 api_keys_table_name=settings_stack.api_keys_table_name,
@@ -286,23 +405,59 @@ class MediaLakeStack(cdk.Stack):
             ),
         )
 
-        # Create the Permissions Stack as a nested stack
-        _ = PermissionsStack(
-            self,
-            "MediaLakePermissionsStack",
-            props=PermissionsStackProps(
-                api_resource=props.api_gateway_core_stack.rest_api,
-                x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
-                cognito_user_pool=props.cognito_stack.user_pool,
-                auth_table=props.authorization_stack.auth_table,
-            ),
-        )
+        # Store the SettingsApiStack reference for potential resource registration
+        self._settings_api_stack = _
 
-        # Update the integrations stack with the pipeline lambda reference
-        # Note: This is a workaround for the circular dependency
-        # In a real implementation, you might want to restructure to avoid this
+        # # Create the Permissions Stack as a nested stack
+        # _ = PermissionsStack(
+        #     "MediaLakePermissionsStack",
+        #     props=PermissionsStackProps(
+        #         api_resource=props.api_gateway_core_stack.rest_api,
+        #         x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
+        #         cognito_user_pool=props.cognito_stack.user_pool,
+        #         auth_table=props.authorization_stack.auth_table,
+        #     ),
+        # )
 
+        # Store the API Gateway stack reference
         self._api_gateway_stack = api_gateway_stack
+
+        # Register resources with the collector to avoid circular dependencies
+        props.resource_collector.add_resource(api_gateway_stack)
+
+        # Register individual resources if they exist
+        if hasattr(api_gateway_stack, "api_resources"):
+            api_resources = api_gateway_stack.api_resources
+            if api_resources:
+                for resource in api_resources:
+                    if resource is not None:
+                        props.resource_collector.add_resource(resource)
+
+        # Register other important resources that might be needed for deployment
+        if hasattr(api_gateway_stack, "health_lambda"):
+            props.resource_collector.add_resource(api_gateway_stack.health_lambda)
+
+        if hasattr(api_gateway_stack, "connector_sync_lambda"):
+            props.resource_collector.add_resource(
+                api_gateway_stack.connector_sync_lambda
+            )
+
+        # Register the settings API stack if it has resources
+        if hasattr(self, "_settings_api_stack"):
+            props.resource_collector.add_resource(self._settings_api_stack)
+
+        # Register other important stacks that might have resources
+        if hasattr(self, "_users_groups_roles_stack"):
+            props.resource_collector.add_resource(self._users_groups_roles_stack)
+
+        if hasattr(self, "_groups_stack"):
+            props.resource_collector.add_resource(self._groups_stack)
+
+        if hasattr(self, "_integrations_stack"):
+            props.resource_collector.add_resource(self._integrations_stack)
+
+        if hasattr(self, "_pipeline_stack"):
+            props.resource_collector.add_resource(self._pipeline_stack)
 
     @property
     def connector_table(self):
@@ -313,23 +468,30 @@ medialake_stack = MediaLakeStack(
     app,
     "MediaLakeStack",
     props=MediaLakeStackProps(
-        api_gateway_core_stack=api_gateway_core_stack,
+        # api_gateway_core_stack=api_gateway_core_stack,  # Removed to break circular dependency
         base_infrastructure=base_infrastructure,
         authorization_stack=authorization_stack,
         cognito_stack=cognito_stack,
+        resource_collector=api_resource_collector,  # Pass the resource collector
     ),
     env=env,
 )
-medialake_stack.add_dependency(api_gateway_core_stack)
+# medialake_stack.add_dependency(api_gateway_core_stack)
 
-# Get API resources for dependencies
-api_resources = medialake_stack._api_gateway_stack.api_resources
+# Use the collector instead of accessing the stack directly
+resource_count = api_resource_collector.get_resource_count()
+print(f"Creating deployment stack with {resource_count} resources")
+
+if resource_count == 0:
+    print(
+        "Warning: No resources collected. Deployment stack may not have proper dependencies."
+    )
 
 api_gateway_deployment_stack = ApiGatewayDeploymentStack(
     app,
     "MediaLakeApiGatewayDeployment",
     props=ApiGatewayDeploymentStackProps(
-        api_dependencies=[medialake_stack._api_gateway_stack] + api_resources,
+        api_dependencies=api_resource_collector.get_resources(),  # Use the collector
     ),
     env=env,
 )
@@ -345,7 +507,7 @@ user_interface_stack = UserInterfaceStack(
         cognito_identity_pool=cognito_stack.identity_pool,
         cognito_user_pool_arn=cognito_stack.user_pool_arn,
         cognito_domain_prefix=cognito_stack.cognito_domain_prefix,
-        api_gateway_rest_id=api_gateway_core_stack.rest_api.rest_api_id,
+        api_gateway_rest_id=medialake_stack.shared_rest_api.rest_api_id,
         api_gateway_stage=api_gateway_deployment_stack.api_deployment_stage.stage_name,
         access_log_bucket=base_infrastructure.access_log_bucket,
         cloudfront_waf_acl_arn=waf_acl_ssm_param_name,

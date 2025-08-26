@@ -1,0 +1,21 @@
+{
+  "exclude": [
+    "**/.venv",
+    "**/venv",
+    "**/.env",
+    "**/env",
+    "**/__pycache__",
+    "**/.git",
+    "**/.cdk.out",
+    "**/cdk.out",
+    "**/dist",
+    "**/build",
+    "**/node_modules",
+    "**/.vscode",
+    "**/.pytest_cache",
+    "**/.idea",
+    "**/assets",
+    "**/.aws-sam",
+    "**/.DS_Store"
+  ]
+}

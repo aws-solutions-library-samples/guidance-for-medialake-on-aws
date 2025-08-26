@@ -22,7 +22,7 @@ class UPSFApiProps:
     """Properties for the UPSF API construct."""
 
     x_origin_verify_secret: secrets_manager.Secret
-    api_resource: api_gateway.IResource
+    api_resource: api_gateway.RestApi
     authorizer: api_gateway.IAuthorizer
     cognito_user_pool: cognito.UserPool
     user_table: dynamodb.Table
@@ -56,7 +56,7 @@ class UPSFApi(Construct):
         }
 
         # 1. User Profile Endpoints
-        profile_resource = users_resource.add_resource("profile")
+        profile_resource = props.api_resource.root.add_resource("profile")
 
         # GET /users/profile - Get user profile
         get_profile_lambda = Lambda(

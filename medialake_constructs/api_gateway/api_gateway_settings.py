@@ -24,13 +24,28 @@ from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaCon
 from .api_gateway_utils import add_cors_options_method
 
 
+def apply_custom_authorization(method: api_gateway.Method, authorizer: str) -> None:
+    """
+    Apply custom authorization to an API Gateway method.
+
+    Args:
+        method: The API Gateway method to apply authorization to
+        authorizer: The custom authorizer to use
+    """
+    # authorizer_id = Fn.ref(authorizer.node.default_child.logical_id)
+
+    cfn_method = method.node.default_child
+    cfn_method.authorization_type = "CUSTOM"
+    cfn_method.authorizer_id = authorizer
+
+
 @dataclass
 class SettingsConstructProps:
     """Configuration for Lambda function creation."""
 
     x_origin_verify_secret: secretsmanager.Secret
-    api_resource: api_gateway.IResource
-    authorizer: api_gateway.IAuthorizer
+    api_resource: api_gateway.RestApi
+    authorizer: str
     cognito_user_pool: cognito.UserPool
     cognito_app_client: str
     system_settings_table_name: str
@@ -76,7 +91,7 @@ class SettingsConstruct(Construct):
         Stack.of(self).account
 
         # Create settings resource
-        settings_resource = props.api_resource.add_resource("settings")
+        settings_resource = props.api_resource.root.add_resource("settings")
         # Add OPTIONS method to support CORS
         add_cors_options_method(settings_resource)
 
@@ -117,12 +132,11 @@ class SettingsConstruct(Construct):
             )
         )
 
-        system_resource.add_method(
+        system_settings_get = system_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(self._get_system_settings_handler.function),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=props.authorizer,
         )
+        apply_custom_authorization(system_settings_get, props.authorizer)
 
         # Create search provider resource
         search_resource = system_resource.add_resource("search")
@@ -156,12 +170,13 @@ class SettingsConstruct(Construct):
             )
         )
 
-        search_resource.add_method(
+        search_provider_get = search_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(self._get_search_provider_handler.function),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=props.authorizer,
+            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            # authorizer=props.authorizer,
         )
+        apply_custom_authorization(search_provider_get, props.authorizer)
 
         # POST /settings/system/search
         self._post_search_provider_handler = Lambda(
@@ -206,12 +221,13 @@ class SettingsConstruct(Construct):
             )
         )
 
-        search_resource.add_method(
+        search_provider_post = search_resource.add_method(
             "POST",
             api_gateway.LambdaIntegration(self._post_search_provider_handler.function),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=props.authorizer,
+            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            # authorizer=props.authorizer,
         )
+        apply_custom_authorization(search_provider_post, props.authorizer)
 
         # PUT /settings/system/search
         self._put_search_provider_handler = Lambda(
@@ -254,12 +270,11 @@ class SettingsConstruct(Construct):
             )
         )
 
-        search_resource.add_method(
+        search_provider_put = search_resource.add_method(
             "PUT",
             api_gateway.LambdaIntegration(self._put_search_provider_handler.function),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=props.authorizer,
         )
+        apply_custom_authorization(search_provider_put, props.authorizer)
 
         # Create users resource
         settings_users_resource = settings_resource.add_resource("users")
@@ -299,12 +314,13 @@ class SettingsConstruct(Construct):
             )
         )
 
-        settings_users_resource.add_method(
+        settings_users_get = settings_users_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(settings_users_get_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=props.authorizer,
+            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            # authorizer=props.authorizer,
         )
+        apply_custom_authorization(settings_users_get, props.authorizer)
 
         settings_roles_get_lambda = Lambda(
             self,
@@ -334,12 +350,13 @@ class SettingsConstruct(Construct):
             )
         )
 
-        settings_roles_resource.add_method(
+        settings_roles_get = settings_roles_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(settings_roles_get_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=props.authorizer,
+            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            # authorizer=props.authorizer,
         )
+        apply_custom_authorization(settings_roles_get, props.authorizer)
 
         settings_user_del_lambda = Lambda(
             self,
@@ -367,12 +384,13 @@ class SettingsConstruct(Construct):
             )
         )
 
-        settings_users_userid_resource.add_method(
+        settings_user_delete = settings_users_userid_resource.add_method(
             "DELETE",
             api_gateway.LambdaIntegration(settings_user_del_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=props.authorizer,
+            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            # authorizer=props.authorizer,
         )
+        apply_custom_authorization(settings_user_delete, props.authorizer)
 
         settings_user_put_lambda = Lambda(
             self,
@@ -404,12 +422,13 @@ class SettingsConstruct(Construct):
             )
         )
 
-        settings_users_userid_resource.add_method(
+        settings_user_put = settings_users_userid_resource.add_method(
             "PUT",
             api_gateway.LambdaIntegration(settings_user_put_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=props.authorizer,
+            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            # authorizer=props.authorizer,
         )
+        apply_custom_authorization(settings_user_put, props.authorizer)
 
         settings_users_user_userid_get_lambda = Lambda(
             self,
@@ -441,14 +460,15 @@ class SettingsConstruct(Construct):
             )
         )
 
-        settings_users_user_userid_resource.add_method(
+        settings_user_userid_get = settings_users_user_userid_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(
                 settings_users_user_userid_get_lambda.function
             ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=props.authorizer,
+            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            # authorizer=props.authorizer,
         )
+        apply_custom_authorization(settings_user_userid_get, props.authorizer)
 
         # settings_users_user_post_lambda = Lambda(
         #     self,
@@ -532,12 +552,13 @@ class SettingsConstruct(Construct):
             )
         )
 
-        api_keys_resource.add_method(
+        api_keys_get = api_keys_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(self._get_api_keys_handler.function),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=props.authorizer,
+            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            # authorizer=props.authorizer,
         )
+        # apply_custom_authorization(api_keys_get, props.authorizer)
 
         # POST /settings/api-keys - Create new API key
         self._post_api_keys_handler = Lambda(
@@ -577,12 +598,13 @@ class SettingsConstruct(Construct):
             )
         )
 
-        api_keys_resource.add_method(
+        api_keys_post = api_keys_resource.add_method(
             "POST",
             api_gateway.LambdaIntegration(self._post_api_keys_handler.function),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=props.authorizer,
+            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            # authorizer=props.authorizer,
         )
+        # apply_custom_authorization(api_keys_post, props.authorizer)
 
         # GET /settings/api-keys/{id} - Get single API key
         self._get_api_key_handler = Lambda(
@@ -609,12 +631,13 @@ class SettingsConstruct(Construct):
             )
         )
 
-        api_key_id_resource.add_method(
+        api_key_get = api_key_id_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(self._get_api_key_handler.function),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=props.authorizer,
+            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            # authorizer=props.authorizer,
         )
+        # apply_custom_authorization(api_key_get, props.authorizer)
 
         # PUT /settings/api-keys/{id} - Update API key
         self._put_api_key_handler = Lambda(
@@ -655,12 +678,13 @@ class SettingsConstruct(Construct):
             )
         )
 
-        api_key_id_resource.add_method(
+        api_key_put = api_key_id_resource.add_method(
             "PUT",
             api_gateway.LambdaIntegration(self._put_api_key_handler.function),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=props.authorizer,
+            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            # authorizer=props.authorizer,
         )
+        apply_custom_authorization(api_key_put, props.authorizer)
 
         # DELETE /settings/api-keys/{id} - Delete API key
         self._delete_api_key_handler = Lambda(
@@ -700,12 +724,13 @@ class SettingsConstruct(Construct):
             )
         )
 
-        api_key_id_resource.add_method(
+        api_key_delete = api_key_id_resource.add_method(
             "DELETE",
             api_gateway.LambdaIntegration(self._delete_api_key_handler.function),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=props.authorizer,
+            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            # authorizer=props.authorizer,
         )
+        apply_custom_authorization(api_key_delete, props.authorizer)
 
     @property
     def system_settings_table_name(self) -> str:

@@ -22,13 +22,14 @@ from aws_cdk import aws_verifiedpermissions as avp
 from constructs import Construct
 
 from constants import DynamoDB
-from medialake_constructs.auth.shared_authorizer_construct import (
-    SharedAuthorizerConstruct,
-    SharedAuthorizerConstructProps,
-)
 
 # DynamoDB table is now created in the Cognito construct
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
+
+# from medialake_constructs.auth.shared_authorizer_construct import (
+#     SharedAuthorizerConstruct,
+#     SharedAuthorizerConstructProps,
+# )
 
 
 @dataclass
@@ -122,21 +123,21 @@ class AuthorizationStack(Stack):
         api_keys_table_arn = f"arn:aws:dynamodb:{cdk.Aws.REGION}:{cdk.Aws.ACCOUNT_ID}:table/{api_keys_table_name}"
 
         # Create the shared custom authorizer
-        self._shared_authorizer = SharedAuthorizerConstruct(
-            self,
-            "SharedAuthorizer",
-            props=SharedAuthorizerConstructProps(
-                auth_table_name=self._auth_table.table_name,
-                avp_policy_store_id=self._policy_store.attr_policy_store_id,
-                avp_policy_store_arn=f"arn:aws:verifiedpermissions::{cdk.Aws.ACCOUNT_ID}:policy-store/{self._policy_store.attr_policy_store_id}",
-                cognito_user_pool_id=props.cognito_user_pool.user_pool_id,
-                api_keys_table_name=api_keys_table_name,
-                api_keys_table_arn=api_keys_table_arn,
-            ),
-        )
+        # self._shared_authorizer = SharedAuthorizerConstruct(
+        #     self,
+        #     "SharedAuthorizer",
+        #     props=SharedAuthorizerConstructProps(
+        #         auth_table_name=self._auth_table.table_name,
+        #         avp_policy_store_id=self._policy_store.attr_policy_store_id,
+        #         avp_policy_store_arn=f"arn:aws:verifiedpermissions::{cdk.Aws.ACCOUNT_ID}:policy-store/{self._policy_store.attr_policy_store_id}",
+        #         cognito_user_pool_id=props.cognito_user_pool.user_pool_id,
+        #         api_keys_table_name=api_keys_table_name,
+        #         api_keys_table_arn=api_keys_table_arn,
+        #     ),
+        # )
 
         # Grant table read access to the shared authorizer
-        self._auth_table.grant_read_data(self._shared_authorizer.authorizer_lambda)
+        # self._auth_table.grant_read_data(self._shared_authorizer.authorizer_lambda)
 
         # Common environment variables for Lambda functions
         common_env_vars = {

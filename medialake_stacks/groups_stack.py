@@ -8,7 +8,6 @@ and associated Lambda functions for managing Groups and group members.
 from dataclasses import dataclass
 
 import aws_cdk as cdk
-from aws_cdk import Fn
 from aws_cdk import aws_apigateway as api_gateway
 from aws_cdk import aws_apigateway as apigateway
 from aws_cdk import aws_cognito as cognito
@@ -18,7 +17,6 @@ from constructs import Construct
 
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 from medialake_constructs.auth.authorizer_utils import (
-    create_shared_custom_authorizer,
     ensure_shared_authorizer_permissions,
 )
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
@@ -31,6 +29,8 @@ class GroupsStackProps:
     # x_origin_verify_secret: secrets_manager.Secret
     cognito_user_pool: cognito.UserPool
     auth_table: dynamodb.TableV2
+    authorizer: apigateway.IAuthorizer
+    api_resource: apigateway.RestApi
 
 
 class GroupsStack(cdk.NestedStack):
@@ -44,26 +44,26 @@ class GroupsStack(cdk.NestedStack):
         super().__init__(scope, constructor_id, **kwargs)
 
         # Use the shared custom authorizer
-        api_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
+        # api_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
 
-        self._api_authorizer = create_shared_custom_authorizer(
-            self, "GroupsCustomApiAuthorizer", api_gateway_id=api_id
-        )
+        # self._api_authorizer = create_shared_custom_authorizer(
+        #     self, "GroupsCustomApiAuthorizer", api_gateway_id=api_id
+        # )
 
-        root_resource_id = Fn.import_value("MediaLakeApiGatewayCore-RootResourceId")
+        # root_resource_id = Fn.import_value("MediaLakeApiGatewayCore-RootResourceId")
 
-        api = apigateway.RestApi.from_rest_api_attributes(
-            self,
-            "GroupsImportedApi",
-            rest_api_id=api_id,
-            root_resource_id=root_resource_id,
-        )
+        # api = apigateway.RestApi.from_rest_api_attributes(
+        #     self,
+        #     "GroupsImportedApi",
+        #     rest_api_id=api_id,
+        #     root_resource_id=root_resource_id,
+        # )
 
         # Ensure the shared authorizer has permissions for this API Gateway
-        ensure_shared_authorizer_permissions(self, "Groups", api)
+        ensure_shared_authorizer_permissions(self, "Groups", props.api_resource)
 
         # Create the groups resource directly off the root
-        groups_resource = api.root.add_resource("groups")
+        groups_resource = props.api_resource.root.add_resource("groups")
 
         # Set up common environment variables for all Lambda functions
         common_env_vars = {
@@ -98,12 +98,16 @@ class GroupsStack(cdk.NestedStack):
             )
         )
 
-        groups_resource.add_method(
+        groups_post_method = groups_resource.add_method(
             "POST",
             api_gateway.LambdaIntegration(post_groups_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=self._api_authorizer,
+            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            # authorizer=props.authorizer,
         )
+
+        cfn_method = groups_resource.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
 
         # GET /groups - List all Groups
         authorization_groups_get = Lambda(
@@ -117,12 +121,16 @@ class GroupsStack(cdk.NestedStack):
         )
         props.auth_table.grant_read_data(authorization_groups_get.function)
 
-        groups_resource.add_method(
+        groups_get_method = groups_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(authorization_groups_get.function),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=self._api_authorizer,
+            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            # authorizer=props.authorizer,
         )
+
+        cfn_method = groups_get_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
 
         # Group by ID resource
         group_id_resource = groups_resource.add_resource("{groupId}")
@@ -139,7 +147,7 @@ class GroupsStack(cdk.NestedStack):
         )
         props.auth_table.grant_read_data(authorization_groups_group_id_get.function)
 
-        group_id_resource.add_method(
+        group_id_get_method = group_id_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(
                 authorization_groups_group_id_get.function,
@@ -147,9 +155,13 @@ class GroupsStack(cdk.NestedStack):
                     "application/json": '{ "groupId": "$input.params(\'groupId\')" }'
                 },
             ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=self._api_authorizer,
+            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            # authorizer=self._api_authorizer,
         )
+
+        cfn_method = group_id_get_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
 
         # PUT /groups/{groupId} - Update an existing Group
         authorization_groups_group_id_put = Lambda(
@@ -165,7 +177,7 @@ class GroupsStack(cdk.NestedStack):
             authorization_groups_group_id_put.function
         )
 
-        group_id_resource.add_method(
+        group_id_put_method = group_id_resource.add_method(
             "PUT",
             api_gateway.LambdaIntegration(
                 authorization_groups_group_id_put.function,
@@ -173,9 +185,12 @@ class GroupsStack(cdk.NestedStack):
                     "application/json": '{ "groupId": "$input.params(\'groupId\')" }'
                 },
             ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=self._api_authorizer,
+            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            # authorizer=props.authorizer,
         )
+        cfn_method = group_id_put_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
 
         # DELETE /groups/{groupId} - Delete a Group
         authorization_groups_group_id_delete = Lambda(
@@ -205,7 +220,7 @@ class GroupsStack(cdk.NestedStack):
             )
         )
 
-        group_id_resource.add_method(
+        group_id_delete_method = group_id_resource.add_method(
             "DELETE",
             api_gateway.LambdaIntegration(
                 authorization_groups_group_id_delete.function,
@@ -213,9 +228,12 @@ class GroupsStack(cdk.NestedStack):
                     "application/json": '{ "groupId": "$input.params(\'groupId\')" }'
                 },
             ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=self._api_authorizer,
+            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            # authorizer=self._api_authorizer,
         )
+        cfn_method = group_id_delete_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
 
         # Group members resource
         group_members_resource = group_id_resource.add_resource("members")
@@ -232,7 +250,7 @@ class GroupsStack(cdk.NestedStack):
         )
         props.auth_table.grant_read_write_data(add_group_members_lambda.function)
 
-        group_members_resource.add_method(
+        group_members_post_method = group_members_resource.add_method(
             "POST",
             api_gateway.LambdaIntegration(
                 add_group_members_lambda.function,
@@ -240,9 +258,12 @@ class GroupsStack(cdk.NestedStack):
                     "application/json": '{ "groupId": "$input.params(\'groupId\')" }'
                 },
             ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=self._api_authorizer,
+            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            # authorizer=props.authorizer,
         )
+        cfn_method = group_members_post_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
 
         # Group member by ID resource
         group_member_id_resource = group_members_resource.add_resource("{userId}")
@@ -259,7 +280,7 @@ class GroupsStack(cdk.NestedStack):
         )
         props.auth_table.grant_read_write_data(remove_group_member_lambda.function)
 
-        group_member_id_resource.add_method(
+        group_member_id_delete_method = group_member_id_resource.add_method(
             "DELETE",
             api_gateway.LambdaIntegration(
                 remove_group_member_lambda.function,
@@ -267,12 +288,17 @@ class GroupsStack(cdk.NestedStack):
                     "application/json": '{ "groupId": "$input.params(\'groupId\')", "userId": "$input.params(\'userId\')" }'
                 },
             ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=self._api_authorizer,
+            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            # authorizer=self._api_authorizer,
         )
+        cfn_method = group_member_id_delete_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
 
         # Add CORS support to all resources
         add_cors_options_method(groups_resource)
         add_cors_options_method(group_id_resource)
         add_cors_options_method(group_members_resource)
         add_cors_options_method(group_member_id_resource)
+        add_cors_options_method(groups_resource)
+        add_cors_options_method(group_members_resource)

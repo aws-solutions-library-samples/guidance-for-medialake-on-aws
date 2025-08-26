@@ -330,24 +330,6 @@ class UIConstruct(Construct):
             enable_accept_encoding_brotli=True,
         )
 
-        # Create a custom origin request policy for API requests that includes X-API-Key header
-        api_origin_request_policy = cloudfront.OriginRequestPolicy(
-            self,
-            "APIOriginRequestPolicy",
-            comment="Origin request policy for API Gateway that forwards X-API-Key header",
-            cookie_behavior=cloudfront.OriginRequestCookieBehavior.none(),
-            header_behavior=cloudfront.OriginRequestHeaderBehavior.allow_list(
-                "Content-Type",
-                "X-API-Key",
-                "x-api-key",
-                "X-Forwarded-User",
-                "Cache-Control",
-                "Pragma",
-                "Expires",
-            ),
-            query_string_behavior=cloudfront.OriginRequestQueryStringBehavior.all(),
-        )
-
         # Create a shared CF Origin for static assets (S3)
         s3_orig = origins.S3BucketOrigin.with_origin_access_control(
             medialake_ui_s3_bucket.bucket,
@@ -394,10 +376,14 @@ class UIConstruct(Construct):
                         origin_ssl_protocols=[cloudfront.OriginSslPolicy.TLS_V1_2],
                         protocol_policy=cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
                     ),
-                    cache_policy=cloudfront.CachePolicy.CACHING_DISABLED,
+                    cache_policy=cloudfront.CachePolicy(
+                        self,
+                        "APIBehaviorCachePolicy",
+                        default_ttl=Duration.seconds(0),
+                    ),
                     response_headers_policy=api_response_headers_policy,
                     allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,
-                    origin_request_policy=api_origin_request_policy,
+                    origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
                 ),
             },
             minimum_protocol_version=cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,

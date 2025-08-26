@@ -1532,7 +1532,27 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                 }
 
                 # Enhanced API key permission validation
-                if not DEBUG_MODE:
+                if DEBUG_MODE:
+                    # In DEBUG_MODE, bypass permission validation if API key is present
+                    logger.warning(
+                        f"DEBUG_MODE enabled: Bypassing API key permission validation for action {action_id}",
+                        extra={"correlation_id": correlation_id},
+                    )
+                    metrics.add_metric(
+                        name="authorize.api_key.debug_bypass",
+                        unit=MetricUnit.Count,
+                        value=1,
+                    )
+                    is_authorized = True
+                    auth_response = {
+                        "decision": "ALLOW",
+                        "reason": "DEBUG_MODE enabled, API key permission validation bypassed",
+                        "principal": {
+                            "entityType": "ApiKey",
+                            "entityId": api_key_item.get("id", "unknown"),
+                        },
+                    }
+                else:
                     # Get path parameters for proper resource path normalization
                     path_parameters = event.get("pathParameters", {}) or {}
 

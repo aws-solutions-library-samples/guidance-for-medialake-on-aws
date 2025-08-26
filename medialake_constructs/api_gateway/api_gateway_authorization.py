@@ -19,6 +19,21 @@ from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 
+def apply_custom_authorization(
+    method: api_gateway.Method, authorizer: api_gateway.IAuthorizer
+) -> None:
+    """
+    Apply custom authorization to an API Gateway method.
+
+    Args:
+        method: The API Gateway method to apply authorization to
+        authorizer: The custom authorizer to use
+    """
+    cfn_method = method.node.default_child
+    cfn_method.authorization_type = "CUSTOM"
+    cfn_method.authorizer_id = authorizer.authorizer_id
+
+
 @dataclass
 class AuthorizationApiProps:
     """Properties for the Authorization API construct."""
@@ -101,12 +116,11 @@ class AuthorizationApi(Construct):
         )
         props.auth_table.grant_read_write_data(create_permission_set_lambda.function)
 
-        permission_sets_resource.add_method(
+        permission_sets_post = permission_sets_resource.add_method(
             "POST",
             api_gateway.LambdaIntegration(create_permission_set_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=self._api_authorizer,
         )
+        apply_custom_authorization(permission_sets_post, self._api_authorizer)
 
         # GET /authorization/permission-sets - List all Permission Sets
         list_permission_sets_lambda = Lambda(
@@ -120,12 +134,11 @@ class AuthorizationApi(Construct):
         )
         props.auth_table.grant_read_data(list_permission_sets_lambda.function)
 
-        permission_sets_resource.add_method(
+        permission_sets_get = permission_sets_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(list_permission_sets_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=self._api_authorizer,
         )
+        apply_custom_authorization(permission_sets_get, self._api_authorizer)
 
         # Permission Set by ID resource
         permission_set_id_resource = permission_sets_resource.add_resource(
@@ -144,7 +157,7 @@ class AuthorizationApi(Construct):
         )
         props.auth_table.grant_read_data(get_permission_set_lambda.function)
 
-        permission_set_id_resource.add_method(
+        permission_set_get = permission_set_id_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(
                 get_permission_set_lambda.function,
@@ -152,9 +165,8 @@ class AuthorizationApi(Construct):
                     "application/json": '{ "permissionSetId": "$input.params(\'permissionSetId\')" }'
                 },
             ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=self._api_authorizer,
         )
+        apply_custom_authorization(permission_set_get, self._api_authorizer)
 
         # PUT /authorization/permission-sets/{permissionSetId} - Update an existing custom Permission Set
         update_permission_set_lambda = Lambda(
@@ -168,7 +180,7 @@ class AuthorizationApi(Construct):
         )
         props.auth_table.grant_read_write_data(update_permission_set_lambda.function)
 
-        permission_set_id_resource.add_method(
+        permission_set_put = permission_set_id_resource.add_method(
             "PUT",
             api_gateway.LambdaIntegration(
                 update_permission_set_lambda.function,
@@ -176,9 +188,8 @@ class AuthorizationApi(Construct):
                     "application/json": '{ "permissionSetId": "$input.params(\'permissionSetId\')" }'
                 },
             ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=self._api_authorizer,
         )
+        apply_custom_authorization(permission_set_put, self._api_authorizer)
 
         # DELETE /authorization/permission-sets/{permissionSetId} - Delete a custom Permission Set
         delete_permission_set_lambda = Lambda(
@@ -192,7 +203,7 @@ class AuthorizationApi(Construct):
         )
         props.auth_table.grant_read_write_data(delete_permission_set_lambda.function)
 
-        permission_set_id_resource.add_method(
+        permission_set_delete = permission_set_id_resource.add_method(
             "DELETE",
             api_gateway.LambdaIntegration(
                 delete_permission_set_lambda.function,
@@ -200,9 +211,8 @@ class AuthorizationApi(Construct):
                     "application/json": '{ "permissionSetId": "$input.params(\'permissionSetId\')" }'
                 },
             ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=self._api_authorizer,
         )
+        apply_custom_authorization(permission_set_delete, self._api_authorizer)
 
         # 2. Assignments Endpoints
         assignments_resource = authorization_resource.add_resource("assignments")
@@ -225,7 +235,7 @@ class AuthorizationApi(Construct):
         )
         props.auth_table.grant_read_write_data(assign_ps_to_user_lambda.function)
 
-        user_id_assignments_resource.add_method(
+        user_assignments_post = user_id_assignments_resource.add_method(
             "POST",
             api_gateway.LambdaIntegration(
                 assign_ps_to_user_lambda.function,
@@ -233,9 +243,8 @@ class AuthorizationApi(Construct):
                     "application/json": '{ "userId": "$input.params(\'userId\')" }'
                 },
             ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=self._api_authorizer,
         )
+        apply_custom_authorization(user_assignments_post, self._api_authorizer)
 
         # GET /authorization/assignments/users/{userId} - List Permission Sets assigned to a User
         authorization_assignments_users_get = Lambda(
@@ -249,7 +258,7 @@ class AuthorizationApi(Construct):
         )
         props.auth_table.grant_read_data(authorization_assignments_users_get.function)
 
-        user_id_assignments_resource.add_method(
+        user_assignments_get = user_id_assignments_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(
                 authorization_assignments_users_get.function,
@@ -257,9 +266,8 @@ class AuthorizationApi(Construct):
                     "application/json": '{ "userId": "$input.params(\'userId\')" }'
                 },
             ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=self._api_authorizer,
         )
+        apply_custom_authorization(user_assignments_get, self._api_authorizer)
 
         # User Permission Set resource
         user_ps_resource = user_id_assignments_resource.add_resource("permission-sets")
@@ -279,7 +287,7 @@ class AuthorizationApi(Construct):
             authorization_assignments_users_permission_sets_id_delete.function
         )
 
-        user_ps_id_resource.add_method(
+        user_permission_set_delete = user_ps_id_resource.add_method(
             "DELETE",
             api_gateway.LambdaIntegration(
                 authorization_assignments_users_permission_sets_id_delete.function,
@@ -287,9 +295,8 @@ class AuthorizationApi(Construct):
                     "application/json": '{ "userId": "$input.params(\'userId\')", "permissionSetId": "$input.params(\'permissionSetId\')" }'
                 },
             ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=self._api_authorizer,
         )
+        apply_custom_authorization(user_permission_set_delete, self._api_authorizer)
 
         # Group Assignments
         group_assignments_resource = assignments_resource.add_resource("groups")
@@ -311,7 +318,7 @@ class AuthorizationApi(Construct):
             authorization_assignments_groups_post.function
         )
 
-        group_id_assignments_resource.add_method(
+        group_assignments_post = group_id_assignments_resource.add_method(
             "POST",
             api_gateway.LambdaIntegration(
                 authorization_assignments_groups_post.function,
@@ -319,9 +326,8 @@ class AuthorizationApi(Construct):
                     "application/json": '{ "groupId": "$input.params(\'groupId\')" }'
                 },
             ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=self._api_authorizer,
         )
+        apply_custom_authorization(group_assignments_post, self._api_authorizer)
 
         # GET /authorization/assignments/groups/{groupId} - List Permission Sets assigned to a Group
         list_group_assignments_lambda = Lambda(
@@ -335,7 +341,7 @@ class AuthorizationApi(Construct):
         )
         props.auth_table.grant_read_data(list_group_assignments_lambda.function)
 
-        group_id_assignments_resource.add_method(
+        group_assignments_get = group_id_assignments_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(
                 list_group_assignments_lambda.function,
@@ -343,9 +349,8 @@ class AuthorizationApi(Construct):
                     "application/json": '{ "groupId": "$input.params(\'groupId\')" }'
                 },
             ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=self._api_authorizer,
         )
+        apply_custom_authorization(group_assignments_get, self._api_authorizer)
 
         # Group Permission Set resource
         group_ps_resource = group_id_assignments_resource.add_resource(
@@ -365,7 +370,7 @@ class AuthorizationApi(Construct):
         )
         props.auth_table.grant_read_write_data(remove_group_assignment_lambda.function)
 
-        group_ps_id_resource.add_method(
+        group_permission_set_delete = group_ps_id_resource.add_method(
             "DELETE",
             api_gateway.LambdaIntegration(
                 remove_group_assignment_lambda.function,
@@ -373,9 +378,8 @@ class AuthorizationApi(Construct):
                     "application/json": '{ "groupId": "$input.params(\'groupId\')", "permissionSetId": "$input.params(\'permissionSetId\')" }'
                 },
             ),
-            authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            authorizer=self._api_authorizer,
         )
+        apply_custom_authorization(group_permission_set_delete, self._api_authorizer)
 
         # Add CORS support to all resources
         add_cors_options_method(authorization_resource)
