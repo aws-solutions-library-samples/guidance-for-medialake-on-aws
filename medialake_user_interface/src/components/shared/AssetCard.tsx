@@ -350,6 +350,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
         {assetType === "Video" ? (
           <div
             id={`video-asset-${id}`}
+            className="asset-card-video"
             onClick={(event) => {
               event.preventDefault();
               onAssetClick();
