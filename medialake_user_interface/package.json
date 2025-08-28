@@ -37,7 +37,6 @@
     "@tanstack/react-virtual": "^3.11.2",
     "@uppy/audio": "^2.1.2",
     "@uppy/aws-s3": "^4.2.3",
-    "@uppy/aws-s3-multipart": "^4.0.0",
     "@uppy/core": "^4.4.4",
     "@uppy/dashboard": "^4.3.3",
     "@uppy/drag-drop": "^4.1.2",
