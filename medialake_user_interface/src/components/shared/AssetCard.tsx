@@ -136,6 +136,9 @@ const AssetCard: React.FC<AssetCardProps> = ({
       try {
         const omakasePlayer = new OmakasePlayer({
           playerHTMLElementId: playerId,
+          playerClickHandler: () => {
+            onAssetClick();
+          },
           playerChroming: {
             theme: "STAMP",
             themeConfig: {
@@ -405,10 +408,6 @@ const AssetCard: React.FC<AssetCardProps> = ({
           <div
             id={`video-asset-${id}`}
             className="asset-card-video"
-            onClick={(event) => {
-              event.preventDefault();
-              onAssetClick();
-            }}
             style={{
               width: dimensions.width,
               height: dimensions.height,
