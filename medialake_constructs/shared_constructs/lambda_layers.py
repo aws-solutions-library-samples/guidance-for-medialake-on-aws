@@ -250,13 +250,13 @@ class FFProbeLayer(Construct):
                             yum update -y && yum install -y wget xz zip tar
                             TEMP_DIR=$(mktemp -d)
                             cd $TEMP_DIR
-                            wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
-                            wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz.md5
-                            md5sum -c ffmpeg-release-amd64-static.tar.xz.md5
-                            mkdir ffmpeg-release-amd64
-                            tar xvf ffmpeg-release-amd64-static.tar.xz -C ffmpeg-release-amd64
+                            wget https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz
+                            wget https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/checksums.sha256
+                            grep ffmpeg-master-latest-linux64-gpl.tar.xz checksums.sha256 | sha256sum -c
+                            mkdir ffmpeg-master-latest-linux64-gpl
+                            tar xvf ffmpeg-master-latest-linux64-gpl.tar.xz -C ffmpeg-master-latest-linux64-gpl
                             mkdir -p ffprobe/bin
-                            cp ffmpeg-release-amd64/*/ffprobe ffprobe/bin/
+                            cp ffmpeg-master-latest-linux64-gpl/*/bin/ffprobe ffprobe/bin/
                             cd ffprobe
                             zip -9 -r $TEMP_DIR/ffprobe.zip .
                             cp $TEMP_DIR/ffprobe.zip /asset-output/
@@ -277,7 +277,7 @@ class FFmpegLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
         """
         This layer bundles a static build of FFmpeg. It downloads the FFmpeg release,
-        verifies it with its MD5 checksum, extracts the binary, and packages it into a Lambda layer.
+        verifies it with its SHA256 checksum, extracts the binary, and packages it into a Lambda layer.
         """
         super().__init__(scope, id, **kwargs)
 
@@ -309,13 +309,13 @@ class FFmpegLayer(Construct):
                             yum update -y && yum install -y wget xz zip tar
                             TEMP_DIR=$(mktemp -d)
                             cd $TEMP_DIR
-                            wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
-                            wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz.md5
-                            md5sum -c ffmpeg-release-amd64-static.tar.xz.md5
-                            mkdir ffmpeg-release-amd64
-                            tar xvf ffmpeg-release-amd64-static.tar.xz -C ffmpeg-release-amd64
+                            wget https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz
+                            wget https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/checksums.sha256
+                            grep ffmpeg-master-latest-linux64-gpl.tar.xz checksums.sha256 | sha256sum -c
+                            mkdir ffmpeg-master-latest-linux64-gpl
+                            tar xvf ffmpeg-master-latest-linux64-gpl.tar.xz -C ffmpeg-master-latest-linux64-gpl
                             mkdir -p ffmpeg/bin
-                            cp ffmpeg-release-amd64/*/ffmpeg ffmpeg/bin/
+                            cp ffmpeg-master-latest-linux64-gpl/*/bin/ffmpeg ffmpeg/bin/
                             cd ffmpeg
                             zip -9 -r $TEMP_DIR/ffmpeg.zip .
                             cp $TEMP_DIR/ffmpeg.zip /asset-output/

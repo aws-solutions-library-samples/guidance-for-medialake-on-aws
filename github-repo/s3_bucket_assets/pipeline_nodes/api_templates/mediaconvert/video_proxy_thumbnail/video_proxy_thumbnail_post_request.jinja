@@ -1,0 +1,92 @@
+{
+  "Role": "{{ variables.mediaconvert_role_arn }}",
+  "Queue": "{{ variables.mediaconvert_queue_arn }}",
+  "Settings": {
+    "Inputs": [
+      {
+        "FileInput": "s3://{{ variables.input_bucket }}/{{ variables.input_key }}",
+        "AudioSelectors": { "Audio Selector 1": { "DefaultSelection": "DEFAULT" } },
+        "VideoSelector": {}
+      }
+    ],
+
+    "OutputGroups": [
+      {
+        "Name": "Proxy Video",
+        "OutputGroupSettings": {
+          "Type": "FILE_GROUP_SETTINGS",
+          "FileGroupSettings": {
+            "Destination": "s3://{{ variables.output_bucket }}/{{ variables.output_key }}",
+            "DestinationSettings": {
+              "S3Settings": { "AccessControl": { "CannedAcl": "BUCKET_OWNER_FULL_CONTROL" } }
+            }
+          }
+        },
+        "Outputs": [
+          {
+            "NameModifier": "_proxy",
+            "VideoDescription": {
+              "CodecSettings": {
+                "Codec": "H_264",
+                "H264Settings": {
+                  "RateControlMode": "QVBR",
+                  "SceneChangeDetect": "TRANSITION_DETECTION",
+                  "MaxBitrate": 2000000
+                }
+              },
+              "Width": 640,
+              "Height": 360
+            },
+            "AudioDescriptions": [
+              {
+                "CodecSettings": {
+                  "Codec": "AAC",
+                  "AacSettings": {
+                    "Bitrate": 96000,
+                    "CodingMode": "CODING_MODE_2_0",
+                    "SampleRate": 48000
+                  }
+                }
+              }
+            ],
+            "ContainerSettings": { "Container": "MP4" }
+          }
+        ]
+      },
+      {
+        "Name": "Thumbnail",
+        "OutputGroupSettings": {
+          "Type": "FILE_GROUP_SETTINGS",
+          "FileGroupSettings": {
+            "Destination": "s3://{{ variables.output_bucket }}/{{ variables.output_key }}"
+          }
+        },
+        "Outputs": [
+          {
+            "NameModifier": "_thumbnail",
+            "Extension": "jpg",
+            "VideoDescription": {
+              "CodecSettings": {
+                "Codec": "FRAME_CAPTURE",
+                "FrameCaptureSettings": {
+                  {% if variables.duration_frames %}
+                  "FramerateNumerator": 1,
+                  "FramerateDenominator": {{ (variables.duration_frames * 0.25) | int }},
+                  {% else %}
+                  "FramerateNumerator": 1,
+                  "FramerateDenominator": 4,
+                  {% endif %}
+                  "MaxCaptures": 1,
+                  "Quality": 80
+                }
+              },
+              "Width": {{ variables.thumbnail_width }},
+              "Height": {{ variables.thumbnail_height }}
+            },
+            "ContainerSettings": { "Container": "RAW" }
+          }
+        ]
+      }
+    ]
+  }
+}

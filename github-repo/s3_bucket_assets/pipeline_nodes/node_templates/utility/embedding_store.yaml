@@ -1,0 +1,56 @@
+spec: v1.0.0
+node:
+  id: embedding_store
+  title: Embedding Store
+  description: Store embeddings in OpenSearch for semantic search
+  version: 1.0.0
+  type: utility
+  integration:
+    config:
+      lambda:
+        handler: utility/EmbeddingStoreLambdaDeployment
+        runtime: python3.12
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              resources:
+                - "*"
+            - effect: Allow
+              actions:
+                - es:ESHttp*
+                - aoss:*
+              resources:
+                - "*"
+            - effect: Allow
+              actions:
+                - kms:Decrypt
+              resources:
+                - "*"
+actions:
+  store:
+    summary: Store Embeddings
+    description: Store embeddings in OpenSearch for semantic search
+    operationId: storeEmbeddings
+    parameters:
+      - in: body
+        name: Index Name
+        required: false
+        default: media
+        schema:
+          type: string
+      - in: body
+        name: Content Type
+        required: false
+        default: video
+        schema:
+          type: string
+          enum: ["video", "audio", "image"]
+    x-requestMapping: utility/embedding_store/store/
+    x-responseMapping: utility/embedding_store/store/
+    connections:
+      incoming:
+        type: [any]

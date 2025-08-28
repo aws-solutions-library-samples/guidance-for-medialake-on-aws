@@ -1,0 +1,28 @@
+spec: v1.0.0
+node:
+  id: wait
+  title: Wait
+  description: Wait for a specific duration
+  version: 1.0.0
+  type: flow
+  integration:
+    config:
+      aws_stepfunction:
+        step_name: wait
+actions:
+  wait:
+    summary: Wait for a specific duration
+    description: This step will wait for a specific duration before moving to the next step
+    operationId: wait
+    parameters:
+      - in: body
+        name: Duration
+        required: true
+        default: 15
+        schema:
+          type: number
+    connections:
+      incoming:
+        type: [any]
+      outgoing:
+        type: [any]

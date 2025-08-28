@@ -1,0 +1,89 @@
+spec: v1.0.0
+node:
+  id: audio_proxy
+  title: Audio Proxy
+  description: Create an audio proxy
+  version: 1.0.0
+  type: utility
+  integration:
+    config:
+      lambda:
+        handler: utility/AudioProxyLambdaDeployment
+        runtime: python3.12
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - iam:PassRole
+              resources:
+                - ${MEDIACONVERT_ROLE_ARN}
+            - effect: Allow
+              actions:
+                - mediaconvert:CreateJob
+                - mediaconvert:ListJobs
+                - mediaconvert:GetJob
+              resources:
+                - ${MEDIACONVERT_QUEUE_ARN}
+            - effect: Allow
+              actions:
+                - mediaconvert:DescribeEndpoints
+              resources:
+                - arn:aws:mediaconvert:${AWS::Region}:${AWS::AccountId}:endpoints/*
+            - effect: Allow
+              actions:
+                - s3:ListBucket
+                - s3:GetObject
+                - s3:PutObject
+                - s3:DeleteObject
+              resources:
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}/*
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}
+            - effect: Allow
+              actions:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+                - dynamodb:PutItem
+              resources:
+                - ${MEDIALAKE_ASSET_TABLE}
+            - effect: Allow
+              actions:
+                - kms:Decrypt
+              resources:
+                - ${MEDIA_ASSETS_BUCKET_ARN_KMS_KEY}
+            - effect: Allow
+              actions:
+                - kms:GenerateDataKey
+              resources:
+                - "*"
+
+actions:
+  extract:
+    summary: Create an audio proxy
+    description: Create an audio proxy from an audio file stored in S3
+    operationId: createAudioProxy
+    parameters:
+      - in: body
+        name: MediaConvert Queue Arn
+        required: true
+        default: ${MEDIACONVERT_QUEUE_ARN}
+        schema:
+          type: string
+      - in: body
+        name: MediaConvert Role Arn
+        required: true
+        default: ${MEDIACONVERT_ROLE_ARN}
+        schema:
+          type: string
+      - in: body
+        name: output_bucket
+        required: true
+        schema:
+          type: string
+          description: S3 bucket name for output
+    x-requestMapping: processor/audio_proxy/extract/
+    x-responseMapping: processor/audio_proxy/extract/
+    connections:
+      incoming:
+        type: [audio]
+      outgoing:
+        type: [any]

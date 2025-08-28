@@ -1,0 +1,52 @@
+spec: v1.0.0
+node:
+  id: audio_splitter
+  title: Audio Splitter
+  description: Splits audio files into MP3 chunks of configurable duration
+  version: 1.0.0
+  type: utility
+  integration:
+    config:
+      lambda:
+        handler: utility/AudioSplitterLambdaDeployment
+        runtime: python3.12
+        layers:
+          - FFmpeg
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - s3:ListBucket
+                - s3:GetObject
+                - s3:PutObject
+              resources:
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}/*
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}
+            - effect: Allow
+              actions:
+                - kms:Decrypt
+              resources:
+                - ${MEDIA_ASSETS_BUCKET_ARN_KMS_KEY}
+            - effect: Allow
+              actions:
+                - kms:GenerateDataKey
+              resources:
+                - "*"
+
+actions:
+  split:
+    summary: Audio Splitter
+    description: Splits audio files into MP3 chunks of configurable duration
+    operationId: audioSplitter
+    parameters:
+      - in: body
+        name: Chunk Duration
+        required: true
+        default: 10
+        schema:
+          type: number
+    connections:
+      incoming:
+        type: [audio]
+      outgoing:
+        type: [audio]
