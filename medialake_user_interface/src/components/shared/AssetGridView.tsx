@@ -113,6 +113,7 @@ function AssetGridView<T>({
               thumbnailUrl={getAssetThumbnail(asset)}
               proxyUrl={getAssetProxy ? getAssetProxy(asset) : undefined}
               assetType={getAssetType(asset)}
+              clips={(asset as any).clips}
               fields={cardFields}
               renderField={(fieldId) => renderCardField(fieldId, asset)}
               onAssetClick={() => onAssetClick(asset)}

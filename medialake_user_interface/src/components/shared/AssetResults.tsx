@@ -228,6 +228,7 @@ function AssetResults<T extends AssetBase>({
         thumbnailUrl={asset.thumbnailUrl}
         proxyUrl={asset.proxyUrl}
         assetType={assetType}
+        clips={(asset as any).clips}
         fields={cardFields}
         renderField={(fieldId) => renderCardField(fieldId, asset)}
         onAssetClick={() => handleAssetClick(asset)}

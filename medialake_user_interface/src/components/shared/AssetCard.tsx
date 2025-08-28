@@ -19,7 +19,8 @@ import { PLACEHOLDER_IMAGE } from "@/utils/placeholderSvg";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import { AssetAudio } from "../asset";
 import { InlineTextEditor } from "../common/InlineTextEditor";
-import { OmakasePlayer } from "@byomakase/omakase-player";
+import { OmakasePlayer, PeriodMarker } from "@byomakase/omakase-player";
+import { randomHexColor } from "../common/utils";
 
 export interface AssetField {
   id: string;
@@ -33,6 +34,12 @@ export interface AssetCardProps {
   thumbnailUrl?: string;
   proxyUrl?: string;
   assetType?: string;
+  clips?: Array<{
+    start_timecode?: string;
+    end_timecode?: string;
+    start?: number;
+    end?: number;
+  }>;
   fields: AssetField[];
   isRenaming?: boolean;
   renderField: (fieldId: string) => string | React.ReactNode;
@@ -64,6 +71,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
   thumbnailUrl,
   proxyUrl,
   assetType,
+  clips,
   fields,
   renderField,
   onAssetClick,
@@ -139,8 +147,54 @@ const AssetCard: React.FC<AssetCardProps> = ({
         // Store the player reference
         omakasePlayerRef.current = omakasePlayer;
 
-        // Load the video
-        omakasePlayer.loadVideo(proxyUrl);
+        // Load the video then add markers if clips provided
+        omakasePlayer
+          .loadVideo(proxyUrl)
+          .subscribe({
+            next: () => {
+              try {
+                if (Array.isArray(clips) && clips.length > 0) {
+                  const timecodeToSeconds = (tc: string): number => {
+                    const [hh, mm, ss, ff] = tc.split(":").map(Number);
+                    const fps = 25; // default/fallback; adjust if actual fps available
+                    return hh * 3600 + mm * 60 + ss + (isNaN(ff) ? 0 : ff / fps);
+                  };
+
+                  clips.forEach((clip) => {
+                    const start =
+                      typeof clip.start === "number"
+                        ? clip.start
+                        : clip.start_timecode
+                          ? timecodeToSeconds(clip.start_timecode)
+                          : undefined;
+                    const end =
+                      typeof clip.end === "number"
+                        ? clip.end
+                        : clip.end_timecode
+                          ? timecodeToSeconds(clip.end_timecode)
+                          : undefined;
+
+                    if (start !== undefined && end !== undefined) {
+                      const marker = new PeriodMarker({
+                        timeObservation: { start, end },
+                        style: {
+                          color: randomHexColor(),
+                        },
+                      });
+                      // Add marker to progress track when available
+                      try {
+                        omakasePlayer.progressMarkerTrack.addMarker(marker);
+                      } catch (e) {
+                        console.warn("progressMarkerTrack not ready", e);
+                      }
+                    }
+                  });
+                }
+              } catch (e) {
+                console.error("Failed to add semantic markers:", e);
+              }
+            },
+          });
 
         console.log(`Omakase player initialized for video asset: ${id}`);
       } catch (error) {
