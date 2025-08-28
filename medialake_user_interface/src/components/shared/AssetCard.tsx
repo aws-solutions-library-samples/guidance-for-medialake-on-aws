@@ -107,6 +107,13 @@ const AssetCard: React.FC<AssetCardProps> = ({
     }
   }, [menuOpen]);
 
+  // Log video asset ID when video asset card is created
+  useEffect(() => {
+    if (assetType === "Video") {
+      console.log(`Video Asset Card created with ID: ${id}`);
+    }
+  }, [assetType, id]);
+
   // Determine the card dimensions based on props
   const getCardDimensions = () => {
     const baseHeight =
@@ -294,7 +301,8 @@ const AssetCard: React.FC<AssetCardProps> = ({
       >
         {/* Render appropriate content based on asset type */}
         {assetType === "Video" ? (
-          <video
+          <div
+            id={`video-asset-${id}`}
             onClick={(event) => {
               event.preventDefault();
               onAssetClick();
@@ -303,11 +311,16 @@ const AssetCard: React.FC<AssetCardProps> = ({
               width: dimensions.width,
               height: dimensions.height,
               backgroundColor: "rgba(0,0,0,0.03)",
-              objectFit: "cover",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
-            controls
-            src={proxyUrl}
-          />
+          >
+            <Typography variant="body2" color="text.secondary">
+              Video Asset
+            </Typography>
+          </div>
         ) : assetType === "Audio" ? (
           <Box
             onClick={onAssetClick}
@@ -748,6 +761,31 @@ const AssetCard: React.FC<AssetCardProps> = ({
       </Box>
     </Box>
   );
+};
+
+// Utility function to iterate through all video asset divs and log their IDs
+export const logAllVideoAssetIds = () => {
+  const videoAssetDivs = document.querySelectorAll('[id^="video-asset-"]');
+  console.log(`Found ${videoAssetDivs.length} video asset divs:`);
+  
+  videoAssetDivs.forEach((div) => {
+    const id = div.id;
+    const assetId = id.replace('video-asset-', '');
+    console.log(`Video Asset ID: ${assetId}`);
+  });
+  
+  return Array.from(videoAssetDivs).map(div => div.id.replace('video-asset-', ''));
+};
+
+// Utility function to get all video asset IDs as an array
+export const getAllVideoAssetIds = (): string[] => {
+  const videoAssetDivs = document.querySelectorAll('[id^="video-asset-"]');
+  return Array.from(videoAssetDivs).map(div => div.id.replace('video-asset-', ''));
+};
+
+// Utility function to get a specific video asset div by asset ID
+export const getVideoAssetDiv = (assetId: string): HTMLDivElement | null => {
+  return document.getElementById(`video-asset-${assetId}`) as HTMLDivElement;
 };
 
 export default AssetCard;
