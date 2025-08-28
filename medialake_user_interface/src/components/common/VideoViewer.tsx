@@ -130,7 +130,7 @@ const useOmakasePlayer = (
       });
 
     const subscriptions = [
-      player.loadVideo(videoSrc, 25).subscribe({
+      player.loadVideo(videoSrc).subscribe({
         next: (video) => {
           console.log(`Video loaded. Duration: ${video.duration}`);
           setDuration(video.duration);
@@ -202,18 +202,6 @@ const useOmakasePlayer = (
       }),
     ];
 
-    player.video.onVideoLoaded$.pipe(filter((video) => !!video)).subscribe({
-      next: () => {
-        try {
-          createTimelineLanes();
-        } catch (error) {
-          console.error("Error creating timeline lanes:", error);
-        }
-      },
-      error: (error) => {
-        console.error("Error in video loaded subscription:", error);
-      },
-    });
 
     const createTimelineLanes = () => {
       markerLane1();

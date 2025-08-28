@@ -19,6 +19,7 @@ import { PLACEHOLDER_IMAGE } from "@/utils/placeholderSvg";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import { AssetAudio } from "../asset";
 import { InlineTextEditor } from "../common/InlineTextEditor";
+import { OmakasePlayer } from "@byomakase/omakase-player";
 
 export interface AssetField {
   id: string;
@@ -92,6 +93,7 @@ const AssetCard: React.FC<AssetCardProps> = ({
   const cardRef = useRef<HTMLDivElement>(null);
   const preventCommitRef = useRef<boolean>(false);
   const commitRef = useRef<(() => void) | null>(null);
+  const omakasePlayerRef = useRef<OmakasePlayer | null>(null);
 
   // Check if features are enabled
   const multiSelectFeature = useFeatureFlag(
@@ -107,12 +109,57 @@ const AssetCard: React.FC<AssetCardProps> = ({
     }
   }, [menuOpen]);
 
-  // Log video asset ID when video asset card is created
+  // Initialize Omakase player for video assets
   useEffect(() => {
-    if (assetType === "Video") {
-      console.log(`Video Asset Card created with ID: ${id}`);
+    if (assetType === "Video" && proxyUrl) {
+      const playerId = `omakase-player-${id}`;
+      
+      // Create the player container div if it doesn't exist
+      const playerContainer = document.getElementById(playerId);
+      if (!playerContainer) {
+        const container = document.createElement('div');
+        container.id = playerId;
+        container.style.width = '100%';
+        container.style.height = '100%';
+        // We'll append this to the video asset div later
+      }
+
+      // Initialize Omakase player
+      try {
+        const omakasePlayer = new OmakasePlayer({
+          playerHTMLElementId: playerId,
+          playerChroming: {
+            theme: "STAMP",
+            themeConfig: {
+              stampScale: "FIT",
+            },
+          },
+        });
+
+        // Store the player reference
+        omakasePlayerRef.current = omakasePlayer;
+
+        // Load the video
+        omakasePlayer.loadVideo(proxyUrl);
+
+        console.log(`Omakase player initialized for video asset: ${id}`);
+      } catch (error) {
+        console.error(`Failed to initialize Omakase player for video asset ${id}:`, error);
+      }
     }
-  }, [assetType, id]);
+
+    // Cleanup function
+    return () => {
+      if (omakasePlayerRef.current) {
+        try {
+          omakasePlayerRef.current.destroy();
+          omakasePlayerRef.current = null;
+        } catch (error) {
+          console.error(`Failed to destroy Omakase player for video asset ${id}:`, error);
+        }
+      }
+    };
+  }, [assetType, proxyUrl, id]);
 
   // Determine the card dimensions based on props
   const getCardDimensions = () => {
@@ -312,14 +359,10 @@ const AssetCard: React.FC<AssetCardProps> = ({
               height: dimensions.height,
               backgroundColor: "rgba(0,0,0,0.03)",
               cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              position: "relative",
             }}
           >
-            <Typography variant="body2" color="text.secondary">
-              Video Asset
-            </Typography>
+            <div id={`omakase-player-${id}`} style={{ width: "100%", height: "100%" }} />
           </div>
         ) : assetType === "Audio" ? (
           <Box
@@ -772,6 +815,15 @@ export const logAllVideoAssetIds = () => {
     const id = div.id;
     const assetId = id.replace('video-asset-', '');
     console.log(`Video Asset ID: ${assetId}`);
+    
+    // Also log the corresponding Omakase player ID
+    const playerId = `omakase-player-${assetId}`;
+    const playerElement = document.getElementById(playerId);
+    if (playerElement) {
+      console.log(`  └─ Omakase Player ID: ${playerId} (found)`);
+    } else {
+      console.log(`  └─ Omakase Player ID: ${playerId} (not found)`);
+    }
   });
   
   return Array.from(videoAssetDivs).map(div => div.id.replace('video-asset-', ''));
@@ -786,6 +838,17 @@ export const getAllVideoAssetIds = (): string[] => {
 // Utility function to get a specific video asset div by asset ID
 export const getVideoAssetDiv = (assetId: string): HTMLDivElement | null => {
   return document.getElementById(`video-asset-${assetId}`) as HTMLDivElement;
+};
+
+// Utility function to get all Omakase player IDs
+export const getAllOmakasePlayerIds = (): string[] => {
+  const playerDivs = document.querySelectorAll('[id^="omakase-player-"]');
+  return Array.from(playerDivs).map(div => div.id);
+};
+
+// Utility function to get a specific Omakase player element by asset ID
+export const getOmakasePlayerElement = (assetId: string): HTMLDivElement | null => {
+  return document.getElementById(`omakase-player-${assetId}`) as HTMLDivElement;
 };
 
 export default AssetCard;
