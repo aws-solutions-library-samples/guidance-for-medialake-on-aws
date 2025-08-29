@@ -115,6 +115,12 @@ const useOmakasePlayer = (
 
     const player = new OmakasePlayer({
       playerHTMLElementId: containerRef.current.id,
+      playerChroming: {
+        theme: "DEFAULT",
+        themeConfig: {
+          controlBarVisibility: 'DISABLED',
+        },
+      },
     });
     playerRef.current = player;
     player
