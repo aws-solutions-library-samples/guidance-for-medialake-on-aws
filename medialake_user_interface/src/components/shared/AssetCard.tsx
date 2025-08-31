@@ -136,15 +136,15 @@ const AssetCard: React.FC<AssetCardProps> = ({
       try {
         const omakasePlayer = new OmakasePlayer({
           playerHTMLElementId: playerId,
-          playerClickHandler: () => {
-            onAssetClick();
-          },
+          // playerClickHandler: () => {
+          //   onAssetClick();
+          // },
           playerChroming: {
             theme: "STAMP",
             themeConfig: {
               stampScale: "FIT",
             },
-          },
+          }
         });
 
         // Store the player reference

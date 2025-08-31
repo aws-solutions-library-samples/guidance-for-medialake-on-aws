@@ -114,13 +114,7 @@ const useOmakasePlayer = (
     markerLaneRef.current = null;
 
     const player = new OmakasePlayer({
-      playerHTMLElementId: containerRef.current.id,
-      playerChroming: {
-        theme: "STAMP",
-        themeConfig: {
-          stampScale: "FIT",
-        },
-      },
+      playerHTMLElementId: containerRef.current.id
     });
     playerRef.current = player;
     player
