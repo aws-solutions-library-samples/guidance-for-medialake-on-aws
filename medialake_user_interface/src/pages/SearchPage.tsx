@@ -166,6 +166,9 @@ const SearchPage: React.FC = () => {
 
   // State for selected fields
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
+  
+  // State for confidence threshold (semantic search)
+  const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0);
 
   const { data, isLoading, isFetching, error } = useSearch(currentQuery, {
     page: currentPage,
@@ -676,6 +679,9 @@ const SearchPage: React.FC = () => {
                 selectedFields={selectedFields}
                 availableFields={availableFields}
                 onFieldsChange={handleFieldsChange}
+                isSemantic={currentSemantic}
+                confidenceThreshold={confidenceThreshold}
+                onConfidenceThresholdChange={setConfidenceThreshold}
                 groupByType={viewPreferences.groupByType}
                 onGroupByTypeChange={viewPreferences.handleGroupByTypeChange}
                 viewMode={viewPreferences.viewMode}

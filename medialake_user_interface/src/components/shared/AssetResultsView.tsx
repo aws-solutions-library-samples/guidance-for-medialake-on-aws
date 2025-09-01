@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Typography, LinearProgress } from "@mui/material";
+import { Box, Typography, LinearProgress, Slider } from "@mui/material";
 import { type SortingState } from "@tanstack/react-table";
 import { type AssetTableColumn } from "@/types/shared/assetComponents";
 import AssetViewControls from "./AssetViewControls";
@@ -16,6 +16,7 @@ export interface AssetField {
 
 export interface AssetResultsViewProps<T> {
   results: T[];
+  originalResults?: T[]; // Original unfiltered results for confidence filtering
   searchMetadata: {
     totalResults: number;
     page: number;
@@ -25,6 +26,11 @@ export interface AssetResultsViewProps<T> {
   onPageSizeChange: (newPageSize: number) => void;
   searchTerm?: string;
   title?: string;
+
+  // Semantic search confidence filtering
+  isSemantic?: boolean;
+  confidenceThreshold?: number;
+  onConfidenceThresholdChange?: (threshold: number) => void;
 
   // Search fields
   selectedFields?: string[];
@@ -92,11 +98,18 @@ export interface AssetResultsViewProps<T> {
 
 function AssetResultsView<T>({
   results,
+  originalResults,
   searchMetadata,
   onPageChange,
   onPageSizeChange,
   searchTerm,
   title = "Results",
+
+  // Semantic search confidence filtering
+  isSemantic = false,
+  confidenceThreshold = 0,
+  onConfidenceThresholdChange,
+
   // Search fields
   selectedFields,
   availableFields,
@@ -189,10 +202,10 @@ function AssetResultsView<T>({
             viewMode === "card"
               ? cardFields
               : columns.map((col) => ({
-                  id: col.id,
-                  label: col.label,
-                  visible: col.visible,
-                }))
+                id: col.id,
+                label: col.label,
+                visible: col.visible,
+              }))
           }
           onFieldToggle={
             viewMode === "card" ? onCardFieldToggle : onColumnToggle
@@ -240,37 +253,86 @@ function AssetResultsView<T>({
         />
       )}
       <Box sx={{ mb: 2 }}>
-        <Typography
-          variant="h4"
-          component="h1"
-          sx={{
-            fontWeight: 700,
-            background: (theme) =>
-              `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-            backgroundClip: "text",
-            WebkitBackgroundClip: "text",
-            color: "transparent",
-            display: "block",
-            visibility: "visible",
-            position: "relative",
-            zIndex: 1,
-          }}
-        >
-          {title}{" "}
-          {searchMetadata?.totalResults > 0 && searchTerm && (
-            <Typography
-              component="span"
-              sx={{
-                fontWeight: 300,
-                fontSize: "0.5em",
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1, flexWrap: "wrap", gap: 2 }}>
+          <Typography
+            variant="h4"
+            component="h1"
+            sx={{
+              fontWeight: 700,
+              background: (theme) =>
+                `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+              backgroundClip: "text",
+              WebkitBackgroundClip: "text",
+              color: "transparent",
+              display: "block",
+              visibility: "visible",
+              position: "relative",
+              zIndex: 1,
+            }}
+          >
+            {title}{" "}
+            {searchMetadata?.totalResults > 0 && searchTerm && (
+              <Typography
+                component="span"
+                sx={{
+                  fontWeight: 300,
+                  fontSize: "0.5em",
+                  color: "text.secondary",
+                  opacity: 0.75,
+                }}
+              >
+                (Found {searchMetadata.totalResults} results for "{searchTerm}"
+                {isSemantic && confidenceThreshold > 0 && originalResults && results.length !== originalResults.length && (
+                  <>, showing {results.length} above {(confidenceThreshold * 100).toFixed(0)}% confidence</>
+                )})
+              </Typography>
+            )}
+          </Typography>
+
+          {/* Confidence Slider - Only show for semantic search */}
+          {isSemantic && (
+            <Box sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              minWidth: 280,
+              flexShrink: 0
+            }}>
+              <Typography variant="body2" sx={{ fontSize: "0.875rem", color: "text.secondary", whiteSpace: "nowrap" }}>
+                Confidence:
+              </Typography>
+              <Slider
+                value={confidenceThreshold}
+                onChange={(_, value) => onConfidenceThresholdChange?.(value as number)}
+                min={0}
+                max={1}
+                step={0.01}
+                size="small"
+                sx={{
+                  width: 140,
+                  '& .MuiSlider-thumb': {
+                    width: 16,
+                    height: 16,
+                  },
+                  '& .MuiSlider-track': {
+                    height: 3,
+                  },
+                  '& .MuiSlider-rail': {
+                    height: 3,
+                  },
+                }}
+              />
+              <Typography variant="body2" sx={{
+                minWidth: 40,
+                fontSize: "0.875rem",
                 color: "text.secondary",
-                opacity: 0.75,
-              }}
-            >
-              (Found {searchMetadata.totalResults} results for "{searchTerm}")
-            </Typography>
+                textAlign: "right"
+              }}>
+                {(confidenceThreshold * 100).toFixed(0)}%
+              </Typography>
+            </Box>
           )}
-        </Typography>
+        </Box>
       </Box>
       <AssetViewControls
         viewMode={viewMode}
@@ -292,10 +354,10 @@ function AssetResultsView<T>({
           viewMode === "card"
             ? cardFields
             : columns.map((col) => ({
-                id: col.id,
-                label: col.label,
-                visible: col.visible,
-              }))
+              id: col.id,
+              label: col.label,
+              visible: col.visible,
+            }))
         }
         onFieldToggle={viewMode === "card" ? onCardFieldToggle : onColumnToggle}
         selectedFields={selectedFields}

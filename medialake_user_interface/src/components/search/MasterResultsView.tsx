@@ -27,6 +27,11 @@ interface MasterResultsViewProps {
   searchTerm: string;
   error?: { status: string; message: string } | null;
   isLoading?: boolean;
+  
+  // Semantic search confidence filtering
+  isSemantic?: boolean;
+  confidenceThreshold?: number;
+  onConfidenceThresholdChange?: (threshold: number) => void;
 
   // Search fields
   selectedFields: string[];
@@ -109,6 +114,11 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   searchTerm,
   error,
   isLoading,
+  
+  // Semantic search confidence filtering
+  isSemantic = false,
+  confidenceThreshold = 0,
+  onConfidenceThresholdChange,
 
   // Search fields
   selectedFields,
@@ -208,9 +218,24 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       ? (assetId: string) => selectedAssets.includes(assetId)
       : undefined;
 
+  // Filter results based on confidence threshold for semantic search
+  const filteredResults = React.useMemo(() => {
+    if (!isSemantic || confidenceThreshold === undefined) {
+      return results;
+    }
+    return results.filter((asset) => {
+      const score = asset.score ?? 1; // Default to 1 if no score (non-semantic results)
+      return score >= confidenceThreshold;
+    });
+  }, [results, isSemantic, confidenceThreshold]);
+
   return (
     <AssetResultsView
-      results={results}
+      results={filteredResults}
+      originalResults={results}
+      isSemantic={isSemantic}
+      confidenceThreshold={confidenceThreshold}
+      onConfidenceThresholdChange={onConfidenceThresholdChange}
       searchMetadata={searchMetadata}
       onPageChange={onPageChange}
       onPageSizeChange={onPageSizeChange}
