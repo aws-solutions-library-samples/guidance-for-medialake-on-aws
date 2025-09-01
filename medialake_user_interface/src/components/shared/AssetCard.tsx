@@ -65,7 +65,7 @@ export interface AssetCardProps {
   selectedSearchFields?: string[]; // Selected search fields
 }
 
-const AssetCard: React.FC<AssetCardProps> = ({
+const AssetCard: React.FC<AssetCardProps> = React.memo(({
   id,
   name,
   thumbnailUrl,
@@ -117,19 +117,23 @@ const AssetCard: React.FC<AssetCardProps> = ({
     }
   }, [menuOpen]);
 
+  // Track if player has been initialized to prevent re-initialization
+  const playerInitializedRef = useRef<boolean>(false);
+  const currentProxyUrlRef = useRef<string | undefined>(proxyUrl);
+
   // Initialize Omakase player for video assets
   useEffect(() => {
-    if (assetType === "Video" && proxyUrl) {
+    // Only initialize if it's a video, has a proxy URL, and hasn't been initialized yet
+    if (assetType === "Video" && proxyUrl && !playerInitializedRef.current) {
       const playerId = `omakase-player-${id}`;
-      
-      // Create the player container div if it doesn't exist
-      const playerContainer = document.getElementById(playerId);
+
+      // Check if player container already exists
+      let playerContainer = document.getElementById(playerId);
       if (!playerContainer) {
-        const container = document.createElement('div');
-        container.id = playerId;
-        container.style.width = '100%';
-        container.style.height = '100%';
-        // We'll append this to the video asset div later
+        playerContainer = document.createElement('div');
+        playerContainer.id = playerId;
+        playerContainer.style.width = '100%';
+        playerContainer.style.height = '100%';
       }
 
       // Initialize Omakase player
@@ -149,6 +153,8 @@ const AssetCard: React.FC<AssetCardProps> = ({
 
         // Store the player reference
         omakasePlayerRef.current = omakasePlayer;
+        playerInitializedRef.current = true;
+        currentProxyUrlRef.current = proxyUrl;
 
         // Load the video then add markers if clips provided
         omakasePlayer
@@ -197,6 +203,9 @@ const AssetCard: React.FC<AssetCardProps> = ({
                 console.error("Failed to add semantic markers:", e);
               }
             },
+            error: (error) => {
+              console.error(`Failed to load video for asset ${id}:`, error);
+            }
           });
 
         console.log(`Omakase player initialized for video asset: ${id}`);
@@ -204,19 +213,34 @@ const AssetCard: React.FC<AssetCardProps> = ({
         console.error(`Failed to initialize Omakase player for video asset ${id}:`, error);
       }
     }
+    // If the proxy URL changed, we need to reload the video
+    else if (assetType === "Video" && proxyUrl && playerInitializedRef.current &&
+      currentProxyUrlRef.current !== proxyUrl && omakasePlayerRef.current) {
+      currentProxyUrlRef.current = proxyUrl;
+      omakasePlayerRef.current.loadVideo(proxyUrl).subscribe({
+        next: () => {
+          console.log(`Video reloaded for asset ${id}`);
+        },
+        error: (error) => {
+          console.error(`Failed to reload video for asset ${id}:`, error);
+        }
+      });
+    }
 
-    // Cleanup function
+    // Cleanup function - only destroy when component unmounts
     return () => {
       if (omakasePlayerRef.current) {
         try {
           omakasePlayerRef.current.destroy();
           omakasePlayerRef.current = null;
+          playerInitializedRef.current = false;
+          console.log(`Omakase player destroyed for video asset: ${id}`);
         } catch (error) {
           console.error(`Failed to destroy Omakase player for video asset ${id}:`, error);
         }
       }
     };
-  }, [assetType, proxyUrl, id]);
+  }, [assetType, proxyUrl, id, clips]); // Added clips to dependencies since markers depend on it
 
   // Determine the card dimensions based on props
   const getCardDimensions = () => {
@@ -858,18 +882,18 @@ const AssetCard: React.FC<AssetCardProps> = ({
       </Box>
     </Box>
   );
-};
+});
 
 // Utility function to iterate through all video asset divs and log their IDs
 export const logAllVideoAssetIds = () => {
   const videoAssetDivs = document.querySelectorAll('[id^="video-asset-"]');
   console.log(`Found ${videoAssetDivs.length} video asset divs:`);
-  
+
   videoAssetDivs.forEach((div) => {
     const id = div.id;
     const assetId = id.replace('video-asset-', '');
     console.log(`Video Asset ID: ${assetId}`);
-    
+
     // Also log the corresponding Omakase player ID
     const playerId = `omakase-player-${assetId}`;
     const playerElement = document.getElementById(playerId);
@@ -879,7 +903,7 @@ export const logAllVideoAssetIds = () => {
       console.log(`  └─ Omakase Player ID: ${playerId} (not found)`);
     }
   });
-  
+
   return Array.from(videoAssetDivs).map(div => div.id.replace('video-asset-', ''));
 };
 

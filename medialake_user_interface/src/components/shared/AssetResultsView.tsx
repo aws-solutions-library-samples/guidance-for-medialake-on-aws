@@ -159,6 +159,17 @@ function AssetResultsView<T>({
   getAssetProxy,
   renderCardField,
 }: AssetResultsViewProps<T>) {
+  // Local state for slider value during dragging (to prevent constant re-filtering)
+  const [sliderValue, setSliderValue] = React.useState(confidenceThreshold);
+  const [isSliderActive, setIsSliderActive] = React.useState(false);
+
+  // Update local slider value when confidence threshold changes from parent
+  React.useEffect(() => {
+    if (!isSliderActive) {
+      setSliderValue(confidenceThreshold);
+    }
+  }, [confidenceThreshold, isSliderActive]);
+
   // If there's an error, display the error component
   if (error) {
     return (
@@ -283,7 +294,7 @@ function AssetResultsView<T>({
               >
                 (Found {searchMetadata.totalResults} results for "{searchTerm}"
                 {isSemantic && confidenceThreshold > 0 && originalResults && results.length !== originalResults.length && (
-                  <>, showing {results.length} above {(confidenceThreshold * 100).toFixed(0)}% confidence</>
+                  <>, showing {results.length} above {confidenceThreshold.toFixed(2)} confidence</>
                 )})
               </Typography>
             )}
@@ -302,8 +313,15 @@ function AssetResultsView<T>({
                 Confidence:
               </Typography>
               <Slider
-                value={confidenceThreshold}
-                onChange={(_, value) => onConfidenceThresholdChange?.(value as number)}
+                value={sliderValue}
+                onChange={(_, value) => {
+                  setSliderValue(value as number);
+                  setIsSliderActive(true);
+                }}
+                onChangeCommitted={(_, value) => {
+                  setIsSliderActive(false);
+                  onConfidenceThresholdChange?.(value as number);
+                }}
                 min={0}
                 max={1}
                 step={0.01}
@@ -328,7 +346,7 @@ function AssetResultsView<T>({
                 color: "text.secondary",
                 textAlign: "right"
               }}>
-                {(confidenceThreshold * 100).toFixed(0)}%
+                {sliderValue.toFixed(2)}
               </Typography>
             </Box>
           )}
