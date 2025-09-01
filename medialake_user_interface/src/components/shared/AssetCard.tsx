@@ -22,12 +22,7 @@ import { InlineTextEditor } from "../common/InlineTextEditor";
 import { OmakasePlayer, PeriodMarker } from "@byomakase/omakase-player";
 import { randomHexColor } from "../common/utils";
 
-// Function to generate color based on confidence score
-const getConfidenceColor = (score: number): string => {
-  // Map confidence score (0-1) to color gradient from red (low) to green (high)
-  const hue = Math.floor(score * 120); // 0 = red, 120 = green
-  return `hsl(${hue}, 70%, 50%)`;
-};
+
 
 export interface AssetField {
   id: string;
@@ -185,8 +180,23 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(({
                   };
 
                   // Filter clips based on confidence threshold for semantic search
-                  const filteredClips = isSemantic && confidenceThreshold > 0
-                    ? clips.filter(clip => (clip.score ?? 1) >= confidenceThreshold)
+                  console.log(`🎬 INITIAL Asset ${id}:`);
+                  console.log(`  - isSemantic: ${isSemantic} (type: ${typeof isSemantic})`);
+                  console.log(`  - confidenceThreshold: ${confidenceThreshold} (type: ${typeof confidenceThreshold})`);
+                  console.log(`  - clips count: ${clips?.length || 0}`);
+                  console.log(`  - clips:`, clips?.map(c => ({ score: c.score, start: c.start_timecode, end: c.end_timecode })));
+
+                  // Check the filtering condition explicitly
+                  const shouldFilter = isSemantic && confidenceThreshold > 0;
+                  console.log(`  - shouldFilter: ${shouldFilter} (isSemantic=${isSemantic} && confidenceThreshold=${confidenceThreshold} > 0)`);
+
+                  const filteredClips = shouldFilter
+                    ? clips.filter(clip => {
+                      const score = clip.score ?? 1;
+                      const passes = score >= confidenceThreshold;
+                      console.log(`    Clip ${clip.start_timecode}-${clip.end_timecode}: score=${score}, threshold=${confidenceThreshold}, passes=${passes}`);
+                      return passes;
+                    })
                     : clips;
 
                   console.log(`Adding ${filteredClips.length} of ${clips.length} clip markers for asset ${id} (confidence >= ${confidenceThreshold})`);
@@ -206,10 +216,8 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(({
                           : undefined;
 
                     if (start !== undefined && end !== undefined) {
-                      // Generate color based on confidence score for semantic search
-                      const markerColor = isSemantic && clip.score !== undefined
-                        ? getConfidenceColor(clip.score)
-                        : randomHexColor();
+                      // Use random colors for all markers
+                      const markerColor = randomHexColor();
 
                       const markerId = `clip-${id}-${start}-${end}`;
                       const marker = new PeriodMarker({
@@ -276,15 +284,25 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(({
   useEffect(() => {
     if (assetType === "Video" && omakasePlayerRef.current && Array.isArray(clips) && clips.length > 0) {
       try {
-        // Clear existing markers by removing them individually
-        markerIdsRef.current.forEach(markerId => {
-          try {
-            omakasePlayerRef.current?.progressMarkerTrack.removeMarker(markerId);
-          } catch (e) {
-            console.warn("Could not remove marker", e);
-          }
-        });
-        markerIdsRef.current = [];
+        // Clear ALL existing markers using removeAllMarkers method
+        console.log(`🧹 CLEARING ALL existing markers for asset ${id} using removeAllMarkers()`);
+        try {
+          omakasePlayerRef.current?.progressMarkerTrack.removeAllMarkers();
+          markerIdsRef.current = []; // Reset our tracking array
+          console.log(`🧹 ✅ All markers cleared successfully`);
+        } catch (e) {
+          console.warn(`🧹 ❌ Could not clear all markers:`, e);
+          // Fallback to individual removal if removeAllMarkers fails
+          markerIdsRef.current.forEach(markerId => {
+            try {
+              omakasePlayerRef.current?.progressMarkerTrack.removeMarker(markerId);
+              console.log(`  ✅ Fallback removed marker: ${markerId}`);
+            } catch (e) {
+              console.warn(`  ❌ Could not remove marker ${markerId}:`, e);
+            }
+          });
+          markerIdsRef.current = [];
+        }
 
         const timecodeToSeconds = (tc: string): number => {
           const [hh, mm, ss, ff] = tc.split(":").map(Number);
@@ -293,8 +311,22 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(({
         };
 
         // Filter clips based on confidence threshold for semantic search
-        const filteredClips = isSemantic && confidenceThreshold > 0
-          ? clips.filter(clip => (clip.score ?? 1) >= confidenceThreshold)
+        console.log(`🔄 UPDATE Asset ${id}:`);
+        console.log(`  - isSemantic: ${isSemantic} (type: ${typeof isSemantic})`);
+        console.log(`  - confidenceThreshold: ${confidenceThreshold} (type: ${typeof confidenceThreshold})`);
+        console.log(`  - clips count: ${clips?.length || 0}`);
+
+        // Check the filtering condition explicitly
+        const shouldFilter = isSemantic && confidenceThreshold > 0;
+        console.log(`  - shouldFilter: ${shouldFilter} (isSemantic=${isSemantic} && confidenceThreshold=${confidenceThreshold} > 0)`);
+
+        const filteredClips = shouldFilter
+          ? clips.filter(clip => {
+            const score = clip.score ?? 1;
+            const passes = score >= confidenceThreshold;
+            console.log(`    UPDATE Clip ${clip.start_timecode}-${clip.end_timecode}: score=${score}, threshold=${confidenceThreshold}, passes=${passes}`);
+            return passes;
+          })
           : clips;
 
         console.log(`Updating ${filteredClips.length} of ${clips.length} clip markers for asset ${id} (confidence >= ${confidenceThreshold})`);
@@ -314,10 +346,8 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(({
                 : undefined;
 
           if (start !== undefined && end !== undefined) {
-            // Generate color based on confidence score for semantic search
-            const markerColor = isSemantic && clip.score !== undefined
-              ? getConfidenceColor(clip.score)
-              : randomHexColor();
+            // Use random colors for all markers
+            const markerColor = randomHexColor();
 
             const markerId = `clip-${id}-${start}-${end}`;
             const marker = new PeriodMarker({
@@ -331,11 +361,14 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(({
             try {
               omakasePlayerRef.current.progressMarkerTrack.addMarker(marker);
               markerIdsRef.current.push(markerId); // Store ID for later removal
+              console.log(`  ✅ Added marker: ${markerId} (${start}s-${end}s)`);
             } catch (e) {
               console.warn("progressMarkerTrack not ready", e);
             }
           }
         });
+
+        console.log(`🎯 SUMMARY for Asset ${id}: Created ${markerIdsRef.current.length} markers from ${filteredClips.length} filtered clips (out of ${clips.length} total clips)`);
       } catch (e) {
         console.error("Failed to update semantic markers:", e);
       }
