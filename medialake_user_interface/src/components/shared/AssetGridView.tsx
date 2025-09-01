@@ -35,6 +35,9 @@ interface AssetGridViewProps<T> {
   selectedSearchFields?: string[];
   isRenaming?: boolean; // Add isRenaming prop for loading state
   renamingAssetId?: string; // ID of the asset currently being renamed
+  // Semantic search confidence filtering for clips
+  isSemantic?: boolean;
+  confidenceThreshold?: number;
 }
 
 function AssetGridView<T>({
@@ -66,6 +69,9 @@ function AssetGridView<T>({
   selectedSearchFields,
   isRenaming,
   renamingAssetId,
+  // Semantic search confidence filtering for clips
+  isSemantic = false,
+  confidenceThreshold = 0,
 }: AssetGridViewProps<T>) {
   // Group results by type if needed
   const groupedResults = React.useMemo(() => {
@@ -144,6 +150,8 @@ function AssetGridView<T>({
               }
               selectedSearchFields={selectedSearchFields}
               isRenaming={isRenaming && renamingAssetId === getAssetId(asset)}
+              isSemantic={isSemantic}
+              confidenceThreshold={confidenceThreshold}
             />
           </Grid>
         ))}
@@ -183,6 +191,7 @@ function AssetGridView<T>({
                         getAssetProxy ? getAssetProxy(asset) : undefined
                       }
                       assetType={getAssetType(asset)}
+                      clips={(asset as any).clips}
                       fields={cardFields}
                       renderField={(fieldId) => renderCardField(fieldId, asset)}
                       onAssetClick={() => onAssetClick(asset)}
@@ -223,6 +232,8 @@ function AssetGridView<T>({
                       isRenaming={
                         isRenaming && renamingAssetId === getAssetId(asset)
                       }
+                      isSemantic={isSemantic}
+                      confidenceThreshold={confidenceThreshold}
                     />
                   </Grid>
                 ))}

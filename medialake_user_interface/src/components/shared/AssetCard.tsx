@@ -22,6 +22,13 @@ import { InlineTextEditor } from "../common/InlineTextEditor";
 import { OmakasePlayer, PeriodMarker } from "@byomakase/omakase-player";
 import { randomHexColor } from "../common/utils";
 
+// Function to generate color based on confidence score
+const getConfidenceColor = (score: number): string => {
+  // Map confidence score (0-1) to color gradient from red (low) to green (high)
+  const hue = Math.floor(score * 120); // 0 = red, 120 = green
+  return `hsl(${hue}, 70%, 50%)`;
+};
+
 export interface AssetField {
   id: string;
   label: string;
@@ -39,6 +46,7 @@ export interface AssetCardProps {
     end_timecode?: string;
     start?: number;
     end?: number;
+    score?: number; // Add score for confidence filtering
   }>;
   fields: AssetField[];
   isRenaming?: boolean;
@@ -63,6 +71,9 @@ export interface AssetCardProps {
   isSelected?: boolean; // Whether the asset is selected for bulk operations
   onSelectToggle?: (id: string, event: React.MouseEvent<HTMLElement>) => void; // Callback when selection is toggled
   selectedSearchFields?: string[]; // Selected search fields
+  // Semantic search confidence filtering for clips
+  isSemantic?: boolean;
+  confidenceThreshold?: number;
 }
 
 const AssetCard: React.FC<AssetCardProps> = React.memo(({
@@ -95,6 +106,9 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(({
   isSelected = false,
   onSelectToggle,
   selectedSearchFields,
+  // Semantic search confidence filtering for clips
+  isSemantic = false,
+  confidenceThreshold = 0,
 }) => {
   const [isHovering, setIsHovering] = useState(false);
   const [isMenuClicked, setIsMenuClicked] = useState(false);
@@ -120,6 +134,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(({
   // Track if player has been initialized to prevent re-initialization
   const playerInitializedRef = useRef<boolean>(false);
   const currentProxyUrlRef = useRef<string | undefined>(proxyUrl);
+  const markerIdsRef = useRef<string[]>([]);
 
   // Initialize Omakase player for video assets
   useEffect(() => {
@@ -169,7 +184,14 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(({
                     return hh * 3600 + mm * 60 + ss + (isNaN(ff) ? 0 : ff / fps);
                   };
 
-                  clips.forEach((clip) => {
+                  // Filter clips based on confidence threshold for semantic search
+                  const filteredClips = isSemantic && confidenceThreshold > 0
+                    ? clips.filter(clip => (clip.score ?? 1) >= confidenceThreshold)
+                    : clips;
+
+                  console.log(`Adding ${filteredClips.length} of ${clips.length} clip markers for asset ${id} (confidence >= ${confidenceThreshold})`);
+
+                  filteredClips.forEach((clip, index) => {
                     const start =
                       typeof clip.start === "number"
                         ? clip.start
@@ -184,15 +206,23 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(({
                           : undefined;
 
                     if (start !== undefined && end !== undefined) {
+                      // Generate color based on confidence score for semantic search
+                      const markerColor = isSemantic && clip.score !== undefined
+                        ? getConfidenceColor(clip.score)
+                        : randomHexColor();
+
+                      const markerId = `clip-${id}-${start}-${end}`;
                       const marker = new PeriodMarker({
+                        id: markerId,
                         timeObservation: { start, end },
                         style: {
-                          color: randomHexColor(),
+                          color: markerColor,
                         },
                       });
                       // Add marker to progress track when available
                       try {
                         omakasePlayer.progressMarkerTrack.addMarker(marker);
+                        markerIdsRef.current.push(markerId); // Store ID for later removal
                       } catch (e) {
                         console.warn("progressMarkerTrack not ready", e);
                       }
@@ -240,7 +270,77 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(({
         }
       }
     };
-  }, [assetType, proxyUrl, id, clips]); // Added clips to dependencies since markers depend on it
+  }, [assetType, proxyUrl, id]); // Removed clips from dependencies to prevent re-initialization
+
+  // Separate effect to handle clip marker updates when confidence threshold changes
+  useEffect(() => {
+    if (assetType === "Video" && omakasePlayerRef.current && Array.isArray(clips) && clips.length > 0) {
+      try {
+        // Clear existing markers by removing them individually
+        markerIdsRef.current.forEach(markerId => {
+          try {
+            omakasePlayerRef.current?.progressMarkerTrack.removeMarker(markerId);
+          } catch (e) {
+            console.warn("Could not remove marker", e);
+          }
+        });
+        markerIdsRef.current = [];
+
+        const timecodeToSeconds = (tc: string): number => {
+          const [hh, mm, ss, ff] = tc.split(":").map(Number);
+          const fps = 25; // default/fallback; adjust if actual fps available
+          return hh * 3600 + mm * 60 + ss + (isNaN(ff) ? 0 : ff / fps);
+        };
+
+        // Filter clips based on confidence threshold for semantic search
+        const filteredClips = isSemantic && confidenceThreshold > 0
+          ? clips.filter(clip => (clip.score ?? 1) >= confidenceThreshold)
+          : clips;
+
+        console.log(`Updating ${filteredClips.length} of ${clips.length} clip markers for asset ${id} (confidence >= ${confidenceThreshold})`);
+
+        filteredClips.forEach((clip) => {
+          const start =
+            typeof clip.start === "number"
+              ? clip.start
+              : clip.start_timecode
+                ? timecodeToSeconds(clip.start_timecode)
+                : undefined;
+          const end =
+            typeof clip.end === "number"
+              ? clip.end
+              : clip.end_timecode
+                ? timecodeToSeconds(clip.end_timecode)
+                : undefined;
+
+          if (start !== undefined && end !== undefined) {
+            // Generate color based on confidence score for semantic search
+            const markerColor = isSemantic && clip.score !== undefined
+              ? getConfidenceColor(clip.score)
+              : randomHexColor();
+
+            const markerId = `clip-${id}-${start}-${end}`;
+            const marker = new PeriodMarker({
+              id: markerId,
+              timeObservation: { start, end },
+              style: {
+                color: markerColor,
+              },
+            });
+            // Add marker to progress track when available
+            try {
+              omakasePlayerRef.current.progressMarkerTrack.addMarker(marker);
+              markerIdsRef.current.push(markerId); // Store ID for later removal
+            } catch (e) {
+              console.warn("progressMarkerTrack not ready", e);
+            }
+          }
+        });
+      } catch (e) {
+        console.error("Failed to update semantic markers:", e);
+      }
+    }
+  }, [clips, isSemantic, confidenceThreshold, assetType, id]); // Update markers when clips or confidence threshold changes
 
   // Determine the card dimensions based on props
   const getCardDimensions = () => {

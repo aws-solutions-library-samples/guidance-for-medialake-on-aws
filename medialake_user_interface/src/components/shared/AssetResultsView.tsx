@@ -487,6 +487,8 @@ function AssetResultsView<T>({
             selectedSearchFields={selectedFields}
             isRenaming={isRenaming}
             renamingAssetId={renamingAssetId}
+            isSemantic={isSemantic}
+            confidenceThreshold={confidenceThreshold}
           />
         ) : (
           <AssetTableView
