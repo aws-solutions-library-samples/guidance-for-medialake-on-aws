@@ -601,7 +601,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(({
                   onAssetClick();
                 }}
                 sx={{
-                  color: "white",
+                  color: "primary.main",
                   "&:hover": {
                     bgcolor: "primary.main",
                     color: "primary.contrastText",
@@ -616,7 +616,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(({
                 size="small"
                 onClick={handleDownloadClick}
                 sx={{
-                  color: "white",
+                  color: "primary.main",
                   "&:hover": {
                     bgcolor: "primary.main",
                     color: "primary.contrastText",
@@ -631,7 +631,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(({
                 size="small"
                 onClick={handleDeleteClick}
                 sx={{
-                  color: "white",
+                  color: "primary.main",
                   "&:hover": {
                     bgcolor: "primary.main",
                     color: "primary.contrastText",
