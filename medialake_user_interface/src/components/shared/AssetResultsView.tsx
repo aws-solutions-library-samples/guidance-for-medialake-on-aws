@@ -305,11 +305,11 @@ function AssetResultsView<T>({
             <Box sx={{
               display: "flex",
               alignItems: "center",
-              gap: 1,
+              gap: 1.5,
               minWidth: 280,
               flexShrink: 0
             }}>
-              <Typography variant="body2" sx={{ fontSize: "0.875rem", color: "text.secondary", whiteSpace: "nowrap" }}>
+              <Typography variant="body2" sx={{ fontSize: "0.875rem", color: "text.secondary", whiteSpace: "nowrap", pr: 0.5 }}>
                 Confidence:
               </Typography>
               <Slider
