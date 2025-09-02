@@ -32,9 +32,11 @@ def lambda_handler(event, context: LambdaContext):
     input_payload = event.get("payload", {}).get("event", {}).get("input", {}) or {}
     pipeline_name = input_payload.get("pipelineName", "Default Image Pipeline")
 
-    # Extract configurable parameters from input
-    source = input_payload.get("source", "medialake.pipeline")
-    detail_type = input_payload.get("detail_type", "AssetIngested")
+    # Extract configurable parameters from environment variables first, then input payload as fallback
+    source = os.environ.get("SOURCE", input_payload.get("source", "medialake.pipeline"))
+    detail_type = os.environ.get(
+        "DETAIL_TYPE", input_payload.get("detail_type", "AssetIngested")
+    )
     # Use the configured event bus name, allow override from input payload
     event_bus_name = input_payload.get("EventBusName", EVENT_BUS_NAME)
 
