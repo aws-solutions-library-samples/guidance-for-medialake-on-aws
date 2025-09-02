@@ -15,6 +15,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
+import InfoIcon from "@mui/icons-material/Info";
 import { PLACEHOLDER_IMAGE } from "@/utils/placeholderSvg";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import { AssetAudio } from "../asset";
@@ -562,19 +563,84 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(({
       >
         {/* Render appropriate content based on asset type */}
         {assetType === "Video" ? (
-          <div
-            id={`video-asset-${id}`}
-            className="asset-card-video"
-            style={{
-              width: dimensions.width,
-              height: dimensions.height,
-              backgroundColor: "rgba(0,0,0,0.03)",
-              cursor: "pointer",
-              position: "relative",
-            }}
-          >
-            <div id={`omakase-player-${id}`} style={{ width: "100%", height: "100%" }} />
-          </div>
+          <Box sx={{ display: "flex", flexDirection: "column" }}>
+            <div
+              id={`video-asset-${id}`}
+              className="asset-card-video"
+              style={{
+                width: dimensions.width,
+                height: dimensions.height,
+                backgroundColor: "rgba(0,0,0,0.03)",
+                cursor: "pointer",
+                position: "relative",
+              }}
+            >
+              <div id={`omakase-player-${id}`} style={{ width: "100%", height: "100%" }} />
+            </div>
+
+            {/* Video Control Bar */}
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "flex-end",
+                gap: 2,
+                p: 1,
+                bgcolor: "background.paper",
+                borderTop: "1px solid",
+                borderColor: "divider",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAssetClick();
+                }}
+                sx={{
+                  color: "white",
+                  "&:hover": {
+                    bgcolor: "primary.main",
+                    color: "primary.contrastText",
+                  },
+                }}
+                title="View Details"
+              >
+                <InfoIcon fontSize="small" />
+              </IconButton>
+
+              <IconButton
+                size="small"
+                onClick={handleDownloadClick}
+                sx={{
+                  color: "white",
+                  "&:hover": {
+                    bgcolor: "primary.main",
+                    color: "primary.contrastText",
+                  },
+                }}
+                title="Download"
+              >
+                <DownloadIcon fontSize="small" />
+              </IconButton>
+
+              <IconButton
+                size="small"
+                onClick={handleDeleteClick}
+                sx={{
+                  color: "white",
+                  "&:hover": {
+                    bgcolor: "primary.main",
+                    color: "primary.contrastText",
+                  },
+                }}
+                title="Delete"
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Box>
+          </Box>
         ) : assetType === "Audio" ? (
           <Box
             onClick={onAssetClick}
@@ -697,48 +763,50 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(({
           )}
         </Box>
 
-        {/* Position buttons at the top right of the card, visible on hover or when menu is open */}
-        <Box
-          sx={{
-            position: "absolute",
-            top: 8,
-            right: 8,
-            display: "flex",
-            gap: 1,
-            zIndex: 10, // Increased z-index to ensure buttons are above other elements
-            opacity: shouldShowButtons ? 1 : 0, // Visible when hovering or menu is clicked
-            transition: "opacity 0.2s ease-in-out",
-            pointerEvents: shouldShowButtons ? "auto" : "none", // Ensure buttons are clickable when visible
-          }}
-          onClick={(e) => e.stopPropagation()} // Stop propagation at the container level
-        >
-          <IconButton
-            size="small"
-            onClick={handleDeleteClick}
-            sx={(theme) => ({
-              bgcolor: alpha(theme.palette.background.paper, 0.7),
-              padding: "4px",
-              "&:hover": {
-                bgcolor: alpha(theme.palette.background.default, 0.9),
-              },
-            })}
+        {/* Position buttons at the top right of the card, visible on hover or when menu is open - Only for non-video assets */}
+        {assetType !== "Video" && (
+          <Box
+            sx={{
+              position: "absolute",
+              top: 8,
+              right: 8,
+              display: "flex",
+              gap: 1,
+              zIndex: 10, // Increased z-index to ensure buttons are above other elements
+              opacity: shouldShowButtons ? 1 : 0, // Visible when hovering or menu is clicked
+              transition: "opacity 0.2s ease-in-out",
+              pointerEvents: shouldShowButtons ? "auto" : "none", // Ensure buttons are clickable when visible
+            }}
+            onClick={(e) => e.stopPropagation()} // Stop propagation at the container level
           >
-            <DeleteIcon fontSize="small" />
-          </IconButton>
-          <IconButton
-            size="small"
-            onClick={handleDownloadClick}
-            sx={(theme) => ({
-              bgcolor: alpha(theme.palette.background.paper, 0.7),
-              padding: "4px",
-              "&:hover": {
-                bgcolor: alpha(theme.palette.background.default, 0.9),
-              },
-            })}
-          >
-            <DownloadIcon fontSize="small" />
-          </IconButton>
-        </Box>
+            <IconButton
+              size="small"
+              onClick={handleDeleteClick}
+              sx={(theme) => ({
+                bgcolor: alpha(theme.palette.background.paper, 0.7),
+                padding: "4px",
+                "&:hover": {
+                  bgcolor: alpha(theme.palette.background.default, 0.9),
+                },
+              })}
+            >
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              size="small"
+              onClick={handleDownloadClick}
+              sx={(theme) => ({
+                bgcolor: alpha(theme.palette.background.paper, 0.7),
+                padding: "4px",
+                "&:hover": {
+                  bgcolor: alpha(theme.palette.background.default, 0.9),
+                },
+              })}
+            >
+              <DownloadIcon fontSize="small" />
+            </IconButton>
+          </Box>
+        )}
 
         {/* Metadata section */}
         {showMetadata && (
