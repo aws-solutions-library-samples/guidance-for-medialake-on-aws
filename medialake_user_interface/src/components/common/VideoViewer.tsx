@@ -127,6 +127,9 @@ const useOmakasePlayer = (
         console.log("Timeline created");
         const scrubberLane = timelineApi.getScrubberLane();
         scrubberLane.style = { ...SCRUBBER_LANE_STYLE_DARK };
+
+        // Create marker lanes after timeline is ready
+        createTimelineLanes();
       });
 
     const subscriptions = [
@@ -441,8 +444,8 @@ function getThumbnailForTime(time: number): string {
   const timeString = `${hours.toString().padStart(2, "0")}:${minutes
     .toString()
     .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}:${frames
-    .toString()
-    .padStart(2, "0")}`;
+      .toString()
+      .padStart(2, "0")}`;
   return createTimecodePlaceholder(timeString);
 }
 
@@ -699,8 +702,8 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
           return `${hours.toString().padStart(2, "0")}:${minutes
             .toString()
             .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}:${frames
-            .toString()
-            .padStart(2, "0")}`;
+              .toString()
+              .padStart(2, "0")}`;
         },
         seek: (time: number) => seek(time),
       }),
@@ -777,8 +780,8 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
         return `${hours.toString().padStart(2, "0")}:${minutes
           .toString()
           .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}:${frames
-          .toString()
-          .padStart(2, "0")}`;
+            .toString()
+            .padStart(2, "0")}`;
       } else {
         return `${hours.toString().padStart(2, "0")}:${minutes
           .toString()
@@ -870,18 +873,18 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
                 sx={{
                   mb:
                     categoryIndex <
-                    Object.keys(
-                      SHORTCUTS.reduce(
-                        (acc, shortcut) => {
-                          if (!acc[shortcut.category]) {
-                            acc[shortcut.category] = [];
-                          }
-                          acc[shortcut.category].push(shortcut);
-                          return acc;
-                        },
-                        {} as Record<string, typeof SHORTCUTS>,
-                      ),
-                    ).length -
+                      Object.keys(
+                        SHORTCUTS.reduce(
+                          (acc, shortcut) => {
+                            if (!acc[shortcut.category]) {
+                              acc[shortcut.category] = [];
+                            }
+                            acc[shortcut.category].push(shortcut);
+                            return acc;
+                          },
+                          {} as Record<string, typeof SHORTCUTS>,
+                        ),
+                      ).length -
                       1
                       ? 2
                       : 0,
@@ -1001,7 +1004,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
                       {} as Record<string, typeof SHORTCUTS>,
                     ),
                   ).length -
-                    1 && <Divider sx={{ mt: 1.5 }} />}
+                  1 && <Divider sx={{ mt: 1.5 }} />}
               </Box>
             ))}
           </Box>
