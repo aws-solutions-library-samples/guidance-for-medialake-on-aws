@@ -53,7 +53,8 @@
     display: grid;
     position: relative;
     width: 700px;
-    aspect-ratio: 16/9
+    aspect-ratio: 16/9;
+    margin: 0 auto
 }
 
 .omakase-player .omakase-player-wrapper.omakase-player-wrapper-stamp {

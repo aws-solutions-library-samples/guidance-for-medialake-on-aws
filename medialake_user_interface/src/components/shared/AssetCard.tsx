@@ -220,9 +220,9 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(({
                       // Use random colors for all markers
                       const markerColor = randomHexColor();
 
-                      const markerId = `clip-${id}-${start}-${end}`;
+                      // Follow JSFiddle approach: let byomakase library generate its own IDs
+                      // This prevents querySelector errors with colon-containing custom IDs
                       const marker = new PeriodMarker({
-                        id: markerId,
                         timeObservation: { start, end },
                         style: {
                           color: markerColor,
@@ -231,7 +231,8 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(({
                       // Add marker to progress track when available
                       try {
                         omakasePlayer.progressMarkerTrack.addMarker(marker);
-                        markerIdsRef.current.push(markerId); // Store ID for later removal
+                        // Store marker reference for later removal since we don't control the ID
+                        markerIdsRef.current.push(marker.id || `${start}-${end}`);
                       } catch (e) {
                         console.warn("progressMarkerTrack not ready", e);
                       }
@@ -350,9 +351,9 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(({
             // Use random colors for all markers
             const markerColor = randomHexColor();
 
-            const markerId = `clip-${id}-${start}-${end}`;
+            // Follow JSFiddle approach: let byomakase library generate its own IDs
+            // This prevents querySelector errors with colon-containing custom IDs
             const marker = new PeriodMarker({
-              id: markerId,
               timeObservation: { start, end },
               style: {
                 color: markerColor,
@@ -361,8 +362,9 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(({
             // Add marker to progress track when available
             try {
               omakasePlayerRef.current.progressMarkerTrack.addMarker(marker);
-              markerIdsRef.current.push(markerId); // Store ID for later removal
-              console.log(`  ✅ Added marker: ${markerId} (${start}s-${end}s)`);
+              // Store marker reference for later removal since we don't control the ID
+              markerIdsRef.current.push(marker.id || `${start}-${end}`);
+              console.log(`  ✅ Added marker: ${marker.id || 'auto-generated'} (${start}s-${end}s)`);
             } catch (e) {
               console.warn("progressMarkerTrack not ready", e);
             }
