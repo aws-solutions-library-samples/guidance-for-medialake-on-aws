@@ -304,8 +304,6 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
         >
           Appearance
         </Button>
-
-
       </Box>
 
       {/* Sort Menu */}

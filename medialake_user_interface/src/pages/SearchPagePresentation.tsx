@@ -34,7 +34,7 @@ interface SearchPagePresentationProps {
   query: string;
   semantic: boolean;
   selectedFields: string[];
-  
+
   // Confidence filtering for semantic search
   confidenceThreshold: number;
   onConfidenceThresholdChange: (threshold: number) => void;
