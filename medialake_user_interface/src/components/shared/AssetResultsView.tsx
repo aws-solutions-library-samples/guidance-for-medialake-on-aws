@@ -14,6 +14,7 @@ export interface AssetField {
   visible: boolean;
 }
 
+
 export interface AssetResultsViewProps<T> {
   results: T[];
   originalResults?: T[]; // Original unfiltered results for confidence filtering
