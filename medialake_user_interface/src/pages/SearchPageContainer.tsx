@@ -33,9 +33,10 @@ const SearchPageContainer: React.FC = () => {
   const query = useSearchQuery();
   const semantic = useSemanticSearch();
   const filters = useSearchFilters();
-  
+
   // Confidence threshold state for semantic search
-  const [confidenceThreshold, setConfidenceThreshold] = React.useState<number>(0);
+  const [confidenceThreshold, setConfidenceThreshold] =
+    React.useState<number>(0.57);
 
   // Actions
   const { setQuery, setIsSemantic, setFilters, updateFilter } =

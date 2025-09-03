@@ -28,7 +28,7 @@ interface MasterResultsViewProps {
   searchTerm: string;
   error?: { status: string; message: string } | null;
   isLoading?: boolean;
-  
+
   // Semantic search confidence filtering
   isSemantic?: boolean;
   confidenceThreshold?: number;
@@ -115,10 +115,10 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   searchTerm,
   error,
   isLoading,
-  
+
   // Semantic search confidence filtering
   isSemantic = false,
-  confidenceThreshold = 0,
+  confidenceThreshold = 0.57,
   onConfidenceThresholdChange,
 
   // Search fields
@@ -220,11 +220,18 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       : undefined;
 
   // Debounce the confidence threshold to reduce rapid filtering during slider interaction
-  const debouncedConfidenceThreshold = useDebounce(confidenceThreshold || 0, 150);
+  const debouncedConfidenceThreshold = useDebounce(
+    confidenceThreshold || 0,
+    150,
+  );
 
   // Filter results based on confidence threshold for semantic search
   const filteredResults = React.useMemo(() => {
-    if (!isSemantic || debouncedConfidenceThreshold === undefined || debouncedConfidenceThreshold === 0) {
+    if (
+      !isSemantic ||
+      debouncedConfidenceThreshold === undefined ||
+      debouncedConfidenceThreshold === 0
+    ) {
       return results;
     }
     return results.filter((asset) => {

@@ -14,7 +14,6 @@ export interface AssetField {
   visible: boolean;
 }
 
-
 export interface AssetResultsViewProps<T> {
   results: T[];
   originalResults?: T[]; // Original unfiltered results for confidence filtering
@@ -108,7 +107,7 @@ function AssetResultsView<T>({
 
   // Semantic search confidence filtering
   isSemantic = false,
-  confidenceThreshold = 0,
+  confidenceThreshold = 0.57,
   onConfidenceThresholdChange,
 
   // Search fields
@@ -214,10 +213,10 @@ function AssetResultsView<T>({
             viewMode === "card"
               ? cardFields
               : columns.map((col) => ({
-                id: col.id,
-                label: col.label,
-                visible: col.visible,
-              }))
+                  id: col.id,
+                  label: col.label,
+                  visible: col.visible,
+                }))
           }
           onFieldToggle={
             viewMode === "card" ? onCardFieldToggle : onColumnToggle
@@ -265,7 +264,16 @@ function AssetResultsView<T>({
         />
       )}
       <Box sx={{ mb: 2 }}>
-        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1, flexWrap: "wrap", gap: 2 }}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            mb: 1,
+            flexWrap: "wrap",
+            gap: 2,
+          }}
+        >
           <Typography
             variant="h4"
             component="h1"
@@ -294,23 +302,40 @@ function AssetResultsView<T>({
                 }}
               >
                 (Found {searchMetadata.totalResults} results for "{searchTerm}"
-                {isSemantic && confidenceThreshold > 0 && originalResults && results.length !== originalResults.length && (
-                  <>, showing {results.length} above {confidenceThreshold.toFixed(2)} confidence</>
-                )})
+                {isSemantic &&
+                  confidenceThreshold > 0 &&
+                  originalResults &&
+                  results.length !== originalResults.length && (
+                    <>
+                      , showing {results.length} above{" "}
+                      {confidenceThreshold.toFixed(2)} confidence
+                    </>
+                  )}
+                )
               </Typography>
             )}
           </Typography>
 
           {/* Confidence Slider - Only show for semantic search */}
           {isSemantic && (
-            <Box sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 1.5,
-              minWidth: 280,
-              flexShrink: 0
-            }}>
-              <Typography variant="body2" sx={{ fontSize: "0.875rem", color: "text.secondary", whiteSpace: "nowrap", pr: 0.5 }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1.5,
+                minWidth: 280,
+                flexShrink: 0,
+              }}
+            >
+              <Typography
+                variant="body2"
+                sx={{
+                  fontSize: "0.875rem",
+                  color: "text.secondary",
+                  whiteSpace: "nowrap",
+                  pr: 0.5,
+                }}
+              >
                 Confidence:
               </Typography>
               <Slider
@@ -329,24 +354,27 @@ function AssetResultsView<T>({
                 size="small"
                 sx={{
                   width: 140,
-                  '& .MuiSlider-thumb': {
+                  "& .MuiSlider-thumb": {
                     width: 16,
                     height: 16,
                   },
-                  '& .MuiSlider-track': {
+                  "& .MuiSlider-track": {
                     height: 3,
                   },
-                  '& .MuiSlider-rail': {
+                  "& .MuiSlider-rail": {
                     height: 3,
                   },
                 }}
               />
-              <Typography variant="body2" sx={{
-                minWidth: 40,
-                fontSize: "0.875rem",
-                color: "text.secondary",
-                textAlign: "right"
-              }}>
+              <Typography
+                variant="body2"
+                sx={{
+                  minWidth: 40,
+                  fontSize: "0.875rem",
+                  color: "text.secondary",
+                  textAlign: "right",
+                }}
+              >
                 {sliderValue.toFixed(2)}
               </Typography>
             </Box>
@@ -373,10 +401,10 @@ function AssetResultsView<T>({
           viewMode === "card"
             ? cardFields
             : columns.map((col) => ({
-              id: col.id,
-              label: col.label,
-              visible: col.visible,
-            }))
+                id: col.id,
+                label: col.label,
+                visible: col.visible,
+              }))
         }
         onFieldToggle={viewMode === "card" ? onCardFieldToggle : onColumnToggle}
         selectedFields={selectedFields}
