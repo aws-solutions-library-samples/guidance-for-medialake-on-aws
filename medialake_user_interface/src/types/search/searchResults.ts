@@ -29,6 +29,7 @@ export interface AssetBase {
   DigitalSourceAsset: DigitalSourceAsset;
   thumbnailUrl?: string;
   proxyUrl?: string;
+  score?: number; // Score for semantic search results (0.000 to 1.000)
 }
 
 export interface ImageItem extends AssetBase {

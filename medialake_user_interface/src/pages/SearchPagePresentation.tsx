@@ -35,6 +35,10 @@ interface SearchPagePresentationProps {
   semantic: boolean;
   selectedFields: string[];
 
+  // Confidence filtering for semantic search
+  confidenceThreshold: number;
+  onConfidenceThresholdChange: (threshold: number) => void;
+
   // Fields data
   defaultFields: Array<{
     name: string;
@@ -159,6 +163,8 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
   query,
   semantic,
   selectedFields,
+  confidenceThreshold,
+  onConfidenceThresholdChange,
   defaultFields,
   availableFields,
   onFieldsChange,
@@ -496,6 +502,9 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
                       }
                     : undefined
                 }
+                isSemantic={semantic}
+                confidenceThreshold={confidenceThreshold}
+                onConfidenceThresholdChange={onConfidenceThresholdChange}
                 error={
                   error
                     ? {

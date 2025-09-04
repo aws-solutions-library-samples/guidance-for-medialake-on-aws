@@ -127,10 +127,13 @@ const useOmakasePlayer = (
         console.log("Timeline created");
         const scrubberLane = timelineApi.getScrubberLane();
         scrubberLane.style = { ...SCRUBBER_LANE_STYLE_DARK };
+
+        // Create marker lanes after timeline is ready
+        createTimelineLanes();
       });
 
     const subscriptions = [
-      player.loadVideo(videoSrc, 25).subscribe({
+      player.loadVideo(videoSrc).subscribe({
         next: (video) => {
           console.log(`Video loaded. Duration: ${video.duration}`);
           setDuration(video.duration);
@@ -201,19 +204,6 @@ const useOmakasePlayer = (
         },
       }),
     ];
-
-    player.video.onVideoLoaded$.pipe(filter((video) => !!video)).subscribe({
-      next: () => {
-        try {
-          createTimelineLanes();
-        } catch (error) {
-          console.error("Error creating timeline lanes:", error);
-        }
-      },
-      error: (error) => {
-        console.error("Error in video loaded subscription:", error);
-      },
-    });
 
     const createTimelineLanes = () => {
       markerLane1();
