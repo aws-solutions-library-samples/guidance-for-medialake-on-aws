@@ -151,6 +151,7 @@ function mapResource(resource: string): any {
     Settings: "settings",
     PermissionSet: "permission-set",
     ApplicationConfiguration: "all",
+    ApiKey: "api-key", // pragma: allowlist secret
     // Add more mappings as needed
   };
 
@@ -164,6 +165,7 @@ function mapResource(resource: string): any {
     if (resource.includes("/settings")) return "settings";
     if (resource.includes("/permission-sets")) return "permission-set";
     if (resource.includes("/permissions")) return "permission-set";
+    if (resource.includes("/api-keys")) return "api-key";
   }
 
   return resourceMap[resource] || resource;

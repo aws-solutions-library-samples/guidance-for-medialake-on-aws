@@ -7,6 +7,7 @@ from aws_cdk import custom_resources as cr
 from constructs import Construct
 
 from config import config
+from constants import DynamoDB as DynamoDBConstants
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
@@ -106,6 +107,18 @@ class SettingsStack(cdk.NestedStack):
             self.system_settings_table.table
         )
 
+        # Create API Keys table
+        self.api_keys_table = DynamoDB(
+            self,
+            "ApiKeysTable",
+            props=DynamoDBProps(
+                name=DynamoDBConstants.api_keys_table_name(),
+                partition_key_name="id",
+                partition_key_type=dynamodb.AttributeType.STRING,
+                point_in_time_recovery=True,
+            ),
+        )
+
     @property
     def system_settings_table_name(self) -> str:
         return self.system_settings_table.table_name
@@ -113,3 +126,11 @@ class SettingsStack(cdk.NestedStack):
     @property
     def system_settings_table_arn(self) -> str:
         return self.system_settings_table.table_arn
+
+    @property
+    def api_keys_table_name(self) -> str:
+        return self.api_keys_table.table_name
+
+    @property
+    def api_keys_table_arn(self) -> str:
+        return self.api_keys_table.table_arn

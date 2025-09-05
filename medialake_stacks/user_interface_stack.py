@@ -80,7 +80,7 @@ class UserInterfaceStack(Stack):
                     [
                         iam.PolicyStatement(
                             actions=["ssm:GetParameter"],
-                            resources=["*"],  # You can restrict this further if needed
+                            resources=["*"],
                         )
                     ]
                 ),

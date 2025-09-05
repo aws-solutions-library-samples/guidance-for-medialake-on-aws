@@ -149,15 +149,6 @@ class ApiGatewayConstruct(Construct):
             logging_level=apigateway.MethodLoggingLevel.INFO,
         )
 
-        # # Create Cognito Authorizer first
-        # self.cognito_user_pool_authorizer = apigateway.CognitoUserPoolsAuthorizer(
-        #     self,
-        #     "CognitoAuthorizer",
-        #     identity_source="method.request.header.Authorization",
-        #     cognito_user_pools=[self.props.user_pool],
-        #     # rest_api=self.api_gateway_rest_api
-        # )
-
         # Create the API without deploying it by default
         rest_api_props = {
             "endpoint_types": [apigateway.EndpointType.EDGE],
@@ -191,15 +182,6 @@ class ApiGatewayConstruct(Construct):
         self.api_gateway_rest_api = apigateway.RestApi(
             self, "MediaLakeApi", **rest_api_props
         )
-
-        # # Create Cognito Authorizer first
-        # self.cognito_user_pool_authorizer = apigateway.CognitoUserPoolsAuthorizer(
-        #     self,
-        #     "CognitoAuthorizer",
-        #     identity_source="method.request.header.Authorization",
-        #     cognito_user_pools=[self.props.user_pool],
-        #     # rest_api=self.api_gateway_rest_api
-        # )
 
         # Set the default method options after creating the authorizer
         self.api_gateway_rest_api.add_gateway_response(

@@ -10,13 +10,28 @@ from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 
+def apply_custom_authorization(
+    method: apigateway.Method, authorizer: apigateway.IAuthorizer
+) -> None:
+    """
+    Apply custom authorization to an API Gateway method.
+
+    Args:
+        method: The API Gateway method to apply authorization to
+        authorizer: The custom authorizer to use
+    """
+    cfn_method = method.node.default_child
+    cfn_method.authorization_type = "CUSTOM"
+    cfn_method.authorizer_id = authorizer.authorizer_id
+
+
 @dataclass
 class ApiGatewayNodesProps:
     """Configuration for nodes API Gateway."""
 
     api_resource: apigateway.IResource
     x_origin_verify_secret: secretsmanager.Secret
-    cognito_authorizer: apigateway.IAuthorizer
+    authorizer: apigateway.IAuthorizer
     pipelines_nodes_table: dynamodb.TableV2
 
 
@@ -52,12 +67,11 @@ class ApiGatewayNodesConstruct(Construct):
         root_methods_resource = nodes_resource.add_resource("methods")
         unconfigured_resource = root_methods_resource.add_resource("unconfigured")
 
-        unconfigured_resource.add_method(
+        nodes_methods_unconfigured_get = unconfigured_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(self._get_nodeId_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
         )
+        apply_custom_authorization(nodes_methods_unconfigured_get, props.authorizer)
 
         # GET /nodes
         self._get_nodes_handler = Lambda(
@@ -75,33 +89,30 @@ class ApiGatewayNodesConstruct(Construct):
 
         props.pipelines_nodes_table.grant_read_data(self._get_nodes_handler.function)
 
-        nodes_resource.add_method(
+        nodes_get = nodes_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(self._get_nodes_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
         )
+        apply_custom_authorization(nodes_get, props.authorizer)
 
         # integration ID specific endpoints
         node_id_resource = nodes_resource.add_resource("{id}")
 
         # GET /nodes/{id}
 
-        node_id_resource.add_method(
+        node_id_get = node_id_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(self._get_nodeId_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
         )
+        apply_custom_authorization(node_id_get, props.authorizer)
 
         # GET /nodes/{id}/methods
         node_methods_resource = node_id_resource.add_resource("methods")
-        node_methods_resource.add_method(
+        node_methods_get = node_methods_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(self._get_nodeId_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
         )
+        apply_custom_authorization(node_methods_get, props.authorizer)
 
         # Add CORS support
         add_cors_options_method(nodes_resource)
