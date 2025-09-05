@@ -379,7 +379,8 @@ def handler(event, context):
                     "type": "object",
                     "dynamic": True,
                     "properties": {
-                        "CustomMetadata": {"type": "object", "dynamic": True}
+                        "CustomMetadata": {"type": "object", "dynamic": True},
+                        "EmbeddedMetadata": {"type": "object", "dynamic": True},
                     },
                 },
                 "DigitalAsset": {
