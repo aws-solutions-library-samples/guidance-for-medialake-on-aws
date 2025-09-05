@@ -8,6 +8,7 @@ import { type SortingState } from "@tanstack/react-table";
 import { type AssetTableColumn } from "@/types/shared/assetComponents";
 import { formatFileSize } from "@/utils/fileSize";
 import { formatDate } from "@/utils/dateFormat";
+import { useDebounce } from "@/hooks/useDebounce";
 import AssetResultsView from "../shared/AssetResultsView";
 
 type AssetItem = (ImageItem | VideoItem | AudioItem) & {
@@ -27,6 +28,11 @@ interface MasterResultsViewProps {
   searchTerm: string;
   error?: { status: string; message: string } | null;
   isLoading?: boolean;
+
+  // Semantic search confidence filtering
+  isSemantic?: boolean;
+  confidenceThreshold?: number;
+  onConfidenceThresholdChange?: (threshold: number) => void;
 
   // Search fields
   selectedFields: string[];
@@ -109,6 +115,11 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   searchTerm,
   error,
   isLoading,
+
+  // Semantic search confidence filtering
+  isSemantic = false,
+  confidenceThreshold = 0.57,
+  onConfidenceThresholdChange,
 
   // Search fields
   selectedFields,
@@ -208,9 +219,34 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       ? (assetId: string) => selectedAssets.includes(assetId)
       : undefined;
 
+  // Debounce the confidence threshold to reduce rapid filtering during slider interaction
+  const debouncedConfidenceThreshold = useDebounce(
+    confidenceThreshold || 0,
+    150,
+  );
+
+  // Filter results based on confidence threshold for semantic search
+  const filteredResults = React.useMemo(() => {
+    if (
+      !isSemantic ||
+      debouncedConfidenceThreshold === undefined ||
+      debouncedConfidenceThreshold === 0
+    ) {
+      return results;
+    }
+    return results.filter((asset) => {
+      const score = asset.score ?? 1; // Default to 1 if no score (non-semantic results)
+      return score >= debouncedConfidenceThreshold;
+    });
+  }, [results, isSemantic, debouncedConfidenceThreshold]);
+
   return (
     <AssetResultsView
-      results={results}
+      results={filteredResults}
+      originalResults={results}
+      isSemantic={isSemantic}
+      confidenceThreshold={confidenceThreshold}
+      onConfidenceThresholdChange={onConfidenceThresholdChange}
       searchMetadata={searchMetadata}
       onPageChange={onPageChange}
       onPageSizeChange={onPageSizeChange}

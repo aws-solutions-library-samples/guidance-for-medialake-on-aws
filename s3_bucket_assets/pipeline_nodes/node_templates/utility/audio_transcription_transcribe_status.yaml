@@ -20,6 +20,7 @@ node:
             - effect: Allow
               actions:
                 - s3:GetObject
+                - s3:ListBucket
               resources:
                 - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}/*
                 - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}

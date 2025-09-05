@@ -2,10 +2,11 @@ import decimal
 import json
 import os
 import re
+import shutil
 import subprocess
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import boto3
 from aws_lambda_powertools import Logger, Tracer
@@ -16,8 +17,9 @@ from pymediainfo import MediaInfo
 logger = Logger()
 tracer = Tracer()
 
-SIGNED_URL_TIMEOUT = 60
+SIGNED_URL_TIMEOUT = int(os.getenv("SIGNED_URL_TIMEOUT", "300"))  # give ffprobe time
 TABLE_NAME = os.environ["MEDIALAKE_ASSET_TABLE"]
+SAFETY_MARGIN_BYTES = 64 * 1024 * 1024  # leave some room
 
 s3_client = boto3.client("s3")
 dynamodb = boto3.resource("dynamodb")
@@ -140,17 +142,36 @@ def _sanitize_field_value(value: Any, field_name: str = "") -> Any:
     return str(value)
 
 
+# ── helpers: disk space and presigned URL ──────────────────────────
+def tmp_free_bytes() -> int:
+    return shutil.disk_usage(TMP_DIR).free
+
+
+def presigned_url(bucket: str, key: str, expires: Optional[int] = None) -> str:
+    return s3_client.generate_presigned_url(
+        "get_object",
+        Params={"Bucket": bucket, "Key": key},
+        ExpiresIn=expires or SIGNED_URL_TIMEOUT,
+    )
+
+
 # ── helpers: analysis tools ────────────────────────────────────────
-def run_ffprobe(file_path: str) -> Dict[str, Any]:
+def run_ffprobe(input_path: str) -> Dict[str, Any]:
+    """Return ffprobe JSON for a file or URL, raise on error."""
+    # Limit probe size so ffprobe doesn't try to slurp entire remote objects
     cmd = [
         "/opt/bin/ffprobe",
         "-v",
         "error",
+        "-analyzeduration",
+        "10M",
+        "-probesize",
+        "10M",
         "-show_streams",
         "-show_format",
         "-print_format",
         "json",
-        file_path,
+        input_path,
     ]
     res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if res.returncode:
@@ -158,8 +179,16 @@ def run_ffprobe(file_path: str) -> Dict[str, Any]:
     return json.loads(res.stdout.decode())
 
 
-def run_mediainfo(file_path: str) -> Dict[str, Any]:
-    return json.loads(MediaInfo.parse(file_path, output="JSON"))
+def run_mediainfo(input_path: str) -> Dict[str, Any]:
+    """Return MediaInfo JSON for a file path or (if supported) HTTP URL."""
+    try:
+        return json.loads(MediaInfo.parse(input_path, output="JSON"))
+    except Exception as e:
+        # Some layers don't have libcurl-enabled MediaInfo; fall back to empty
+        logger.warning(
+            "MediaInfo failed; continuing with ffprobe only", extra={"error": str(e)}
+        )
+        return {"media": {"track": []}}
 
 
 def merge_metadata(ff: Dict, mi: Dict) -> Dict[str, Any]:
@@ -233,18 +262,42 @@ def lambda_handler(event, context):
 
         inv_id = clean_asset_id(inv_raw)
 
-        # download
+        # Get file info and determine strategy
         src = asset["DigitalSourceAsset"]["MainRepresentation"]
         bucket = src["StorageInfo"]["PrimaryLocation"]["Bucket"]
         key = src["StorageInfo"]["PrimaryLocation"]["ObjectKey"]["FullPath"]
         local = TMP_DIR / Path(key).name
-        s3_client.download_file(bucket, key, str(local))
-        steps.setdefault(inv_id, {})["S3_download"] = "Success"
 
-        # analyse
-        ff = run_ffprobe(str(local))
+        # Object size & strategy
+        head = s3_client.head_object(Bucket=bucket, Key=key)
+        size = head.get("ContentLength", 0)
+        free = tmp_free_bytes()
+        can_download = size and (size + SAFETY_MARGIN_BYTES) < free
+
+        strategy = "download" if can_download else "stream"
+        steps.setdefault(inv_id, {})["Strategy"] = strategy
+        logger.append_keys(
+            inventory_id=inv_id, s3_size=size, tmp_free=free, strategy=strategy
+        )
+
+        input_path = ""
+        downloaded = False
+
+        if strategy == "download":
+            s3_client.download_file(bucket, key, str(local))
+            downloaded = True
+            input_path = str(local)
+            steps[inv_id]["S3_download"] = "Success"
+        else:
+            input_path = presigned_url(bucket, key)
+            steps[inv_id]["S3_presigned_url"] = "Success"
+
+        # Analyse
+        ff = run_ffprobe(input_path)
         steps[inv_id]["FFProbe"] = "Success"
-        mi = run_mediainfo(str(local))
+        mi = run_mediainfo(
+            input_path if downloaded else input_path
+        )  # try URL; will fall back
         steps[inv_id]["MediaInfo"] = "Success"
         merged = merge_metadata(ff, mi)
 
@@ -280,6 +333,14 @@ def lambda_handler(event, context):
         updated_item = asset_table.get_item(Key={"InventoryID": inv_id}).get("Item", {})
         updated_assets[inv_id] = updated_item
         steps[inv_id]["DDB_get"] = "Success"
+
+        # Cleanup local file if used
+        if downloaded:
+            try:
+                local.unlink(missing_ok=True)
+                steps[inv_id]["Tmp_cleanup"] = "Success"
+            except Exception as e:
+                logger.warning("Failed to cleanup tmp file", extra={"error": str(e)})
 
     # strip Decimal objects before returning
     return {

@@ -1,17 +1,20 @@
 spec: v1.0.0
 node:
-  id: image_proxy
-  title: Image Proxy
-  description: Create an image proxy
+  id: video_splitter
+  title: Video Splitter
+  description: Splits video files into MP4 chunks of configurable duration
   version: 1.0.0
   type: utility
   integration:
     config:
       lambda:
-        handler: utility/ImageProxyLambdaDeployment
+        handler: utility/VideoSplitterLambdaDeployment
         runtime: python3.12
+        memory_size: 2048 # Increased memory for video processing
+        ephemeral_storage: 10240 # Default ephemeral storage
+        timeout: 900 # 15 minutes for video processing
         layers:
-          - ResvgCli
+          - FFmpeg
         iam_policy:
           statements:
             - effect: Allow
@@ -19,19 +22,9 @@ node:
                 - s3:ListBucket
                 - s3:GetObject
                 - s3:PutObject
-                - s3:DeleteObject
               resources:
                 - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}/*
                 - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}
-                - arn:aws:s3:::*/*
-                - arn:aws:s3:::*
-            - effect: Allow
-              actions:
-                - dynamodb:GetItem
-                - dynamodb:UpdateItem
-                - dynamodb:PutItem
-              resources:
-                - ${MEDIALAKE_ASSET_TABLE}
             - effect: Allow
               actions:
                 - kms:Decrypt
@@ -44,15 +37,19 @@ node:
                 - "*"
 
 actions:
-  extract:
-    summary: Create an image proxy
-    description: Create an image proxy from an image file stored in S3
-    operationId: createImageProxy
+  split:
+    summary: Video Splitter
+    description: Splits video files into MP4 chunks of configurable duration
+    operationId: videoSplitter
     parameters:
-    x-requestMapping: processor/image_proxy/extract/
-    x-responseMapping: processor/image_proxy/extract/
+      - in: body
+        name: Chunk Duration
+        required: true
+        default: 7200
+        schema:
+          type: number
     connections:
       incoming:
-        type: [image]
+        type: [video]
       outgoing:
-        type: [any]
+        type: [video]
