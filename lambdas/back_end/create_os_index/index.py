@@ -248,7 +248,13 @@ def handler(event, context):
     }
 
     payload = {
-        "settings": {"index": {"knn": True, "mapping.total_fields.limit": 6000}},
+        "settings": {
+            "index": {
+                "knn": True,
+                "mapping.total_fields.limit": 6000,
+                "query.bool.max_clause_count": 5000,
+            }
+        },
         "mappings": {
             "properties": {
                 "type": {"type": "text"},
