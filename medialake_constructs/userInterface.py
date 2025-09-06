@@ -395,12 +395,12 @@ class UIConstruct(Construct):
 
         # Create a shared CF Origin for static assets (S3)
         s3_orig = origins.S3BucketOrigin.with_origin_access_control(
-            medialake_ui_s3_bucket.bucket,
+            medialake_ui_s3_bucket.concrete_bucket,
         )
 
         # Create CF Origin for media assets bucket
         media_orig = origins.S3BucketOrigin.with_origin_access_control(
-            props.media_assets_bucket,
+            props.media_assets_bucket.concrete_bucket,
         )
 
         self.cloudfront_distribution = cloudfront.Distribution(

@@ -106,6 +106,18 @@ class S3Bucket(Construct):
         return self._bucket
 
     @property
+    def concrete_bucket(self) -> s3.Bucket:
+        """
+        Returns the underlying S3 bucket as a concrete Bucket class.
+        This is needed for CloudFront origins that require the full Bucket interface.
+        """
+        if isinstance(self._bucket, s3.Bucket):
+            return self._bucket
+        else:
+            # If it's an imported bucket, we can't return it as a concrete Bucket
+            raise ValueError("Cannot return concrete bucket for imported buckets")
+
+    @property
     def bucket_arn(self) -> str:
         """
         Returns the underlying S3 bucket as an IBucket interface.
