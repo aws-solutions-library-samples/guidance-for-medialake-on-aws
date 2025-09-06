@@ -2,9 +2,10 @@ import secrets
 import string
 from dataclasses import dataclass
 
-from aws_cdk import Stack, Token
+from aws_cdk import CfnOutput, Stack, Token
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_s3 as s3
+from aws_cdk import aws_ssm as ssm
 from aws_cdk import custom_resources as cr
 
 # from medialake_stacks.auth_stack import AuthStack
@@ -17,6 +18,7 @@ from medialake_constructs.userInterface import UIConstruct, UIConstructProps
 @dataclass
 class UserInterfaceStackProps:
     access_log_bucket: s3.IBucket
+    media_assets_bucket: s3.IBucket
     api_gateway_rest_id: str
     api_gateway_stage: str
     cognito_user_pool_id: str
@@ -87,6 +89,12 @@ class UserInterfaceStack(Stack):
             )
             waf_acl_arn = waf_acl_param.get_response_field("Parameter.Value")
 
+        # Create StringParameter for CloudFront distribution domain
+        # This centralizes parameter ownership at the stack level
+        parameter_name = (
+            f"/medialake/{config.environment}/cloudfront-distribution-domain"
+        )
+
         self._ui = UIConstruct(
             self,
             "UserInterface",
@@ -97,9 +105,30 @@ class UserInterfaceStack(Stack):
                 api_gateway_rest_id=props.api_gateway_rest_id,
                 api_gateway_stage=props.api_gateway_stage,
                 access_log_bucket=props.access_log_bucket,
+                media_assets_bucket=props.media_assets_bucket,
                 cloudfront_waf_acl_arn=waf_acl_arn,
                 cognito_domain_prefix=props.cognito_domain_prefix,
+                parameter_name=parameter_name,
             ),
+        )
+
+        # Create the SSM parameter after UI construct is created
+        # so we can access the CloudFront distribution domain
+        ssm.StringParameter(
+            self,
+            "CloudFrontDistributionDomainParameter",
+            parameter_name=parameter_name,
+            string_value=self._ui.cloudfront_distribution.distribution_domain_name,
+            description="CloudFront distribution domain for MediaLake UI",
+        )
+
+        # Export SSM parameter name as CloudFormation output
+        CfnOutput(
+            self,
+            "CloudFrontDistributionDomainParameterName",
+            value=f"/medialake/{config.environment}/cloudfront-distribution-domain",
+            description="SSM parameter name for CloudFront distribution domain",
+            export_name=f"{self.stack_name}-CloudFrontDistributionDomainParameterName",
         )
 
         _ = cr.AwsCustomResource(

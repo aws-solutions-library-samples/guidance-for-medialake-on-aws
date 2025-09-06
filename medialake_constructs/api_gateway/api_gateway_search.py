@@ -42,6 +42,7 @@ class SearchProps:
     open_search_index: str
     system_settings_table: str
     s3_vector_bucket_name: str
+    cloudfront_distribution_domain_parameter_name: str
     vpc: Optional[ec2.IVpc] = None
     security_group: Optional[ec2.SecurityGroup] = None
 
@@ -82,6 +83,7 @@ class SearchConstruct(Construct):
                     "SYSTEM_SETTINGS_TABLE": props.system_settings_table,
                     "S3_VECTOR_BUCKET_NAME": props.s3_vector_bucket_name,
                     "S3_VECTOR_INDEX_NAME": "media-vectors",
+                    "CLOUDFRONT_DISTRIBUTION_DOMAIN": props.cloudfront_distribution_domain_parameter_name,
                 },
             ),
         )
@@ -176,6 +178,15 @@ class SearchConstruct(Construct):
                     f"arn:aws:s3vectors:{Stack.of(self).region}:{Stack.of(self).account}:bucket/{props.s3_vector_bucket_name}",
                     f"arn:aws:s3vectors:{Stack.of(self).region}:{Stack.of(self).account}:bucket/{props.s3_vector_bucket_name}/*",
                 ],
+            )
+        )
+
+        # Add SSM GetParameter permissions
+        search_get_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["ssm:GetParameter"],
+                resources=["*"],
             )
         )
 

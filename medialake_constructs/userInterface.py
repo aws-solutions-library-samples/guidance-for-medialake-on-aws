@@ -23,6 +23,7 @@ from aws_cdk import aws_logs as logs
 from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_s3_deployment as s3deploy
 from aws_cdk import aws_secretsmanager as secretsmanager
+from aws_cdk import aws_ssm as ssm
 from aws_cdk import custom_resources as cr
 from constructs import Construct
 
@@ -73,6 +74,7 @@ class LocalBundling:
 @dataclass
 class UIConstructProps:
     access_log_bucket: s3.IBucket
+    media_assets_bucket: s3.IBucket
     api_gateway_rest_id: str
     api_gateway_stage: str
     cognito_user_pool_id: str
@@ -81,6 +83,7 @@ class UIConstructProps:
     cognito_identity_pool: str
     cognito_domain_prefix: str
     cognito_construct: Optional[Construct] = None
+    parameter_name: Optional[str] = None
     app_path: str = os.path.join(
         os.path.dirname(os.path.dirname(__file__)), "medialake_user_interface"
     )
@@ -315,6 +318,49 @@ class UIConstruct(Construct):
             ),
         )
 
+        # Simplified response headers policy for media assets (binary content)
+        # Omits CSP and other headers not needed for binary media serving
+        media_response_headers_policy = cloudfront.ResponseHeadersPolicy(
+            self,
+            "MediaSecurityHeadersPolicy",
+            security_headers_behavior=cloudfront.ResponseSecurityHeadersBehavior(
+                strict_transport_security={
+                    "override": True,
+                    "access_control_max_age": Duration.seconds(31536000),
+                    "include_subdomains": True,
+                    "preload": True,
+                },
+                content_type_options={"override": True},
+                referrer_policy={
+                    "referrer_policy": cloudfront.HeadersReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN,
+                    "override": True,
+                },
+            ),
+            cors_behavior=cloudfront.ResponseHeadersCorsBehavior(
+                access_control_allow_credentials=False,
+                access_control_allow_headers=[
+                    "Range",
+                    "If-Range",
+                    "If-Modified-Since",
+                    "If-None-Match",
+                    "Content-Type",
+                ],
+                access_control_allow_methods=[
+                    "GET",
+                    "HEAD",
+                    "OPTIONS",
+                ],
+                access_control_allow_origins=["*"],
+                origin_override=True,
+                access_control_expose_headers=[
+                    "Content-Length",
+                    "Content-Range",
+                    "Accept-Ranges",
+                ],
+                access_control_max_age=Duration.seconds(7200),
+            ),
+        )
+
         # Create a custom cache policy for static assets
         static_assets_cache_policy = cloudfront.CachePolicy(
             self,
@@ -330,9 +376,31 @@ class UIConstruct(Construct):
             enable_accept_encoding_brotli=True,
         )
 
+        # Create a custom cache policy for media assets with shorter TTLs
+        media_cache_policy = cloudfront.CachePolicy(
+            self,
+            "MediaCachePolicy",
+            comment="Cache policy for media assets (videos, audio, documents)",
+            default_ttl=Duration.hours(6),
+            min_ttl=Duration.minutes(1),
+            max_ttl=Duration.days(30),
+            cookie_behavior=cloudfront.CacheCookieBehavior.none(),
+            header_behavior=cloudfront.CacheHeaderBehavior.allow_list(
+                "Range", "If-Range", "If-Modified-Since", "If-None-Match"
+            ),
+            query_string_behavior=cloudfront.CacheQueryStringBehavior.none(),
+            enable_accept_encoding_gzip=True,
+            enable_accept_encoding_brotli=True,
+        )
+
         # Create a shared CF Origin for static assets (S3)
         s3_orig = origins.S3BucketOrigin.with_origin_access_control(
             medialake_ui_s3_bucket.bucket,
+        )
+
+        # Create CF Origin for media assets bucket
+        media_orig = origins.S3BucketOrigin.with_origin_access_control(
+            props.media_assets_bucket,
         )
 
         self.cloudfront_distribution = cloudfront.Distribution(
@@ -368,6 +436,16 @@ class UIConstruct(Construct):
                     cache_policy=static_assets_cache_policy,
                     origin_request_policy=cloudfront.OriginRequestPolicy.CORS_S3_ORIGIN,
                     response_headers_policy=ui_response_headers_policy,
+                    compress=True,
+                ),
+                "/media/*": cloudfront.BehaviorOptions(
+                    origin=media_orig,
+                    viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+                    allowed_methods=cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+                    cached_methods=cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
+                    cache_policy=media_cache_policy,
+                    origin_request_policy=cloudfront.OriginRequestPolicy.CORS_S3_ORIGIN,
+                    response_headers_policy=media_response_headers_policy,
                     compress=True,
                 ),
                 f"/{config.api_path}/*": cloudfront.BehaviorOptions(
@@ -409,6 +487,31 @@ class UIConstruct(Construct):
                 ),
             ],
         )
+
+        # Add policy statement to media assets bucket for CloudFront access
+        props.media_assets_bucket.add_to_resource_policy(
+            iam.PolicyStatement(
+                principals=[iam.ServicePrincipal("cloudfront.amazonaws.com")],
+                actions=["s3:GetObject"],
+                resources=[props.media_assets_bucket.arn_for_objects("*")],
+                conditions={
+                    "StringEquals": {
+                        "AWS:SourceArn": self.cloudfront_distribution.distribution_arn
+                    }
+                },
+            )
+        )
+
+        # Store CloudFront distribution domain in SSM Parameter Store
+        # Only create parameter if not provided externally
+        if props.parameter_name is None:
+            ssm.StringParameter(
+                self,
+                "CloudFrontDistributionDomainParameter",
+                parameter_name="/medialake/cloudfront-distribution-domain",
+                string_value=self.cloudfront_distribution.distribution_domain_name,
+                description="CloudFront distribution domain for MediaLake UI",
+            )
 
         print(f"Cognito domain prefix: {props.cognito_domain_prefix}")
         print(

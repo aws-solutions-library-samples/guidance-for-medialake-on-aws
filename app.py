@@ -510,6 +510,7 @@ user_interface_stack = UserInterfaceStack(
         api_gateway_rest_id=medialake_stack.shared_rest_api.rest_api_id,
         api_gateway_stage=api_gateway_deployment_stack.api_deployment_stage.stage_name,
         access_log_bucket=base_infrastructure.access_log_bucket,
+        media_assets_bucket=base_infrastructure.media_assets_s3_bucket,
         cloudfront_waf_acl_arn=waf_acl_ssm_param_name,
     ),
     env=env,

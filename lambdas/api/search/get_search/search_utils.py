@@ -4,6 +4,7 @@ import re
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import quote
 
 import boto3
 from aws_lambda_powertools import Logger
@@ -19,6 +20,7 @@ _SIGV4_CFG = Config(
 
 _ENDPOINT_TMPL = "https://s3.{region}.amazonaws.com"
 _S3_CLIENT_CACHE: dict[str, boto3.client] = {}  # {region → client}
+_CLOUDFRONT_DOMAIN_CACHE: Optional[str] = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -48,6 +50,35 @@ def _get_s3_client_for_bucket(bucket: str) -> boto3.client:
             config=_SIGV4_CFG,
         )
     return _S3_CLIENT_CACHE[region]
+
+
+def _get_cloudfront_domain() -> str:
+    """
+    Retrieve CloudFront domain from SSM parameter with caching.
+    Returns the domain string for CloudFront URL generation.
+    """
+    global _CLOUDFRONT_DOMAIN_CACHE
+
+    if _CLOUDFRONT_DOMAIN_CACHE is not None:
+        return _CLOUDFRONT_DOMAIN_CACHE
+
+    try:
+        ssm_client = boto3.client("ssm")
+        response = ssm_client.get_parameter(
+            Name="/medialake/cloudfront-distribution-domain", WithDecryption=True
+        )
+        raw = response["Parameter"]["Value"].strip()
+
+        # Sanitize domain by removing scheme prefix and trailing slashes
+        domain = re.sub(r"^https?://", "", raw)
+        domain = domain.rstrip("/")
+
+        _CLOUDFRONT_DOMAIN_CACHE = domain
+        logger.debug(f"Retrieved CloudFront domain from SSM: {domain}")
+        return domain
+    except Exception as e:
+        logger.error(f"Error retrieving CloudFront domain from SSM: {str(e)}")
+        raise
 
 
 # Supported special keywords for search
@@ -282,6 +313,108 @@ def generate_presigned_urls_batch(
 
     batch_time = time.time() - start_time
     logger.info(f"[PERF] Batch presigned URL generation completed in {batch_time:.3f}s")
+
+    return results
+
+
+def generate_cloudfront_url(bucket: str, key: str) -> Optional[str]:
+    """
+    Generate a CloudFront URL for an S3 object.
+    Format: https://{cloudfront_domain}/media/{bucket}/{key}
+    """
+    try:
+        cloudfront_domain = _get_cloudfront_domain()
+
+        # Strip leading slash from key if present
+        clean_key = key.lstrip("/")
+
+        # URL-encode bucket and key, preserving slashes in key
+        encoded_bucket = quote(bucket, safe="")
+        encoded_key = quote(clean_key, safe="/")
+
+        url = f"https://{cloudfront_domain}/media/{encoded_bucket}/{encoded_key}"
+
+        logger.debug("Generated CloudFront URL for s3://%s/%s: %s", bucket, key, url)
+
+        return url
+    except Exception as e:
+        logger.error(f"Error generating CloudFront URL: {str(e)}")
+        return None
+
+
+def generate_cloudfront_urls_batch(
+    url_requests: List[Dict[str, str]],
+) -> Dict[str, Optional[str]]:
+    """
+    Generate multiple CloudFront URLs in parallel for better performance.
+
+    Args:
+        url_requests: List of dicts with 'bucket', 'key', and 'request_id' keys
+
+    Returns:
+        Dict mapping request_id to CloudFront URL (or None if failed)
+    """
+    import concurrent.futures
+    import time
+
+    start_time = time.time()
+    logger.info(
+        f"[PERF] Starting batch CloudFront URL generation for {len(url_requests)} URLs"
+    )
+
+    # Prefetch CloudFront domain to prevent thundering herd on SSM
+    try:
+        cloudfront_domain = _get_cloudfront_domain()
+    except Exception as e:
+        logger.error(f"Failed to prefetch CloudFront domain: {str(e)}")
+        # Return all failed results
+        return {request["request_id"]: None for request in url_requests}
+
+    def generate_single_url(request):
+        try:
+            # Strip leading slash from key if present
+            clean_key = request["key"].lstrip("/")
+
+            # URL-encode bucket and key, preserving slashes in key
+            encoded_bucket = quote(request["bucket"], safe="")
+            encoded_key = quote(clean_key, safe="/")
+
+            url = f"https://{cloudfront_domain}/media/{encoded_bucket}/{encoded_key}"
+
+            return {
+                "request_id": request["request_id"],
+                "url": url,
+            }
+        except Exception as e:
+            logger.warning(
+                f"Failed to generate CloudFront URL for {request['request_id']}: {str(e)}"
+            )
+            return {"request_id": request["request_id"], "url": None}
+
+    results = {}
+
+    # Use ThreadPoolExecutor for I/O-bound operations
+    with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+        future_to_request = {
+            executor.submit(generate_single_url, request): request
+            for request in url_requests
+        }
+
+        for future in concurrent.futures.as_completed(future_to_request):
+            try:
+                result = future.result()
+                results[result["request_id"]] = result["url"]
+            except Exception as e:
+                request = future_to_request[future]
+                logger.warning(
+                    f"Exception generating CloudFront URL for {request['request_id']}: {str(e)}"
+                )
+                results[request["request_id"]] = None
+
+    batch_time = time.time() - start_time
+    logger.info(
+        f"[PERF] Batch CloudFront URL generation completed in {batch_time:.3f}s"
+    )
 
     return results
 

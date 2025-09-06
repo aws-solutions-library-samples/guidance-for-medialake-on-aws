@@ -14,6 +14,7 @@ from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_secretsmanager as secretsmanager
 from constructs import Construct
 
+from config import config
 from constants import Lambda as LambdaConstants
 from medialake_constructs.api_gateway.api_gateway_assets import (
     AssetsConstruct,
@@ -252,6 +253,7 @@ class ApiGatewayStack(cdk.NestedStack):
                 security_group=props.security_group,
                 system_settings_table=props.system_settings_table,
                 s3_vector_bucket_name=props.s3_vector_bucket_name,
+                cloudfront_distribution_domain_parameter_name=f"/medialake/{config.environment}/cloudfront-distribution-domain",
             ),
         )
 

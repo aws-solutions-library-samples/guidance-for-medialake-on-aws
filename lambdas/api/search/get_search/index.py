@@ -21,8 +21,8 @@ from opensearchpy import (
 )
 from pydantic import BaseModel, ConfigDict, Field, conint
 from search_utils import (
-    generate_presigned_url,
-    generate_presigned_urls_batch,
+    generate_cloudfront_url,
+    generate_cloudfront_urls_batch,
     parse_search_query,
 )
 
@@ -506,9 +506,9 @@ def add_common_fields(result: Dict, prefix: str = "") -> Dict:
     return result
 
 
-def collect_presigned_url_requests(hits: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
+def collect_cloudfront_url_requests(hits: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
     """
-    Collect all presigned URL requests from search hits without generating URLs.
+    Collect all CloudFront URL requests from search hits without generating URLs.
     Returns tuple of (processed_hits_data, url_requests)
     """
     processed_hits = []
@@ -556,22 +556,22 @@ def collect_presigned_url_requests(hits: List[Dict]) -> Tuple[List[Dict], List[D
     return processed_hits, url_requests
 
 
-def process_search_hit_with_urls(
-    hit_data: Dict, presigned_urls: Dict[str, Optional[str]]
+def process_search_hit_with_cloudfront_urls(
+    hit_data: Dict, cloudfront_urls: Dict[str, Optional[str]]
 ) -> Dict:
-    """Process a single search hit with pre-generated presigned URLs"""
+    """Process a single search hit with pre-generated CloudFront URLs"""
     hit = hit_data["hit"]
     source = hit_data["source"]
 
-    # Get presigned URLs from the batch results
+    # Get CloudFront URLs from the batch results
     thumbnail_url = None
     proxy_url = None
 
     if hit_data["thumbnail_request_id"]:
-        thumbnail_url = presigned_urls.get(hit_data["thumbnail_request_id"])
+        thumbnail_url = cloudfront_urls.get(hit_data["thumbnail_request_id"])
 
     if hit_data["proxy_request_id"]:
-        proxy_url = presigned_urls.get(hit_data["proxy_request_id"])
+        proxy_url = cloudfront_urls.get(hit_data["proxy_request_id"])
 
     # Create base result object
     result = AssetSearchResult(
@@ -591,7 +591,7 @@ def process_search_hit_with_urls(
 
 
 def process_search_hit(hit: Dict) -> Dict:
-    """Process a single search hit and add presigned URL if thumbnail representation exists"""
+    """Process a single search hit and add CloudFront URL if thumbnail representation exists"""
     source = hit["_source"]
     digital_source_asset = source.get("DigitalSourceAsset", {})
     derived_representations = source.get("DerivedRepresentations", [])
@@ -612,15 +612,15 @@ def process_search_hit(hit: Dict) -> Dict:
         )
 
         if rep_storage_info.get("StorageType") == "s3":
-            presigned_url = generate_presigned_url(
+            cloudfront_url = generate_cloudfront_url(
                 bucket=rep_storage_info.get("Bucket", ""),
                 key=rep_storage_info.get("ObjectKey", {}).get("FullPath", ""),
             )
 
             if purpose == "thumbnail":
-                thumbnail_url = presigned_url
+                thumbnail_url = cloudfront_url
             elif purpose == "proxy":
-                proxy_url = presigned_url
+                proxy_url = cloudfront_url
 
         if thumbnail_url and proxy_url:
             break
@@ -1048,35 +1048,39 @@ def perform_search(params: SearchParams) -> Dict:
                 # Semantic search without clip logic - with batch presigned URL generation
                 batch_processing_start = time.time()
 
-                # Step 1: Collect all presigned URL requests
+                # Step 1: Collect all CloudFront URL requests
                 url_collection_start = time.time()
-                processed_hits_data, url_requests = collect_presigned_url_requests(hits)
+                processed_hits_data, url_requests = collect_cloudfront_url_requests(
+                    hits
+                )
                 logger.info(
                     f"[PERF] Semantic URL request collection took: {time.time() - url_collection_start:.3f}s"
                 )
                 logger.info(
-                    f"Collected {len(url_requests)} presigned URL requests for {len(processed_hits_data)} semantic hits"
+                    f"Collected {len(url_requests)} CloudFront URL requests for {len(processed_hits_data)} semantic hits"
                 )
 
-                # Step 2: Generate all presigned URLs in parallel
+                # Step 2: Generate all CloudFront URLs in parallel
                 if url_requests:
                     batch_url_start = time.time()
-                    presigned_urls = generate_presigned_urls_batch(url_requests)
+                    cloudfront_urls = generate_cloudfront_urls_batch(url_requests)
                     logger.info(
-                        f"[PERF] Semantic batch presigned URL generation took: {time.time() - batch_url_start:.3f}s"
+                        f"[PERF] Semantic batch CloudFront URL generation took: {time.time() - batch_url_start:.3f}s"
                     )
                     logger.info(
-                        f"Generated {len([url for url in presigned_urls.values() if url])} successful URLs out of {len(url_requests)} requests"
+                        f"Generated {len([url for url in cloudfront_urls.values() if url])} successful URLs out of {len(url_requests)} requests"
                     )
                 else:
-                    presigned_urls = {}
+                    cloudfront_urls = {}
 
                 # Step 3: Process all hits with pre-generated URLs
                 results_processing_start = time.time()
                 results = []
                 for hit_data in processed_hits_data:
                     try:
-                        result = process_search_hit_with_urls(hit_data, presigned_urls)
+                        result = process_search_hit_with_cloudfront_urls(
+                            hit_data, cloudfront_urls
+                        )
                         results.append(result)
                     except Exception as e:
                         logger.warning(f"Error processing semantic hit: {str(e)}")
@@ -1119,35 +1123,37 @@ def perform_search(params: SearchParams) -> Dict:
             # Regular text search with batch presigned URL generation
             batch_processing_start = time.time()
 
-            # Step 1: Collect all presigned URL requests
+            # Step 1: Collect all CloudFront URL requests
             url_collection_start = time.time()
-            processed_hits_data, url_requests = collect_presigned_url_requests(hits)
+            processed_hits_data, url_requests = collect_cloudfront_url_requests(hits)
             logger.info(
                 f"[PERF] URL request collection took: {time.time() - url_collection_start:.3f}s"
             )
             logger.info(
-                f"Collected {len(url_requests)} presigned URL requests for {len(processed_hits_data)} hits"
+                f"Collected {len(url_requests)} CloudFront URL requests for {len(processed_hits_data)} hits"
             )
 
-            # Step 2: Generate all presigned URLs in parallel
+            # Step 2: Generate all CloudFront URLs in parallel
             if url_requests:
                 batch_url_start = time.time()
-                presigned_urls = generate_presigned_urls_batch(url_requests)
+                cloudfront_urls = generate_cloudfront_urls_batch(url_requests)
                 logger.info(
-                    f"[PERF] Batch presigned URL generation took: {time.time() - batch_url_start:.3f}s"
+                    f"[PERF] Batch CloudFront URL generation took: {time.time() - batch_url_start:.3f}s"
                 )
                 logger.info(
-                    f"Generated {len([url for url in presigned_urls.values() if url])} successful URLs out of {len(url_requests)} requests"
+                    f"Generated {len([url for url in cloudfront_urls.values() if url])} successful URLs out of {len(url_requests)} requests"
                 )
             else:
-                presigned_urls = {}
+                cloudfront_urls = {}
 
             # Step 3: Process all hits with pre-generated URLs
             results_processing_start = time.time()
             results = []
             for hit_data in processed_hits_data:
                 try:
-                    result = process_search_hit_with_urls(hit_data, presigned_urls)
+                    result = process_search_hit_with_cloudfront_urls(
+                        hit_data, cloudfront_urls
+                    )
                     results.append(result)
                 except Exception as e:
                     logger.warning(f"Error processing hit: {str(e)}")
