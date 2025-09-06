@@ -606,6 +606,17 @@ class BaseInfrastructureStack(Stack):
                     description=f"Keeps {fn.function_name} warm via scheduled EventBridge rule.",
                 )
 
+        # Export media assets bucket name via SSM parameter to avoid circular dependencies
+        from aws_cdk import aws_ssm as ssm
+
+        ssm.StringParameter(
+            self,
+            "MediaAssetsBucketNameParameter",
+            parameter_name=f"/medialake/{config.environment}/media-assets-bucket-name",
+            string_value=self.media_assets_s3_bucket.bucket_name,
+            description="Media assets bucket name for cross-stack reference",
+        )
+
         # Add outputs for retained resources in prod environment
         self.add_retained_resources_outputs()
 

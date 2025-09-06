@@ -74,7 +74,7 @@ class LocalBundling:
 @dataclass
 class UIConstructProps:
     # access_log_bucket: s3.IBucket  # Removed to avoid circular dependency
-    media_assets_bucket: s3.IBucket
+    # media_assets_bucket: s3.IBucket  # Removed to avoid circular dependency - now fetched from SSM
     api_gateway_rest_id: str
     api_gateway_stage: str
     cognito_user_pool_id: str
@@ -392,8 +392,22 @@ class UIConstruct(Construct):
             enable_accept_encoding_gzip=True,
             enable_accept_encoding_brotli=True,
         )
-        media_bucket = props.media_assets_bucket.concrete_bucket
 
+        # Get media assets bucket name from SSM parameter to avoid circular dependency
+        media_bucket_name_param = ssm.StringParameter.from_string_parameter_name(
+            self,
+            "MediaAssetsBucketNameParam",
+            string_parameter_name=f"/medialake/{config.environment}/media-assets-bucket-name",
+        )
+
+        # Import the media assets bucket using the name from SSM
+        media_bucket = s3.Bucket.from_bucket_name(
+            self,
+            "ImportedMediaAssetsBucket",
+            bucket_name=media_bucket_name_param.string_value,
+        )
+
+        # Create media origin using the imported bucket
         media_origin = origins.S3BucketOrigin.with_origin_access_control(
             media_bucket,
             # Optionally, specify origin_access_control=oac if using a customized OAC
