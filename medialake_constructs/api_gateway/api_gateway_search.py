@@ -42,7 +42,6 @@ class SearchProps:
     open_search_index: str
     system_settings_table: str
     s3_vector_bucket_name: str
-    cloudfront_distribution_domain_parameter_name: str
     vpc: Optional[ec2.IVpc] = None
     security_group: Optional[ec2.SecurityGroup] = None
 
@@ -83,7 +82,8 @@ class SearchConstruct(Construct):
                     "SYSTEM_SETTINGS_TABLE": props.system_settings_table,
                     "S3_VECTOR_BUCKET_NAME": props.s3_vector_bucket_name,
                     "S3_VECTOR_INDEX_NAME": "media-vectors",
-                    "CLOUDFRONT_DISTRIBUTION_DOMAIN": props.cloudfront_distribution_domain_parameter_name,
+                    # CLOUDFRONT_DISTRIBUTION_DOMAIN removed to break circular dependency
+                    # Lambda will fetch this from SSM parameter at runtime
                 },
             ),
         )
