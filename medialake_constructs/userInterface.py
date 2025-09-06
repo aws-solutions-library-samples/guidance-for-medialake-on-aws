@@ -392,6 +392,12 @@ class UIConstruct(Construct):
             enable_accept_encoding_gzip=True,
             enable_accept_encoding_brotli=True,
         )
+        media_bucket = props.media_assets_bucket.concrete_bucket
+
+        media_origin = origins.S3BucketOrigin.with_origin_access_control(
+            media_bucket,
+            # Optionally, specify origin_access_control=oac if using a customized OAC
+        )
 
         # Create a shared CF Origin for static assets (S3)
         s3_orig = origins.S3BucketOrigin.with_origin_access_control(
@@ -399,9 +405,9 @@ class UIConstruct(Construct):
         )
 
         # Create CF Origin for media assets bucket
-        media_orig = origins.S3BucketOrigin.with_origin_access_control(
-            props.media_assets_bucket.concrete_bucket,
-        )
+        # media_orig = origins.S3BucketOrigin.with_origin_access_control(
+        #     props.media_assets_bucket.concrete_bucket,
+        # )
 
         self.cloudfront_distribution = cloudfront.Distribution(
             self,
@@ -439,7 +445,7 @@ class UIConstruct(Construct):
                     compress=True,
                 ),
                 "/media/*": cloudfront.BehaviorOptions(
-                    origin=media_orig,
+                    origin=media_origin,
                     viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
                     allowed_methods=cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
                     cached_methods=cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
@@ -489,18 +495,18 @@ class UIConstruct(Construct):
         )
 
         # Add policy statement to media assets bucket for CloudFront access
-        props.media_assets_bucket.add_to_resource_policy(
-            iam.PolicyStatement(
-                principals=[iam.ServicePrincipal("cloudfront.amazonaws.com")],
-                actions=["s3:GetObject"],
-                resources=[props.media_assets_bucket.arn_for_objects("*")],
-                conditions={
-                    "StringEquals": {
-                        "AWS:SourceArn": self.cloudfront_distribution.distribution_arn
-                    }
-                },
-            )
-        )
+        # props.media_assets_bucket.bucket.add_to_resource_policy(
+        #     iam.PolicyStatement(
+        #         principals=[iam.ServicePrincipal("cloudfront.amazonaws.com")],
+        #         actions=["s3:GetObject"],
+        #         resources=[props.media_assets_bucket.arn_for_objects("*")],
+        #         conditions={
+        #             "StringEquals": {
+        #                 "AWS:SourceArn": self.cloudfront_distribution.distribution_arn
+        #             }
+        #         },
+        #     )
+        # )
 
         # Store CloudFront distribution domain in SSM Parameter Store
         # Only create parameter if not provided externally
