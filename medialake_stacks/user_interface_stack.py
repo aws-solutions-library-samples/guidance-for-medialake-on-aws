@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from aws_cdk import CfnOutput, Fn, Stack, Token
 from aws_cdk import aws_iam as iam
+from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_ssm as ssm
 from aws_cdk import custom_resources as cr
 
@@ -97,10 +98,10 @@ class UserInterfaceStack(Stack):
 
         # Import S3 buckets from BaseInfrastructureStack exports
         media_assets_bucket_arn = Fn.import_value(
-            "MediaLakeBaseInfrastructure-ExportsOutputFnGetAttMediaAssetsS3Bucket06290FA8ArnBCB645A8"  # pragma: allowlist secret
+            "MediaLakeBaseInfrastructure-MediaAssetsBucketArn"
         )
         access_log_bucket_arn = Fn.import_value(
-            "MediaLakeBaseInfrastructure-ExportsOutputFnGetAttAccessLogsBucketS3Bucket06290FA8ArnBCB645A8"  # pragma: allowlist secret
+            "MediaLakeBaseInfrastructure-AccessLogsBucketArn"
         )
 
         # Create bucket references from ARNs

@@ -617,6 +617,24 @@ class BaseInfrastructureStack(Stack):
             description="Media assets bucket name for cross-stack reference",
         )
 
+        # Export media assets bucket ARN for cross-stack reference
+        CfnOutput(
+            self,
+            "MediaAssetsBucketArn",
+            value=self.media_assets_s3_bucket.bucket_arn,
+            description="Media assets bucket ARN for cross-stack reference",
+            export_name=f"{self.stack_name}-MediaAssetsBucketArn",
+        )
+
+        # Export access logs bucket ARN for cross-stack reference
+        CfnOutput(
+            self,
+            "AccessLogsBucketArn",
+            value=self._access_logs_bucket.bucket_arn,
+            description="Access logs bucket ARN for cross-stack reference",
+            export_name=f"{self.stack_name}-AccessLogsBucketArn",
+        )
+
         # Add outputs for retained resources in prod environment
         self.add_retained_resources_outputs()
 
