@@ -1,5 +1,6 @@
 import decimal
 import json
+import os
 import re
 import uuid
 from datetime import datetime
@@ -60,24 +61,38 @@ def _get_cloudfront_domain() -> str:
     global _CLOUDFRONT_DOMAIN_CACHE
 
     if _CLOUDFRONT_DOMAIN_CACHE is not None:
+        logger.info(
+            f"[URL_DEBUG] Using cached CloudFront domain: '{_CLOUDFRONT_DOMAIN_CACHE}'"
+        )
         return _CLOUDFRONT_DOMAIN_CACHE
 
     try:
+        # Get environment from environment variable or default to 'dev'
+        environment = os.environ.get("ENVIRONMENT", "dev")
+        ssm_parameter_name = f"/medialake/{environment}/cloudfront-distribution-domain"
+
+        logger.info(
+            f"[URL_DEBUG] Retrieving CloudFront domain from SSM parameter: {ssm_parameter_name}"
+        )
         ssm_client = boto3.client("ssm")
         response = ssm_client.get_parameter(
-            Name="/medialake/cloudfront-distribution-domain", WithDecryption=True
+            Name=ssm_parameter_name, WithDecryption=True
         )
         raw = response["Parameter"]["Value"].strip()
+        logger.info(f"[URL_DEBUG] Raw SSM parameter value: '{raw}'")
 
         # Sanitize domain by removing scheme prefix and trailing slashes
         domain = re.sub(r"^https?://", "", raw)
         domain = domain.rstrip("/")
+        logger.info(f"[URL_DEBUG] Sanitized domain: '{domain}'")
 
         _CLOUDFRONT_DOMAIN_CACHE = domain
-        logger.debug(f"Retrieved CloudFront domain from SSM: {domain}")
+        logger.info(f"[URL_DEBUG] Cached CloudFront domain: '{domain}'")
         return domain
     except Exception as e:
-        logger.error(f"Error retrieving CloudFront domain from SSM: {str(e)}")
+        logger.error(
+            f"[URL_DEBUG] Error retrieving CloudFront domain from SSM: {str(e)}"
+        )
         raise
 
 
@@ -90,15 +105,6 @@ KEYWORDS = {
     "ingested_date_gte": r"ingested_date_gte:([<>]=?\d{4}-\d{2}-\d{2})",
     "ingested_date_lte": r"ingested_date_lte:([<>]=?\d{4}-\d{2}-\d{2})",
 }
-
-# KEYWORDS = {
-#    'content_type': r'type:(\w+)',
-#    'format': r'format:(\w+)',
-#    'size': r'size:([<>]=?\d+(?:\.\d+)?(?:KB|MB|GB|TB))',
-#    'date': r'date:([<>]=?\d{4}-\d{2}-\d{2})',
-#    'metadata': r'metadata:(\w+:\w+)',
-# 	'storageIdentifier': r'storageIdentifier:([a-zA-Z0-9._\-*/]+)'
-# }
 
 
 def parse_size_value(size_str: str) -> Optional[Dict[str, Any]]:
@@ -323,22 +329,32 @@ def generate_cloudfront_url(bucket: str, key: str) -> Optional[str]:
     Format: https://{cloudfront_domain}/media/{bucket}/{key}
     """
     try:
+        logger.info(
+            f"[URL_DEBUG] Generating CloudFront URL for bucket: '{bucket}', key: '{key}'"
+        )
+
         cloudfront_domain = _get_cloudfront_domain()
+        logger.info(f"[URL_DEBUG] Retrieved CloudFront domain: '{cloudfront_domain}'")
 
         # Strip leading slash from key if present
         clean_key = key.lstrip("/")
+        logger.info(f"[URL_DEBUG] Cleaned key: '{clean_key}'")
 
         # URL-encode bucket and key, preserving slashes in key
         encoded_bucket = quote(bucket, safe="")
         encoded_key = quote(clean_key, safe="/")
+        logger.info(
+            f"[URL_DEBUG] Encoded bucket: '{encoded_bucket}', encoded key: '{encoded_key}'"
+        )
 
         url = f"https://{cloudfront_domain}/media/{encoded_bucket}/{encoded_key}"
-
-        logger.debug("Generated CloudFront URL for s3://%s/%s: %s", bucket, key, url)
+        logger.info(f"[URL_DEBUG] Generated CloudFront URL: '{url}'")
 
         return url
     except Exception as e:
-        logger.error(f"Error generating CloudFront URL: {str(e)}")
+        logger.error(
+            f"[URL_DEBUG] Error generating CloudFront URL for s3://{bucket}/{key}: {str(e)}"
+        )
         return None
 
 
@@ -359,27 +375,42 @@ def generate_cloudfront_urls_batch(
 
     start_time = time.time()
     logger.info(
-        f"[PERF] Starting batch CloudFront URL generation for {len(url_requests)} URLs"
+        f"[URL_DEBUG] Starting batch CloudFront URL generation for {len(url_requests)} URLs"
     )
+    logger.info(f"[URL_DEBUG] URL requests: {url_requests}")
 
     # Prefetch CloudFront domain to prevent thundering herd on SSM
     try:
         cloudfront_domain = _get_cloudfront_domain()
+        logger.info(
+            f"[URL_DEBUG] Successfully prefetched CloudFront domain: '{cloudfront_domain}'"
+        )
     except Exception as e:
-        logger.error(f"Failed to prefetch CloudFront domain: {str(e)}")
+        logger.error(f"[URL_DEBUG] Failed to prefetch CloudFront domain: {str(e)}")
         # Return all failed results
         return {request["request_id"]: None for request in url_requests}
 
     def generate_single_url(request):
         try:
+            logger.info(f"[URL_DEBUG] Processing single URL request: {request}")
+
             # Strip leading slash from key if present
             clean_key = request["key"].lstrip("/")
+            logger.info(
+                f"[URL_DEBUG] Cleaned key for {request['request_id']}: '{clean_key}'"
+            )
 
             # URL-encode bucket and key, preserving slashes in key
             encoded_bucket = quote(request["bucket"], safe="")
             encoded_key = quote(clean_key, safe="/")
+            logger.info(
+                f"[URL_DEBUG] Encoded for {request['request_id']} - bucket: '{encoded_bucket}', key: '{encoded_key}'"
+            )
 
             url = f"https://{cloudfront_domain}/media/{encoded_bucket}/{encoded_key}"
+            logger.info(
+                f"[URL_DEBUG] Generated URL for {request['request_id']}: '{url}'"
+            )
 
             return {
                 "request_id": request["request_id"],
@@ -387,7 +418,7 @@ def generate_cloudfront_urls_batch(
             }
         except Exception as e:
             logger.warning(
-                f"Failed to generate CloudFront URL for {request['request_id']}: {str(e)}"
+                f"[URL_DEBUG] Failed to generate CloudFront URL for {request['request_id']}: {str(e)}"
             )
             return {"request_id": request["request_id"], "url": None}
 
@@ -404,17 +435,21 @@ def generate_cloudfront_urls_batch(
             try:
                 result = future.result()
                 results[result["request_id"]] = result["url"]
+                logger.info(
+                    f"[URL_DEBUG] Collected result for {result['request_id']}: {result['url']}"
+                )
             except Exception as e:
                 request = future_to_request[future]
                 logger.warning(
-                    f"Exception generating CloudFront URL for {request['request_id']}: {str(e)}"
+                    f"[URL_DEBUG] Exception generating CloudFront URL for {request['request_id']}: {str(e)}"
                 )
                 results[request["request_id"]] = None
 
     batch_time = time.time() - start_time
     logger.info(
-        f"[PERF] Batch CloudFront URL generation completed in {batch_time:.3f}s"
+        f"[URL_DEBUG] Batch CloudFront URL generation completed in {batch_time:.3f}s"
     )
+    logger.info(f"[URL_DEBUG] Final results: {results}")
 
     return results
 

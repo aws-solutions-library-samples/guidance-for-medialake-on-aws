@@ -514,12 +514,24 @@ def collect_cloudfront_url_requests(hits: List[Dict]) -> Tuple[List[Dict], List[
     processed_hits = []
     url_requests = []
 
-    for hit in hits:
+    logger.info(f"[URL_DEBUG] Starting URL collection for {len(hits)} hits")
+
+    for hit_idx, hit in enumerate(hits):
         source = hit["_source"]
         digital_source_asset = source.get("DigitalSourceAsset", {})
         derived_representations = source.get("DerivedRepresentations", [])
 
         asset_id = digital_source_asset.get("ID", "unknown")
+        logger.info(
+            f"[URL_DEBUG] Processing hit {hit_idx + 1}/{len(hits)} - Asset ID: {asset_id}"
+        )
+        logger.info(
+            f"[URL_DEBUG] DigitalSourceAsset keys: {list(digital_source_asset.keys())}"
+        )
+        logger.info(
+            f"[URL_DEBUG] DerivedRepresentations count: {len(derived_representations)}"
+        )
+
         hit_data = {
             "hit": hit,
             "source": source,
@@ -529,29 +541,69 @@ def collect_cloudfront_url_requests(hits: List[Dict]) -> Tuple[List[Dict], List[
         }
 
         # Collect URL requests for derived representations
-        for representation in derived_representations:
-            purpose = representation.get("Purpose")
+        for rep_idx, representation in enumerate(derived_representations):
+            purpose = representation.get("Purpose", "unknown")
             rep_storage_info = representation.get("StorageInfo", {}).get(
                 "PrimaryLocation", {}
             )
 
+            logger.info(
+                f"[URL_DEBUG] Processing representation {rep_idx + 1}/{len(derived_representations)} - Purpose: {purpose}"
+            )
+            logger.info(
+                f"[URL_DEBUG] StorageInfo keys: {list(rep_storage_info.keys())}"
+            )
+            logger.info(
+                f"[URL_DEBUG] StorageType: {rep_storage_info.get('StorageType', 'NOT_FOUND')}"
+            )
+
             if rep_storage_info.get("StorageType") == "s3":
                 bucket = rep_storage_info.get("Bucket", "")
-                key = rep_storage_info.get("ObjectKey", {}).get("FullPath", "")
+                object_key = rep_storage_info.get("ObjectKey", {})
+                key = object_key.get("FullPath", "")
+
+                logger.info(
+                    f"[URL_DEBUG] S3 representation found - Bucket: '{bucket}', Key: '{key}'"
+                )
+                logger.info(f"[URL_DEBUG] ObjectKey structure: {object_key}")
 
                 if bucket and key:
                     request_id = f"{asset_id}_{purpose}_{len(url_requests)}"
+                    url_request = {
+                        "request_id": request_id,
+                        "bucket": bucket,
+                        "key": key,
+                    }
 
-                    url_requests.append(
-                        {"request_id": request_id, "bucket": bucket, "key": key}
-                    )
+                    url_requests.append(url_request)
+                    logger.info(f"[URL_DEBUG] Added URL request: {url_request}")
 
                     if purpose == "thumbnail":
                         hit_data["thumbnail_request_id"] = request_id
+                        logger.info(
+                            f"[URL_DEBUG] Set thumbnail_request_id: {request_id}"
+                        )
                     elif purpose == "proxy":
                         hit_data["proxy_request_id"] = request_id
+                        logger.info(f"[URL_DEBUG] Set proxy_request_id: {request_id}")
+                else:
+                    logger.warning(
+                        f"[URL_DEBUG] Missing bucket or key - Bucket: '{bucket}', Key: '{key}'"
+                    )
+            else:
+                logger.info(
+                    f"[URL_DEBUG] Non-S3 representation - StorageType: {rep_storage_info.get('StorageType', 'NOT_FOUND')}"
+                )
 
         processed_hits.append(hit_data)
+        logger.info(
+            f"[URL_DEBUG] Hit {hit_idx + 1} processed - thumbnail_id: {hit_data['thumbnail_request_id']}, proxy_id: {hit_data['proxy_request_id']}"
+        )
+
+    logger.info(
+        f"[URL_DEBUG] URL collection complete - {len(url_requests)} URL requests collected"
+    )
+    logger.info(f"[URL_DEBUG] URL requests: {url_requests}")
 
     return processed_hits, url_requests
 
@@ -562,6 +614,14 @@ def process_search_hit_with_cloudfront_urls(
     """Process a single search hit with pre-generated CloudFront URLs"""
     hit = hit_data["hit"]
     source = hit_data["source"]
+    asset_id = hit_data["asset_id"]
+
+    logger.info(
+        f"[URL_DEBUG] Processing hit with CloudFront URLs for asset: {asset_id}"
+    )
+    logger.info(
+        f"[URL_DEBUG] Available CloudFront URLs: {list(cloudfront_urls.keys())}"
+    )
 
     # Get CloudFront URLs from the batch results
     thumbnail_url = None
@@ -569,9 +629,19 @@ def process_search_hit_with_cloudfront_urls(
 
     if hit_data["thumbnail_request_id"]:
         thumbnail_url = cloudfront_urls.get(hit_data["thumbnail_request_id"])
+        logger.info(
+            f"[URL_DEBUG] Thumbnail URL for {asset_id}: {thumbnail_url} (request_id: {hit_data['thumbnail_request_id']})"
+        )
+    else:
+        logger.info(f"[URL_DEBUG] No thumbnail request ID for {asset_id}")
 
     if hit_data["proxy_request_id"]:
         proxy_url = cloudfront_urls.get(hit_data["proxy_request_id"])
+        logger.info(
+            f"[URL_DEBUG] Proxy URL for {asset_id}: {proxy_url} (request_id: {hit_data['proxy_request_id']})"
+        )
+    else:
+        logger.info(f"[URL_DEBUG] No proxy request ID for {asset_id}")
 
     # Create base result object
     result = AssetSearchResult(
@@ -587,7 +657,13 @@ def process_search_hit_with_cloudfront_urls(
 
     # Convert to dictionary and add common fields
     result_dict = result.model_dump(by_alias=True)
-    return add_common_fields(result_dict)
+    final_result = add_common_fields(result_dict)
+
+    logger.info(
+        f"[URL_DEBUG] Final processed result for {asset_id} - thumbnailUrl: {final_result.get('thumbnailUrl')}, proxyUrl: {final_result.get('proxyUrl')}"
+    )
+
+    return final_result
 
 
 def process_search_hit(hit: Dict) -> Dict:
@@ -1057,33 +1133,67 @@ def perform_search(params: SearchParams) -> Dict:
                     f"[PERF] Semantic URL request collection took: {time.time() - url_collection_start:.3f}s"
                 )
                 logger.info(
-                    f"Collected {len(url_requests)} CloudFront URL requests for {len(processed_hits_data)} semantic hits"
+                    f"[URL_DEBUG] Collected {len(url_requests)} CloudFront URL requests for {len(processed_hits_data)} semantic hits"
                 )
 
                 # Step 2: Generate all CloudFront URLs in parallel
                 if url_requests:
+                    logger.info(
+                        f"[URL_DEBUG] Proceeding with semantic batch URL generation for {len(url_requests)} requests"
+                    )
                     batch_url_start = time.time()
                     cloudfront_urls = generate_cloudfront_urls_batch(url_requests)
                     logger.info(
                         f"[PERF] Semantic batch CloudFront URL generation took: {time.time() - batch_url_start:.3f}s"
                     )
+                    successful_urls = len(
+                        [url for url in cloudfront_urls.values() if url]
+                    )
                     logger.info(
-                        f"Generated {len([url for url in cloudfront_urls.values() if url])} successful URLs out of {len(url_requests)} requests"
+                        f"[URL_DEBUG] Generated {successful_urls} successful URLs out of {len(url_requests)} requests"
+                    )
+                    logger.info(
+                        f"[URL_DEBUG] Semantic CloudFront URLs result: {cloudfront_urls}"
                     )
                 else:
+                    logger.warning(
+                        "[URL_DEBUG] No URL requests to process for semantic search - skipping URL generation"
+                    )
                     cloudfront_urls = {}
 
                 # Step 3: Process all hits with pre-generated URLs
                 results_processing_start = time.time()
                 results = []
-                for hit_data in processed_hits_data:
+                logger.info(
+                    f"[URL_DEBUG] Processing {len(processed_hits_data)} semantic hits with CloudFront URLs"
+                )
+
+                for hit_idx, hit_data in enumerate(processed_hits_data):
                     try:
+                        logger.info(
+                            f"[URL_DEBUG] Processing semantic hit {hit_idx + 1}/{len(processed_hits_data)} - Asset ID: {hit_data['asset_id']}"
+                        )
+                        logger.info(
+                            f"[URL_DEBUG] Thumbnail request ID: {hit_data.get('thumbnail_request_id')}"
+                        )
+                        logger.info(
+                            f"[URL_DEBUG] Proxy request ID: {hit_data.get('proxy_request_id')}"
+                        )
+
                         result = process_search_hit_with_cloudfront_urls(
                             hit_data, cloudfront_urls
                         )
+
+                        # Log the final result URLs
+                        logger.info(
+                            f"[URL_DEBUG] Final semantic result for {hit_data['asset_id']} - thumbnailUrl: {result.get('thumbnailUrl')}, proxyUrl: {result.get('proxyUrl')}"
+                        )
+
                         results.append(result)
                     except Exception as e:
-                        logger.warning(f"Error processing semantic hit: {str(e)}")
+                        logger.warning(
+                            f"[URL_DEBUG] Error processing semantic hit {hit_idx + 1}: {str(e)}"
+                        )
                         continue
 
                 logger.info(
@@ -1130,33 +1240,63 @@ def perform_search(params: SearchParams) -> Dict:
                 f"[PERF] URL request collection took: {time.time() - url_collection_start:.3f}s"
             )
             logger.info(
-                f"Collected {len(url_requests)} CloudFront URL requests for {len(processed_hits_data)} hits"
+                f"[URL_DEBUG] Collected {len(url_requests)} CloudFront URL requests for {len(processed_hits_data)} hits"
             )
 
             # Step 2: Generate all CloudFront URLs in parallel
             if url_requests:
+                logger.info(
+                    f"[URL_DEBUG] Proceeding with batch URL generation for {len(url_requests)} requests"
+                )
                 batch_url_start = time.time()
                 cloudfront_urls = generate_cloudfront_urls_batch(url_requests)
                 logger.info(
                     f"[PERF] Batch CloudFront URL generation took: {time.time() - batch_url_start:.3f}s"
                 )
+                successful_urls = len([url for url in cloudfront_urls.values() if url])
                 logger.info(
-                    f"Generated {len([url for url in cloudfront_urls.values() if url])} successful URLs out of {len(url_requests)} requests"
+                    f"[URL_DEBUG] Generated {successful_urls} successful URLs out of {len(url_requests)} requests"
                 )
+                logger.info(f"[URL_DEBUG] CloudFront URLs result: {cloudfront_urls}")
             else:
+                logger.warning(
+                    "[URL_DEBUG] No URL requests to process - skipping URL generation"
+                )
                 cloudfront_urls = {}
 
             # Step 3: Process all hits with pre-generated URLs
             results_processing_start = time.time()
             results = []
-            for hit_data in processed_hits_data:
+            logger.info(
+                f"[URL_DEBUG] Processing {len(processed_hits_data)} hits with CloudFront URLs"
+            )
+
+            for hit_idx, hit_data in enumerate(processed_hits_data):
                 try:
+                    logger.info(
+                        f"[URL_DEBUG] Processing hit {hit_idx + 1}/{len(processed_hits_data)} - Asset ID: {hit_data['asset_id']}"
+                    )
+                    logger.info(
+                        f"[URL_DEBUG] Thumbnail request ID: {hit_data.get('thumbnail_request_id')}"
+                    )
+                    logger.info(
+                        f"[URL_DEBUG] Proxy request ID: {hit_data.get('proxy_request_id')}"
+                    )
+
                     result = process_search_hit_with_cloudfront_urls(
                         hit_data, cloudfront_urls
                     )
+
+                    # Log the final result URLs
+                    logger.info(
+                        f"[URL_DEBUG] Final result for {hit_data['asset_id']} - thumbnailUrl: {result.get('thumbnailUrl')}, proxyUrl: {result.get('proxyUrl')}"
+                    )
+
                     results.append(result)
                 except Exception as e:
-                    logger.warning(f"Error processing hit: {str(e)}")
+                    logger.warning(
+                        f"[URL_DEBUG] Error processing hit {hit_idx + 1}: {str(e)}"
+                    )
                     continue
 
             logger.info(
@@ -1219,7 +1359,7 @@ def handle_search():
     """Handle search requests with validated parameters."""
     handler_start = time.time()
     try:
-        logger.info(f"[PERF] Starting search handler")
+        logger.info("[PERF] Starting search handler")
 
         param_start = time.time()
         query_params = app.current_event.get("queryStringParameters") or {}
@@ -1259,7 +1399,7 @@ def handle_search():
 def lambda_handler(event: dict, context: LambdaContext) -> dict:
     """Lambda handler function"""
     lambda_start = time.time()
-    logger.info(f"[PERF] Lambda handler started")
+    logger.info("[PERF] Lambda handler started")
 
     result = app.resolve(event, context)
 
