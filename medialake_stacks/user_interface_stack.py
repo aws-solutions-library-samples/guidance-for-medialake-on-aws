@@ -16,8 +16,7 @@ from medialake_constructs.userInterface import UIConstruct, UIConstructProps
 
 @dataclass
 class UserInterfaceStackProps:
-    # access_log_bucket: s3.IBucket  # Removed to avoid circular dependency
-    # media_assets_bucket: s3.IBucket  # Removed to avoid circular dependency - now fetched from SSM
+    # Buckets are now imported from BaseInfrastructureStack exports
     api_gateway_rest_id: str
     api_gateway_stage: str
     cognito_user_pool_id: str
@@ -96,6 +95,22 @@ class UserInterfaceStack(Stack):
         api_gateway_rest_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
         api_gateway_stage = Fn.import_value("MediaLakeApiGatewayDeployment-StageName")
 
+        # Import S3 buckets from BaseInfrastructureStack exports
+        media_assets_bucket_arn = Fn.import_value(
+            "MediaLakeBaseInfrastructure-ExportsOutputFnGetAttMediaAssetsS3Bucket06290FA8ArnBCB645A8"  # pragma: allowlist secret
+        )
+        access_log_bucket_arn = Fn.import_value(
+            "MediaLakeBaseInfrastructure-ExportsOutputFnGetAttAccessLogsBucketS3Bucket06290FA8ArnBCB645A8"  # pragma: allowlist secret
+        )
+
+        # Create bucket references from ARNs
+        media_assets_bucket = s3.Bucket.from_bucket_arn(
+            self, "ImportedMediaAssetsBucket", media_assets_bucket_arn
+        )
+        access_log_bucket = s3.Bucket.from_bucket_arn(
+            self, "ImportedAccessLogBucket", access_log_bucket_arn
+        )
+
         self._ui = UIConstruct(
             self,
             "UserInterface",
@@ -105,8 +120,8 @@ class UserInterfaceStack(Stack):
                 cognito_identity_pool=props.cognito_identity_pool,
                 api_gateway_rest_id=api_gateway_rest_id,
                 api_gateway_stage=api_gateway_stage,
-                # access_log_bucket=props.access_log_bucket,  # Removed to avoid circular dependency
-                # media_assets_bucket=props.media_assets_bucket,  # Removed to avoid circular dependency - now fetched from SSM
+                access_log_bucket=access_log_bucket,
+                media_assets_bucket=media_assets_bucket,
                 cloudfront_waf_acl_arn=waf_acl_arn,
                 cognito_domain_prefix=props.cognito_domain_prefix,
                 parameter_name=parameter_name,

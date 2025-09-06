@@ -73,8 +73,8 @@ class LocalBundling:
 
 @dataclass
 class UIConstructProps:
-    # access_log_bucket: s3.IBucket  # Removed to avoid circular dependency
-    # media_assets_bucket: s3.IBucket  # Removed to avoid circular dependency - now fetched from SSM
+    access_log_bucket: s3.IBucket
+    media_assets_bucket: s3.IBucket
     api_gateway_rest_id: str
     api_gateway_stage: str
     cognito_user_pool_id: str
@@ -394,24 +394,7 @@ class UIConstruct(Construct):
         )
 
         # Get media assets bucket name from SSM parameter to avoid circular dependency
-        media_bucket_name_param = ssm.StringParameter.from_string_parameter_name(
-            self,
-            "MediaAssetsBucketNameParam",
-            string_parameter_name=f"/medialake/{config.environment}/media-assets-bucket-name",
-        )
-
-        # Import the media assets bucket using the name from SSM
-        media_bucket = s3.Bucket.from_bucket_name(
-            self,
-            "ImportedMediaAssetsBucket",
-            bucket_name=media_bucket_name_param.string_value,
-        )
-
-        # Create media origin using the imported bucket
-        media_origin = origins.S3BucketOrigin.with_origin_access_control(
-            media_bucket,
-            # Optionally, specify origin_access_control=oac if using a customized OAC
-        )
+        # Media assets bucket is now passed directly through props
 
         # Create a shared CF Origin for static assets (S3)
         s3_orig = origins.S3BucketOrigin.with_origin_access_control(
@@ -419,9 +402,9 @@ class UIConstruct(Construct):
         )
 
         # Create CF Origin for media assets bucket
-        # media_orig = origins.S3BucketOrigin.with_origin_access_control(
-        #     props.media_assets_bucket.concrete_bucket,
-        # )
+        media_origin = origins.S3BucketOrigin.with_origin_access_control(
+            props.media_assets_bucket,
+        )
 
         self.cloudfront_distribution = cloudfront.Distribution(
             self,
@@ -510,18 +493,22 @@ class UIConstruct(Construct):
         )
 
         # Add policy statement to media assets bucket for CloudFront access
-        # props.media_assets_bucket.bucket.add_to_resource_policy(
-        #     iam.PolicyStatement(
-        #         principals=[iam.ServicePrincipal("cloudfront.amazonaws.com")],
-        #         actions=["s3:GetObject"],
-        #         resources=[props.media_assets_bucket.arn_for_objects("*")],
-        #         conditions={
-        #             "StringEquals": {
-        #                 "AWS:SourceArn": self.cloudfront_distribution.distribution_arn
-        #             }
-        #         },
-        #     )
-        # )
+        # Note: For imported buckets, we can't add resource policies directly
+        # This would need to be handled through a custom resource or Lambda function
+        # For now, we'll skip this policy addition for imported buckets
+        if hasattr(props.media_assets_bucket, "add_to_resource_policy"):
+            props.media_assets_bucket.add_to_resource_policy(
+                iam.PolicyStatement(
+                    principals=[iam.ServicePrincipal("cloudfront.amazonaws.com")],
+                    actions=["s3:GetObject"],
+                    resources=[props.media_assets_bucket.arn_for_objects("*")],
+                    conditions={
+                        "StringEquals": {
+                            "AWS:SourceArn": self.cloudfront_distribution.distribution_arn
+                        }
+                    },
+                )
+            )
 
         # Store CloudFront distribution domain in SSM Parameter Store
         # Only create parameter if not provided externally

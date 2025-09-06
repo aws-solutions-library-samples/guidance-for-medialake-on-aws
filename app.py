@@ -510,14 +510,14 @@ user_interface_stack = UserInterfaceStack(
         # Use CloudFormation imports to avoid circular dependencies
         api_gateway_rest_id="",  # Will be imported from CloudFormation
         api_gateway_stage="",  # Will be imported from CloudFormation
-        # access_log_bucket=base_infrastructure.access_log_bucket,  # Removed to avoid circular dependency
-        # media_assets_bucket=base_infrastructure.media_assets_s3_bucket,  # Removed to avoid circular dependency - now fetched from SSM
+        # Buckets will be imported from BaseInfrastructureStack exports
         cloudfront_waf_acl_arn=waf_acl_ssm_param_name,
     ),
     env=env,
 )
-# Remove explicit dependency to break circular reference
-# user_interface_stack.add_dependency(medialake_stack)
+# Add dependencies to ensure exports are available
+user_interface_stack.add_dependency(base_infrastructure)
+user_interface_stack.add_dependency(api_gateway_deployment_stack)
 
 # Create the Cognito Update Stack (between user_interface_stack and cleanup_stack)
 cognito_update_stack = CognitoUpdateStack(
