@@ -73,7 +73,7 @@ class LocalBundling:
 
 @dataclass
 class UIConstructProps:
-    access_log_bucket: s3.IBucket
+    # access_log_bucket: s3.IBucket  # Removed to avoid circular dependency
     media_assets_bucket: s3.IBucket
     api_gateway_rest_id: str
     api_gateway_stage: str
@@ -472,9 +472,10 @@ class UIConstruct(Construct):
             },
             minimum_protocol_version=cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
             ssl_support_method=cloudfront.SSLMethod.SNI,
-            enable_logging=True,
-            log_bucket=props.access_log_bucket,
-            log_file_prefix="medialake-cloudfront-logs",
+            # Disable CloudFront logging to avoid circular dependency with access_log_bucket
+            # enable_logging=True,
+            # log_bucket=props.access_log_bucket,
+            # log_file_prefix="medialake-cloudfront-logs",
             price_class=cloudfront.PriceClass.PRICE_CLASS_100,
             default_root_object=props.distribution_default_root_object,
             # geo_restriction=cloudfront.GeoRestriction.allowlist("US", "GB"),

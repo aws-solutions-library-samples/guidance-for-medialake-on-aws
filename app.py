@@ -510,7 +510,7 @@ user_interface_stack = UserInterfaceStack(
         # Use CloudFormation imports to avoid circular dependencies
         api_gateway_rest_id="",  # Will be imported from CloudFormation
         api_gateway_stage="",  # Will be imported from CloudFormation
-        access_log_bucket=base_infrastructure.access_log_bucket,
+        # access_log_bucket=base_infrastructure.access_log_bucket,  # Removed to avoid circular dependency
         media_assets_bucket=base_infrastructure.media_assets_s3_bucket,
         cloudfront_waf_acl_arn=waf_acl_ssm_param_name,
     ),

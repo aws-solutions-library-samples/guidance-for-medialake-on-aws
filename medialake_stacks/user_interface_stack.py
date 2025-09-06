@@ -17,7 +17,7 @@ from medialake_constructs.userInterface import UIConstruct, UIConstructProps
 
 @dataclass
 class UserInterfaceStackProps:
-    access_log_bucket: s3.IBucket
+    # access_log_bucket: s3.IBucket  # Removed to avoid circular dependency
     media_assets_bucket: s3.IBucket
     api_gateway_rest_id: str
     api_gateway_stage: str
@@ -108,7 +108,7 @@ class UserInterfaceStack(Stack):
                 cognito_identity_pool=props.cognito_identity_pool,
                 api_gateway_rest_id=api_gateway_rest_id,
                 api_gateway_stage=api_gateway_stage,
-                access_log_bucket=props.access_log_bucket,
+                # access_log_bucket=props.access_log_bucket,  # Removed to avoid circular dependency
                 media_assets_bucket=props.media_assets_bucket,
                 cloudfront_waf_acl_arn=waf_acl_arn,
                 cognito_domain_prefix=props.cognito_domain_prefix,
