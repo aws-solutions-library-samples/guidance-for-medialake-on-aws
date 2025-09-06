@@ -2,7 +2,7 @@ import secrets
 import string
 from dataclasses import dataclass
 
-from aws_cdk import CfnOutput, Stack, Token
+from aws_cdk import CfnOutput, Fn, Stack, Token
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_ssm as ssm
@@ -95,6 +95,10 @@ class UserInterfaceStack(Stack):
             f"/medialake/{config.environment}/cloudfront-distribution-domain"
         )
 
+        # Import API Gateway values from CloudFormation exports to avoid circular dependencies
+        api_gateway_rest_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
+        api_gateway_stage = Fn.import_value("MediaLakeApiGatewayDeployment-StageName")
+
         self._ui = UIConstruct(
             self,
             "UserInterface",
@@ -102,8 +106,8 @@ class UserInterfaceStack(Stack):
                 cognito_user_pool_id=props.cognito_user_pool_id,
                 cognito_user_pool_client_id=props.cognito_user_pool_client_id,
                 cognito_identity_pool=props.cognito_identity_pool,
-                api_gateway_rest_id=props.api_gateway_rest_id,
-                api_gateway_stage=props.api_gateway_stage,
+                api_gateway_rest_id=api_gateway_rest_id,
+                api_gateway_stage=api_gateway_stage,
                 access_log_bucket=props.access_log_bucket,
                 media_assets_bucket=props.media_assets_bucket,
                 cloudfront_waf_acl_arn=waf_acl_arn,
