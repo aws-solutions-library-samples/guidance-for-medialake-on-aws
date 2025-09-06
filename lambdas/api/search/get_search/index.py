@@ -319,6 +319,16 @@ def build_search_query(params: SearchParams) -> Dict:
                     "boost": 0.7,
                 }
             },
+            # Add metadata search using multi_match for all metadata fields
+            {
+                "multi_match": {
+                    "query": clean_query,
+                    "fields": ["Metadata.*"],
+                    "type": "best_fields",
+                    "boost": 0.8,
+                    "lenient": True,
+                }
+            },
         ]
 
         # Add individual term matches for multi-keyword search with OR logic
