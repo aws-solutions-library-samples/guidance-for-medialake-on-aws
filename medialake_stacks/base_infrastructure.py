@@ -284,7 +284,6 @@ class BaseInfrastructureStack(Stack):
                         if config.s3.asset_bucket.kms_key_arn
                         else None
                     ),
-                    alias=KMS.MEDIA_BUCKET_KEY_ALIAS,
                 ),
             )
         else:
@@ -304,6 +303,7 @@ class BaseInfrastructureStack(Stack):
                         and config.s3.asset_bucket.kms_key_arn
                         else None
                     ),
+                    alias=KMS.MEDIA_BUCKET_KEY_ALIAS,
                     cors=[
                         s3.CorsRule(
                             allowed_methods=[
