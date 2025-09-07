@@ -14,6 +14,7 @@ import {
   Radio,
   ListItemIcon,
   ListItemText,
+  Tooltip,
 } from "@mui/material";
 
 import ViewModuleIcon from "@mui/icons-material/ViewModule";
@@ -212,12 +213,16 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
           onChange={onViewModeChange}
           size="small"
         >
-          <ToggleButton value="card">
-            <ViewModuleIcon />
-          </ToggleButton>
-          <ToggleButton value="table">
-            <ViewListIcon />
-          </ToggleButton>
+          <Tooltip title="Card view">
+            <ToggleButton value="card">
+              <ViewModuleIcon />
+            </ToggleButton>
+          </Tooltip>
+          <Tooltip title="Table view">
+            <ToggleButton value="table">
+              <ViewListIcon />
+            </ToggleButton>
+          </Tooltip>
         </ToggleButtonGroup>
       </Box>
 
@@ -461,30 +466,36 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                   Card Size
                 </Typography>
                 <Box sx={{ display: "flex", gap: 1 }}>
-                  <ToggleButton
-                    value="small"
-                    selected={cardSize === "small"}
-                    onChange={() => onCardSizeChange("small")}
-                    size="small"
-                  >
-                    <PhotoSizeSelectSmallIcon />
-                  </ToggleButton>
-                  <ToggleButton
-                    value="medium"
-                    selected={cardSize === "medium"}
-                    onChange={() => onCardSizeChange("medium")}
-                    size="small"
-                  >
-                    <ViewModuleIcon />
-                  </ToggleButton>
-                  <ToggleButton
-                    value="large"
-                    selected={cardSize === "large"}
-                    onChange={() => onCardSizeChange("large")}
-                    size="small"
-                  >
-                    <PhotoSizeSelectLargeIcon />
-                  </ToggleButton>
+                  <Tooltip title="Small cards">
+                    <ToggleButton
+                      value="small"
+                      selected={cardSize === "small"}
+                      onChange={() => onCardSizeChange("small")}
+                      size="small"
+                    >
+                      <PhotoSizeSelectSmallIcon />
+                    </ToggleButton>
+                  </Tooltip>
+                  <Tooltip title="Medium cards">
+                    <ToggleButton
+                      value="medium"
+                      selected={cardSize === "medium"}
+                      onChange={() => onCardSizeChange("medium")}
+                      size="small"
+                    >
+                      <ViewModuleIcon />
+                    </ToggleButton>
+                  </Tooltip>
+                  <Tooltip title="Large cards">
+                    <ToggleButton
+                      value="large"
+                      selected={cardSize === "large"}
+                      onChange={() => onCardSizeChange("large")}
+                      size="small"
+                    >
+                      <PhotoSizeSelectLargeIcon />
+                    </ToggleButton>
+                  </Tooltip>
                 </Box>
               </Box>
 
@@ -497,30 +508,36 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                   Aspect Ratio
                 </Typography>
                 <Box sx={{ display: "flex", gap: 1 }}>
-                  <ToggleButton
-                    value="vertical"
-                    selected={aspectRatio === "vertical"}
-                    onChange={() => onAspectRatioChange("vertical")}
-                    size="small"
-                  >
-                    <CropPortraitIcon />
-                  </ToggleButton>
-                  <ToggleButton
-                    value="square"
-                    selected={aspectRatio === "square"}
-                    onChange={() => onAspectRatioChange("square")}
-                    size="small"
-                  >
-                    <CropSquareIcon />
-                  </ToggleButton>
-                  <ToggleButton
-                    value="horizontal"
-                    selected={aspectRatio === "horizontal"}
-                    onChange={() => onAspectRatioChange("horizontal")}
-                    size="small"
-                  >
-                    <CropLandscapeIcon />
-                  </ToggleButton>
+                  <Tooltip title="Vertical aspect ratio">
+                    <ToggleButton
+                      value="vertical"
+                      selected={aspectRatio === "vertical"}
+                      onChange={() => onAspectRatioChange("vertical")}
+                      size="small"
+                    >
+                      <CropPortraitIcon />
+                    </ToggleButton>
+                  </Tooltip>
+                  <Tooltip title="Square aspect ratio">
+                    <ToggleButton
+                      value="square"
+                      selected={aspectRatio === "square"}
+                      onChange={() => onAspectRatioChange("square")}
+                      size="small"
+                    >
+                      <CropSquareIcon />
+                    </ToggleButton>
+                  </Tooltip>
+                  <Tooltip title="Horizontal aspect ratio">
+                    <ToggleButton
+                      value="horizontal"
+                      selected={aspectRatio === "horizontal"}
+                      onChange={() => onAspectRatioChange("horizontal")}
+                      size="small"
+                    >
+                      <CropLandscapeIcon />
+                    </ToggleButton>
+                  </Tooltip>
                 </Box>
               </Box>
 
@@ -533,22 +550,26 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                   Thumbnail Scale
                 </Typography>
                 <Box sx={{ display: "flex", gap: 1 }}>
-                  <ToggleButton
-                    value="fit"
-                    selected={thumbnailScale === "fit"}
-                    onChange={() => onThumbnailScaleChange("fit")}
-                    size="small"
-                  >
-                    <FitScreenIcon />
-                  </ToggleButton>
-                  <ToggleButton
-                    value="fill"
-                    selected={thumbnailScale === "fill"}
-                    onChange={() => onThumbnailScaleChange("fill")}
-                    size="small"
-                  >
-                    <FullscreenIcon />
-                  </ToggleButton>
+                  <Tooltip title="Fit to container (maintain aspect ratio)">
+                    <ToggleButton
+                      value="fit"
+                      selected={thumbnailScale === "fit"}
+                      onChange={() => onThumbnailScaleChange("fit")}
+                      size="small"
+                    >
+                      <FitScreenIcon />
+                    </ToggleButton>
+                  </Tooltip>
+                  <Tooltip title="Fill container (may crop image)">
+                    <ToggleButton
+                      value="fill"
+                      selected={thumbnailScale === "fill"}
+                      onChange={() => onThumbnailScaleChange("fill")}
+                      size="small"
+                    >
+                      <FullscreenIcon />
+                    </ToggleButton>
+                  </Tooltip>
                 </Box>
               </Box>
             </>

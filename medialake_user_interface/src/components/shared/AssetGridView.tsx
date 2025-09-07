@@ -100,7 +100,7 @@ function AssetGridView<T>({
   const getGridSizes = () => {
     switch (cardSize) {
       case "small":
-        return { xs: 12, sm: 6, md: 3, lg: 2 };
+        return { xs: 12, sm: 6, md: 3, lg: 2.4 };
       case "large":
         return { xs: 12, sm: 12, md: 6, lg: 4 };
       default: // medium

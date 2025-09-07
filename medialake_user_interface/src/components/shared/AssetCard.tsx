@@ -451,7 +451,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
               : 200;
 
       const sizeMultiplier =
-        cardSize === "small" ? 0.8 : cardSize === "large" ? 1.2 : 1;
+        cardSize === "small" ? 0.8 : cardSize === "large" ? 1.4 : 1.1;
 
       return {
         height: baseHeight * sizeMultiplier,
