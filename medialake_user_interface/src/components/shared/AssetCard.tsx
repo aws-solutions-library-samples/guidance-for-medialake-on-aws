@@ -699,7 +699,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
 
                 <Button
                   size="small"
-                  variant="contained"
+                  variant="outlined"
                   onClick={(e) => {
                     e.stopPropagation();
                     onAssetClick();
@@ -860,7 +860,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                     <Button
                       ref={buttonRef}
                       size="small"
-                      variant="contained"
+                      variant="outlined"
                       onClick={(e) => {
                         e.stopPropagation();
                         onAssetClick();
@@ -991,7 +991,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
 
                 <Button
                   size="small"
-                  variant="contained"
+                  variant="outlined"
                   onClick={(e) => {
                     e.stopPropagation();
                     onAssetClick();
