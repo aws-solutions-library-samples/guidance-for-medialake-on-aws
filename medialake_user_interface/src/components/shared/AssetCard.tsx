@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useFeatureFlag } from "@/utils/featureFlags";
 import {
   Box,
@@ -673,8 +673,8 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                 sx={{
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "flex-end",
-                  gap: 2,
+                  justifyContent: "space-between",
+                  gap: 1,
                   p: 1,
                   bgcolor: "background.paper",
                   borderTop: "1px solid",
@@ -682,24 +682,6 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                 }}
                 onClick={(e) => e.stopPropagation()}
               >
-                <IconButton
-                  size="small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onAssetClick();
-                  }}
-                  sx={{
-                    color: "primary.main",
-                    "&:hover": {
-                      bgcolor: "primary.main",
-                      color: "primary.contrastText",
-                    },
-                  }}
-                  title="View Details"
-                >
-                  <InfoIcon fontSize="small" />
-                </IconButton>
-
                 <IconButton
                   size="small"
                   onClick={handleDownloadClick}
@@ -714,6 +696,38 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                 >
                   <DownloadIcon fontSize="small" />
                 </IconButton>
+
+                <Button
+                  size="small"
+                  variant="contained"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAssetClick();
+                  }}
+                  sx={{
+                    flex: 1,
+                    mx: 1,
+                    minWidth: "40px",
+                    fontSize: "0.75rem",
+                    py: 0.5,
+                    textAlign: "center",
+                    justifyContent: "center",
+                    overflow: "hidden",
+                  }}
+                  title="Asset Detail"
+                >
+                  <Box
+                    sx={{
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      width: "100%",
+                      textAlign: "center",
+                    }}
+                  >
+                    Asset Detail
+                  </Box>
+                </Button>
 
                 <IconButton
                   size="small"
@@ -754,8 +768,8 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                 sx={{
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "flex-end",
-                  gap: 2,
+                  justifyContent: "space-between",
+                  gap: 1,
                   p: 1,
                   bgcolor: "background.paper",
                   borderTop: "1px solid",
@@ -763,24 +777,6 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                 }}
                 onClick={(e) => e.stopPropagation()}
               >
-                <IconButton
-                  size="small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onAssetClick();
-                  }}
-                  sx={{
-                    color: "primary.main",
-                    "&:hover": {
-                      bgcolor: "primary.main",
-                      color: "primary.contrastText",
-                    },
-                  }}
-                  title="View Details"
-                >
-                  <InfoIcon fontSize="small" />
-                </IconButton>
-
                 <IconButton
                   size="small"
                   onClick={handleDownloadClick}
@@ -795,6 +791,139 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                 >
                   <DownloadIcon fontSize="small" />
                 </IconButton>
+
+                {(() => {
+                  const [showIcon, setShowIcon] = useState(false);
+                  const buttonRef = useRef<HTMLButtonElement>(null);
+
+                  const checkOverflow = useCallback(() => {
+                    if (buttonRef.current) {
+                      const el = buttonRef.current;
+                      const textSpan = el.querySelector(
+                        ".button-text",
+                      ) as HTMLElement;
+                      const iconSpan = el.querySelector(
+                        ".button-icon",
+                      ) as HTMLElement;
+
+                      if (textSpan && iconSpan) {
+                        // Temporarily show text to measure
+                        const originalTextDisplay = textSpan.style.display;
+                        const originalIconDisplay = iconSpan.style.display;
+
+                        textSpan.style.display = "block";
+                        iconSpan.style.display = "none";
+
+                        // Force reflow
+                        el.offsetWidth;
+
+                        const isOverflowing = el.scrollWidth > el.clientWidth;
+                        console.log("Audio Button overflow check:", {
+                          scrollWidth: el.scrollWidth,
+                          clientWidth: el.clientWidth,
+                          isOverflowing,
+                          timestamp: new Date().toISOString(),
+                        });
+
+                        // Restore original display if we're not changing state
+                        if (!isOverflowing) {
+                          textSpan.style.display = originalTextDisplay;
+                          iconSpan.style.display = originalIconDisplay;
+                        }
+
+                        setShowIcon(isOverflowing);
+                      }
+                    }
+                  }, []);
+
+                  useEffect(() => {
+                    // Initial check
+                    const timer = setTimeout(checkOverflow, 100);
+
+                    // Add resize listener
+                    const handleResize = () => {
+                      console.log(
+                        "Window resized, rechecking audio button overflow",
+                      );
+                      checkOverflow();
+                    };
+
+                    window.addEventListener("resize", handleResize);
+
+                    return () => {
+                      clearTimeout(timer);
+                      window.removeEventListener("resize", handleResize);
+                    };
+                  }, [checkOverflow]);
+
+                  return (
+                    <Button
+                      ref={buttonRef}
+                      size="small"
+                      variant="contained"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAssetClick();
+                      }}
+                      sx={{
+                        flex: 1,
+                        mx: 1,
+                        minWidth: "40px",
+                        fontSize: "0.75rem",
+                        py: 0.5,
+                        whiteSpace: "nowrap !important",
+                        overflow: "hidden !important",
+                        textOverflow: "ellipsis !important",
+                        textAlign: "center",
+                        justifyContent: "center",
+                        "& .MuiButton-root": {
+                          whiteSpace: "nowrap !important",
+                          overflow: "hidden !important",
+                          textOverflow: "ellipsis !important",
+                        },
+                        "& .MuiButton-startIcon": {
+                          display: "none !important",
+                        },
+                        "& .MuiButton-endIcon": {
+                          display: "none !important",
+                        },
+                        "& .button-text": {
+                          display: showIcon ? "none" : "block",
+                          textOverflow: "ellipsis !important",
+                          overflow: "hidden !important",
+                          whiteSpace: "nowrap !important",
+                          width: "100%",
+                        },
+                        "& .button-icon": {
+                          display: showIcon ? "block" : "none",
+                        },
+                        "& span, & .MuiButton-label": {
+                          whiteSpace: "nowrap !important",
+                          overflow: "hidden !important",
+                          textOverflow: "ellipsis !important",
+                          width: "100%",
+                          display: "block !important",
+                        },
+                      }}
+                      title="View Asset Details"
+                    >
+                      <Box component="span" className="button-text">
+                        <Box
+                          sx={{
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            width: "100%",
+                            textAlign: "center",
+                          }}
+                        >
+                          Asset Detail
+                        </Box>
+                      </Box>
+                      <InfoIcon fontSize="small" className="button-icon" />
+                    </Button>
+                  );
+                })()}
 
                 <IconButton
                   size="small"
@@ -836,8 +965,8 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                 sx={{
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "flex-end",
-                  gap: 2,
+                  justifyContent: "space-between",
+                  gap: 1,
                   p: 1,
                   bgcolor: "background.paper",
                   borderTop: "1px solid",
@@ -845,24 +974,6 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                 }}
                 onClick={(e) => e.stopPropagation()}
               >
-                <IconButton
-                  size="small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onAssetClick();
-                  }}
-                  sx={{
-                    color: "primary.main",
-                    "&:hover": {
-                      bgcolor: "primary.main",
-                      color: "primary.contrastText",
-                    },
-                  }}
-                  title="View Details"
-                >
-                  <InfoIcon fontSize="small" />
-                </IconButton>
-
                 <IconButton
                   size="small"
                   onClick={handleDownloadClick}
@@ -877,6 +988,38 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                 >
                   <DownloadIcon fontSize="small" />
                 </IconButton>
+
+                <Button
+                  size="small"
+                  variant="contained"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAssetClick();
+                  }}
+                  sx={{
+                    flex: 1,
+                    mx: 1,
+                    minWidth: "40px",
+                    fontSize: "0.75rem",
+                    py: 0.5,
+                    textAlign: "center",
+                    justifyContent: "center",
+                    overflow: "hidden",
+                  }}
+                  title="Asset Detail"
+                >
+                  <Box
+                    sx={{
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      width: "100%",
+                      textAlign: "center",
+                    }}
+                  >
+                    Asset Detail
+                  </Box>
+                </Button>
 
                 <IconButton
                   size="small"
