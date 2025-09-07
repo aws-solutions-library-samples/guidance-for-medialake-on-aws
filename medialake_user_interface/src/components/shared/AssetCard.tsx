@@ -703,38 +703,168 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
               </Box>
             </Box>
           ) : assetType === "Audio" ? (
-            <Box
-              onClick={onAssetClick}
-              sx={{
-                cursor: "pointer",
-                width: dimensions.width,
-                height: dimensions.height,
-                backgroundColor: "rgba(0,0,0,0.03)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                overflow: "hidden",
-              }}
-            >
-              <AssetAudio src={proxyUrl || ""} alt={name} compact={true} />
+            <Box sx={{ display: "flex", flexDirection: "column" }}>
+              <Box
+                onClick={onAssetClick}
+                sx={{
+                  cursor: "pointer",
+                  width: dimensions.width,
+                  height: dimensions.height,
+                  backgroundColor: "rgba(0,0,0,0.03)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "hidden",
+                }}
+              >
+                <AssetAudio src={proxyUrl || ""} alt={name} compact={true} />
+              </Box>
+
+              {/* Audio Control Bar */}
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "flex-end",
+                  gap: 2,
+                  p: 1,
+                  bgcolor: "background.paper",
+                  borderTop: "1px solid",
+                  borderColor: "divider",
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAssetClick();
+                  }}
+                  sx={{
+                    color: "primary.main",
+                    "&:hover": {
+                      bgcolor: "primary.main",
+                      color: "primary.contrastText",
+                    },
+                  }}
+                  title="View Details"
+                >
+                  <InfoIcon fontSize="small" />
+                </IconButton>
+
+                <IconButton
+                  size="small"
+                  onClick={handleDownloadClick}
+                  sx={{
+                    color: "primary.main",
+                    "&:hover": {
+                      bgcolor: "primary.main",
+                      color: "primary.contrastText",
+                    },
+                  }}
+                  title="Download"
+                >
+                  <DownloadIcon fontSize="small" />
+                </IconButton>
+
+                <IconButton
+                  size="small"
+                  onClick={handleDeleteClick}
+                  sx={{
+                    color: "primary.main",
+                    "&:hover": {
+                      bgcolor: "primary.main",
+                      color: "primary.contrastText",
+                    },
+                  }}
+                  title="Delete"
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Box>
             </Box>
           ) : (
-            <Box
-              onClick={onAssetClick}
-              component="img"
-              src={thumbnailUrl || placeholderImage}
-              alt={name}
-              onError={onImageError || defaultImageErrorHandler}
-              data-image-id={id}
-              sx={{
-                cursor: "pointer",
-                width: dimensions.width,
-                height: dimensions.height,
-                backgroundColor: "rgba(0,0,0,0.03)",
-                objectFit: thumbnailScale === "fit" ? "contain" : "cover",
-                transition: "all 0.2s ease-in-out",
-              }}
-            />
+            <Box sx={{ display: "flex", flexDirection: "column" }}>
+              <Box
+                onClick={onAssetClick}
+                component="img"
+                src={thumbnailUrl || placeholderImage}
+                alt={name}
+                onError={onImageError || defaultImageErrorHandler}
+                data-image-id={id}
+                sx={{
+                  cursor: "pointer",
+                  width: dimensions.width,
+                  height: dimensions.height,
+                  backgroundColor: "rgba(0,0,0,0.03)",
+                  objectFit: thumbnailScale === "fit" ? "contain" : "cover",
+                  transition: "all 0.2s ease-in-out",
+                }}
+              />
+
+              {/* Image Control Bar */}
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "flex-end",
+                  gap: 2,
+                  p: 1,
+                  bgcolor: "background.paper",
+                  borderTop: "1px solid",
+                  borderColor: "divider",
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAssetClick();
+                  }}
+                  sx={{
+                    color: "primary.main",
+                    "&:hover": {
+                      bgcolor: "primary.main",
+                      color: "primary.contrastText",
+                    },
+                  }}
+                  title="View Details"
+                >
+                  <InfoIcon fontSize="small" />
+                </IconButton>
+
+                <IconButton
+                  size="small"
+                  onClick={handleDownloadClick}
+                  sx={{
+                    color: "primary.main",
+                    "&:hover": {
+                      bgcolor: "primary.main",
+                      color: "primary.contrastText",
+                    },
+                  }}
+                  title="Download"
+                >
+                  <DownloadIcon fontSize="small" />
+                </IconButton>
+
+                <IconButton
+                  size="small"
+                  onClick={handleDeleteClick}
+                  sx={{
+                    color: "primary.main",
+                    "&:hover": {
+                      bgcolor: "primary.main",
+                      color: "primary.contrastText",
+                    },
+                  }}
+                  title="Delete"
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Box>
+            </Box>
           )}
 
           {/* Position checkbox and favorite buttons at the top left of the card */}
@@ -824,8 +954,8 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
             )}
           </Box>
 
-          {/* Position buttons at the top right of the card, visible on hover or when menu is open - Only for non-video assets */}
-          {assetType !== "Video" && (
+          {/* Position buttons at the top right of the card, visible on hover or when menu is open - Removed since all assets now have bottom control bars */}
+          {false && (
             <Box
               sx={{
                 position: "absolute",
