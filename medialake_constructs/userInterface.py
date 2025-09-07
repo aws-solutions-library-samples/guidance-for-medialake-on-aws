@@ -28,6 +28,10 @@ from aws_cdk import custom_resources as cr
 from constructs import Construct
 
 from config import config
+from medialake_constructs.edge_lambda_construct import (
+    EdgeLambdaConstruct,
+    EdgeLambdaConstructProps,
+)
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
 
 
@@ -397,6 +401,11 @@ class UIConstruct(Construct):
         # Get media assets bucket name from SSM parameter to avoid circular dependency
         # Media assets bucket is now passed directly through props
 
+        # Create Edge Lambda construct
+        edge_lambda_construct = EdgeLambdaConstruct(
+            self, "EdgeLambda", props=EdgeLambdaConstructProps()
+        )
+
         # Create a shared CF Origin for static assets (S3)
         s3_orig = origins.S3BucketOrigin.with_origin_access_control(
             medialake_ui_s3_bucket.concrete_bucket,
@@ -420,6 +429,17 @@ class UIConstruct(Construct):
                 cache_policy=static_assets_cache_policy,
                 origin_request_policy=cloudfront.OriginRequestPolicy.CORS_S3_ORIGIN,
                 compress=True,
+                # Add edge Lambda functions
+                edge_lambdas=[
+                    cloudfront.EdgeLambda(
+                        function_version=edge_lambda_construct.lambda_version,
+                        event_type=cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
+                    ),
+                    cloudfront.EdgeLambda(
+                        function_version=edge_lambda_construct.lambda_version,
+                        event_type=cloudfront.LambdaEdgeEventType.VIEWER_RESPONSE,
+                    ),
+                ],
             ),
             additional_behaviors={
                 "*.js": cloudfront.BehaviorOptions(
@@ -431,6 +451,17 @@ class UIConstruct(Construct):
                     origin_request_policy=cloudfront.OriginRequestPolicy.CORS_S3_ORIGIN,
                     response_headers_policy=ui_response_headers_policy,
                     compress=True,
+                    # Add edge Lambda functions
+                    edge_lambdas=[
+                        cloudfront.EdgeLambda(
+                            function_version=edge_lambda_construct.lambda_version,
+                            event_type=cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
+                        ),
+                        cloudfront.EdgeLambda(
+                            function_version=edge_lambda_construct.lambda_version,
+                            event_type=cloudfront.LambdaEdgeEventType.VIEWER_RESPONSE,
+                        ),
+                    ],
                 ),
                 "*.css": cloudfront.BehaviorOptions(
                     origin=s3_orig,
@@ -441,6 +472,17 @@ class UIConstruct(Construct):
                     origin_request_policy=cloudfront.OriginRequestPolicy.CORS_S3_ORIGIN,
                     response_headers_policy=ui_response_headers_policy,
                     compress=True,
+                    # Add edge Lambda functions
+                    edge_lambdas=[
+                        cloudfront.EdgeLambda(
+                            function_version=edge_lambda_construct.lambda_version,
+                            event_type=cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
+                        ),
+                        cloudfront.EdgeLambda(
+                            function_version=edge_lambda_construct.lambda_version,
+                            event_type=cloudfront.LambdaEdgeEventType.VIEWER_RESPONSE,
+                        ),
+                    ],
                 ),
                 "/media/*": cloudfront.BehaviorOptions(
                     origin=media_origin,
