@@ -22,7 +22,6 @@ from aws_cdk import aws_iam as iam
 from aws_cdk import aws_logs as logs
 from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_s3_deployment as s3deploy
-from aws_cdk import aws_secretsmanager as secretsmanager
 from aws_cdk import aws_ssm as ssm
 from aws_cdk import custom_resources as cr
 from constructs import Construct
@@ -148,17 +147,6 @@ class UIConstruct(Construct):
                 bucket_name=f"{config.resource_prefix}-user-interface-{stack.account}-{config.environment}",
                 website_index_document=props.website_index_document,
                 website_error_document=props.website_error_document,
-            ),
-        )
-
-        x_origin_verify_secret = secretsmanager.Secret(
-            self,
-            "X-Origin-Verify-Secret",
-            removal_policy=props.removal_policy,
-            generate_secret_string=secretsmanager.SecretStringGenerator(
-                exclude_punctuation=props.exclude_punctuation,
-                generate_string_key=props.generate_secret_string_key,
-                secret_string_template="{}",
             ),
         )
 
@@ -323,8 +311,6 @@ class UIConstruct(Construct):
             ),
         )
 
-        # Simplified response headers policy for media assets (binary content)
-        # Omits CSP and other headers not needed for binary media serving
         media_response_headers_policy = cloudfront.ResponseHeadersPolicy(
             self,
             "MediaSecurityHeadersPolicy",
@@ -413,7 +399,7 @@ class UIConstruct(Construct):
 
         # Create CF Origin for media assets bucket
         media_origin = origins.S3BucketOrigin.with_origin_access_control(
-            props.media_assets_bucket,
+            props.media_assets_bucket.concrete_bucket,
         )
 
         self.cloudfront_distribution = cloudfront.Distribution(
@@ -429,17 +415,6 @@ class UIConstruct(Construct):
                 cache_policy=static_assets_cache_policy,
                 origin_request_policy=cloudfront.OriginRequestPolicy.CORS_S3_ORIGIN,
                 compress=True,
-                # Add edge Lambda functions
-                edge_lambdas=[
-                    cloudfront.EdgeLambda(
-                        function_version=edge_lambda_construct.lambda_version,
-                        event_type=cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
-                    ),
-                    cloudfront.EdgeLambda(
-                        function_version=edge_lambda_construct.lambda_version,
-                        event_type=cloudfront.LambdaEdgeEventType.VIEWER_RESPONSE,
-                    ),
-                ],
             ),
             additional_behaviors={
                 "*.js": cloudfront.BehaviorOptions(
@@ -451,17 +426,6 @@ class UIConstruct(Construct):
                     origin_request_policy=cloudfront.OriginRequestPolicy.CORS_S3_ORIGIN,
                     response_headers_policy=ui_response_headers_policy,
                     compress=True,
-                    # Add edge Lambda functions
-                    edge_lambdas=[
-                        cloudfront.EdgeLambda(
-                            function_version=edge_lambda_construct.lambda_version,
-                            event_type=cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
-                        ),
-                        cloudfront.EdgeLambda(
-                            function_version=edge_lambda_construct.lambda_version,
-                            event_type=cloudfront.LambdaEdgeEventType.VIEWER_RESPONSE,
-                        ),
-                    ],
                 ),
                 "*.css": cloudfront.BehaviorOptions(
                     origin=s3_orig,
@@ -472,17 +436,6 @@ class UIConstruct(Construct):
                     origin_request_policy=cloudfront.OriginRequestPolicy.CORS_S3_ORIGIN,
                     response_headers_policy=ui_response_headers_policy,
                     compress=True,
-                    # Add edge Lambda functions
-                    edge_lambdas=[
-                        cloudfront.EdgeLambda(
-                            function_version=edge_lambda_construct.lambda_version,
-                            event_type=cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
-                        ),
-                        cloudfront.EdgeLambda(
-                            function_version=edge_lambda_construct.lambda_version,
-                            event_type=cloudfront.LambdaEdgeEventType.VIEWER_RESPONSE,
-                        ),
-                    ],
                 ),
                 "/media/*": cloudfront.BehaviorOptions(
                     origin=media_origin,
@@ -493,6 +446,17 @@ class UIConstruct(Construct):
                     origin_request_policy=cloudfront.OriginRequestPolicy.CORS_S3_ORIGIN,
                     response_headers_policy=media_response_headers_policy,
                     compress=True,
+                    # Add edge Lambda functions for media behavior
+                    edge_lambdas=[
+                        cloudfront.EdgeLambda(
+                            function_version=edge_lambda_construct.lambda_version,
+                            event_type=cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
+                        ),
+                        cloudfront.EdgeLambda(
+                            function_version=edge_lambda_construct.lambda_version,
+                            event_type=cloudfront.LambdaEdgeEventType.VIEWER_RESPONSE,
+                        ),
+                    ],
                 ),
                 f"/{config.api_path}/*": cloudfront.BehaviorOptions(
                     origin=origins.HttpOrigin(
@@ -551,6 +515,109 @@ class UIConstruct(Construct):
                         }
                     },
                 )
+            )
+
+        update_bucket_policy = cr.AwsCustomResource(
+            self,
+            "UpdateMediaBucketPolicy",
+            on_create=cr.AwsSdkCall(
+                service="S3",
+                action="putBucketPolicy",
+                parameters={
+                    "Bucket": props.media_assets_bucket.bucket_name,
+                    "Policy": json.dumps(
+                        {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Sid": "AllowCloudFrontServicePrincipal",
+                                    "Effect": "Allow",
+                                    "Principal": {
+                                        "Service": "cloudfront.amazonaws.com"
+                                    },
+                                    "Action": "s3:GetObject",
+                                    "Resource": f"{props.media_assets_bucket.bucket_arn}/*",
+                                    "Condition": {
+                                        "StringEquals": {
+                                            "AWS:SourceArn": self.cloudfront_distribution.distribution_arn
+                                        }
+                                    },
+                                }
+                            ],
+                        }
+                    ),
+                },
+                physical_resource_id=cr.PhysicalResourceId.of(
+                    f"{config.resource_prefix}-media-bucket-policy"
+                ),
+            ),
+            policy=cr.AwsCustomResourcePolicy.from_statements(
+                [
+                    iam.PolicyStatement(
+                        actions=["s3:PutBucketPolicy", "s3:GetBucketPolicy"],
+                        resources=[props.media_assets_bucket.bucket_arn],
+                    )
+                ]
+            ),
+        )
+
+        # Get the KMS key ARN (you might need to pass this through props)
+        if hasattr(props, "media_bucket_kms_key_arn"):
+            update_kms_policy = cr.AwsCustomResource(
+                self,
+                "UpdateKMSPolicy",
+                on_create=cr.AwsSdkCall(
+                    service="KMS",
+                    action="putKeyPolicy",
+                    parameters={
+                        "KeyId": props.media_bucket_kms_key_arn,
+                        "PolicyName": "default",
+                        "Policy": json.dumps(
+                            {
+                                "Version": "2012-10-17",
+                                "Statement": [
+                                    {
+                                        "Sid": "Enable IAM User Permissions",
+                                        "Effect": "Allow",
+                                        "Principal": {
+                                            "AWS": f"arn:aws:iam::{stack.account}:root"
+                                        },
+                                        "Action": "kms:*",
+                                        "Resource": "*",
+                                    },
+                                    {
+                                        "Sid": "Allow CloudFront",
+                                        "Effect": "Allow",
+                                        "Principal": {
+                                            "Service": "cloudfront.amazonaws.com"
+                                        },
+                                        "Action": [
+                                            "kms:Decrypt",
+                                            "kms:GenerateDataKey",
+                                        ],
+                                        "Resource": "*",
+                                        "Condition": {
+                                            "StringEquals": {
+                                                "AWS:SourceArn": self.cloudfront_distribution.distribution_arn
+                                            }
+                                        },
+                                    },
+                                ],
+                            }
+                        ),
+                    },
+                    physical_resource_id=cr.PhysicalResourceId.of(
+                        f"{config.resource_prefix}-kms-policy-update"
+                    ),
+                ),
+                policy=cr.AwsCustomResourcePolicy.from_statements(
+                    [
+                        iam.PolicyStatement(
+                            actions=["kms:PutKeyPolicy", "kms:GetKeyPolicy"],
+                            resources=[props.media_bucket_kms_key_arn],
+                        )
+                    ]
+                ),
             )
 
         # Store CloudFront distribution domain in SSM Parameter Store

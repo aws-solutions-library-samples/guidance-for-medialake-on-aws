@@ -1,66 +1,61 @@
-import re
 from typing import Any, Dict
 
 
 def lambda_handler(event: Dict[str, Any], context) -> Dict[str, Any]:
     """
     CloudFront Edge Lambda function that:
-    1. Strips /*/*/ from the URI
-    2. Modifies CSP headers to allow WASM
-    3. Forwards to S3 origin
+    1. Strips /media/bucket-name from the URI (origin-request)
+    2. Modifies CSP headers to allow WASM (viewer-response)
     """
 
-    # Get the request from the event
-    request = event["Records"][0]["cf"]["request"]
-
-    # Get the original URI
-    original_uri = request["uri"]
-
-    # Strip /*/*/ pattern from URI
-    # This removes path segments that match the pattern
-    cleaned_uri = re.sub(r"/\*/\*/", "/", original_uri)
-
-    # Update the request URI
-    request["uri"] = cleaned_uri
-
-    # Get the response headers (if this is a response event)
+    # Check if this is an origin-request or viewer-response event
     if "response" in event["Records"][0]["cf"]:
+        # VIEWER-RESPONSE: Modify headers
         response = event["Records"][0]["cf"]["response"]
         headers = response.get("headers", {})
 
         # Modify CSP headers to allow WASM
         if "content-security-policy" in headers:
             csp_header = headers["content-security-policy"][0]["value"]
-
-            # Update CSP to allow WASM and blob URLs
             updated_csp = modify_csp_for_wasm(csp_header)
-
-            headers["content-security-policy"] = [
-                {"key": "Content-Security-Policy", "value": updated_csp}
-            ]
+            headers["content-security-policy"][0]["value"] = updated_csp
 
         # Add additional security headers if not present
         add_security_headers(headers)
 
-        return {
-            "status": "200",
-            "statusDescription": "OK",
-            "headers": headers,
-            "body": response.get("body", ""),
-        }
+        # Return the MODIFIED response, not a new one
+        response["headers"] = headers
+        return response
 
-    # For request events, just return the modified request
-    return request
+    else:
+        # ORIGIN-REQUEST: Strip /media/bucket-name from URI
+        request = event["Records"][0]["cf"]["request"]
+        original_uri = request["uri"]
+
+        # Strip /media/medialakebaseinfrastructu-mediaassetss3bucket06290-yjdpyqbwuak9 from the beginning
+        # This regex matches /media/ followed by the bucket name
+        bucket_name = "medialakebaseinfrastructu-mediaassetss3bucket06290-yjdpyqbwuak9"
+        prefix_to_strip = f"/media/{bucket_name}"
+
+        if original_uri.startswith(prefix_to_strip + "/"):
+            # Remove the prefix, keeping the leading slash for the rest of the path
+            request["uri"] = original_uri[len(prefix_to_strip) :]
+        elif original_uri.startswith(prefix_to_strip):
+            # Handle edge case where there's no trailing slash
+            request["uri"] = original_uri[len(prefix_to_strip) :]
+        elif original_uri.startswith("/media/"):
+            # Fallback: just strip /media/ if bucket name doesn't match
+            request["uri"] = original_uri[6:]
+
+        return request
 
 
 def modify_csp_for_wasm(csp_header: str) -> str:
     """
     Modify CSP header to allow WASM and blob URLs
     """
-    # Parse the CSP directive
     directives = {}
 
-    # Split by semicolon and parse each directive
     for directive in csp_header.split(";"):
         directive = directive.strip()
         if not directive:
@@ -75,7 +70,7 @@ def modify_csp_for_wasm(csp_header: str) -> str:
     # Update script-src to include wasm-unsafe-eval and blob:
     if "script-src" in directives:
         script_src = directives["script-src"]
-        if "wasm-unsafe-eval" not in script_src:
+        if "'wasm-unsafe-eval'" not in script_src:
             script_src += " 'wasm-unsafe-eval'"
         if "blob:" not in script_src:
             script_src += " blob:"
@@ -126,17 +121,14 @@ def add_security_headers(headers: Dict[str, Any]) -> None:
     """
     Add additional security headers if not present
     """
-    # Add X-Content-Type-Options if not present
     if "x-content-type-options" not in headers:
         headers["x-content-type-options"] = [
             {"key": "X-Content-Type-Options", "value": "nosniff"}
         ]
 
-    # Add X-Frame-Options if not present
     if "x-frame-options" not in headers:
         headers["x-frame-options"] = [{"key": "X-Frame-Options", "value": "DENY"}]
 
-    # Add Referrer-Policy if not present
     if "referrer-policy" not in headers:
         headers["referrer-policy"] = [
             {"key": "Referrer-Policy", "value": "strict-origin-when-cross-origin"}
