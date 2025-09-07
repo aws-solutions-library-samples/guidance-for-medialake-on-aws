@@ -59,9 +59,9 @@ DEFAULT_TAGS: Dict[str, str] = {
 class S3:
     """S3 related constants"""
 
-    ASSETS_BUCKET_EXPORT = "MediaLakeAssetsBucket"
-    LOGS_BUCKET_EXPORT = "MediaLakeLogsBucket"
-    DEPLOYMENT_BUCKET_EXPORT = "MediaLakeDeploymentBucket"
+    ASSETS_BUCKET_EXPORT = f"{config.resource_prefix}-AssetsBucket"
+    LOGS_BUCKET_EXPORT = f"{config.resource_prefix}-LogsBucket"
+    DEPLOYMENT_BUCKET_EXPORT = f"{config.resource_prefix}-DeploymentBucket"
 
     # Lifecycle rules
     DEFAULT_EXPIRATION_DAYS = 90
@@ -72,6 +72,57 @@ class S3:
     DEFAULT_CORS_ALLOWED_METHODS = ["GET", "HEAD", "PUT", "POST"]
     DEFAULT_CORS_ALLOWED_HEADERS = ["*"]
     DEFAULT_CORS_MAX_AGE = 3600
+
+
+# KMS constants
+class KMS:
+    """KMS related constants"""
+
+    # Key aliases
+    MEDIA_BUCKET_KEY_ALIAS = f"alias/{S3.ASSETS_BUCKET_EXPORT}-Key"
+    LOGS_BUCKET_KEY_ALIAS = f"alias/{S3.LOGS_BUCKET_EXPORT}-Key"
+    LAMBDA_LAYER_KEY_ALIAS = f"alias/{config.resource_prefix}-lambda-layer-key"
+    DYNAMODB_KEY_ALIAS = f"alias/{config.resource_prefix}-dynamodb-key"
+
+    # Key descriptions
+    MEDIA_BUCKET_KEY_DESCRIPTION = (
+        f"KMS key for {config.resource_prefix} media assets bucket encryption"
+    )
+    LOGS_BUCKET_KEY_DESCRIPTION = (
+        f"KMS key for {config.resource_prefix} logs bucket encryption"
+    )
+    LAMBDA_LAYER_KEY_DESCRIPTION = (
+        f"KMS key for {config.resource_prefix} Lambda layer encryption"
+    )
+    DYNAMODB_KEY_DESCRIPTION = (
+        f"KMS key for {config.resource_prefix} DynamoDB table encryption"
+    )
+
+    # Key usage
+    ENCRYPT_DECRYPT = "ENCRYPT_DECRYPT"
+    SIGN_VERIFY = "SIGN_VERIFY"
+    GENERATE_VERIFY_MAC = "GENERATE_VERIFY_MAC"
+
+    # Key spec
+    SYMMETRIC_DEFAULT = "SYMMETRIC_DEFAULT"
+    RSA_2048 = "RSA_2048"
+    RSA_3072 = "RSA_3072"
+    RSA_4096 = "RSA_4096"
+
+    # Key rotation
+    ENABLE_AUTOMATIC_ROTATION = True
+    ROTATION_PERIOD_DAYS = 365
+
+    @staticmethod
+    def key_alias_name(key_type: str, environment: str = None) -> str:
+        """Get the full KMS key alias name with prefix and environment"""
+        env = environment or config.environment
+        return f"alias/{config.resource_prefix}-{key_type}-key-{env}"
+
+    @staticmethod
+    def key_arn(region: str, account: str, key_id: str) -> str:
+        """Get the full KMS key ARN"""
+        return f"arn:aws:kms:{region}:{account}:key/{key_id}"
 
 
 # Lambda constants

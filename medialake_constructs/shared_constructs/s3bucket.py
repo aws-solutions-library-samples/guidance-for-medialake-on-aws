@@ -24,6 +24,7 @@ class S3BucketProps:
     lifecycle_rules: Optional[List[s3.LifecycleRule]] = None
     existing_kms_key_arn: Optional[str] = None
     existing_bucket_arn: Optional[str] = None
+    alias: Optional[str] = None
 
 
 class S3Bucket(Construct):
@@ -51,6 +52,7 @@ class S3Bucket(Construct):
                     else RemovalPolicy.RETAIN
                 ),
                 enable_key_rotation=True,
+                alias=props.alias,
             )
 
         bucket_props = {

@@ -19,6 +19,7 @@ from aws_cdk import (
 from aws_cdk import aws_cloudfront as cloudfront
 from aws_cdk import aws_cloudfront_origins as origins
 from aws_cdk import aws_iam as iam
+from aws_cdk import aws_kms as cdk_kms
 from aws_cdk import aws_logs as logs
 from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_s3_deployment as s3deploy
@@ -27,6 +28,7 @@ from aws_cdk import custom_resources as cr
 from constructs import Construct
 
 from config import config
+from constants import KMS
 from medialake_constructs.edge_lambda_construct import (
     EdgeLambdaConstruct,
     EdgeLambdaConstructProps,
@@ -399,7 +401,7 @@ class UIConstruct(Construct):
 
         # Create CF Origin for media assets bucket
         media_origin = origins.S3BucketOrigin.with_origin_access_control(
-            props.media_assets_bucket.concrete_bucket,
+            props.media_assets_bucket,
         )
 
         self.cloudfront_distribution = cloudfront.Distribution(
@@ -561,64 +563,67 @@ class UIConstruct(Construct):
             ),
         )
 
-        # Get the KMS key ARN (you might need to pass this through props)
-        if hasattr(props, "media_bucket_kms_key_arn"):
-            update_kms_policy = cr.AwsCustomResource(
-                self,
-                "UpdateKMSPolicy",
-                on_create=cr.AwsSdkCall(
-                    service="KMS",
-                    action="putKeyPolicy",
-                    parameters={
-                        "KeyId": props.media_bucket_kms_key_arn,
-                        "PolicyName": "default",
-                        "Policy": json.dumps(
-                            {
-                                "Version": "2012-10-17",
-                                "Statement": [
-                                    {
-                                        "Sid": "Enable IAM User Permissions",
-                                        "Effect": "Allow",
-                                        "Principal": {
-                                            "AWS": f"arn:aws:iam::{stack.account}:root"
-                                        },
-                                        "Action": "kms:*",
-                                        "Resource": "*",
+        media_bucket_kms_key = cdk_kms.Key.from_lookup(
+            self, "ImportedKey", alias_name=KMS.MEDIA_BUCKET_KEY_ALIAS
+        )
+        media_bucket_kms_key_arn = media_bucket_kms_key.key_arn
+
+        update_kms_policy = cr.AwsCustomResource(
+            self,
+            "UpdateKMSPolicy",
+            on_create=cr.AwsSdkCall(
+                service="KMS",
+                action="putKeyPolicy",
+                parameters={
+                    "KeyId": media_bucket_kms_key_arn,
+                    "PolicyName": "default",
+                    "Policy": json.dumps(
+                        {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Sid": "Enable IAM User Permissions",
+                                    "Effect": "Allow",
+                                    "Principal": {
+                                        "AWS": f"arn:aws:iam::{stack.account}:root"
                                     },
-                                    {
-                                        "Sid": "Allow CloudFront",
-                                        "Effect": "Allow",
-                                        "Principal": {
-                                            "Service": "cloudfront.amazonaws.com"
-                                        },
-                                        "Action": [
-                                            "kms:Decrypt",
-                                            "kms:GenerateDataKey",
-                                        ],
-                                        "Resource": "*",
-                                        "Condition": {
-                                            "StringEquals": {
-                                                "AWS:SourceArn": self.cloudfront_distribution.distribution_arn
-                                            }
-                                        },
+                                    "Action": "kms:*",
+                                    "Resource": "*",
+                                },
+                                {
+                                    "Sid": "Allow CloudFront",
+                                    "Effect": "Allow",
+                                    "Principal": {
+                                        "Service": "cloudfront.amazonaws.com"
                                     },
-                                ],
-                            }
-                        ),
-                    },
-                    physical_resource_id=cr.PhysicalResourceId.of(
-                        f"{config.resource_prefix}-kms-policy-update"
+                                    "Action": [
+                                        "kms:Decrypt",
+                                        "kms:GenerateDataKey",
+                                    ],
+                                    "Resource": "*",
+                                    "Condition": {
+                                        "StringEquals": {
+                                            "AWS:SourceArn": self.cloudfront_distribution.distribution_arn
+                                        }
+                                    },
+                                },
+                            ],
+                        }
                     ),
+                },
+                physical_resource_id=cr.PhysicalResourceId.of(
+                    f"{config.resource_prefix}-kms-policy-update"
                 ),
-                policy=cr.AwsCustomResourcePolicy.from_statements(
-                    [
-                        iam.PolicyStatement(
-                            actions=["kms:PutKeyPolicy", "kms:GetKeyPolicy"],
-                            resources=[props.media_bucket_kms_key_arn],
-                        )
-                    ]
-                ),
-            )
+            ),
+            policy=cr.AwsCustomResourcePolicy.from_statements(
+                [
+                    iam.PolicyStatement(
+                        actions=["kms:PutKeyPolicy", "kms:GetKeyPolicy"],
+                        resources=[media_bucket_kms_key_arn],
+                    )
+                ]
+            ),
+        )
 
         # Store CloudFront distribution domain in SSM Parameter Store
         # Only create parameter if not provided externally

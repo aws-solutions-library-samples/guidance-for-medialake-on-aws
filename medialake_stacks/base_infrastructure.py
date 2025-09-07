@@ -9,6 +9,7 @@ from aws_cdk import aws_s3 as s3
 from constructs import Construct
 
 from config import config
+from constants import KMS
 from constants import Lambda as LambdaConstants
 
 # from medialake_constructs.shared_constructs.opensearch_ingestion_pipeline import (
@@ -283,6 +284,7 @@ class BaseInfrastructureStack(Stack):
                         if config.s3.asset_bucket.kms_key_arn
                         else None
                     ),
+                    alias=KMS.MEDIA_BUCKET_KEY_ALIAS,
                 ),
             )
         else:
