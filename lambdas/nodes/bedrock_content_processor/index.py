@@ -3,6 +3,8 @@ import importlib.util
 import json
 import mimetypes
 import os
+import random
+import time
 from decimal import Decimal
 from typing import Any, Callable, Dict, Union
 from urllib.parse import urlparse
@@ -368,6 +370,87 @@ def create_response_output(tpl_paths, bucket, result, event, mapping):
 
 
 # ────────────────────────────────────────────────────────────
+# Retry mechanism for Bedrock API calls
+# ────────────────────────────────────────────────────────────
+
+
+def invoke_bedrock_with_retry(
+    bedrock_client,
+    model_id: str,
+    body: bytes,
+    content_type: str = "application/json",
+    max_retries: int = 50,
+    base_delay: float = 1.0,
+    max_delay: float = 60.0,
+):
+    """
+    Invoke Bedrock model with exponential backoff retry for throttling exceptions.
+
+    Args:
+        bedrock_client: The Bedrock runtime client
+        model_id: The model ID to invoke
+        body: The request body as bytes
+        content_type: Content type for the request
+        max_retries: Maximum number of retry attempts (default: 50)
+        base_delay: Base delay in seconds for exponential backoff
+        max_delay: Maximum delay in seconds between retries
+
+    Returns:
+        The response from Bedrock invoke_model
+
+    Raises:
+        ClientError: If all retries are exhausted or for non-throttling errors
+    """
+    for attempt in range(max_retries + 1):
+        try:
+            logger.info(f"Bedrock invoke attempt {attempt + 1}/{max_retries + 1}")
+            response = bedrock_client.invoke_model(
+                modelId=model_id, body=body, contentType=content_type
+            )
+            logger.info(f"Bedrock invoke succeeded on attempt {attempt + 1}")
+            return response
+
+        except ClientError as e:
+            error_code = e.response.get("Error", {}).get("Code", "")
+
+            # Check if this is a throttling error
+            if error_code in [
+                "ThrottlingException",
+                "TooManyRequestsException",
+                "ServiceQuotaExceededException",
+            ]:
+                if attempt < max_retries:
+                    # Calculate delay with exponential backoff and jitter
+                    delay = min(base_delay * (2**attempt), max_delay)
+                    jitter = random.uniform(0, delay * 0.1)  # Add up to 10% jitter
+                    total_delay = delay + jitter
+
+                    logger.warning(
+                        f"Bedrock throttling on attempt {attempt + 1}: {error_code}. "
+                        f"Retrying in {total_delay:.2f} seconds..."
+                    )
+                    time.sleep(total_delay)
+                    continue
+                else:
+                    logger.error(
+                        f"Bedrock throttling: exhausted all {max_retries + 1} attempts. "
+                        f"Final error: {error_code}"
+                    )
+                    raise
+            else:
+                # Non-throttling error, don't retry
+                logger.error(f"Bedrock non-throttling error: {error_code}")
+                raise
+        except Exception as e:
+            # Non-ClientError exceptions, don't retry
+            logger.error(f"Bedrock unexpected error: {type(e).__name__}: {e}")
+            raise
+
+    # This should never be reached, but just in case
+    raise RuntimeError("Unexpected end of retry loop")
+
+
+# ────────────────────────────────────────────────────────────
 # Lambda handler (all inner errors bubble up)                  ❶
 # ────────────────────────────────────────────────────────────
 @lambda_middleware(event_bus_name=os.getenv("EVENT_BUS_NAME", "default-event-bus"))
@@ -452,11 +535,11 @@ def lambda_handler(event, context):
         # ── Invoke Bedrock ────────────────────────────────────────────────
         logger.info(f"Invoking {model_id} with payload from {fetched_uri}")
         try:
-            resp = bedrock_rt.invoke_model(
-                modelId=profile_id, body=body_json, contentType="application/json"
+            resp = invoke_bedrock_with_retry(
+                bedrock_rt, profile_id, body_json, "application/json"
             )
         except ClientError:
-            logger.error(f"Bedrock invoke failed. Payload: {body_json}")
+            logger.error(f"Bedrock invoke failed after retries. Payload: {body_json}")
             raise  # ← propagate
 
         data = json.loads(resp["body"].read())

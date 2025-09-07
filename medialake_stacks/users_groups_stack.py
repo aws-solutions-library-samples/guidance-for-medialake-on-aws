@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 
 import aws_cdk as cdk
-from aws_cdk import Fn
 from aws_cdk import aws_apigateway as apigateway
 from aws_cdk import aws_cognito as cognito
 from aws_cdk import aws_dynamodb as dynamodb
@@ -19,6 +18,8 @@ class UsersGroupsStackProps:
     """Configuration for Users, Groups, and Roles Stack."""
 
     cognito_user_pool: cognito.UserPool
+    authorizer: apigateway.IAuthorizer
+    api_resource: apigateway.RestApi
     cognito_app_client: str
     x_origin_verify_secret: secretsmanager.Secret
     auth_table_name: str
@@ -37,22 +38,22 @@ class UsersGroupsStack(cdk.NestedStack):
         super().__init__(scope, id, **kwargs)
 
         # Import the API Gateway Core components
-        api_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
-        root_resource_id = Fn.import_value("MediaLakeApiGatewayCore-RootResourceId")
+        # api_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
+        # root_resource_id = Fn.import_value("MediaLakeApiGatewayCore-RootResourceId")
 
-        api = apigateway.RestApi.from_rest_api_attributes(
-            self,
-            "UsersGroupsRolesImportedApi",
-            rest_api_id=api_id,
-            root_resource_id=root_resource_id,
-        )
+        # api = apigateway.RestApi.from_rest_api_attributes(
+        #     self,
+        #     "UsersGroupsRolesImportedApi",
+        #     rest_api_id=api_id,
+        #     root_resource_id=root_resource_id,
+        # )
 
-        # Create Cognito User Pool authorizer for standard authentication
-        self._cognito_user_pool_authorizer = apigateway.CognitoUserPoolsAuthorizer(
-            self,
-            "UsersGroupsRolesCognitoAuthorizer",
-            cognito_user_pools=[props.cognito_user_pool],
-        )
+        # Use the shared custom authorizer
+
+        # api_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
+        # self._cognito_user_pool_authorizer = create_shared_custom_authorizer(
+        #     self, "UsersGroupsCustomApiAuthorizer", api_gateway_id=api_id
+        # )
 
         # 1. User Table
         user_table_props = DynamoDBProps(
@@ -180,8 +181,8 @@ class UsersGroupsStack(cdk.NestedStack):
             self,
             "UsersApiGateway",
             props=UsersApiProps(
-                api_resource=api.root,
-                cognito_authorizer=self._cognito_user_pool_authorizer,
+                api_resource=props.api_resource,
+                authorizer=props.authorizer,
                 cognito_user_pool=props.cognito_user_pool,
                 x_origin_verify_secret=props.x_origin_verify_secret,
             ),
@@ -192,8 +193,8 @@ class UsersGroupsStack(cdk.NestedStack):
             self,
             "UPSFApi",
             props=UPSFApiProps(
-                api_resource=api.root,
-                cognito_authorizer=self._cognito_user_pool_authorizer,
+                api_resource=props.api_resource,
+                authorizer=props.authorizer,
                 cognito_user_pool=props.cognito_user_pool,
                 x_origin_verify_secret=props.x_origin_verify_secret,
                 user_table=self._user_table.table,
