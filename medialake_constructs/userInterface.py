@@ -28,7 +28,6 @@ from aws_cdk import custom_resources as cr
 from constructs import Construct
 
 from config import config
-from constants import KMS
 from medialake_constructs.edge_lambda_construct import (
     EdgeLambdaConstruct,
     EdgeLambdaConstructProps,
@@ -80,6 +79,7 @@ class LocalBundling:
 class UIConstructProps:
     access_log_bucket: s3.IBucket
     media_assets_bucket: s3.IBucket
+    media_assets_bucket_kms_key_arn: str
     api_gateway_rest_id: str
     api_gateway_stage: str
     cognito_user_pool_id: str
@@ -563,8 +563,8 @@ class UIConstruct(Construct):
             ),
         )
 
-        media_bucket_kms_key = cdk_kms.Key.from_lookup(
-            self, "ImportedKey", alias_name=KMS.MEDIA_BUCKET_KEY_ALIAS
+        media_bucket_kms_key = cdk_kms.Key.from_key_arn(
+            self, "ImportedKey", key_arn=props.media_assets_bucket_kms_key_arn
         )
         media_bucket_kms_key_arn = media_bucket_kms_key.key_arn
 

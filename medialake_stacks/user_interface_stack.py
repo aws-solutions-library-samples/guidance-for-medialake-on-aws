@@ -100,6 +100,9 @@ class UserInterfaceStack(Stack):
         media_assets_bucket_arn = Fn.import_value(
             "MediaLakeBaseInfrastructure-MediaAssetsBucketArn"
         )
+        media_assets_bucket_kms_key_arn = Fn.import_value(
+            "MediaLakeBaseInfrastructure-MediaAssetsBucketKmsKeyArn"
+        )
         access_log_bucket_arn = Fn.import_value(
             "MediaLakeBaseInfrastructure-AccessLogsBucketArn"
         )
@@ -123,6 +126,7 @@ class UserInterfaceStack(Stack):
                 api_gateway_stage=api_gateway_stage,
                 access_log_bucket=access_log_bucket,
                 media_assets_bucket=media_assets_bucket,
+                media_assets_bucket_kms_key_arn=media_assets_bucket_kms_key_arn,
                 cloudfront_waf_acl_arn=waf_acl_arn,
                 cognito_domain_prefix=props.cognito_domain_prefix,
                 parameter_name=parameter_name,

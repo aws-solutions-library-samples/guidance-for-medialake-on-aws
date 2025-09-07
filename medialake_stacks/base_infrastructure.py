@@ -628,6 +628,15 @@ class BaseInfrastructureStack(Stack):
             export_name=f"{self.stack_name}-MediaAssetsBucketArn",
         )
 
+        # Export media assets bucket KMS key ARN for cross-stack reference
+        CfnOutput(
+            self,
+            "MediaAssetsBucketKmsKeyArn",
+            value=self.media_assets_s3_bucket.key_arn,
+            description="Media assets bucket KMS key ARN for cross-stack reference",
+            export_name=f"{self.stack_name}-MediaAssetsBucketKmsKeyArn",
+        )
+
         # Export access logs bucket ARN for cross-stack reference
         CfnOutput(
             self,
