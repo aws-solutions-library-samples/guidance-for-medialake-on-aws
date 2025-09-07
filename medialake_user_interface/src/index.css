@@ -11,9 +11,3 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
-
-/* Override Omakase Player styles to remove poster frame/watermark */
-.omakase-player .omakase-player-wrapper .omakase-background-image {
-  /* background-image: none !important; */
-  background-image: none !important;
-}
