@@ -16,7 +16,10 @@ import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import InfoIcon from "@mui/icons-material/Info";
-import { PLACEHOLDER_IMAGE } from "@/utils/placeholderSvg";
+import {
+  PLACEHOLDER_IMAGE,
+  VIDEO_PLACEHOLDER_IMAGE,
+} from "@/utils/placeholderSvg";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import { AssetAudio } from "../asset";
 import { InlineTextEditor } from "../common/InlineTextEditor";
@@ -130,6 +133,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
     const playerInitializedRef = useRef<boolean>(false);
     const currentProxyUrlRef = useRef<string | undefined>(proxyUrl);
     const markerIdsRef = useRef<string[]>([]);
+    const [videoLoadError, setVideoLoadError] = useState(false);
 
     // Initialize Omakase player for video assets
     useEffect(() => {
@@ -165,6 +169,9 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
           omakasePlayerRef.current = omakasePlayer;
           playerInitializedRef.current = true;
           currentProxyUrlRef.current = proxyUrl;
+
+          // Reset error state when attempting to load video
+          setVideoLoadError(false);
 
           // Load the video then add markers if clips provided
           omakasePlayer.loadVideo(proxyUrl).subscribe({
@@ -263,6 +270,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
             },
             error: (error) => {
               console.error(`Failed to load video for asset ${id}:`, error);
+              setVideoLoadError(true);
             },
           });
 
@@ -289,6 +297,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
           },
           error: (error) => {
             console.error(`Failed to reload video for asset ${id}:`, error);
+            setVideoLoadError(true);
           },
         });
       }
@@ -455,7 +464,8 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
     const defaultImageErrorHandler = (
       event: React.SyntheticEvent<HTMLImageElement, Event>,
     ) => {
-      event.currentTarget.src = placeholderImage;
+      event.currentTarget.src =
+        assetType === "Video" ? VIDEO_PLACEHOLDER_IMAGE : placeholderImage;
     };
 
     const handleDeleteClick = (event: React.MouseEvent<HTMLElement>) => {
@@ -622,22 +632,41 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
           {/* Render appropriate content based on asset type */}
           {assetType === "Video" ? (
             <Box sx={{ display: "flex", flexDirection: "column" }}>
-              <div
-                id={`video-asset-${id}`}
-                className="asset-card-video"
-                style={{
-                  width: dimensions.width,
-                  height: dimensions.height,
-                  backgroundColor: "rgba(0,0,0,0.03)",
-                  cursor: "pointer",
-                  position: "relative",
-                }}
-              >
+              {proxyUrl && !videoLoadError ? (
                 <div
-                  id={`omakase-player-${id}`}
-                  style={{ width: "100%", height: "100%" }}
+                  id={`video-asset-${id}`}
+                  className="asset-card-video"
+                  style={{
+                    width: dimensions.width,
+                    height: dimensions.height,
+                    backgroundColor: "rgba(0,0,0,0.03)",
+                    cursor: "pointer",
+                    position: "relative",
+                  }}
+                >
+                  <div
+                    id={`omakase-player-${id}`}
+                    style={{ width: "100%", height: "100%" }}
+                  />
+                </div>
+              ) : (
+                <Box
+                  onClick={onAssetClick}
+                  component="img"
+                  src={thumbnailUrl || VIDEO_PLACEHOLDER_IMAGE}
+                  alt={name}
+                  onError={onImageError || defaultImageErrorHandler}
+                  data-image-id={id}
+                  sx={{
+                    cursor: "pointer",
+                    width: dimensions.width,
+                    height: dimensions.height,
+                    backgroundColor: "rgba(0,0,0,0.03)",
+                    objectFit: thumbnailScale === "fit" ? "contain" : "cover",
+                    transition: "all 0.2s ease-in-out",
+                  }}
                 />
-              </div>
+              )}
 
               {/* Video Control Bar */}
               <Box
