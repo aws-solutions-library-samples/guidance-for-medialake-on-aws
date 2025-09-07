@@ -156,7 +156,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
             playerChroming: {
               theme: "STAMP",
               themeConfig: {
-                stampScale: "FIT",
+                stampScale: thumbnailScale === "fit" ? "FIT" : "FILL",
               },
             },
           });
@@ -309,7 +309,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
           }
         }
       };
-    }, [assetType, proxyUrl, id]); // Removed clips from dependencies to prevent re-initialization
+    }, [assetType, proxyUrl, id, thumbnailScale]); // Added thumbnailScale to reinitialize player when scale changes
 
     // Separate effect to handle clip marker updates when confidence threshold changes
     useEffect(() => {
