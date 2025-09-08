@@ -292,11 +292,14 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                     });
 
                     if (start !== undefined && end !== undefined) {
-                      // Skip markers that start at 0 or have very short duration
-                      // This prevents unwanted markers at the beginning of videos
-                      if (start === 0 || (start < 2 && end - start < 2)) {
+                      // Skip markers that have very short duration (likely unwanted markers)
+                      // Only skip clips starting at 0 if they're very short (< 1 second)
+                      if (
+                        (start === 0 && end - start < 1) ||
+                        (start < 2 && end - start < 1)
+                      ) {
                         console.log(
-                          `  ⚠️ Skipping potential unwanted marker: ${start}s - ${end}s (duration: ${end - start}s)`,
+                          `  ⚠️ Skipping unwanted short marker: ${start}s - ${end}s (duration: ${end - start}s)`,
                         );
                         return;
                       }
@@ -510,11 +513,14 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                   : undefined;
 
             if (start !== undefined && end !== undefined) {
-              // Skip markers that start at 0 or have very short duration
-              // This prevents unwanted markers at the beginning of videos
-              if (start === 0 || (start < 2 && end - start < 2)) {
+              // Skip markers that have very short duration (likely unwanted markers)
+              // Only skip clips starting at 0 if they're very short (< 1 second)
+              if (
+                (start === 0 && end - start < 1) ||
+                (start < 2 && end - start < 1)
+              ) {
                 console.log(
-                  `  ⚠️ UPDATE: Skipping potential unwanted marker: ${start}s - ${end}s (duration: ${end - start}s)`,
+                  `  ⚠️ UPDATE: Skipping unwanted short marker: ${start}s - ${end}s (duration: ${end - start}s)`,
                 );
                 return;
               }

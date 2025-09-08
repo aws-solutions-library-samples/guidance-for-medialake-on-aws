@@ -89,6 +89,29 @@ export function transformResultsToClipMode(
         `🎬 Processing asset ${assetIndex + 1}/${results.length}: Type=${assetType}, HasClips=${!!clips}, ClipCount=${clips?.length || 0}`,
       );
 
+      // Debug: Log all clips for this asset to see if the 00:00:00 clip is present
+      if (clips && clips.length > 0) {
+        console.log(
+          `🎬 Clips for asset ${assetIndex + 1}:`,
+          clips.map((clip) => ({
+            start_timecode: clip.start_timecode,
+            end_timecode: clip.end_timecode,
+            score: clip.score,
+          })),
+        );
+
+        // Check specifically for clips starting at 00:00:00
+        const zeroStartClips = clips.filter(
+          (clip) => clip.start_timecode === "00:00:00:00",
+        );
+        if (zeroStartClips.length > 0) {
+          console.log(
+            `🔍 Found ${zeroStartClips.length} clips starting at 00:00:00:00:`,
+            zeroStartClips,
+          );
+        }
+      }
+
       // For video assets, process individual clips if available
       if (
         assetType === "Video" &&
@@ -97,6 +120,17 @@ export function transformResultsToClipMode(
         clips.length > 0
       ) {
         clips.forEach((clip, clipIndex) => {
+          // Debug logging for clips starting at 00:00:00
+          if (clip.start_timecode === "00:00:00:00") {
+            console.log(`🔍 Found clip starting at 00:00:00:00:`, {
+              clipIndex,
+              score: clip.score,
+              start_timecode: clip.start_timecode,
+              end_timecode: clip.end_timecode,
+              hasValidScore: clip.score !== undefined && clip.score !== null,
+            });
+          }
+
           // Only process clips that have a valid score for semantic search
           if (clip.score !== undefined && clip.score !== null) {
             // Create a new asset item for each clip
@@ -115,7 +149,26 @@ export function transformResultsToClipMode(
               clips: [clip],
             };
 
+            // Debug logging for clips starting at 00:00:00 that are being added
+            if (clip.start_timecode === "00:00:00:00") {
+              console.log(
+                `✅ Adding clip starting at 00:00:00:00 to results:`,
+                {
+                  clipAssetId: clipAsset.InventoryID,
+                  score: clipAsset.score,
+                },
+              );
+            }
+
             allClipAssets!.push(clipAsset);
+          } else if (clip.start_timecode === "00:00:00:00") {
+            console.log(
+              `❌ Skipping clip starting at 00:00:00:00 due to invalid score:`,
+              {
+                score: clip.score,
+                scoreType: typeof clip.score,
+              },
+            );
           }
         });
       }

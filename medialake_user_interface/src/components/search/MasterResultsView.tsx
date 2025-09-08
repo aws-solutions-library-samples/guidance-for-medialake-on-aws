@@ -293,7 +293,22 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
 
     const filtered = transformedResults.filter((asset) => {
       const score = asset.score ?? 1; // Default to 1 if no score (non-semantic results)
-      return score >= debouncedConfidenceThreshold;
+      const passesThreshold = score >= debouncedConfidenceThreshold;
+
+      // Debug logging for clips starting at 00:00:00
+      if (
+        isClipAsset(asset) &&
+        asset.clipData.start_timecode === "00:00:00:00"
+      ) {
+        console.log(`🔍 Confidence filtering clip starting at 00:00:00:00:`, {
+          assetId: asset.InventoryID,
+          score,
+          threshold: debouncedConfidenceThreshold,
+          passesThreshold,
+        });
+      }
+
+      return passesThreshold;
     });
 
     const endTime = performance.now();
