@@ -7,7 +7,7 @@ from constructs import Construct
 
 
 class EdgeLambdaConstruct(Construct):
-    def __init__(self, scope: Construct, construct_id: str, props):
+    def __init__(self, scope: Construct, construct_id: str, props=None):
         super().__init__(scope, construct_id)
 
         # Create Lambda function with simplified code

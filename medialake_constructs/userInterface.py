@@ -28,10 +28,7 @@ from aws_cdk import custom_resources as cr
 from constructs import Construct
 
 from config import config
-from medialake_constructs.edge_lambda_construct import (
-    EdgeLambdaConstruct,
-    EdgeLambdaConstructProps,
-)
+from medialake_constructs.edge_lambda_construct import EdgeLambdaConstruct
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
 
 
@@ -390,9 +387,7 @@ class UIConstruct(Construct):
         # Media assets bucket is now passed directly through props
 
         # Create Edge Lambda construct
-        edge_lambda_construct = EdgeLambdaConstruct(
-            self, "EdgeLambda", props=EdgeLambdaConstructProps()
-        )
+        edge_lambda_construct = EdgeLambdaConstruct(self, "EdgeLambda")
 
         # Create a shared CF Origin for static assets (S3)
         s3_orig = origins.S3BucketOrigin.with_origin_access_control(
