@@ -333,6 +333,21 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                         console.log(
                           `  ✅ Added marker: ${start}s - ${end}s (color: ${markerColor})`,
                         );
+
+                        // For clip assets, seek to the beginning of the clip
+                        if (isClipAsset) {
+                          try {
+                            omakasePlayer.video.seekToTime(start);
+                            console.log(
+                              `  🎯 Seeked to clip start time: ${start}s for clip asset ${id}`,
+                            );
+                          } catch (seekError) {
+                            console.warn(
+                              `  ⚠️ Failed to seek to clip start time ${start}s:`,
+                              seekError,
+                            );
+                          }
+                        }
                       } catch (e) {
                         console.warn("progressMarkerTrack not ready", e);
                       }
