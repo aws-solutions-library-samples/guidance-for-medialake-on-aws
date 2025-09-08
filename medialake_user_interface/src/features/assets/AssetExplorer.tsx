@@ -36,6 +36,7 @@ import {
   useRemoveFavorite,
 } from "@/api/hooks/useFavorites";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
+import { getOriginalAssetId } from "@/utils/clipTransformation";
 
 interface AssetExplorerProps {
   connectorId: string;
@@ -222,7 +223,9 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({
       const assetType = asset.DigitalSourceAsset.Type.toLowerCase();
       // Special case for audio to use singular form
       const pathPrefix = assetType === "audio" ? "/audio/" : `/${assetType}s/`;
-      navigate(`${pathPrefix}${asset.InventoryID}`, {
+      // Always use the original asset ID, not the clip ID
+      const originalAssetId = getOriginalAssetId(asset);
+      navigate(`${pathPrefix}${originalAssetId}`, {
         state: {
           assetType: asset.DigitalSourceAsset.Type,
           connectorId,

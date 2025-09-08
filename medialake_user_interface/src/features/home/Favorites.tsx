@@ -6,6 +6,7 @@ import {
   useRemoveFavorite,
 } from "../../api/hooks/useFavorites";
 import AssetCard from "../../components/shared/AssetCard";
+import { getOriginalAssetId } from "@/utils/clipTransformation";
 
 export const Favorites: React.FC = () => {
   const navigate = useNavigate();
@@ -57,7 +58,9 @@ export const Favorites: React.FC = () => {
       assetType.toLowerCase() === "audio"
         ? "/audio/"
         : `/${assetType.toLowerCase()}s/`;
-    navigate(`${pathPrefix}${assetId}`);
+    // Always use the original asset ID, not the clip ID
+    const originalAssetId = getOriginalAssetId({ InventoryID: assetId });
+    navigate(`${pathPrefix}${originalAssetId}`);
   };
 
   // Handle toggling favorite status
