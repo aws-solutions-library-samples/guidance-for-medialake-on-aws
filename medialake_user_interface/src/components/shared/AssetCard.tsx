@@ -253,13 +253,13 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
 
                     filteredClips = shouldFilter
                       ? clips.filter((clip) => {
-                          const score = clip.score ?? 1;
-                          const passes = score >= confidenceThreshold;
-                          console.log(
-                            `    Clip ${clip.start_timecode}-${clip.end_timecode}: score=${score}, threshold=${confidenceThreshold}, passes=${passes}`,
-                          );
-                          return passes;
-                        })
+                        const score = clip.score ?? 1;
+                        const passes = score >= confidenceThreshold;
+                        console.log(
+                          `    Clip ${clip.start_timecode}-${clip.end_timecode}: score=${score}, threshold=${confidenceThreshold}, passes=${passes}`,
+                        );
+                        return passes;
+                      })
                       : clips;
 
                     console.log(
@@ -499,13 +499,13 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
 
             filteredClips = shouldFilter
               ? clips.filter((clip) => {
-                  const score = clip.score ?? 1;
-                  const passes = score >= confidenceThreshold;
-                  console.log(
-                    `    UPDATE Clip ${clip.start_timecode}-${clip.end_timecode}: score=${score}, threshold=${confidenceThreshold}, passes=${passes}`,
-                  );
-                  return passes;
-                })
+                const score = clip.score ?? 1;
+                const passes = score >= confidenceThreshold;
+                console.log(
+                  `    UPDATE Clip ${clip.start_timecode}-${clip.end_timecode}: score=${score}, threshold=${confidenceThreshold}, passes=${passes}`,
+                );
+                return passes;
+              })
               : clips;
 
             console.log(
@@ -567,6 +567,21 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                 console.log(
                   `  ✅ Added marker: ${marker.id || "auto-generated"} (${start}s-${end}s)`,
                 );
+
+                // For clip assets, seek to the beginning of the clip
+                if (isClipAsset) {
+                  try {
+                    omakasePlayerRef.current.video.seekToTime(start);
+                    console.log(
+                      `  🎯 UPDATE: Seeked to clip start time: ${start}s for clip asset ${id}`,
+                    );
+                  } catch (seekError) {
+                    console.warn(
+                      `  ⚠️ UPDATE: Failed to seek to clip start time ${start}s:`,
+                      seekError,
+                    );
+                  }
+                }
               } catch (e) {
                 console.warn("progressMarkerTrack not ready", e);
               }
