@@ -253,13 +253,13 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
 
                     filteredClips = shouldFilter
                       ? clips.filter((clip) => {
-                        const score = clip.score ?? 1;
-                        const passes = score >= confidenceThreshold;
-                        console.log(
-                          `    Clip ${clip.start_timecode}-${clip.end_timecode}: score=${score}, threshold=${confidenceThreshold}, passes=${passes}`,
-                        );
-                        return passes;
-                      })
+                          const score = clip.score ?? 1;
+                          const passes = score >= confidenceThreshold;
+                          console.log(
+                            `    Clip ${clip.start_timecode}-${clip.end_timecode}: score=${score}, threshold=${confidenceThreshold}, passes=${passes}`,
+                          );
+                          return passes;
+                        })
                       : clips;
 
                     console.log(
@@ -499,13 +499,13 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
 
             filteredClips = shouldFilter
               ? clips.filter((clip) => {
-                const score = clip.score ?? 1;
-                const passes = score >= confidenceThreshold;
-                console.log(
-                  `    UPDATE Clip ${clip.start_timecode}-${clip.end_timecode}: score=${score}, threshold=${confidenceThreshold}, passes=${passes}`,
-                );
-                return passes;
-              })
+                  const score = clip.score ?? 1;
+                  const passes = score >= confidenceThreshold;
+                  console.log(
+                    `    UPDATE Clip ${clip.start_timecode}-${clip.end_timecode}: score=${score}, threshold=${confidenceThreshold}, passes=${passes}`,
+                  );
+                  return passes;
+                })
               : clips;
 
             console.log(
