@@ -82,6 +82,8 @@ class SearchConstruct(Construct):
                     "SYSTEM_SETTINGS_TABLE": props.system_settings_table,
                     "S3_VECTOR_BUCKET_NAME": props.s3_vector_bucket_name,
                     "S3_VECTOR_INDEX_NAME": "media-vectors",
+                    # CLOUDFRONT_DISTRIBUTION_DOMAIN removed to break circular dependency
+                    # Lambda will fetch this from SSM parameter at runtime
                 },
             ),
         )
@@ -176,6 +178,15 @@ class SearchConstruct(Construct):
                     f"arn:aws:s3vectors:{Stack.of(self).region}:{Stack.of(self).account}:bucket/{props.s3_vector_bucket_name}",
                     f"arn:aws:s3vectors:{Stack.of(self).region}:{Stack.of(self).account}:bucket/{props.s3_vector_bucket_name}/*",
                 ],
+            )
+        )
+
+        # Add SSM GetParameter permissions
+        search_get_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["ssm:GetParameter"],
+                resources=["*"],
             )
         )
 

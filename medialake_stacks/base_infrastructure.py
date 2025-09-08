@@ -9,6 +9,7 @@ from aws_cdk import aws_s3 as s3
 from constructs import Construct
 
 from config import config
+from constants import KMS
 from constants import Lambda as LambdaConstants
 
 # from medialake_constructs.shared_constructs.opensearch_ingestion_pipeline import (
@@ -302,6 +303,7 @@ class BaseInfrastructureStack(Stack):
                         and config.s3.asset_bucket.kms_key_arn
                         else None
                     ),
+                    alias=KMS.MEDIA_BUCKET_KEY_ALIAS,
                     cors=[
                         s3.CorsRule(
                             allowed_methods=[
@@ -605,6 +607,44 @@ class BaseInfrastructureStack(Stack):
                     ],
                     description=f"Keeps {fn.function_name} warm via scheduled EventBridge rule.",
                 )
+
+        # Export media assets bucket name via SSM parameter to avoid circular dependencies
+        from aws_cdk import aws_ssm as ssm
+
+        ssm.StringParameter(
+            self,
+            "MediaAssetsBucketNameParameter",
+            parameter_name=f"/medialake/{config.environment}/media-assets-bucket-name",
+            string_value=self.media_assets_s3_bucket.bucket_name,
+            description="Media assets bucket name for cross-stack reference",
+        )
+
+        # Export media assets bucket ARN for cross-stack reference
+        CfnOutput(
+            self,
+            "MediaAssetsBucketArn",
+            value=self.media_assets_s3_bucket.bucket_arn,
+            description="Media assets bucket ARN for cross-stack reference",
+            export_name=f"{self.stack_name}-MediaAssetsBucketArn",
+        )
+
+        # Export media assets bucket KMS key ARN for cross-stack reference
+        CfnOutput(
+            self,
+            "MediaAssetsBucketKmsKeyArn",
+            value=self.media_assets_s3_bucket.key_arn,
+            description="Media assets bucket KMS key ARN for cross-stack reference",
+            export_name=f"{self.stack_name}-MediaAssetsBucketKmsKeyArn",
+        )
+
+        # Export access logs bucket ARN for cross-stack reference
+        CfnOutput(
+            self,
+            "AccessLogsBucketArn",
+            value=self._access_logs_bucket.bucket_arn,
+            description="Access logs bucket ARN for cross-stack reference",
+            export_name=f"{self.stack_name}-AccessLogsBucketArn",
+        )
 
         # Add outputs for retained resources in prod environment
         self.add_retained_resources_outputs()

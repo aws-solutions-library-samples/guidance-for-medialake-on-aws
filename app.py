@@ -507,14 +507,17 @@ user_interface_stack = UserInterfaceStack(
         cognito_identity_pool=cognito_stack.identity_pool,
         cognito_user_pool_arn=cognito_stack.user_pool_arn,
         cognito_domain_prefix=cognito_stack.cognito_domain_prefix,
-        api_gateway_rest_id=medialake_stack.shared_rest_api.rest_api_id,
-        api_gateway_stage=api_gateway_deployment_stack.api_deployment_stage.stage_name,
-        access_log_bucket=base_infrastructure.access_log_bucket,
+        # Use CloudFormation imports to avoid circular dependencies
+        api_gateway_rest_id="",  # Will be imported from CloudFormation
+        api_gateway_stage="",  # Will be imported from CloudFormation
+        # Buckets will be imported from BaseInfrastructureStack exports
         cloudfront_waf_acl_arn=waf_acl_ssm_param_name,
     ),
     env=env,
 )
-user_interface_stack.add_dependency(medialake_stack)
+# Add dependencies to ensure exports are available
+user_interface_stack.add_dependency(base_infrastructure)
+user_interface_stack.add_dependency(api_gateway_deployment_stack)
 
 # Create the Cognito Update Stack (between user_interface_stack and cleanup_stack)
 cognito_update_stack = CognitoUpdateStack(
