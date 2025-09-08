@@ -448,16 +448,13 @@ class UIConstruct(Construct):
                     origin_request_policy=cloudfront.OriginRequestPolicy.CORS_S3_ORIGIN,
                     response_headers_policy=media_response_headers_policy,
                     compress=True,
-                    # Add edge Lambda functions for media behavior
+                    # Only use origin-request, not viewer-response
                     edge_lambdas=[
                         cloudfront.EdgeLambda(
                             function_version=edge_lambda_construct.lambda_version,
                             event_type=cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
                         ),
-                        cloudfront.EdgeLambda(
-                            function_version=edge_lambda_construct.lambda_version,
-                            event_type=cloudfront.LambdaEdgeEventType.VIEWER_RESPONSE,
-                        ),
+                        # Remove the viewer-response Lambda
                     ],
                 ),
                 f"/{config.api_path}/*": cloudfront.BehaviorOptions(

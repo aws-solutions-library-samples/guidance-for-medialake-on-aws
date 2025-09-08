@@ -1,147 +1,61 @@
-"""
-CDK construct for CloudFront Edge Lambda functions
-"""
-
-import os
-from dataclasses import dataclass
-
 from aws_cdk import (
     Duration,
-    RemovalPolicy,
 )
-from aws_cdk import aws_cloudfront as cloudfront
-from aws_cdk import aws_lambda as lambda_
-from aws_cdk import aws_logs as logs
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_lambda as _lambda
 from constructs import Construct
 
 
-@dataclass
-class EdgeLambdaConstructProps:
-    """Properties for EdgeLambdaConstruct"""
-
-    # Optional properties for customization
-    log_retention: logs.RetentionDays = logs.RetentionDays.ONE_WEEK
-    removal_policy: RemovalPolicy = RemovalPolicy.DESTROY
-
-
 class EdgeLambdaConstruct(Construct):
-    """
-    Construct for CloudFront Edge Lambda functions
-    """
+    def __init__(self, scope: Construct, construct_id: str, props):
+        super().__init__(scope, construct_id)
 
-    def __init__(
-        self,
-        scope: Construct,
-        construct_id: str,
-        props: EdgeLambdaConstructProps,
-        **kwargs,
-    ) -> None:
-        super().__init__(scope, construct_id, **kwargs)
-
-        # Create the CSP header modifier Lambda function
-        self.csp_header_modifier = lambda_.Function(
+        # Create Lambda function with simplified code
+        self.lambda_function = _lambda.Function(
             self,
-            "CSPHeaderModifier",
-            runtime=lambda_.Runtime.PYTHON_3_9,
+            "CSPHeaderLambda",
+            runtime=_lambda.Runtime.PYTHON_3_9,
             handler="index.lambda_handler",
-            code=lambda_.Code.from_asset(
-                os.path.join(
-                    os.path.dirname(os.path.dirname(__file__)),
-                    "lambdas/edge/csp_header_modifier",
-                )
-            ),
-            description="CloudFront Edge Lambda to modify CSP headers and clean URIs",
-            timeout=Duration.seconds(5),  # Edge Lambda max timeout
-            memory_size=128,  # Edge Lambda max memory
-            log_retention=props.log_retention,
-        )
-
-        # Create CloudWatch Log Group for the Lambda function
-        self.log_group = logs.LogGroup(
-            self,
-            "CSPHeaderModifierLogGroup",
-            log_group_name=f"/aws/lambda/{self.csp_header_modifier.function_name}",
-            retention=props.log_retention,
-            removal_policy=props.removal_policy,
-        )
-
-        # Create Lambda@Edge version (required for CloudFront)
-        self.lambda_version = lambda_.Version(
-            self,
-            "CSPHeaderModifierVersion",
-            lambda_=self.csp_header_modifier,
-            description="Version for CSP header modifier Edge Lambda",
-        )
-
-    def get_origin_request_function(self) -> cloudfront.Function:
-        """
-        Get the Lambda@Edge function for origin request events
-        """
-        return cloudfront.Function(
-            self,
-            "CSPOriginRequestFunction",
-            code=cloudfront.FunctionCode.from_inline(
+            code=_lambda.Code.from_inline(
                 """
-                function handler(event) {
-                var request = event.request;
-                var uri = request.uri;
+import re
 
-                // Strip /*/*/ pattern from URI
-                var cleanedUri = uri.replace(/\/\*\/\*/g, '/');
-                request.uri = cleanedUri;
+def lambda_handler(event, context):
+    # Only handle origin-request events
+    request = event['Records'][0]['cf']['request']
+    original_uri = request['uri']
 
-                return request;
-                }
-            """
+    # Pattern to match /media/{bucket-name}/ where bucket name contains 'mediaassetss3bucket'
+    # This makes it work regardless of the random suffix CDK adds
+    pattern = r'^/media/[^/]*mediaassetss3bucket[^/]*/(.*)$'
+
+    match = re.match(pattern, original_uri)
+    if match:
+        # Extract the path after /media/{bucket-name}/
+        request['uri'] = '/' + match.group(1)
+    elif original_uri.startswith('/media/'):
+        # Fallback: just strip /media/ if no bucket pattern found
+        request['uri'] = original_uri[6:]
+
+    return request
+"""
             ),
-            comment="Strips /*/*/ from URI before forwarding to origin",
+            role=iam.Role(
+                self,
+                "EdgeLambdaRole",
+                assumed_by=iam.CompositePrincipal(
+                    iam.ServicePrincipal("lambda.amazonaws.com"),
+                    iam.ServicePrincipal("edgelambda.amazonaws.com"),
+                ),
+                managed_policies=[
+                    iam.ManagedPolicy.from_aws_managed_policy_name(
+                        "service-role/AWSLambdaBasicExecutionRole"
+                    )
+                ],
+            ),
+            timeout=Duration.seconds(5),
+            memory_size=128,
         )
 
-    def get_viewer_response_function(self) -> cloudfront.Function:
-        """
-        Get the Lambda@Edge function for viewer response events
-        """
-        return cloudfront.Function(
-            self,
-            "CSPViewerResponseFunction",
-            code=cloudfront.FunctionCode.from_inline(
-                """
-                function handler(event) {
-                var response = event.response;
-                var headers = response.headers;
-
-                // Modify CSP header to allow WASM
-                if (headers['content-security-policy']) {
-                    var csp = headers['content-security-policy'].value;
-
-                    // Add wasm-unsafe-eval to script-src if not present
-                    if (csp.includes('script-src') && !csp.includes('wasm-unsafe-eval')) {
-                        csp = csp.replace(/script-src([^;]*)/, 'script-src$1 \'wasm-unsafe-eval\'');
-                    }
-
-                    // Add blob: to script-src if not present
-                    if (csp.includes('script-src') && !csp.includes('blob:')) {
-                        csp = csp.replace(/script-src([^;]*)/, 'script-src$1 blob:');
-                    }
-
-                    // Add data: to connect-src if not present
-                    if (csp.includes('connect-src') && !csp.includes('data:')) {
-                        csp = csp.replace(/connect-src([^;]*)/, 'connect-src$1 data:');
-                    }
-
-                    // Add blob: to connect-src if not present
-                    if (csp.includes('connect-src') && !csp.includes('blob:')) {
-                        csp = csp.replace(/connect-src([^;]*)/, 'connect-src$1 blob:');
-                    }
-
-                    headers['content-security-policy'] = {
-                        value: csp
-                    };
-                }
-
-                return response;
-                }
-            """
-            ),
-            comment="Modifies CSP headers to allow WASM and blob URLs",
-        )
+        # Publish version for Lambda@Edge
+        self.lambda_version = self.lambda_function.current_version
