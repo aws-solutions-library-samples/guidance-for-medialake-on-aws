@@ -10,6 +10,12 @@ import { formatFileSize } from "@/utils/fileSize";
 import { formatDate } from "@/utils/dateFormat";
 import { useDebounce } from "@/hooks/useDebounce";
 import AssetResultsView from "../shared/AssetResultsView";
+import {
+  transformResultsToClipMode,
+  getClipDisplayName,
+  isClipAsset,
+} from "@/utils/clipTransformation";
+import { useSemanticMode } from "@/stores/searchStore";
 
 type AssetItem = (ImageItem | VideoItem | AudioItem) & {
   DigitalSourceAsset: {
@@ -177,41 +183,86 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   isRenaming = false,
   renamingAssetId,
 }) => {
-  // Function to render card fields
-  const renderCardField = (
-    fieldId: string,
-    asset: AssetItem,
-  ): React.ReactNode => {
-    // console.log('Rendering field:', fieldId, 'for asset:', asset.InventoryID);
+  // Get semantic mode from store
+  const semanticMode = useSemanticMode();
 
-    switch (fieldId) {
-      case "name":
-        return asset.DigitalSourceAsset.MainRepresentation.StorageInfo
-          .PrimaryLocation.ObjectKey.Name;
-      case "type":
-        return asset.DigitalSourceAsset.Type;
-      case "format":
-        return asset.DigitalSourceAsset.MainRepresentation.Format;
-      case "size":
-        const sizeInBytes =
-          asset.DigitalSourceAsset.MainRepresentation.StorageInfo
-            .PrimaryLocation.FileInfo.Size;
-        return formatFileSize(sizeInBytes);
-      case "createdAt":
-        return formatDate(asset.DigitalSourceAsset.CreateDate);
-      case "modifiedAt":
-        return formatDate(
-          asset.DigitalSourceAsset.ModifiedDate ||
-            asset.DigitalSourceAsset.CreateDate,
-        );
-      case "fullPath":
-        return asset.DigitalSourceAsset.MainRepresentation.StorageInfo
-          .PrimaryLocation.ObjectKey.FullPath;
-      default:
-        console.log("Unknown field ID:", fieldId);
-        return "";
-    }
-  };
+  // Pre-compute and store the transformed results (expensive operation)
+  // This only recalculates when results, isSemantic, semanticMode, or pagination change
+  const { transformedResults, adjustedSearchMetadata } = React.useMemo(() => {
+    console.log("🔄 Transforming results to clip mode...", {
+      resultsCount: results.length,
+      isSemantic,
+      semanticMode,
+      page: searchMetadata.page,
+      pageSize: searchMetadata.pageSize,
+    });
+
+    const transformation = transformResultsToClipMode(
+      results,
+      isSemantic,
+      semanticMode,
+      // Only apply pagination in clip mode
+      isSemantic && semanticMode === "clip"
+        ? {
+            page: searchMetadata.page,
+            pageSize: searchMetadata.pageSize,
+          }
+        : undefined,
+    );
+
+    // Adjust search metadata for clip mode
+    const adjustedMetadata = {
+      ...searchMetadata,
+      totalResults:
+        isSemantic && semanticMode === "clip"
+          ? transformation.totalClips
+          : searchMetadata.totalResults,
+    };
+
+    return {
+      transformedResults: transformation.results,
+      adjustedSearchMetadata: adjustedMetadata,
+    };
+  }, [results, isSemantic, semanticMode, searchMetadata]);
+
+  // Function to render card fields - memoized to prevent unnecessary re-renders
+  const renderCardField = React.useCallback(
+    (fieldId: string, asset: AssetItem): React.ReactNode => {
+      // console.log('Rendering field:', fieldId, 'for asset:', asset.InventoryID);
+
+      switch (fieldId) {
+        case "name":
+          // Use clip display name for clip assets
+          return isClipAsset(asset)
+            ? getClipDisplayName(asset)
+            : asset.DigitalSourceAsset.MainRepresentation.StorageInfo
+                .PrimaryLocation.ObjectKey.Name;
+        case "type":
+          return asset.DigitalSourceAsset.Type;
+        case "format":
+          return asset.DigitalSourceAsset.MainRepresentation.Format;
+        case "size":
+          const sizeInBytes =
+            asset.DigitalSourceAsset.MainRepresentation.StorageInfo
+              .PrimaryLocation.FileInfo.Size;
+          return formatFileSize(sizeInBytes);
+        case "createdAt":
+          return formatDate(asset.DigitalSourceAsset.CreateDate);
+        case "modifiedAt":
+          return formatDate(
+            asset.DigitalSourceAsset.ModifiedDate ||
+              asset.DigitalSourceAsset.CreateDate,
+          );
+        case "fullPath":
+          return asset.DigitalSourceAsset.MainRepresentation.StorageInfo
+            .PrimaryLocation.ObjectKey.FullPath;
+        default:
+          console.log("Unknown field ID:", fieldId);
+          return "";
+      }
+    },
+    [],
+  ); // No dependencies since this function is pure
 
   // Function to check if an asset is selected
   const isAssetSelected =
@@ -220,34 +271,52 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       : undefined;
 
   // Debounce the confidence threshold to reduce rapid filtering during slider interaction
+  // Reduced debounce time for more responsive UI
   const debouncedConfidenceThreshold = useDebounce(
     confidenceThreshold || 0,
-    150,
+    100,
   );
 
   // Filter results based on confidence threshold for semantic search
+  // This is a lightweight operation that only filters the pre-computed results
   const filteredResults = React.useMemo(() => {
+    const startTime = performance.now();
+
     if (
       !isSemantic ||
       debouncedConfidenceThreshold === undefined ||
       debouncedConfidenceThreshold === 0
     ) {
-      return results;
+      console.log("🔍 No filtering needed - returning all transformed results");
+      return transformedResults;
     }
-    return results.filter((asset) => {
+
+    const filtered = transformedResults.filter((asset) => {
       const score = asset.score ?? 1; // Default to 1 if no score (non-semantic results)
       return score >= debouncedConfidenceThreshold;
     });
-  }, [results, isSemantic, debouncedConfidenceThreshold]);
+
+    const endTime = performance.now();
+    console.log(
+      `🔍 Confidence filtering completed in ${(endTime - startTime).toFixed(2)}ms`,
+      {
+        originalCount: transformedResults.length,
+        filteredCount: filtered.length,
+        threshold: debouncedConfidenceThreshold,
+      },
+    );
+
+    return filtered;
+  }, [transformedResults, isSemantic, debouncedConfidenceThreshold]);
 
   return (
     <AssetResultsView
       results={filteredResults}
-      originalResults={results}
+      originalResults={transformedResults}
       isSemantic={isSemantic}
       confidenceThreshold={confidenceThreshold}
       onConfidenceThresholdChange={onConfidenceThresholdChange}
-      searchMetadata={searchMetadata}
+      searchMetadata={adjustedSearchMetadata}
       onPageChange={onPageChange}
       onPageSizeChange={onPageSizeChange}
       selectedFields={selectedFields}
@@ -292,14 +361,24 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       isLoading={isLoading}
       isRenaming={isRenaming}
       renamingAssetId={renamingAssetId}
-      getAssetId={(asset) => asset.InventoryID}
-      getAssetName={(asset) =>
-        asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-          .ObjectKey.Name
-      }
-      getAssetType={(asset) => asset.DigitalSourceAsset.Type}
-      getAssetThumbnail={(asset) => asset.thumbnailUrl || ""}
-      getAssetProxy={(asset) => asset.proxyUrl || ""}
+      getAssetId={React.useCallback((asset) => asset.InventoryID, [])}
+      getAssetName={React.useCallback(
+        (asset) =>
+          isClipAsset(asset)
+            ? getClipDisplayName(asset)
+            : asset.DigitalSourceAsset.MainRepresentation.StorageInfo
+                .PrimaryLocation.ObjectKey.Name,
+        [],
+      )}
+      getAssetType={React.useCallback(
+        (asset) => asset.DigitalSourceAsset.Type,
+        [],
+      )}
+      getAssetThumbnail={React.useCallback(
+        (asset) => asset.thumbnailUrl || "",
+        [],
+      )}
+      getAssetProxy={React.useCallback((asset) => asset.proxyUrl || "", [])}
       renderCardField={renderCardField}
     />
   );

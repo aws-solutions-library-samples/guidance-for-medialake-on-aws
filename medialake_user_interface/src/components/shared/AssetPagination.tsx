@@ -15,6 +15,7 @@ interface AssetPaginationProps {
   totalResults: number;
   onPageChange: (event: React.ChangeEvent<unknown>, value: number) => void;
   onPageSizeChange: (newPageSize: number) => void;
+  isFiltered?: boolean;
 }
 
 const AssetPagination: React.FC<AssetPaginationProps> = ({
@@ -23,6 +24,7 @@ const AssetPagination: React.FC<AssetPaginationProps> = ({
   totalResults,
   onPageChange,
   onPageSizeChange,
+  isFiltered = false,
 }) => {
   if (totalResults === 0) {
     return null;
@@ -45,8 +47,9 @@ const AssetPagination: React.FC<AssetPaginationProps> = ({
     >
       <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
         <Typography variant="body2" color="text.secondary">
-          Showing {(page - 1) * pageSize + 1} -{" "}
-          {Math.min(page * pageSize, totalResults)} of {totalResults} results
+          {isFiltered
+            ? `Showing ${totalResults} filtered results`
+            : `Showing ${(page - 1) * pageSize + 1} - ${Math.min(page * pageSize, totalResults)} of ${totalResults} results`}
         </Typography>
         <FormControl size="small" variant="outlined">
           <Select

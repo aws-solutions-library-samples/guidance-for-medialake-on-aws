@@ -301,17 +301,14 @@ function AssetResultsView<T>({
                   opacity: 0.75,
                 }}
               >
-                (Found {searchMetadata.totalResults} results for "{searchTerm}"
+                (Found{" "}
                 {isSemantic &&
-                  confidenceThreshold > 0 &&
-                  originalResults &&
-                  results.length !== originalResults.length && (
-                    <>
-                      , showing {results.length} above{" "}
-                      {confidenceThreshold.toFixed(2)} confidence
-                    </>
-                  )}
-                )
+                confidenceThreshold > 0 &&
+                originalResults &&
+                results.length !== originalResults.length
+                  ? results.length
+                  : searchMetadata.totalResults}{" "}
+                results for "{searchTerm}")
               </Typography>
             )}
           </Typography>
@@ -559,9 +556,22 @@ function AssetResultsView<T>({
       <AssetPagination
         page={searchMetadata.page}
         pageSize={searchMetadata.pageSize}
-        totalResults={searchMetadata.totalResults}
+        totalResults={
+          isSemantic &&
+          confidenceThreshold > 0 &&
+          originalResults &&
+          results.length !== originalResults.length
+            ? results.length
+            : searchMetadata.totalResults
+        }
         onPageChange={(_, page) => onPageChange(page)}
         onPageSizeChange={onPageSizeChange}
+        isFiltered={
+          isSemantic &&
+          confidenceThreshold > 0 &&
+          originalResults &&
+          results.length !== originalResults.length
+        }
       />
     </Box>
   );
