@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useFeatureFlag } from "@/utils/featureFlags";
 import {
   Box,
@@ -16,7 +16,10 @@ import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import InfoIcon from "@mui/icons-material/Info";
-import { PLACEHOLDER_IMAGE } from "@/utils/placeholderSvg";
+import {
+  PLACEHOLDER_IMAGE,
+  VIDEO_PLACEHOLDER_IMAGE,
+} from "@/utils/placeholderSvg";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import { AssetAudio } from "../asset";
 import { InlineTextEditor } from "../common/InlineTextEditor";
@@ -130,6 +133,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
     const playerInitializedRef = useRef<boolean>(false);
     const currentProxyUrlRef = useRef<string | undefined>(proxyUrl);
     const markerIdsRef = useRef<string[]>([]);
+    const [videoLoadError, setVideoLoadError] = useState(false);
 
     // Initialize Omakase player for video assets
     useEffect(() => {
@@ -156,7 +160,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
             playerChroming: {
               theme: "STAMP",
               themeConfig: {
-                stampScale: "FIT",
+                stampScale: thumbnailScale === "fit" ? "FIT" : "FILL",
               },
             },
           });
@@ -165,6 +169,9 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
           omakasePlayerRef.current = omakasePlayer;
           playerInitializedRef.current = true;
           currentProxyUrlRef.current = proxyUrl;
+
+          // Reset error state when attempting to load video
+          setVideoLoadError(false);
 
           // Load the video then add markers if clips provided
           omakasePlayer.loadVideo(proxyUrl).subscribe({
@@ -263,6 +270,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
             },
             error: (error) => {
               console.error(`Failed to load video for asset ${id}:`, error);
+              setVideoLoadError(true);
             },
           });
 
@@ -289,6 +297,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
           },
           error: (error) => {
             console.error(`Failed to reload video for asset ${id}:`, error);
+            setVideoLoadError(true);
           },
         });
       }
@@ -309,7 +318,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
           }
         }
       };
-    }, [assetType, proxyUrl, id]); // Removed clips from dependencies to prevent re-initialization
+    }, [assetType, proxyUrl, id, thumbnailScale]); // Added thumbnailScale to reinitialize player when scale changes
 
     // Separate effect to handle clip marker updates when confidence threshold changes
     useEffect(() => {
@@ -442,7 +451,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
               : 200;
 
       const sizeMultiplier =
-        cardSize === "small" ? 0.8 : cardSize === "large" ? 1.2 : 1;
+        cardSize === "small" ? 0.8 : cardSize === "large" ? 1.4 : 1.1;
 
       return {
         height: baseHeight * sizeMultiplier,
@@ -455,7 +464,8 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
     const defaultImageErrorHandler = (
       event: React.SyntheticEvent<HTMLImageElement, Event>,
     ) => {
-      event.currentTarget.src = placeholderImage;
+      event.currentTarget.src =
+        assetType === "Video" ? VIDEO_PLACEHOLDER_IMAGE : placeholderImage;
     };
 
     const handleDeleteClick = (event: React.MouseEvent<HTMLElement>) => {
@@ -622,30 +632,49 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
           {/* Render appropriate content based on asset type */}
           {assetType === "Video" ? (
             <Box sx={{ display: "flex", flexDirection: "column" }}>
-              <div
-                id={`video-asset-${id}`}
-                className="asset-card-video"
-                style={{
-                  width: dimensions.width,
-                  height: dimensions.height,
-                  backgroundColor: "rgba(0,0,0,0.03)",
-                  cursor: "pointer",
-                  position: "relative",
-                }}
-              >
+              {proxyUrl && !videoLoadError ? (
                 <div
-                  id={`omakase-player-${id}`}
-                  style={{ width: "100%", height: "100%" }}
+                  id={`video-asset-${id}`}
+                  className="asset-card-video"
+                  style={{
+                    width: dimensions.width,
+                    height: dimensions.height,
+                    backgroundColor: "rgba(0,0,0,0.03)",
+                    cursor: "pointer",
+                    position: "relative",
+                  }}
+                >
+                  <div
+                    id={`omakase-player-${id}`}
+                    style={{ width: "100%", height: "100%" }}
+                  />
+                </div>
+              ) : (
+                <Box
+                  onClick={onAssetClick}
+                  component="img"
+                  src={thumbnailUrl || VIDEO_PLACEHOLDER_IMAGE}
+                  alt={name}
+                  onError={onImageError || defaultImageErrorHandler}
+                  data-image-id={id}
+                  sx={{
+                    cursor: "pointer",
+                    width: dimensions.width,
+                    height: dimensions.height,
+                    backgroundColor: "rgba(0,0,0,0.03)",
+                    objectFit: thumbnailScale === "fit" ? "contain" : "cover",
+                    transition: "all 0.2s ease-in-out",
+                  }}
                 />
-              </div>
+              )}
 
               {/* Video Control Bar */}
               <Box
                 sx={{
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "flex-end",
-                  gap: 2,
+                  justifyContent: "space-between",
+                  gap: 1,
                   p: 1,
                   bgcolor: "background.paper",
                   borderTop: "1px solid",
@@ -653,24 +682,6 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                 }}
                 onClick={(e) => e.stopPropagation()}
               >
-                <IconButton
-                  size="small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onAssetClick();
-                  }}
-                  sx={{
-                    color: "primary.main",
-                    "&:hover": {
-                      bgcolor: "primary.main",
-                      color: "primary.contrastText",
-                    },
-                  }}
-                  title="View Details"
-                >
-                  <InfoIcon fontSize="small" />
-                </IconButton>
-
                 <IconButton
                   size="small"
                   onClick={handleDownloadClick}
@@ -685,6 +696,38 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                 >
                   <DownloadIcon fontSize="small" />
                 </IconButton>
+
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAssetClick();
+                  }}
+                  sx={{
+                    flex: 1,
+                    mx: 1,
+                    minWidth: "40px",
+                    fontSize: "0.75rem",
+                    py: 0.5,
+                    textAlign: "center",
+                    justifyContent: "center",
+                    overflow: "hidden",
+                  }}
+                  title="Asset Detail"
+                >
+                  <Box
+                    sx={{
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      width: "100%",
+                      textAlign: "center",
+                    }}
+                  >
+                    Asset Detail
+                  </Box>
+                </Button>
 
                 <IconButton
                   size="small"
@@ -703,38 +746,297 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
               </Box>
             </Box>
           ) : assetType === "Audio" ? (
-            <Box
-              onClick={onAssetClick}
-              sx={{
-                cursor: "pointer",
-                width: dimensions.width,
-                height: dimensions.height,
-                backgroundColor: "rgba(0,0,0,0.03)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                overflow: "hidden",
-              }}
-            >
-              <AssetAudio src={proxyUrl || ""} alt={name} compact={true} />
+            <Box sx={{ display: "flex", flexDirection: "column" }}>
+              <Box
+                onClick={onAssetClick}
+                sx={{
+                  cursor: "pointer",
+                  width: dimensions.width,
+                  height: dimensions.height,
+                  backgroundColor: "rgba(0,0,0,0.03)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "hidden",
+                }}
+              >
+                <AssetAudio src={proxyUrl || ""} alt={name} compact={true} />
+              </Box>
+
+              {/* Audio Control Bar */}
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 1,
+                  p: 1,
+                  bgcolor: "background.paper",
+                  borderTop: "1px solid",
+                  borderColor: "divider",
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <IconButton
+                  size="small"
+                  onClick={handleDownloadClick}
+                  sx={{
+                    color: "primary.main",
+                    "&:hover": {
+                      bgcolor: "primary.main",
+                      color: "primary.contrastText",
+                    },
+                  }}
+                  title="Download"
+                >
+                  <DownloadIcon fontSize="small" />
+                </IconButton>
+
+                {(() => {
+                  const [showIcon, setShowIcon] = useState(false);
+                  const buttonRef = useRef<HTMLButtonElement>(null);
+
+                  const checkOverflow = useCallback(() => {
+                    if (buttonRef.current) {
+                      const el = buttonRef.current;
+                      const textSpan = el.querySelector(
+                        ".button-text",
+                      ) as HTMLElement;
+                      const iconSpan = el.querySelector(
+                        ".button-icon",
+                      ) as HTMLElement;
+
+                      if (textSpan && iconSpan) {
+                        // Temporarily show text to measure
+                        const originalTextDisplay = textSpan.style.display;
+                        const originalIconDisplay = iconSpan.style.display;
+
+                        textSpan.style.display = "block";
+                        iconSpan.style.display = "none";
+
+                        // Force reflow
+                        el.offsetWidth;
+
+                        const isOverflowing = el.scrollWidth > el.clientWidth;
+                        console.log("Audio Button overflow check:", {
+                          scrollWidth: el.scrollWidth,
+                          clientWidth: el.clientWidth,
+                          isOverflowing,
+                          timestamp: new Date().toISOString(),
+                        });
+
+                        // Restore original display if we're not changing state
+                        if (!isOverflowing) {
+                          textSpan.style.display = originalTextDisplay;
+                          iconSpan.style.display = originalIconDisplay;
+                        }
+
+                        setShowIcon(isOverflowing);
+                      }
+                    }
+                  }, []);
+
+                  useEffect(() => {
+                    // Initial check
+                    const timer = setTimeout(checkOverflow, 100);
+
+                    // Add resize listener
+                    const handleResize = () => {
+                      console.log(
+                        "Window resized, rechecking audio button overflow",
+                      );
+                      checkOverflow();
+                    };
+
+                    window.addEventListener("resize", handleResize);
+
+                    return () => {
+                      clearTimeout(timer);
+                      window.removeEventListener("resize", handleResize);
+                    };
+                  }, [checkOverflow]);
+
+                  return (
+                    <Button
+                      ref={buttonRef}
+                      size="small"
+                      variant="outlined"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAssetClick();
+                      }}
+                      sx={{
+                        flex: 1,
+                        mx: 1,
+                        minWidth: "40px",
+                        fontSize: "0.75rem",
+                        py: 0.5,
+                        whiteSpace: "nowrap !important",
+                        overflow: "hidden !important",
+                        textOverflow: "ellipsis !important",
+                        textAlign: "center",
+                        justifyContent: "center",
+                        "& .MuiButton-root": {
+                          whiteSpace: "nowrap !important",
+                          overflow: "hidden !important",
+                          textOverflow: "ellipsis !important",
+                        },
+                        "& .MuiButton-startIcon": {
+                          display: "none !important",
+                        },
+                        "& .MuiButton-endIcon": {
+                          display: "none !important",
+                        },
+                        "& .button-text": {
+                          display: showIcon ? "none" : "block",
+                          textOverflow: "ellipsis !important",
+                          overflow: "hidden !important",
+                          whiteSpace: "nowrap !important",
+                          width: "100%",
+                        },
+                        "& .button-icon": {
+                          display: showIcon ? "block" : "none",
+                        },
+                        "& span, & .MuiButton-label": {
+                          whiteSpace: "nowrap !important",
+                          overflow: "hidden !important",
+                          textOverflow: "ellipsis !important",
+                          width: "100%",
+                          display: "block !important",
+                        },
+                      }}
+                      title="View Asset Details"
+                    >
+                      <Box component="span" className="button-text">
+                        <Box
+                          sx={{
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            width: "100%",
+                            textAlign: "center",
+                          }}
+                        >
+                          Asset Detail
+                        </Box>
+                      </Box>
+                      <InfoIcon fontSize="small" className="button-icon" />
+                    </Button>
+                  );
+                })()}
+
+                <IconButton
+                  size="small"
+                  onClick={handleDeleteClick}
+                  sx={{
+                    color: "primary.main",
+                    "&:hover": {
+                      bgcolor: "primary.main",
+                      color: "primary.contrastText",
+                    },
+                  }}
+                  title="Delete"
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Box>
             </Box>
           ) : (
-            <Box
-              onClick={onAssetClick}
-              component="img"
-              src={thumbnailUrl || placeholderImage}
-              alt={name}
-              onError={onImageError || defaultImageErrorHandler}
-              data-image-id={id}
-              sx={{
-                cursor: "pointer",
-                width: dimensions.width,
-                height: dimensions.height,
-                backgroundColor: "rgba(0,0,0,0.03)",
-                objectFit: thumbnailScale === "fit" ? "contain" : "cover",
-                transition: "all 0.2s ease-in-out",
-              }}
-            />
+            <Box sx={{ display: "flex", flexDirection: "column" }}>
+              <Box
+                onClick={onAssetClick}
+                component="img"
+                src={thumbnailUrl || placeholderImage}
+                alt={name}
+                onError={onImageError || defaultImageErrorHandler}
+                data-image-id={id}
+                sx={{
+                  cursor: "pointer",
+                  width: dimensions.width,
+                  height: dimensions.height,
+                  backgroundColor: "rgba(0,0,0,0.03)",
+                  objectFit: thumbnailScale === "fit" ? "contain" : "cover",
+                  transition: "all 0.2s ease-in-out",
+                }}
+              />
+
+              {/* Image Control Bar */}
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 1,
+                  p: 1,
+                  bgcolor: "background.paper",
+                  borderTop: "1px solid",
+                  borderColor: "divider",
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <IconButton
+                  size="small"
+                  onClick={handleDownloadClick}
+                  sx={{
+                    color: "primary.main",
+                    "&:hover": {
+                      bgcolor: "primary.main",
+                      color: "primary.contrastText",
+                    },
+                  }}
+                  title="Download"
+                >
+                  <DownloadIcon fontSize="small" />
+                </IconButton>
+
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAssetClick();
+                  }}
+                  sx={{
+                    flex: 1,
+                    mx: 1,
+                    minWidth: "40px",
+                    fontSize: "0.75rem",
+                    py: 0.5,
+                    textAlign: "center",
+                    justifyContent: "center",
+                    overflow: "hidden",
+                  }}
+                  title="Asset Detail"
+                >
+                  <Box
+                    sx={{
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      width: "100%",
+                      textAlign: "center",
+                    }}
+                  >
+                    Asset Detail
+                  </Box>
+                </Button>
+
+                <IconButton
+                  size="small"
+                  onClick={handleDeleteClick}
+                  sx={{
+                    color: "primary.main",
+                    "&:hover": {
+                      bgcolor: "primary.main",
+                      color: "primary.contrastText",
+                    },
+                  }}
+                  title="Delete"
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Box>
+            </Box>
           )}
 
           {/* Position checkbox and favorite buttons at the top left of the card */}
@@ -824,8 +1126,8 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
             )}
           </Box>
 
-          {/* Position buttons at the top right of the card, visible on hover or when menu is open - Only for non-video assets */}
-          {assetType !== "Video" && (
+          {/* Position buttons at the top right of the card, visible on hover or when menu is open - Removed since all assets now have bottom control bars */}
+          {false && (
             <Box
               sx={{
                 position: "absolute",

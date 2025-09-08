@@ -41,6 +41,7 @@ import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import VolumeOffIcon from "@mui/icons-material/VolumeOff";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import "./VideoViewer.css";
+import "../../styles/player-overrides.css";
 
 import { createTimecodePlaceholder } from "@/utils/placeholderSvg";
 import { useVideoKeyboardShortcuts } from "./useVideoKeyboardShortcuts";
