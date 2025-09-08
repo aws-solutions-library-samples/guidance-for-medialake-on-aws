@@ -331,12 +331,15 @@ export function getOriginalAssetId(asset: any): string {
   if (isClipAsset(asset)) {
     return asset.originalAssetId;
   }
-  
+
   // If the ID contains "_clip_", extract the original part
-  if (typeof asset.InventoryID === 'string' && asset.InventoryID.includes('_clip_')) {
-    return asset.InventoryID.split('_clip_')[0];
+  if (
+    typeof asset.InventoryID === "string" &&
+    asset.InventoryID.includes("_clip_")
+  ) {
+    return asset.InventoryID.split("_clip_")[0];
   }
-  
+
   // Otherwise, return the regular InventoryID
   return asset.InventoryID;
 }
