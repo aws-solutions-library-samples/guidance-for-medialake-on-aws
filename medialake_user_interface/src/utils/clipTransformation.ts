@@ -321,6 +321,27 @@ export function getClipDisplayName(asset: any): string {
 }
 
 /**
+ * Gets the original asset ID from either a clip asset or regular asset
+ * For clip assets, returns the originalAssetId property
+ * For regular assets, returns the InventoryID
+ * For clip IDs that follow the pattern "originalId_clip_N", extracts the original ID
+ */
+export function getOriginalAssetId(asset: any): string {
+  // If it's a clip asset with originalAssetId property, use that
+  if (isClipAsset(asset)) {
+    return asset.originalAssetId;
+  }
+  
+  // If the ID contains "_clip_", extract the original part
+  if (typeof asset.InventoryID === 'string' && asset.InventoryID.includes('_clip_')) {
+    return asset.InventoryID.split('_clip_')[0];
+  }
+  
+  // Otherwise, return the regular InventoryID
+  return asset.InventoryID;
+}
+
+/**
  * Clears the transformation cache
  */
 export function clearTransformationCache(): void {

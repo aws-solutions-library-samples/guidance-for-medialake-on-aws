@@ -22,6 +22,7 @@ import MasterResultsView from "@/components/search/MasterResultsView";
 import TabbedSidebar from "@/components/common/RightSidebar/TabbedSidebar";
 import ApiStatusModal from "@/components/ApiStatusModal";
 import { type AssetItem, type Filters, type ExpandedSections } from "./types";
+import { getOriginalAssetId } from "@/utils/clipTransformation";
 
 interface SearchPagePresentationProps {
   // Search data
@@ -190,7 +191,9 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
       const assetType = asset.DigitalSourceAsset.Type.toLowerCase();
       // Special case for audio to use singular form
       const pathPrefix = assetType === "audio" ? "/audio/" : `/${assetType}s/`;
-      navigate(`${pathPrefix}${asset.InventoryID}`, {
+      // Always use the original asset ID, not the clip ID
+      const originalAssetId = getOriginalAssetId(asset);
+      navigate(`${pathPrefix}${originalAssetId}`, {
         state: {
           assetType: asset.DigitalSourceAsset.Type,
           searchTerm: query,
