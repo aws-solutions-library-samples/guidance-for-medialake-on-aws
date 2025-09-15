@@ -87,7 +87,7 @@ export const useSemanticSearchSettings = () => {
           type: providerType,
           config: {
             ...fetchedProvider,
-            isConfigured: true,
+            isConfigured: fetchedProvider.isConfigured || false,
           },
         },
         embeddingStore: {
@@ -125,7 +125,7 @@ export const useSemanticSearchSettings = () => {
   };
 
   // Handle provider type change
-  const handleProviderTypeChange = (
+  const handleProviderTypeChange = async (
     providerType: "twelvelabs-api" | "twelvelabs-bedrock",
   ) => {
     if (providerType === "twelvelabs-api") {
@@ -134,24 +134,73 @@ export const useSemanticSearchSettings = () => {
       setApiKeyInput("");
       setIsApiKeyDialogOpen(true);
     } else {
-      // No API key needed for Bedrock
-      setSettings((prev) => ({
-        ...prev,
-        current: {
-          ...prev.current,
-          provider: {
+      // For Bedrock, save immediately since no API key is needed
+      try {
+        const embeddingStorePayload = {
+          type: settings.current.embeddingStore.type,
+          isEnabled: settings.current.isEnabled,
+        };
+
+        const providerExists = settings.original.provider.config?.id;
+
+        if (providerExists) {
+          // Update existing provider to Bedrock type
+          await updateProvider.mutateAsync({
+            isEnabled: settings.current.isEnabled,
+            embeddingStore: embeddingStorePayload,
+          });
+        } else {
+          // Create new Bedrock provider
+          await createProvider.mutateAsync({
+            name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_BEDROCK.name,
             type: "twelvelabs-bedrock",
-            config: {
-              id: "",
-              name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_BEDROCK.name,
+            apiKey: "", // Not needed for Bedrock
+            isEnabled: settings.current.isEnabled,
+            embeddingStore: embeddingStorePayload,
+          });
+        }
+
+        // Update local state after successful save
+        setSettings((prev) => ({
+          ...prev,
+          current: {
+            ...prev.current,
+            provider: {
               type: "twelvelabs-bedrock",
-              apiKey: "",
-              isConfigured: true,
-              isEnabled: true,
+              config: {
+                id: providerExists
+                  ? prev.original.provider.config?.id || ""
+                  : "",
+                name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_BEDROCK.name,
+                type: "twelvelabs-bedrock",
+                apiKey: "",
+                isConfigured: true,
+                isEnabled: true,
+              },
             },
           },
-        },
-      }));
+          original: {
+            ...prev.current,
+            provider: {
+              type: "twelvelabs-bedrock",
+              config: {
+                id: providerExists
+                  ? prev.original.provider.config?.id || ""
+                  : "",
+                name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_BEDROCK.name,
+                type: "twelvelabs-bedrock",
+                apiKey: "",
+                isConfigured: true,
+                isEnabled: true,
+              },
+            },
+          },
+          hasChanges: false,
+        }));
+      } catch (error) {
+        console.error("Failed to save Bedrock provider:", error);
+        // Could add error notification here
+      }
     }
   };
 
@@ -229,7 +278,10 @@ export const useSemanticSearchSettings = () => {
       const providerConfig: SearchProvider = {
         id: settings.current.provider.config?.id || "",
         name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.name,
-        type: "twelvelabs",
+        type:
+          settings.current.provider.type === "twelvelabs-api"
+            ? "twelvelabs-api"
+            : "twelvelabs-bedrock",
         apiKey: apiKeyInput,
         endpoint:
           SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.defaultEndpoint,
@@ -256,7 +308,10 @@ export const useSemanticSearchSettings = () => {
       };
 
       // Save to API immediately with the new API key
-      if (isEditingApiKey && providerConfig.id) {
+      // Use provider existence from original settings to determine POST vs PUT
+      const providerExists = settings.original.provider.config?.id;
+
+      if (providerExists) {
         // Update existing provider
         await updateProvider.mutateAsync({
           apiKey: providerConfig.apiKey,
@@ -299,11 +354,14 @@ export const useSemanticSearchSettings = () => {
         isEnabled: current.isEnabled,
       };
 
+      // Use provider existence from original settings to determine POST vs PUT
+      const providerExists = settings.original.provider.config?.id;
+
       if (
         current.provider.config &&
         current.provider.type === "twelvelabs-api"
       ) {
-        if (isEditingApiKey && current.provider.config.id) {
+        if (providerExists) {
           // Update existing provider
           await updateProvider.mutateAsync({
             apiKey: current.provider.config.apiKey,
@@ -323,11 +381,23 @@ export const useSemanticSearchSettings = () => {
           });
         }
       } else if (current.provider.type === "twelvelabs-bedrock") {
-        // For Bedrock, we still need to save embedding store settings
-        await updateProvider.mutateAsync({
-          isEnabled: current.isEnabled,
-          embeddingStore: embeddingStorePayload,
-        });
+        // For Bedrock, determine if we need to create or update
+        if (providerExists) {
+          // Update existing provider to Bedrock type
+          await updateProvider.mutateAsync({
+            isEnabled: current.isEnabled,
+            embeddingStore: embeddingStorePayload,
+          });
+        } else {
+          // Create new Bedrock provider
+          await createProvider.mutateAsync({
+            name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_BEDROCK.name,
+            type: "twelvelabs-bedrock",
+            apiKey: "", // Not needed for Bedrock
+            isEnabled: current.isEnabled,
+            embeddingStore: embeddingStorePayload,
+          });
+        }
       }
 
       // Update original to match current (changes saved)

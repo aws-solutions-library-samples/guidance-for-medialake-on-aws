@@ -119,8 +119,8 @@ def update_search_provider():
             update_expression_parts.append("isEnabled = :isEnabled")
             expression_attribute_values[":isEnabled"] = body["isEnabled"]
 
-        # Add secretArn to update expression if it was created
-        if "secretArn" in existing_provider and "secretArn" not in existing_provider:
+        # Add secretArn to update expression if it was created for API key update
+        if "apiKey" in body and "secretArn" in existing_provider:
             update_expression_parts.append("secretArn = :secretArn")
             expression_attribute_values[":secretArn"] = existing_provider["secretArn"]
 
@@ -141,10 +141,11 @@ def update_search_provider():
         if updated_provider:
             updated_provider.pop("PK", None)
             updated_provider.pop("SK", None)
-            updated_provider.pop(
-                "secretArn", None
-            )  # Don't expose the secret ARN in the response
-            updated_provider["isConfigured"] = True
+            # Don't expose the secret ARN in the response
+            has_secret = updated_provider.pop("secretArn", None) is not None
+            # Provider is configured if it has a secret ARN or if it's Bedrock (which doesn't need one)
+            is_bedrock = updated_provider.get("type") == "twelvelabs-bedrock"
+            updated_provider["isConfigured"] = has_secret or is_bedrock
 
         # Handle embedding store update if provided
         updated_embedding_store = None
