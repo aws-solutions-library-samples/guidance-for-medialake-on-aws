@@ -128,6 +128,7 @@ export function defineAbilityFor(
 
           // Map settings resources to CASL subjects
           const settingsMapping: { [key: string]: string } = {
+            "api-keys": "api-key",
             users: "user",
             system: "settings", // Changed from system-settings to generic settings
             permissions: "permission-set",

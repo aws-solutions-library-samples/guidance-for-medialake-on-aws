@@ -24,6 +24,7 @@ class S3BucketProps:
     lifecycle_rules: Optional[List[s3.LifecycleRule]] = None
     existing_kms_key_arn: Optional[str] = None
     existing_bucket_arn: Optional[str] = None
+    alias: Optional[str] = None
 
 
 class S3Bucket(Construct):
@@ -51,6 +52,7 @@ class S3Bucket(Construct):
                     else RemovalPolicy.RETAIN
                 ),
                 enable_key_rotation=True,
+                alias=props.alias,
             )
 
         bucket_props = {
@@ -104,6 +106,18 @@ class S3Bucket(Construct):
         Returns the underlying S3 bucket as an IBucket interface.
         """
         return self._bucket
+
+    @property
+    def concrete_bucket(self) -> s3.Bucket:
+        """
+        Returns the underlying S3 bucket as a concrete Bucket class.
+        This is needed for CloudFront origins that require the full Bucket interface.
+        """
+        if isinstance(self._bucket, s3.Bucket):
+            return self._bucket
+        else:
+            # If it's an imported bucket, we can't return it as a concrete Bucket
+            raise ValueError("Cannot return concrete bucket for imported buckets")
 
     @property
     def bucket_arn(self) -> str:

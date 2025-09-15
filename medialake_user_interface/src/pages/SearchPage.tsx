@@ -58,6 +58,7 @@ type AssetItem = (ImageItem | VideoItem | AudioItem) & {
 };
 import { useSearchState } from "../hooks/useSearchState";
 import { FacetFilters } from "../types/facetSearch";
+import { getOriginalAssetId } from "@/utils/clipTransformation";
 
 interface LocationState {
   query?: string;
@@ -166,6 +167,9 @@ const SearchPage: React.FC = () => {
 
   // State for selected fields
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
+
+  // State for confidence threshold (semantic search)
+  const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0.57);
 
   const { data, isLoading, isFetching, error } = useSearch(currentQuery, {
     page: currentPage,
@@ -340,7 +344,9 @@ const SearchPage: React.FC = () => {
       const assetType = asset.DigitalSourceAsset.Type.toLowerCase();
       // Special case for audio to use singular form
       const pathPrefix = assetType === "audio" ? "/audio/" : `/${assetType}s/`;
-      navigate(`${pathPrefix}${asset.InventoryID}`, {
+      // Always use the original asset ID, not the clip ID
+      const originalAssetId = getOriginalAssetId(asset);
+      navigate(`${pathPrefix}${originalAssetId}`, {
         state: {
           assetType: asset.DigitalSourceAsset.Type,
           searchTerm: currentQuery,
@@ -676,6 +682,9 @@ const SearchPage: React.FC = () => {
                 selectedFields={selectedFields}
                 availableFields={availableFields}
                 onFieldsChange={handleFieldsChange}
+                isSemantic={currentSemantic}
+                confidenceThreshold={confidenceThreshold}
+                onConfidenceThresholdChange={setConfidenceThreshold}
                 groupByType={viewPreferences.groupByType}
                 onGroupByTypeChange={viewPreferences.handleGroupByTypeChange}
                 viewMode={viewPreferences.viewMode}
