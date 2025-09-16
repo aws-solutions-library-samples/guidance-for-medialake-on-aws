@@ -412,10 +412,7 @@ const SystemSettingsPage: React.FC = () => {
                       )}
                     </Typography>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                      <FormControl
-                        sx={{ minWidth: 200 }}
-                        disabled={!settings.isEnabled}
-                      >
+                      <FormControl sx={{ minWidth: 200 }} disabled={false}>
                         <InputLabel>
                           {t(
                             "settings.systemSettings.search.selectProvider",
@@ -452,7 +449,7 @@ const SystemSettingsPage: React.FC = () => {
                             variant="outlined"
                             startIcon={<EditIcon />}
                             onClick={() => handleOpenApiKeyDialog(true)}
-                            disabled={!settings.isEnabled}
+                            disabled={false}
                           >
                             {t(
                               "settings.systemSettings.search.editApiKey",
