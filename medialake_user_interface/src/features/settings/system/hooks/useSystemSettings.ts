@@ -115,6 +115,20 @@ export const useSemanticSearchSettings = () => {
 
   // Handle toggle change
   const handleToggleChange = (enabled: boolean) => {
+    // If trying to enable but no provider is configured, prompt user to configure first
+    if (enabled && !settings.current.provider.config?.isConfigured) {
+      // For now, just open the API key dialog for the default provider type
+      if (settings.current.provider.type === "twelvelabs-api") {
+        setIsEditingApiKey(false);
+        setApiKeyInput("");
+        setIsApiKeyDialogOpen(true);
+      } else {
+        // For Bedrock, trigger the provider type change which will save immediately
+        handleProviderTypeChange("twelvelabs-bedrock");
+      }
+      return;
+    }
+
     setSettings((prev) => ({
       ...prev,
       current: {
@@ -165,6 +179,7 @@ export const useSemanticSearchSettings = () => {
           ...prev,
           current: {
             ...prev.current,
+            isEnabled: true, // Enable search when Bedrock provider is configured
             provider: {
               type: "twelvelabs-bedrock",
               config: {
@@ -181,6 +196,7 @@ export const useSemanticSearchSettings = () => {
           },
           original: {
             ...prev.current,
+            isEnabled: true, // Update original state too
             provider: {
               type: "twelvelabs-bedrock",
               config: {
