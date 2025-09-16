@@ -244,6 +244,16 @@ class AssetsConstruct(Construct):
             )
         )
 
+        # Add SSM permissions for CloudFront domain retrieval
+        get_asset_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["ssm:GetParameter"],
+                resources=[
+                    f"arn:aws:ssm:{Stack.of(self).region}:{Stack.of(self).account}:parameter/medialake/*/cloudfront-distribution-domain"
+                ],
+            )
+        )
+
         # Add EC2 permissions for VPC access
         get_asset_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
