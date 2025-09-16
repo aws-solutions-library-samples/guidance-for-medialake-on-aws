@@ -299,36 +299,58 @@ def process_node_template(bucket: str, key: str) -> Dict[str, list]:
 def process_integration_node(
     bucket: str, node_data: dict, integration: dict
 ) -> Dict[str, list]:
-    """Process an INTEGRATION node by fetching and processing its OpenINTEGRATION spec."""
+    """Process an INTEGRATION node - supports both OpenAPI spec and direct action patterns."""
     try:
         spec_path = integration.get("api", {}).get("open_api_spec_path")
-        if not spec_path:
-            raise ValueError("Missing open_api_spec_path in INTEGRATION api config")
 
-        logger.info(f"Fetching OpenINTEGRATION spec from: {spec_path}")
+        # Check if this is an OpenAPI spec-based integration node
+        if spec_path:
+            logger.info(
+                f"Processing OpenAPI-based integration node with spec: {spec_path}"
+            )
 
-        # Fetch and process OpenINTEGRATION spec
-        spec_response = s3_client.get_object(Bucket=bucket, Key=spec_path)
-        spec_content = spec_response["Body"].read().decode("utf-8")
-        spec_data = yaml.safe_load(spec_content)
+            # Fetch and process OpenAPI spec
+            spec_response = s3_client.get_object(Bucket=bucket, Key=spec_path)
+            spec_content = spec_response["Body"].read().decode("utf-8")
+            spec_data = yaml.safe_load(spec_content)
 
-        # Combine node metadata with OpenINTEGRATION spec
-        combined_data = {
-            "x-medialake-nodeId": node_data["node"]["id"],
-            "x-node-type": "INTEGRATION",
-            "info": {
-                "title": node_data["node"]["title"],
-                "description": node_data["node"]["description"],
-                "version": node_data["node"]["version"],
-            },
-            "paths": spec_data.get("paths", {}),
-            "components": spec_data.get("components", {}),
-            "servers": spec_data.get("servers", []),
-            "tags": spec_data.get("tags", []),
-        }
+            # Combine node metadata with OpenAPI spec
+            combined_data = {
+                "x-medialake-nodeId": node_data["node"]["id"],
+                "x-node-type": "INTEGRATION",
+                "info": {
+                    "title": node_data["node"]["title"],
+                    "description": node_data["node"]["description"],
+                    "version": node_data["node"]["version"],
+                },
+                "paths": spec_data.get("paths", {}),
+                "components": spec_data.get("components", {}),
+                "servers": spec_data.get("servers", []),
+                "tags": spec_data.get("tags", []),
+            }
 
-        # Process the combined data using process_node_file
-        return process_node_file(bucket, spec_path, combined_data)
+            # Process the combined data using process_node_file
+            return process_node_file(bucket, spec_path, combined_data)
+
+        else:
+            # Handle direct action-based integration nodes (like TwelveLabs Bedrock)
+            logger.info(
+                f"Processing action-based integration node: {node_data['node']['id']}"
+            )
+
+            # Use the standard node processing for action-based integration nodes
+            # but ensure they're marked as INTEGRATION type
+            result = process_standard_node(node_data)
+
+            # Update the node type to INTEGRATION in all items
+            if result and "items" in result:
+                for item in result["items"]:
+                    if item.get("sk") == "INFO":
+                        item["nodeType"] = "INTEGRATION"
+                        # Update categories to be more appropriate for integrations
+                        item["categories"] = ["Integration", "AI/ML"]
+
+            return result
 
     except Exception as e:
         logger.error(

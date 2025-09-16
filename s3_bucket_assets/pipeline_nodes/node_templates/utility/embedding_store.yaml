@@ -10,6 +10,7 @@ node:
       lambda:
         handler: utility/EmbeddingStoreLambdaDeployment
         runtime: python3.12
+        vpc: true
         iam_policy:
           statements:
             - effect: Allow

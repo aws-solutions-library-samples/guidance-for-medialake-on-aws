@@ -466,7 +466,7 @@ def add_common_fields(result: Dict, prefix: str = "") -> Dict:
     digital_source_asset = result.get(f"{prefix}DigitalSourceAsset", {})
     main_rep = digital_source_asset.get("MainRepresentation", {})
     storage_info = main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
-    object_key = storage_info.get("ObjectKey", {})
+    storage_info.get("ObjectKey", {})
     inventory_id = result.get("InventoryID", "")
 
     # Add ID fields
@@ -479,25 +479,25 @@ def add_common_fields(result: Dict, prefix: str = "") -> Dict:
             result["id"] = inventory_id
 
     # Add asset metadata fields
-    result["assetType"] = digital_source_asset.get("Type", "")
-    result["format"] = main_rep.get("Format", "")
-    result["objectName"] = object_key.get("Name", "")
-    result["fullPath"] = object_key.get("FullPath", "")
-    result["bucket"] = storage_info.get("Bucket", "")
+    # result["assetType"] = digital_source_asset.get("Type", "")
+    # result["format"] = main_rep.get("Format", "")
+    # result["objectName"] = object_key.get("Name", "")
+    # result["fullPath"] = object_key.get("FullPath", "")
+    # result["bucket"] = storage_info.get("Bucket", "")
 
-    # Handle file size - check different locations
-    file_size = storage_info.get("FileSize", 0)
-    if not file_size and "FileInfo" in storage_info:
-        file_size = storage_info.get("FileInfo", {}).get("Size", 0)
-    result["fileSize"] = file_size
+    # # Handle file size - check different locations
+    # file_size = storage_info.get("FileSize", 0)
+    # if not file_size and "FileInfo" in storage_info:
+    #     file_size = storage_info.get("FileInfo", {}).get("Size", 0)
+    # result["fileSize"] = file_size
 
     # Handle creation date - check different locations
-    created_date = storage_info.get("CreateDate", "")
-    if not created_date and "FileInfo" in storage_info:
-        created_date = storage_info.get("FileInfo", {}).get("CreateDate", "")
-    if not created_date:
-        created_date = digital_source_asset.get("CreateDate", "")
-    result["createdAt"] = created_date
+    # created_date = storage_info.get("CreateDate", "")
+    # if not created_date and "FileInfo" in storage_info:
+    #     created_date = storage_info.get("FileInfo", {}).get("CreateDate", "")
+    # if not created_date:
+    #     created_date = digital_source_asset.get("CreateDate", "")
+    # result["createdAt"] = created_date
 
     # Include consolidated metadata directly
     if "Metadata" in result and "Consolidated" in result.get("Metadata", {}):
@@ -675,7 +675,13 @@ def process_search_hit(hit: Dict) -> Dict:
     main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
 
     asset_id = digital_source_asset.get("ID", "unknown")
-    logger.debug(f"Processing asset {asset_id} with score {hit.get('_score', 0)}")
+    inventory_id = source.get("InventoryID", "unknown")
+    logger.info(
+        f"Processing asset {asset_id} (InventoryID: {inventory_id}) with score {hit.get('_score', 0)}"
+    )
+    logger.info(
+        f"Asset has DigitalSourceAsset: {bool(digital_source_asset)}, DerivedRepresentations: {len(derived_representations)}"
+    )
 
     thumbnail_url = None
     proxy_url = None
@@ -721,45 +727,18 @@ def process_search_hit(hit: Dict) -> Dict:
 def process_clip(clip_hit: Dict) -> Dict:
     """Process a clip hit to preserve all clip-specific fields."""
     source = clip_hit["_source"]
-    digital_source_asset = source.get("DigitalSourceAsset", {})
-    main_rep = digital_source_asset.get("MainRepresentation", {})
-    storage_info = main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
-    object_key = storage_info.get("ObjectKey", {})
+    inventory_id = source.get("InventoryID", None)
 
-    asset_id = digital_source_asset.get("ID", "unknown")
-    logger.debug(
-        f"Processing clip for asset {asset_id} with score {clip_hit.get('_score', 0)}"
+    logger.info(
+        f"Processing clip for asset {inventory_id} with score {clip_hit.get('_score', 0)}"
     )
 
+    # For clip documents, we only have minimal information
+    # The parent asset information should be handled by the calling function
     result = {
-        "DigitalSourceAsset": digital_source_asset,
         "score": clip_hit["_score"],
+        "InventoryID": inventory_id,
     }
-
-    # Add the same root-level fields as in process_search_hit for consistency
-    result["assetType"] = digital_source_asset.get("Type", "")
-    result["format"] = main_rep.get("Format", "")
-    result["objectName"] = object_key.get("Name", "")
-    result["fullPath"] = object_key.get("FullPath", "")
-    result["bucket"] = storage_info.get("Bucket", "")
-
-    # Handle different possible locations of file size
-    file_size = storage_info.get("FileSize", 0)
-    if not file_size and "FileInfo" in storage_info:
-        file_size = storage_info.get("FileInfo", {}).get("Size", 0)
-    result["fileSize"] = file_size
-
-    # Handle different possible locations of creation date
-    created_date = storage_info.get("CreateDate", "")
-    if not created_date and "FileInfo" in storage_info:
-        created_date = storage_info.get("FileInfo", {}).get("CreateDate", "")
-    if not created_date:
-        created_date = digital_source_asset.get("CreateDate", "")
-    result["createdAt"] = created_date
-
-    # Include any consolidated metadata if available
-    if "Metadata" in source and "Consolidated" in source.get("Metadata", {}):
-        result["metadata"] = source["Metadata"].get("Consolidated", {})
 
     # Add clip-specific fields efficiently
     clip_fields = [
@@ -768,26 +747,33 @@ def process_clip(clip_hit: Dict) -> Dict:
         "end_timecode",
         "type",
         "timestamp",
+        "embedding_option",
     ]
     for field in clip_fields:
         if field in source:
             result[field] = source[field]
 
     # Include any other fields from the source that might be clip-specific
+    # but exclude embedding data to keep response size manageable
     for key, value in source.items():
-        if key not in result and key not in ["DigitalSourceAsset", "Metadata"]:
+        if key not in result and key not in [
+            "embedding",
+            "DigitalSourceAsset",
+            "Metadata",
+        ]:
             result[key] = value
 
+    logger.info(f"Processed clip with fields: {list(result.keys())}")
     return result
 
 
-def get_parent_asset(client, index_name, asset_id):
+def get_parent_asset(client, index_name, inventory_id):
     """Fetch a parent asset by its ID from OpenSearch."""
     try:
         query = {
             "query": {
                 "bool": {
-                    "must": [{"term": {"DigitalSourceAsset.ID.keyword": asset_id}}],
+                    "must": [{"match_phrase": {"InventoryID": inventory_id}}],
                     "must_not": [{"term": {"embedding_scope": "clip"}}],
                 }
             },
@@ -801,7 +787,7 @@ def get_parent_asset(client, index_name, asset_id):
 
         return None
     except Exception as e:
-        logger.warning(f"Error fetching parent asset {asset_id}: {str(e)}")
+        logger.warning(f"Error fetching parent asset {inventory_id}: {str(e)}")
         return None
 
 
@@ -824,22 +810,22 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
         if source.get("embedding_scope") == "clip":
             asset_type = source.get("type", "").lower()
             if asset_type in ["video", "audio"]:
-                asset_id = source.get("DigitalSourceAsset", {}).get("ID")
-                if asset_id:
-                    clips_by_asset[asset_id].append(
+                inventory_id = source.get("InventoryID", None)
+                if inventory_id:
+                    clips_by_asset[inventory_id].append(
                         {"source": source, "score": hit["_score"], "hit": hit}
                     )
-                    orphaned_clip_assets.add(asset_id)
+                    orphaned_clip_assets.add(inventory_id)
         else:
-            asset_id = source.get("DigitalSourceAsset", {}).get("ID")
-            if asset_id:
-                parent_assets[asset_id] = {
+            inventory_id = source.get("InventoryID", None)
+            if inventory_id:
+                parent_assets[inventory_id] = {
                     "source": source,
                     "score": hit["_score"],
                     "hit": hit,
                 }
                 orphaned_clip_assets.discard(
-                    asset_id
+                    inventory_id
                 )  # More efficient than remove with check
             else:
                 standalone_hits.append(hit)
@@ -858,10 +844,18 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
 
         orphan_ids = list(orphaned_clip_assets - parent_assets.keys())
         if orphan_ids:
+            logger.info(f"Searching for parent assets with IDs: {orphan_ids}")
+
+            # Use match_phrase for each InventoryID with should clause
+            should_clauses = []
+            for inventory_id in orphan_ids:
+                should_clauses.append({"match_phrase": {"InventoryID": inventory_id}})
+
             batch_query = {
                 "query": {
                     "bool": {
-                        "must": [{"terms": {"DigitalSourceAsset.ID": orphan_ids}}],
+                        "should": should_clauses,
+                        "minimum_should_match": 1,
                         "must_not": [{"term": {"embedding_scope": "clip"}}],
                     }
                 },
@@ -870,9 +864,12 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
 
             try:
                 resp = client.search(body=batch_query, index=index_name)
+                logger.info(
+                    f"Batch query found {resp['hits']['total']['value']} parent assets"
+                )
                 for hit in resp["hits"]["hits"]:
                     src = hit["_source"]
-                    pid = src["DigitalSourceAsset"]["ID"]
+                    pid = src["InventoryID"]
                     highest_clip_score = max(
                         (c["score"] for c in clips_by_asset.get(pid, [])), default=0
                     )
@@ -881,23 +878,27 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
                         "score": highest_clip_score,
                         "hit": hit,
                     }
-                    logger.debug(
+                    logger.info(
                         f"Fetched parent asset for orphaned clips: {pid} with score {highest_clip_score}"
                     )
             except Exception as e:
-                logger.warning(f"Error batch fetching parent assets: {str(e)}")
+                logger.error(f"Error batch fetching parent assets: {str(e)}")
+                import traceback
 
-    def process_asset_with_clips(asset_id):
-        if asset_id not in parent_assets:
+                logger.error(f"Traceback: {traceback.format_exc()}")
+
+    def process_asset_with_clips(inventory_id):
+        if inventory_id not in parent_assets:
+            logger.warning(f"Parent asset {inventory_id} not found in parent_assets")
             return None
 
         try:
-            parent_hit = parent_assets[asset_id]["hit"]
+            parent_hit = parent_assets[inventory_id]["hit"]
+            logger.info(f"Processing parent asset {inventory_id}")
             result = process_search_hit(parent_hit)
-            parent_hit["_score"]
 
-            if asset_id in clips_by_asset:
-                asset_clips = clips_by_asset[asset_id]
+            if inventory_id in clips_by_asset:
+                asset_clips = clips_by_asset[inventory_id]
                 highest_clip_score = max(c["score"] for c in asset_clips)
 
                 # Use highest clip score
@@ -909,15 +910,19 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
                 )
                 result["clips"] = [process_clip(c["hit"]) for c in sorted_clips]
 
-                logger.debug(
-                    f"Processed asset {asset_id} with {len(result['clips'])} clips, final score: {result['score']}"
+                logger.info(
+                    f"Processed asset {inventory_id} with {len(result['clips'])} clips, final score: {result['score']}"
                 )
             else:
                 result["clips"] = []
+                logger.info(f"No clips found for asset {inventory_id}")
 
             return result
         except Exception as e:
-            logger.warning(f"Error processing parent asset {asset_id}: {str(e)}")
+            logger.error(f"Error processing parent asset {inventory_id}: {str(e)}")
+            import traceback
+
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return None
 
     def process_standalone_hit(hit):
@@ -932,8 +937,8 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         # Process parent assets with clips
         result_futures = {
-            executor.submit(process_asset_with_clips, asset_id): asset_id
-            for asset_id in parent_assets.keys()
+            executor.submit(process_asset_with_clips, inventory_id): inventory_id
+            for inventory_id in parent_assets.keys()
         }
 
         # Process standalone hits
@@ -948,8 +953,8 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
                 if result:
                     results.append(result)
             except Exception as e:
-                asset_id = result_futures[future]
-                logger.warning(f"Error processing asset {asset_id}: {str(e)}")
+                inventory_id = result_futures[future]
+                logger.warning(f"Error processing asset {inventory_id}: {str(e)}")
 
         # Collect results from standalone hits
         for future in concurrent.futures.as_completed(standalone_futures):

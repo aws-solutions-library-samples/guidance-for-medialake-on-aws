@@ -196,14 +196,6 @@ class NodesStack(cdk.NestedStack):
             code_path=["lambdas", "nodes", "pre_signed_url"],
         )
 
-        self.debug_input_lambda_deployment = LambdaDeployment(
-            self,
-            "DebugInputLambdaDeployment",
-            destination_bucket=props.iac_bucket.bucket,
-            parent_folder="nodes/utility",
-            code_path=["lambdas", "nodes", "debug_input"],
-        )
-
         self.publish_event_lambda_deployment = LambdaDeployment(
             self,
             "PublishEventLambdaDeployment",
@@ -243,6 +235,31 @@ class NodesStack(cdk.NestedStack):
             destination_bucket=props.iac_bucket.bucket,
             parent_folder="nodes/utility",
             code_path=["lambdas", "nodes", "s3_vector_store"],
+        )
+
+        # TwelveLabs Bedrock integration nodes
+        self.twelvelabs_bedrock_invoke_lambda_deployment = LambdaDeployment(
+            self,
+            "TwelveLabsBedrockInvokeLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/integration",
+            code_path=["lambdas", "nodes", "twelvelabs_bedrock_invoke"],
+        )
+
+        self.twelvelabs_bedrock_status_lambda_deployment = LambdaDeployment(
+            self,
+            "TwelveLabsBedrockStatusLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/integration",
+            code_path=["lambdas", "nodes", "twelvelabs_bedrock_status"],
+        )
+
+        self.twelvelabs_bedrock_results_lambda_deployment = LambdaDeployment(
+            self,
+            "TwelveLabsBedrockResultsLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/integration",
+            code_path=["lambdas", "nodes", "twelvelabs_bedrock_results"],
         )
 
         # Create DynamoDB table for nodes

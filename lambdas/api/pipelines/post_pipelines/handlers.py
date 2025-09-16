@@ -273,7 +273,7 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                 is_last = node.id == last_lambda_node_id
 
                 lambda_result = create_lambda_function(
-                    pipeline_name, node, is_first=is_first, is_last=is_last
+                    pipeline_name, node, pipeline, is_first=is_first, is_last=is_last
                 )
 
                 # Create a specific key for Lambda ARN mapping that distinguishes methods/operations.

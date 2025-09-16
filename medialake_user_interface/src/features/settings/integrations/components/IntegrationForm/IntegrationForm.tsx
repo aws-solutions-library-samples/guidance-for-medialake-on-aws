@@ -122,25 +122,35 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
     mode: "onChange",
   });
 
-  // Process nodes only when rawNodes changes
+  // Process nodes only when rawNodes changes - filter out nodes without auth requirements
   const nodes: IntegrationNode[] = React.useMemo(() => {
     if (!rawNodes.length) return [];
-    return rawNodes.map((node) => {
-      const authMethod = node.auth?.authMethod;
-      return {
-        nodeId:
-          node.nodeId ||
-          `node-${node.info.title.toLowerCase().replace(/\s+/g, "-")}`,
-        info: {
-          title: node.info.title,
-          description: node.info.description,
-        },
-        auth:
-          authMethod === "awsIam" || authMethod === "apiKey"
-            ? { authMethod: authMethod as "awsIam" | "apiKey" }
-            : { authMethod: "apiKey" as const },
-      };
-    });
+    return rawNodes
+      .filter((node) => {
+        // Filter out nodes that don't have authentication requirements
+        // A node has auth requirements if it has a non-empty auth object with authMethod
+        const hasAuth =
+          node.auth &&
+          Object.keys(node.auth).length > 0 &&
+          node.auth.authMethod;
+        return hasAuth;
+      })
+      .map((node) => {
+        const authMethod = node.auth?.authMethod;
+        return {
+          nodeId:
+            node.nodeId ||
+            `node-${node.info.title.toLowerCase().replace(/\s+/g, "-")}`,
+          info: {
+            title: node.info.title,
+            description: node.info.description,
+          },
+          auth:
+            authMethod === "awsIam" || authMethod === "apiKey"
+              ? { authMethod: authMethod as "awsIam" | "apiKey" }
+              : { authMethod: "apiKey" as const },
+        };
+      });
   }, [rawNodes]);
 
   // Memoize form values to prevent infinite render loops but still update when needed

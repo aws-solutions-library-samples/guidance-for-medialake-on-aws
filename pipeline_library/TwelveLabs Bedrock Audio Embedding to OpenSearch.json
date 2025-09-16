@@ -1,0 +1,510 @@
+{
+  "name": "TwelveLabs Bedrock Audio Embedding to OpenSearch",
+  "description": "",
+  "active": true,
+  "configuration": {
+    "nodes": [
+      {
+        "id": "dndnode_5",
+        "type": "custom",
+        "position": {
+          "x": 640,
+          "y": 400
+        },
+        "data": {
+          "nodeId": "wait",
+          "label": "Wait (wait)",
+          "description": "This step will wait for a specific duration before moving to the next step",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [
+            {
+              "name": "any",
+              "description": "Output type: any"
+            }
+          ],
+          "type": "FLOW",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "wait",
+            "parameters": {
+              "Duration": "15"
+            }
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "dndnode_7",
+        "type": "custom",
+        "position": {
+          "x": 944,
+          "y": 560
+        },
+        "data": {
+          "nodeId": "map",
+          "label": "Map (map)",
+          "description": "This step will iterate over an array of items and execute the same steps for each item",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [
+            {
+              "name": "Processor",
+              "description": "json payload item processor"
+            },
+            {
+              "name": "Next",
+              "description": "output to the next node"
+            }
+          ],
+          "type": "FLOW",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "map",
+            "parameters": {
+              "ConcurrencyLimit": 1,
+              "ItemsPath": "$.payload.externalTaskStatus"
+            }
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "dndnode_8",
+        "type": "custom",
+        "position": {
+          "x": 1184,
+          "y": 704
+        },
+        "data": {
+          "nodeId": "success",
+          "label": "Success",
+          "description": "This step will end the execution with a success status",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [],
+          "type": "FLOW",
+          "configuration": {
+            "method": "success",
+            "parameters": {}
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "dndnode_9",
+        "type": "custom",
+        "position": {
+          "x": 1216,
+          "y": 560
+        },
+        "data": {
+          "nodeId": "embedding_store",
+          "label": "Embedding Store (store) (store)",
+          "description": "Store embeddings in OpenSearch for semantic search",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [],
+          "type": "UTILITY",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "store",
+            "parameters": {
+              "Index Name": "media",
+              "Content Type": "audio"
+            }
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "dndnode_10",
+        "type": "custom",
+        "position": {
+          "x": 320,
+          "y": 400
+        },
+        "data": {
+          "nodeId": "choice",
+          "label": "Choice",
+          "description": "This step will branch the workflow based on a condition",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [
+            {
+              "name": "Completed",
+              "description": "Path taken when condition evaluates to true"
+            },
+            {
+              "name": "In Progress",
+              "description": "Path taken when condition evaluates to false"
+            },
+            {
+              "name": "Fail",
+              "description": "Path taken when condition evaluates to false"
+            }
+          ],
+          "type": "FLOW",
+          "configuration": {
+            "method": "choice",
+            "parameters": {}
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "dndnode_11",
+        "type": "custom",
+        "position": {
+          "x": 672,
+          "y": 560
+        },
+        "data": {
+          "nodeId": "fail",
+          "label": "Fail (fail)",
+          "description": "This step will end the state machine execution with a failure status",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [],
+          "type": "FLOW",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "fail",
+            "parameters": {
+              "Error": "Failed",
+              "Cause": "Flow step failed"
+            }
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "dndnode_15",
+        "type": "custom",
+        "position": {
+          "x": 848,
+          "y": 208
+        },
+        "data": {
+          "nodeId": "twelvelabs_bedrock_status",
+          "label": "TwelveLabs Bedrock Status",
+          "description": "Check if TwelveLabs Bedrock embedding job is complete by polling S3",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["invocation_arn", "any"],
+          "outputTypes": [
+            {
+              "name": "status",
+              "description": "Output type: status"
+            }
+          ],
+          "type": "INTEGRATION",
+          "configuration": {
+            "method": "check_status",
+            "parameters": {}
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "dndnode_16",
+        "type": "custom",
+        "position": {
+          "x": 944,
+          "y": 400
+        },
+        "data": {
+          "nodeId": "twelvelabs_bedrock_results",
+          "label": "TwelveLabs Bedrock Results",
+          "description": "Retrieve and parse embedding results from completed TwelveLabs Bedrock job",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["invocation_arn", "any"],
+          "outputTypes": [
+            {
+              "name": "embeddings",
+              "description": "Output type: embeddings"
+            }
+          ],
+          "type": "INTEGRATION",
+          "configuration": {
+            "method": "get_results",
+            "parameters": {}
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "dndnode_22",
+        "type": "custom",
+        "position": {
+          "x": 320,
+          "y": 208
+        },
+        "data": {
+          "nodeId": "trigger_audio_processing_completed",
+          "label": "Audio Processing Completed (trigger)",
+          "description": "This step will trigger after audio processing is completed",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [
+            {
+              "name": "audio",
+              "description": "Output type: audio"
+            }
+          ],
+          "type": "TRIGGER",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "trigger",
+            "parameters": {
+              "Prefix": ""
+            },
+            "requestMapping": null,
+            "responseMapping": null
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "dndnode_23",
+        "type": "custom",
+        "position": {
+          "x": 592,
+          "y": 208
+        },
+        "data": {
+          "nodeId": "twelvelabs_bedrock_invoke",
+          "label": "TwelveLabs Bedrock Invoke (invoke)",
+          "description": "Start async embedding generation using TwelveLabs Marengo 2.7 on Bedrock",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["video", "audio", "image"],
+          "outputTypes": [
+            {
+              "name": "invocation_arn",
+              "description": "Output type: invocation_arn"
+            }
+          ],
+          "type": "INTEGRATION",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "invoke",
+            "parameters": {
+              "Model ID": "twelvelabs.marengo-embed-2-7-v1:0",
+              "Region": "us-east-1",
+              "S3 Output Bucket": "${EXTERNAL_PAYLOAD_BUCKET}"
+            }
+          }
+        },
+        "width": 200,
+        "height": 113
+      }
+    ],
+    "edges": [
+      {
+        "id": "dndnode_7-dndnode_8",
+        "source": "dndnode_7",
+        "target": "dndnode_8",
+        "type": "custom",
+        "data": {
+          "type": "custom",
+          "text": "Connected",
+          "id": "dndnode_7-dndnode_8"
+        },
+        "sourceHandle": "Next",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_7-dndnode_9",
+        "source": "dndnode_7",
+        "target": "dndnode_9",
+        "type": "custom",
+        "data": {
+          "type": "custom",
+          "text": "Connected",
+          "id": "dndnode_7-dndnode_9"
+        },
+        "sourceHandle": "Processor",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "reactflow__edge-dndnode_10In Progress-dndnode_5input-any",
+        "source": "dndnode_10",
+        "target": "dndnode_5",
+        "type": "custom",
+        "data": {
+          "type": "custom",
+          "text": "Connected",
+          "id": "dndnode_4-dndnode_5"
+        },
+        "sourceHandle": "In Progress",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_10-dndnode_11",
+        "source": "dndnode_10",
+        "target": "dndnode_11",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "Fail",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_15-dndnode_10",
+        "source": "dndnode_15",
+        "target": "dndnode_10",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "status",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_16-dndnode_7",
+        "source": "dndnode_16",
+        "target": "dndnode_7",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "embeddings",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_5-dndnode_15",
+        "source": "dndnode_5",
+        "target": "dndnode_15",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "any",
+        "targetHandle": "input-invocation_arn"
+      },
+      {
+        "id": "dndnode_10-dndnode_16",
+        "source": "dndnode_10",
+        "target": "dndnode_16",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "Completed",
+        "targetHandle": "input-invocation_arn"
+      },
+      {
+        "id": "dndnode_22-dndnode_23",
+        "source": "dndnode_22",
+        "target": "dndnode_23",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "audio",
+        "targetHandle": "input-audio"
+      },
+      {
+        "source": "dndnode_23",
+        "sourceHandle": "invocation_arn",
+        "target": "dndnode_15",
+        "targetHandle": "input-invocation_arn",
+        "id": "dndnode_23-dndnode_15",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        }
+      }
+    ],
+    "settings": {
+      "autoStart": false,
+      "retryAttempts": 3,
+      "timeout": 3600
+    }
+  }
+}

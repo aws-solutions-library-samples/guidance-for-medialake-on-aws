@@ -77,27 +77,27 @@ def _map_item(container: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     return None
 
 
-def extract_asset_id(container: Dict[str, Any]) -> Optional[str]:
+def extract_inventory_id(container: Dict[str, Any]) -> Optional[str]:
     # Check if data is an array (batch processing) - get from first item
     if isinstance(container.get("data"), list) and container["data"]:
         first_item = container["data"][0]
-        if isinstance(first_item, dict) and first_item.get("asset_id"):
-            return first_item["asset_id"]
+        if isinstance(first_item, dict) and first_item.get("inventory_id"):
+            return first_item["inventory_id"]
 
     itm = _item(container)
-    if itm and itm.get("asset_id"):
-        return itm["asset_id"]
+    if itm and itm.get("inventory_id"):
+        return itm["inventory_id"]
 
     m_itm = _map_item(container)
-    if m_itm and m_itm.get("asset_id"):
-        return m_itm["asset_id"]
+    if m_itm and m_itm.get("inventory_id"):
+        return m_itm["inventory_id"]
 
     for asset in container.get("assets", []):
-        dsa_id = asset.get("DigitalSourceAsset", {}).get("ID")
-        if dsa_id:
-            return dsa_id
+        inventory_id = asset.get("InventoryID")
+        if inventory_id:
+            return inventory_id
 
-    return container.get("DigitalSourceAsset", {}).get("ID")
+    return container.get("InventoryID")
 
 
 def extract_scope(container: Dict[str, Any]) -> Optional[str]:
@@ -234,24 +234,26 @@ def _get_segment_bounds(payload: Dict[str, Any]) -> Tuple[int, int]:
         if start is not None and end is not None:
             return int(start), int(end)
 
-    logger.warning("Segment bounds not found – defaulting to 0-0")
-    return 0, 0
+    logger.error("Segment bounds not found – this indicates a data structure mismatch")
+    raise RuntimeError(
+        "Segment bounds not found – expected 'start_offset_sec'/'start_time' and 'end_offset_sec'/'end_time' fields"
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Early-exit helpers
 def _bad_request(msg: str):
-    logger.warning(msg)
-    return {"statusCode": 400, "body": json.dumps({"error": msg})}
+    logger.error(msg)
+    raise RuntimeError(msg)
 
 
-def _ok_no_op(vector_len: int, asset_id: Optional[str]):
+def _ok_no_op(vector_len: int, inventory_id: Optional[str]):
     return {
         "statusCode": 200,
         "body": json.dumps(
             {
                 "message": "Embedding processed (OpenSearch not available)",
-                "asset_id": asset_id,
+                "inventory_id": inventory_id,
                 "vector_length": vector_len,
             }
         ),
@@ -269,46 +271,51 @@ def check_opensearch_response(resp: Dict[str, Any], op: str) -> None:
 
 # ─────────────────────────────────────────────────────────────────────────────
 # One-shot master-document cache + FPS extraction
-_master_doc_cache: Dict[str, Dict[str, Any]] = {}  # asset_id → _source
+_master_doc_cache: Dict[str, Dict[str, Any]] = {}  # inventory_id → _source
 
 
 def _get_master_doc(
     client: OpenSearch,
-    asset_id: str,
+    inventory_id: str,
     is_video: bool,
     max_retries: int = 50,
     delay_seconds: float = 1.0,
 ) -> Dict[str, Any]:
     """
-    Fetches the master document for a given asset_id, retrying up to max_retries
+    Fetches the master document for a given inventory_id, retrying up to max_retries
     times if no document is found.
     """
     # return cached if available
-    if asset_id in _master_doc_cache:
-        return _master_doc_cache[asset_id]
-
-    filters = [
-        {"term": {"DigitalSourceAsset.ID": asset_id}},
-        {"exists": {"field": "InventoryID"}},
-        {
-            "nested": {
-                "path": "DerivedRepresentations",
-                "query": {"exists": {"field": "DerivedRepresentations.ID"}},
-            }
-        },
-    ]
+    if inventory_id in _master_doc_cache:
+        return _master_doc_cache[inventory_id]
 
     for attempt in range(1, max_retries + 1):
         resp = client.search(
             index=INDEX_NAME,
-            body={"query": {"bool": {"filter": filters}}},
+            body={
+                "query": {
+                    "bool": {
+                        "filter": [
+                            {"match_phrase": {"InventoryID": inventory_id}},
+                            {
+                                "nested": {
+                                    "path": "DerivedRepresentations",
+                                    "query": {
+                                        "exists": {"field": "DerivedRepresentations.ID"}
+                                    },
+                                }
+                            },
+                        ]
+                    }
+                }
+            },
             size=1,
         )
         total_hits = resp.get("hits", {}).get("total", {}).get("value", 0)
 
         if total_hits > 0:
             doc = resp["hits"]["hits"][0]["_source"]
-            _master_doc_cache[asset_id] = doc
+            _master_doc_cache[inventory_id] = doc
             return doc
 
         # not found, wait and retry
@@ -316,11 +323,11 @@ def _get_master_doc(
 
     # after all retries
     raise RuntimeError(
-        f"No master document found for asset {asset_id} after {max_retries} attempts"
+        f"No master document found for asset {inventory_id} after {max_retries} attempts"
     )
 
 
-def _extract_fps(master_src: Dict[str, Any], asset_id: str) -> int:
+def _extract_fps(master_src: Dict[str, Any], inventory_id: str) -> int:
     try:
         fr = master_src["Metadata"]["EmbeddedMetadata"]["general"]["FrameRate"]
         fps_int = int(round(float(fr)))
@@ -329,13 +336,13 @@ def _extract_fps(master_src: Dict[str, Any], asset_id: str) -> int:
         return fps_int
     except Exception as exc:
         raise RuntimeError(
-            f"Master document for asset {asset_id} is missing a valid FrameRate"
+            f"Master document for asset {inventory_id} is missing a valid FrameRate"
         ) from exc
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 def process_single_embedding(
-    payload: Dict[str, Any], embedding_data: Dict[str, Any], client, asset_id: str
+    payload: Dict[str, Any], embedding_data: Dict[str, Any], client, inventory_id: str
 ) -> Dict[str, Any]:
     """Process a single embedding object."""
     embedding_vector = embedding_data.get("float")
@@ -370,7 +377,7 @@ def process_single_embedding(
         "embedding": embedding_vector,
         "embedding_scope": "clip" if IS_AUDIO_CONTENT else scope,
         "timestamp": datetime.utcnow().isoformat(),
-        "DigitalSourceAsset": {"ID": asset_id},
+        "InventoryID": inventory_id,
         "start_timecode": start_tc,
         "end_timecode": end_tc,
     }
@@ -389,10 +396,10 @@ def process_single_embedding(
     except Exception as e:
         logger.error(
             "Failed to index document in OpenSearch",
-            extra={"asset_id": asset_id, "error": str(e), "index": INDEX_NAME},
+            extra={"inventory_id": inventory_id, "error": str(e), "index": INDEX_NAME},
         )
         raise RuntimeError(
-            f"Failed to index document for asset {asset_id}: {str(e)}"
+            f"Failed to index document for asset {inventory_id}: {str(e)}"
         ) from e
 
 
@@ -409,15 +416,15 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
         if not payload:
             return _bad_request("Event missing 'payload'")
 
-        asset_id = extract_asset_id(payload)
-        if not asset_id:
-            return _bad_request("Unable to determine asset_id – aborting")
+        inventory_id = extract_inventory_id(payload)
+        if not inventory_id:
+            return _bad_request("Unable to determine inventory_id – aborting")
 
         # OpenSearch client (may be None in local dev)
         try:
             client = get_opensearch_client()
             if not client:
-                return _ok_no_op(None, asset_id)
+                return _ok_no_op(None, inventory_id)
         except Exception as e:
             logger.error(
                 "Failed to initialize OpenSearch client", extra={"error": str(e)}
@@ -452,7 +459,7 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                     # Process clip/audio embeddings
                     try:
                         result = process_single_embedding(
-                            payload, embedding_data, client, asset_id
+                            payload, embedding_data, client, inventory_id
                         )
                         results.append(result)
                         logger.info(
@@ -497,8 +504,7 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                         "query": {
                             "bool": {
                                 "filter": [
-                                    {"term": {"DigitalSourceAsset.ID": asset_id}},
-                                    {"exists": {"field": "InventoryID"}},
+                                    {"match_phrase": {"InventoryID": inventory_id}},
                                     {
                                         "nested": {
                                             "path": "DerivedRepresentations",
@@ -516,7 +522,7 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
 
                     logger.info(
                         f"Searching for master document for video embedding {i+1}",
-                        extra={"index": INDEX_NAME, "asset_id": asset_id},
+                        extra={"index": INDEX_NAME, "inventory_id": inventory_id},
                     )
                     start_time = time.time()
                     try:
@@ -528,13 +534,13 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                         logger.error(
                             f"Failed to search for master document in batch video embedding {i+1}",
                             extra={
-                                "asset_id": asset_id,
+                                "inventory_id": inventory_id,
                                 "error": str(e),
                                 "index": INDEX_NAME,
                             },
                         )
                         raise RuntimeError(
-                            f"Failed to search for master document in batch video embedding {i+1} for asset {asset_id}: {str(e)}"
+                            f"Failed to search for master document in batch video embedding {i+1} for asset {inventory_id}: {str(e)}"
                         ) from e
 
                     while (
@@ -555,18 +561,18 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                             logger.error(
                                 f"Failed to refresh index and retry search in batch video embedding {i+1}",
                                 extra={
-                                    "asset_id": asset_id,
+                                    "inventory_id": inventory_id,
                                     "error": str(e),
                                     "index": INDEX_NAME,
                                 },
                             )
                             raise RuntimeError(
-                                f"Failed to refresh index and retry search in batch video embedding {i+1} for asset {asset_id}: {str(e)}"
+                                f"Failed to refresh index and retry search in batch video embedding {i+1} for asset {inventory_id}: {str(e)}"
                             ) from e
 
                     if search_resp["hits"]["total"]["value"] == 0:
                         raise RuntimeError(
-                            f"No master doc with DigitalSourceAsset.ID={asset_id} in '{INDEX_NAME}'"
+                            f"No master doc with InventoryID={inventory_id} in '{INDEX_NAME}'"
                         )
 
                     existing_id = search_resp["hits"]["hits"][0]["_id"]
@@ -579,14 +585,14 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                         logger.error(
                             f"Failed to get document metadata in batch video embedding {i+1}",
                             extra={
-                                "asset_id": asset_id,
+                                "inventory_id": inventory_id,
                                 "document_id": existing_id,
                                 "error": str(e),
                                 "index": INDEX_NAME,
                             },
                         )
                         raise RuntimeError(
-                            f"Failed to get metadata for document {existing_id} in batch video embedding {i+1} (asset {asset_id}): {str(e)}"
+                            f"Failed to get metadata for document {existing_id} in batch video embedding {i+1} (asset {inventory_id}): {str(e)}"
                         ) from e
 
                     update_body = {
@@ -625,7 +631,7 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                                 logger.error(
                                     "Failed to resolve conflict during batch video embedding update",
                                     extra={
-                                        "asset_id": asset_id,
+                                        "inventory_id": inventory_id,
                                         "document_id": existing_id,
                                         "error": str(e),
                                         "attempt": attempt + 1,
@@ -633,7 +639,7 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                                     },
                                 )
                                 raise RuntimeError(
-                                    f"Failed to resolve conflict for batch video embedding {i+1} document {existing_id} (asset {asset_id}): {str(e)}"
+                                    f"Failed to resolve conflict for batch video embedding {i+1} document {existing_id} (asset {inventory_id}): {str(e)}"
                                 ) from e
                     else:
                         raise RuntimeError(
@@ -667,7 +673,7 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                     {
                         "message": f"Batch processed: {len(results)} embeddings stored successfully",
                         "index": INDEX_NAME,
-                        "asset_id": asset_id,
+                        "inventory_id": inventory_id,
                         "processed_count": len(results),
                         "total_count": len(payload["data"]),
                     }
@@ -703,7 +709,7 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
             logger.info(
                 "Segment SMPTE conversion",
                 extra={
-                    "asset_id": asset_id,
+                    "inventory_id": inventory_id,
                     "fps": fps,
                     "start_seconds": start_sec,
                     "end_seconds": end_sec,
@@ -717,7 +723,7 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
             logger.info(
                 "Segment SMPTE values",
                 extra={
-                    "asset_id": asset_id,
+                    "inventory_id": inventory_id,
                     "start_timecode": start_tc,
                     "end_timecode": end_tc,
                 },
@@ -728,7 +734,7 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                 "embedding": embedding_vector,
                 "embedding_scope": "clip" if IS_AUDIO_CONTENT else scope,
                 "timestamp": datetime.utcnow().isoformat(),
-                "DigitalSourceAsset": {"ID": asset_id},
+                "InventoryID": inventory_id,
                 "start_timecode": start_tc,
                 "end_timecode": end_tc,
             }
@@ -752,14 +758,14 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                 logger.error(
                     "Failed to index clip/audio document",
                     extra={
-                        "asset_id": asset_id,
+                        "inventory_id": inventory_id,
                         "error": str(e),
                         "index": INDEX_NAME,
                         "scope": scope,
                     },
                 )
                 raise RuntimeError(
-                    f"Failed to index {scope} document for asset {asset_id}: {str(e)}"
+                    f"Failed to index {scope} document for asset {inventory_id}: {str(e)}"
                 ) from e
 
             return {
@@ -769,7 +775,7 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                         "message": "Embedding stored successfully",
                         "index": INDEX_NAME,
                         "document_id": res.get("_id", "unknown"),
-                        "asset_id": asset_id,
+                        "inventory_id": inventory_id,
                     }
                 ),
             }
@@ -778,14 +784,14 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
         if IS_AUDIO_CONTENT:
             logger.info(
                 "Skipping master-doc update for audio content",
-                extra={"asset_id": asset_id},
+                extra={"inventory_id": inventory_id},
             )
             return {
                 "statusCode": 200,
                 "body": json.dumps(
                     {
                         "message": "Embedding stored (audio clip only – master unchanged)",
-                        "asset_id": asset_id,
+                        "inventory_id": inventory_id,
                     }
                 ),
             }
@@ -795,8 +801,7 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
             "query": {
                 "bool": {
                     "filter": [
-                        {"term": {"DigitalSourceAsset.ID": asset_id}},
-                        {"exists": {"field": "InventoryID"}},
+                        {"match_phrase": {"InventoryID": inventory_id}},
                         {
                             "nested": {
                                 "path": "DerivedRepresentations",
@@ -812,7 +817,11 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
 
         logger.info(
             "Searching for existing master document",
-            extra={"index": INDEX_NAME, "asset_id": asset_id, "query": search_query},
+            extra={
+                "index": INDEX_NAME,
+                "inventory_id": inventory_id,
+                "query": search_query,
+            },
         )
         start_time = time.time()
         try:
@@ -821,10 +830,14 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
         except Exception as e:
             logger.error(
                 "Failed to search for master document",
-                extra={"asset_id": asset_id, "error": str(e), "index": INDEX_NAME},
+                extra={
+                    "inventory_id": inventory_id,
+                    "error": str(e),
+                    "index": INDEX_NAME,
+                },
             )
             raise RuntimeError(
-                f"Failed to search for master document for asset {asset_id}: {str(e)}"
+                f"Failed to search for master document for asset {inventory_id}: {str(e)}"
             ) from e
 
         while (
@@ -840,15 +853,19 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
             except Exception as e:
                 logger.error(
                     "Failed to refresh index and retry search",
-                    extra={"asset_id": asset_id, "error": str(e), "index": INDEX_NAME},
+                    extra={
+                        "inventory_id": inventory_id,
+                        "error": str(e),
+                        "index": INDEX_NAME,
+                    },
                 )
                 raise RuntimeError(
-                    f"Failed to refresh index and retry search for asset {asset_id}: {str(e)}"
+                    f"Failed to refresh index and retry search for asset {inventory_id}: {str(e)}"
                 ) from e
 
         if search_resp["hits"]["total"]["value"] == 0:
             raise RuntimeError(
-                f"No master doc with DigitalSourceAsset.ID={asset_id} in '{INDEX_NAME}'"
+                f"No master doc with InventoryID={inventory_id} in '{INDEX_NAME}'"
             )
 
         existing_id = search_resp["hits"]["hits"][0]["_id"]
@@ -861,14 +878,14 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
             logger.error(
                 "Failed to get document metadata",
                 extra={
-                    "asset_id": asset_id,
+                    "inventory_id": inventory_id,
                     "document_id": existing_id,
                     "error": str(e),
                     "index": INDEX_NAME,
                 },
             )
             raise RuntimeError(
-                f"Failed to get metadata for document {existing_id} (asset {asset_id}): {str(e)}"
+                f"Failed to get metadata for document {existing_id} (asset {inventory_id}): {str(e)}"
             ) from e
 
         update_body = {
@@ -908,14 +925,14 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                     logger.error(
                         "Failed to resolve conflict during document update",
                         extra={
-                            "asset_id": asset_id,
+                            "inventory_id": inventory_id,
                             "document_id": existing_id,
                             "error": str(e),
                             "attempt": attempt + 1,
                         },
                     )
                     raise RuntimeError(
-                        f"Failed to resolve conflict for document {existing_id} (asset {asset_id}): {str(e)}"
+                        f"Failed to resolve conflict for document {existing_id} (asset {inventory_id}): {str(e)}"
                     ) from e
         else:
             raise RuntimeError("Failed to update master document after 50 retries")
@@ -927,7 +944,7 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                     "message": "Embedding stored successfully",
                     "index": INDEX_NAME,
                     "document_id": existing_id,
-                    "asset_id": asset_id,
+                    "inventory_id": inventory_id,
                 }
             ),
         }
