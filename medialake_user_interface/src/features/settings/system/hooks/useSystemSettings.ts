@@ -3,6 +3,7 @@ import {
   useSearchProvider,
   useCreateSearchProvider,
   useUpdateSearchProvider,
+  useDeleteSearchProvider,
 } from "../api/systemHooks";
 import {
   SearchProvider,
@@ -36,7 +37,7 @@ export const useSemanticSearchSettings = () => {
     current: {
       isEnabled: false,
       provider: {
-        type: "twelvelabs-api",
+        type: "none",
         config: null,
       },
       embeddingStore: {
@@ -46,7 +47,7 @@ export const useSemanticSearchSettings = () => {
     original: {
       isEnabled: false,
       provider: {
-        type: "twelvelabs-api",
+        type: "none",
         config: null,
       },
       embeddingStore: {
@@ -67,28 +68,38 @@ export const useSemanticSearchSettings = () => {
     error: providerError,
   } = useSearchProvider();
 
-  // Mutations for creating and updating the provider
+  // Mutations for creating, updating, and deleting the provider
   const createProvider = useCreateSearchProvider();
   const updateProvider = useUpdateSearchProvider();
+  const deleteProvider = useDeleteSearchProvider();
 
   // Initialize settings from fetched data
   useEffect(() => {
     if (providerData?.data?.searchProvider) {
       const fetchedProvider = providerData.data.searchProvider;
       const fetchedEmbeddingStore = providerData.data.embeddingStore;
-      const providerType =
-        fetchedProvider.type === "twelvelabs-bedrock"
+
+      // If provider is not configured, treat it as "none" to show "Select a provider"
+      // This handles the case where backend returns a fallback provider
+      const isConfigured = fetchedProvider.isConfigured || false;
+      const providerType = isConfigured
+        ? fetchedProvider.type === "twelvelabs-bedrock"
           ? "twelvelabs-bedrock"
-          : "twelvelabs-api";
+          : fetchedProvider.type === "twelvelabs-api"
+            ? "twelvelabs-api"
+            : "none"
+        : "none";
 
       const initialSettings: SemanticSearchSettings = {
         isEnabled: fetchedProvider.isEnabled || false,
         provider: {
           type: providerType,
-          config: {
-            ...fetchedProvider,
-            isConfigured: fetchedProvider.isConfigured || false,
-          },
+          config: isConfigured
+            ? {
+                ...fetchedProvider,
+                isConfigured: true,
+              }
+            : null,
         },
         embeddingStore: {
           type: fetchedEmbeddingStore?.type || "opensearch",
@@ -113,22 +124,9 @@ export const useSemanticSearchSettings = () => {
     }));
   }, [settings.current, settings.original]);
 
-  // Handle toggle change
-  const handleToggleChange = (enabled: boolean) => {
-    // If trying to enable but no provider is configured, prompt user to configure first
-    if (enabled && !settings.current.provider.config?.isConfigured) {
-      // For now, just open the API key dialog for the default provider type
-      if (settings.current.provider.type === "twelvelabs-api") {
-        setIsEditingApiKey(false);
-        setApiKeyInput("");
-        setIsApiKeyDialogOpen(true);
-      } else {
-        // For Bedrock, trigger the provider type change which will save immediately
-        handleProviderTypeChange("twelvelabs-bedrock");
-      }
-      return;
-    }
-
+  // Handle toggle change with immediate save
+  const handleToggleChange = async (enabled: boolean) => {
+    // Update local state immediately for responsive UI
     setSettings((prev) => ({
       ...prev,
       current: {
@@ -136,13 +134,109 @@ export const useSemanticSearchSettings = () => {
         isEnabled: enabled,
       },
     }));
+
+    if (enabled) {
+      // Handle enabling: only save if provider is configured
+      if (settings.current.provider.config?.isConfigured) {
+        try {
+          const embeddingStorePayload = {
+            type: settings.current.embeddingStore.type,
+            isEnabled: enabled,
+          };
+
+          await updateProvider.mutateAsync({
+            isEnabled: enabled,
+            embeddingStore: embeddingStorePayload,
+          });
+
+          // Update original state to reflect saved changes
+          setSettings((prev) => ({
+            ...prev,
+            original: {
+              ...prev.original,
+              isEnabled: enabled,
+            },
+          }));
+        } catch (error) {
+          console.error("Failed to save toggle state:", error);
+          // Revert local state on error
+          setSettings((prev) => ({
+            ...prev,
+            current: {
+              ...prev.current,
+              isEnabled: !enabled,
+            },
+          }));
+          throw error;
+        }
+      }
+      // If no provider configured, just keep local state - user needs to select provider first
+    } else {
+      // Handle disabling: delete the provider configuration and reset to default state
+      if (settings.original.provider.config?.id) {
+        try {
+          await deleteProvider.mutateAsync();
+
+          // Reset to default state (no provider selected)
+          const defaultSettings = {
+            isEnabled: false,
+            provider: {
+              type: "none" as const,
+              config: null,
+            },
+            embeddingStore: {
+              type: "opensearch" as const,
+            },
+          };
+
+          setSettings((prev) => ({
+            ...prev,
+            current: defaultSettings,
+            original: defaultSettings,
+          }));
+        } catch (error) {
+          console.error("Failed to delete provider:", error);
+          // Revert local state on error
+          setSettings((prev) => ({
+            ...prev,
+            current: {
+              ...prev.current,
+              isEnabled: !enabled,
+            },
+          }));
+          throw error;
+        }
+      } else {
+        // No provider exists, just update local state
+        setSettings((prev) => ({
+          ...prev,
+          original: {
+            ...prev.original,
+            isEnabled: enabled,
+          },
+        }));
+      }
+    }
   };
 
   // Handle provider type change
   const handleProviderTypeChange = async (
-    providerType: "twelvelabs-api" | "twelvelabs-bedrock",
+    providerType: "none" | "twelvelabs-api" | "twelvelabs-bedrock",
   ) => {
-    if (providerType === "twelvelabs-api") {
+    if (providerType === "none") {
+      // Reset to no provider
+      setSettings((prev) => ({
+        ...prev,
+        current: {
+          ...prev.current,
+          isEnabled: false,
+          provider: {
+            type: "none",
+            config: null,
+          },
+        },
+      }));
+    } else if (providerType === "twelvelabs-api") {
       // Open API key dialog for Twelve Labs API
       setIsEditingApiKey(false);
       setApiKeyInput("");
@@ -294,10 +388,7 @@ export const useSemanticSearchSettings = () => {
       const providerConfig: SearchProvider = {
         id: settings.current.provider.config?.id || "",
         name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.name,
-        type:
-          settings.current.provider.type === "twelvelabs-api"
-            ? "twelvelabs-api"
-            : "twelvelabs-bedrock",
+        type: "twelvelabs-api", // API key dialog is only for API providers
         apiKey: apiKeyInput,
         endpoint:
           SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.defaultEndpoint,
@@ -463,7 +554,10 @@ export const useSemanticSearchSettings = () => {
     handleCancel,
 
     // Mutations
-    isSaving: createProvider.isPending || updateProvider.isPending,
+    isSaving:
+      createProvider.isPending ||
+      updateProvider.isPending ||
+      deleteProvider.isPending,
 
     // Dialog input handlers
     setApiKeyInput,

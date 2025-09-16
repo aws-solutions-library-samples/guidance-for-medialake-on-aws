@@ -276,6 +276,52 @@ class SettingsConstruct(Construct):
         )
         apply_custom_authorization(search_provider_put, props.authorizer)
 
+        # DELETE /settings/system/search
+        self._delete_search_provider_handler = Lambda(
+            self,
+            "DeleteSearchProviderHandler",
+            config=LambdaConfig(
+                name="delete_search_provider",
+                entry="lambdas/api/settings/system/search/delete_search",
+                environment_variables={
+                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+                    "SYSTEM_SETTINGS_TABLE": self._system_settings_table_name,
+                    "METRICS_NAMESPACE": "MediaLake",
+                },
+            ),
+        )
+
+        self._delete_search_provider_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "dynamodb:DeleteItem",
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                ],
+                resources=[self._system_settings_table_arn],
+            )
+        )
+
+        # Add permissions to access Secrets Manager
+        self._delete_search_provider_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "secretsmanager:DeleteSecret",
+                ],
+                resources=["*"],
+            )
+        )
+
+        search_provider_delete = search_resource.add_method(
+            "DELETE",
+            api_gateway.LambdaIntegration(
+                self._delete_search_provider_handler.function
+            ),
+        )
+        apply_custom_authorization(search_provider_delete, props.authorizer)
+
         # Create users resource
         settings_users_resource = settings_resource.add_resource("users")
         settings_users_userid_resource = settings_users_resource.add_resource("{id}")

@@ -84,6 +84,9 @@ class SearchConstruct(Construct):
                     "S3_VECTOR_INDEX_NAME": "media-vectors",
                     # CLOUDFRONT_DISTRIBUTION_DOMAIN removed to break circular dependency
                     # Lambda will fetch this from SSM parameter at runtime
+                    # Bedrock inference profile ID for TwelveLabs Marengo Embed v2.7
+                    # Using AWS system-defined cross-Region inference profile
+                    "BEDROCK_INFERENCE_PROFILE_ARN": "us.twelvelabs.marengo-embed-2-7-v1:0",
                 },
             ),
         )
@@ -186,6 +189,36 @@ class SearchConstruct(Construct):
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=["ssm:GetParameter"],
+                resources=["*"],
+            )
+        )
+
+        # Add Bedrock InvokeModel permissions for TwelveLabs embedding generation
+        # Using system-defined cross-Region inference profile
+        search_get_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "bedrock:InvokeModel",
+                ],
+                resources=[
+                    # Foundation model ARN - required for InvokeModel calls
+                    "arn:aws:bedrock:*::foundation-model/twelvelabs.marengo-embed-2-7-v1:0",
+                    # System-defined cross-Region inference profile for TwelveLabs Marengo
+                    # The ARN includes the account ID for system-defined profiles
+                    f"arn:aws:bedrock:*:{Stack.of(self).account}:inference-profile/us.twelvelabs.marengo-embed-2-7-v1:0",
+                ],
+            )
+        )
+
+        # Add permissions to list and get inference profiles (for debugging/monitoring)
+        search_get_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "bedrock:ListInferenceProfiles",
+                    "bedrock:GetInferenceProfile",
+                ],
                 resources=["*"],
             )
         )
