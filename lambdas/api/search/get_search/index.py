@@ -20,11 +20,8 @@ from opensearchpy import (
     RequestsHttpConnection,
 )
 from pydantic import BaseModel, ConfigDict, Field, conint
-from search_utils import (
-    generate_cloudfront_url,
-    generate_cloudfront_urls_batch,
-    parse_search_query,
-)
+from search_utils import parse_search_query
+from url_utils import generate_cloudfront_url, generate_cloudfront_urls_batch
 
 # Global flag to enable/disable clip logic
 CLIP_LOGIC_ENABLED = True
