@@ -252,7 +252,6 @@ def handler(event, context):
             "index": {
                 "knn": True,
                 "mapping.total_fields.limit": 6000,
-                "query.bool.max_clause_count": 5000,
             }
         },
         "mappings": {
