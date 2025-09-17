@@ -97,6 +97,35 @@ export const useCreateSearchProvider = () => {
   });
 };
 
+export const useDeleteSearchProvider = () => {
+  const queryClient = useQueryClient();
+  const { showError } = useErrorModal();
+
+  return useMutation<SystemSettingsResponse, SystemSettingsError, void>({
+    mutationFn: async () => {
+      try {
+        const response = await apiClient.delete<SystemSettingsResponse>(
+          SYSTEM_API.endpoints.DELETE_SEARCH_PROVIDER,
+        );
+
+        return response.data;
+      } catch (error) {
+        logger.error("Search provider deletion error:", error);
+        showError("Failed to delete search provider");
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.SYSTEM_SETTINGS.all,
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.SYSTEM_SETTINGS.search(),
+      });
+    },
+  });
+};
+
 export const useUpdateSearchProvider = () => {
   const queryClient = useQueryClient();
   const { showError } = useErrorModal();
