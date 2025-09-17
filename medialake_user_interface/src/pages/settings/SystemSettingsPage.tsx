@@ -111,6 +111,7 @@ const SystemSettingsPage: React.FC = () => {
   const { t } = useTranslation();
   const theme = useTheme();
   const [tabValue, setTabValue] = useState(0);
+  const [showWarningDialog, setShowWarningDialog] = useState(false);
 
   // Notification
   const {
@@ -199,16 +200,32 @@ const SystemSettingsPage: React.FC = () => {
     }
   }, [isApiKeyDialogOpen, settings.provider.config, setApiKeyInput]);
 
+  // Check for incomplete configuration before page unload
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (settings.isEnabled && settings.provider.type === "none") {
+        e.preventDefault();
+        e.returnValue =
+          "You have enabled search but haven't selected a provider. Your search functionality may not work properly.";
+        setShowWarningDialog(true);
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [settings.isEnabled, settings.provider.type]);
+
   const onSaveApiKey = async () => {
     try {
       const success = await handleSaveApiKey();
       if (success) {
-        handleToggleChange(true); // Enable the provider after successful save
         handleCloseApiKeyDialog();
+        // Enable the toggle after successful API key save
+        handleToggleChange(true);
         showNotification(
           t(
             "settings.systemSettings.search.apiKeySaveSuccess",
-            "API key saved",
+            "API key saved and enabled",
           ),
           "success",
         );
@@ -376,7 +393,7 @@ const SystemSettingsPage: React.FC = () => {
                           onChange={(_evt, checked) =>
                             handleToggleChange(checked)
                           }
-                          disabled={!settings.provider.config?.isConfigured}
+                          disabled={false}
                           color="success"
                           size="medium"
                         />
@@ -412,10 +429,7 @@ const SystemSettingsPage: React.FC = () => {
                       )}
                     </Typography>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                      <FormControl
-                        sx={{ minWidth: 200 }}
-                        disabled={!settings.isEnabled}
-                      >
+                      <FormControl sx={{ minWidth: 200 }} disabled={false}>
                         <InputLabel>
                           {t(
                             "settings.systemSettings.search.selectProvider",
@@ -432,6 +446,12 @@ const SystemSettingsPage: React.FC = () => {
                             handleProviderTypeChange(e.target.value as any)
                           }
                         >
+                          <MenuItem value="none">
+                            {t(
+                              "settings.systemSettings.search.selectProviderOption",
+                              "Select a provider...",
+                            )}
+                          </MenuItem>
                           <MenuItem value="twelvelabs-api">
                             {
                               SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API
@@ -452,7 +472,7 @@ const SystemSettingsPage: React.FC = () => {
                             variant="outlined"
                             startIcon={<EditIcon />}
                             onClick={() => handleOpenApiKeyDialog(true)}
-                            disabled={!settings.isEnabled}
+                            disabled={false}
                           >
                             {t(
                               "settings.systemSettings.search.editApiKey",
@@ -685,6 +705,46 @@ const SystemSettingsPage: React.FC = () => {
             disabled={!apiKeyInput}
           >
             {t("common.save", "Save")}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Warning Dialog for incomplete configuration */}
+      <Dialog
+        open={showWarningDialog}
+        onClose={() => setShowWarningDialog(false)}
+        aria-labelledby="warning-dialog-title"
+        aria-describedby="warning-dialog-description"
+      >
+        <DialogTitle id="warning-dialog-title">
+          {t(
+            "settings.systemSettings.search.incompleteConfigTitle",
+            "Incomplete Search Configuration",
+          )}
+        </DialogTitle>
+        <DialogContent>
+          <Typography id="warning-dialog-description">
+            {t(
+              "settings.systemSettings.search.incompleteConfigMessage",
+              "You have enabled semantic search but haven't selected a provider. Search functionality will not work properly until you configure a provider.",
+            )}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowWarningDialog(false)} color="primary">
+            {t("common.ok", "OK")}
+          </Button>
+          <Button
+            onClick={() => {
+              setShowWarningDialog(false);
+              handleToggleChange(false); // Disable search
+            }}
+            color="secondary"
+          >
+            {t(
+              "settings.systemSettings.search.disableSearch",
+              "Disable Search",
+            )}
           </Button>
         </DialogActions>
       </Dialog>

@@ -40,10 +40,11 @@ def get_search_provider():
             # Don't expose the secret ARN in the response
             search_provider.pop("secretArn", None)
 
-            # Add isConfigured flag if secretArn exists in the original item
-            search_provider["isConfigured"] = "secretArn" in provider_response.get(
-                "Item", {}
-            )
+            # Add isConfigured flag - true if secretArn exists OR if it's Bedrock (which doesn't need one)
+            original_item = provider_response.get("Item", {})
+            has_secret = "secretArn" in original_item  # pragma: allowlist secret
+            is_bedrock = original_item.get("type") == "twelvelabs-bedrock"
+            search_provider["isConfigured"] = has_secret or is_bedrock
 
         # Get embedding store settings
         embedding_response = system_settings_table.get_item(
@@ -69,8 +70,8 @@ def get_search_provider():
                     search_provider
                     if search_provider
                     else {
-                        "name": "Twelve Labs",
-                        "type": "twelvelabs",
+                        "name": "TwelveLabs API",
+                        "type": "twelvelabs-api",
                         "isConfigured": False,
                         "isEnabled": False,
                     }
