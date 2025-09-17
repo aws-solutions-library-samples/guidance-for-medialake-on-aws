@@ -31,9 +31,14 @@ def get_search_provider():
         )
 
         search_provider = provider_response.get("Item", {})
+        logger.info(f"Raw DynamoDB response: {provider_response}")
+        logger.info(f"Retrieved search_provider: {search_provider}")
 
         # Remove DynamoDB specific attributes
         if search_provider:
+            # Create a proper copy of the original item BEFORE modifying search_provider
+            original_item = provider_response.get("Item", {}).copy()
+
             search_provider.pop("PK", None)
             search_provider.pop("SK", None)
 
@@ -41,9 +46,9 @@ def get_search_provider():
             search_provider.pop("secretArn", None)
 
             # Add isConfigured flag - true if secretArn exists OR if it's Bedrock (which doesn't need one)
-            original_item = provider_response.get("Item", {})
             has_secret = "secretArn" in original_item  # pragma: allowlist secret
             is_bedrock = original_item.get("type") == "twelvelabs-bedrock"
+
             search_provider["isConfigured"] = has_secret or is_bedrock
 
         # Get embedding store settings

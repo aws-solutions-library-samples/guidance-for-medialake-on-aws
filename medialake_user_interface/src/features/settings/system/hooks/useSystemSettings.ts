@@ -79,10 +79,12 @@ export const useSemanticSearchSettings = () => {
       const fetchedProvider = providerData.data.searchProvider;
       const fetchedEmbeddingStore = providerData.data.embeddingStore;
 
-      // If provider is not configured, treat it as "none" to show "Select a provider"
-      // This handles the case where backend returns a fallback provider
+      // Preserve provider information to track existence, even if not fully configured
       const isConfigured = fetchedProvider.isConfigured || false;
-      const providerType = isConfigured
+      const hasId = !!fetchedProvider.id; // Provider exists in database if it has an ID
+
+      // Show "none" in UI if not configured, but preserve actual type for backend operations
+      const displayType = isConfigured
         ? fetchedProvider.type === "twelvelabs-bedrock"
           ? "twelvelabs-bedrock"
           : fetchedProvider.type === "twelvelabs-api"
@@ -93,11 +95,11 @@ export const useSemanticSearchSettings = () => {
       const initialSettings: SemanticSearchSettings = {
         isEnabled: fetchedProvider.isEnabled || false,
         provider: {
-          type: providerType,
-          config: isConfigured
+          type: displayType,
+          config: hasId
             ? {
                 ...fetchedProvider,
-                isConfigured: true,
+                isConfigured,
               }
             : null,
         },
@@ -252,16 +254,22 @@ export const useSemanticSearchSettings = () => {
         const providerExists = settings.original.provider.config?.id;
 
         if (providerExists) {
-          // Update existing provider to Bedrock type
+          // Update existing provider to selected type
           await updateProvider.mutateAsync({
+            type: providerType,
             isEnabled: settings.current.isEnabled,
             embeddingStore: embeddingStorePayload,
           });
         } else {
-          // Create new Bedrock provider
+          // Create new provider with selected type
+          const providerConfig =
+            providerType === "twelvelabs-bedrock"
+              ? SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_BEDROCK
+              : SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API;
+
           await createProvider.mutateAsync({
-            name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_BEDROCK.name,
-            type: "twelvelabs-bedrock",
+            name: providerConfig.name,
+            type: providerType,
             apiKey: "", // Not needed for Bedrock
             isEnabled: settings.current.isEnabled,
             embeddingStore: embeddingStorePayload,
@@ -421,6 +429,7 @@ export const useSemanticSearchSettings = () => {
       if (providerExists) {
         // Update existing provider
         await updateProvider.mutateAsync({
+          type: providerConfig.type,
           apiKey: providerConfig.apiKey,
           endpoint: providerConfig.endpoint,
           isEnabled: settings.current.isEnabled,
@@ -471,6 +480,7 @@ export const useSemanticSearchSettings = () => {
         if (providerExists) {
           // Update existing provider
           await updateProvider.mutateAsync({
+            type: current.provider.config.type,
             apiKey: current.provider.config.apiKey,
             endpoint: current.provider.config.endpoint,
             isEnabled: current.isEnabled,
