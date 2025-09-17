@@ -796,20 +796,13 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                 ),
             }
 
-        # ── MASTER-DOC UPDATE for VIDEO (existing query) ──────────────────────
+        # ── MASTER-DOC UPDATE for VIDEO/IMAGE (fixed query for actual mapping) ──────────────────────
         search_query = {
             "query": {
                 "bool": {
                     "filter": [
                         {"match_phrase": {"InventoryID": inventory_id}},
-                        {
-                            "nested": {
-                                "path": "DerivedRepresentations",
-                                "query": {
-                                    "exists": {"field": "DerivedRepresentations.ID"}
-                                },
-                            }
-                        },
+                        {"exists": {"field": "DerivedRepresentations.ID"}},
                     ]
                 }
             }
