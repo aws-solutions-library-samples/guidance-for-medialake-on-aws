@@ -72,6 +72,8 @@ def create_search_provider():
             secret_name = f"medialake/search/provider/{provider_id}"
             secret_value = json.dumps({"x-api-key": body["apiKey"]})
 
+            logger.info(f"Creating secret with name: {secret_name}")
+
             # Create the secret in Secrets Manager
             secret_response = secretsmanager.create_secret(
                 Name=secret_name,
@@ -80,6 +82,7 @@ def create_search_provider():
             )
 
             secret_arn = secret_response["ARN"]
+            logger.info(f"Secret created successfully with ARN: {secret_arn}")
 
         # Create new search provider
         now = datetime.utcnow().isoformat()
@@ -98,6 +101,9 @@ def create_search_provider():
         # Only add secretArn if we created a secret
         if secret_arn:
             search_provider["secretArn"] = secret_arn
+            logger.info(f"Adding secretArn to provider: {secret_arn}")
+
+        logger.info(f"Saving provider to DynamoDB: {search_provider}")
 
         # Save to DynamoDB
         system_settings_table.put_item(Item=search_provider)

@@ -32,7 +32,14 @@ def update_search_provider():
         body = app.current_event.json_body
 
         # Manual validation of request body
-        allowed_fields = ["name", "apiKey", "endpoint", "isEnabled", "embeddingStore"]
+        allowed_fields = [
+            "name",
+            "type",
+            "apiKey",
+            "endpoint",
+            "isEnabled",
+            "embeddingStore",
+        ]
         for field in body:
             if field not in allowed_fields:
                 return {
@@ -119,6 +126,14 @@ def update_search_provider():
             update_expression_parts.append("isEnabled = :isEnabled")
             expression_attribute_values[":isEnabled"] = body["isEnabled"]
 
+        if "type" in body:
+            update_expression_parts.append("#type = :type")
+            expression_attribute_values[":type"] = body["type"]
+            # Add expression attribute names for reserved word 'type'
+            if "ExpressionAttributeNames" not in locals():
+                expression_attribute_names = {}
+            expression_attribute_names = {"#type": "type"}
+
         # Add secretArn to update expression if it was created for API key update
         if "apiKey" in body and "secretArn" in existing_provider:
             update_expression_parts.append("secretArn = :secretArn")
@@ -127,12 +142,19 @@ def update_search_provider():
         # Update search provider
         update_expression = " , ".join(update_expression_parts)
 
-        response = system_settings_table.update_item(
-            Key={"PK": "SYSTEM_SETTINGS", "SK": "SEARCH_PROVIDER"},
-            UpdateExpression=update_expression,
-            ExpressionAttributeValues=expression_attribute_values,
-            ReturnValues="ALL_NEW",
-        )
+        # Prepare update_item parameters
+        update_params = {
+            "Key": {"PK": "SYSTEM_SETTINGS", "SK": "SEARCH_PROVIDER"},
+            "UpdateExpression": update_expression,
+            "ExpressionAttributeValues": expression_attribute_values,
+            "ReturnValues": "ALL_NEW",
+        }
+
+        # Add ExpressionAttributeNames if type field is being updated
+        if "type" in body:
+            update_params["ExpressionAttributeNames"] = {"#type": "type"}
+
+        response = system_settings_table.update_item(**update_params)
 
         # Get updated item
         updated_provider = response.get("Attributes", {})

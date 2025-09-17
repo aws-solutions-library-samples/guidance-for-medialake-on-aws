@@ -37,6 +37,7 @@ export interface EmbeddingStore {
 
 export interface SearchProviderUpdate {
   name?: string;
+  type?: string;
   apiKey?: string;
   endpoint?: string;
   isEnabled?: boolean;
