@@ -25,6 +25,7 @@ import { AssetAudio } from "../asset";
 import { InlineTextEditor } from "../common/InlineTextEditor";
 import { OmakasePlayer, PeriodMarker } from "@byomakase/omakase-player";
 import { randomHexColor } from "../common/utils";
+import { useSemanticMode } from "@/stores/searchStore";
 
 export interface AssetField {
   id: string;
@@ -122,6 +123,10 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
       true,
     );
     const favoritesFeature = useFeatureFlag("user-favorites-enabled", true);
+
+    // Get semantic mode to conditionally hide buttons
+    const semanticMode = useSemanticMode();
+    const isClipMode = semanticMode === "clip";
 
     // Update when menuOpen prop changes
     useEffect(() => {
@@ -1083,20 +1088,22 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                   );
                 })()}
 
-                <IconButton
-                  size="small"
-                  onClick={handleDeleteClick}
-                  sx={{
-                    color: "primary.main",
-                    "&:hover": {
-                      bgcolor: "primary.main",
-                      color: "primary.contrastText",
-                    },
-                  }}
-                  title="Delete"
-                >
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
+                {!isClipMode && (
+                  <IconButton
+                    size="small"
+                    onClick={handleDeleteClick}
+                    sx={{
+                      color: "primary.main",
+                      "&:hover": {
+                        bgcolor: "primary.main",
+                        color: "primary.contrastText",
+                      },
+                    }}
+                    title="Delete"
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                )}
               </Box>
             </Box>
           ) : (
@@ -1132,20 +1139,22 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                 }}
                 onClick={(e) => e.stopPropagation()}
               >
-                <IconButton
-                  size="small"
-                  onClick={handleDownloadClick}
-                  sx={{
-                    color: "primary.main",
-                    "&:hover": {
-                      bgcolor: "primary.main",
-                      color: "primary.contrastText",
-                    },
-                  }}
-                  title="Download"
-                >
-                  <DownloadIcon fontSize="small" />
-                </IconButton>
+                {!isClipMode && (
+                  <IconButton
+                    size="small"
+                    onClick={handleDownloadClick}
+                    sx={{
+                      color: "primary.main",
+                      "&:hover": {
+                        bgcolor: "primary.main",
+                        color: "primary.contrastText",
+                      },
+                    }}
+                    title="Download"
+                  >
+                    <DownloadIcon fontSize="small" />
+                  </IconButton>
+                )}
 
                 <Button
                   size="small"
@@ -1179,20 +1188,22 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                   </Box>
                 </Button>
 
-                <IconButton
-                  size="small"
-                  onClick={handleDeleteClick}
-                  sx={{
-                    color: "primary.main",
-                    "&:hover": {
-                      bgcolor: "primary.main",
-                      color: "primary.contrastText",
-                    },
-                  }}
-                  title="Delete"
-                >
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
+                {!isClipMode && (
+                  <IconButton
+                    size="small"
+                    onClick={handleDeleteClick}
+                    sx={{
+                      color: "primary.main",
+                      "&:hover": {
+                        bgcolor: "primary.main",
+                        color: "primary.contrastText",
+                      },
+                    }}
+                    title="Delete"
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                )}
               </Box>
             </Box>
           )}
