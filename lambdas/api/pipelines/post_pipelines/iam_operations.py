@@ -923,9 +923,10 @@ def create_service_roles_from_yaml(
 
                 # Create a unique role name
                 sanitized_pipeline_name = sanitize_role_name(pipeline_name)
-                sanitized_role_name = (
+                base_role_name = (
                     f"{resource_prefix}_{sanitized_pipeline_name}_{node_id}_{role_name}"
                 )
+                sanitized_role_name = sanitize_role_name(base_role_name)
 
                 # Create the role
                 iam_client = boto3.client("iam")

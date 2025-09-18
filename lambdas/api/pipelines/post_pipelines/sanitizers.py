@@ -31,10 +31,13 @@ def sanitize_role_name(name: str) -> str:
     # Ensure the name starts with a letter or allowed character
     sanitized_name = re.sub(r"^[^a-z0-9+=,.@_-]+", "", sanitized_name)
 
+    # Ensure the name doesn't end with a hyphen or underscore before truncating
+    sanitized_name = re.sub(r"[-_]+$", "", sanitized_name)
+
     # Truncate to 64 characters (maximum length for IAM role names)
     sanitized_name = sanitized_name[:64]
 
-    # Ensure the name doesn't end with a hyphen or underscore
+    # Final cleanup - ensure no trailing hyphens or underscores after truncation
     sanitized_name = re.sub(r"[-_]+$", "", sanitized_name)
 
     return sanitized_name
