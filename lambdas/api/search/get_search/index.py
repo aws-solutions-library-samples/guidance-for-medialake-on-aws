@@ -20,14 +20,11 @@ from opensearchpy import (
     RequestsHttpConnection,
 )
 from pydantic import BaseModel, ConfigDict, Field, conint
-from search_utils import (
-    generate_presigned_url,
-    generate_presigned_urls_batch,
-    parse_search_query,
-)
+from search_utils import parse_search_query
 
 # Import unified search components
 from unified_search_orchestrator import UnifiedSearchOrchestrator
+from url_utils import generate_cloudfront_url, generate_cloudfront_urls_batch
 
 # Global flag to enable/disable clip logic
 CLIP_LOGIC_ENABLED = True
@@ -334,6 +331,16 @@ def build_search_query(params: SearchParams) -> Dict:
                     "boost": 0.7,
                 }
             },
+            # Add metadata search using multi_match for all metadata fields
+            {
+                "multi_match": {
+                    "query": clean_query,
+                    "fields": ["Metadata.*"],
+                    "type": "best_fields",
+                    "boost": 0.8,
+                    "lenient": True,
+                }
+            },
         ]
 
         # Add individual term matches for multi-keyword search with OR logic
@@ -481,7 +488,7 @@ def add_common_fields(result: Dict, prefix: str = "") -> Dict:
     digital_source_asset = result.get(f"{prefix}DigitalSourceAsset", {})
     main_rep = digital_source_asset.get("MainRepresentation", {})
     storage_info = main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
-    object_key = storage_info.get("ObjectKey", {})
+    storage_info.get("ObjectKey", {})
     inventory_id = result.get("InventoryID", "")
 
     # Add ID fields
@@ -494,25 +501,25 @@ def add_common_fields(result: Dict, prefix: str = "") -> Dict:
             result["id"] = inventory_id
 
     # Add asset metadata fields
-    result["assetType"] = digital_source_asset.get("Type", "")
-    result["format"] = main_rep.get("Format", "")
-    result["objectName"] = object_key.get("Name", "")
-    result["fullPath"] = object_key.get("FullPath", "")
-    result["bucket"] = storage_info.get("Bucket", "")
+    # result["assetType"] = digital_source_asset.get("Type", "")
+    # result["format"] = main_rep.get("Format", "")
+    # result["objectName"] = object_key.get("Name", "")
+    # result["fullPath"] = object_key.get("FullPath", "")
+    # result["bucket"] = storage_info.get("Bucket", "")
 
-    # Handle file size - check different locations
-    file_size = storage_info.get("FileSize", 0)
-    if not file_size and "FileInfo" in storage_info:
-        file_size = storage_info.get("FileInfo", {}).get("Size", 0)
-    result["fileSize"] = file_size
+    # # Handle file size - check different locations
+    # file_size = storage_info.get("FileSize", 0)
+    # if not file_size and "FileInfo" in storage_info:
+    #     file_size = storage_info.get("FileInfo", {}).get("Size", 0)
+    # result["fileSize"] = file_size
 
     # Handle creation date - check different locations
-    created_date = storage_info.get("CreateDate", "")
-    if not created_date and "FileInfo" in storage_info:
-        created_date = storage_info.get("FileInfo", {}).get("CreateDate", "")
-    if not created_date:
-        created_date = digital_source_asset.get("CreateDate", "")
-    result["createdAt"] = created_date
+    # created_date = storage_info.get("CreateDate", "")
+    # if not created_date and "FileInfo" in storage_info:
+    #     created_date = storage_info.get("FileInfo", {}).get("CreateDate", "")
+    # if not created_date:
+    #     created_date = digital_source_asset.get("CreateDate", "")
+    # result["createdAt"] = created_date
 
     # Include consolidated metadata directly
     if "Metadata" in result and "Consolidated" in result.get("Metadata", {}):
@@ -521,20 +528,32 @@ def add_common_fields(result: Dict, prefix: str = "") -> Dict:
     return result
 
 
-def collect_presigned_url_requests(hits: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
+def collect_cloudfront_url_requests(hits: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
     """
-    Collect all presigned URL requests from search hits without generating URLs.
+    Collect all CloudFront URL requests from search hits without generating URLs.
     Returns tuple of (processed_hits_data, url_requests)
     """
     processed_hits = []
     url_requests = []
 
-    for hit in hits:
+    logger.info(f"[URL_DEBUG] Starting URL collection for {len(hits)} hits")
+
+    for hit_idx, hit in enumerate(hits):
         source = hit["_source"]
         digital_source_asset = source.get("DigitalSourceAsset", {})
         derived_representations = source.get("DerivedRepresentations", [])
 
         asset_id = digital_source_asset.get("ID", "unknown")
+        logger.info(
+            f"[URL_DEBUG] Processing hit {hit_idx + 1}/{len(hits)} - Asset ID: {asset_id}"
+        )
+        logger.info(
+            f"[URL_DEBUG] DigitalSourceAsset keys: {list(digital_source_asset.keys())}"
+        )
+        logger.info(
+            f"[URL_DEBUG] DerivedRepresentations count: {len(derived_representations)}"
+        )
+
         hit_data = {
             "hit": hit,
             "source": source,
@@ -544,49 +563,107 @@ def collect_presigned_url_requests(hits: List[Dict]) -> Tuple[List[Dict], List[D
         }
 
         # Collect URL requests for derived representations
-        for representation in derived_representations:
-            purpose = representation.get("Purpose")
+        for rep_idx, representation in enumerate(derived_representations):
+            purpose = representation.get("Purpose", "unknown")
             rep_storage_info = representation.get("StorageInfo", {}).get(
                 "PrimaryLocation", {}
             )
 
+            logger.info(
+                f"[URL_DEBUG] Processing representation {rep_idx + 1}/{len(derived_representations)} - Purpose: {purpose}"
+            )
+            logger.info(
+                f"[URL_DEBUG] StorageInfo keys: {list(rep_storage_info.keys())}"
+            )
+            logger.info(
+                f"[URL_DEBUG] StorageType: {rep_storage_info.get('StorageType', 'NOT_FOUND')}"
+            )
+
             if rep_storage_info.get("StorageType") == "s3":
                 bucket = rep_storage_info.get("Bucket", "")
-                key = rep_storage_info.get("ObjectKey", {}).get("FullPath", "")
+                object_key = rep_storage_info.get("ObjectKey", {})
+                key = object_key.get("FullPath", "")
+
+                logger.info(
+                    f"[URL_DEBUG] S3 representation found - Bucket: '{bucket}', Key: '{key}'"
+                )
+                logger.info(f"[URL_DEBUG] ObjectKey structure: {object_key}")
 
                 if bucket and key:
                     request_id = f"{asset_id}_{purpose}_{len(url_requests)}"
+                    url_request = {
+                        "request_id": request_id,
+                        "bucket": bucket,
+                        "key": key,
+                    }
 
-                    url_requests.append(
-                        {"request_id": request_id, "bucket": bucket, "key": key}
-                    )
+                    url_requests.append(url_request)
+                    logger.info(f"[URL_DEBUG] Added URL request: {url_request}")
 
                     if purpose == "thumbnail":
                         hit_data["thumbnail_request_id"] = request_id
+                        logger.info(
+                            f"[URL_DEBUG] Set thumbnail_request_id: {request_id}"
+                        )
                     elif purpose == "proxy":
                         hit_data["proxy_request_id"] = request_id
+                        logger.info(f"[URL_DEBUG] Set proxy_request_id: {request_id}")
+                else:
+                    logger.warning(
+                        f"[URL_DEBUG] Missing bucket or key - Bucket: '{bucket}', Key: '{key}'"
+                    )
+            else:
+                logger.info(
+                    f"[URL_DEBUG] Non-S3 representation - StorageType: {rep_storage_info.get('StorageType', 'NOT_FOUND')}"
+                )
 
         processed_hits.append(hit_data)
+        logger.info(
+            f"[URL_DEBUG] Hit {hit_idx + 1} processed - thumbnail_id: {hit_data['thumbnail_request_id']}, proxy_id: {hit_data['proxy_request_id']}"
+        )
+
+    logger.info(
+        f"[URL_DEBUG] URL collection complete - {len(url_requests)} URL requests collected"
+    )
+    logger.info(f"[URL_DEBUG] URL requests: {url_requests}")
 
     return processed_hits, url_requests
 
 
-def process_search_hit_with_urls(
-    hit_data: Dict, presigned_urls: Dict[str, Optional[str]]
+def process_search_hit_with_cloudfront_urls(
+    hit_data: Dict, cloudfront_urls: Dict[str, Optional[str]]
 ) -> Dict:
-    """Process a single search hit with pre-generated presigned URLs"""
+    """Process a single search hit with pre-generated CloudFront URLs"""
     hit = hit_data["hit"]
     source = hit_data["source"]
+    asset_id = hit_data["asset_id"]
 
-    # Get presigned URLs from the batch results
+    logger.info(
+        f"[URL_DEBUG] Processing hit with CloudFront URLs for asset: {asset_id}"
+    )
+    logger.info(
+        f"[URL_DEBUG] Available CloudFront URLs: {list(cloudfront_urls.keys())}"
+    )
+
+    # Get CloudFront URLs from the batch results
     thumbnail_url = None
     proxy_url = None
 
     if hit_data["thumbnail_request_id"]:
-        thumbnail_url = presigned_urls.get(hit_data["thumbnail_request_id"])
+        thumbnail_url = cloudfront_urls.get(hit_data["thumbnail_request_id"])
+        logger.info(
+            f"[URL_DEBUG] Thumbnail URL for {asset_id}: {thumbnail_url} (request_id: {hit_data['thumbnail_request_id']})"
+        )
+    else:
+        logger.info(f"[URL_DEBUG] No thumbnail request ID for {asset_id}")
 
     if hit_data["proxy_request_id"]:
-        proxy_url = presigned_urls.get(hit_data["proxy_request_id"])
+        proxy_url = cloudfront_urls.get(hit_data["proxy_request_id"])
+        logger.info(
+            f"[URL_DEBUG] Proxy URL for {asset_id}: {proxy_url} (request_id: {hit_data['proxy_request_id']})"
+        )
+    else:
+        logger.info(f"[URL_DEBUG] No proxy request ID for {asset_id}")
 
     # Create base result object
     result = AssetSearchResult(
@@ -602,11 +679,17 @@ def process_search_hit_with_urls(
 
     # Convert to dictionary and add common fields
     result_dict = result.model_dump(by_alias=True)
-    return add_common_fields(result_dict)
+    final_result = add_common_fields(result_dict)
+
+    logger.info(
+        f"[URL_DEBUG] Final processed result for {asset_id} - thumbnailUrl: {final_result.get('thumbnailUrl')}, proxyUrl: {final_result.get('proxyUrl')}"
+    )
+
+    return final_result
 
 
 def process_search_hit(hit: Dict) -> Dict:
-    """Process a single search hit and add presigned URL if thumbnail representation exists"""
+    """Process a single search hit and add CloudFront URL if thumbnail representation exists"""
     source = hit["_source"]
     digital_source_asset = source.get("DigitalSourceAsset", {})
     derived_representations = source.get("DerivedRepresentations", [])
@@ -614,7 +697,13 @@ def process_search_hit(hit: Dict) -> Dict:
     main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
 
     asset_id = digital_source_asset.get("ID", "unknown")
-    logger.debug(f"Processing asset {asset_id} with score {hit.get('_score', 0)}")
+    inventory_id = source.get("InventoryID", "unknown")
+    logger.info(
+        f"Processing asset {asset_id} (InventoryID: {inventory_id}) with score {hit.get('_score', 0)}"
+    )
+    logger.info(
+        f"Asset has DigitalSourceAsset: {bool(digital_source_asset)}, DerivedRepresentations: {len(derived_representations)}"
+    )
 
     thumbnail_url = None
     proxy_url = None
@@ -627,15 +716,15 @@ def process_search_hit(hit: Dict) -> Dict:
         )
 
         if rep_storage_info.get("StorageType") == "s3":
-            presigned_url = generate_presigned_url(
+            cloudfront_url = generate_cloudfront_url(
                 bucket=rep_storage_info.get("Bucket", ""),
                 key=rep_storage_info.get("ObjectKey", {}).get("FullPath", ""),
             )
 
             if purpose == "thumbnail":
-                thumbnail_url = presigned_url
+                thumbnail_url = cloudfront_url
             elif purpose == "proxy":
-                proxy_url = presigned_url
+                proxy_url = cloudfront_url
 
         if thumbnail_url and proxy_url:
             break
@@ -660,45 +749,18 @@ def process_search_hit(hit: Dict) -> Dict:
 def process_clip(clip_hit: Dict) -> Dict:
     """Process a clip hit to preserve all clip-specific fields."""
     source = clip_hit["_source"]
-    digital_source_asset = source.get("DigitalSourceAsset", {})
-    main_rep = digital_source_asset.get("MainRepresentation", {})
-    storage_info = main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
-    object_key = storage_info.get("ObjectKey", {})
+    inventory_id = source.get("InventoryID", None)
 
-    asset_id = digital_source_asset.get("ID", "unknown")
-    logger.debug(
-        f"Processing clip for asset {asset_id} with score {clip_hit.get('_score', 0)}"
+    logger.info(
+        f"Processing clip for asset {inventory_id} with score {clip_hit.get('_score', 0)}"
     )
 
+    # For clip documents, we only have minimal information
+    # The parent asset information should be handled by the calling function
     result = {
-        "DigitalSourceAsset": digital_source_asset,
         "score": clip_hit["_score"],
+        "InventoryID": inventory_id,
     }
-
-    # Add the same root-level fields as in process_search_hit for consistency
-    result["assetType"] = digital_source_asset.get("Type", "")
-    result["format"] = main_rep.get("Format", "")
-    result["objectName"] = object_key.get("Name", "")
-    result["fullPath"] = object_key.get("FullPath", "")
-    result["bucket"] = storage_info.get("Bucket", "")
-
-    # Handle different possible locations of file size
-    file_size = storage_info.get("FileSize", 0)
-    if not file_size and "FileInfo" in storage_info:
-        file_size = storage_info.get("FileInfo", {}).get("Size", 0)
-    result["fileSize"] = file_size
-
-    # Handle different possible locations of creation date
-    created_date = storage_info.get("CreateDate", "")
-    if not created_date and "FileInfo" in storage_info:
-        created_date = storage_info.get("FileInfo", {}).get("CreateDate", "")
-    if not created_date:
-        created_date = digital_source_asset.get("CreateDate", "")
-    result["createdAt"] = created_date
-
-    # Include any consolidated metadata if available
-    if "Metadata" in source and "Consolidated" in source.get("Metadata", {}):
-        result["metadata"] = source["Metadata"].get("Consolidated", {})
 
     # Add clip-specific fields efficiently
     clip_fields = [
@@ -707,26 +769,33 @@ def process_clip(clip_hit: Dict) -> Dict:
         "end_timecode",
         "type",
         "timestamp",
+        "embedding_option",
     ]
     for field in clip_fields:
         if field in source:
             result[field] = source[field]
 
     # Include any other fields from the source that might be clip-specific
+    # but exclude embedding data to keep response size manageable
     for key, value in source.items():
-        if key not in result and key not in ["DigitalSourceAsset", "Metadata"]:
+        if key not in result and key not in [
+            "embedding",
+            "DigitalSourceAsset",
+            "Metadata",
+        ]:
             result[key] = value
 
+    logger.info(f"Processed clip with fields: {list(result.keys())}")
     return result
 
 
-def get_parent_asset(client, index_name, asset_id):
+def get_parent_asset(client, index_name, inventory_id):
     """Fetch a parent asset by its ID from OpenSearch."""
     try:
         query = {
             "query": {
                 "bool": {
-                    "must": [{"term": {"DigitalSourceAsset.ID.keyword": asset_id}}],
+                    "must": [{"match_phrase": {"InventoryID": inventory_id}}],
                     "must_not": [{"term": {"embedding_scope": "clip"}}],
                 }
             },
@@ -740,7 +809,7 @@ def get_parent_asset(client, index_name, asset_id):
 
         return None
     except Exception as e:
-        logger.warning(f"Error fetching parent asset {asset_id}: {str(e)}")
+        logger.warning(f"Error fetching parent asset {inventory_id}: {str(e)}")
         return None
 
 
@@ -763,22 +832,22 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
         if source.get("embedding_scope") == "clip":
             asset_type = source.get("type", "").lower()
             if asset_type in ["video", "audio"]:
-                asset_id = source.get("DigitalSourceAsset", {}).get("ID")
-                if asset_id:
-                    clips_by_asset[asset_id].append(
+                inventory_id = source.get("InventoryID", None)
+                if inventory_id:
+                    clips_by_asset[inventory_id].append(
                         {"source": source, "score": hit["_score"], "hit": hit}
                     )
-                    orphaned_clip_assets.add(asset_id)
+                    orphaned_clip_assets.add(inventory_id)
         else:
-            asset_id = source.get("DigitalSourceAsset", {}).get("ID")
-            if asset_id:
-                parent_assets[asset_id] = {
+            inventory_id = source.get("InventoryID", None)
+            if inventory_id:
+                parent_assets[inventory_id] = {
                     "source": source,
                     "score": hit["_score"],
                     "hit": hit,
                 }
                 orphaned_clip_assets.discard(
-                    asset_id
+                    inventory_id
                 )  # More efficient than remove with check
             else:
                 standalone_hits.append(hit)
@@ -797,10 +866,18 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
 
         orphan_ids = list(orphaned_clip_assets - parent_assets.keys())
         if orphan_ids:
+            logger.info(f"Searching for parent assets with IDs: {orphan_ids}")
+
+            # Use match_phrase for each InventoryID with should clause
+            should_clauses = []
+            for inventory_id in orphan_ids:
+                should_clauses.append({"match_phrase": {"InventoryID": inventory_id}})
+
             batch_query = {
                 "query": {
                     "bool": {
-                        "must": [{"terms": {"DigitalSourceAsset.ID": orphan_ids}}],
+                        "should": should_clauses,
+                        "minimum_should_match": 1,
                         "must_not": [{"term": {"embedding_scope": "clip"}}],
                     }
                 },
@@ -809,9 +886,12 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
 
             try:
                 resp = client.search(body=batch_query, index=index_name)
+                logger.info(
+                    f"Batch query found {resp['hits']['total']['value']} parent assets"
+                )
                 for hit in resp["hits"]["hits"]:
                     src = hit["_source"]
-                    pid = src["DigitalSourceAsset"]["ID"]
+                    pid = src["InventoryID"]
                     highest_clip_score = max(
                         (c["score"] for c in clips_by_asset.get(pid, [])), default=0
                     )
@@ -820,23 +900,27 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
                         "score": highest_clip_score,
                         "hit": hit,
                     }
-                    logger.debug(
+                    logger.info(
                         f"Fetched parent asset for orphaned clips: {pid} with score {highest_clip_score}"
                     )
             except Exception as e:
-                logger.warning(f"Error batch fetching parent assets: {str(e)}")
+                logger.error(f"Error batch fetching parent assets: {str(e)}")
+                import traceback
 
-    def process_asset_with_clips(asset_id):
-        if asset_id not in parent_assets:
+                logger.error(f"Traceback: {traceback.format_exc()}")
+
+    def process_asset_with_clips(inventory_id):
+        if inventory_id not in parent_assets:
+            logger.warning(f"Parent asset {inventory_id} not found in parent_assets")
             return None
 
         try:
-            parent_hit = parent_assets[asset_id]["hit"]
+            parent_hit = parent_assets[inventory_id]["hit"]
+            logger.info(f"Processing parent asset {inventory_id}")
             result = process_search_hit(parent_hit)
-            parent_hit["_score"]
 
-            if asset_id in clips_by_asset:
-                asset_clips = clips_by_asset[asset_id]
+            if inventory_id in clips_by_asset:
+                asset_clips = clips_by_asset[inventory_id]
                 highest_clip_score = max(c["score"] for c in asset_clips)
 
                 # Use highest clip score
@@ -848,15 +932,19 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
                 )
                 result["clips"] = [process_clip(c["hit"]) for c in sorted_clips]
 
-                logger.debug(
-                    f"Processed asset {asset_id} with {len(result['clips'])} clips, final score: {result['score']}"
+                logger.info(
+                    f"Processed asset {inventory_id} with {len(result['clips'])} clips, final score: {result['score']}"
                 )
             else:
                 result["clips"] = []
+                logger.info(f"No clips found for asset {inventory_id}")
 
             return result
         except Exception as e:
-            logger.warning(f"Error processing parent asset {asset_id}: {str(e)}")
+            logger.error(f"Error processing parent asset {inventory_id}: {str(e)}")
+            import traceback
+
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return None
 
     def process_standalone_hit(hit):
@@ -871,8 +959,8 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         # Process parent assets with clips
         result_futures = {
-            executor.submit(process_asset_with_clips, asset_id): asset_id
-            for asset_id in parent_assets.keys()
+            executor.submit(process_asset_with_clips, inventory_id): inventory_id
+            for inventory_id in parent_assets.keys()
         }
 
         # Process standalone hits
@@ -887,8 +975,8 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
                 if result:
                     results.append(result)
             except Exception as e:
-                asset_id = result_futures[future]
-                logger.warning(f"Error processing asset {asset_id}: {str(e)}")
+                inventory_id = result_futures[future]
+                logger.warning(f"Error processing asset {inventory_id}: {str(e)}")
 
         # Collect results from standalone hits
         for future in concurrent.futures.as_completed(standalone_futures):
@@ -1063,38 +1151,76 @@ def perform_search(params: SearchParams) -> Dict:
                 # Semantic search without clip logic - with batch presigned URL generation
                 batch_processing_start = time.time()
 
-                # Step 1: Collect all presigned URL requests
+                # Step 1: Collect all CloudFront URL requests
                 url_collection_start = time.time()
-                processed_hits_data, url_requests = collect_presigned_url_requests(hits)
+                processed_hits_data, url_requests = collect_cloudfront_url_requests(
+                    hits
+                )
                 logger.info(
                     f"[PERF] Semantic URL request collection took: {time.time() - url_collection_start:.3f}s"
                 )
                 logger.info(
-                    f"Collected {len(url_requests)} presigned URL requests for {len(processed_hits_data)} semantic hits"
+                    f"[URL_DEBUG] Collected {len(url_requests)} CloudFront URL requests for {len(processed_hits_data)} semantic hits"
                 )
 
-                # Step 2: Generate all presigned URLs in parallel
+                # Step 2: Generate all CloudFront URLs in parallel
                 if url_requests:
-                    batch_url_start = time.time()
-                    presigned_urls = generate_presigned_urls_batch(url_requests)
                     logger.info(
-                        f"[PERF] Semantic batch presigned URL generation took: {time.time() - batch_url_start:.3f}s"
+                        f"[URL_DEBUG] Proceeding with semantic batch URL generation for {len(url_requests)} requests"
+                    )
+                    batch_url_start = time.time()
+                    cloudfront_urls = generate_cloudfront_urls_batch(url_requests)
+                    logger.info(
+                        f"[PERF] Semantic batch CloudFront URL generation took: {time.time() - batch_url_start:.3f}s"
+                    )
+                    successful_urls = len(
+                        [url for url in cloudfront_urls.values() if url]
                     )
                     logger.info(
-                        f"Generated {len([url for url in presigned_urls.values() if url])} successful URLs out of {len(url_requests)} requests"
+                        f"[URL_DEBUG] Generated {successful_urls} successful URLs out of {len(url_requests)} requests"
+                    )
+                    logger.info(
+                        f"[URL_DEBUG] Semantic CloudFront URLs result: {cloudfront_urls}"
                     )
                 else:
-                    presigned_urls = {}
+                    logger.warning(
+                        "[URL_DEBUG] No URL requests to process for semantic search - skipping URL generation"
+                    )
+                    cloudfront_urls = {}
 
                 # Step 3: Process all hits with pre-generated URLs
                 results_processing_start = time.time()
                 results = []
-                for hit_data in processed_hits_data:
+                logger.info(
+                    f"[URL_DEBUG] Processing {len(processed_hits_data)} semantic hits with CloudFront URLs"
+                )
+
+                for hit_idx, hit_data in enumerate(processed_hits_data):
                     try:
-                        result = process_search_hit_with_urls(hit_data, presigned_urls)
+                        logger.info(
+                            f"[URL_DEBUG] Processing semantic hit {hit_idx + 1}/{len(processed_hits_data)} - Asset ID: {hit_data['asset_id']}"
+                        )
+                        logger.info(
+                            f"[URL_DEBUG] Thumbnail request ID: {hit_data.get('thumbnail_request_id')}"
+                        )
+                        logger.info(
+                            f"[URL_DEBUG] Proxy request ID: {hit_data.get('proxy_request_id')}"
+                        )
+
+                        result = process_search_hit_with_cloudfront_urls(
+                            hit_data, cloudfront_urls
+                        )
+
+                        # Log the final result URLs
+                        logger.info(
+                            f"[URL_DEBUG] Final semantic result for {hit_data['asset_id']} - thumbnailUrl: {result.get('thumbnailUrl')}, proxyUrl: {result.get('proxyUrl')}"
+                        )
+
                         results.append(result)
                     except Exception as e:
-                        logger.warning(f"Error processing semantic hit: {str(e)}")
+                        logger.warning(
+                            f"[URL_DEBUG] Error processing semantic hit {hit_idx + 1}: {str(e)}"
+                        )
                         continue
 
                 logger.info(
@@ -1134,38 +1260,70 @@ def perform_search(params: SearchParams) -> Dict:
             # Regular text search with batch presigned URL generation
             batch_processing_start = time.time()
 
-            # Step 1: Collect all presigned URL requests
+            # Step 1: Collect all CloudFront URL requests
             url_collection_start = time.time()
-            processed_hits_data, url_requests = collect_presigned_url_requests(hits)
+            processed_hits_data, url_requests = collect_cloudfront_url_requests(hits)
             logger.info(
                 f"[PERF] URL request collection took: {time.time() - url_collection_start:.3f}s"
             )
             logger.info(
-                f"Collected {len(url_requests)} presigned URL requests for {len(processed_hits_data)} hits"
+                f"[URL_DEBUG] Collected {len(url_requests)} CloudFront URL requests for {len(processed_hits_data)} hits"
             )
 
-            # Step 2: Generate all presigned URLs in parallel
+            # Step 2: Generate all CloudFront URLs in parallel
             if url_requests:
+                logger.info(
+                    f"[URL_DEBUG] Proceeding with batch URL generation for {len(url_requests)} requests"
+                )
                 batch_url_start = time.time()
-                presigned_urls = generate_presigned_urls_batch(url_requests)
+                cloudfront_urls = generate_cloudfront_urls_batch(url_requests)
                 logger.info(
-                    f"[PERF] Batch presigned URL generation took: {time.time() - batch_url_start:.3f}s"
+                    f"[PERF] Batch CloudFront URL generation took: {time.time() - batch_url_start:.3f}s"
                 )
+                successful_urls = len([url for url in cloudfront_urls.values() if url])
                 logger.info(
-                    f"Generated {len([url for url in presigned_urls.values() if url])} successful URLs out of {len(url_requests)} requests"
+                    f"[URL_DEBUG] Generated {successful_urls} successful URLs out of {len(url_requests)} requests"
                 )
+                logger.info(f"[URL_DEBUG] CloudFront URLs result: {cloudfront_urls}")
             else:
-                presigned_urls = {}
+                logger.warning(
+                    "[URL_DEBUG] No URL requests to process - skipping URL generation"
+                )
+                cloudfront_urls = {}
 
             # Step 3: Process all hits with pre-generated URLs
             results_processing_start = time.time()
             results = []
-            for hit_data in processed_hits_data:
+            logger.info(
+                f"[URL_DEBUG] Processing {len(processed_hits_data)} hits with CloudFront URLs"
+            )
+
+            for hit_idx, hit_data in enumerate(processed_hits_data):
                 try:
-                    result = process_search_hit_with_urls(hit_data, presigned_urls)
+                    logger.info(
+                        f"[URL_DEBUG] Processing hit {hit_idx + 1}/{len(processed_hits_data)} - Asset ID: {hit_data['asset_id']}"
+                    )
+                    logger.info(
+                        f"[URL_DEBUG] Thumbnail request ID: {hit_data.get('thumbnail_request_id')}"
+                    )
+                    logger.info(
+                        f"[URL_DEBUG] Proxy request ID: {hit_data.get('proxy_request_id')}"
+                    )
+
+                    result = process_search_hit_with_cloudfront_urls(
+                        hit_data, cloudfront_urls
+                    )
+
+                    # Log the final result URLs
+                    logger.info(
+                        f"[URL_DEBUG] Final result for {hit_data['asset_id']} - thumbnailUrl: {result.get('thumbnailUrl')}, proxyUrl: {result.get('proxyUrl')}"
+                    )
+
                     results.append(result)
                 except Exception as e:
-                    logger.warning(f"Error processing hit: {str(e)}")
+                    logger.warning(
+                        f"[URL_DEBUG] Error processing hit {hit_idx + 1}: {str(e)}"
+                    )
                     continue
 
             logger.info(

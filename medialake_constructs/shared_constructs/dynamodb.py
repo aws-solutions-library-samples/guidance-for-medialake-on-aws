@@ -3,9 +3,7 @@ from typing import Optional
 
 from aws_cdk import RemovalPolicy, Stack
 from aws_cdk import aws_dynamodb as dynamodb
-from aws_cdk import aws_iam as iam
 from aws_cdk import aws_kms as kms
-from aws_cdk import aws_s3 as s3
 from constructs import Construct
 
 from config import config
@@ -18,9 +16,6 @@ class DynamoDBProps:
     name: str
     partition_key_name: str
     partition_key_type: str
-    pipeline_name: Optional[str] = None
-    pipeline_role: Optional[iam.Role] = None
-    ddb_export_bucket: Optional[s3.Bucket] = None
     sort_key_name: Optional[str] = None
     sort_key_type: Optional[dynamodb.AttributeType] = None
     stream: Optional[dynamodb.StreamViewType] = None

@@ -3,6 +3,7 @@ import {
   useSearchProvider,
   useCreateSearchProvider,
   useUpdateSearchProvider,
+  useDeleteSearchProvider,
 } from "../api/systemHooks";
 import {
   SearchProvider,
@@ -36,7 +37,7 @@ export const useSemanticSearchSettings = () => {
     current: {
       isEnabled: false,
       provider: {
-        type: "twelvelabs-api",
+        type: "none",
         config: null,
       },
       embeddingStore: {
@@ -46,7 +47,7 @@ export const useSemanticSearchSettings = () => {
     original: {
       isEnabled: false,
       provider: {
-        type: "twelvelabs-api",
+        type: "none",
         config: null,
       },
       embeddingStore: {
@@ -67,30 +68,42 @@ export const useSemanticSearchSettings = () => {
     error: providerError,
   } = useSearchProvider();
 
-  // Mutations for creating and updating the provider
+  // Mutations for creating, updating, and deleting the provider
   const createProvider = useCreateSearchProvider();
   const updateProvider = useUpdateSearchProvider();
+  const deleteProvider = useDeleteSearchProvider();
 
   // Initialize settings from fetched data
   useEffect(() => {
     if (providerData?.data?.searchProvider) {
       const fetchedProvider = providerData.data.searchProvider;
       const fetchedEmbeddingStore = providerData.data.embeddingStore;
-      const providerType =
-        fetchedProvider.type === "twelvelabs-bedrock"
+
+      // Preserve provider information to track existence, even if not fully configured
+      const isConfigured = fetchedProvider.isConfigured || false;
+      const hasId = !!fetchedProvider.id; // Provider exists in database if it has an ID
+
+      // Show "none" in UI if not configured, but preserve actual type for backend operations
+      const displayType = isConfigured
+        ? fetchedProvider.type === "twelvelabs-bedrock"
           ? "twelvelabs-bedrock"
           : fetchedProvider.type === "coactive"
             ? "coactive"
-            : "twelvelabs-api";
+            : fetchedProvider.type === "twelvelabs-api"
+              ? "twelvelabs-api"
+              : "none"
+        : "none";
 
       const initialSettings: SemanticSearchSettings = {
         isEnabled: fetchedProvider.isEnabled || false,
         provider: {
-          type: providerType,
-          config: {
-            ...fetchedProvider,
-            isConfigured: true,
-          },
+          type: displayType,
+          config: hasId
+            ? {
+                ...fetchedProvider,
+                isConfigured,
+              }
+            : null,
         },
         embeddingStore: {
           type: fetchedEmbeddingStore?.type || "opensearch",
@@ -115,8 +128,9 @@ export const useSemanticSearchSettings = () => {
     }));
   }, [settings.current, settings.original]);
 
-  // Handle toggle change
-  const handleToggleChange = (enabled: boolean) => {
+  // Handle toggle change with immediate save
+  const handleToggleChange = async (enabled: boolean) => {
+    // Update local state immediately for responsive UI
     setSettings((prev) => ({
       ...prev,
       current: {
@@ -124,13 +138,109 @@ export const useSemanticSearchSettings = () => {
         isEnabled: enabled,
       },
     }));
+
+    if (enabled) {
+      // Handle enabling: only save if provider is configured
+      if (settings.current.provider.config?.isConfigured) {
+        try {
+          const embeddingStorePayload = {
+            type: settings.current.embeddingStore.type,
+            isEnabled: enabled,
+          };
+
+          await updateProvider.mutateAsync({
+            isEnabled: enabled,
+            embeddingStore: embeddingStorePayload,
+          });
+
+          // Update original state to reflect saved changes
+          setSettings((prev) => ({
+            ...prev,
+            original: {
+              ...prev.original,
+              isEnabled: enabled,
+            },
+          }));
+        } catch (error) {
+          console.error("Failed to save toggle state:", error);
+          // Revert local state on error
+          setSettings((prev) => ({
+            ...prev,
+            current: {
+              ...prev.current,
+              isEnabled: !enabled,
+            },
+          }));
+          throw error;
+        }
+      }
+      // If no provider configured, just keep local state - user needs to select provider first
+    } else {
+      // Handle disabling: delete the provider configuration and reset to default state
+      if (settings.original.provider.config?.id) {
+        try {
+          await deleteProvider.mutateAsync();
+
+          // Reset to default state (no provider selected)
+          const defaultSettings = {
+            isEnabled: false,
+            provider: {
+              type: "none" as const,
+              config: null,
+            },
+            embeddingStore: {
+              type: "opensearch" as const,
+            },
+          };
+
+          setSettings((prev) => ({
+            ...prev,
+            current: defaultSettings,
+            original: defaultSettings,
+          }));
+        } catch (error) {
+          console.error("Failed to delete provider:", error);
+          // Revert local state on error
+          setSettings((prev) => ({
+            ...prev,
+            current: {
+              ...prev.current,
+              isEnabled: !enabled,
+            },
+          }));
+          throw error;
+        }
+      } else {
+        // No provider exists, just update local state
+        setSettings((prev) => ({
+          ...prev,
+          original: {
+            ...prev.original,
+            isEnabled: enabled,
+          },
+        }));
+      }
+    }
   };
 
   // Handle provider type change
-  const handleProviderTypeChange = (
-    providerType: "twelvelabs-api" | "twelvelabs-bedrock" | "coactive",
+  const handleProviderTypeChange = async (
+    providerType: "none" | "twelvelabs-api" | "twelvelabs-bedrock" | "coactive",
   ) => {
-    if (providerType === "twelvelabs-api") {
+    if (providerType === "none") {
+      // Reset to no provider
+      setSettings((prev) => ({
+        ...prev,
+        current: {
+          ...prev.current,
+          isEnabled: false,
+          provider: {
+            type: "none",
+            config: null,
+          },
+        },
+      }));
+    } else if (providerType === "twelvelabs-api") {
       // Update provider type first, then open API key dialog
       setSettings((prev) => ({
         ...prev,
@@ -165,24 +275,81 @@ export const useSemanticSearchSettings = () => {
       setApiKeyInput("");
       setIsApiKeyDialogOpen(true);
     } else {
-      // No API key needed for Bedrock
-      setSettings((prev) => ({
-        ...prev,
-        current: {
-          ...prev.current,
-          provider: {
-            type: "twelvelabs-bedrock",
-            config: {
-              id: "",
-              name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_BEDROCK.name,
+      // For Bedrock, save immediately since no API key is needed
+      try {
+        const embeddingStorePayload = {
+          type: settings.current.embeddingStore.type,
+          isEnabled: settings.current.isEnabled,
+        };
+
+        const providerExists = settings.original.provider.config?.id;
+
+        if (providerExists) {
+          // Update existing provider to selected type
+          await updateProvider.mutateAsync({
+            type: providerType,
+            isEnabled: settings.current.isEnabled,
+            embeddingStore: embeddingStorePayload,
+          });
+        } else {
+          // Create new provider with selected type
+          const providerConfig =
+            providerType === "twelvelabs-bedrock"
+              ? SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_BEDROCK
+              : SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API;
+
+          await createProvider.mutateAsync({
+            name: providerConfig.name,
+            type: providerType,
+            apiKey: "", // Not needed for Bedrock
+            isEnabled: settings.current.isEnabled,
+            embeddingStore: embeddingStorePayload,
+          });
+        }
+
+        // Update local state after successful save
+        setSettings((prev) => ({
+          ...prev,
+          current: {
+            ...prev.current,
+            isEnabled: true, // Enable search when Bedrock provider is configured
+            provider: {
               type: "twelvelabs-bedrock",
-              apiKey: "",
-              isConfigured: true,
-              isEnabled: true,
+              config: {
+                id: providerExists
+                  ? prev.original.provider.config?.id || ""
+                  : "",
+                name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_BEDROCK.name,
+                type: "twelvelabs-bedrock",
+                apiKey: "",
+                isConfigured: true,
+                isEnabled: true,
+              },
             },
           },
-        },
-      }));
+          original: {
+            ...prev.current,
+            isEnabled: true, // Update original state too
+            provider: {
+              type: "twelvelabs-bedrock",
+              config: {
+                id: providerExists
+                  ? prev.original.provider.config?.id || ""
+                  : "",
+                name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_BEDROCK.name,
+                type: "twelvelabs-bedrock",
+                apiKey: "",
+                isConfigured: true,
+                isEnabled: true,
+              },
+            },
+          },
+          hasChanges: false,
+        }));
+      } catch (error) {
+        console.error("Failed to save Bedrock provider:", error);
+        // Could add error notification here
+      }
     }
   };
 
@@ -282,7 +449,7 @@ export const useSemanticSearchSettings = () => {
         providerConfig = {
           id: settings.current.provider.config?.id || "",
           name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.name,
-          type: "twelvelabs",
+          type: "twelvelabs-api", // API key dialog is only for API providers
           apiKey: apiKeyInput,
           endpoint:
             SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.defaultEndpoint,
@@ -361,14 +528,18 @@ export const useSemanticSearchSettings = () => {
         isEnabled: current.isEnabled,
       };
 
+      // Use provider existence from original settings to determine POST vs PUT
+      const providerExists = settings.original.provider.config?.id;
+
       if (
         current.provider.config &&
         (current.provider.type === "twelvelabs-api" ||
           current.provider.type === "coactive")
       ) {
-        if (isEditingApiKey && current.provider.config.id) {
+        if (providerExists) {
           // Update existing provider
           await updateProvider.mutateAsync({
+            type: current.provider.config.type,
             apiKey: current.provider.config.apiKey,
             endpoint: current.provider.config.endpoint,
             isEnabled: current.isEnabled,
@@ -386,11 +557,23 @@ export const useSemanticSearchSettings = () => {
           });
         }
       } else if (current.provider.type === "twelvelabs-bedrock") {
-        // For Bedrock, we still need to save embedding store settings
-        await updateProvider.mutateAsync({
-          isEnabled: current.isEnabled,
-          embeddingStore: embeddingStorePayload,
-        });
+        // For Bedrock, determine if we need to create or update
+        if (providerExists) {
+          // Update existing provider to Bedrock type
+          await updateProvider.mutateAsync({
+            isEnabled: current.isEnabled,
+            embeddingStore: embeddingStorePayload,
+          });
+        } else {
+          // Create new Bedrock provider
+          await createProvider.mutateAsync({
+            name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_BEDROCK.name,
+            type: "twelvelabs-bedrock",
+            apiKey: "", // Not needed for Bedrock
+            isEnabled: current.isEnabled,
+            embeddingStore: embeddingStorePayload,
+          });
+        }
       }
 
       // Update original to match current (changes saved)
@@ -440,7 +623,10 @@ export const useSemanticSearchSettings = () => {
     handleCancel,
 
     // Mutations
-    isSaving: createProvider.isPending || updateProvider.isPending,
+    isSaving:
+      createProvider.isPending ||
+      updateProvider.isPending ||
+      deleteProvider.isPending,
 
     // Dialog input handlers
     setApiKeyInput,

@@ -3,52 +3,11 @@ import json
 import re
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
-import boto3
 from aws_lambda_powertools import Logger
-from botocore.config import Config
 
 logger = Logger()
-
-# Signature style & virtual-host addressing are required for every region
-_SIGV4_CFG = Config(
-    signature_version="s3v4",
-    s3={"addressing_style": "virtual"},
-)
-
-_ENDPOINT_TMPL = "https://s3.{region}.amazonaws.com"
-_S3_CLIENT_CACHE: dict[str, boto3.client] = {}  # {region → client}
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-def _get_s3_client_for_bucket(bucket: str) -> boto3.client:
-    """
-    Return an S3 client **pinned to the bucket's actual region**.
-    Clients are cached to reuse TCP connections across warm invocations.
-    """
-    generic = _S3_CLIENT_CACHE.setdefault(
-        "us-east-1",
-        boto3.client("s3", region_name="us-east-1", config=_SIGV4_CFG),
-    )
-
-    try:
-        region = (
-            generic.get_bucket_location(Bucket=bucket).get("LocationConstraint")
-            or "us-east-1"
-        )
-    except generic.exceptions.NoSuchBucket:
-        raise ValueError(f"S3 bucket {bucket!r} does not exist")
-
-    if region not in _S3_CLIENT_CACHE:
-        _S3_CLIENT_CACHE[region] = boto3.client(
-            "s3",
-            region_name=region,
-            endpoint_url=_ENDPOINT_TMPL.format(region=region),
-            config=_SIGV4_CFG,
-        )
-    return _S3_CLIENT_CACHE[region]
-
 
 # Supported special keywords for search
 KEYWORDS = {
@@ -59,15 +18,6 @@ KEYWORDS = {
     "ingested_date_gte": r"ingested_date_gte:([<>]=?\d{4}-\d{2}-\d{2})",
     "ingested_date_lte": r"ingested_date_lte:([<>]=?\d{4}-\d{2}-\d{2})",
 }
-
-# KEYWORDS = {
-#    'content_type': r'type:(\w+)',
-#    'format': r'format:(\w+)',
-#    'size': r'size:([<>]=?\d+(?:\.\d+)?(?:KB|MB|GB|TB))',
-#    'date': r'date:([<>]=?\d{4}-\d{2}-\d{2})',
-#    'metadata': r'metadata:(\w+:\w+)',
-# 	'storageIdentifier': r'storageIdentifier:([a-zA-Z0-9._\-*/]+)'
-# }
 
 
 def parse_size_value(size_str: str) -> Optional[Dict[str, Any]]:
@@ -189,101 +139,6 @@ class CustomEncoder(json.JSONEncoder):
             return None  # Ignore function objects
 
         return super(CustomEncoder, self).default(obj)
-
-
-def generate_presigned_url(
-    bucket: str, key: str, expiration: int = 3600
-) -> Optional[str]:
-    """
-    Generate a presigned URL for an S3 object with region-aware client.
-    The URL is signed in the bucket's own region, preventing
-    SignatureDoesNotMatch errors outside us-east-1.
-    """
-    try:
-        # Use region-aware S3 client
-        s3_client = _get_s3_client_for_bucket(bucket)
-        url = s3_client.generate_presigned_url(
-            "get_object",
-            Params={
-                "Bucket": bucket,
-                "Key": key,
-                "ResponseContentDisposition": "inline",
-            },
-            ExpiresIn=expiration,
-        )
-
-        logger.debug(
-            "Generated presigned URL for s3://%s/%s (region %s)",
-            bucket,
-            key,
-            s3_client.meta.region_name,
-        )
-
-        return url
-    except Exception as e:
-        logger.error(f"Error generating presigned URL: {str(e)}")
-        return None
-
-
-def generate_presigned_urls_batch(
-    url_requests: List[Dict[str, str]], expiration: int = 3600
-) -> Dict[str, Optional[str]]:
-    """
-    Generate multiple presigned URLs in parallel for better performance.
-
-    Args:
-        url_requests: List of dicts with 'bucket', 'key', and 'request_id' keys
-        expiration: URL expiration time in seconds
-
-    Returns:
-        Dict mapping request_id to presigned URL (or None if failed)
-    """
-    import concurrent.futures
-    import time
-
-    start_time = time.time()
-    logger.info(
-        f"[PERF] Starting batch presigned URL generation for {len(url_requests)} URLs"
-    )
-
-    def generate_single_url(request):
-        try:
-            return {
-                "request_id": request["request_id"],
-                "url": generate_presigned_url(
-                    request["bucket"], request["key"], expiration
-                ),
-            }
-        except Exception as e:
-            logger.warning(
-                f"Failed to generate presigned URL for {request['request_id']}: {str(e)}"
-            )
-            return {"request_id": request["request_id"], "url": None}
-
-    results = {}
-
-    # Use ThreadPoolExecutor for I/O-bound operations
-    with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
-        future_to_request = {
-            executor.submit(generate_single_url, request): request
-            for request in url_requests
-        }
-
-        for future in concurrent.futures.as_completed(future_to_request):
-            try:
-                result = future.result()
-                results[result["request_id"]] = result["url"]
-            except Exception as e:
-                request = future_to_request[future]
-                logger.warning(
-                    f"Exception generating presigned URL for {request['request_id']}: {str(e)}"
-                )
-                results[request["request_id"]] = None
-
-    batch_time = time.time() - start_time
-    logger.info(f"[PERF] Batch presigned URL generation completed in {batch_time:.3f}s")
-
-    return results
 
 
 def normalize_distance(dist: float) -> float:

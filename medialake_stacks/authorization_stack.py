@@ -13,24 +13,23 @@ from dataclasses import dataclass
 from typing import Any
 
 import aws_cdk as cdk
-from aws_cdk import CustomResource, Duration, RemovalPolicy, Stack
+from aws_cdk import CustomResource, RemovalPolicy, Stack
 from aws_cdk import aws_cognito as cognito
-from aws_cdk import aws_events as events
-from aws_cdk import aws_events_targets as targets
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_lambda as lambda_
 from aws_cdk import aws_lambda_event_sources as lambda_event_sources
 from aws_cdk import aws_verifiedpermissions as avp
 from constructs import Construct
 
-from constants import Lambda as LambdaConstants
-from medialake_constructs.auth.shared_authorizer_construct import (
-    SharedAuthorizerConstruct,
-    SharedAuthorizerConstructProps,
-)
+from constants import DynamoDB
 
 # DynamoDB table is now created in the Cognito construct
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
+
+# from medialake_constructs.auth.shared_authorizer_construct import (
+#     SharedAuthorizerConstruct,
+#     SharedAuthorizerConstructProps,
+# )
 
 
 @dataclass
@@ -119,20 +118,26 @@ class AuthorizationStack(Stack):
             ),
         )
 
+        # Get API keys table information
+        api_keys_table_name = DynamoDB.api_keys_table_name()
+        api_keys_table_arn = f"arn:aws:dynamodb:{cdk.Aws.REGION}:{cdk.Aws.ACCOUNT_ID}:table/{api_keys_table_name}"
+
         # Create the shared custom authorizer
-        self._shared_authorizer = SharedAuthorizerConstruct(
-            self,
-            "SharedAuthorizer",
-            props=SharedAuthorizerConstructProps(
-                auth_table_name=self._auth_table.table_name,
-                avp_policy_store_id=self._policy_store.attr_policy_store_id,
-                avp_policy_store_arn=f"arn:aws:verifiedpermissions::{cdk.Aws.ACCOUNT_ID}:policy-store/{self._policy_store.attr_policy_store_id}",
-                cognito_user_pool_id=props.cognito_user_pool.user_pool_id,
-            ),
-        )
+        # self._shared_authorizer = SharedAuthorizerConstruct(
+        #     self,
+        #     "SharedAuthorizer",
+        #     props=SharedAuthorizerConstructProps(
+        #         auth_table_name=self._auth_table.table_name,
+        #         avp_policy_store_id=self._policy_store.attr_policy_store_id,
+        #         avp_policy_store_arn=f"arn:aws:verifiedpermissions::{cdk.Aws.ACCOUNT_ID}:policy-store/{self._policy_store.attr_policy_store_id}",
+        #         cognito_user_pool_id=props.cognito_user_pool.user_pool_id,
+        #         api_keys_table_name=api_keys_table_name,
+        #         api_keys_table_arn=api_keys_table_arn,
+        #     ),
+        # )
 
         # Grant table read access to the shared authorizer
-        self._auth_table.grant_read_data(self._shared_authorizer.authorizer_lambda)
+        # self._auth_table.grant_read_data(self._shared_authorizer.authorizer_lambda)
 
         # Common environment variables for Lambda functions
         common_env_vars = {
@@ -142,35 +147,7 @@ class AuthorizationStack(Stack):
             "COGNITO_USER_POOL_ID": props.cognito_user_pool.user_pool_id,
         }
 
-        # 3. Use the Custom API Gateway Lambda Authorizer from props
-        # self._custom_authorizer_lambda = props.custom_authorizer_lambda
-
-        self._custom_authorizer_lambda = Lambda(
-            self,
-            "CustomAuthorizerLambda",
-            config=LambdaConfig(
-                name="custom_api_authorizer",
-                entry="lambdas/auth/custom_authorizer",
-                memory_size=256,
-                timeout_minutes=1,
-                snap_start=False,  # Disable SnapStart to avoid versioning
-                environment_variables=common_env_vars,
-            ),
-        )
-
-        self._auth_table.grant_read_data(self._custom_authorizer_lambda.function)
-        self._custom_authorizer_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "verifiedpermissions:IsAuthorizedWithToken",
-                    "verifiedpermissions:IsAuthorized",
-                ],
-                resources=[
-                    f"arn:aws:verifiedpermissions::{cdk.Aws.ACCOUNT_ID}:policy-store/{self._policy_store.attr_policy_store_id}"
-                ],
-            )
-        )
+        # 3. Custom API Gateway Lambda Authorizer removed - using shared authorizer instead
 
         # 4. Create the DynamoDB Stream Lambda for policy synchronization
         self._policy_sync_lambda = Lambda(
@@ -267,22 +244,7 @@ class AuthorizationStack(Stack):
             },
         )
 
-        # Lambda warming for custom_authorizer
-        # Note: pre_token_generation lambda warming is now handled in CognitoUpdateStack
-        events.Rule(
-            self,
-            "CustomAuthorizerWarmerRule",
-            schedule=events.Schedule.rate(
-                Duration.minutes(LambdaConstants.WARMER_INTERVAL_MINUTES)
-            ),
-            targets=[
-                targets.LambdaFunction(
-                    self._custom_authorizer_lambda.function,
-                    event=events.RuleTargetInput.from_object({"lambda_warmer": True}),
-                ),
-            ],
-            description="Keeps custom_authorizer Lambda warm via scheduled EventBridge rule.",
-        )
+        # Lambda warming moved to shared authorizer construct
 
     @property
     def auth_table(self):
@@ -305,13 +267,3 @@ class AuthorizationStack(Stack):
     def auth_seeder_lambda(self):
         """Return the auth table seeder Lambda function"""
         return self._auth_seeder_lambda.function
-
-    @property
-    def authorizer_lambda(self):
-        """Return the custom authorizer Lambda function"""
-        return self._custom_authorizer_lambda.function
-
-    @property
-    def shared_authorizer_lambda(self):
-        """Return the shared authorizer Lambda function"""
-        return self._shared_authorizer.authorizer_lambda

@@ -24,11 +24,26 @@ from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBPr
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 
+def apply_custom_authorization(
+    method: api_gateway.Method, authorizer: api_gateway.IAuthorizer
+) -> None:
+    """
+    Apply custom authorization to an API Gateway method.
+
+    Args:
+        method: The API Gateway method to apply authorization to
+        authorizer: The custom authorizer to use
+    """
+    cfn_method = method.node.default_child
+    cfn_method.authorization_type = "CUSTOM"
+    cfn_method.authorizer_id = authorizer.authorizer_id
+
+
 @dataclass
 class RolesApiProps:
     x_origin_verify_secret: secrets_manager.Secret
     api_resource: api_gateway.IResource
-    cognito_authorizer: api_gateway.IAuthorizer
+    authorizer: api_gateway.IAuthorizer
     cognito_user_pool: cognito.UserPool
 
 

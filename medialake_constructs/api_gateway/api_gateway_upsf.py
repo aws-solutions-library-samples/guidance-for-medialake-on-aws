@@ -22,8 +22,8 @@ class UPSFApiProps:
     """Properties for the UPSF API construct."""
 
     x_origin_verify_secret: secrets_manager.Secret
-    api_resource: api_gateway.IResource
-    cognito_authorizer: api_gateway.IAuthorizer
+    api_resource: api_gateway.RestApi
+    authorizer: api_gateway.IAuthorizer
     cognito_user_pool: cognito.UserPool
     user_table: dynamodb.Table
 
@@ -56,7 +56,7 @@ class UPSFApi(Construct):
         }
 
         # 1. User Profile Endpoints
-        profile_resource = users_resource.add_resource("profile")
+        profile_resource = props.api_resource.root.add_resource("profile")
 
         # GET /users/profile - Get user profile
         get_profile_lambda = Lambda(
@@ -73,8 +73,8 @@ class UPSFApi(Construct):
         profile_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(get_profile_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # PUT /users/profile - Update user profile
@@ -92,8 +92,8 @@ class UPSFApi(Construct):
         profile_resource.add_method(
             "PUT",
             api_gateway.LambdaIntegration(put_profile_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # 2. User Settings Endpoints
@@ -114,8 +114,8 @@ class UPSFApi(Construct):
         settings_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(get_settings_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # PUT /users/settings/{namespace}/{key} - Update user setting
@@ -143,8 +143,8 @@ class UPSFApi(Construct):
                     "application/json": '{ "namespace": "$input.params(\'namespace\')", "key": "$input.params(\'key\')" }'
                 },
             ),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # 3. User Favorites Endpoints
@@ -165,8 +165,8 @@ class UPSFApi(Construct):
         favorites_resource.add_method(
             "POST",
             api_gateway.LambdaIntegration(post_favorite_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # GET /users/favorites - List favorites
@@ -184,8 +184,8 @@ class UPSFApi(Construct):
         favorites_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(get_favorites_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # DELETE /users/favorites/{itemType}/{itemId} - Remove favorite
@@ -213,8 +213,8 @@ class UPSFApi(Construct):
                     "application/json": '{ "itemType": "$input.params(\'itemType\')", "itemId": "$input.params(\'itemId\')" }'
                 },
             ),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            authorizer=props.authorizer,
         )
 
         # Add CORS support to all resources

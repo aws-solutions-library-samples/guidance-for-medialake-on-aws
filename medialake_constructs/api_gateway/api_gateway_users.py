@@ -12,7 +12,7 @@ and associated Lambda functions for managing media connectors. It handles:
 
 from dataclasses import dataclass
 
-from aws_cdk import Duration, Stack
+from aws_cdk import Stack
 from aws_cdk import aws_apigateway as api_gateway
 from aws_cdk import aws_cognito as cognito
 from aws_cdk import aws_dynamodb as dynamodb
@@ -28,8 +28,8 @@ from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaCon
 @dataclass
 class UsersApiProps:
     x_origin_verify_secret: secrets_manager.Secret
-    api_resource: api_gateway.IResource
-    cognito_authorizer: api_gateway.IAuthorizer
+    api_resource: api_gateway.RestApi
+    authorizer: api_gateway.IAuthorizer
     cognito_user_pool: cognito.UserPool
 
 
@@ -62,7 +62,7 @@ class UsersApi(Construct):
         )
 
         # Create connectors resource
-        users_resource = props.api_resource.add_resource("users")
+        users_resource = props.api_resource.root.add_resource("users")
 
         # Add connector_id path parameter resource
         users_user_resource = users_resource.add_resource("user")
@@ -111,26 +111,30 @@ class UsersApi(Construct):
             },
         )
 
-        users_user_id_resources.add_cors_preflight(
-            allow_origins=["http://localhost:5173"],
-            allow_methods=["GET", "PUT", "OPTIONS", "DELETE", "POST"],
-            allow_headers=[
-                "Content-Type",
-                "Authorization",
-                "X-Amz-Date",
-                "X-Api-Key",
-                "X-Amz-Security-Token",
-            ],
-            allow_credentials=True,
-            max_age=Duration.seconds(300),
-        )
+        # users_user_id_resources.add_cors_preflight(
+        #     allow_origins=["http://localhost:5173"],
+        #     allow_methods=["GET", "PUT", "DELETE", "POST"],
+        #     allow_headers=[
+        #         "Content-Type",
+        #         "Authorization",
+        #         "X-Amz-Date",
+        #         "X-Api-Key",
+        #         "X-Amz-Security-Token",
+        #     ],
+        #     allow_credentials=True,
+        #     max_age=Duration.seconds(300),
+        # )
 
-        users_user_id_resources.add_method(
+        users_user_get_method = users_user_id_resources.add_method(
             "GET",
             api_gateway_get_user_id_integration,
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            # authorizer=props.authorizer,
         )
+
+        cfn_method = users_user_get_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
 
         users_user_id_put_lambda = Lambda(
             self,
@@ -186,12 +190,16 @@ class UsersApi(Construct):
             )
         )
 
-        users_user_id_resources.add_method(
+        users_user_id_put_method = users_user_id_resources.add_method(
             "PUT",
             api_gateway_put_users_user_id_integration,
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            # authorizer=props.authorizer,
         )
+
+        cfn_method = users_user_id_put_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
 
         users_user_post_lambda = Lambda(
             self,
@@ -209,27 +217,31 @@ class UsersApi(Construct):
             ),
         )
 
-        # Add CORS preflight for POST method
-        users_user_resource.add_cors_preflight(
-            allow_origins=["http://localhost:5173"],
-            allow_methods=["GET", "PUT", "OPTIONS", "DELETE", "POST"],
-            allow_headers=[
-                "Content-Type",
-                "Authorization",
-                "X-Amz-Date",
-                "X-Api-Key",
-                "X-Amz-Security-Token",
-            ],
-            allow_credentials=True,
-            max_age=Duration.seconds(300),
-        )
+        # # Add CORS preflight for POST method
+        # users_user_resource.add_cors_preflight(
+        #     allow_origins=["http://localhost:5173"],
+        #     allow_methods=["GET", "PUT", "OPTIONS", "DELETE", "POST"],
+        #     allow_headers=[
+        #         "Content-Type",
+        #         "Authorization",
+        #         "X-Amz-Date",
+        #         "X-Api-Key",
+        #         "X-Amz-Security-Token",
+        #     ],
+        #     allow_credentials=True,
+        #     max_age=Duration.seconds(300),
+        # )
 
-        users_user_resource.add_method(
+        users_user_post_method = users_user_resource.add_method(
             "POST",
             api_gateway.LambdaIntegration(users_user_post_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            # authorizer=props.authorizer,
         )
+
+        cfn_method = users_user_post_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
 
         self._users_table.table.grant_read_data(users_user_post_lambda.function)
         users_user_post_lambda.function.add_to_role_policy(
@@ -305,12 +317,16 @@ class UsersApi(Construct):
             },
         )
 
-        users_user_id_disableuser_resource.add_method(
+        users_user_id_disableuser_post_method = users_user_id_disableuser_resource.add_method(
             "POST",
             api_post_users_user_id_disableuser_integration,
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            # authorizer=props.authorizer,
         )
+
+        cfn_method = users_user_id_disableuser_post_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
 
         users_user_id_enableuser_resource = users_user_id_resources.add_resource(
             "enableuser"
@@ -363,18 +379,20 @@ class UsersApi(Construct):
             },
         )
 
-        users_user_id_enableuser_resource.add_method(
+        users_user_id_enableuser_post_method = users_user_id_enableuser_resource.add_method(
             "POST",
             api_post_users_user_id_enableuser_integration,
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
+            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
+            # authorizer=props.authorizer,
         )
+
+        cfn_method = users_user_id_enableuser_post_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
 
         # Add CORS support
         add_cors_options_method(users_resource)
-        # users_user_resource already has CORS configuration through add_cors_preflight
-        # add_cors_options_method(users_user_resource)
-        # users_user_id_resources already has CORS configuration through add_cors_preflight
-        # add_cors_options_method(users_user_id_resources)
+        add_cors_options_method(users_user_resource)
+        add_cors_options_method(users_user_id_resources)
         add_cors_options_method(users_user_id_disableuser_resource)
         add_cors_options_method(users_user_id_enableuser_resource)

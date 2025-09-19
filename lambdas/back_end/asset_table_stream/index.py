@@ -1,463 +1,291 @@
 import json
 import os
 import time
-import uuid
-from typing import Any, Dict
+from decimal import Decimal
+from functools import wraps
 
 import boto3
-from aws_lambda_powertools import Logger
-from aws_lambda_powertools.utilities.data_classes import DynamoDBStreamEvent
-from aws_lambda_powertools.utilities.data_classes.dynamo_db_stream_event import (
-    DynamoDBRecord,
-)
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from opensearchpy import AWSV4SignerAuth, OpenSearch, RequestsHttpConnection
+from aws_lambda_powertools import Logger, Metrics, Tracer
+from boto3.dynamodb.types import TypeDeserializer
+from opensearchpy import OpenSearch, RequestsHttpConnection
+from opensearchpy.exceptions import NotFoundError
+from requests_aws4auth import AWS4Auth
 
-# Initialize logger with default level WARNING, but check environment variable
-log_level = os.environ.get("LOG_LEVEL", "DEBUG").upper()
-logger = Logger(
-    service="asset-table-stream",
-    level=log_level,
-    json_default=str,  # Handles datetime and other complex types
-    use_rfc3339=True,  # Standardized timestamp format
-)
+logger = Logger(service="ddb-to-os-index")
+tracer = Tracer()
+metrics = Metrics()
 
-HOST = os.environ["OPENSEARCH_ENDPOINT"]
-INDEX_NAME = os.environ["OPENSEARCH_INDEX"]
+# OpenSearch configuration
+REGION = os.environ["OS_DOMAIN_REGION"]
+HOST = os.environ["OPENSEARCH_ENDPOINT"].split("://")[-1]  # Extract hostname from URL
+INDEX = os.environ["OPENSEARCH_INDEX"]
+SQS_URL = os.environ["SQS_URL"]
 
-# Add s3 client initialization near the top with other clients
-s3 = boto3.client("s3")
+deserializer = TypeDeserializer()
 
 
-class OpenSearchClient:
-    def __init__(self):
-        self.client = self._initialize_client()
+def retry_with_backoff(max_retries=156, base_delay=1, max_delay=60):
+    """
+    Decorator that implements retry logic with exponential backoff.
 
-    def _initialize_client(self) -> OpenSearch:
-        credentials = boto3.Session().get_credentials()
-        auth = AWSV4SignerAuth(credentials, "us-east-1", os.environ["SCOPE"])
-        return OpenSearch(
-            hosts=[HOST],
-            http_auth=auth,
-            use_ssl=True,
-            verify_certs=True,
-            connection_class=RequestsHttpConnection,
-        )
+    Args:
+        max_retries: Maximum number of retry attempts (default: 156)
+        base_delay: Initial delay in seconds between retries (default: 1s)
+        max_delay: Maximum delay in seconds between retries (default: 60s)
+    """
 
-    def search_by_inventory_id(self, inventory_id: str) -> Dict:
-        # Use term query with .keyword field for exact matching
-        search_query = {"query": {"term": {"inventoryId.keyword": inventory_id}}}
-        logger.info(f"Searching for inventoryId: {inventory_id}")
-        logger.info(f"Search query: {json.dumps(search_query, default=str)}")
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            last_exception = None
 
-        try:
-            result = self.client.search(
-                index=INDEX_NAME,
-                body=search_query,
-                size=100,
-            )
-            total_hits = result["hits"]["total"]["value"]
-            logger.info(f"Search found {total_hits} documents")
-            logger.info(f"Raw search response: {json.dumps(result, default=str)}")
-            return result
-        except Exception as e:
-            logger.error(f"Search error: {str(e)}")
-            logger.error(f"Error type: {type(e).__name__}")
-            raise
+            for attempt in range(max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    last_exception = e
 
-    def update_document(self, doc_id: str, data: Dict) -> Dict:
-        """Update document using the update API"""
-        try:
-            body = {"doc": data}
-            logger.info(
-                f"Updating document {doc_id} with body: {json.dumps(body, default=str)}"
-            )
-            result = self.client.update(
-                index=INDEX_NAME, id=doc_id, body=body, refresh=True
-            )
-            logger.info(f"Update result: {json.dumps(result, default=str)}")
-            return result
-        except Exception as e:
-            logger.error(f"Error updating document: {str(e)}")
-            raise
+                    if attempt == max_retries:
+                        # Last attempt failed, log error and re-raise the exception
+                        logger.error(
+                            f"All {max_retries + 1} retry attempts failed for function {func.__name__}",
+                            extra={
+                                "function": func.__name__,
+                                "total_attempts": max_retries + 1,
+                                "final_error": str(e),
+                                "error_type": type(e).__name__,
+                            },
+                        )
+                        raise e
 
-    def index_document(self, data: Dict) -> Dict:
-        """Index or update document based on inventoryId existence"""
-        inventory_id = data.get("inventoryId")
-        logger.info(f"Starting index_document for inventoryId: {inventory_id}")
+                    # Implement exponential backoff: delay = base_delay * (2 ** attempt)
+                    # Cap at max_delay to prevent excessive wait times
+                    delay = min(base_delay * (2**attempt), max_delay)
 
-        if not inventory_id:
-            logger.error("No inventoryId provided in data")
-            raise ValueError("Document must have an inventoryId")
-
-        try:
-            # Add sleep before searching
-            logger.info("Sleeping for 5 seconds before searching...")
-            SEARCH_DELAY = float(os.environ.get("SEARCH_DELAY", "0"))
-            if SEARCH_DELAY > 0:
-                logger.info(f"Sleeping for {SEARCH_DELAY} seconds before searching...")
-                time.sleep(SEARCH_DELAY)
-
-            # First search for existing document
-            search_result = self.search_by_inventory_id(inventory_id)
-
-            if search_result["hits"]["total"]["value"] > 0:
-                # Get the _id of the first matching document
-                doc_id = search_result["hits"]["hits"][0]["_id"]
-                logger.info(f"Found existing document with ID: {doc_id}")
-
-                # Update the existing document using _update endpoint
-                return self.update_document(doc_id, data)
-            else:
-                # Create new document if none exists
-                logger.info("No existing document found, creating new one")
-                result = self.client.index(
-                    index=INDEX_NAME,
-                    body=data,
-                    refresh=True,
-                )
-                logger.info(f"Index result: {json.dumps(result, default=str)}")
-                return result
-        except Exception as e:
-            logger.error(f"Error in index_document: {str(e)}")
-            raise
-
-    def delete_documents(self, inventory_id: str) -> Dict:
-        """Delete all documents with matching inventoryId"""
-        try:
-            # First search for all documents with this inventory ID
-            search_result = self.search_by_inventory_id(inventory_id)
-            total_hits = search_result["hits"]["total"]["value"]
-
-            if total_hits > 0:
-                logger.info(
-                    f"Found {total_hits} documents to delete for inventoryId: {inventory_id}"
-                )
-                deletion_results = []
-
-                # Delete each document found
-                for hit in search_result["hits"]["hits"]:
-                    doc_id = hit["_id"]
-                    logger.info(f"Deleting document with ID: {doc_id}")
-
-                    # Delete the document using the DELETE /{index}/_doc/{id} endpoint
-                    result = self.client.delete(
-                        index=INDEX_NAME,
-                        id=doc_id,
-                        # refresh=True  # Force refresh after deletion
-                    )
-                    deletion_results.append(result)
-                    logger.info(
-                        f"Delete result for doc {doc_id}: {json.dumps(result, default=str)}"
-                    )
-
-                return {
-                    "deleted_count": len(deletion_results),
-                    "results": deletion_results,
-                }
-            else:
-                logger.warning(
-                    f"No documents found to delete for inventoryId: {inventory_id}"
-                )
-                return {"result": "not_found", "deleted_count": 0}
-
-        except Exception as e:
-            logger.error(f"Error deleting documents: {str(e)}")
-            raise
-
-
-def normalize_storage_info(storage_info: Dict) -> Dict:
-    primary_location = storage_info.get("PrimaryLocation", {})
-    return {
-        "storageType": primary_location.get("StorageType"),
-        "bucket": primary_location.get("Bucket"),
-        "path": primary_location.get("ObjectKey", {}).get("FullPath"),
-        "status": primary_location.get("Status"),
-        "fileSize": primary_location.get("FileInfo", {}).get("Size"),
-        "hashValue": primary_location.get("FileInfo", {}).get("Hash", {}).get("Value"),
-    }
-
-
-def normalize_image_spec(image_spec: Dict) -> Dict:
-    return {
-        "colorSpace": image_spec.get("ColorSpace"),
-        "width": image_spec.get("Resolution", {}).get("Width"),
-        "height": image_spec.get("Resolution", {}).get("Height"),
-        "dpi": image_spec.get("DPI"),
-    }
-
-
-def normalize_representation(representation: Dict) -> Dict:
-    return {
-        "id": representation.get("ID"),
-        "type": representation.get("Type"),
-        "format": representation.get("Format"),
-        "purpose": representation.get("Purpose"),
-        "storage": normalize_storage_info(representation.get("StorageInfo", {})),
-        "imageSpec": normalize_image_spec(representation.get("ImageSpec", {})),
-    }
-
-
-def normalize_asset_data(inventory_data: Dict) -> Dict:
-    digital_asset = inventory_data.get("DigitalSourceAsset", {})
-
-    # Process derived representations
-    derived_representations = []
-    for derived_rep in inventory_data.get("DerivedRepresentations", []):
-        if derived_rep:
-            normalized_derived = normalize_representation(derived_rep)
-            derived_representations.append(normalized_derived)
-
-    normalized_data = {
-        "inventoryId": inventory_data.get("InventoryID"),
-        "assetId": digital_asset.get("ID"),
-        "assetType": digital_asset.get("Type"),
-        "createDate": digital_asset.get("CreateDate"),
-        "mainRepresentation": normalize_representation(
-            digital_asset.get("MainRepresentation", {})
-        ),
-        "derivedRepresentations": derived_representations,
-    }
-
-    return normalized_data
-
-
-def delete_s3_objects(asset_data: Dict) -> None:
-    """Deletes all S3 objects associated with the asset"""
-    try:
-        # Delete main representation
-        main_rep = asset_data.get("DigitalSourceAsset", {}).get(
-            "MainRepresentation", {}
-        )
-        if main_rep:
-            main_storage = main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
-            if main_storage:
-                main_bucket = main_storage.get("Bucket")
-                main_key = main_storage.get("ObjectKey", {}).get("FullPath")
-                if main_bucket and main_key:
-                    logger.debug(
-                        "Attempting to delete main representation",
-                        extra={
-                            "bucket": main_bucket,
-                            "key": main_key,
-                            "operation": "delete_main_representation",
-                        },
-                    )
-                    s3.delete_object(Bucket=main_bucket, Key=main_key)
-                    logger.info(
-                        "Successfully deleted main representation",
-                        extra={
-                            "bucket": main_bucket,
-                            "key": main_key,
-                        },
-                    )
-                else:
                     logger.warning(
-                        "Missing bucket or key for main representation",
+                        f"Attempt {attempt + 1} failed, retrying in {delay}s",
                         extra={
-                            "bucket": main_bucket,
-                            "key": main_key,
-                            "asset_data": asset_data,
+                            "attempt": attempt + 1,
+                            "max_retries": max_retries,
+                            "delay": delay,
+                            "error": str(e),
+                            "error_type": type(e).__name__,
                         },
                     )
 
-        # Delete derived representations
-        derived_reps = asset_data.get("DerivedRepresentations", [])
-        for derived in derived_reps:
-            if not derived:
-                logger.debug("Empty derived representation found, skipping")
-                continue
+                    time.sleep(delay)
 
-            storage = derived.get("StorageInfo", {}).get("PrimaryLocation", {})
-            if storage:
-                derived_bucket = storage.get("Bucket")
-                derived_key = storage.get("ObjectKey", {}).get("FullPath")
-                if derived_bucket and derived_key:
-                    logger.debug(
-                        "Attempting to delete derived representation",
-                        extra={
-                            "bucket": derived_bucket,
-                            "key": derived_key,
-                            "operation": "delete_derived_representation",
-                        },
-                    )
-                    s3.delete_object(Bucket=derived_bucket, Key=derived_key)
-                    logger.info(
-                        "Successfully deleted derived representation",
-                        extra={
-                            "bucket": derived_bucket,
-                            "key": derived_key,
-                        },
-                    )
-                else:
-                    logger.warning(
-                        "Missing bucket or key for derived representation",
-                        extra={
-                            "bucket": derived_bucket,
-                            "key": derived_key,
-                            "derived_data": derived,
-                        },
-                    )
+            # This should never be reached, but just in case
+            raise last_exception
 
-    except Exception as e:
-        logger.error(
-            "Failed to delete S3 objects",
-            extra={
-                "error": str(e),
-                "error_type": type(e).__name__,
-                "asset_data": asset_data,
-            },
-        )
-        raise
+        return wrapper
+
+    return decorator
 
 
-def process_dynamodb_record(
-    record: DynamoDBRecord, opensearch_client: OpenSearchClient
-) -> None:
-    event_name = record.event_name
-    logger.debug(
-        "Starting DynamoDB record processing",
-        extra={
-            "event_name": event_name,
-            "record_id": record.event_id,
-        },
+class DecimalEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles Decimal objects from DynamoDB."""
+
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            # Convert to int if it's a whole number, otherwise float
+            return int(obj) if obj % 1 == 0 else float(obj)
+        return super().default(obj)
+
+
+# Initialize AWS credentials and clients
+credentials = boto3.Session().get_credentials()
+awsauth = AWS4Auth(
+    credentials.access_key,
+    credentials.secret_key,
+    REGION,
+    "es",
+    session_token=credentials.token,
+)
+sqs = boto3.client("sqs")
+opensearch_client = OpenSearch(
+    hosts=[{"host": HOST, "port": 443}],
+    http_auth=awsauth,
+    use_ssl=True,
+    verify_certs=True,
+    connection_class=RequestsHttpConnection,
+)
+
+
+@retry_with_backoff(max_retries=10, base_delay=1, max_delay=30)
+def opensearch_delete_document(document_id):
+    """Delete a document from OpenSearch with retry logic."""
+    return opensearch_client.delete(index=INDEX, id=document_id)
+
+
+@retry_with_backoff(max_retries=10, base_delay=1, max_delay=30)
+def opensearch_index_document(document_id, document):
+    """Index a document in OpenSearch with retry logic."""
+    return opensearch_client.index(
+        index=INDEX, id=document_id, body=document, refresh=True
     )
 
-    # Handle DELETE events - Fix the event name comparison
-    if (
-        event_name == "DynamoDBRecordEventName.REMOVE"
-    ):  # This is the actual event name from the logs
-        old_data = record.dynamodb.old_image
-        logger.debug(
-            "Processing REMOVE event",
-            extra={
-                "old_data": old_data,
-            },
-        )
 
-        # Get the InventoryID from the correct path in old_image
-        inventory_id = old_data.get("InventoryID")  # Changed from nested get
+@retry_with_backoff(max_retries=10, base_delay=1, max_delay=30)
+def opensearch_update_document(document_id, partial_doc):
+    """Update a document in OpenSearch with retry logic."""
+    try:
+        return opensearch_client.update(
+            index=INDEX,
+            id=document_id,
+            body={"doc": partial_doc},
+            refresh=True,
+        )
+    except NotFoundError:
+        # Document doesn't exist, create it instead
         logger.info(
-            "Processing DELETE event",
-            extra={
-                "inventory_id": inventory_id,
-                "operation": "delete_asset",
-                "old_data": old_data,
-            },
+            "Document not found during update, creating new document",
+            extra={"document_id": document_id},
+        )
+        return opensearch_client.index(
+            index=INDEX, id=document_id, body=partial_doc, refresh=True
         )
 
-        if inventory_id:
-            try:
-                logger.debug(
-                    "Starting OpenSearch documents deletion",
-                    extra={"inventory_id": inventory_id},
-                )
-                delete_result = opensearch_client.delete_documents(inventory_id)
+
+def dynamodb_item_to_dict(item):
+    """
+    Convert a DynamoDB record (e.g., NewImage from a Streams event)
+    into a normal Python dict.
+    """
+    return {k: deserializer.deserialize(v) for k, v in item.items()}
+
+
+@tracer.capture_lambda_handler
+@metrics.log_metrics
+def lambda_handler(event, context):
+    logger.info("Lambda invoked", extra={"aws_request_id": context.aws_request_id})
+    logger.debug("Full event payload", extra={"event": event})
+    try:
+        for record in event.get("Records", []):
+            event_name = record.get("eventName")
+            logger.info(f"Processing record", extra={"eventName": event_name})
+
+            # ---------------------------- REMOVE ----------------------------
+            if event_name == "REMOVE":
+                document_id = record["dynamodb"]["OldImage"]["InventoryID"]["S"]
                 logger.info(
-                    "Successfully deleted OpenSearch documents",
-                    extra={"delete_result": delete_result},
+                    f"Deleting document from OpenSearch",
+                    extra={"document_id": document_id},
                 )
 
-                logger.debug(
-                    "Starting S3 objects deletion", extra={"inventory_id": inventory_id}
-                )
-                delete_s3_objects(old_data)  # Pass the entire old_data
-                logger.info("Successfully deleted S3 objects")
+                try:
+                    opensearch_delete_document(document_id)
+                    logger.info(
+                        "Deleted document successfully",
+                        extra={"document_id": document_id},
+                    )
+                except Exception as e:
+                    logger.error(
+                        "Failed to delete document after all retries; sending to SQS",
+                        extra={
+                            "document_id": document_id,
+                            "error": str(e),
+                            "error_type": type(e).__name__,
+                        },
+                    )
+                    old_doc = dynamodb_item_to_dict(record["dynamodb"]["OldImage"])
+                    sqs.send_message(
+                        QueueUrl=SQS_URL,
+                        MessageBody=json.dumps(old_doc, cls=DecimalEncoder),
+                        MessageAttributes={
+                            "MessageType": {
+                                "DataType": "String",
+                                "StringValue": "Delete the Index",
+                            }
+                        },
+                    )
 
-            except Exception as e:
-                logger.error(
-                    "Failed to process DELETE event",
+            # ---------------------------- INSERT ----------------------------
+            elif event_name == "INSERT":
+                new_image = record["dynamodb"].get("NewImage")
+                if not new_image:
+                    logger.warning("INSERT event without NewImage; skipping")
+                    continue
+
+                document = dynamodb_item_to_dict(new_image)
+                document_id = document["InventoryID"]
+                logger.info("Indexing new document", extra={"document_id": document_id})
+
+                try:
+                    opensearch_index_document(document_id, document)
+                    logger.info(
+                        "Indexed document successfully",
+                        extra={"document_id": document_id},
+                    )
+                except Exception as e:
+                    logger.error(
+                        "Failed to index document after all retries; sending to SQS",
+                        extra={
+                            "document_id": document_id,
+                            "error": str(e),
+                            "error_type": type(e).__name__,
+                        },
+                    )
+                    sqs.send_message(
+                        QueueUrl=SQS_URL,
+                        MessageBody=json.dumps(document, cls=DecimalEncoder),
+                        MessageAttributes={
+                            "MessageType": {
+                                "DataType": "String",
+                                "StringValue": "Insert the Index",
+                            }
+                        },
+                    )
+
+            # ---------------------------- MODIFY ----------------------------
+            elif event_name == "MODIFY":
+                new_image = record["dynamodb"].get("NewImage")
+                if not new_image:
+                    logger.warning("MODIFY event without NewImage; skipping")
+                    continue
+
+                partial_doc = dynamodb_item_to_dict(new_image)
+                document_id = partial_doc["InventoryID"]
+                logger.info(
+                    "Updating document",
                     extra={
-                        "error": str(e),
-                        "error_type": type(e).__name__,
-                        "inventory_id": inventory_id,
-                        "old_data": old_data,
+                        "document_id": document_id,
+                        "updated_keys": list(partial_doc.keys()),
                     },
                 )
-                raise
-        else:
-            logger.warning(
-                "DELETE event missing inventory_id",
-                extra={
-                    "old_data": old_data,
-                    "event_name": event_name,
-                },
-            )
-        return
 
-    # Handle INSERT and MODIFY events
-    if "NewImage" not in record.dynamodb:
-        logger.info("No new image in record, skipping")
-        return
+                try:
+                    opensearch_update_document(document_id, partial_doc)
+                    logger.info(
+                        "Updated document successfully",
+                        extra={"document_id": document_id},
+                    )
+                except Exception as e:
+                    logger.error(
+                        "Failed to update document after all retries; sending to SQS",
+                        extra={
+                            "document_id": document_id,
+                            "error": str(e),
+                            "error_type": type(e).__name__,
+                        },
+                    )
+                    sqs.send_message(
+                        QueueUrl=SQS_URL,
+                        MessageBody=json.dumps(partial_doc, cls=DecimalEncoder),
+                        MessageAttributes={
+                            "MessageType": {
+                                "DataType": "String",
+                                "StringValue": "Modify the Index",
+                            }
+                        },
+                    )
 
-    logger.info("Processing INSERT/MODIFY event")
-    new_data = record.dynamodb.new_image
-    logger.info(f"Raw DynamoDB data: {json.dumps(new_data, default=str)}")
-
-    normalized_data = normalize_asset_data(new_data)
-    logger.info(f"Normalized data: {json.dumps(normalized_data, default=str)}")
-
-    if not normalized_data:
-        logger.warning("No valid asset data found in record")
-        return
-
-    try:
-        response = opensearch_client.index_document(normalized_data)
-        logger.info(f"Final processing result: {json.dumps(response, default=str)}")
-    except Exception as e:
-        logger.error(f"Error processing document: {str(e)}")
-        raise
-
-
-@logger.inject_lambda_context
-def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
-    batch_id = uuid.uuid4()
-    try:
-        stream_event = DynamoDBStreamEvent(event)
-        opensearch_client = OpenSearchClient()
-
-        for record in stream_event.records:
-            print(
-                f"STREAM22 {record.event_name}",
-                batch_id,
-                "-LIST-",
-                record.dynamodb.new_image["DigitalSourceAsset"]["MainRepresentation"][
-                    "StorageInfo"
-                ]["PrimaryLocation"]["ObjectKey"]["Name"],
-            )
-
-        for record in stream_event.records:
-            print(
-                f"STREAM22 {record.event_name}",
-                batch_id,
-                "-PROCESS-",
-                record.dynamodb.new_image["DigitalSourceAsset"]["MainRepresentation"][
-                    "StorageInfo"
-                ]["PrimaryLocation"]["ObjectKey"]["Name"],
-            )
-            if record.event_source != "aws:dynamodb":
-                logger.warning(
-                    f"Skipping non-DynamoDB event source: {record.event_source}"
-                )
-                continue
-
-            process_dynamodb_record(record, opensearch_client)
-            print(
-                f"STREAM22 {record.event_name}",
-                batch_id,
-                "-COMPLETED-",
-                record.dynamodb.new_image["DigitalSourceAsset"]["MainRepresentation"][
-                    "StorageInfo"
-                ]["PrimaryLocation"]["ObjectKey"]["Name"],
-            )
-
+        logger.info("All records processed successfully")
         return {
             "statusCode": 200,
-            "body": json.dumps("Successfully processed DynamoDB Stream event"),
+            "body": json.dumps("Processing completed successfully"),
         }
+
     except Exception as e:
-        logger.error(f"Error in lambda handler: {str(e)}")
-        return {
-            "statusCode": 500,
-            "body": json.dumps(f"Error processing DynamoDB Stream event: {str(e)}"),
-        }
+        logger.exception("Unhandled exception processing stream")
+        return {"statusCode": 500, "body": json.dumps(f"Error processing stream: {e}")}

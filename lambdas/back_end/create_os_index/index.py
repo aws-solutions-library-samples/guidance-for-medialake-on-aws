@@ -248,7 +248,12 @@ def handler(event, context):
     }
 
     payload = {
-        "settings": {"index": {"knn": True, "mapping.total_fields.limit": 6000}},
+        "settings": {
+            "index": {
+                "knn": True,
+                "mapping.total_fields.limit": 6000,
+            }
+        },
         "mappings": {
             "properties": {
                 "type": {"type": "text"},
@@ -373,7 +378,8 @@ def handler(event, context):
                     "type": "object",
                     "dynamic": True,
                     "properties": {
-                        "CustomMetadata": {"type": "object", "dynamic": True}
+                        "CustomMetadata": {"type": "object", "dynamic": True},
+                        "EmbeddedMetadata": {"type": "object", "dynamic": True},
                     },
                 },
                 "DigitalAsset": {

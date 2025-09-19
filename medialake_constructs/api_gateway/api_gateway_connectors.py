@@ -39,6 +39,21 @@ from medialake_constructs.shared_constructs.lambda_layers import (
 )
 
 
+def apply_custom_authorization(
+    method: apigateway.Method, authorizer: apigateway.IAuthorizer
+) -> None:
+    """
+    Apply custom authorization to an API Gateway method.
+
+    Args:
+        method: The API Gateway method to apply authorization to
+        authorizer: The custom authorizer to use
+    """
+    cfn_method = method.node.default_child
+    cfn_method.authorization_type = "CUSTOM"
+    cfn_method.authorizer_id = authorizer.authorizer_id
+
+
 @dataclass
 class ConnectorsProps:
     asset_table: dynamodb.TableV2
@@ -61,7 +76,7 @@ class ConnectorsProps:
 
     # Optional fields
     api_resource: str | None = None
-    cognito_authorizer: str | None = None
+    authorizer: str | None = None
     x_origin_verify_secret: secretsmanager.Secret | None = None
     system_settings_table_name: str | None = None
     system_settings_table_arn: str | None = None
@@ -258,12 +273,19 @@ class ConnectorsConstruct(Construct):
 
         self.connectors_table.table.grant_read_data(connectors_get_lambda.function)
 
-        connectors_resource.add_method(
+        # authorizer = apigateway.TokenAuthorizer.from_request_authorizer_attributes(
+        #     self,
+        #     "ImportedAuthorizer",
+        #     authorizer_id=props.authorizer.authorizer_id,
+        #     authorizer_arn=props.authorizer.authorizer_arn
+        # )
+
+        connectors_get = connectors_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(connectors_get_lambda.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
         )
+
+        apply_custom_authorization(connectors_get, props.authorizer)
 
         connectors_del_lambda = Lambda(
             self,
@@ -379,7 +401,7 @@ class ConnectorsConstruct(Construct):
         )
 
         # Move the DELETE method to the connector_id_resource and add path parameter mapping
-        connector_id_resource.add_method(
+        connectors_del = connector_id_resource.add_method(
             "DELETE",
             apigateway.LambdaIntegration(
                 connectors_del_lambda.function,
@@ -387,9 +409,8 @@ class ConnectorsConstruct(Construct):
                     "application/json": '{ "connector_id": "$input.params(\'connector_id\')" }'
                 },
             ),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
         )
+        apply_custom_authorization(connectors_del, props.authorizer)
 
         # Create s3connector resource and Lambda function
         connector_s3_resource = connectors_resource.add_resource("s3")
@@ -504,15 +525,6 @@ class ConnectorsConstruct(Construct):
             )
         )
 
-        # These EC2 actions are used by Lambda when deploying it into a VPC.
-        # They allow the Lambda service to look up network configuration like VPCs, subnets, and security groups.
-        #
-        # These are **read-only** (describe) actions and do not allow modifying or deleting anything.
-        # Because of how AWS permissions work, "describe" actions **cannot** be restricted to specific ARNs.
-        # AWS requires that the `resources` field be set to `"*"` for these actions, since they operate across the account.
-        #
-        # It's safe to include these permissions because they only allow the Lambda to retrieve network info,
-        # which is necessary for it to be deployed into a VPC.
         connector_s3_post_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
@@ -652,12 +664,12 @@ class ConnectorsConstruct(Construct):
             )
         )
 
-        connector_s3_resource.add_method(
+        connectors_s3_post = connector_s3_resource.add_method(
             "POST",
             apigateway.LambdaIntegration(connector_s3_post_lambda.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
         )
+
+        apply_custom_authorization(connectors_s3_post, props.authorizer)
 
         connector_s3_get_lambda = Lambda(
             self,
@@ -694,12 +706,12 @@ class ConnectorsConstruct(Construct):
                 )
             )
 
-        connector_s3_resource.add_method(
+        connector_s3_get = connector_s3_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(connector_s3_get_lambda.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
         )
+
+        apply_custom_authorization(connector_s3_get, props.authorizer)
 
         s3_sync_connector_resource = connector_id_resource.add_resource("sync")
 
@@ -729,12 +741,12 @@ class ConnectorsConstruct(Construct):
             self._connector_sync_lambda.function
         )
 
-        s3_sync_connector_resource.add_method(
+        s3_sync_connector_post = s3_sync_connector_resource.add_method(
             "POST",
             apigateway.LambdaIntegration(self._connector_sync_lambda.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
         )
+
+        apply_custom_authorization(s3_sync_connector_post, props.authorizer)
 
         # Create s3 explorer resource with path parameter
         s3_explorer_resource = connector_s3_resource.add_resource("explorer")
@@ -783,12 +795,11 @@ class ConnectorsConstruct(Construct):
                 "application/json": '{ "connector_id": "$input.params(\'connector_id\')" }'
             },
         )
-        s3_explorer_connector_resource.add_method(
+        s3_explorer_connector_get = s3_explorer_connector_resource.add_method(
             "GET",
             s3_explorer_integration,
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
         )
+        apply_custom_authorization(s3_explorer_connector_get, props.authorizer)
 
         self.connectors_table.table.grant_read_data(s3_explorer_get_lambda.function)
 
@@ -833,24 +844,15 @@ class ConnectorsConstruct(Construct):
             )
 
         # Add GET method to buckets resource
-        storage_buckets_resource.add_method(
+        storage_buckets_get = storage_buckets_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(get_buckets_lambda.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
         )
+
+        apply_custom_authorization(storage_buckets_get, props.authorizer)
 
         # Store reference to get_buckets lambda for external configuration
         self._get_buckets_lambda = get_buckets_lambda
-
-        # CORS support is handled by default_cors_preflight_options at the API Gateway level
-        # No need to manually add OPTIONS methods as they're automatically added to all resources
-        # add_cors_options_method(connectors_resource)
-        # add_cors_options_method(connector_id_resource)
-        # add_cors_options_method(connector_s3_resource)
-        # add_cors_options_method(s3_sync_connector_resource)
-        # add_cors_options_method(s3_explorer_resource)
-        # add_cors_options_method(s3_explorer_connector_resource)
 
         aws_resource = props.api_resource.root.add_resource("aws")
         regions_resource = aws_resource.add_resource("regions")
@@ -877,12 +879,12 @@ class ConnectorsConstruct(Construct):
             )
         )
 
-        regions_resource.add_method(
+        regions_get = regions_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(get_regions_lambda.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
         )
+
+        apply_custom_authorization(regions_get, props.authorizer)
 
         # CORS support is handled by default_cors_preflight_options at the API Gateway level
         # No need to manually add OPTIONS methods as they're automatically added to all resources

@@ -12,7 +12,7 @@ node:
         runtime: python3.12
         memory_size: 2048 # Increased memory for video processing
         ephemeral_storage: 10240 # Default ephemeral storage
-        timeout: 900 # 15 minutes for video processing
+        timeout: 900
         layers:
           - FFmpeg
         iam_policy:

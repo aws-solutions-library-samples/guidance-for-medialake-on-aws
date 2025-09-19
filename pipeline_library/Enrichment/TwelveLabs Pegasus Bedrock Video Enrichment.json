@@ -1,0 +1,112 @@
+{
+  "name": "TwelveLabs Pegasus Bedrock Video Enrichment",
+  "description": "",
+  "active": true,
+  "configuration": {
+    "nodes": [
+      {
+        "id": "dndnode_1",
+        "type": "custom",
+        "position": {
+          "x": 656,
+          "y": 272
+        },
+        "data": {
+          "nodeId": "bedrock_content_processor",
+          "label": "Bedrock Content Processor (process_content)",
+          "description": "Process any content using Amazon Bedrock models with customizable prompts",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [
+            {
+              "name": "any",
+              "description": "Output type: any"
+            }
+          ],
+          "type": "UTILITY",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "process_content",
+            "parameters": {
+              "content_source": "proxy",
+              "model_region": "us-west-2",
+              "model_id": "twelvelabs.pegasus-1-2-v1:0",
+              "prompt_name": "structured_recap"
+            }
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "dndnode_4",
+        "type": "custom",
+        "position": {
+          "x": 400,
+          "y": 272
+        },
+        "data": {
+          "nodeId": "trigger_video_processing_completed",
+          "label": "Video Processing Completed (trigger)",
+          "description": "This step will trigger after video processing is completed",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [
+            {
+              "name": "video",
+              "description": "Output type: video"
+            }
+          ],
+          "type": "TRIGGER",
+          "configuration": {
+            "method": "trigger",
+            "parameters": {
+              "Prefix": ""
+            },
+            "path": "",
+            "operationId": "",
+            "requestMapping": null,
+            "responseMapping": null
+          }
+        },
+        "width": 200,
+        "height": 113,
+        "selected": false,
+        "dragging": false
+      }
+    ],
+    "edges": [
+      {
+        "source": "dndnode_4",
+        "sourceHandle": "video",
+        "target": "dndnode_1",
+        "targetHandle": "input-any",
+        "id": "dndnode_4-dndnode_1",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        }
+      }
+    ],
+    "settings": {
+      "autoStart": false,
+      "retryAttempts": 3,
+      "timeout": 3600
+    }
+  }
+}

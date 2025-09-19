@@ -249,6 +249,12 @@ Resources:
                 Action:
                   - 'ec2:DescribeAvailabilityZones'
                 Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'kms:ListAliases'
+                  - 'kms:DescribeKey'
+                  - 'kms:ListKeys'
+                Resource: '*'
 
   CDKDeployRole:
     Type: 'AWS::IAM::Role'

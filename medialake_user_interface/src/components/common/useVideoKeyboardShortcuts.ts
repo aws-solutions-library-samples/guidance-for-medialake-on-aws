@@ -46,8 +46,8 @@ interface UseVideoKeyboardShortcutsProps {
 }
 
 export const useVideoKeyboardShortcuts = ({
-  play,
-  pause,
+  play: originalPlay,
+  pause: originalPause,
   seek,
   setPlaybackRate,
   mute,
@@ -97,7 +97,41 @@ export const useVideoKeyboardShortcuts = ({
   const lastNonZeroShuttleRef = useRef<number>(1);
 
   // Keep refs for toggle logic used inside the keydown listener.
+  // Wrap play and pause with logging
+  const play = useCallback(() => {
+    console.log(
+      `PLAY() called from keyboard shortcuts - Stack:`,
+      new Error().stack?.split("\n").slice(1, 4).join("\n"),
+    );
+    originalPlay();
+  }, [originalPlay]);
+
+  const pause = useCallback(() => {
+    console.log(
+      `PAUSE() called from keyboard shortcuts - Stack:`,
+      new Error().stack?.split("\n").slice(1, 4).join("\n"),
+    );
+    originalPause();
+  }, [originalPause]);
+
   const isPlayingRef = useRef(isPlaying);
+
+  // Prevent video element from receiving focus to avoid native browser controls
+  useEffect(() => {
+    const omakasePlayer = omakaseRef?.current;
+    const htmlVideoElement = omakasePlayer?.video?.htmlVideoElement;
+
+    if (htmlVideoElement) {
+      console.log(`INITIALIZING video element to prevent focus conflicts`);
+      // Disable tabindex to prevent focus
+      htmlVideoElement.setAttribute("tabindex", "-1");
+      // Remove any existing focus
+      htmlVideoElement.blur();
+      console.log(
+        `VIDEO ELEMENT configured to prevent native keyboard controls`,
+      );
+    }
+  }, [omakaseRef]);
   useEffect(() => {
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
@@ -192,18 +226,76 @@ export const useVideoKeyboardShortcuts = ({
     [applyShuttleSpeed, SHUTTLE_STOPS],
   );
 
+  // Add a ref to track the last toggle time to prevent rapid toggles
+  const lastToggleTimeRef = useRef<number>(0);
+  const toggleCallCountRef = useRef<number>(0);
+
   // Create a single transport toggle for K/Space and the play button
   const toggleTransport = useCallback(() => {
-    const moving = isPlayingRef.current || isShuttlingReverseRef.current;
-    if (moving) {
-      // Stop, but keep lastNonZeroShuttleRef so a second press resumes at that speed/direction
-      applyShuttleSpeed(0);
-    } else {
-      // Resume at last non-zero (could be reverse or forward)
-      const resume = lastNonZeroShuttleRef.current || 1;
-      applyShuttleSpeed(resume);
+    const now = Date.now();
+    const timeSinceLastToggle = now - lastToggleTimeRef.current;
+    const callCount = ++toggleCallCountRef.current;
+
+    console.log(
+      `TOGGLE TRANSPORT CALLED #${callCount} - Time since last: ${timeSinceLastToggle}ms`,
+    );
+    console.log(
+      `Call stack:`,
+      new Error().stack?.split("\n").slice(1, 4).join("\n"),
+    );
+
+    // Prevent rapid toggles within 150ms
+    if (timeSinceLastToggle < 150) {
+      console.log(
+        `Ignoring rapid toggle #${callCount}, time since last: ${timeSinceLastToggle}ms`,
+      );
+      return;
     }
-  }, [applyShuttleSpeed]);
+
+    lastToggleTimeRef.current = now;
+
+    // Check if we're in shuttle mode first
+    if (isShuttlingReverseRef.current) {
+      console.log(`Stopping shuttle mode (call #${callCount})`);
+      applyShuttleSpeed(0);
+      return;
+    }
+
+    // Check the actual video element state to avoid React state synchronization issues
+    const videoElement = omakaseRef?.current?.video?.htmlVideoElement;
+    const actuallyPlaying = videoElement ? !videoElement.paused : isPlaying;
+
+    console.log(` TOGGLE STATE CHECK #${callCount}:`);
+    console.log(`  - isPlaying prop: ${isPlaying}`);
+    console.log(`  - isPlayingRef: ${isPlayingRef.current}`);
+    console.log(`  - video.paused: ${videoElement?.paused}`);
+    console.log(`  - actuallyPlaying: ${actuallyPlaying}`);
+    console.log(`  - timeSinceLastToggle: ${timeSinceLastToggle}ms`);
+
+    if (actuallyPlaying) {
+      console.log(`PAUSING video (call #${callCount})`);
+      pause();
+
+      // Prevent focus-related issues by removing focus from video element
+      const preventFocusIssues = () => {
+        console.log(`PREVENTING focus-related keyboard conflicts`);
+        const omakasePlayer = omakaseRef?.current;
+        const htmlVideoElement = omakasePlayer?.video?.htmlVideoElement;
+
+        if (htmlVideoElement) {
+          // Remove focus from video element to prevent native browser controls
+          htmlVideoElement.blur();
+          // Disable tabindex to prevent future focus
+          htmlVideoElement.setAttribute("tabindex", "-1");
+          console.log(`REMOVED focus from video element`);
+        }
+      };
+      preventFocusIssues();
+    } else {
+      console.log(`PLAYING video (call #${callCount})`);
+      play();
+    }
+  }, [play, pause, applyShuttleSpeed, isPlaying]);
 
   // Reset to 1x forward speed
   const resetSpeed = useCallback(
@@ -293,14 +385,128 @@ export const useVideoKeyboardShortcuts = ({
     onFullscreenChange?.(true);
   }, [toggleFullscreen, onFullscreenChange]);
 
-  // Keyboard event handler
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (
-        (event.target as HTMLElement).tagName === "INPUT" ||
-        (event.target as HTMLElement).tagName === "TEXTAREA"
-      ) {
+  // Marker navigation functions
+  const navigateToNextMarker = useCallback(() => {
+    if (!markerLaneRef.current) {
+      console.warn(
+        "Marker lane is not available yet. Video may still be loading.",
+      );
+      return;
+    }
+
+    try {
+      const markers = markerLaneRef.current.getMarkers();
+      if (!markers || markers.length === 0) {
+        console.log("No markers available to navigate to.");
         return;
+      }
+
+      // Sort markers by their start time (chronological order)
+      const sortedMarkers = [...markers].sort((a, b) => {
+        const aStart = a.timeObservation?.start || 0;
+        const bStart = b.timeObservation?.start || 0;
+        return aStart - bStart;
+      });
+
+      const currentMarkerInFocus = markerLaneRef.current.getMarkerInFocus();
+      let nextMarkerIndex = 0;
+
+      if (currentMarkerInFocus) {
+        // Find current marker index in sorted array and move to next
+        const currentIndex = sortedMarkers.findIndex(
+          (marker) => marker.id === currentMarkerInFocus.id,
+        );
+        nextMarkerIndex = (currentIndex + 1) % sortedMarkers.length;
+      }
+
+      const nextMarker = sortedMarkers[nextMarkerIndex];
+      if (nextMarker) {
+        markerLaneRef.current.focusMarker(nextMarker.id);
+        // Seek to the start of the marker
+        const timeObservation = nextMarker.timeObservation;
+        if (timeObservation && timeObservation.start !== undefined) {
+          seek(timeObservation.start);
+        }
+        console.log(
+          "Navigated to next marker:",
+          nextMarker.id,
+          "at time:",
+          timeObservation?.start,
+        );
+      }
+    } catch (error) {
+      console.error("Error navigating to next marker:", error);
+    }
+  }, [markerLaneRef, seek]);
+
+  const navigateToPreviousMarker = useCallback(() => {
+    if (!markerLaneRef.current) {
+      console.warn(
+        "Marker lane is not available yet. Video may still be loading.",
+      );
+      return;
+    }
+
+    try {
+      const markers = markerLaneRef.current.getMarkers();
+      if (!markers || markers.length === 0) {
+        console.log("No markers available to navigate to.");
+        return;
+      }
+
+      // Sort markers by their start time (chronological order)
+      const sortedMarkers = [...markers].sort((a, b) => {
+        const aStart = a.timeObservation?.start || 0;
+        const bStart = b.timeObservation?.start || 0;
+        return aStart - bStart;
+      });
+
+      const currentMarkerInFocus = markerLaneRef.current.getMarkerInFocus();
+      let prevMarkerIndex = sortedMarkers.length - 1;
+
+      if (currentMarkerInFocus) {
+        // Find current marker index in sorted array and move to previous
+        const currentIndex = sortedMarkers.findIndex(
+          (marker) => marker.id === currentMarkerInFocus.id,
+        );
+        prevMarkerIndex =
+          currentIndex > 0 ? currentIndex - 1 : sortedMarkers.length - 1;
+      }
+
+      const prevMarker = sortedMarkers[prevMarkerIndex];
+      if (prevMarker) {
+        markerLaneRef.current.focusMarker(prevMarker.id);
+        // Seek to the start of the marker
+        const timeObservation = prevMarker.timeObservation;
+        if (timeObservation && timeObservation.start !== undefined) {
+          seek(timeObservation.start);
+        }
+        console.log(
+          "Navigated to previous marker:",
+          prevMarker.id,
+          "at time:",
+          timeObservation?.start,
+        );
+      }
+    } catch (error) {
+      console.error("Error navigating to previous marker:", error);
+    }
+  }, [markerLaneRef, seek]);
+
+  // Keyboard event handler with capture-phase blocking
+  useEffect(() => {
+    const handledKeys = new Set([" ", "k", "K"]); // Space + K keys that we handle
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Ignore when typing in fields
+      const tag = (event.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+      // If we handle this key, stop anyone else from seeing it
+      if (handledKeys.has(event.key)) {
+        (event as any).stopImmediatePropagation?.();
+        event.stopPropagation();
+        event.preventDefault();
       }
 
       // Double-tap detection
@@ -315,11 +521,11 @@ export const useVideoKeyboardShortcuts = ({
         case " ": // Space or K toggles transport / double-tap resets to 1x
         case "k":
         case "K":
-          event.preventDefault();
           if (isDoubleTap) {
             resetSpeed(true); // play at 1× forward
           } else {
-            toggleTransport(); // existing play/pause respecting speed
+            // Call immediately - no delay needed since we blocked other handlers
+            toggleTransport();
           }
           break;
         case "j": // decrease speed; crosses 0 into reverse
@@ -424,12 +630,43 @@ export const useVideoKeyboardShortcuts = ({
           event.preventDefault();
           stepFrame(1);
           break;
+        case "n": // next marker
+        case "N":
+          event.preventDefault();
+          navigateToNextMarker();
+          break;
+        case "p": // previous marker
+        case "P":
+          event.preventDefault();
+          navigateToPreviousMarker();
+          break;
       }
     };
 
-    document.addEventListener("keydown", handleKeyDown);
+    // Block native/key-up fallbacks some players use
+    const blockNative = (e: KeyboardEvent) => {
+      if (handledKeys.has(e.key)) {
+        (e as any).stopImmediatePropagation?.();
+        e.stopPropagation();
+        e.preventDefault();
+      }
+    };
+
+    // Capture-phase listener at the top of the tree to intercept before any other handlers
+    window.addEventListener("keydown", handleKeyDown, { capture: true });
+    window.addEventListener("keyup", blockNative, { capture: true });
+    window.addEventListener("keypress", blockNative, { capture: true });
+
     return () => {
-      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keydown", handleKeyDown, {
+        capture: true,
+      } as any);
+      window.removeEventListener("keyup", blockNative, {
+        capture: true,
+      } as any);
+      window.removeEventListener("keypress", blockNative, {
+        capture: true,
+      } as any);
       if (volumeHoverTimeoutRef.current) {
         clearTimeout(volumeHoverTimeoutRef.current);
       }
@@ -455,19 +692,159 @@ export const useVideoKeyboardShortcuts = ({
     handleFullscreenToggle,
     markerLaneRef,
     customCallbacks,
+    navigateToNextMarker,
+    navigateToPreviousMarker,
   ]);
 
-  // Keyboard shortcuts for help display
-  const SHORTCUTS: string[] = [
-    "Space / K – Play/Pause",
-    "J – Shuttle slower/reverse",
-    "L – Shuttle faster/forward",
-    "← / → – Step 5 s backward/forward",
-    ", / . – Frame backward/forward",
-    "↑ / ↓ – Volume up/down",
-    "F – Toggle fullscreen",
-    "M – Mute/Unmute",
-    "I – Add marker",
+  // Prevent video element from holding focus after mouse clicks (belt & suspenders)
+  useEffect(() => {
+    const omakasePlayer = omakaseRef?.current;
+    const htmlVideoElement = omakasePlayer?.video?.htmlVideoElement;
+
+    if (!htmlVideoElement) return;
+
+    const blurAfterPointer = () => {
+      setTimeout(() => {
+        htmlVideoElement.blur();
+        console.log("🎯 BLURRED video element after pointer interaction");
+      }, 0);
+    };
+
+    // Prevent video from being focusable and blur after any pointer interaction
+    htmlVideoElement.setAttribute("tabindex", "-1");
+    htmlVideoElement.addEventListener("pointerdown", blurAfterPointer);
+    htmlVideoElement.addEventListener("click", blurAfterPointer);
+
+    console.log(
+      "✅ VIDEO ELEMENT configured to prevent focus after mouse interactions",
+    );
+
+    return () => {
+      htmlVideoElement.removeEventListener("pointerdown", blurAfterPointer);
+      htmlVideoElement.removeEventListener("click", blurAfterPointer);
+    };
+  }, [omakaseRef]);
+
+  // Keyboard shortcuts for help display with actions
+  const SHORTCUTS = [
+    {
+      keys: ["Space", "K"],
+      description: "Play/Pause",
+      category: "Playback",
+      action: toggleTransport,
+    },
+    {
+      keys: ["J"],
+      description: "Shuttle slower/reverse",
+      category: "Playback",
+      action: () => bumpShuttle(-1),
+    },
+    {
+      keys: ["L"],
+      description: "Shuttle faster/forward",
+      category: "Playback",
+      action: () => bumpShuttle(1),
+    },
+    {
+      keys: ["←"],
+      description: "Step 5s backward",
+      category: "Navigation",
+      action: () => seek(Math.max(currentTime - 5, 0)),
+    },
+    {
+      keys: ["→"],
+      description: "Step 5s forward",
+      category: "Navigation",
+      action: () => seek(Math.min(currentTime + 5, duration)),
+    },
+    {
+      keys: [","],
+      description: "Frame backward",
+      category: "Navigation",
+      action: () => stepFrame(-1),
+    },
+    {
+      keys: ["."],
+      description: "Frame forward",
+      category: "Navigation",
+      action: () => stepFrame(1),
+    },
+    {
+      keys: ["N"],
+      description: "Next marker",
+      category: "Markers",
+      action: navigateToNextMarker,
+    },
+    {
+      keys: ["P"],
+      description: "Previous marker",
+      category: "Markers",
+      action: navigateToPreviousMarker,
+    },
+    {
+      keys: ["I"],
+      description: "Add marker",
+      category: "Markers",
+      action: () => {
+        if (markerLaneRef.current) {
+          try {
+            const periodMarker = new PeriodMarker({
+              timeObservation: { start: currentTime, end: currentTime + 2 },
+              editable: true,
+              style: {
+                ...PERIOD_MARKER_STYLE,
+                color: randomHexColor(),
+              },
+            });
+            markerLaneRef.current.addMarker(periodMarker);
+            customCallbacks.onMarkerAdd?.(currentTime);
+            console.log("Marker added at time:", currentTime);
+          } catch (error) {
+            console.error("Error adding marker:", error);
+          }
+        }
+      },
+    },
+    {
+      keys: ["↑"],
+      description: "Volume up",
+      category: "Audio",
+      action: () => {
+        const newVol = Math.min(volume + 10, 100);
+        setPlayerVolume(newVol);
+        setVolumeState(newVol);
+        if (newVol > 0) {
+          lastNonZeroVolumeRef.current = newVol;
+          if (muted) {
+            unmute();
+            setMuted(false);
+          }
+        }
+      },
+    },
+    {
+      keys: ["↓"],
+      description: "Volume down",
+      category: "Audio",
+      action: () => {
+        const newVol = Math.max(volume - 10, 0);
+        setPlayerVolume(newVol);
+        setVolumeState(newVol);
+        setMuted(newVol === 0);
+      },
+    },
+    {
+      keys: ["M"],
+      description: "Mute/Unmute",
+      category: "Audio",
+      action: handleMuteToggle,
+    },
+    {
+      keys: ["F"],
+      description: "Toggle fullscreen",
+      category: "Display",
+      action: handleFullscreenToggle,
+    },
   ];
 
   return {

@@ -125,6 +125,14 @@ export const QUERY_KEYS = {
     detail: (id: string) =>
       [...QUERY_KEYS.PERMISSION_SETS.details(), id] as const,
   },
+  API_KEYS: {
+    all: ["api-keys"] as const,
+    lists: () => [...QUERY_KEYS.API_KEYS.all, "list"] as const,
+    list: (filters: string) =>
+      [...QUERY_KEYS.API_KEYS.lists(), { filters }] as const,
+    details: () => [...QUERY_KEYS.API_KEYS.all, "detail"] as const,
+    detail: (id: string) => [...QUERY_KEYS.API_KEYS.details(), id] as const,
+  },
   GROUPS: {
     all: ["groups"] as const,
     lists: () => [...QUERY_KEYS.GROUPS.all, "list"] as const,

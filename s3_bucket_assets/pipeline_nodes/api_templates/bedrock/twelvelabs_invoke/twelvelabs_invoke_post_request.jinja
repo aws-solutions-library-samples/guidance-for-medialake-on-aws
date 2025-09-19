@@ -1,0 +1,31 @@
+{
+  "modelId": "{{ variables.model_id }}",
+  "modelInput": {
+    "inputType": "{{ variables.input_type }}"
+    {% if variables.input_type == "video" and variables.video_uri %}
+    ,
+    "mediaSource": {
+      "s3Location": {
+        "uri": "{{ variables.video_uri }}",
+        "bucketOwner": "{{ variables.account_id }}"
+      }
+    }
+    {% elif variables.input_type == "image" and variables.image_uri %}
+    ,
+    "mediaSource": {
+      "s3Location": {
+        "uri": "{{ variables.image_uri }}",
+        "bucketOwner": "{{ variables.account_id }}"
+      }
+    }
+    {% elif variables.input_type == "text" and variables.text_content %}
+    ,
+    "inputText": "{{ variables.text_content }}"
+    {% endif %}
+  },
+  "outputDataConfig": {
+    "s3OutputDataConfig": {
+      "s3Uri": "s3://{{ variables.s3_output_bucket }}/{% if variables.input_type == 'video' %}videoEmbedding{% elif variables.input_type == 'image' %}imageEmbedding{% else %}textEmbedding{% endif %}/{{ variables.uid }}"
+    }
+  }
+}

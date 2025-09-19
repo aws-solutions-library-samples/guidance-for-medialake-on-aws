@@ -35,6 +35,8 @@ import {
 } from "@mui/icons-material";
 import { useSemanticSearchSettings } from "@/features/settings/system/hooks/useSystemSettings";
 import { SYSTEM_SETTINGS_CONFIG } from "@/features/settings/system/config";
+import { ApiKeyManagement } from "@/components/settings/api-keys";
+import { Can } from "@/permissions/components/Can";
 
 // Fallback notification hook
 const useNotificationWithFallback = () => {
@@ -201,12 +203,13 @@ const SystemSettingsPage: React.FC = () => {
     try {
       const success = await handleSaveApiKey();
       if (success) {
-        handleToggleChange(true); // Enable the provider after successful save
         handleCloseApiKeyDialog();
+        // Enable the toggle after successful API key save
+        handleToggleChange(true);
         showNotification(
           t(
             "settings.systemSettings.search.apiKeySaveSuccess",
-            "API key saved",
+            "API key saved and enabled",
           ),
           "success",
         );
@@ -296,6 +299,9 @@ const SystemSettingsPage: React.FC = () => {
             }}
           >
             <Tab label={t("settings.systemSettings.tabs.search", "Search")} />
+            <Tab
+              label={t("settings.systemSettings.tabs.apiKeys", "API Keys")}
+            />
           </Tabs>
         </Box>
 
@@ -371,7 +377,7 @@ const SystemSettingsPage: React.FC = () => {
                           onChange={(_evt, checked) =>
                             handleToggleChange(checked)
                           }
-                          disabled={!settings.provider.config?.isConfigured}
+                          disabled={false}
                           color="success"
                           size="medium"
                         />
@@ -407,10 +413,7 @@ const SystemSettingsPage: React.FC = () => {
                       )}
                     </Typography>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                      <FormControl
-                        sx={{ minWidth: 200 }}
-                        disabled={!settings.isEnabled}
-                      >
+                      <FormControl sx={{ minWidth: 200 }} disabled={false}>
                         <InputLabel>
                           {t(
                             "settings.systemSettings.search.selectProvider",
@@ -427,6 +430,12 @@ const SystemSettingsPage: React.FC = () => {
                             handleProviderTypeChange(e.target.value as any)
                           }
                         >
+                          <MenuItem value="none">
+                            {t(
+                              "settings.systemSettings.search.selectProviderOption",
+                              "Select a provider...",
+                            )}
+                          </MenuItem>
                           <MenuItem value="twelvelabs-api">
                             {
                               SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API
@@ -451,7 +460,7 @@ const SystemSettingsPage: React.FC = () => {
                             variant="outlined"
                             startIcon={<EditIcon />}
                             onClick={() => handleOpenApiKeyDialog(true)}
-                            disabled={!settings.isEnabled}
+                            disabled={false}
                           >
                             {t(
                               "settings.systemSettings.search.editApiKey",
@@ -620,6 +629,43 @@ const SystemSettingsPage: React.FC = () => {
                 </Box>
               </Box>
             )}
+          </TabPanel>
+
+          <TabPanel value={tabValue} index={1}>
+            <Can I="view" a="api-key">
+              <ApiKeyManagement />
+            </Can>
+            <Can I="view" a="api-key">
+              {(allowed) =>
+                !allowed && (
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: "100%",
+                      textAlign: "center",
+                      py: 8,
+                    }}
+                  >
+                    <Typography
+                      variant="h6"
+                      color="text.secondary"
+                      gutterBottom
+                    >
+                      {t("permissions.accessDenied", "Access Denied")}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {t(
+                        "permissions.apiKeyAccessDenied",
+                        "You don't have permission to view API keys.",
+                      )}
+                    </Typography>
+                  </Box>
+                )
+              }
+            </Can>
           </TabPanel>
         </Box>
       </Paper>
