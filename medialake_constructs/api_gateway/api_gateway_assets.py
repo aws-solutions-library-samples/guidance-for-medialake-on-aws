@@ -27,6 +27,7 @@ from constructs import Construct
 
 from config import config
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
+from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 from medialake_constructs.shared_constructs.lambda_layers import (
     SearchLayer,
@@ -815,20 +816,37 @@ class AssetsConstruct(Construct):
         Create resources for bulk download functionality.
 
         This method creates and configures:
+        - DynamoDB table for tracking bulk download jobs
         - EFS filesystem for temporary storage
         - Lambda functions for processing downloads
         - Step Functions state machine for orchestration
         - API Gateway endpoints for client interaction
-
-        Note: Bulk download jobs are now stored in the user table using the pattern:
-        itemKey: "BULK_DOWNLOAD#{job_id}#{reverse_timestamp}"
         """
-        # Use the existing user table for bulk download jobs
+        # Create DynamoDB table for bulk download jobs
+        bulk_download_table = DynamoDB(
+            self,
+            "AssetsBulkDownloadJobsTable",
+            props=DynamoDBProps(
+                name=f"{config.resource_prefix}-assets-bulk-download-jobs-{config.environment}",
+                partition_key_name="jobId",
+                partition_key_type=dynamodb.AttributeType.STRING,
+                point_in_time_recovery=True,
+                ttl_attribute="expiresAt",
+                removal_policy=RemovalPolicy.DESTROY,
+            ),
+        )
+        self._bulk_download_table = bulk_download_table.table
 
-        # self._bulk_download_table = props.user_table
-
-        self._users_table = dynamodb.TableV2.from_table_name(
-            self, "ImportedTable", f"{config.resource_prefix}-user-{config.environment}"
+        # Add GSI for querying by userId
+        self._bulk_download_table.add_global_secondary_index(
+            index_name="UserIdIndex",
+            partition_key=dynamodb.Attribute(
+                name="userId", type=dynamodb.AttributeType.STRING
+            ),
+            sort_key=dynamodb.Attribute(
+                name="createdAt", type=dynamodb.AttributeType.STRING
+            ),
+            projection_type=dynamodb.ProjectionType.ALL,
         )
 
         # Create EFS filesystem for temporary storage
@@ -885,7 +903,7 @@ class AssetsConstruct(Construct):
 
         # Common environment variables for all Lambda functions
         common_env_vars = {
-            "USER_TABLE_NAME": f"{config.resource_prefix}-user-{config.environment}",  # Using user table for bulk download jobs
+            "BULK_DOWNLOAD_TABLE": self._bulk_download_table.table_name,
             "MEDIA_ASSETS_BUCKET": props.media_assets_bucket.bucket_name,
             "EFS_MOUNT_PATH": "/mnt/bulk-downloads",
             "USE_ZIPMERGE": "true",  # Enable the use of zipmerge binary
@@ -1503,7 +1521,7 @@ class AssetsConstruct(Construct):
                 name="assets_bulk_download_single_file",
                 entry="lambdas/api/assets/download/bulk/post_bulk/single_file",
                 environment_variables={
-                    "USER_TABLE_NAME": f"{config.resource_prefix}-user-{config.environment}",
+                    "BULK_DOWNLOAD_TABLE": self._bulk_download_table.table_name,
                     "ASSET_TABLE": asset_table_name,
                 },
                 timeout_minutes=1,
@@ -1518,7 +1536,7 @@ class AssetsConstruct(Construct):
                     "dynamodb:GetItem",
                     "dynamodb:UpdateItem",
                 ],
-                resources=[self._users_table.table_arn],
+                resources=[self._bulk_download_table.table_arn],
             )
         )
 
@@ -1933,9 +1951,10 @@ class AssetsConstruct(Construct):
         add_cors_options_method(user_resource)
 
     @property
-    def bulk_download_table(self) -> dynamodb.Table:
-        """Returns the user table that stores bulk download jobs."""
-        return self._users_table if hasattr(self, "_users_table") else None
+    def bulk_download_table(self) -> dynamodb.TableV2:
+        return (
+            self._bulk_download_table if hasattr(self, "_bulk_download_table") else None
+        )
 
     @property
     def efs_filesystem(self) -> efs.FileSystem:
