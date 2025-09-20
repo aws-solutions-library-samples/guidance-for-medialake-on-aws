@@ -27,7 +27,6 @@ from constructs import Construct
 
 from config import config
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
-from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 from medialake_constructs.shared_constructs.lambda_layers import (
     SearchLayer,
@@ -816,37 +815,17 @@ class AssetsConstruct(Construct):
         Create resources for bulk download functionality.
 
         This method creates and configures:
-        - DynamoDB table for tracking bulk download jobs
         - EFS filesystem for temporary storage
         - Lambda functions for processing downloads
         - Step Functions state machine for orchestration
         - API Gateway endpoints for client interaction
-        """
-        # Create DynamoDB table for bulk download jobs
-        bulk_download_table = DynamoDB(
-            self,
-            "AssetsBulkDownloadJobsTable",
-            props=DynamoDBProps(
-                name=f"{config.resource_prefix}-assets-bulk-download-jobs-{config.environment}",
-                partition_key_name="jobId",
-                partition_key_type=dynamodb.AttributeType.STRING,
-                point_in_time_recovery=True,
-                ttl_attribute="expiresAt",
-                removal_policy=RemovalPolicy.DESTROY,
-            ),
-        )
-        self._bulk_download_table = bulk_download_table.table
 
-        # Add GSI for querying by userId
-        self._bulk_download_table.add_global_secondary_index(
-            index_name="UserIdIndex",
-            partition_key=dynamodb.Attribute(
-                name="userId", type=dynamodb.AttributeType.STRING
-            ),
-            sort_key=dynamodb.Attribute(
-                name="createdAt", type=dynamodb.AttributeType.STRING
-            ),
-            projection_type=dynamodb.ProjectionType.ALL,
+        Note: Bulk download jobs are now stored in the user table using the pattern:
+        itemKey: "BULK_DOWNLOAD#{job_id}#{reverse_timestamp}"
+        """
+        # Use the existing user table for bulk download jobs
+        self._users_table = dynamodb.TableV2.from_table_name(
+            self, "ImportedTable", f"{config.resource_prefix}-user-{config.environment}"
         )
 
         # Create EFS filesystem for temporary storage
@@ -903,7 +882,7 @@ class AssetsConstruct(Construct):
 
         # Common environment variables for all Lambda functions
         common_env_vars = {
-            "BULK_DOWNLOAD_TABLE": self._bulk_download_table.table_name,
+            "USER_TABLE_NAME": f"{config.resource_prefix}-user-{config.environment}",
             "MEDIA_ASSETS_BUCKET": props.media_assets_bucket.bucket_name,
             "EFS_MOUNT_PATH": "/mnt/bulk-downloads",
             "USE_ZIPMERGE": "true",  # Enable the use of zipmerge binary
@@ -1163,7 +1142,7 @@ class AssetsConstruct(Construct):
                     ],
                     resources=[
                         self._users_table.table_arn,
-                        f"{self._users_table.table_arn}/index/*",  # Allow access to all GSIs (user table)
+                        f"{self._users_table.table_arn}/index/*",  # Allow access to all GSIs
                     ],
                 )
             )
@@ -1521,7 +1500,7 @@ class AssetsConstruct(Construct):
                 name="assets_bulk_download_single_file",
                 entry="lambdas/api/assets/download/bulk/post_bulk/single_file",
                 environment_variables={
-                    "BULK_DOWNLOAD_TABLE": self._bulk_download_table.table_name,
+                    "USER_TABLE_NAME": f"{config.resource_prefix}-user-{config.environment}",
                     "ASSET_TABLE": asset_table_name,
                 },
                 timeout_minutes=1,
@@ -1536,7 +1515,7 @@ class AssetsConstruct(Construct):
                     "dynamodb:GetItem",
                     "dynamodb:UpdateItem",
                 ],
-                resources=[self._bulk_download_table.table_arn],
+                resources=[self._users_table.table_arn],
             )
         )
 
