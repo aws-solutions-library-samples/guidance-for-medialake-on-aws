@@ -100,20 +100,20 @@ class BaseEmbeddingStore(ABC):
     def _get_regional_inference_profile(self) -> str:
         """
         Get the appropriate TwelveLabs Marengo Embed v2.7 inference profile based on AWS region.
-        
+
         Returns:
             Regional inference profile ID for TwelveLabs Marengo Embed v2.7
         """
         # Allow override via environment variable
         if "BEDROCK_INFERENCE_PROFILE_ARN" in os.environ:
             return os.environ["BEDROCK_INFERENCE_PROFILE_ARN"]
-        
+
         # Get current AWS region
         aws_region = os.environ.get("AWS_REGION", "us-east-1")
-        
+
         # Common suffix for all TwelveLabs Marengo Embed v2.7 inference profiles
         model_suffix = ".twelvelabs.marengo-embed-2-7-v1:0"
-        
+
         # Map regions to regional prefixes based on AWS documentation
         if aws_region.startswith("us-"):
             # US regions: us-east-1, us-east-2, us-west-1, us-west-2
@@ -126,11 +126,15 @@ class BaseEmbeddingStore(ABC):
             regional_prefix = "apac"
         else:
             # Default to US profile for unknown regions
-            self.logger.warning(f"Unknown AWS region: {aws_region}, defaulting to US inference profile")
+            self.logger.warning(
+                f"Unknown AWS region: {aws_region}, defaulting to US inference profile"
+            )
             regional_prefix = "us"
-        
+
         inference_profile_id = f"{regional_prefix}{model_suffix}"
-        self.logger.info(f"Selected inference profile {inference_profile_id} for region {aws_region}")
+        self.logger.info(
+            f"Selected inference profile {inference_profile_id} for region {aws_region}"
+        )
         return inference_profile_id
 
     def _generate_embedding_via_bedrock(
