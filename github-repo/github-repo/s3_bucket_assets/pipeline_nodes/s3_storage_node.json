@@ -1,0 +1,52 @@
+{
+  "configSchema": {
+    "aws": {
+      "action": "putObject",
+      "parameters": {
+        "properties": {
+          "bucketName": {
+            "description": "Name of the S3 bucket",
+            "type": "string"
+          },
+          "region": {
+            "description": "AWS region for the S3 bucket",
+            "type": "string"
+          }
+        },
+        "required": ["region", "bucketName"],
+        "type": "object"
+      },
+      "requestMapping": {
+        "description": "Maps workflow input to S3 parameters",
+        "type": "object"
+      },
+      "responseMapping": {
+        "description": "Maps S3 response to workflow output",
+        "type": "object"
+      },
+      "service": "s3"
+    }
+  },
+  "description": "Node for S3 storage operations",
+  "integrationSchema": {
+    "aws": {
+      "credentials": {
+        "required": true,
+        "rotation": "optional",
+        "type": "aws"
+      },
+      "endpoints": {
+        "required": false
+      },
+      "optional": ["region", "assumeRoleDuration"],
+      "required": ["roleArn"]
+    }
+  },
+  "isActive": true,
+  "name": "S3 Storage",
+  "nodeCategory": "storage",
+  "nodeId": "s3_storage",
+  "nodeTags": "integration",
+  "nodeType": "aws",
+  "version": "1.0.0"
+}

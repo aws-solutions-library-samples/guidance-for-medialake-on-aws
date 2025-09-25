@@ -164,6 +164,45 @@ class SearchConstruct(Construct):
             )
         )
 
+        # Add SSM GetParameter permissions
+        search_get_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["ssm:GetParameter"],
+                resources=["*"],
+            )
+        )
+
+        # Add Bedrock InvokeModel permissions for TwelveLabs embedding generation
+        # Using system-defined cross-Region inference profile
+        search_get_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "bedrock:InvokeModel",
+                ],
+                resources=[
+                    # Foundation model ARN - required for InvokeModel calls
+                    "arn:aws:bedrock:*::foundation-model/twelvelabs.marengo-embed-2-7-v1:0",
+                    # System-defined cross-Region inference profile for TwelveLabs Marengo
+                    # Dynamically determine the correct regional inference profile based on deployment region
+                    f"arn:aws:bedrock:*:{Stack.of(self).account}:inference-profile/{self._get_regional_inference_profile_id()}",
+                ],
+            )
+        )
+
+        # Add permissions to list and get inference profiles (for debugging/monitoring)
+        search_get_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "bedrock:ListInferenceProfiles",
+                    "bedrock:GetInferenceProfile",
+                ],
+                resources=["*"],
+            )
+        )
+
         search_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(search_get_lambda.function),
@@ -229,3 +268,32 @@ class SearchConstruct(Construct):
 
         add_cors_options_method(search_resource)
         add_cors_options_method(fields_resource)
+
+    def _get_regional_inference_profile_id(self) -> str:
+        """
+        Get the appropriate TwelveLabs Marengo Embed v2.7 inference profile ID based on deployment region.
+
+        Returns:
+            Regional inference profile ID for TwelveLabs Marengo Embed v2.7
+        """
+        # Get the deployment region from the stack
+        deployment_region = Stack.of(self).region
+
+        # Common suffix for all TwelveLabs Marengo Embed v2.7 inference profiles
+        model_suffix = ".twelvelabs.marengo-embed-2-7-v1:0"
+
+        # Map regions to regional prefixes based on AWS documentation
+        if deployment_region.startswith("us-"):
+            # US regions: us-east-1, us-east-2, us-west-1, us-west-2
+            regional_prefix = "us"
+        elif deployment_region.startswith("eu-"):
+            # EU regions: eu-central-1, eu-central-2, eu-north-1, eu-south-1, eu-south-2, eu-west-1, eu-west-2, eu-west-3
+            regional_prefix = "eu"
+        elif deployment_region.startswith("ap-"):
+            # APAC regions: ap-northeast-1, ap-northeast-2, ap-northeast-3, ap-south-1, ap-south-2, ap-southeast-1, ap-southeast-2, ap-southeast-3, ap-southeast-4
+            regional_prefix = "apac"
+        else:
+            # Default to US profile for unknown regions
+            regional_prefix = "us"
+
+        return f"{regional_prefix}{model_suffix}"

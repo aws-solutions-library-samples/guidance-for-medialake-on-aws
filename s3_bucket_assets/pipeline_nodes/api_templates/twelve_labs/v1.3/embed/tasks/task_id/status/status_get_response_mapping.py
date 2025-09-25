@@ -12,11 +12,16 @@ def translate_event_to_request(response_body_and_event):
         "ready": "Completed",
         "indexing": "inProgress",
         "pending": "Started",
-        "failed": "Started",  # Even if failed, we use "Started" as per requirements
+        "failed": "Failed",  # Failed tasks should have Failed status
     }
 
     # Determine job result based on status
-    job_result = "Success" if task_status == "ready" else "inProgress"
+    if task_status == "ready":
+        job_result = "Success"
+    elif task_status == "failed":
+        job_result = "Failed"
+    else:
+        job_result = "inProgress"
 
     return {
         "task_id": task_id,

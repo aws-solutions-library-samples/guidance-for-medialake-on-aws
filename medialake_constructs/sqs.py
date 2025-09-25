@@ -87,9 +87,9 @@ class SQSConstruct(Construct):
         # Create the main queue
         queue_props = {
             "queue_name": queue_name,
-            "fifo": self.props.fifo,
-            "content_based_deduplication": self.props.content_based_deduplication
-            and self.props.fifo,
+            # "fifo": self.props.fifo,
+            # "content_based_deduplication": self.props.content_based_deduplication
+            # and self.props.fifo,
             "visibility_timeout": self.props.visibility_timeout,
             "delivery_delay": self.props.delivery_delay,
             "receive_message_wait_time": self.props.receive_message_wait_time,
@@ -97,6 +97,14 @@ class SQSConstruct(Construct):
             "enforce_ssl": self.props.enforce_ssl,
             "removal_policy": self.props.removal_policy,
         }
+
+        # only include FIFO‑flags if this is actually a FIFO queue
+        if self.props.fifo:
+            queue_props["fifo"] = True
+
+            # only then can you safely turn on content‑based deduplication
+            if self.props.content_based_deduplication:
+                queue_props["content_based_deduplication"] = True
 
         # Add encryption if enabled
         if self.props.encryption:

@@ -72,6 +72,41 @@ def sanitize_function_name(pipeline_name, node_label, version):
     return sanitized_name
 
 
+def get_lambda_config_with_defaults(lambda_config: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Extract Lambda configuration parameters from YAML with fallback defaults.
+
+    Args:
+        lambda_config: Lambda configuration from YAML
+
+    Returns:
+        Dictionary with Lambda configuration parameters including:
+        - memory_size: Memory allocation in MB (default: 1024)
+        - ephemeral_storage_size: Ephemeral storage size in MB (default: 10240)
+        - timeout: Function timeout in seconds (default: 300)
+    """
+    # Extract parameters with defaults matching current hardcoded values
+    memory_size = lambda_config.get("memory_size", 1024)
+    ephemeral_storage = lambda_config.get("ephemeral_storage", 10240)
+    timeout = lambda_config.get("timeout", 300)
+
+    # Validate parameters within AWS Lambda limits
+    memory_size = max(128, min(10240, int(memory_size)))
+    ephemeral_storage = max(512, min(10240, int(ephemeral_storage)))
+    timeout = max(1, min(900, int(timeout)))
+
+    logger.info(
+        f"Lambda configuration: memory_size={memory_size}MB, "
+        f"ephemeral_storage={ephemeral_storage}MB, timeout={timeout}s"
+    )
+
+    return {
+        "memory_size": memory_size,
+        "ephemeral_storage_size": ephemeral_storage,
+        "timeout": timeout,
+    }
+
+
 def read_yaml_from_s3(bucket: str, key: str) -> Dict[str, Any]:
     """
     Read and parse a YAML file from S3.
@@ -339,8 +374,73 @@ def determine_layers_for_node(
     return layers
 
 
+def _determine_connection_input_type(
+    pipeline: Any, target_node_id: str
+) -> Optional[str]:
+    """
+    Determine the input type for any node based on its incoming connections.
+
+    Args:
+        pipeline: Pipeline object containing edges and nodes
+        target_node_id: ID of the target node to analyze
+
+    Returns:
+        The connection input type ('video', 'image', 'text', 'audio', etc.) or None if not determinable
+    """
+    if (
+        not pipeline
+        or not hasattr(pipeline, "configuration")
+        or not hasattr(pipeline.configuration, "edges")
+    ):
+        return None
+
+    # Find incoming edges to this node
+    for edge in pipeline.configuration.edges:
+        edge_target = edge.target if hasattr(edge, "target") else edge.get("target")
+        if edge_target == target_node_id:
+            # Extract input type from target handle (e.g., "input-video" -> "video")
+            target_handle = (
+                edge.targetHandle
+                if hasattr(edge, "targetHandle")
+                else edge.get("targetHandle")
+            )
+            if target_handle and target_handle.startswith("input-"):
+                input_type = target_handle.replace("input-", "")
+                logger.info(
+                    f"Determined connection input type for {target_node_id}: {input_type}"
+                )
+                return input_type
+
+            # Extract input type from source handle if it's a specific type
+            source_handle = (
+                edge.sourceHandle
+                if hasattr(edge, "sourceHandle")
+                else edge.get("sourceHandle")
+            )
+            if source_handle and source_handle not in [
+                "Next",
+                "Processor",
+                "Completed",
+                "In Progress",
+                "Fail",
+            ]:
+                logger.info(
+                    f"Determined connection input type for {target_node_id} from source handle: {source_handle}"
+                )
+                return source_handle
+
+            # If we found an edge but couldn't determine type, break to avoid checking other edges
+            break
+
+    return None
+
+
 def create_lambda_function(
-    pipeline_name: str, node: Any, is_first: bool = False, is_last: bool = False
+    pipeline_name: str,
+    node: Any,
+    pipeline: Any = None,
+    is_first: bool = False,
+    is_last: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """
     Create or update a Lambda function for a node.
@@ -348,9 +448,9 @@ def create_lambda_function(
     Args:
         pipeline_name: Name of the pipeline
         node: Node object containing configuration
+        pipeline: Pipeline object containing edges and nodes for connection analysis
         is_first: Whether this is the first lambda in the pipeline
         is_last: Whether this is the last lambda in the pipeline
-        execution_uuid: UUID to use for consistent naming across resources
 
     Returns:
         Dictionary containing:
@@ -453,6 +553,10 @@ def create_lambda_function(
     zip_file_key = get_zip_file_key(IAC_ASSETS_BUCKET, zip_file_prefix)
 
     runtime = lambda_config["runtime"].lower()
+
+    # Extract configurable Lambda parameters with defaults
+    config_params = get_lambda_config_with_defaults(lambda_config)
+
     role_arn = create_lambda_role(
         pipeline_name, node.data.id, yaml_data, operation_id, function_name
     )
@@ -486,9 +590,11 @@ def create_lambda_function(
                 create_function_params = {
                     "FunctionName": function_name,
                     "Runtime": runtime,
-                    "MemorySize": 1024,
-                    "EphemeralStorage": {"Size": 10240},
-                    "Timeout": 300,
+                    "MemorySize": config_params["memory_size"],
+                    "EphemeralStorage": {
+                        "Size": config_params["ephemeral_storage_size"]
+                    },
+                    "Timeout": config_params["timeout"],
                     "Role": role_arn,
                     "Handler": "index.lambda_handler",
                     "Code": {"S3Bucket": IAC_ASSETS_BUCKET, "S3Key": zip_file_key},
@@ -505,6 +611,11 @@ def create_lambda_function(
                         f"Attaching layers to Lambda function {function_name}: {layers}"
                     )
 
+                # Determine connection input type for this node
+                connection_input_type = _determine_connection_input_type(
+                    pipeline, node.id
+                )
+
                 # Common environment variables for all Lambda functions
                 common_env_vars = {
                     "EXTERNAL_PAYLOAD_BUCKET": os.environ.get(
@@ -516,11 +627,19 @@ def create_lambda_function(
                     ),
                     "MEDIALAKE_ASSET_TABLE": MEDIALAKE_ASSET_TABLE,
                     "API_TEMPLATE_BUCKET": os.environ.get("NODE_TEMPLATES_BUCKET"),
+                    "OPENSEARCH_ENDPOINT": os.environ.get("OPENSEARCH_ENDPOINT"),
                     # Add required environment variables
                     "SERVICE": node.data.id,  # node Title
                     "STEP_NAME": node.data.label,  # friendly name of the node
                     "PIPELINE_NAME": pipeline_name,  # name of the pipeline
                 }
+
+                # Add connection input type if determined
+                if connection_input_type:
+                    common_env_vars["CONNECTION_INPUT_TYPE"] = connection_input_type
+                    logger.info(
+                        f"Added CONNECTION_INPUT_TYPE={connection_input_type} to Lambda {function_name}"
+                    )
 
                 # Add IS_FIRST and IS_LAST if applicable
                 if is_first:
@@ -535,14 +654,73 @@ def create_lambda_function(
                         f"Marking lambda {function_name} as last lambda in pipeline"
                     )
 
+                # Add node configuration parameters to common environment variables
+                if (
+                    hasattr(node.data, "configuration")
+                    and "parameters" in node.data.configuration
+                ):
+                    # Loop through all parameters and add them to common_env_vars
+                    for param_key, param_value in node.data.configuration[
+                        "parameters"
+                    ].items():
+                        # Skip numeric keys as they are just parameter definitions
+                        if param_key.isdigit():
+                            continue
+
+                        # Create sanitized environment variable name (replace spaces with underscores)
+                        env_var_name = param_key.replace(" ", "_").upper()
+
+                        # Get the parameter value or default if not available
+                        if param_value:
+                            env_var_value = str(param_value)
+
+                            # Check if the value is in the format ${VARIABLE_NAME}
+                            # Check for standard environment variables
+                            var_match = re.match(
+                                r"^\${([A-Za-z0-9_]+)}$", env_var_value
+                            )
+                            # Check for CloudFormation parameters (AWS::Region, AWS::AccountId)
+                            cf_match = re.match(
+                                r"^\${(AWS::Region|AWS::AccountId)}$", env_var_value
+                            )
+
+                            if cf_match:
+                                # Handle CloudFormation parameters
+                                cf_param = cf_match.group(1)
+                                if cf_param == "AWS::Region":
+                                    resolved_value = boto3.session.Session().region_name
+                                elif cf_param == "AWS::AccountId":
+                                    sts_client = boto3.client("sts")
+                                    resolved_value = sts_client.get_caller_identity()[
+                                        "Account"
+                                    ]
+                                common_env_vars[env_var_name] = resolved_value
+                                logger.info(
+                                    f"Added CloudFormation parameter {env_var_name}={resolved_value} to Lambda environment variables"
+                                )
+                            elif var_match:
+                                # Handle environment variable references
+                                env_var_ref = var_match.group(1)
+                                resolved_value = os.environ.get(env_var_ref, "")
+                                common_env_vars[env_var_name] = resolved_value
+                                logger.info(
+                                    f"Added environment variable reference {env_var_name}={resolved_value} to Lambda environment variables"
+                                )
+                            else:
+                                # Regular parameter value
+                                common_env_vars[env_var_name] = env_var_value
+                                logger.info(
+                                    f"Added parameter {env_var_name}={env_var_value} to Lambda environment variables"
+                                )
+
                 # Only include additional Environment variables if the node type is "integration"
                 if node.data.type.lower() == "integration":
                     env_vars = {
-                        **common_env_vars,  # Include common env vars
+                        **common_env_vars,  # Include common env vars (now with node parameters)
                         "WORKFLOW_STEP_NAME": function_name,
                         "IS_LAST_STEP": os.environ.get("IS_LAST_STEP", "false"),
-                        "REQUEST_TEMPLATES_PATH": request_templates_path,
-                        "RESPONSE_TEMPLATES_PATH": response_templates_path,
+                        "REQUEST_TEMPLATES_PATH": request_templates_path or "",
+                        "RESPONSE_TEMPLATES_PATH": response_templates_path or "",
                         "API_SERVICE_URL": api_service_url,
                         "API_SERVICE_RESOURCE": (
                             node.data.configuration.get("path", "")
@@ -580,29 +758,7 @@ def create_lambda_function(
                         "CUSTOM_HEADERS": os.environ.get("CUSTOM_HEADERS", "{}"),
                     }
                     create_function_params["Environment"] = {"Variables": env_vars}
-                if (
-                    node.data.type.lower() == "utility"
-                    and node.data.id == "embedding_store"
-                ):
 
-                    env_vars = {
-                        **common_env_vars,  # Include common env vars
-                        "OPENSEARCH_ENDPOINT": os.environ.get("OPENSEARCH_ENDPOINT"),
-                    }
-                    create_function_params["Environment"] = {"Variables": env_vars}
-
-                    subnet_ids = (
-                        OPENSEARCH_VPC_SUBNET_IDS.split(",")
-                        if OPENSEARCH_VPC_SUBNET_IDS
-                        else []
-                    )
-                    create_function_params["VpcConfig"] = {
-                        "SubnetIds": subnet_ids,
-                        "SecurityGroupIds": [OPENSEARCH_SECURITY_GROUP_ID],
-                    }
-                    logger.info(
-                        f"Added VPC configuration to embedding_store Lambda: Subnets={subnet_ids}, SecurityGroup={OPENSEARCH_SECURITY_GROUP_ID}"
-                    )
                 # For all other node types, just add the common environment variables
                 elif (
                     node.data.type.lower() != "integration"
@@ -627,182 +783,50 @@ def create_lambda_function(
                         f"Added environment variables to {node.data.type} Lambda function: {function_name}"
                     )
 
-                # Add any parameters from node.data.configuration as environment variables
-                if (
-                    hasattr(node.data, "configuration")
-                    and "parameters" in node.data.configuration
-                ):
-                    # Ensure we have an Environment.Variables dictionary
-                    if "Environment" not in create_function_params:
-                        create_function_params["Environment"] = {
-                            "Variables": common_env_vars
-                        }
-
-                    # Loop through all parameters
-                    for param_key, param_value in node.data.configuration[
-                        "parameters"
-                    ].items():
-                        # Skip numeric keys as they are just parameter definitions
-                        if param_key.isdigit():
-                            continue
-
-                        # Create sanitized environment variable name (replace spaces with underscores)
-                        env_var_name = param_key.replace(" ", "_").upper()
-
-                        # Get the parameter value or default if not available
-                        if param_value:
-                            env_var_value = str(param_value)
-
-                            # Check if the value is in the format ${VARIABLE_NAME}
-
-                            # Check for standard environment variables
-                            var_match = re.match(
-                                r"^\${([A-Za-z0-9_]+)}$", env_var_value
-                            )
-                            # Check for CloudFormation parameters (AWS::Region, AWS::AccountId)
-                            cf_match = re.match(
-                                r"^\${(AWS::Region|AWS::AccountId)}$", env_var_value
-                            )
-
-                            logger.info(
-                                f"Processing parameter {param_key}={param_value}, env_var_value={env_var_value}"
-                            )
-                            logger.info(f"var_match: {var_match}, cf_match: {cf_match}")
-
-                            if cf_match:
-                                # Handle CloudFormation parameters
-                                cf_param = cf_match.group(1)
-                                if cf_param == "AWS::Region":
-                                    # Get the current AWS region
-                                    region = boto3.session.Session().region_name
-                                    env_var_value = str(region)
-                                    logger.info(
-                                        f"Replaced CloudFormation parameter {param_value} with region: {env_var_value}"
-                                    )
-                                elif cf_param == "AWS::AccountId":
-                                    # Get the current AWS account ID
-                                    sts_client = boto3.client("sts")
-                                    account_id = sts_client.get_caller_identity()[
-                                        "Account"
-                                    ]
-                                    env_var_value = str(account_id)
-                                    logger.info(
-                                        f"Replaced CloudFormation parameter {param_value} with account ID: {env_var_value}"
-                                    )
-                            elif var_match:
-                                # Extract the variable name
-                                config_var_name = var_match.group(1)
-                                logger.info(
-                                    f"Attempting to resolve variable: {config_var_name}"
-                                )
-                                # Try to get the value from the config module
-                                import config
-
-                                if hasattr(config, config_var_name):
-                                    config_value = getattr(config, config_var_name)
-                                    logger.info(
-                                        f"Found config variable {config_var_name} with value: {config_value}"
-                                    )
-                                    if config_value is not None:
-                                        env_var_value = str(config_value)
-                                        logger.info(
-                                            f"Replaced variable reference {param_value} with value from config: {env_var_value}"
-                                        )
-                                    else:
-                                        logger.warning(
-                                            f"Config variable {config_var_name} exists but is None, using original value"
-                                        )
-                                else:
-                                    logger.warning(
-                                        f"Config variable {config_var_name} not found in config module, using original value"
-                                    )
-                        else:
-                            # Find the parameter definition to get the default value
-                            for def_key, def_value in node.data.configuration[
-                                "parameters"
-                            ].items():
-                                if (
-                                    def_key.isdigit()
-                                    and def_value.get("name") == param_key
-                                ):
-                                    env_var_value = str(def_value.get("default", ""))
-                                    break
-                            else:
-                                env_var_value = ""
-
-                            # Apply variable resolution to default values as well
-                            if env_var_value:
-                                # Check for standard environment variables
-                                var_match = re.match(
-                                    r"^\${([A-Za-z0-9_]+)}$", env_var_value
-                                )
-                                # Check for CloudFormation parameters (AWS::Region, AWS::AccountId)
-                                cf_match = re.match(
-                                    r"^\${(AWS::Region|AWS::AccountId)}$", env_var_value
-                                )
-
-                                logger.info(
-                                    f"Processing default parameter {param_key}={env_var_value}"
-                                )
-                                logger.info(
-                                    f"var_match: {var_match}, cf_match: {cf_match}"
-                                )
-
-                                if cf_match:
-                                    # Handle CloudFormation parameters
-                                    cf_param = cf_match.group(1)
-                                    if cf_param == "AWS::Region":
-                                        # Get the current AWS region
-                                        region = boto3.session.Session().region_name
-                                        env_var_value = str(region)
-                                        logger.info(
-                                            f"Replaced CloudFormation parameter {env_var_value} with region: {env_var_value}"
-                                        )
-                                    elif cf_param == "AWS::AccountId":
-                                        # Get the current AWS account ID
-                                        sts_client = boto3.client("sts")
-                                        account_id = sts_client.get_caller_identity()[
-                                            "Account"
-                                        ]
-                                        env_var_value = str(account_id)
-                                        logger.info(
-                                            f"Replaced CloudFormation parameter {env_var_value} with account ID: {env_var_value}"
-                                        )
-                                elif var_match:
-                                    # Extract the variable name
-                                    config_var_name = var_match.group(1)
-                                    logger.info(
-                                        f"Attempting to resolve default variable: {config_var_name}"
-                                    )
-                                    # Try to get the value from the config module
-                                    import config
-
-                                    if hasattr(config, config_var_name):
-                                        config_value = getattr(config, config_var_name)
-                                        logger.info(
-                                            f"Found config variable {config_var_name} with value: {config_value}"
-                                        )
-                                        if config_value is not None:
-                                            env_var_value = str(config_value)
-                                            logger.info(
-                                                f"Replaced default variable reference {env_var_value} with value from config: {env_var_value}"
-                                            )
-                                        else:
-                                            logger.warning(
-                                                f"Config variable {config_var_name} exists but is None, using original value"
-                                            )
-                                    else:
-                                        logger.warning(
-                                            f"Config variable {config_var_name} not found in config module, using original value"
-                                        )
-
-                        # Add the environment variable
-                        create_function_params["Environment"]["Variables"][
-                            env_var_name
-                        ] = env_var_value
-                        logger.info(
-                            f"Added parameter as environment variable: {env_var_name}={env_var_value}"
+                # Check if VPC configuration is needed based on YAML config
+                vpc_config = None
+                try:
+                    # Check for VPC configuration in the YAML
+                    lambda_config = (
+                        yaml_data.get("node", {})
+                        .get("integration", {})
+                        .get("config", {})
+                        .get("lambda", {})
+                    )
+                    if not lambda_config:
+                        # Also check utility nodes
+                        lambda_config = (
+                            yaml_data.get("node", {})
+                            .get("utility", {})
+                            .get("config", {})
+                            .get("lambda", {})
                         )
+
+                    if lambda_config and lambda_config.get("vpc", False):
+                        subnet_ids = (
+                            OPENSEARCH_VPC_SUBNET_IDS.split(",")
+                            if OPENSEARCH_VPC_SUBNET_IDS
+                            else []
+                        )
+                        if subnet_ids and OPENSEARCH_SECURITY_GROUP_ID:
+                            vpc_config = {
+                                "SubnetIds": subnet_ids,
+                                "SecurityGroupIds": [OPENSEARCH_SECURITY_GROUP_ID],
+                            }
+                            logger.info(
+                                f"Added VPC configuration to Lambda {function_name}: Subnets={subnet_ids}, SecurityGroup={OPENSEARCH_SECURITY_GROUP_ID}"
+                            )
+                        else:
+                            logger.warning(
+                                f"VPC configuration requested for {function_name} but VPC subnet IDs or security group not available"
+                            )
+                except Exception as e:
+                    logger.warning(
+                        f"Error checking VPC configuration for {function_name}: {e}"
+                    )
+
+                if vpc_config:
+                    create_function_params["VpcConfig"] = vpc_config
 
                 # Create the Lambda function with the appropriate parameters
                 response = lambda_client.create_function(**create_function_params)

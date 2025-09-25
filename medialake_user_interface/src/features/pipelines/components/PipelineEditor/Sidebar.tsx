@@ -11,10 +11,17 @@ import {
   Divider,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import {
+  FaFileVideo,
+  FaBolt,
+  FaCodeBranch,
+  FaTools,
+  FaPlug,
+  FaCogs,
+} from "react-icons/fa";
 import { useGetUnconfiguredNodeMethods } from "@/shared/nodes/api/nodesController";
 import { Node as NodeType } from "@/shared/nodes/types/nodes.types";
 import { RightSidebar } from "@/components/common/RightSidebar/RightSidebar";
-// import { createJobStatusNodeData } from './jobStatusNodeUtils';
 
 interface NodeSection {
   title: string;
@@ -27,13 +34,43 @@ const SidebarContent: React.FC = () => {
   const [expandedSections, setExpandedSections] = useState<string[]>([
     "TRIGGER",
   ]);
+  const [manuallyExpandedSections, setManuallyExpandedSections] = useState<
+    string[]
+  >(["TRIGGER"]);
   const {
     data: nodesResponse,
     isLoading,
     error,
   } = useGetUnconfiguredNodeMethods();
 
+  // Function to get the appropriate icon based on node type
+  const getNodeIcon = (nodeType: string | undefined) => {
+    if (!nodeType) return <FaFileVideo size={20} />;
+
+    const type = nodeType?.toUpperCase() || "";
+
+    if (type.includes("TRIGGER")) {
+      return <FaBolt size={20} />;
+    } else if (type.includes("FLOW")) {
+      return <FaCodeBranch size={20} />;
+    } else if (type.includes("UTILITY")) {
+      return <FaTools size={20} />;
+    } else if (type.includes("INTEGRATION")) {
+      return <FaPlug size={20} />;
+    }
+
+    // Default icon for other types
+    return <FaCogs size={20} />;
+  };
+
   const handleSectionToggle = (sectionId: string) => {
+    setManuallyExpandedSections((prev) => {
+      if (prev.includes(sectionId)) {
+        return prev.filter((type) => type !== sectionId);
+      }
+      return [...prev, sectionId];
+    });
+
     setExpandedSections((prev) => {
       if (prev.includes(sectionId)) {
         return prev.filter((type) => type !== sectionId);
@@ -354,16 +391,6 @@ const SidebarContent: React.FC = () => {
     event.dataTransfer.effectAllowed = "move";
   };
 
-  // Handler for dragging the custom job status node
-  // const onDragStartJobStatus = (event: React.DragEvent) => {
-  //     const nodeData = createJobStatusNodeData();
-  //     event.dataTransfer.setData('application/reactflow', JSON.stringify({
-  //         ...nodeData,
-  //         customNodeType: 'jobStatusNode' // This helps identify it as a special node type
-  //     }));
-  //     event.dataTransfer.effectAllowed = 'move';
-  // };
-
   const sections = useMemo(() => {
     if (!nodesResponse?.data) return [];
 
@@ -457,6 +484,22 @@ const SidebarContent: React.FC = () => {
       }),
     }));
   }, [sections, searchQuery]);
+
+  // Auto-expand sections with search matches
+  React.useEffect(() => {
+    if (searchQuery.trim()) {
+      // Find sections that have matching nodes
+      const sectionsWithMatches = filteredSections
+        .filter((section) => section.nodes.length > 0)
+        .map((section) => section.types[0]);
+
+      // Expand sections with matches
+      setExpandedSections(sectionsWithMatches);
+    } else {
+      // When search is cleared, revert to manually expanded sections
+      setExpandedSections(manuallyExpandedSections);
+    }
+  }, [filteredSections, searchQuery, manuallyExpandedSections]);
 
   if (isLoading) {
     return (
@@ -607,6 +650,15 @@ const SidebarContent: React.FC = () => {
                     }}
                   >
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {getNodeIcon(node.info.nodeType)}
+                      </Box>
                       <Typography variant="subtitle1">
                         {node.info.title}
                       </Typography>

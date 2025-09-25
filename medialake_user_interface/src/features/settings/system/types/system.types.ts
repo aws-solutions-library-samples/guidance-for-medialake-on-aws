@@ -37,6 +37,7 @@ export interface EmbeddingStore {
 
 export interface SearchProviderUpdate {
   name?: string;
+  type?: string;
   apiKey?: string;
   endpoint?: string;
   isEnabled?: boolean;
@@ -51,7 +52,7 @@ export interface SearchProviderUpdate {
 export interface SemanticSearchSettings {
   isEnabled: boolean;
   provider: {
-    type: "twelvelabs-api" | "twelvelabs-bedrock";
+    type: "none" | "twelvelabs-api" | "twelvelabs-bedrock";
     config: SearchProvider | null;
   };
   embeddingStore: {

@@ -425,7 +425,7 @@ export const useRenameAsset = (onError?: (message: string) => void) => {
 export const useRelatedVersions = (
   assetId: string,
   page: number = 1,
-  pageSize: number = 50,
+  pageSize: number = 20,
 ) => {
   console.log(
     "useRelatedVersions - Called with assetId:",
@@ -444,7 +444,7 @@ export const useRelatedVersions = (
           params: {
             page,
             pageSize,
-            min_score: 0.01,
+            min_score: 0.6,
           },
         },
       );

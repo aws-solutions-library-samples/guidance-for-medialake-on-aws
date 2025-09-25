@@ -1,0 +1,72 @@
+spec: v1.0.0
+node:
+  id: twelvelabs_bedrock_invoke
+  title: TwelveLabs Bedrock Invoke
+  description: Submit async embedding job to TwelveLabs Marengo 2.7 on Bedrock
+  version: 1.0.0
+  type: integration
+  integration:
+    config:
+      lambda:
+        handler: integration/TwelveLabsBedrockInvokeLambdaDeployment
+        runtime: python3.12
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              resources:
+                - "*"
+            - effect: Allow
+              actions:
+                - bedrock:InvokeModel
+                - bedrock:StartAsyncInvoke
+                - bedrock:GetAsyncInvoke
+              resources:
+                - "*"
+            - effect: Allow
+              actions:
+                - s3:GetObject
+                - s3:PutObject
+                - s3:ListBucket
+              resources:
+                - "*"
+            - effect: Allow
+              actions:
+                - kms:Decrypt
+                - kms:Encrypt
+                - kms:GenerateDataKey
+              resources:
+                - "*"
+            - effect: Allow
+              actions:
+                - sts:GetCallerIdentity
+              resources:
+                - "*"
+actions:
+  invoke:
+    summary: Submit Embedding Job
+    description: Start async embedding generation using TwelveLabs Marengo 2.7 on Bedrock
+    operationId: submitEmbeddingJob
+    parameters:
+      - in: body
+        name: Model ID
+        required: false
+        default: "twelvelabs.marengo-embed-2-7-v1:0"
+        schema:
+          type: string
+      - in: body
+        name: S3 Output Bucket
+        required: false
+        default: "${EXTERNAL_PAYLOAD_BUCKET}"
+        schema:
+          type: string
+    x-requestMapping: integration/twelvelabs_bedrock_invoke/invoke/
+    x-responseMapping: integration/twelvelabs_bedrock_invoke/invoke/
+    connections:
+      incoming:
+        type: [video, audio, image]
+      outgoing:
+        type: [invocation_arn]

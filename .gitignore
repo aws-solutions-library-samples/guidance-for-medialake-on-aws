@@ -137,8 +137,6 @@ dev-3.sh
 aiPrompt.json
 
 
-s3_bucket_assets/pipeline_nodes/node_templates/utility/debug_input.yaml
-
 # Playwright
 /playwright-report/
 /blob-report/

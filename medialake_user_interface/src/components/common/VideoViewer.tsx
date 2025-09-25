@@ -92,6 +92,7 @@ const useOmakasePlayer = (
 ) => {
   const playerRef = useRef<OmakasePlayer | null>(null);
   const [playerVolume, setPlayerVolume] = useState(1);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const callbacksRef = useRef(callbacks);
   useEffect(() => {
@@ -103,6 +104,9 @@ const useOmakasePlayer = (
 
   const initializePlayer = useCallback(() => {
     if (!containerRef.current) return;
+
+    // Reset marker lane state when initializing a new player
+    markerLaneRef.current = null;
 
     const player = new OmakasePlayer({
       playerHTMLElementId: containerRef.current.id,
@@ -195,7 +199,14 @@ const useOmakasePlayer = (
 
     player.video.onVideoLoaded$.pipe(filter((video) => !!video)).subscribe({
       next: () => {
-        createTimelineLanes();
+        try {
+          createTimelineLanes();
+        } catch (error) {
+          console.error("Error creating timeline lanes:", error);
+        }
+      },
+      error: (error) => {
+        console.error("Error in video loaded subscription:", error);
       },
     });
 
@@ -203,22 +214,59 @@ const useOmakasePlayer = (
       markerLane1();
     };
 
-    const markerLane1 = () => {
-      const markerLane = new MarkerLane({
-        style: { ...TIMELINE_STYLE_DARK, height: 25 },
-      });
-      const lane = player.timeline!.addTimelineLane(markerLane);
-      markerLaneRef.current = lane;
-      const periodMarker = new PeriodMarker({
-        timeObservation: { start: 200, end: 300 },
-        editable: true,
-        style: { ...PERIOD_MARKER_STYLE },
-      });
+    const markerLane1 = (retryCount = 0) => {
+      const maxRetries = 3;
+      const retryDelay = 1000; // 1 second
+
+      try {
+        if (!player.timeline) {
+          console.warn("Timeline not available for marker lane creation");
+          if (retryCount < maxRetries) {
+            console.log(
+              `Retrying marker lane creation in ${retryDelay}ms (attempt ${retryCount + 1}/${maxRetries})`,
+            );
+            retryTimeoutRef.current = setTimeout(() => {
+              markerLane1(retryCount + 1);
+            }, retryDelay);
+            return;
+          } else {
+            console.error("Failed to create marker lane after maximum retries");
+            return;
+          }
+        }
+
+        const markerLane = new MarkerLane({
+          style: { ...TIMELINE_STYLE_DARK, height: 25 },
+        });
+        const lane = player.timeline.addTimelineLane(markerLane);
+        markerLaneRef.current = lane;
+
+        console.log("Marker lane created successfully");
+      } catch (error) {
+        console.error("Error creating marker lane:", error);
+        markerLaneRef.current = null;
+
+        if (retryCount < maxRetries) {
+          console.log(
+            `Retrying marker lane creation in ${retryDelay}ms (attempt ${retryCount + 1}/${maxRetries})`,
+          );
+          retryTimeoutRef.current = setTimeout(() => {
+            markerLane1(retryCount + 1);
+          }, retryDelay);
+        } else {
+          console.error("Failed to create marker lane after maximum retries");
+        }
+      }
     };
 
     return () => {
       subscriptions.forEach((subscription) => subscription.unsubscribe());
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
       playerRef.current = null;
+      // Cleanup handled by individual subscriptions and refs
     };
   }, [videoSrc, containerRef, markerLaneRef]);
 
@@ -502,7 +550,14 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
       ref,
       () => ({
         hello: () => {
-          if (markerLaneRef.current) {
+          if (!markerLaneRef.current) {
+            console.warn(
+              "Marker lane is not available yet. Video may still be loading.",
+            );
+            return null;
+          }
+
+          try {
             const periodMarker = new PeriodMarker({
               timeObservation: { start: currentTime, end: currentTime + 5 },
               editable: true,
@@ -512,13 +567,24 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
               },
             });
             markerLaneRef.current.addMarker(periodMarker);
-            customCallbacks.onMarkerAdd(currentTime);
+            customCallbacks.onMarkerAdd?.(currentTime);
 
             console.log("playeref", playerRef);
             return periodMarker;
+          } catch (error) {
+            console.error("Error adding marker:", error);
+            return null;
           }
         },
-        getMarkerLane: () => markerLaneRef.current,
+        getMarkerLane: () => {
+          if (markerLaneRef.current) {
+            return markerLaneRef.current;
+          }
+          console.warn(
+            "Marker lane is not available yet. Video may still be loading.",
+          );
+          return null;
+        },
         getCurrentTime: () => currentTime,
         formatToTimecode: (time: number) => {
           const hours = Math.floor(time / 3600);

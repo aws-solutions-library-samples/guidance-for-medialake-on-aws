@@ -1,0 +1,53 @@
+MediaLake Solution Guidance
+
+Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License").
+You may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+**********************
+THIRD PARTY COMPONENTS
+**********************
+This software includes third party software subject to the following copyrights:
+
+AWS SDK under the Apache License Version 2.0
+Amazon Cognito Identity SDK for JavaScript under the Apache License Version 2.0
+MediaInfo under the BSD-2-Clause License
+ReactFlow under the Massachusetts Institute of Technology (MIT) license
+Tanstack Query under the Massachusetts Institute of Technology (MIT) license
+<<<<<<< HEAD
+Omakase Player under the Apache License Version 2.0
+=======
+Uppy under the Massachusetts Institute of Technology (MIT) license
+@byomakase/omakase-player under the Massachusetts Institute of Technology (MIT) license
+@mui components under the Massachusetts Institute of Technology (MIT) license
+@emotion/react and @emotion/styled under the Massachusetts Institute of Technology (MIT) license
+React under the Massachusetts Institute of Technology (MIT) license
+React Router under the Massachusetts Institute of Technology (MIT) license
+Axios under the Massachusetts Institute of Technology (MIT) license
+date-fns under the Massachusetts Institute of Technology (MIT) license
+i18next under the Massachusetts Institute of Technology (MIT) license
+zod under the Massachusetts Institute of Technology (MIT) license
+yup under the Massachusetts Institute of Technology (MIT) license
+notistack under the Massachusetts Institute of Technology (MIT) license
+lucide-react under the Massachusetts Institute of Technology (MIT) license
+rxjs under the Apache License Version 2.0
+boto3 under the Apache License Version 2.0
+pydantic under the Massachusetts Institute of Technology (MIT) license
+Jinja2 under the BSD-3-Clause License
+aws-lambda-powertools under the Massachusetts Institute of Technology (MIT) license
+pytest under the Massachusetts Institute of Technology (MIT) license
+opensearch-py under the Apache License Version 2.0
+requests_aws4auth under the Massachusetts Institute of Technology (MIT) license
+pynamodb under the Massachusetts Institute of Technology (MIT) license
+pyaml under the Massachusetts Institute of Technology (MIT) license
+>>>>>>> fdf331aac393632ee74f65e04736b719d966405f

@@ -38,12 +38,6 @@ paths:
       summary: Generate video embeddings
       description: Generate embeddings for videos
       operationId: generateVideoEmbeddings
-      parameters:
-        - in: query
-          name: nodeId
-          required: true
-          schema:
-            type: string
       x-requestMapping: api_templates/twelvelabs/v1.3/embed/tasks
       x-responseMapping: api_templates/twelvelabs/v1.3/embed/tasks
   /embed:
@@ -51,35 +45,17 @@ paths:
       summary: Generate image or audio embeddings
       description: Generate embeddings for image or audio
       operationId: generateImageOrAudioEmbeddings
-      parameters:
-        - in: query
-          name: nodeId
-          required: true
-          schema:
-            type: string
       x-requestMapping: api_templates/twelvelabs/v1.3/embed/tasks
       x-responseMapping: api_templates/twelvelabs/v1.3/embed/tasks
   /embed/tasks/{task_id}/status:
     get:
       summary: Get the status of a video embedding task
       operationId: getEmbeddingTaskStatus
-      parameters:
-        - name: task_id
-          in: path
-          required: true
-          schema:
-            type: string
       x-requestMapping: api_templates/twelvelabs/v1.3/embed/tasks/status
       x-responseMapping: api_templates/twelvelabs/v1.3/embed/tasks/status
   /embed/tasks/{task_id}:
     get:
       summary: Get the results of a video embedding task
       operationId: getEmbeddingTaskResults
-      parameters:
-        - name: task_id
-          in: path
-          required: true
-          schema:
-            type: string
       x-requestMapping: api_templates/twelvelabs/v1.3/embed/tasks/task_id
       x-responseMapping: api_templates/twelvelabs/v1.3/embed/tasks/task_id

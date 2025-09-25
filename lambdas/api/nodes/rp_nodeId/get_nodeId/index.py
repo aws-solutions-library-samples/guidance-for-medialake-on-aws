@@ -113,6 +113,31 @@ def get_unconfigured_nodes():
                 "connections": {"incoming": {}, "outgoing": {}},
             }
 
+            # Get auth data for this node
+            auth_params = {"Key": {"pk": f"NODE#{node_id}", "sk": "AUTH"}}
+            logger.info(f"Getting auth data with params: {auth_params}")
+
+            try:
+                node_auth = table.get_item(**auth_params).get("Item")
+                logger.info(
+                    f"Auth data response: {json.dumps(node_auth, cls=DecimalEncoder, default=str) if node_auth else 'None'}"
+                )
+
+                # Add auth if available
+                if node_auth:
+                    # Include all auth data, removing only pk and sk
+                    auth_data = {
+                        k: v for k, v in node_auth.items() if k not in ["pk", "sk"]
+                    }
+                    node_data["auth"] = auth_data
+                    logger.info(f"Added auth data for node {node_id}: {auth_data}")
+                else:
+                    node_data["auth"] = {}
+                    logger.info(f"No auth data found for node {node_id}")
+            except Exception as e:
+                logger.error(f"Error getting auth data for node {node_id}: {str(e)}")
+                node_data["auth"] = {}
+
             # Get connection data for this node
             connection_params = {
                 "KeyConditionExpression": "pk = :pk AND begins_with(sk, :connection)",
@@ -337,10 +362,13 @@ def get_node_by_id(node_id: str):
 
     # Add auth if available
     if node_auth:
-        node_data["auth"] = {
-            "authMethod": node_auth.get("authMethod"),
-            "authConfig": node_auth.get("authConfig", {}),
-        }
+        # Include all auth data, removing only pk and sk
+        auth_data = {k: v for k, v in node_auth.items() if k not in ["pk", "sk"]}
+        node_data["auth"] = auth_data
+        logger.info(f"Added auth data for node {node_id}: {auth_data}")
+    else:
+        node_data["auth"] = {}
+        logger.info(f"No auth data found for node {node_id}")
 
     # Add methods
     node_data["methods"] = [

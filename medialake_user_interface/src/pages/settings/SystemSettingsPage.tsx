@@ -201,12 +201,13 @@ const SystemSettingsPage: React.FC = () => {
     try {
       const success = await handleSaveApiKey();
       if (success) {
-        handleToggleChange(true); // Enable the provider after successful save
         handleCloseApiKeyDialog();
+        // Enable the toggle after successful API key save
+        handleToggleChange(true);
         showNotification(
           t(
             "settings.systemSettings.search.apiKeySaveSuccess",
-            "API key saved",
+            "API key saved and enabled",
           ),
           "success",
         );
@@ -371,7 +372,7 @@ const SystemSettingsPage: React.FC = () => {
                           onChange={(_evt, checked) =>
                             handleToggleChange(checked)
                           }
-                          disabled={!settings.provider.config?.isConfigured}
+                          disabled={false}
                           color="success"
                           size="medium"
                         />
@@ -407,10 +408,7 @@ const SystemSettingsPage: React.FC = () => {
                       )}
                     </Typography>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                      <FormControl
-                        sx={{ minWidth: 200 }}
-                        disabled={!settings.isEnabled}
-                      >
+                      <FormControl sx={{ minWidth: 200 }} disabled={false}>
                         <InputLabel>
                           {t(
                             "settings.systemSettings.search.selectProvider",
@@ -447,7 +445,7 @@ const SystemSettingsPage: React.FC = () => {
                             variant="outlined"
                             startIcon={<EditIcon />}
                             onClick={() => handleOpenApiKeyDialog(true)}
-                            disabled={!settings.isEnabled}
+                            disabled={false}
                           >
                             {t(
                               "settings.systemSettings.search.editApiKey",

@@ -49,12 +49,6 @@ actions:
     description: Create an image proxy from an image file stored in S3
     operationId: createImageProxy
     parameters:
-      - in: body
-        name: output_bucket
-        required: true
-        schema:
-          type: string
-          description: S3 bucket name for output
     x-requestMapping: processor/image_proxy/extract/
     x-responseMapping: processor/image_proxy/extract/
     connections:

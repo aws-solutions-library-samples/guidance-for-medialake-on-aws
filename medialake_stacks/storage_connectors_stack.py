@@ -27,6 +27,8 @@ class StorageConnectorsStack(cdk.NestedStack):
                 visibility_timeout=Duration.seconds(60),
                 retention_period=Duration.days(14),
                 encryption=True,
+                fifo=True,
+                content_based_deduplication=True,
                 enforce_ssl=True,
                 # No DLQ for this queue as it's already a DLQ
                 max_receive_count=0,

@@ -373,7 +373,7 @@ class UIConstruct(Construct):
                     response_headers_policy=ui_response_headers_policy,
                     compress=True,
                 ),
-                f"/{props.api_gateway_stage}/*": cloudfront.BehaviorOptions(
+                f"/{config.api_path}/*": cloudfront.BehaviorOptions(
                     origin=origins.HttpOrigin(
                         f"{props.api_gateway_rest_id}.execute-api.{scope.region}.amazonaws.com",
                         origin_ssl_protocols=[cloudfront.OriginSslPolicy.TLS_V1_2],

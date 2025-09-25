@@ -143,7 +143,47 @@ def lambda_handler(event: Dict[str, Any], _: LambdaContext):
 
     # ── get_job with retry ──
     response = get_job_with_retry(job_id)
-    logger.info(response)
+
+    # ── DEBUG: Log the complete MediaConvert response structure ──
+    logger.info("=== MEDIACONVERT RESPONSE DEBUG ===")
+    logger.info(f"Job Status: {response.get('Job', {}).get('Status')}")
+    logger.info(f"Job ID: {response.get('Job', {}).get('Id')}")
+
+    # Log OutputGroupDetails structure
+    output_group_details = response.get("Job", {}).get("OutputGroupDetails", [])
+    logger.info(f"OutputGroupDetails count: {len(output_group_details)}")
+
+    for i, group_detail in enumerate(output_group_details):
+        logger.info(f"OutputGroup {i}:")
+        logger.info(f"  Type: {group_detail.get('Type')}")
+
+        output_details = group_detail.get("OutputDetails", [])
+        logger.info(f"  OutputDetails count: {len(output_details)}")
+
+        for j, output_detail in enumerate(output_details):
+            logger.info(f"    Output {j}:")
+            logger.info(
+                f"      OutputFilePaths: {output_detail.get('OutputFilePaths', [])}"
+            )
+            logger.info(f"      DurationInMs: {output_detail.get('DurationInMs')}")
+
+            # Log all keys in the output detail to see what's available
+            logger.info(f"      Available keys: {list(output_detail.keys())}")
+
+            # Check for video details
+            if "VideoDetails" in output_detail:
+                video_details = output_detail["VideoDetails"]
+                logger.info(f"      VideoDetails: {video_details}")
+
+            # Check for audio details
+            if "AudioDetails" in output_detail:
+                audio_details = output_detail["AudioDetails"]
+                logger.info(f"      AudioDetails: {audio_details}")
+
+    # Also log the complete response as JSON for full visibility
+    logger.info("=== COMPLETE MEDIACONVERT RESPONSE ===")
+    logger.info(json.dumps(response, indent=2, default=str))
+    logger.info("=== END MEDIACONVERT RESPONSE DEBUG ===")
 
     # ── translate response ──
     result = create_response_output(s3_tmpls, api_template_bucket, response, event)
@@ -163,6 +203,28 @@ def lambda_handler(event: Dict[str, Any], _: LambdaContext):
             name_mod = proxy_output.get("NameModifier", "")
             proxy_path = f"{base_path}{name_mod}.mp4"
             thumb_path = f"{base_path}_thumbnail.0000000.jpg"
+
+            # MediaConvert OutputDetails don't include file sizes, so get them from S3
+            logger.info(
+                f"Getting actual file sizes from S3 for proxy: {proxy_path} and thumbnail: {thumb_path}"
+            )
+
+            try:
+                proxy_head = s3_client.head_object(Bucket=out_bucket, Key=proxy_path)
+                proxy_size = proxy_head["ContentLength"]
+                logger.info(f"Proxy file size: {proxy_size} bytes")
+            except ClientError as e:
+                logger.error(f"Failed to get proxy file size for {proxy_path}: {e}")
+                raise
+
+            try:
+                thumb_head = s3_client.head_object(Bucket=out_bucket, Key=thumb_path)
+                thumb_size = thumb_head["ContentLength"]
+                logger.info(f"Thumbnail file size: {thumb_size} bytes")
+            except ClientError as e:
+                logger.error(f"Failed to get thumbnail file size for {thumb_path}: {e}")
+                raise
+
             reps.extend(
                 [
                     {
@@ -174,7 +236,7 @@ def lambda_handler(event: Dict[str, Any], _: LambdaContext):
                             "PrimaryLocation": {
                                 "Bucket": out_bucket,
                                 "ObjectKey": {"FullPath": proxy_path},
-                                "FileInfo": {"Size": 5_000_000},
+                                "FileInfo": {"Size": proxy_size},
                                 "Provider": "aws",
                                 "Status": "active",
                                 "StorageType": "s3",
@@ -191,7 +253,7 @@ def lambda_handler(event: Dict[str, Any], _: LambdaContext):
                             "PrimaryLocation": {
                                 "Bucket": out_bucket,
                                 "ObjectKey": {"FullPath": thumb_path},
-                                "FileInfo": {"Size": 12_670},
+                                "FileInfo": {"Size": thumb_size},
                                 "Provider": "aws",
                                 "Status": "active",
                                 "StorageType": "s3",
@@ -213,6 +275,22 @@ def lambda_handler(event: Dict[str, Any], _: LambdaContext):
             name_mod = audio_output.get("NameModifier", "")
             codec = audio_output["AudioDescriptions"][0]["CodecSettings"]["Codec"]
             proxy_path = f"{base_path}{name_mod}.{codec.lower()}"
+
+            # MediaConvert OutputDetails don't include file sizes, so get them from S3
+            logger.info(
+                f"Getting actual file size from S3 for audio proxy: {proxy_path}"
+            )
+
+            try:
+                proxy_head = s3_client.head_object(Bucket=out_bucket, Key=proxy_path)
+                proxy_size = proxy_head["ContentLength"]
+                logger.info(f"Audio proxy file size: {proxy_size} bytes")
+            except ClientError as e:
+                logger.error(
+                    f"Failed to get audio proxy file size for {proxy_path}: {e}"
+                )
+                raise
+
             reps.append(
                 {
                     "ID": f"{asset_id}:proxy",
@@ -223,7 +301,7 @@ def lambda_handler(event: Dict[str, Any], _: LambdaContext):
                         "PrimaryLocation": {
                             "Bucket": out_bucket,
                             "ObjectKey": {"FullPath": proxy_path},
-                            "FileInfo": {"Size": 5_000_000},
+                            "FileInfo": {"Size": proxy_size},
                             "Provider": "aws",
                             "Status": "active",
                             "StorageType": "s3",

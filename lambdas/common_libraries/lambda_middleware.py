@@ -447,7 +447,8 @@ class LambdaMiddleware:
 
             # c) shrink inline payload
             payload["data"] = placeholder_list
-            payload["assets"] = []  # drop heavy assets
+            # Keep assets for downstream processing - they contain essential metadata
+            # Only drop the heavy "map" block to save space
             payload.pop("map", None)  # drop map block entirely
 
             meta["stepExternalPayload"] = "True"

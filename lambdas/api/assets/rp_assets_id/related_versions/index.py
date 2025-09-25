@@ -68,8 +68,8 @@ class QueryParams(BaseModel):
     """Pydantic model for query parameters"""
 
     page: conint(gt=0) = Field(default=1)  # type: ignore
-    pageSize: conint(gt=0, le=500) = Field(default=50)  # type: ignore
-    min_score: float = Field(default=0.01)
+    pageSize: conint(gt=0, le=500) = Field(default=20)  # type: ignore
+    min_score: float = Field(default=0.6)
 
     @validator("pageSize")
     @classmethod
@@ -615,6 +615,7 @@ def perform_vector_search(asset_id: str, params: QueryParams) -> Dict:
             search_body = {
                 "size": params.size,
                 "from": params.from_,
+                "min_score": params.min_score,
                 "query": {
                     "nested": {
                         "path": "DigitalAsset",
@@ -665,6 +666,7 @@ def perform_vector_search(asset_id: str, params: QueryParams) -> Dict:
             search_body = {
                 "size": params.size,
                 "from": params.from_,
+                "min_score": params.min_score,
                 "query": {
                     "knn": {"embedding": {"vector": embedding, "k": params.size}}
                 },

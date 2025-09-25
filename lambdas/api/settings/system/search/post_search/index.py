@@ -33,7 +33,7 @@ def create_search_provider():
         body = app.current_event.json_body
 
         # Manual validation of required fields
-        required_fields = ["name", "type", "apiKey"]
+        required_fields = ["name", "type"]
         for field in required_fields:
             if field not in body:
                 return {
@@ -41,6 +41,14 @@ def create_search_provider():
                     "message": f"Missing required field: {field}",
                     "data": {},
                 }
+
+        # API key is only required for twelvelabs-api, not for twelvelabs-bedrock
+        if body.get("type") == "twelvelabs-api" and "apiKey" not in body:
+            return {
+                "status": "error",
+                "message": "API key is required for Twelve Labs API provider",
+                "data": {},
+            }
 
         # Check if search provider already exists
         existing_provider = system_settings_table.get_item(
@@ -57,20 +65,26 @@ def create_search_provider():
         # Create a unique identifier for the provider
         provider_id = str(uuid.uuid4())
 
-        # Store API key in Secrets Manager
-        secret_name = f"medialake/search/provider/{provider_id}"
-        secret_value = json.dumps({"x-api-key": body["apiKey"]})
+        # Only create secret for providers that need API keys
+        secret_arn = None
+        if body.get("apiKey"):
+            # Store API key in Secrets Manager
+            secret_name = f"medialake/search/provider/{provider_id}"
+            secret_value = json.dumps({"x-api-key": body["apiKey"]})
 
-        # Create the secret in Secrets Manager
-        secret_response = secretsmanager.create_secret(
-            Name=secret_name,
-            Description=f"API key for {body['name']} search provider",
-            SecretString=secret_value,
-        )
+            logger.info(f"Creating secret with name: {secret_name}")
 
-        secret_arn = secret_response["ARN"]
+            # Create the secret in Secrets Manager
+            secret_response = secretsmanager.create_secret(
+                Name=secret_name,
+                Description=f"API key for {body['name']} search provider",
+                SecretString=secret_value,
+            )
 
-        # Create new search provider without the API key
+            secret_arn = secret_response["ARN"]
+            logger.info(f"Secret created successfully with ARN: {secret_arn}")
+
+        # Create new search provider
         now = datetime.utcnow().isoformat()
         search_provider = {
             "PK": "SYSTEM_SETTINGS",
@@ -78,12 +92,18 @@ def create_search_provider():
             "id": provider_id,
             "name": body["name"],
             "type": body["type"],
-            "secretArn": secret_arn,  # Store the ARN of the secret instead of the API key
             "endpoint": body.get("endpoint"),
             "isEnabled": body.get("isEnabled", True),
             "createdAt": now,
             "updatedAt": now,
         }
+
+        # Only add secretArn if we created a secret
+        if secret_arn:
+            search_provider["secretArn"] = secret_arn
+            logger.info(f"Adding secretArn to provider: {secret_arn}")
+
+        logger.info(f"Saving provider to DynamoDB: {search_provider}")
 
         # Save to DynamoDB
         system_settings_table.put_item(Item=search_provider)
@@ -131,10 +151,12 @@ def create_search_provider():
         response_provider = search_provider.copy()
         response_provider.pop("PK")
         response_provider.pop("SK")
-        response_provider.pop(
-            "secretArn"
-        )  # Don't expose the secret ARN in the response
-        response_provider["isConfigured"] = True
+        # Don't expose the secret ARN in the response (if it exists)
+        response_provider.pop("secretArn", None)
+        # Provider is configured if it has a secret ARN or if it's Bedrock (which doesn't need one)
+        response_provider["isConfigured"] = (
+            bool(secret_arn) or body.get("type") == "twelvelabs-bedrock"
+        )
 
         # Prepare response
         return {

@@ -20,6 +20,8 @@ import ReactFlow, {
   Connection,
   Node,
   reconnectEdge,
+  MarkerType,
+  useUpdateNodeInternals,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import {
@@ -73,7 +75,6 @@ import {
   Sidebar,
   NodeConfigurationForm,
   PipelineToolbar,
-  // JobStatusNode
 } from "../components/PipelineEditor";
 import type { PipelineToolbarProps } from "../components/PipelineEditor/PipelineToolbar";
 import IntegrationValidationDialog from "../components/IntegrationValidationDialog";
@@ -82,7 +83,12 @@ import {
   RightSidebarProvider,
   useRightSidebar,
 } from "@/components/common/RightSidebar/SidebarContext";
-// import { JOB_STATUS_NODE_TYPE } from '../components/PipelineEditor/jobStatusNodeUtils';
+
+const EDGE_ANIMATION_SPEED_SEC = 2;
+const edgeStyle = (speed = EDGE_ANIMATION_SPEED_SEC) => ({
+  animation: `dashdraw ${speed}s linear infinite`,
+  strokeDasharray: 5,
+});
 
 // Define the custom node data type
 interface CustomNodeData {
@@ -96,12 +102,13 @@ interface CustomNodeData {
   configuration?: any;
   onDelete?: (id: string) => void;
   onConfigure?: (id: string) => void;
+  onRotate?: (id: string, rotation: number) => void;
   type?: string; // Node type (e.g., 'TRIGGER', 'INTEGRATION', 'FLOW')
+  rotation?: number; // Rotation angle in degrees (0, 90, 180, 270)
 }
 
 const nodeTypes = {
   custom: CustomNode,
-  // jobStatusNode: JobStatusNode
 };
 
 const edgeTypes = {
@@ -212,7 +219,9 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
             type:
               param.schema.type === "string"
                 ? "text"
-                : (param.schema.type as "number" | "boolean" | "select"),
+                : param.schema.type === "integer"
+                  ? "number"
+                  : (param.schema.type as "number" | "boolean" | "select"),
             required: param.required || false,
             description: param.description,
           };
@@ -223,7 +232,13 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
           }
 
           // Preserve default value if it exists (API uses 'default', but our type uses 'defaultValue')
-          if ((param as any).default !== undefined) {
+          if (param.schema?.default !== undefined) {
+            parameterData.defaultValue = param.schema.default;
+            console.log(
+              `[PipelineEditorPage] Found default value for ${param.name}:`,
+              param.schema.default,
+            );
+          } else if ((param as any).default !== undefined) {
             parameterData.defaultValue = (param as any).default;
             console.log(
               `[PipelineEditorPage] Found default value for ${param.name}:`,
@@ -239,10 +254,14 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
       } else if (method.parameters && typeof method.parameters === "object") {
         // Single object format (like S3 Vector Store)
         const param = method.parameters as any;
-        const paramName = param.name || "parameter";
+        const paramName = param.name;
 
-        // Handle object type parameters with nested properties
-        if (
+        // Skip processing if paramName is undefined or empty
+        if (!paramName) {
+          console.log("[PipelineEditorPage] Skipping parameter with no name");
+          // Set parameters to empty object and continue
+          parameters = {};
+        } else if (
           param.schema &&
           param.schema.type === "object" &&
           param.schema.properties
@@ -256,7 +275,9 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
                 type:
                   propSchema.type === "string"
                     ? "text"
-                    : (propSchema.type as "number" | "boolean" | "select"),
+                    : propSchema.type === "integer"
+                      ? "number"
+                      : (propSchema.type as "number" | "boolean" | "select"),
                 required: param.schema.required?.includes(propName) || false,
                 description: propSchema.description || "",
               };
@@ -277,7 +298,9 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
             type:
               param.schema?.type === "string"
                 ? "text"
-                : (param.schema?.type as "number" | "boolean" | "select"),
+                : param.schema?.type === "integer"
+                  ? "number"
+                  : (param.schema?.type as "number" | "boolean" | "select"),
             required: param.required || false,
             description: param.description || param.schema?.description || "",
           };
@@ -382,7 +405,9 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
               type:
                 param.schema?.type === "string"
                   ? "text"
-                  : (param.schema?.type as "number" | "boolean" | "select"),
+                  : param.schema?.type === "integer"
+                    ? "number"
+                    : (param.schema?.type as "number" | "boolean" | "select"),
               required: param.required || false,
               description: param.description,
             };
@@ -415,7 +440,9 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
                   type:
                     propSchema.type === "string"
                       ? "text"
-                      : (propSchema.type as "number" | "boolean" | "select"),
+                      : propSchema.type === "integer"
+                        ? "number"
+                        : (propSchema.type as "number" | "boolean" | "select"),
                   required: param.schema.required?.includes(propName) || false,
                   description: propSchema.description || "",
                 };
@@ -434,7 +461,9 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
               type:
                 param.schema?.type === "string"
                   ? "text"
-                  : (param.schema?.type as "number" | "boolean" | "select"),
+                  : param.schema?.type === "integer"
+                    ? "number"
+                    : (param.schema?.type as "number" | "boolean" | "select"),
               required: param.required || false,
               description: param.description || param.schema?.description || "",
             };
@@ -645,6 +674,7 @@ const PipelineEditorContent = () => {
   );
   const { screenToFlowPosition } = useReactFlow();
   const reactFlowInstance = useReactFlow();
+  const updateNodeInternals = useUpdateNodeInternals();
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
   const [errorType, setErrorType] = useState<"trigger" | "compatibility">(
     "compatibility",
@@ -981,6 +1011,34 @@ const PipelineEditorContent = () => {
     [nodes],
   );
 
+  const onRotateNode = useCallback(
+    (nodeId: string, rotation: number) => {
+      // 1. Update the node's rotation
+      setNodes((nds) =>
+        nds.map((node) =>
+          node.id === nodeId
+            ? { ...node, data: { ...node.data, rotation } }
+            : node,
+        ),
+      );
+
+      // 2. Tell React Flow to recalc all the edge handles for this node
+      updateNodeInternals(nodeId);
+
+      // 3. Update pipeline configuration
+      setFormData((prev) => ({
+        ...prev,
+        configuration: {
+          ...prev.configuration,
+          nodes: prev.configuration.nodes.map((n) =>
+            n.id === nodeId ? { ...n, rotation } : n,
+          ),
+        },
+      }));
+    },
+    [setNodes, setFormData, updateNodeInternals],
+  );
+
   // Debug pipeline object
   React.useEffect(() => {
     if (pipeline) {
@@ -1073,6 +1131,15 @@ const PipelineEditorContent = () => {
                   type: "custom",
                 };
               }
+              // Add arrow markers and animation to imported edges
+              edge.animated = true;
+              edge.markerEnd = {
+                type: MarkerType.ArrowClosed,
+                width: 20,
+                height: 20,
+                refX: 19,
+                refY: 10,
+              };
               return edge;
             });
 
@@ -1338,6 +1405,8 @@ const PipelineEditorContent = () => {
             configuration: node.data.configuration,
             onDelete: onDeleteNode,
             onConfigure: onConfigureNode,
+            onRotate: onRotateNode,
+            rotation: (node.data as any).rotation || 0,
           },
           // Preserve width and height
           width:
@@ -1388,6 +1457,15 @@ const PipelineEditorContent = () => {
             source: edge.source,
             target: edge.target,
             type: edge.type || "custom",
+            animated: true,
+            style: edgeStyle(),
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              width: 20,
+              height: 20,
+              refX: 19,
+              refY: 10,
+            },
             data: edge.data,
             // Include sourceHandle and targetHandle if they exist in the edge data
             ...(edgeWithHandles.sourceHandle && {
@@ -1409,7 +1487,14 @@ const PipelineEditorContent = () => {
       pipelineInitialized.current = true;
       console.log("[PipelineEditorPage] Pipeline initialized");
     }
-  }, [pipeline, onDeleteNode, onConfigureNode, setNodes, setEdges]);
+  }, [
+    pipeline,
+    onDeleteNode,
+    onConfigureNode,
+    onRotateNode,
+    setNodes,
+    setEdges,
+  ]);
 
   // Update existing nodes with handlers
   React.useEffect(() => {
@@ -1420,10 +1505,11 @@ const PipelineEditorContent = () => {
           ...node.data,
           onDelete: onDeleteNode,
           onConfigure: onConfigureNode,
+          onRotate: onRotateNode,
         },
       })),
     );
-  }, [onDeleteNode, onConfigureNode, setNodes]);
+  }, [onDeleteNode, onConfigureNode, onRotateNode, setNodes]);
 
   // Handle edge reconnection start
   const onReconnectStart = useCallback(() => {
@@ -1446,6 +1532,15 @@ const PipelineEditorContent = () => {
               target: newConnection.target,
               sourceHandle: newConnection.sourceHandle,
               targetHandle: newConnection.targetHandle,
+              animated: true,
+              style: edgeStyle(),
+              markerEnd: {
+                type: MarkerType.ArrowClosed,
+                width: 20,
+                height: 20,
+                refX: 19,
+                refY: 10,
+              },
             };
           }
           return edge;
@@ -1519,6 +1614,15 @@ const PipelineEditorContent = () => {
         ...connection,
         id: `${connection.source}-${connection.target}`,
         type: "custom",
+        animated: true,
+        style: edgeStyle(),
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          width: 20,
+          height: 20,
+          refX: 19,
+          refY: 10,
+        },
         data: {
           text: "Connected",
         },
@@ -1562,7 +1666,6 @@ const PipelineEditorContent = () => {
       updateIdCounter(nodes);
 
       // Check if this is our special job status node
-      // const isJobStatusNode = nodeData.customNodeType === 'jobStatusNode';
 
       const newReactFlowNode: Node<CustomNodeData> = {
         id: getId(),
@@ -1596,6 +1699,7 @@ const PipelineEditorContent = () => {
           ...newReactFlowNode.data,
           onDelete: onDeleteNode,
           onConfigure: onConfigureNode,
+          onRotate: onRotateNode,
         },
       };
 
@@ -1615,32 +1719,19 @@ const PipelineEditorContent = () => {
         },
       }));
 
-      // Determine whether configuration parameters exist
+      // Determine whether configuration parameters exist or if it's an integration node
       const parameters = newReactFlowNode.data.configuration?.parameters;
       const hasParameters = parameters && Object.keys(parameters).length > 0;
+      const isIntegrationNode = newReactFlowNode.data.type === "INTEGRATION";
 
-      console.log("[PipelineEditorPage] Node configuration check:", {
-        nodeId: nodeData.id,
-        nodeType: nodeData.type,
-        configuration: newReactFlowNode.data.configuration,
-        parameters: parameters,
-        hasParameters: hasParameters,
-        parameterKeys: parameters ? Object.keys(parameters) : [],
-      });
-
-      if (hasParameters) {
-        // If parameters exist, open the configuration dialog
-        console.log(
-          "[PipelineEditorPage] Opening configuration dialog for node:",
-          nodeData.id,
-        );
+      if (hasParameters || isIntegrationNode) {
+        // If parameters exist or it's an integration node, open the configuration dialog
         setSelectedNode(nodeWithHandlers);
         setIsNodeConfigOpen(true);
       } else {
         // No configuration needed—skip opening the dialog
         console.log(
-          "[PipelineEditorPage] Node has no configuration parameters; skipping config dialog for:",
-          nodeData.id,
+          "Node has no configuration parameters and is not an integration node; skipping config dialog.",
         );
       }
 
@@ -1664,7 +1755,13 @@ const PipelineEditorContent = () => {
       // setSelectedNode(nodeWithHandlers);
       // setIsNodeConfigOpen(true);
     },
-    [screenToFlowPosition, setNodes, onDeleteNode, onConfigureNode],
+    [
+      screenToFlowPosition,
+      setNodes,
+      onDeleteNode,
+      onConfigureNode,
+      onRotateNode,
+    ],
   );
 
   const handleNodeConfigClose = useCallback(() => {

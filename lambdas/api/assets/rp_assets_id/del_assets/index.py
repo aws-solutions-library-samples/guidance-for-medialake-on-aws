@@ -196,7 +196,7 @@ def delete_s3_objects(asset: Dict[str, Any]) -> None:
 @tracer.capture_method
 def delete_opensearch_docs(asset: Dict[str, Any]) -> None:
     """
-    Delete OpenSearch documents whose DigitalSourceAsset.ID equals the asset’s ID.
+    Delete OpenSearch documents whose InventoryID equals the asset's InventoryID.
     Uses _delete_by_query with SigV4-signed request.
     """
     if not OPENSEARCH_ENDPOINT:
@@ -204,17 +204,17 @@ def delete_opensearch_docs(asset: Dict[str, Any]) -> None:
         return
 
     host = OPENSEARCH_ENDPOINT.lstrip("https://").lstrip("http://")
-    dsa_id = asset.get("DigitalSourceAsset", {}).get("ID")
-    if not dsa_id:
-        logger.warning("DigitalSourceAsset.ID missing – skipping OpenSearch deletion.")
+    inventory_id = asset.get("InventoryID")
+    if not inventory_id:
+        logger.warning("InventoryID missing – skipping OpenSearch deletion.")
         return
 
-    query = {"query": {"term": {"DigitalSourceAsset.ID": dsa_id}}}
+    query = {"query": {"match_phrase": {"InventoryID": inventory_id}}}
 
     url = f"https://{host}/{INDEX_NAME}/_delete_by_query?refresh=true&conflicts=proceed"
     logger.info(
         "Executing _delete_by_query",
-        extra={"url": url, "query": query, "dsa_id": dsa_id},
+        extra={"url": url, "query": query, "inventory_id": inventory_id},
     )
 
     status, body = _signed_request(
@@ -230,7 +230,7 @@ def delete_opensearch_docs(asset: Dict[str, Any]) -> None:
     if status not in (200, 202):
         logger.error(
             "OpenSearch deletion failed",
-            extra={"status": status, "body": body, "dsa_id": dsa_id},
+            extra={"status": status, "body": body, "inventory_id": inventory_id},
         )
         raise AssetDeletionError(f"Failed to delete OpenSearch docs (status {status})")
 
@@ -242,7 +242,7 @@ def delete_opensearch_docs(asset: Dict[str, Any]) -> None:
 
     logger.info(
         "OpenSearch deletion complete",
-        extra={"deleted_docs": deleted, "dsa_id": dsa_id},
+        extra={"deleted_docs": deleted, "inventory_id": inventory_id},
     )
     metrics.add_metric("OpenSearchDocsDeleted", MetricUnit.Count, deleted)
 

@@ -1,0 +1,4 @@
+opensearch-py
+#requests_aws4auth
+aws-lambda-powertools>=2.0.0
+aws-xray-sdk

@@ -1,0 +1,4 @@
+pillow
+exifread
+iptcinfo3
+python-xmp-toolkit

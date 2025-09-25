@@ -262,6 +262,7 @@ def get_asset_clips(asset_id: str) -> List[Dict[str, Any]]:
             "size": 100,  # Limit to 100 clips per asset
             "_source": {"excludes": ["embedding"]},
             "sort": [{"start_timecode": {"order": "asc"}}],  # Sort by start time
+            "track_scores": True,  # Ensure scores are calculated even with sorting
         }
 
         response = client.search(body=query, index=index_name)

@@ -429,15 +429,15 @@ class AssetProcessor:
             logger.error(f"Error deleting S3 file {bucket}/{key}: {str(e)}")
             raise
 
-    def delete_opensearch_docs(self, asset_id: str) -> None:
-        """Delete all OpenSearch docs for a given DigitalSourceAsset.ID."""
+    def delete_opensearch_docs(self, inventory_id: str) -> None:
+        """Delete all OpenSearch docs for a given InventoryID."""
         if not OPENSEARCH_ENDPOINT:
             logger.info("OPENSEARCH_ENDPOINT not set – skipping OpenSearch deletion.")
             return
 
         host = OPENSEARCH_ENDPOINT.lstrip("https://").lstrip("http://")
         url = f"https://{host}/{OPENSEARCH_INDEX}/_delete_by_query?refresh=true&conflicts=proceed"
-        query = {"query": {"term": {"DigitalSourceAsset.ID": asset_id}}}
+        query = {"query": {"match_phrase": {"InventoryID": inventory_id}}}
 
         status, body = self._signed_request("POST", url, payload=query)
         if status not in (200, 202):
@@ -449,7 +449,7 @@ class AssetProcessor:
             except Exception:
                 pass
             logger.info(
-                f"OpenSearch deletion complete – deleted {deleted} docs for {asset_id}"
+                f"OpenSearch deletion complete – deleted {deleted} docs for {inventory_id}"
             )
             metrics.add_metric(
                 name="OpenSearchDocsDeleted", unit=MetricUnit.Count, value=deleted
@@ -1877,7 +1877,7 @@ def handler(event: Dict, context: LambdaContext) -> Dict:
             TableName=os.environ["ASSETS_TABLE"]
         )
         logger.debug(
-            f"DynamoDB table info available - Table Status: {dynamo_client.describe_table(TableName=table_name).get('Table', {}).get('TableStatus')}"
+            f"DynamoDB table info available - Table Status: {dynamodb_client.describe_table(TableName=os.environ['ASSETS_TABLE']).get('Table', {}).get('TableStatus')}"
         )
     except Exception as e:
         logger.error(f"Error accessing DynamoDB table: {str(e)}")

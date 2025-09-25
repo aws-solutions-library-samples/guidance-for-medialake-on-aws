@@ -1,0 +1,46 @@
+spec: v1.0.0
+node:
+  id: twelvelabs_bedrock_status
+  title: TwelveLabs Bedrock Status
+  description: Check status of TwelveLabs Bedrock async embedding job
+  version: 1.0.0
+  type: integration
+  integration:
+    config:
+      lambda:
+        handler: integration/TwelveLabsBedrockStatusLambdaDeployment
+        runtime: python3.12
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              resources:
+                - "*"
+            - effect: Allow
+              actions:
+                - s3:GetObject
+                - s3:ListBucket
+                - s3:ListObjectsV2
+              resources:
+                - "*"
+            - effect: Allow
+              actions:
+                - kms:Decrypt
+              resources:
+                - "*"
+actions:
+  check_status:
+    summary: Check Job Status
+    description: Check if TwelveLabs Bedrock embedding job is complete by polling S3
+    operationId: checkJobStatus
+    parameters: []
+    x-requestMapping: integration/twelvelabs_bedrock_status/check_status/
+    x-responseMapping: integration/twelvelabs_bedrock_status/check_status/
+    connections:
+      incoming:
+        type: [invocation_arn, any]
+      outgoing:
+        type: [status]

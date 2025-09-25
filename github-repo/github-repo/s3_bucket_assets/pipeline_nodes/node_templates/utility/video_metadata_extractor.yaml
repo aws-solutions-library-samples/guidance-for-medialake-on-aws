@@ -1,0 +1,74 @@
+spec: v1.0.0
+node:
+  id: video_metadata_extractor
+  title: Video Metadata Extractor
+  description: Extract metadata from video files stored in S3
+  version: 1.0.0
+  type: utility
+  integration:
+    config:
+      lambda:
+        handler: utility/VideoMetadataExtractorLambdaDeployment
+        runtime: python3.12
+        layers:
+          - PyMediaInfo
+          - FFProbe
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - s3:ListBucket
+                - s3:GetObject
+                - s3:PutObject
+              resources:
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}/*
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}
+            - effect: Allow
+              actions:
+                - s3:GetObject
+              resources:
+                - "*"
+            - effect: Allow
+              actions:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+                - dynamodb:PutItem
+              resources:
+                - ${MEDIALAKE_ASSET_TABLE}
+            - effect: Allow
+              actions:
+                - kms:Decrypt
+              resources:
+                - ${MEDIA_ASSETS_BUCKET_ARN_KMS_KEY}
+            - effect: Allow
+              actions:
+                - kms:GenerateDataKey
+              resources:
+                - "*"
+
+actions:
+  extract:
+    summary: Extract video metadata
+    description: Extract metadata from an video file stored in S3
+    operationId: extractVideoMetadata
+    parameters:
+      - in: body
+        name: S3 File Location
+        required: true
+        schema:
+          type: object
+          properties:
+            bucket:
+              type: string
+              description: S3 bucket name
+            key:
+              type: string
+              description: S3 object key
+          required:
+            - bucket
+            - key
+    connections:
+      incoming:
+        type: [video]
+      outgoing:
+        type: [metadata]

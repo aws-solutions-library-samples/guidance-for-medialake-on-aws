@@ -25,6 +25,7 @@ const mapParameterTypeToFormType = (
     case "boolean":
       return "switch";
     case "number":
+    case "integer":
       return "number";
     case "select":
       return "select";
@@ -176,6 +177,7 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> =
                 label: param.label || key,
                 required: param.required || false,
                 description: param.description || "",
+                defaultValue: param.defaultValue, // Preserve defaultValue from PipelineEditorPage transformation
               };
 
               // Handle select parameters specifically
@@ -187,7 +189,10 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> =
               } else {
                 // For other parameter types
                 transformedParam.schema = {
-                  type: param.type || "string",
+                  type:
+                    param.type === "integer"
+                      ? "number"
+                      : param.type || "string",
                 };
               }
 
@@ -219,12 +224,89 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> =
       }
 
       // For TRIGGER or INTEGRATION nodes.
-      const params = (methodInfo as any)?.config?.parameters || [];
+      // First check config.parameters.
+      const configParams = (methodInfo as any)?.config?.parameters;
       console.log(
-        "[NodeConfigurationForm] TRIGGER/INTEGRATION node parameters:",
-        params,
+        "[NodeConfigurationForm] TRIGGER/INTEGRATION node configParams:",
+        configParams,
       );
-      return params;
+
+      // If configParams is an array with items, use it.
+      if (Array.isArray(configParams) && configParams.length > 0) {
+        console.log(
+          "[NodeConfigurationForm] Using configParams array:",
+          configParams,
+        );
+        return configParams;
+      }
+
+      // Otherwise, check if methodInfo.parameters exists (same fallback as UTILITY nodes).
+      const topLevelParams = (methodInfo as any)?.parameters;
+      console.log(
+        "[NodeConfigurationForm] TRIGGER/INTEGRATION node topLevelParams:",
+        topLevelParams,
+      );
+
+      if (Array.isArray(topLevelParams) && topLevelParams.length > 0) {
+        console.log(
+          "[NodeConfigurationForm] Using topLevelParams array:",
+          topLevelParams,
+        );
+        return topLevelParams;
+      }
+
+      // If topLevelParams exists as an object, convert it to an array with proper structure.
+      if (topLevelParams && typeof topLevelParams === "object") {
+        // Transform parameters to ensure consistent structure
+        const paramsArray = Object.entries(topLevelParams).map(
+          ([key, param]: [string, any]) => {
+            // Create a new parameter with consistent structure
+            const transformedParam: any = {
+              name: key,
+              label: param.label || key,
+              required: param.required || false,
+              description: param.description || "",
+              defaultValue: param.defaultValue, // Preserve defaultValue from PipelineEditorPage transformation
+            };
+
+            // Handle select parameters specifically
+            if (param.type === "select") {
+              transformedParam.schema = {
+                type: "select",
+                options: param.options || [],
+              };
+            } else {
+              // For other parameter types
+              transformedParam.schema = {
+                type: param.type || "string",
+              };
+            }
+
+            return transformedParam;
+          },
+        );
+
+        console.log(
+          "[NodeConfigurationForm] Using transformed topLevelParams:",
+          paramsArray,
+        );
+        return paramsArray;
+      }
+
+      // Finally, if configParams exists as an object, convert it.
+      if (configParams && typeof configParams === "object") {
+        const paramsArray = Object.values(configParams);
+        console.log(
+          "[NodeConfigurationForm] Using configParams object converted to array:",
+          paramsArray,
+        );
+        return paramsArray;
+      }
+
+      console.log(
+        "[NodeConfigurationForm] No parameters found for TRIGGER/INTEGRATION node",
+      );
+      return [];
     }, [node.info.nodeType, flowParameters, methodInfo, node.nodeId]);
 
     const hasParameters = useMemo(
@@ -589,9 +671,12 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> =
         values.integrationId = integrationOptions[0].value;
       }
 
-      // Handle default values for UTILITY, FLOW, and TRIGGER nodes from effectiveParameters
+      // Handle default values for UTILITY, FLOW, TRIGGER, and INTEGRATION nodes from effectiveParameters
       if (
-        (node.info.nodeType === "UTILITY" || isFlowNode || isTriggerNode) &&
+        (node.info.nodeType === "UTILITY" ||
+          isFlowNode ||
+          isTriggerNode ||
+          isIntegrationNode) &&
         effectiveParameters.length > 0
       ) {
         console.log(
@@ -613,12 +698,12 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> =
           // Check for default in different possible locations
           // The API response structure might vary, so we need to check multiple locations
           let defaultValue =
-            param.default !== undefined
-              ? param.default
-              : param.schema?.default !== undefined
-                ? param.schema.default
-                : param.defaultValue !== undefined
-                  ? param.defaultValue
+            param.defaultValue !== undefined
+              ? param.defaultValue
+              : param.default !== undefined
+                ? param.default
+                : param.schema?.default !== undefined
+                  ? param.schema.default
                   : param.default_value !== undefined
                     ? param.default_value
                     : undefined;
@@ -628,18 +713,6 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> =
             `[NodeConfigurationForm] Raw parameter object:`,
             JSON.stringify(param),
           );
-
-          // Hardcode default values for specific parameters since they're not being properly passed
-          if (
-            node.nodeId === "pre_signed_url" &&
-            param.name === "URL Validity Duration"
-          ) {
-            defaultValue = 3600;
-            console.log(
-              `[NodeConfigurationForm] Hardcoding default value for ${param.name} to:`,
-              defaultValue,
-            );
-          }
 
           console.log(
             `[NodeConfigurationForm] Default value for ${paramName}:`,
@@ -669,14 +742,43 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> =
 
           // Only set default if it's not already set in configuration
           if (defaultValue !== undefined && !values.parameters[paramName]) {
-            values.parameters = {
-              ...values.parameters,
-              [paramName]: defaultValue,
-            };
+            // Skip setting default values for number fields when they are template variables
+            const isNumberField =
+              param.schema?.type === "number" ||
+              param.schema?.type === "integer";
+            const isTemplateVariable =
+              typeof defaultValue === "string" &&
+              defaultValue.startsWith("${") &&
+              defaultValue.endsWith("}");
+
             console.log(
-              `[NodeConfigurationForm] Setting default value for ${paramName}:`,
-              defaultValue,
+              `[NodeConfigurationForm] DEBUG - Processing ${paramName}:`,
+              {
+                paramName,
+                defaultValue,
+                paramSchemaType: param.schema?.type,
+                isNumberField,
+                isTemplateVariable,
+                paramType: param.type,
+                fullParam: param,
+              },
             );
+
+            if (isNumberField && isTemplateVariable) {
+              console.log(
+                `[NodeConfigurationForm] Skipping template variable default for number field ${paramName}:`,
+                defaultValue,
+              );
+            } else {
+              values.parameters = {
+                ...values.parameters,
+                [paramName]: defaultValue,
+              };
+              console.log(
+                `[NodeConfigurationForm] Setting default value for ${paramName}:`,
+                defaultValue,
+              );
+            }
           } else {
             console.log(
               `[NodeConfigurationForm] Not setting default for ${paramName}. Already set:`,

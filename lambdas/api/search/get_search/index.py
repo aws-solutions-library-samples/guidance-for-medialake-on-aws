@@ -466,7 +466,7 @@ def add_common_fields(result: Dict, prefix: str = "") -> Dict:
     digital_source_asset = result.get(f"{prefix}DigitalSourceAsset", {})
     main_rep = digital_source_asset.get("MainRepresentation", {})
     storage_info = main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
-    object_key = storage_info.get("ObjectKey", {})
+    storage_info.get("ObjectKey", {})
     inventory_id = result.get("InventoryID", "")
 
     # Add ID fields
@@ -479,25 +479,25 @@ def add_common_fields(result: Dict, prefix: str = "") -> Dict:
             result["id"] = inventory_id
 
     # Add asset metadata fields
-    result["assetType"] = digital_source_asset.get("Type", "")
-    result["format"] = main_rep.get("Format", "")
-    result["objectName"] = object_key.get("Name", "")
-    result["fullPath"] = object_key.get("FullPath", "")
-    result["bucket"] = storage_info.get("Bucket", "")
+    # result["assetType"] = digital_source_asset.get("Type", "")
+    # result["format"] = main_rep.get("Format", "")
+    # result["objectName"] = object_key.get("Name", "")
+    # result["fullPath"] = object_key.get("FullPath", "")
+    # result["bucket"] = storage_info.get("Bucket", "")
 
-    # Handle file size - check different locations
-    file_size = storage_info.get("FileSize", 0)
-    if not file_size and "FileInfo" in storage_info:
-        file_size = storage_info.get("FileInfo", {}).get("Size", 0)
-    result["fileSize"] = file_size
+    # # Handle file size - check different locations
+    # file_size = storage_info.get("FileSize", 0)
+    # if not file_size and "FileInfo" in storage_info:
+    #     file_size = storage_info.get("FileInfo", {}).get("Size", 0)
+    # result["fileSize"] = file_size
 
     # Handle creation date - check different locations
-    created_date = storage_info.get("CreateDate", "")
-    if not created_date and "FileInfo" in storage_info:
-        created_date = storage_info.get("FileInfo", {}).get("CreateDate", "")
-    if not created_date:
-        created_date = digital_source_asset.get("CreateDate", "")
-    result["createdAt"] = created_date
+    # created_date = storage_info.get("CreateDate", "")
+    # if not created_date and "FileInfo" in storage_info:
+    #     created_date = storage_info.get("FileInfo", {}).get("CreateDate", "")
+    # if not created_date:
+    #     created_date = digital_source_asset.get("CreateDate", "")
+    # result["createdAt"] = created_date
 
     # Include consolidated metadata directly
     if "Metadata" in result and "Consolidated" in result.get("Metadata", {}):
@@ -645,45 +645,18 @@ def process_search_hit(hit: Dict) -> Dict:
 def process_clip(clip_hit: Dict) -> Dict:
     """Process a clip hit to preserve all clip-specific fields."""
     source = clip_hit["_source"]
-    digital_source_asset = source.get("DigitalSourceAsset", {})
-    main_rep = digital_source_asset.get("MainRepresentation", {})
-    storage_info = main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
-    object_key = storage_info.get("ObjectKey", {})
+    inventory_id = source.get("InventoryID", None)
 
-    asset_id = digital_source_asset.get("ID", "unknown")
-    logger.debug(
-        f"Processing clip for asset {asset_id} with score {clip_hit.get('_score', 0)}"
+    logger.info(
+        f"Processing clip for asset {inventory_id} with score {clip_hit.get('_score', 0)}"
     )
 
+    # For clip documents, we only have minimal information
+    # The parent asset information should be handled by the calling function
     result = {
-        "DigitalSourceAsset": digital_source_asset,
         "score": clip_hit["_score"],
+        "InventoryID": inventory_id,
     }
-
-    # Add the same root-level fields as in process_search_hit for consistency
-    result["assetType"] = digital_source_asset.get("Type", "")
-    result["format"] = main_rep.get("Format", "")
-    result["objectName"] = object_key.get("Name", "")
-    result["fullPath"] = object_key.get("FullPath", "")
-    result["bucket"] = storage_info.get("Bucket", "")
-
-    # Handle different possible locations of file size
-    file_size = storage_info.get("FileSize", 0)
-    if not file_size and "FileInfo" in storage_info:
-        file_size = storage_info.get("FileInfo", {}).get("Size", 0)
-    result["fileSize"] = file_size
-
-    # Handle different possible locations of creation date
-    created_date = storage_info.get("CreateDate", "")
-    if not created_date and "FileInfo" in storage_info:
-        created_date = storage_info.get("FileInfo", {}).get("CreateDate", "")
-    if not created_date:
-        created_date = digital_source_asset.get("CreateDate", "")
-    result["createdAt"] = created_date
-
-    # Include any consolidated metadata if available
-    if "Metadata" in source and "Consolidated" in source.get("Metadata", {}):
-        result["metadata"] = source["Metadata"].get("Consolidated", {})
 
     # Add clip-specific fields efficiently
     clip_fields = [
@@ -692,26 +665,33 @@ def process_clip(clip_hit: Dict) -> Dict:
         "end_timecode",
         "type",
         "timestamp",
+        "embedding_option",
     ]
     for field in clip_fields:
         if field in source:
             result[field] = source[field]
 
     # Include any other fields from the source that might be clip-specific
+    # but exclude embedding data to keep response size manageable
     for key, value in source.items():
-        if key not in result and key not in ["DigitalSourceAsset", "Metadata"]:
+        if key not in result and key not in [
+            "embedding",
+            "DigitalSourceAsset",
+            "Metadata",
+        ]:
             result[key] = value
 
+    logger.info(f"Processed clip with fields: {list(result.keys())}")
     return result
 
 
-def get_parent_asset(client, index_name, asset_id):
+def get_parent_asset(client, index_name, inventory_id):
     """Fetch a parent asset by its ID from OpenSearch."""
     try:
         query = {
             "query": {
                 "bool": {
-                    "must": [{"term": {"DigitalSourceAsset.ID.keyword": asset_id}}],
+                    "must": [{"match_phrase": {"InventoryID": inventory_id}}],
                     "must_not": [{"term": {"embedding_scope": "clip"}}],
                 }
             },
@@ -725,7 +705,7 @@ def get_parent_asset(client, index_name, asset_id):
 
         return None
     except Exception as e:
-        logger.warning(f"Error fetching parent asset {asset_id}: {str(e)}")
+        logger.warning(f"Error fetching parent asset {inventory_id}: {str(e)}")
         return None
 
 
@@ -748,22 +728,22 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
         if source.get("embedding_scope") == "clip":
             asset_type = source.get("type", "").lower()
             if asset_type in ["video", "audio"]:
-                asset_id = source.get("DigitalSourceAsset", {}).get("ID")
-                if asset_id:
-                    clips_by_asset[asset_id].append(
+                inventory_id = source.get("InventoryID", None)
+                if inventory_id:
+                    clips_by_asset[inventory_id].append(
                         {"source": source, "score": hit["_score"], "hit": hit}
                     )
-                    orphaned_clip_assets.add(asset_id)
+                    orphaned_clip_assets.add(inventory_id)
         else:
-            asset_id = source.get("DigitalSourceAsset", {}).get("ID")
-            if asset_id:
-                parent_assets[asset_id] = {
+            inventory_id = source.get("InventoryID", None)
+            if inventory_id:
+                parent_assets[inventory_id] = {
                     "source": source,
                     "score": hit["_score"],
                     "hit": hit,
                 }
                 orphaned_clip_assets.discard(
-                    asset_id
+                    inventory_id
                 )  # More efficient than remove with check
             else:
                 standalone_hits.append(hit)
@@ -782,10 +762,18 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
 
         orphan_ids = list(orphaned_clip_assets - parent_assets.keys())
         if orphan_ids:
+            logger.info(f"Searching for parent assets with IDs: {orphan_ids}")
+
+            # Use match_phrase for each InventoryID with should clause
+            should_clauses = []
+            for inventory_id in orphan_ids:
+                should_clauses.append({"match_phrase": {"InventoryID": inventory_id}})
+
             batch_query = {
                 "query": {
                     "bool": {
-                        "must": [{"terms": {"DigitalSourceAsset.ID": orphan_ids}}],
+                        "should": should_clauses,
+                        "minimum_should_match": 1,
                         "must_not": [{"term": {"embedding_scope": "clip"}}],
                     }
                 },
@@ -794,9 +782,12 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
 
             try:
                 resp = client.search(body=batch_query, index=index_name)
+                logger.info(
+                    f"Batch query found {resp['hits']['total']['value']} parent assets"
+                )
                 for hit in resp["hits"]["hits"]:
                     src = hit["_source"]
-                    pid = src["DigitalSourceAsset"]["ID"]
+                    pid = src["InventoryID"]
                     highest_clip_score = max(
                         (c["score"] for c in clips_by_asset.get(pid, [])), default=0
                     )
@@ -805,23 +796,27 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
                         "score": highest_clip_score,
                         "hit": hit,
                     }
-                    logger.debug(
+                    logger.info(
                         f"Fetched parent asset for orphaned clips: {pid} with score {highest_clip_score}"
                     )
             except Exception as e:
-                logger.warning(f"Error batch fetching parent assets: {str(e)}")
+                logger.error(f"Error batch fetching parent assets: {str(e)}")
+                import traceback
 
-    def process_asset_with_clips(asset_id):
-        if asset_id not in parent_assets:
+                logger.error(f"Traceback: {traceback.format_exc()}")
+
+    def process_asset_with_clips(inventory_id):
+        if inventory_id not in parent_assets:
+            logger.warning(f"Parent asset {inventory_id} not found in parent_assets")
             return None
 
         try:
-            parent_hit = parent_assets[asset_id]["hit"]
+            parent_hit = parent_assets[inventory_id]["hit"]
+            logger.info(f"Processing parent asset {inventory_id}")
             result = process_search_hit(parent_hit)
-            parent_hit["_score"]
 
-            if asset_id in clips_by_asset:
-                asset_clips = clips_by_asset[asset_id]
+            if inventory_id in clips_by_asset:
+                asset_clips = clips_by_asset[inventory_id]
                 highest_clip_score = max(c["score"] for c in asset_clips)
 
                 # Use highest clip score
@@ -833,15 +828,19 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
                 )
                 result["clips"] = [process_clip(c["hit"]) for c in sorted_clips]
 
-                logger.debug(
-                    f"Processed asset {asset_id} with {len(result['clips'])} clips, final score: {result['score']}"
+                logger.info(
+                    f"Processed asset {inventory_id} with {len(result['clips'])} clips, final score: {result['score']}"
                 )
             else:
                 result["clips"] = []
+                logger.info(f"No clips found for asset {inventory_id}")
 
             return result
         except Exception as e:
-            logger.warning(f"Error processing parent asset {asset_id}: {str(e)}")
+            logger.error(f"Error processing parent asset {inventory_id}: {str(e)}")
+            import traceback
+
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return None
 
     def process_standalone_hit(hit):
@@ -856,8 +855,8 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         # Process parent assets with clips
         result_futures = {
-            executor.submit(process_asset_with_clips, asset_id): asset_id
-            for asset_id in parent_assets.keys()
+            executor.submit(process_asset_with_clips, inventory_id): inventory_id
+            for inventory_id in parent_assets.keys()
         }
 
         # Process standalone hits
@@ -872,8 +871,8 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
                 if result:
                     results.append(result)
             except Exception as e:
-                asset_id = result_futures[future]
-                logger.warning(f"Error processing asset {asset_id}: {str(e)}")
+                inventory_id = result_futures[future]
+                logger.warning(f"Error processing asset {inventory_id}: {str(e)}")
 
         # Collect results from standalone hits
         for future in concurrent.futures.as_completed(standalone_futures):
@@ -1048,38 +1047,76 @@ def perform_search(params: SearchParams) -> Dict:
                 # Semantic search without clip logic - with batch presigned URL generation
                 batch_processing_start = time.time()
 
-                # Step 1: Collect all presigned URL requests
+                # Step 1: Collect all CloudFront URL requests
                 url_collection_start = time.time()
-                processed_hits_data, url_requests = collect_presigned_url_requests(hits)
+                processed_hits_data, url_requests = collect_cloudfront_url_requests(
+                    hits
+                )
                 logger.info(
                     f"[PERF] Semantic URL request collection took: {time.time() - url_collection_start:.3f}s"
                 )
                 logger.info(
-                    f"Collected {len(url_requests)} presigned URL requests for {len(processed_hits_data)} semantic hits"
+                    f"[URL_DEBUG] Collected {len(url_requests)} CloudFront URL requests for {len(processed_hits_data)} semantic hits"
                 )
 
-                # Step 2: Generate all presigned URLs in parallel
+                # Step 2: Generate all CloudFront URLs in parallel
                 if url_requests:
-                    batch_url_start = time.time()
-                    presigned_urls = generate_presigned_urls_batch(url_requests)
                     logger.info(
-                        f"[PERF] Semantic batch presigned URL generation took: {time.time() - batch_url_start:.3f}s"
+                        f"[URL_DEBUG] Proceeding with semantic batch URL generation for {len(url_requests)} requests"
+                    )
+                    batch_url_start = time.time()
+                    cloudfront_urls = generate_cloudfront_urls_batch(url_requests)
+                    logger.info(
+                        f"[PERF] Semantic batch CloudFront URL generation took: {time.time() - batch_url_start:.3f}s"
+                    )
+                    successful_urls = len(
+                        [url for url in cloudfront_urls.values() if url]
                     )
                     logger.info(
-                        f"Generated {len([url for url in presigned_urls.values() if url])} successful URLs out of {len(url_requests)} requests"
+                        f"[URL_DEBUG] Generated {successful_urls} successful URLs out of {len(url_requests)} requests"
+                    )
+                    logger.info(
+                        f"[URL_DEBUG] Semantic CloudFront URLs result: {cloudfront_urls}"
                     )
                 else:
-                    presigned_urls = {}
+                    logger.warning(
+                        "[URL_DEBUG] No URL requests to process for semantic search - skipping URL generation"
+                    )
+                    cloudfront_urls = {}
 
                 # Step 3: Process all hits with pre-generated URLs
                 results_processing_start = time.time()
                 results = []
-                for hit_data in processed_hits_data:
+                logger.info(
+                    f"[URL_DEBUG] Processing {len(processed_hits_data)} semantic hits with CloudFront URLs"
+                )
+
+                for hit_idx, hit_data in enumerate(processed_hits_data):
                     try:
-                        result = process_search_hit_with_urls(hit_data, presigned_urls)
+                        logger.info(
+                            f"[URL_DEBUG] Processing semantic hit {hit_idx + 1}/{len(processed_hits_data)} - Asset ID: {hit_data['asset_id']}"
+                        )
+                        logger.info(
+                            f"[URL_DEBUG] Thumbnail request ID: {hit_data.get('thumbnail_request_id')}"
+                        )
+                        logger.info(
+                            f"[URL_DEBUG] Proxy request ID: {hit_data.get('proxy_request_id')}"
+                        )
+
+                        result = process_search_hit_with_cloudfront_urls(
+                            hit_data, cloudfront_urls
+                        )
+
+                        # Log the final result URLs
+                        logger.info(
+                            f"[URL_DEBUG] Final semantic result for {hit_data['asset_id']} - thumbnailUrl: {result.get('thumbnailUrl')}, proxyUrl: {result.get('proxyUrl')}"
+                        )
+
                         results.append(result)
                     except Exception as e:
-                        logger.warning(f"Error processing semantic hit: {str(e)}")
+                        logger.warning(
+                            f"[URL_DEBUG] Error processing semantic hit {hit_idx + 1}: {str(e)}"
+                        )
                         continue
 
                 logger.info(
@@ -1213,7 +1250,7 @@ def handle_search():
     """Handle search requests with validated parameters."""
     handler_start = time.time()
     try:
-        logger.info(f"[PERF] Starting search handler")
+        logger.info("[PERF] Starting search handler")
 
         param_start = time.time()
         query_params = app.current_event.get("queryStringParameters") or {}
@@ -1253,7 +1290,7 @@ def handle_search():
 def lambda_handler(event: dict, context: LambdaContext) -> dict:
     """Lambda handler function"""
     lambda_start = time.time()
-    logger.info(f"[PERF] Lambda handler started")
+    logger.info("[PERF] Lambda handler started")
 
     result = app.resolve(event, context)
 
