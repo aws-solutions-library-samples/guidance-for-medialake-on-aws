@@ -13,6 +13,10 @@ interface AssetGridViewProps<T> {
   onAssetClick: (asset: T) => void;
   onDeleteClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onDownloadClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
+  onAddToCollectionClick?: (
+    asset: T,
+    event: React.MouseEvent<HTMLElement>,
+  ) => void;
   onEditClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onEditNameComplete: (asset: T, save: boolean, value?: string) => void;
@@ -51,6 +55,7 @@ function AssetGridView<T>({
   onAssetClick,
   onDeleteClick,
   onDownloadClick,
+  onAddToCollectionClick,
   onEditClick,
   onEditNameChange,
   onEditNameComplete,

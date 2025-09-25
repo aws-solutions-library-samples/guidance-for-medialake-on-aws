@@ -68,6 +68,10 @@ export interface AssetResultsViewProps<T> {
   onAssetClick: (asset: T) => void;
   onDeleteClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onDownloadClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
+  onAddToCollectionClick?: (
+    asset: T,
+    event: React.MouseEvent<HTMLElement>,
+  ) => void;
   onEditClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onEditNameComplete: (asset: T, save: boolean, value?: string) => void;
@@ -135,6 +139,7 @@ function AssetResultsView<T>({
   onAssetClick,
   onDeleteClick,
   onDownloadClick,
+  onAddToCollectionClick,
   onEditClick,
   onEditNameChange,
   onEditNameComplete,
@@ -495,6 +500,7 @@ function AssetResultsView<T>({
             onAssetClick={onAssetClick}
             onDeleteClick={onDeleteClick}
             onDownloadClick={onDownloadClick}
+            onAddToCollectionClick={onAddToCollectionClick}
             onEditClick={onEditClick}
             onEditNameChange={onEditNameChange}
             onEditNameComplete={onEditNameComplete}
@@ -526,6 +532,7 @@ function AssetResultsView<T>({
             onAssetClick={onAssetClick}
             onDeleteClick={onDeleteClick}
             onDownloadClick={onDownloadClick}
+            onAddToCollectionClick={onAddToCollectionClick}
             onEditClick={onEditClick}
             onEditNameChange={onEditNameChange}
             onEditNameComplete={onEditNameComplete}

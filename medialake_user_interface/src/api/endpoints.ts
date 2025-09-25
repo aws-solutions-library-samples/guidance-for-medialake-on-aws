@@ -68,4 +68,17 @@ export const API_ENDPOINTS = {
     DELETE: (itemType: string, itemId: string) =>
       `/users/favorites/${itemType}/${itemId}`,
   },
+  COLLECTIONS: {
+    BASE: "/collections",
+    GET: (id: string) => `/collections/${id}`,
+    UPDATE: (id: string) => `/collections/${id}`,
+    DELETE: (id: string) => `/collections/${id}`,
+    SHARE: (id: string) => `/collections/${id}/share`,
+    UNSHARE: (id: string, userId: string) =>
+      `/collections/${id}/share/${userId}`,
+    SHARES: (id: string) => `/collections/${id}/shares`,
+    SHARED: "/collections/shared",
+    ITEMS: (id: string) => `/collections/${id}/items`,
+    TYPES: "/collection-types",
+  },
 };

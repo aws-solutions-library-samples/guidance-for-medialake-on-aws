@@ -16,6 +16,7 @@ import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import InfoIcon from "@mui/icons-material/Info";
+import AddIcon from "@mui/icons-material/Add";
 import {
   PLACEHOLDER_IMAGE,
   VIDEO_PLACEHOLDER_IMAGE,
@@ -53,6 +54,7 @@ export interface AssetCardProps {
   onAssetClick: () => void;
   onDeleteClick: (event: React.MouseEvent<HTMLElement>) => void;
   onDownloadClick: (event: React.MouseEvent<HTMLElement>) => void;
+  onAddToCollectionClick?: (event: React.MouseEvent<HTMLElement>) => void;
   onEditClick?: (event: React.MouseEvent<HTMLElement>) => void;
   placeholderImage?: string;
   onImageError?: (event: React.SyntheticEvent<HTMLImageElement, Event>) => void;
@@ -88,6 +90,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
     onAssetClick,
     onDeleteClick,
     onDownloadClick,
+    onAddToCollectionClick,
     onEditClick,
     placeholderImage = PLACEHOLDER_IMAGE,
     onImageError,
@@ -860,6 +863,25 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                   <DownloadIcon fontSize="small" />
                 </IconButton>
 
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    console.log("AssetCard: Add to Collection clicked!", e);
+                    e.stopPropagation();
+                    onAddToCollectionClick?.(e);
+                  }}
+                  sx={{
+                    color: "primary.main",
+                    "&:hover": {
+                      bgcolor: "primary.main",
+                      color: "primary.contrastText",
+                    },
+                  }}
+                  title="Add to Collection"
+                >
+                  <AddIcon fontSize="small" />
+                </IconButton>
+
                 <Button
                   size="small"
                   variant="outlined"
@@ -953,6 +975,25 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                   title="Download"
                 >
                   <DownloadIcon fontSize="small" />
+                </IconButton>
+
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    console.log("AssetCard: Add to Collection clicked!", e);
+                    e.stopPropagation();
+                    onAddToCollectionClick?.(e);
+                  }}
+                  sx={{
+                    color: "primary.main",
+                    "&:hover": {
+                      bgcolor: "primary.main",
+                      color: "primary.contrastText",
+                    },
+                  }}
+                  title="Add to Collection"
+                >
+                  <AddIcon fontSize="small" />
                 </IconButton>
 
                 {(() => {
@@ -1155,6 +1196,25 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                     <DownloadIcon fontSize="small" />
                   </IconButton>
                 )}
+
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    console.log("AssetCard: Add to Collection clicked!", e);
+                    e.stopPropagation();
+                    onAddToCollectionClick?.(e);
+                  }}
+                  sx={{
+                    color: "primary.main",
+                    "&:hover": {
+                      bgcolor: "primary.main",
+                      color: "primary.contrastText",
+                    },
+                  }}
+                  title="Add to Collection"
+                >
+                  <AddIcon fontSize="small" />
+                </IconButton>
 
                 <Button
                   size="small"

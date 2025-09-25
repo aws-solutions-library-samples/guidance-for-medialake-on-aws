@@ -66,6 +66,12 @@ export default {
     viewDetails: "View Details",
     retry: "Retry",
     retryFromCurrent: "Retry from current position",
+    addToCollection: "Add to Collection",
+    addToCollectionSuccess: "Asset added to collection successfully",
+    addToCollectionError: "Failed to add asset to collection",
+    selectCollection: "Select a collection to add this asset to",
+    noCollectionsAvailable: "No collections available",
+    createCollectionFirst: "Create a collection first to organize your assets",
   },
   assetExplorer: {
     noConnectorSelected: "Select a connector to view assets",
@@ -105,6 +111,7 @@ export default {
     menu: {
       home: "Home",
       assets: "Assets",
+      collections: "Collections",
       pipelines: "Pipelines",
       pipelineExecutions: "Pipeline Executions",
       settings: "Settings",

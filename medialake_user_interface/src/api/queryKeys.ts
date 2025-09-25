@@ -167,4 +167,18 @@ export const QUERY_KEYS = {
     all: ["system-settings"] as const,
     search: () => [...QUERY_KEYS.SYSTEM_SETTINGS.all, "search"] as const,
   },
+  COLLECTIONS: {
+    all: ["collections"] as const,
+    lists: () => [...QUERY_KEYS.COLLECTIONS.all, "list"] as const,
+    list: (filters?: Record<string, any>) =>
+      [...QUERY_KEYS.COLLECTIONS.lists(), { filters }] as const,
+    details: () => [...QUERY_KEYS.COLLECTIONS.all, "detail"] as const,
+    detail: (id: string) => [...QUERY_KEYS.COLLECTIONS.details(), id] as const,
+    shared: () => [...QUERY_KEYS.COLLECTIONS.all, "shared"] as const,
+    shares: (id: string) =>
+      [...QUERY_KEYS.COLLECTIONS.detail(id), "shares"] as const,
+    items: (id: string) =>
+      [...QUERY_KEYS.COLLECTIONS.detail(id), "items"] as const,
+    types: () => [...QUERY_KEYS.COLLECTIONS.all, "types"] as const,
+  },
 } as const;

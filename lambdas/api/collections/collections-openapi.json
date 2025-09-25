@@ -1,0 +1,2935 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Media Management Collections API",
+    "description": "Enhanced Collections management API following industry best practices for REST APIs.\n\n## Key Features\n- Hierarchical collection structure with unlimited nesting\n- Custom collection types configured at system level\n- Metadata inheritance from parent collections\n- Rules-based automatic item assignment\n- Batch operations for efficient item management\n- Granular permission management\n- Collection sharing and collaboration features\n- Cursor-based pagination for optimal performance\n\n## Response Format\nAll responses follow a consistent structure with success/error indicators,\ndata payload, pagination info (when applicable), and metadata.\n",
+    "contact": {
+      "name": "API Support",
+      "email": "api-support@example.com"
+    },
+    "license": {
+      "name": "Apache 2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
+    },
+    "version": "2.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://api.example.com/v1",
+      "description": "Production server"
+    },
+    {
+      "url": "https://staging-api.example.com/v1",
+      "description": "Staging server"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Collections",
+      "description": "Collection management operations"
+    },
+    {
+      "name": "Items",
+      "description": "Collection item management"
+    },
+    {
+      "name": "Rules",
+      "description": "Collection rules engine operations"
+    },
+    {
+      "name": "Sharing",
+      "description": "Collection sharing and permissions"
+    },
+    {
+      "name": "Types",
+      "description": "Collection type configuration"
+    }
+  ],
+  "paths": {
+    "/collection-types": {
+      "get": {
+        "tags": ["Types"],
+        "summary": "List available collection types",
+        "operationId": "listCollectionTypes",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Opaque cursor for pagination",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "eyJpZCI6MTIzLCJjcmVhdGVkX2F0IjoiMjAyNS0wOC0yM1QxMjo1OTowMFoifQ=="
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of items per page",
+            "required": false,
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "filter[active]",
+            "in": "query",
+            "description": "Filter by active status",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sort order (- prefix for descending)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "sortOrder",
+                "-sortOrder",
+                "typeName",
+                "-typeName",
+                "createdAt",
+                "-createdAt"
+              ]
+            },
+            "example": "sortOrder"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Collection types retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionTypeListResponse"
+                },
+                "examples": {
+                  "default": {
+                    "$ref": "#/components/examples/CollectionTypeListExample"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Types"],
+        "summary": "Create a new collection type",
+        "operationId": "createCollectionType",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollectionTypeCreateRequest"
+              },
+              "examples": {
+                "project": {
+                  "$ref": "#/components/examples/CollectionTypeCreateExample"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Collection type created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionTypeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          }
+        }
+      }
+    },
+    "/collections": {
+      "get": {
+        "tags": ["Collections"],
+        "summary": "List collections with cursor pagination",
+        "operationId": "listCollections",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Opaque cursor for pagination",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "eyJpZCI6MTIzLCJjcmVhdGVkX2F0IjoiMjAyNS0wOC0yM1QxMjo1OTowMFoifQ=="
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of items per page",
+            "required": false,
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "filter[type]",
+            "in": "query",
+            "description": "Filter by collection type (e.g., project, task)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "project"
+          },
+          {
+            "name": "filter[ownerId]",
+            "in": "query",
+            "description": "Filter by owner user ID",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "user_12345"
+          },
+          {
+            "name": "filter[favorite]",
+            "in": "query",
+            "description": "Filter to only favorite collections",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "filter[status]",
+            "in": "query",
+            "description": "Filter by collection status",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["ACTIVE", "ARCHIVED", "DELETED"]
+            }
+          },
+          {
+            "name": "filter[search]",
+            "in": "query",
+            "description": "Search collections by name or metadata",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filter[parentId]",
+            "in": "query",
+            "description": "Filter by parent collection ID (null for root collections)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sort order (- prefix for descending)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "name",
+                "-name",
+                "createdAt",
+                "-createdAt",
+                "updatedAt",
+                "-updatedAt"
+              ]
+            },
+            "example": "-updatedAt"
+          },
+          {
+            "name": "fields",
+            "in": "query",
+            "description": "Comma-separated list of fields to return",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "id,name,status,itemCount"
+          },
+          {
+            "name": "include",
+            "in": "query",
+            "description": "Include related resources",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["owner", "children", "items", "permissions"]
+            },
+            "example": "owner"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Collections retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionListResponse"
+                },
+                "examples": {
+                  "listWithCursor": {
+                    "$ref": "#/components/examples/CollectionListExample"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Collections"],
+        "summary": "Create a new collection",
+        "operationId": "createCollection",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollectionCreateRequest"
+              },
+              "examples": {
+                "projectCollection": {
+                  "$ref": "#/components/examples/CreateProjectCollectionExample"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Collection created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionCreateResponse"
+                },
+                "examples": {
+                  "created": {
+                    "$ref": "#/components/examples/CollectionCreatedExample"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          }
+        }
+      }
+    },
+    "/collections/{collectionId}": {
+      "get": {
+        "tags": ["Collections"],
+        "summary": "Get collection details",
+        "operationId": "getCollection",
+        "parameters": [
+          {
+            "name": "collectionId",
+            "in": "path",
+            "description": "Unique collection identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "col_98765"
+          },
+          {
+            "name": "include",
+            "in": "query",
+            "description": "Comma-separated list of related resources to include",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "items,children,owner,permissions,rules"
+          },
+          {
+            "name": "fields",
+            "in": "query",
+            "description": "Comma-separated list of fields to return",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "id,name,metadata,status"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Collection details retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionDetailResponse"
+                },
+                "examples": {
+                  "withAllRelations": {
+                    "$ref": "#/components/examples/CollectionDetailExample"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Collections"],
+        "summary": "Delete a collection",
+        "operationId": "deleteCollection",
+        "parameters": [
+          {
+            "name": "collectionId",
+            "in": "path",
+            "description": "Unique collection identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "col_98765"
+          },
+          {
+            "name": "cascade",
+            "in": "query",
+            "description": "Delete child collections and remove items",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Collection deleted successfully"
+          },
+          "400": {
+            "description": "Cannot delete collection with children (when cascade=false)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "tags": ["Collections"],
+        "summary": "Update collection attributes or metadata",
+        "operationId": "updateCollection",
+        "parameters": [
+          {
+            "name": "collectionId",
+            "in": "path",
+            "description": "Unique collection identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "col_98765"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollectionUpdateRequest"
+              },
+              "examples": {
+                "updateMetadata": {
+                  "$ref": "#/components/examples/UpdateCollectionExample"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Collection updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionUpdateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          }
+        }
+      }
+    },
+    "/collections/{collectionId}/items": {
+      "get": {
+        "tags": ["Items"],
+        "summary": "List items in a collection",
+        "operationId": "listCollectionItems",
+        "parameters": [
+          {
+            "name": "collectionId",
+            "in": "path",
+            "description": "Unique collection identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "col_98765"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Opaque cursor for pagination",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "eyJpZCI6MTIzLCJjcmVhdGVkX2F0IjoiMjAyNS0wOC0yM1QxMjo1OTowMFoifQ=="
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of items per page",
+            "required": false,
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "filter[type]",
+            "in": "query",
+            "description": "Filter by item type",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["asset", "workflow", "collection"]
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sort order",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["sortOrder", "-sortOrder", "addedAt", "-addedAt"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Collection items retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionItemsListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Items"],
+        "summary": "Add a single item to collection",
+        "operationId": "addCollectionItem",
+        "parameters": [
+          {
+            "name": "collectionId",
+            "in": "path",
+            "description": "Unique collection identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "col_98765"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollectionItemAddRequest"
+              },
+              "examples": {
+                "addAsset": {
+                  "$ref": "#/components/examples/AddSingleItemExample"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Item added successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionItemResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Item already exists in collection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/collections/{collectionId}/items/batch": {
+      "post": {
+        "tags": ["Items"],
+        "summary": "Add multiple items to collection (batch operation)",
+        "operationId": "batchAddItems",
+        "parameters": [
+          {
+            "name": "collectionId",
+            "in": "path",
+            "description": "Unique collection identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "col_98765"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollectionItemsBatchAddRequest"
+              },
+              "examples": {
+                "batchAdd": {
+                  "$ref": "#/components/examples/BatchAddItemsExample"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Items processed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionItemsBatchResponse"
+                },
+                "examples": {
+                  "batchAddResponse": {
+                    "$ref": "#/components/examples/BatchAddResponseExample"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/collections/{collectionId}/items/batch-remove": {
+      "post": {
+        "tags": ["Items"],
+        "summary": "Remove multiple items from collection (batch operation)",
+        "operationId": "batchRemoveItems",
+        "parameters": [
+          {
+            "name": "collectionId",
+            "in": "path",
+            "description": "Unique collection identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "col_98765"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollectionItemsBatchRemoveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Items removed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionItemsBatchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/collections/{collectionId}/items/{itemId}": {
+      "put": {
+        "tags": ["Items"],
+        "summary": "Update item metadata within collection",
+        "operationId": "updateCollectionItem",
+        "parameters": [
+          {
+            "name": "collectionId",
+            "in": "path",
+            "description": "Unique collection identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "col_98765"
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "description": "Unique item identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "asset_1001"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollectionItemUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Item updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionItemResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Items"],
+        "summary": "Remove single item from collection",
+        "operationId": "removeCollectionItem",
+        "parameters": [
+          {
+            "name": "collectionId",
+            "in": "path",
+            "description": "Unique collection identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "col_98765"
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "description": "Unique item identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "asset_1001"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Item removed successfully"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/collections/{collectionId}/rules": {
+      "get": {
+        "tags": ["Rules"],
+        "summary": "List rules for automatic item assignment",
+        "operationId": "listCollectionRules",
+        "parameters": [
+          {
+            "name": "collectionId",
+            "in": "path",
+            "description": "Unique collection identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "col_98765"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Opaque cursor for pagination",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "eyJpZCI6MTIzLCJjcmVhdGVkX2F0IjoiMjAyNS0wOC0yM1QxMjo1OTowMFoifQ=="
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of items per page",
+            "required": false,
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "filter[active]",
+            "in": "query",
+            "description": "Filter by active status",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rules retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionRulesListResponse"
+                },
+                "examples": {
+                  "rulesExample": {
+                    "$ref": "#/components/examples/CollectionRulesExample"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Rules"],
+        "summary": "Add a new rule for automatic item assignment",
+        "operationId": "createCollectionRule",
+        "parameters": [
+          {
+            "name": "collectionId",
+            "in": "path",
+            "description": "Unique collection identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "col_98765"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollectionRuleCreateRequest"
+              },
+              "examples": {
+                "semanticRule": {
+                  "$ref": "#/components/examples/SemanticRuleExample"
+                },
+                "metadataRule": {
+                  "$ref": "#/components/examples/MetadataRuleExample"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Rule created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionRuleResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          }
+        }
+      }
+    },
+    "/collections/{collectionId}/rules/{ruleId}": {
+      "put": {
+        "tags": ["Rules"],
+        "summary": "Update an existing rule",
+        "operationId": "updateCollectionRule",
+        "parameters": [
+          {
+            "name": "collectionId",
+            "in": "path",
+            "description": "Unique collection identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "col_98765"
+          },
+          {
+            "name": "ruleId",
+            "in": "path",
+            "description": "Unique rule identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "rule_543"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollectionRuleUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Rule updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionRuleResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Rules"],
+        "summary": "Delete a rule",
+        "operationId": "deleteCollectionRule",
+        "parameters": [
+          {
+            "name": "collectionId",
+            "in": "path",
+            "description": "Unique collection identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "col_98765"
+          },
+          {
+            "name": "ruleId",
+            "in": "path",
+            "description": "Unique rule identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "rule_543"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Rule deleted successfully"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/collections/{collectionId}/share": {
+      "get": {
+        "tags": ["Sharing"],
+        "summary": "List all users and groups with access",
+        "operationId": "listCollectionShares",
+        "parameters": [
+          {
+            "name": "collectionId",
+            "in": "path",
+            "description": "Unique collection identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "col_98765"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Opaque cursor for pagination",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "eyJpZCI6MTIzLCJjcmVhdGVkX2F0IjoiMjAyNS0wOC0yM1QxMjo1OTowMFoifQ=="
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of items per page",
+            "required": false,
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Shared users retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListSharedUsersResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Sharing"],
+        "summary": "Share collection with users or groups",
+        "operationId": "shareCollection",
+        "parameters": [
+          {
+            "name": "collectionId",
+            "in": "path",
+            "description": "Unique collection identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "col_98765"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShareCollectionRequest"
+              },
+              "examples": {
+                "shareWithUser": {
+                  "$ref": "#/components/examples/ShareWithUserExample"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Collection shared successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareCollectionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "User already has access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/collections/{collectionId}/share/{userId}": {
+      "delete": {
+        "tags": ["Sharing"],
+        "summary": "Remove user's access to collection",
+        "operationId": "unshareCollection",
+        "parameters": [
+          {
+            "name": "collectionId",
+            "in": "path",
+            "description": "Unique collection identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "col_98765"
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "description": "Unique user identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "user_12345"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Access removed successfully"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/collections/shared-with-me": {
+      "get": {
+        "tags": ["Sharing"],
+        "summary": "List collections shared with current user",
+        "operationId": "listSharedCollections",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Opaque cursor for pagination",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "eyJpZCI6MTIzLCJjcmVhdGVkX2F0IjoiMjAyNS0wOC0yM1QxMjo1OTowMFoifQ=="
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of items per page",
+            "required": false,
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "filter[role]",
+            "in": "query",
+            "description": "Filter by permission level",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["viewer", "editor", "admin", "owner"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Shared collections retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "SuccessResponse": {
+        "required": ["data", "meta", "success"],
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "object"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ResponseMeta"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "required": ["error", "meta", "success"],
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse_error"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ResponseMeta"
+          }
+        }
+      },
+      "ValidationErrorResponse": {
+        "required": ["error", "meta", "success"],
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "error": {
+            "$ref": "#/components/schemas/ValidationErrorResponse_error"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ResponseMeta"
+          }
+        }
+      },
+      "ResponseMeta": {
+        "required": ["timestamp", "version"],
+        "type": "object",
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-08-23T13:04:00Z"
+          },
+          "version": {
+            "type": "string",
+            "example": "v1"
+          },
+          "request_id": {
+            "type": "string",
+            "example": "req_123abc456"
+          }
+        }
+      },
+      "CursorPagination": {
+        "required": ["has_next_page", "has_prev_page", "limit"],
+        "type": "object",
+        "properties": {
+          "next_cursor": {
+            "type": "string",
+            "example": "eyJpZCI6MTQwLCJjcmVhdGVkX2F0IjoiMjAyNS0wOC0yM1QxMzo0NTowMFoifQ=="
+          },
+          "prev_cursor": {
+            "type": "string",
+            "example": "eyJpZCI6MTIwLCJjcmVhdGVkX2F0IjoiMjAyNS0wOC0yM1QxMjozMDowMFoifQ=="
+          },
+          "has_next_page": {
+            "type": "boolean"
+          },
+          "has_prev_page": {
+            "type": "boolean"
+          },
+          "limit": {
+            "type": "integer",
+            "example": 20
+          }
+        }
+      },
+      "CollectionTypeCreateRequest": {
+        "required": ["allowedItemTypes", "typeName"],
+        "type": "object",
+        "properties": {
+          "typeName": {
+            "type": "string",
+            "example": "Project"
+          },
+          "description": {
+            "type": "string",
+            "example": "Project collections for organizing work"
+          },
+          "allowedItemTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["asset", "workflow", "collection"]
+            }
+          },
+          "icon": {
+            "type": "string",
+            "example": "folder-project"
+          },
+          "color": {
+            "type": "string",
+            "example": "#4A90E2"
+          },
+          "metadataSchema": {
+            "type": "object",
+            "description": "JSON Schema for metadata validation"
+          }
+        }
+      },
+      "CollectionTypeResource": {
+        "required": [
+          "allowedItemTypes",
+          "createdAt",
+          "id",
+          "isActive",
+          "typeName",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "type_project"
+          },
+          "typeName": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "allowedItemTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "icon": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "metadataSchema": {
+            "type": "object"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CollectionTypeListResponse": {
+        "required": ["data", "meta", "pagination", "success"],
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CollectionTypeResource"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/CursorPagination"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ResponseMeta"
+          }
+        }
+      },
+      "CollectionTypeResponse": {
+        "required": ["data", "meta", "success"],
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/CollectionTypeResource"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ResponseMeta"
+          }
+        }
+      },
+      "CollectionCreateRequest": {
+        "required": ["name"],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Q3 Marketing Campaign"
+          },
+          "description": {
+            "type": "string",
+            "example": "Marketing materials for Q3 2025"
+          },
+          "collectionTypeId": {
+            "type": "string",
+            "example": "type_project"
+          },
+          "parentId": {
+            "type": "string",
+            "description": "Parent collection ID for nesting"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "example": {
+              "department": "Marketing",
+              "client": "Acme Corp",
+              "deadline": "2025-09-30"
+            }
+          },
+          "tags": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "example": {
+              "environment": "production",
+              "priority": "high"
+            }
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "Optional TTL for temporary collections",
+            "format": "date-time"
+          }
+        }
+      },
+      "CollectionResource": {
+        "required": [
+          "childCollectionCount",
+          "createdAt",
+          "id",
+          "itemCount",
+          "name",
+          "ownerId",
+          "status",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "col_98765"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "collectionTypeId": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": "string"
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "tags": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": ["ACTIVE", "ARCHIVED", "DELETED"]
+          },
+          "itemCount": {
+            "type": "integer",
+            "example": 42
+          },
+          "childCollectionCount": {
+            "type": "integer",
+            "example": 3
+          },
+          "isFavorite": {
+            "type": "boolean"
+          },
+          "userRole": {
+            "type": "string",
+            "enum": ["owner", "admin", "editor", "viewer"]
+          },
+          "inheritedMetadata": {
+            "type": "object",
+            "description": "Metadata inherited from parent collections"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CollectionCreateResponse": {
+        "required": ["data", "meta", "success"],
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/CollectionResource"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ResponseMeta"
+          }
+        }
+      },
+      "CollectionListResponse": {
+        "required": ["data", "meta", "pagination", "success"],
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CollectionResource"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/CursorPagination"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ResponseMeta"
+          }
+        }
+      },
+      "CollectionDetailResponse": {
+        "required": ["data", "meta", "success"],
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CollectionResource"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "children": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/CollectionResource"
+                    }
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/ItemResource"
+                    }
+                  },
+                  "owner": {
+                    "$ref": "#/components/schemas/UserResource"
+                  },
+                  "rules": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/RuleResource"
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ResponseMeta"
+          }
+        }
+      },
+      "CollectionUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "tags": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": ["ACTIVE", "ARCHIVED"]
+          }
+        }
+      },
+      "CollectionUpdateResponse": {
+        "required": ["data", "meta", "success"],
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/CollectionResource"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ResponseMeta"
+          }
+        }
+      },
+      "CollectionItemAddRequest": {
+        "required": ["id", "type"],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["asset", "workflow", "collection"]
+          },
+          "id": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "integer"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Item-specific metadata within this collection"
+          }
+        }
+      },
+      "CollectionItemsBatchAddRequest": {
+        "required": ["items"],
+        "type": "object",
+        "properties": {
+          "items": {
+            "maxItems": 100,
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CollectionItemsBatchAddRequest_items"
+            }
+          }
+        }
+      },
+      "CollectionItemsBatchRemoveRequest": {
+        "required": ["items"],
+        "type": "object",
+        "properties": {
+          "items": {
+            "maxItems": 100,
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CollectionItemsBatchRemoveRequest_items"
+            }
+          }
+        }
+      },
+      "CollectionItemUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "sortOrder": {
+            "type": "integer"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "ItemResource": {
+        "required": ["addedAt", "addedBy", "id", "itemId", "itemType"],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "item_abc123"
+          },
+          "itemType": {
+            "type": "string",
+            "enum": ["asset", "workflow", "collection"]
+          },
+          "itemId": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "integer"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "addedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "addedBy": {
+            "type": "string"
+          }
+        }
+      },
+      "CollectionItemResponse": {
+        "required": ["data", "meta", "success"],
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/ItemResource"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ResponseMeta"
+          }
+        }
+      },
+      "CollectionItemsBatchResponse": {
+        "required": ["data", "meta", "success"],
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemResource"
+            }
+          },
+          "meta": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ResponseMeta"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "processed": {
+                    "type": "integer",
+                    "example": 10
+                  },
+                  "successful": {
+                    "type": "integer",
+                    "example": 9
+                  },
+                  "failed": {
+                    "type": "integer",
+                    "example": 1
+                  }
+                }
+              }
+            ]
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CollectionItemsBatchResponse_errors"
+            }
+          }
+        }
+      },
+      "CollectionItemsListResponse": {
+        "required": ["data", "meta", "pagination", "success"],
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemResource"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/CursorPagination"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ResponseMeta"
+          }
+        }
+      },
+      "CollectionRuleCreateRequest": {
+        "required": ["criteria", "name", "ruleType"],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Purple Car Images"
+          },
+          "description": {
+            "type": "string"
+          },
+          "ruleType": {
+            "type": "string",
+            "enum": ["semantic", "metadata", "keyword", "composite"]
+          },
+          "criteria": {
+            "type": "object",
+            "description": "Rule-specific criteria"
+          },
+          "isActive": {
+            "type": "boolean",
+            "default": true
+          },
+          "priority": {
+            "type": "integer",
+            "description": "Higher priority rules are evaluated first",
+            "default": 0
+          }
+        }
+      },
+      "CollectionRuleUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "criteria": {
+            "type": "object"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "priority": {
+            "type": "integer"
+          }
+        }
+      },
+      "RuleResource": {
+        "required": [
+          "createdAt",
+          "criteria",
+          "id",
+          "isActive",
+          "name",
+          "ruleType",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "rule_543"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "ruleType": {
+            "type": "string",
+            "enum": ["semantic", "metadata", "keyword", "composite"]
+          },
+          "criteria": {
+            "type": "object"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "priority": {
+            "type": "integer"
+          },
+          "matchCount": {
+            "type": "integer",
+            "description": "Number of items currently matching this rule"
+          },
+          "lastEvaluatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CollectionRuleResponse": {
+        "required": ["data", "meta", "success"],
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/RuleResource"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ResponseMeta"
+          }
+        }
+      },
+      "CollectionRulesListResponse": {
+        "required": ["data", "meta", "pagination", "success"],
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleResource"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/CursorPagination"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ResponseMeta"
+          }
+        }
+      },
+      "ShareCollectionRequest": {
+        "required": ["role", "targetId", "targetType"],
+        "type": "object",
+        "properties": {
+          "targetType": {
+            "type": "string",
+            "enum": ["user", "group"]
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "description": "Permission levels:\n- viewer: Read-only access\n- editor: Add/remove items and modify metadata\n- admin: Manage permissions and settings\n",
+            "enum": ["viewer", "editor", "admin"]
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "Optional expiration for temporary shares",
+            "format": "date-time"
+          }
+        }
+      },
+      "ShareResource": {
+        "required": ["id", "role", "sharedAt", "targetId", "targetType"],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "share_789"
+          },
+          "targetType": {
+            "type": "string",
+            "enum": ["user", "group"]
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["viewer", "editor", "admin"]
+          },
+          "sharedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sharedBy": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ShareCollectionResponse": {
+        "required": ["data", "meta", "success"],
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/ShareResource"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ResponseMeta"
+          }
+        }
+      },
+      "ListSharedUsersResponse": {
+        "required": ["data", "meta", "pagination", "success"],
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShareResource"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/CursorPagination"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ResponseMeta"
+          }
+        }
+      },
+      "UserResource": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "user_12345"
+          },
+          "username": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "avatarUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "ErrorResponse_error": {
+        "required": ["code", "message"],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "ERROR_CODE"
+          },
+          "message": {
+            "type": "string",
+            "example": "Human-readable error description"
+          }
+        }
+      },
+      "ValidationErrorResponse_error_details": {
+        "required": ["code", "field", "message"],
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          }
+        }
+      },
+      "ValidationErrorResponse_error": {
+        "required": ["code", "details", "message"],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "VALIDATION_ERROR"
+          },
+          "message": {
+            "type": "string",
+            "example": "Validation failed"
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationErrorResponse_error_details"
+            }
+          }
+        }
+      },
+      "CollectionItemsBatchAddRequest_items": {
+        "required": ["id", "type"],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["asset", "workflow", "collection"]
+          },
+          "id": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "integer"
+          },
+          "metadata": {
+            "type": "object"
+          }
+        }
+      },
+      "CollectionItemsBatchRemoveRequest_items": {
+        "required": ["id", "type"],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["asset", "workflow", "collection"]
+          },
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "CollectionItemsBatchResponse_errors": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Bad request - Invalid input data",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "success": false,
+              "error": {
+                "code": "BAD_REQUEST",
+                "message": "Invalid request parameters"
+              },
+              "meta": {
+                "timestamp": "2025-08-23T13:04:00Z",
+                "version": "v1",
+                "request_id": "req_abc123"
+              }
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Unauthorized - Authentication required",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "success": false,
+              "error": {
+                "code": "AUTHENTICATION_REQUIRED",
+                "message": "Missing or invalid authentication token"
+              },
+              "meta": {
+                "timestamp": "2025-08-23T13:04:00Z",
+                "version": "v1",
+                "request_id": "req_abc124"
+              }
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Forbidden - Insufficient permissions",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "success": false,
+              "error": {
+                "code": "INSUFFICIENT_PERMISSIONS",
+                "message": "You don't have permission to access this resource"
+              },
+              "meta": {
+                "timestamp": "2025-08-23T13:04:00Z",
+                "version": "v1",
+                "request_id": "req_abc125"
+              }
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "success": false,
+              "error": {
+                "code": "RESOURCE_NOT_FOUND",
+                "message": "The requested resource was not found"
+              },
+              "meta": {
+                "timestamp": "2025-08-23T13:04:00Z",
+                "version": "v1",
+                "request_id": "req_abc126"
+              }
+            }
+          }
+        }
+      },
+      "ValidationError": {
+        "description": "Validation error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ValidationErrorResponse"
+            },
+            "example": {
+              "success": false,
+              "error": {
+                "code": "VALIDATION_ERROR",
+                "message": "The request could not be processed due to validation errors",
+                "details": [
+                  {
+                    "field": "name",
+                    "message": "Name is required",
+                    "code": "REQUIRED_FIELD"
+                  },
+                  {
+                    "field": "metadata.budget",
+                    "message": "Budget must be a positive number",
+                    "code": "INVALID_VALUE"
+                  }
+                ]
+              },
+              "meta": {
+                "timestamp": "2025-08-23T13:04:00Z",
+                "version": "v1",
+                "request_id": "req_abc127"
+              }
+            }
+          }
+        }
+      },
+      "InternalServerError": {
+        "description": "Internal server error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "success": false,
+              "error": {
+                "code": "INTERNAL_SERVER_ERROR",
+                "message": "An unexpected error occurred"
+              },
+              "meta": {
+                "timestamp": "2025-08-23T13:04:00Z",
+                "version": "v1",
+                "request_id": "req_abc128"
+              }
+            }
+          }
+        }
+      }
+    },
+    "parameters": {
+      "CursorParam": {
+        "name": "cursor",
+        "in": "query",
+        "description": "Opaque cursor for pagination",
+        "required": false,
+        "schema": {
+          "type": "string"
+        },
+        "example": "eyJpZCI6MTIzLCJjcmVhdGVkX2F0IjoiMjAyNS0wOC0yM1QxMjo1OTowMFoifQ=="
+      },
+      "LimitParam": {
+        "name": "limit",
+        "in": "query",
+        "description": "Number of items per page",
+        "required": false,
+        "schema": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer",
+          "default": 20
+        }
+      },
+      "collectionId": {
+        "name": "collectionId",
+        "in": "path",
+        "description": "Unique collection identifier",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "example": "col_98765"
+      },
+      "itemId": {
+        "name": "itemId",
+        "in": "path",
+        "description": "Unique item identifier",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "example": "asset_1001"
+      },
+      "ruleId": {
+        "name": "ruleId",
+        "in": "path",
+        "description": "Unique rule identifier",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "example": "rule_543"
+      },
+      "userId": {
+        "name": "userId",
+        "in": "path",
+        "description": "Unique user identifier",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "example": "user_12345"
+      }
+    },
+    "examples": {
+      "CollectionTypeListExample": {
+        "value": {
+          "success": true,
+          "data": [
+            {
+              "id": "type_project",
+              "typeName": "Project",
+              "description": "Project collections for organizing work",
+              "allowedItemTypes": ["asset", "workflow", "collection"],
+              "icon": "folder-project",
+              "color": "#4A90E2",
+              "isActive": true,
+              "sortOrder": 1,
+              "createdAt": "2025-01-15T10:00:00Z",
+              "updatedAt": "2025-01-15T10:00:00Z"
+            }
+          ],
+          "pagination": {
+            "next_cursor": "eyJpZCI6InR5cGVfdGFzayIsImNyZWF0ZWRfYXQiOiIyMDI1LTAxLTE1VDEwOjAwOjAwWiJ9",
+            "has_next_page": true,
+            "has_prev_page": false,
+            "limit": 20
+          },
+          "meta": {
+            "timestamp": "2025-08-23T13:04:00Z",
+            "version": "v1"
+          }
+        }
+      },
+      "CollectionTypeCreateExample": {
+        "value": {
+          "typeName": "Campaign",
+          "description": "Marketing campaign collections",
+          "allowedItemTypes": ["asset", "workflow"],
+          "icon": "megaphone",
+          "color": "#FF6B6B",
+          "metadataSchema": {
+            "type": "object",
+            "required": ["startDate", "endDate", "budget"],
+            "properties": {
+              "startDate": {
+                "type": "string",
+                "format": "date"
+              },
+              "endDate": {
+                "type": "string",
+                "format": "date"
+              },
+              "budget": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      },
+      "CreateProjectCollectionExample": {
+        "value": {
+          "name": "Q3 Marketing Campaign",
+          "description": "All assets for Q3 2025 marketing push",
+          "collectionTypeId": "type_project",
+          "metadata": {
+            "department": "Marketing",
+            "client": "Acme Corp",
+            "deadline": "2025-09-30",
+            "budget": 150000
+          },
+          "tags": {
+            "environment": "production",
+            "priority": "high"
+          }
+        }
+      },
+      "CollectionCreatedExample": {
+        "value": {
+          "success": true,
+          "data": {
+            "id": "col_98765",
+            "name": "Q3 Marketing Campaign",
+            "description": "All assets for Q3 2025 marketing push",
+            "collectionTypeId": "type_project",
+            "ownerId": "user_12345",
+            "metadata": {
+              "department": "Marketing",
+              "client": "Acme Corp",
+              "deadline": "2025-09-30",
+              "budget": 150000
+            },
+            "tags": {
+              "environment": "production",
+              "priority": "high"
+            },
+            "status": "ACTIVE",
+            "itemCount": 0,
+            "childCollectionCount": 0,
+            "isFavorite": false,
+            "userRole": "owner",
+            "createdAt": "2025-07-24T18:54:00Z",
+            "updatedAt": "2025-07-24T18:54:00Z"
+          },
+          "meta": {
+            "timestamp": "2025-07-24T18:54:00Z",
+            "version": "v1",
+            "request_id": "req_abc123"
+          }
+        }
+      },
+      "CollectionListExample": {
+        "value": {
+          "success": true,
+          "data": [
+            {
+              "id": "col_98765",
+              "name": "Q3 Marketing Campaign",
+              "collectionTypeId": "type_project",
+              "ownerId": "user_12345",
+              "metadata": {
+                "department": "Marketing"
+              },
+              "status": "ACTIVE",
+              "itemCount": 15,
+              "childCollectionCount": 3,
+              "isFavorite": true,
+              "userRole": "owner",
+              "createdAt": "2025-07-24T18:54:00Z",
+              "updatedAt": "2025-07-25T10:30:00Z"
+            }
+          ],
+          "pagination": {
+            "next_cursor": "eyJpZCI6ImNvbF85ODc2NiIsImNyZWF0ZWRfYXQiOiIyMDI1LTA3LTI0VDE5OjAwOjAwWiJ9",
+            "has_next_page": true,
+            "has_prev_page": false,
+            "limit": 20
+          },
+          "meta": {
+            "timestamp": "2025-08-23T13:04:00Z",
+            "version": "v1"
+          }
+        }
+      },
+      "CollectionDetailExample": {
+        "value": {
+          "success": true,
+          "data": {
+            "id": "col_98765",
+            "name": "Q3 Marketing Campaign",
+            "description": "All assets for Q3 2025 marketing push",
+            "collectionTypeId": "type_project",
+            "ownerId": "user_12345",
+            "metadata": {
+              "department": "Marketing",
+              "client": "Acme Corp"
+            },
+            "status": "ACTIVE",
+            "itemCount": 2,
+            "childCollectionCount": 1,
+            "createdAt": "2025-07-24T18:54:00Z",
+            "updatedAt": "2025-07-25T10:30:00Z",
+            "children": [
+              {
+                "id": "col_98766",
+                "name": "Banner Designs",
+                "collectionTypeId": "type_task",
+                "status": "ACTIVE"
+              }
+            ],
+            "items": [
+              {
+                "id": "item_001",
+                "itemType": "asset",
+                "itemId": "asset_1001",
+                "addedAt": "2025-07-24T19:00:00Z",
+                "addedBy": "user_12345"
+              }
+            ]
+          },
+          "meta": {
+            "timestamp": "2025-08-23T13:04:00Z",
+            "version": "v1"
+          }
+        }
+      },
+      "UpdateCollectionExample": {
+        "value": {
+          "name": "Q3 Campaign - Updated",
+          "metadata": {
+            "department": "Digital Marketing",
+            "status": "completed"
+          }
+        }
+      },
+      "AddSingleItemExample": {
+        "value": {
+          "type": "asset",
+          "id": "asset_1003",
+          "sortOrder": 1,
+          "metadata": {
+            "featured": true,
+            "position": "hero"
+          }
+        }
+      },
+      "BatchAddItemsExample": {
+        "value": {
+          "items": [
+            {
+              "type": "asset",
+              "id": "asset_1003",
+              "sortOrder": 1
+            },
+            {
+              "type": "asset",
+              "id": "asset_1004",
+              "sortOrder": 2
+            },
+            {
+              "type": "workflow",
+              "id": "workflow_501",
+              "sortOrder": 3
+            }
+          ]
+        }
+      },
+      "BatchAddResponseExample": {
+        "value": {
+          "success": true,
+          "data": [
+            {
+              "id": "item_abc123",
+              "itemType": "asset",
+              "itemId": "asset_1003",
+              "sortOrder": 1,
+              "addedAt": "2025-07-25T10:00:00Z",
+              "addedBy": "user_12345"
+            },
+            {
+              "id": "item_abc124",
+              "itemType": "asset",
+              "itemId": "asset_1004",
+              "sortOrder": 2,
+              "addedAt": "2025-07-25T10:00:01Z",
+              "addedBy": "user_12345"
+            }
+          ],
+          "meta": {
+            "timestamp": "2025-07-25T10:00:01Z",
+            "version": "v1",
+            "processed": 3,
+            "successful": 2,
+            "failed": 1
+          },
+          "errors": [
+            {
+              "index": 2,
+              "id": "workflow_501",
+              "error": "NOT_FOUND",
+              "detail": "Workflow with ID workflow_501 not found"
+            }
+          ]
+        }
+      },
+      "SemanticRuleExample": {
+        "value": {
+          "name": "Purple Racing Cars",
+          "description": "Automatically add images of purple racing cars",
+          "ruleType": "semantic",
+          "criteria": {
+            "searchPhrase": "purple car racing on track",
+            "threshold": 0.75
+          },
+          "isActive": true,
+          "priority": 10
+        }
+      },
+      "MetadataRuleExample": {
+        "value": {
+          "name": "High-Res Marketing Images",
+          "description": "Auto-add high resolution marketing images",
+          "ruleType": "metadata",
+          "criteria": {
+            "conditions": [
+              {
+                "field": "width",
+                "operator": "greater_than",
+                "value": 1920
+              },
+              {
+                "field": "department",
+                "operator": "equals",
+                "value": "Marketing"
+              },
+              {
+                "field": "fileType",
+                "operator": "in",
+                "value": ["jpg", "png", "webp"]
+              }
+            ],
+            "matchAll": true
+          },
+          "isActive": true
+        }
+      },
+      "CollectionRulesExample": {
+        "value": {
+          "success": true,
+          "data": [
+            {
+              "id": "rule_543",
+              "name": "Purple Racing Cars",
+              "ruleType": "semantic",
+              "criteria": {
+                "searchPhrase": "purple car racing on track",
+                "threshold": 0.75
+              },
+              "isActive": true,
+              "priority": 10,
+              "matchCount": 42,
+              "lastEvaluatedAt": "2025-07-25T09:00:00Z",
+              "createdAt": "2025-07-20T10:00:00Z",
+              "updatedAt": "2025-07-20T10:00:00Z"
+            }
+          ],
+          "pagination": {
+            "has_next_page": false,
+            "has_prev_page": false,
+            "limit": 20
+          },
+          "meta": {
+            "timestamp": "2025-08-23T13:04:00Z",
+            "version": "v1"
+          }
+        }
+      },
+      "ShareWithUserExample": {
+        "value": {
+          "targetType": "user",
+          "targetId": "user_67890",
+          "role": "editor",
+          "expiresAt": "2025-12-31T23:59:59Z"
+        }
+      }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}

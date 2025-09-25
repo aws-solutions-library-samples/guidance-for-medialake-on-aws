@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box,
@@ -21,6 +21,8 @@ import SearchFilters from "@/components/search/SearchFilters";
 import MasterResultsView from "@/components/search/MasterResultsView";
 import TabbedSidebar from "@/components/common/RightSidebar/TabbedSidebar";
 import ApiStatusModal from "@/components/ApiStatusModal";
+import { AddToCollectionModal } from "@/components/collections/AddToCollectionModal";
+import { useAddItemToCollection } from "@/api/hooks/useCollections";
 import { type AssetItem, type Filters, type ExpandedSections } from "./types";
 import { getOriginalAssetId } from "@/utils/clipTransformation";
 
@@ -186,6 +188,13 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
 }) => {
   const navigate = useNavigate();
 
+  // Add to Collection state
+  const [addToCollectionModalOpen, setAddToCollectionModalOpen] =
+    useState(false);
+  const [selectedAssetForCollection, setSelectedAssetForCollection] =
+    useState<AssetItem | null>(null);
+  const addItemToCollectionMutation = useAddItemToCollection();
+
   const handleAssetClick = useCallback(
     (asset: AssetItem) => {
       const assetType = asset.DigitalSourceAsset.Type.toLowerCase();
@@ -202,6 +211,41 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
       });
     },
     [navigate, query],
+  );
+
+  // Handle Add to Collection click
+  const handleAddToCollectionClick = useCallback(
+    (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => {
+      console.log("Add to Collection clicked!", asset);
+      event.stopPropagation();
+      setSelectedAssetForCollection(asset);
+      setAddToCollectionModalOpen(true);
+    },
+    [],
+  );
+
+  // Handle actually adding the asset to a collection
+  const handleAddToCollection = useCallback(
+    async (collectionId: string) => {
+      if (!selectedAssetForCollection) return;
+
+      const assetId = getOriginalAssetId(selectedAssetForCollection);
+
+      await addItemToCollectionMutation.mutateAsync({
+        collectionId,
+        data: {
+          type: "asset",
+          id: assetId,
+          metadata: {
+            assetType: selectedAssetForCollection.DigitalSourceAsset.Type,
+            fileName:
+              selectedAssetForCollection.DigitalSourceAsset.MainRepresentation
+                .StorageInfo.PrimaryLocation.ObjectKey.Name,
+          },
+        },
+      });
+    },
+    [selectedAssetForCollection, addItemToCollectionMutation],
   );
 
   const handlePageChange = (newPage: number) => {
@@ -472,6 +516,7 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
                 onAssetClick={handleAssetClick}
                 onDeleteClick={assetOperations.handleDeleteClick}
                 onMenuClick={assetOperations.handleDownloadClick}
+                onAddToCollectionClick={handleAddToCollectionClick}
                 onEditClick={assetOperations.handleStartEditing}
                 onEditNameChange={assetOperations.handleNameChange}
                 onEditNameComplete={assetOperations.handleNameEditComplete}
@@ -580,6 +625,24 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
           action={assetSelection.modalState.action}
           message={assetSelection.modalState.message}
         />
+
+        {/* Add to Collection Modal */}
+        {selectedAssetForCollection && (
+          <AddToCollectionModal
+            open={addToCollectionModalOpen}
+            onClose={() => {
+              setAddToCollectionModalOpen(false);
+              setSelectedAssetForCollection(null);
+            }}
+            assetId={getOriginalAssetId(selectedAssetForCollection)}
+            assetName={
+              selectedAssetForCollection.DigitalSourceAsset.MainRepresentation
+                .StorageInfo.PrimaryLocation.ObjectKey.Name
+            }
+            assetType={selectedAssetForCollection.DigitalSourceAsset.Type}
+            onAddToCollection={handleAddToCollection}
+          />
+        )}
       </>
     </RightSidebarProvider>
   );

@@ -10,6 +10,7 @@ import GroupBasedAccess from "@/components/examples/GroupBasedAccess";
 import Home from "@/pages/Home";
 import SearchPage from "@/pages/SearchPage";
 import AssetsPage from "@/pages/AssetsPage";
+import CollectionsPage from "@/pages/CollectionsPage";
 import UploadDemo from "@/pages/UploadDemo";
 import { S3Explorer } from "@/features/home/S3Explorer";
 import { ExecutionsPage } from "@/features/executions";
@@ -90,6 +91,10 @@ export const router = createBrowserRouter([
             element={<UploadDemo />}
           />
         ),
+      },
+      {
+        path: "collections",
+        element: <CollectionsPage />,
       },
       {
         path: "executions",

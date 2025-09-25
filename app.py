@@ -33,6 +33,7 @@ from medialake_stacks.cognito_update_stack import (
     CognitoUpdateStack,
     CognitoUpdateStackProps,
 )
+from medialake_stacks.collections_stack import CollectionsStack, CollectionsStackProps
 from medialake_stacks.groups_stack import GroupsStack, GroupsStackProps
 from medialake_stacks.integrations_environment_stack import (
     IntegrationsEnvironmentStack,
@@ -311,6 +312,22 @@ class MediaLakeStack(cdk.Stack):
         # Store reference to users_groups_roles_stack
         self._users_groups_roles_stack = users_groups_roles_stack
 
+        # Create the Collections Stack
+        collections_stack = CollectionsStack(
+            self,
+            "MediaLakeCollectionsStack",
+            props=CollectionsStackProps(
+                cognito_user_pool=props.cognito_stack.user_pool,
+                x_origin_verify_secret=self.shared_x_origin_secret,
+                authorizer=api_gateway_stack.authorizer,
+                api_resource=self.shared_rest_api,
+            ),
+        )
+        collections_stack.add_dependency(props.authorization_stack)
+
+        # Store reference to collections_stack
+        self._collections_stack = collections_stack
+
         groups_stack = GroupsStack(
             self,
             "MediaLakeGroups",
@@ -458,6 +475,9 @@ class MediaLakeStack(cdk.Stack):
 
         if hasattr(self, "_pipeline_stack"):
             props.resource_collector.add_resource(self._pipeline_stack)
+
+        if hasattr(self, "_collections_stack"):
+            props.resource_collector.add_resource(self._collections_stack)
 
     @property
     def connector_table(self):

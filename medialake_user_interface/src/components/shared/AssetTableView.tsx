@@ -12,6 +12,10 @@ interface AssetTableViewProps<T> {
   onAssetClick: (asset: T) => void;
   onDeleteClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onDownloadClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
+  onAddToCollectionClick?: (
+    asset: T,
+    event: React.MouseEvent<HTMLElement>,
+  ) => void;
   onEditClick?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onEditNameComplete?: (asset: T, save: boolean, value?: string) => void;
@@ -25,9 +29,9 @@ interface AssetTableViewProps<T> {
   onSelectToggle?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   isFavorite?: (asset: T) => boolean;
   onFavoriteToggle?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
-  selectedSearchFields?: string[]; // Add selectedSearchFields prop
-  isRenaming?: boolean; // Add isRenaming prop for loading state
-  renamingAssetId?: string; // ID of the asset currently being renamed
+  selectedSearchFields?: string[];
+  isRenaming?: boolean;
+  renamingAssetId?: string;
 }
 
 function AssetTableView<T>({
@@ -39,6 +43,7 @@ function AssetTableView<T>({
   onAssetClick,
   onDeleteClick,
   onDownloadClick,
+  onAddToCollectionClick,
   onEditClick,
   onEditNameChange,
   onEditNameComplete,
@@ -95,6 +100,7 @@ function AssetTableView<T>({
         onSortingChange={onSortChange}
         onDeleteClick={onDeleteClick}
         onDownloadClick={onDownloadClick}
+        onAddToCollectionClick={onAddToCollectionClick}
         onEditClick={onEditClick}
         onAssetClick={onAssetClick}
         getThumbnailUrl={getAssetThumbnail}
@@ -144,6 +150,7 @@ function AssetTableView<T>({
               onSortingChange={onSortChange}
               onDeleteClick={onDeleteClick}
               onDownloadClick={onDownloadClick}
+              onAddToCollectionClick={onAddToCollectionClick}
               onEditClick={onEditClick}
               onAssetClick={onAssetClick}
               getThumbnailUrl={getAssetThumbnail}
