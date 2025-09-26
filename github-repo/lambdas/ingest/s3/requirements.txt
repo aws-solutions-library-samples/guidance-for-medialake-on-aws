@@ -1,5 +1,0 @@
-python-magic>=0.4.27
-Pillow>=9.4.0
-ffmpeg-python>=0.2.0
-mutagen>=1.46.0
-boto3==1.39.9
