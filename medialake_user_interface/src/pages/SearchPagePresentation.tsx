@@ -147,6 +147,12 @@ interface SearchPagePresentationProps {
     selectedAsset?: AssetItem;
   };
 
+  // Add to Collection handler
+  onAddToCollectionClick?: (
+    asset: AssetItem,
+    event: React.MouseEvent<HTMLElement>,
+  ) => void;
+
   // Feature flags
   multiSelectEnabled: boolean;
 
@@ -179,6 +185,7 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
   assetSelection,
   assetFavorites,
   assetOperations,
+  onAddToCollectionClick,
   multiSelectEnabled,
   isLoading,
   isFetching,
@@ -516,7 +523,7 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
                 onAssetClick={handleAssetClick}
                 onDeleteClick={assetOperations.handleDeleteClick}
                 onMenuClick={assetOperations.handleDownloadClick}
-                onAddToCollectionClick={handleAddToCollectionClick}
+                onAddToCollectionClick={onAddToCollectionClick}
                 onEditClick={assetOperations.handleStartEditing}
                 onEditNameChange={assetOperations.handleNameChange}
                 onEditNameComplete={assetOperations.handleNameEditComplete}

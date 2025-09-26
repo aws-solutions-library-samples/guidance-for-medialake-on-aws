@@ -21,6 +21,8 @@ import {
   Snackbar,
   Alert,
 } from "@mui/material";
+import { AddToCollectionModal } from "@/components/collections/AddToCollectionModal";
+import { useAddItemToCollection } from "@/api/hooks/useCollections";
 import SearchOffIcon from "@mui/icons-material/SearchOff";
 import {
   RightSidebar,
@@ -105,6 +107,13 @@ interface SelectedAsset {
 
 const SearchPage: React.FC = () => {
   const location = useLocation();
+
+  // Add to Collection state
+  const [addToCollectionModalOpen, setAddToCollectionModalOpen] =
+    useState(false);
+  const [selectedAssetForCollection, setSelectedAssetForCollection] =
+    useState<AssetItem | null>(null);
+  const addItemToCollectionMutation = useAddItemToCollection();
   const {
     query,
     isSemantic,
@@ -355,6 +364,41 @@ const SearchPage: React.FC = () => {
       });
     },
     [navigate, currentQuery],
+  );
+
+  // Handle Add to Collection click
+  const handleAddToCollectionClick = useCallback(
+    (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => {
+      console.log("SearchPage: Add to Collection clicked!", asset);
+      event.stopPropagation();
+      setSelectedAssetForCollection(asset);
+      setAddToCollectionModalOpen(true);
+    },
+    [],
+  );
+
+  // Handle actually adding the asset to a collection
+  const handleAddToCollection = useCallback(
+    async (collectionId: string) => {
+      if (!selectedAssetForCollection) return;
+
+      const assetId = getOriginalAssetId(selectedAssetForCollection);
+
+      await addItemToCollectionMutation.mutateAsync({
+        collectionId,
+        data: {
+          type: "asset",
+          id: assetId,
+          metadata: {
+            assetType: selectedAssetForCollection.DigitalSourceAsset.Type,
+            fileName:
+              selectedAssetForCollection.DigitalSourceAsset.MainRepresentation
+                .StorageInfo.PrimaryLocation.ObjectKey.Name,
+          },
+        },
+      });
+    },
+    [selectedAssetForCollection, addItemToCollectionMutation],
   );
 
   // Update local state from useAssetOperations
@@ -708,6 +752,7 @@ const SearchPage: React.FC = () => {
                 onAssetClick={handleAssetClick}
                 onDeleteClick={handleDeleteClick}
                 onMenuClick={handleDownloadClick}
+                onAddToCollectionClick={handleAddToCollectionClick}
                 onEditClick={handleStartEditing}
                 onEditNameChange={handleNameChange}
                 onEditNameComplete={handleNameEditComplete}
@@ -832,6 +877,24 @@ const SearchPage: React.FC = () => {
             {alert?.message}
           </Alert>
         </Snackbar>
+
+        {/* Add to Collection Modal */}
+        {selectedAssetForCollection && (
+          <AddToCollectionModal
+            open={addToCollectionModalOpen}
+            onClose={() => {
+              setAddToCollectionModalOpen(false);
+              setSelectedAssetForCollection(null);
+            }}
+            assetId={getOriginalAssetId(selectedAssetForCollection)}
+            assetName={
+              selectedAssetForCollection.DigitalSourceAsset.MainRepresentation
+                .StorageInfo.PrimaryLocation.ObjectKey.Name
+            }
+            assetType={selectedAssetForCollection.DigitalSourceAsset.Type}
+            onAddToCollection={handleAddToCollection}
+          />
+        )}
       </>
     </RightSidebarProvider>
   );

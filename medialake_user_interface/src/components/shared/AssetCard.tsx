@@ -867,8 +867,20 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                   size="small"
                   onClick={(e) => {
                     console.log("AssetCard: Add to Collection clicked!", e);
+                    console.log(
+                      "AssetCard: onAddToCollectionClick prop is:",
+                      typeof onAddToCollectionClick,
+                      onAddToCollectionClick,
+                    );
                     e.stopPropagation();
-                    onAddToCollectionClick?.(e);
+                    if (onAddToCollectionClick) {
+                      console.log("AssetCard: Calling onAddToCollectionClick");
+                      onAddToCollectionClick(e);
+                    } else {
+                      console.log(
+                        "AssetCard: onAddToCollectionClick is undefined!",
+                      );
+                    }
                   }}
                   sx={{
                     color: "primary.main",

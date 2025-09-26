@@ -78,6 +78,13 @@ function AssetGridView<T>({
   isSemantic = false,
   confidenceThreshold = 0,
 }: AssetGridViewProps<T>) {
+  // Debug: Check if we're receiving the onAddToCollectionClick prop
+  console.log(
+    "AssetGridView: onAddToCollectionClick prop is:",
+    typeof onAddToCollectionClick,
+    onAddToCollectionClick,
+  );
+
   // Group results by type if needed
   const groupedResults = React.useMemo(() => {
     if (!groupByType) return { all: results };
@@ -130,6 +137,11 @@ function AssetGridView<T>({
               onAssetClick={() => onAssetClick(asset)}
               onDeleteClick={(e) => onDeleteClick(asset, e)}
               onDownloadClick={(e) => onDownloadClick(asset, e)}
+              onAddToCollectionClick={
+                onAddToCollectionClick
+                  ? (e) => onAddToCollectionClick(asset, e)
+                  : undefined
+              }
               onEditClick={(e) => onEditClick(asset, e)}
               isEditing={editingAssetId === getAssetId(asset)}
               editedName={editedName}
@@ -202,6 +214,11 @@ function AssetGridView<T>({
                       onAssetClick={() => onAssetClick(asset)}
                       onDeleteClick={(e) => onDeleteClick(asset, e)}
                       onDownloadClick={(e) => onDownloadClick(asset, e)}
+                      onAddToCollectionClick={
+                        onAddToCollectionClick
+                          ? (e) => onAddToCollectionClick(asset, e)
+                          : undefined
+                      }
                       onEditClick={(e) => onEditClick(asset, e)}
                       isEditing={editingAssetId === getAssetId(asset)}
                       editedName={editedName}

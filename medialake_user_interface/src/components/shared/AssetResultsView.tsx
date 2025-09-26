@@ -164,6 +164,13 @@ function AssetResultsView<T>({
   getAssetProxy,
   renderCardField,
 }: AssetResultsViewProps<T>) {
+  // Debug: Check if we're receiving the onAddToCollectionClick prop
+  console.log(
+    "AssetResultsView: onAddToCollectionClick prop is:",
+    typeof onAddToCollectionClick,
+    onAddToCollectionClick,
+  );
+
   // Local state for slider value during dragging (to prevent constant re-filtering)
   const [sliderValue, setSliderValue] = React.useState(confidenceThreshold);
   const [isSliderActive, setIsSliderActive] = React.useState(false);

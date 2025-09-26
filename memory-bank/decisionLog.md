@@ -240,3 +240,32 @@ Created complete Collections stack (`medialake_stacks/collections_stack.py`) fol
 - Complete API Gateway construct integration validated
 - Property accessors for external integration implemented
 - Comprehensive documentation and comments included
+
+[2025-09-26 01:39:00] - Add to Collection Router Architecture Decision
+
+## Decision
+
+Implemented Add to Collection functionality directly in SearchPage.tsx instead of SearchPageContainer.tsx due to data flow incompatibilities.
+
+## Rationale
+
+- SearchPageContainer.tsx caused blank page with search results not displaying
+- SearchPage.tsx is the working search implementation used by the router
+- Direct integration ensures both search functionality and Add to Collection work properly
+- Maintains existing search workflow while adding new collection organization features
+
+## Implementation Details
+
+- Reverted router.tsx to use SearchPage instead of SearchPageContainer
+- Added AddToCollectionModal import and useAddItemToCollection hook to SearchPage.tsx
+- Implemented handleAddToCollectionClick handler with proper asset context
+- Added modal state management (addToCollectionModalOpen, selectedAssetForCollection)
+- Integrated modal into SearchPage component structure
+- Maintains all existing search functionality while adding collection organization capabilities
+
+## Quality Assurance
+
+- Search results functionality preserved
+- Add to Collection modal integration complete
+- API hooks properly connected
+- Component architecture maintains MediaLake patterns

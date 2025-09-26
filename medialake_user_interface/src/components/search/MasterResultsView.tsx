@@ -188,6 +188,13 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   isRenaming = false,
   renamingAssetId,
 }) => {
+  // Debug: Check if we're receiving the onAddToCollectionClick prop
+  console.log(
+    "MasterResultsView: onAddToCollectionClick prop is:",
+    typeof onAddToCollectionClick,
+    onAddToCollectionClick,
+  );
+
   // Get semantic mode from store
   const semanticMode = useSemanticMode();
 

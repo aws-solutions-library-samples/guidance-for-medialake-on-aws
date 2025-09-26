@@ -65,8 +65,65 @@ def extract_user_context(event: Dict[str, Any]) -> Dict[str, Optional[str]]:
         Dictionary with user_id and username
     """
     try:
-        authorizer = event.get("requestContext", {}).get("authorizer", {})
-        claims = authorizer.get("claims", {})
+        request_context = event.get("requestContext")
+        if not isinstance(request_context, dict):
+            logger.debug(
+                {
+                    "message": "No valid requestContext found",
+                    "request_context_type": type(request_context).__name__,
+                    "operation": "extract_user_context",
+                }
+            )
+            return {"user_id": None, "username": None}
+
+        authorizer = request_context.get("authorizer")
+        if not isinstance(authorizer, dict):
+            logger.debug(
+                {
+                    "message": "No valid authorizer found",
+                    "authorizer_type": type(authorizer).__name__,
+                    "operation": "extract_user_context",
+                }
+            )
+            return {"user_id": None, "username": None}
+
+        claims = authorizer.get("claims")
+
+        # Handle claims as either dict or JSON string
+        if isinstance(claims, str):
+            try:
+                import json
+
+                claims = json.loads(claims)
+                logger.debug(
+                    {
+                        "message": "Parsed claims from JSON string",
+                        "operation": "extract_user_context",
+                    }
+                )
+            except (json.JSONDecodeError, ValueError) as e:
+                logger.warning(
+                    {
+                        "message": "Failed to parse claims JSON string",
+                        "error": str(e),
+                        "claims_preview": (
+                            claims[:200]
+                            if isinstance(claims, str)
+                            else str(claims)[:200]
+                        ),
+                        "operation": "extract_user_context",
+                    }
+                )
+                return {"user_id": None, "username": None}
+        elif not isinstance(claims, dict):
+            logger.debug(
+                {
+                    "message": "Claims is neither dict nor string",
+                    "claims_type": type(claims).__name__,
+                    "operation": "extract_user_context",
+                }
+            )
+            return {"user_id": None, "username": None}
 
         user_id = claims.get("sub")
         username = claims.get("cognito:username")
@@ -87,6 +144,9 @@ def extract_user_context(event: Dict[str, Any]) -> Dict[str, Optional[str]]:
                 "message": "Failed to extract user context",
                 "error": str(e),
                 "operation": "extract_user_context",
+                "event_keys": (
+                    list(event.keys()) if isinstance(event, dict) else "event_not_dict"
+                ),
             }
         )
         return {"user_id": None, "username": None}

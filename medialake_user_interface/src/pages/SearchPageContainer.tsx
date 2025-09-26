@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { useSearchState } from "@/hooks/useSearchState";
 import { useSearch } from "@/api/hooks/useSearch";
@@ -15,12 +15,22 @@ import {
   useDomainActions,
   useUIActions,
 } from "@/stores/searchStore";
+import { AddToCollectionModal } from "@/components/collections/AddToCollectionModal";
+import { useAddItemToCollection } from "@/api/hooks/useCollections";
+import { getOriginalAssetId } from "@/utils/clipTransformation";
 import SearchPagePresentation from "./SearchPagePresentation";
 import { type AssetItem, type LocationState } from "./types";
 
 const SearchPageContainer: React.FC = () => {
   const location = useLocation();
   const locationState = location.state as LocationState;
+
+  // Add to Collection state
+  const [addToCollectionModalOpen, setAddToCollectionModalOpen] =
+    useState(false);
+  const [selectedAssetForCollection, setSelectedAssetForCollection] =
+    useState<AssetItem | null>(null);
+  const addItemToCollectionMutation = useAddItemToCollection();
 
   // Initialize search state with URL sync
   const searchState = useSearchState({
@@ -212,41 +222,98 @@ const SearchPageContainer: React.FC = () => {
     // For now, maintain compatibility
   };
 
+  // Handle Add to Collection click
+  const handleAddToCollectionClick = useCallback(
+    (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => {
+      console.log("SearchPageContainer: Add to Collection clicked!", asset);
+      event.stopPropagation();
+      setSelectedAssetForCollection(asset);
+      setAddToCollectionModalOpen(true);
+    },
+    [],
+  );
+
+  // Handle actually adding the asset to a collection
+  const handleAddToCollection = useCallback(
+    async (collectionId: string) => {
+      if (!selectedAssetForCollection) return;
+
+      const assetId = getOriginalAssetId(selectedAssetForCollection);
+
+      await addItemToCollectionMutation.mutateAsync({
+        collectionId,
+        data: {
+          type: "asset",
+          id: assetId,
+          metadata: {
+            assetType: selectedAssetForCollection.DigitalSourceAsset.Type,
+            fileName:
+              selectedAssetForCollection.DigitalSourceAsset.MainRepresentation
+                .StorageInfo.PrimaryLocation.ObjectKey.Name,
+          },
+        },
+      });
+    },
+    [selectedAssetForCollection, addItemToCollectionMutation],
+  );
+
   return (
-    <SearchPagePresentation
-      // Search data
-      searchResults={searchResults}
-      searchMetadata={searchMetadata}
-      query={query}
-      semantic={semantic}
-      selectedFields={selectedFields}
-      confidenceThreshold={confidenceThreshold}
-      onConfidenceThresholdChange={setConfidenceThreshold}
-      // Fields data
-      defaultFields={defaultFields}
-      availableFields={availableFields}
-      onFieldsChange={handleFieldsChange}
-      // Filter state
-      filters={legacyFilters}
-      expandedSections={expandedSections}
-      onFilterChange={handleFilterChange}
-      onSectionToggle={handleSectionToggle}
-      // View preferences
-      viewPreferences={viewPreferences}
-      // Asset state
-      assetSelection={assetSelection}
-      assetFavorites={assetFavorites}
-      assetOperations={assetOperations}
-      // Feature flags
-      multiSelectEnabled={multiSelectFeature.value}
-      // Loading states
-      isLoading={isSearchLoading}
-      isFetching={isSearchFetching}
-      isFieldsLoading={isFieldsLoading}
-      // Error states
-      error={searchError}
-      fieldsError={fieldsError}
-    />
+    <>
+      <SearchPagePresentation
+        // Search data
+        searchResults={searchResults}
+        searchMetadata={searchMetadata}
+        query={query}
+        semantic={semantic}
+        selectedFields={selectedFields}
+        confidenceThreshold={confidenceThreshold}
+        onConfidenceThresholdChange={setConfidenceThreshold}
+        // Fields data
+        defaultFields={defaultFields}
+        availableFields={availableFields}
+        onFieldsChange={handleFieldsChange}
+        // Filter state
+        filters={legacyFilters}
+        expandedSections={expandedSections}
+        onFilterChange={handleFilterChange}
+        onSectionToggle={handleSectionToggle}
+        // View preferences
+        viewPreferences={viewPreferences}
+        // Asset state
+        assetSelection={assetSelection}
+        assetFavorites={assetFavorites}
+        assetOperations={assetOperations}
+        // Add to Collection
+        onAddToCollectionClick={handleAddToCollectionClick}
+        // Feature flags
+        multiSelectEnabled={multiSelectFeature.value}
+        // Loading states
+        isLoading={isSearchLoading}
+        isFetching={isSearchFetching}
+        isFieldsLoading={isFieldsLoading}
+        // Error states
+        error={searchError}
+        fieldsError={fieldsError}
+      />
+
+      {/* Add to Collection Modal */}
+      {selectedAssetForCollection && (
+        <AddToCollectionModal
+          open={addToCollectionModalOpen}
+          onClose={() => {
+            setAddToCollectionModalOpen(false);
+            setSelectedAssetForCollection(null);
+          }}
+          assetId={getOriginalAssetId(selectedAssetForCollection)}
+          assetName={
+            selectedAssetForCollection.DigitalSourceAsset.MainRepresentation
+              .StorageInfo.PrimaryLocation.ObjectKey.Name
+          }
+          assetType={selectedAssetForCollection.DigitalSourceAsset.Type}
+          onAddToCollection={handleAddToCollection}
+        />
+      )}
+    </>
   );
 };
 
