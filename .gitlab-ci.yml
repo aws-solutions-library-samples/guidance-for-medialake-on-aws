@@ -68,7 +68,7 @@ playwright_e2e_test:
     - echo "Environment credentials overridden for testing"
     # Verify AWS access
     - cat /root/.aws/credentials
-    - while true; do bash /usr/local/bin/aws-creds-vendor >/proc/1/fd/1 2>/proc/1/fd/2; sleep 2400; done &
+    - which aws-creds-vendor
     - aws sts get-caller-identity
     - echo "AWS identity verified for testing"
   script:
