@@ -466,15 +466,15 @@ playwright_e2e_test:
     # - export AWS_SECRET_ACCESS_KEY="$SECRET_ACCESS_KEY"
     # - unset AWS_SESSION_TOKEN
     - echo "Environment credentials overridden for testing"
+    # Verify AWS access
+    - aws sts get-caller-identity --debug
+    - echo "AWS identity verified for testing"
     # Navigate to UI directory and install dependencies
     - cd medialake_user_interface
     - npm install
     # Install Playwright browsers without system dependencies (we installed them manually)
     - npx playwright install chromium
     - echo "Playwright setup completed"
-    # Verify AWS access
-    - aws sts get-caller-identity
-    - echo "AWS identity verified for testing"
   script:
     - echo "Running comprehensive Playwright E2E test against deployed MediaLake infrastructure"
     - echo "Starting Playwright test execution..."
