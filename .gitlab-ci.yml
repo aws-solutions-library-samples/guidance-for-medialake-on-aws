@@ -52,6 +52,7 @@ playwright_e2e_test:
     # - aws configure set default.region $DEPLOY_REGION
     - echo "AWS credentials configured for testing in region $DEPLOY_REGION"
     - cat $AWS_SHARED_CREDENTIALS_FILE
+    - echo $AWS_CREDS_TARGET_ROLE
     - echo $AWS_DEFAULT_ACCOUNT
     - echo $AWS_DEFAULT_REGION
     - echo $DEPLOY_REGION
