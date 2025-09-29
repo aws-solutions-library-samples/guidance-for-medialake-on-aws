@@ -69,7 +69,9 @@ playwright_e2e_test:
     # Verify AWS access
     - cat /root/.aws/credentials
     - cat /root/.aws/config
-    - which aws-creds-vendor
+    - whoami
+    - ls -la /root/.aws/credentials
+    - ls -la /root/.aws/config
     - aws sts get-caller-identity
     - echo "AWS identity verified for testing"
   script:
