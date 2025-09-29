@@ -27,7 +27,7 @@ playwright_e2e_test:
     - size:large
   # Commented out for faster testing iteration
   variables:
-    AWS_CREDS_TARGET_ROLE: $US_WEST_2_AWS_IAM_ROLE
+    # AWS_CREDS_TARGET_ROLE: $US_WEST_2_AWS_IAM_ROLE
     AWS_DEFAULT_ACCOUNT: $US_WEST_2_AWS_ACCOUNT_ID
     AWS_DEFAULT_REGION: $US_WEST_2_AWS_REGION
     DEPLOY_REGION: $US_WEST_2_AWS_REGION
