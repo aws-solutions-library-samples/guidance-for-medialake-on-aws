@@ -2,7 +2,7 @@ stages:
   - test
 
 default:
-  image: public.ecr.aws/amazonlinux/amazonlinux:latest
+  # image: public.ecr.aws/amazonlinux/amazonlinux:latest
   tags:
     - arch:amd64
     - size:large
@@ -10,8 +10,8 @@ default:
 # Variables
 variables:
   PROJECT_ENV: $CI_COMMIT_REF_SLUG
-  AWS_CONFIG_FILE: $CI_BUILDS_DIR/.awscredentialvendor/config
-  AWS_SHARED_CREDENTIALS_FILE: $CI_BUILDS_DIR/.awscredentialvendor/credentials
+  # AWS_CONFIG_FILE: $CI_BUILDS_DIR/.awscredentialvendor/config
+  # AWS_SHARED_CREDENTIALS_FILE: $CI_BUILDS_DIR/.awscredentialvendor/credentials
 
 # Cache modules in between jobs
 cache:
@@ -41,12 +41,13 @@ playwright_e2e_test:
     #SECRET_ACCESS_KEY: $US_WEST_2_SECRET_KEY
   before_script:
     # Install required dependencies
-    - yum update -y
-    - yum install -y python3 python3-pip unzip which findutils
+    # - yum update -y
+    # - yum install -y python3 python3-pip unzip which findutils
+    - apk add --no-cache aws-cli
     # Install AWS CLI
-    - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-    - unzip awscliv2.zip
-    - ./aws/install
+    # - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+    # - unzip awscliv2.zip
+    # - ./aws/install
     # Configure AWS credentials for test execution
     # - aws configure set aws_access_key_id $ACCESS_KEY_ID
     # - aws configure set aws_secret_access_key $SECRET_ACCESS_KEY
