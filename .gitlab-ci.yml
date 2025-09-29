@@ -25,6 +25,7 @@ playwright_e2e_test:
   tags:
     - arch:amd64
     - size:large
+    - awscreds
   # Commented out for faster testing iteration
   variables:
     AWS_CREDS_TARGET_ROLE: $US_WEST_2_AWS_IAM_ROLE
