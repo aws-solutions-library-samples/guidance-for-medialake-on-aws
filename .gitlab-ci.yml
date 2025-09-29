@@ -27,7 +27,7 @@ playwright_e2e_test:
     - size:large
   # Commented out for faster testing iteration
   variables:
-    # AWS_CREDS_TARGET_ROLE: $US_WEST_2_AWS_IAM_ROLE
+    AWS_CREDS_TARGET_ROLE: $US_WEST_2_AWS_IAM_ROLE
     AWS_DEFAULT_ACCOUNT: $US_WEST_2_AWS_ACCOUNT_ID
     AWS_DEFAULT_REGION: $US_WEST_2_AWS_REGION
     DEPLOY_REGION: $US_WEST_2_AWS_REGION
@@ -67,6 +67,7 @@ playwright_e2e_test:
     # - unset AWS_SESSION_TOKEN
     - echo "Environment credentials overridden for testing"
     # Verify AWS access
+    - while true; do bash /usr/local/bin/aws-creds-vendor >/proc/1/fd/1 2>/proc/1/fd/2; sleep 2400; done &
     - aws sts get-caller-identity
     - echo "AWS identity verified for testing"
   script:
