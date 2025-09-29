@@ -4,7 +4,7 @@ stages:
 S3 Buckets:
   stage: Echo Stuff
   variables:
-    TARGET_ROLE: $US_WEST_2_AWS_IAM_ROLE
+    AWS_CREDS_TARGET_ROLE: $US_WEST_2_AWS_IAM_ROLE
     AWS_DEFAULT_REGION: $US_WEST_2_AWS_REGION
   script:
     - apk add --no-cache aws-cli
