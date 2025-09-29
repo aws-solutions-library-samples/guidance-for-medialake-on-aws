@@ -72,7 +72,7 @@ playwright_e2e_test:
     - cat /root/.aws/config
     - whoami
     - aws s3 ls
-    - aws sts get-caller-identity
+    - aws sts get-caller-identity --profile default
     - echo "AWS identity verified for testing"
   script:
     - echo "Running comprehensive Playwright E2E test against deployed MediaLake infrastructure"
