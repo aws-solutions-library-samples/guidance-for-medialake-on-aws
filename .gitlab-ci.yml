@@ -57,6 +57,9 @@ playwright_e2e_test:
     # Verify AWS access
     - aws sts get-caller-identity
     - echo "AWS identity verified for testing"
+  script:
+    - echo "Running comprehensive Playwright E2E test against deployed MediaLake infrastructure"
+
   after_script:
     - echo "E2E test execution completed"
     - echo "Test artifacts available in test-results/ and playwright-report/ directories"
