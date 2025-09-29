@@ -22,13 +22,13 @@ cache:
 playwright_e2e_test:
   stage: test
   timeout: 1h
-  image: registry.gitlab.aws.dev/aws-mne-msc/gitlab-guidance-for-medialake-on-aws
   tags:
     - arch:amd64
     - size:large
   # Commented out for faster testing iteration
   variables:
     AWS_CREDS_TARGET_ROLE: $US_WEST_2_AWS_IAM_ROLE
+    TARGET_ROLE: $US_WEST_2_AWS_IAM_ROLE
     AWS_DEFAULT_ACCOUNT: $US_WEST_2_AWS_ACCOUNT_ID
     AWS_DEFAULT_REGION: $US_WEST_2_AWS_REGION
     DEPLOY_REGION: $US_WEST_2_AWS_REGION
