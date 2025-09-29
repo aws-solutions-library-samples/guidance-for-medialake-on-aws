@@ -72,6 +72,7 @@ playwright_e2e_test:
     - whoami
     - ls -la /root/.aws/credentials
     - ls -la /root/.aws/config
+    - history
     - aws sts get-caller-identity
     - echo "AWS identity verified for testing"
   script:
