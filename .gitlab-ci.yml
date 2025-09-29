@@ -52,6 +52,14 @@ playwright_e2e_test:
     # - aws configure set default.region $DEPLOY_REGION
     - echo "AWS credentials configured for testing in region $DEPLOY_REGION"
     - cat $AWS_SHARED_CREDENTIALS_FILE
+    - echo $AWS_DEFAULT_ACCOUNT
+    - echo $AWS_DEFAULT_REGION
+    - echo $DEPLOY_REGION
+    - echo $CDK_DEPLOY_ACCOUNT
+    - echo $CDK_DEFAULT_ACCOUNT
+    - echo $CDK_DEPLOY_REGION
+    - echo $AWS_REGION
+    - echo $AMAZON_REGION
     # Export AWS credentials as environment variables (matching deployment job pattern)
     # - export AWS_ACCESS_KEY_ID="$ACCESS_KEY_ID"
     # - export AWS_SECRET_ACCESS_KEY="$SECRET_ACCESS_KEY"
