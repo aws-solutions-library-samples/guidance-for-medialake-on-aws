@@ -22,7 +22,7 @@ cache:
 playwright_e2e_test:
   stage: test
   timeout: 1h
-  image: registry.gitlab.aws.dev/aws-mne-msc/media-lake-v2
+  image: registry.gitlab.aws.dev/aws-mne-msc/gitlab-guidance-for-medialake-on-aws
   tags:
     - arch:amd64
     - size:large
