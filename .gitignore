@@ -143,3 +143,6 @@ aiPrompt.json
 /blob-report/
 /playwright/.cache/
 1scratch
+
+
+*.lp5

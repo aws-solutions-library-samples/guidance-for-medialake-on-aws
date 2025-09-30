@@ -8,7 +8,9 @@ import time
 from typing import Any, Dict, List, Optional
 
 import boto3
+from bedrock_twelvelabs_search_provider import BedrockTwelveLabsSearchProvider
 from coactive_search_provider import CoactiveSearchProvider
+from twelvelabs_api_search_provider import TwelveLabsAPISearchProvider
 from unified_search_models import (
     SearchArchitectureType,
     SearchHit,
@@ -41,6 +43,12 @@ class UnifiedSearchOrchestrator:
         """Initialize and register all available search providers"""
         # Register provider classes
         self.provider_factory.register_provider("coactive", CoactiveSearchProvider)
+        self.provider_factory.register_provider(
+            "bedrock_twelvelabs", BedrockTwelveLabsSearchProvider
+        )
+        self.provider_factory.register_provider(
+            "twelvelabs_api", TwelveLabsAPISearchProvider
+        )
 
         # Load provider configurations and create instances
         self._load_provider_configurations()
@@ -127,32 +135,95 @@ class UnifiedSearchOrchestrator:
                 "isEnabled"
             ):
                 item = coactive_response["Item"]
+                provider_type = item.get("type", "coactive")
+
                 # Map the DynamoDB record structure to expected config format
-                coactive_config = {
-                    "provider": item.get(
-                        "type", "coactive"
-                    ),  # Use 'type' field from DB
-                    "provider_location": "external",
-                    "architecture": "external_semantic_service",
-                    "capabilities": {
-                        "media": ["video", "audio", "image"],
-                        "semantic": True,
-                    },
-                    "dataset_id": item.get(
-                        "datasetId"
-                    ),  # Now populated by PUT endpoint when Coactive dataset is created
-                    "endpoint": item.get("endpoint"),
-                    "auth": {
-                        "type": "bearer",
-                        "secret_arn": item.get("secretArn"),
-                    },
-                    "metadata_mapping": item.get("metadataMapping", {}),
-                    "name": item.get("name", "Coactive AI"),
-                    "id": item.get("id"),
-                }
-                configs.append(coactive_config)
+                if provider_type == "coactive":
+                    provider_config = {
+                        "provider": "coactive",
+                        "provider_location": "external",
+                        "architecture": "external_semantic_service",
+                        "capabilities": {
+                            "media": ["video", "audio", "image"],
+                            "semantic": True,
+                        },
+                        "dataset_id": item.get("datasetId"),
+                        "endpoint": item.get("endpoint"),
+                        "auth": {
+                            "type": "bearer",
+                            "secret_arn": item.get("secretArn"),
+                        },
+                        "metadata_mapping": item.get("metadataMapping", {}),
+                        "name": item.get("name", "Coactive AI"),
+                        "id": item.get("id"),
+                    }
+                elif provider_type == "bedrock twelvelabs":
+                    provider_config = {
+                        "provider": "bedrock_twelvelabs",
+                        "provider_location": "internal",
+                        "architecture": "provider_plus_store",
+                        "capabilities": {
+                            "media": ["video", "audio", "image"],
+                            "semantic": True,
+                        },
+                        "endpoint": item.get("endpoint"),
+                        "auth": {
+                            "type": "bedrock",
+                            "secret_arn": item.get("secretArn"),
+                        },
+                        "store": "opensearch",  # Default to opensearch for bedrock
+                        "metadata_mapping": item.get("metadataMapping", {}),
+                        "name": item.get("name", "Bedrock TwelveLabs"),
+                        "id": item.get("id"),
+                    }
+                elif provider_type == "twelvelabs":
+                    provider_config = {
+                        "provider": "twelvelabs_api",
+                        "provider_location": "external",
+                        "architecture": "provider_plus_store",
+                        "capabilities": {
+                            "media": ["video", "audio", "image"],
+                            "semantic": True,
+                        },
+                        "endpoint": item.get(
+                            "endpoint", "https://api.twelvelabs.io/v1"
+                        ),
+                        "auth": {
+                            "type": "api_key",
+                            "secret_arn": item.get("secretArn"),
+                        },
+                        "store": "opensearch",  # Default to opensearch for twelvelabs api
+                        "metadata_mapping": item.get("metadataMapping", {}),
+                        "name": item.get("name", "TwelveLabs API"),
+                        "id": item.get("id"),
+                    }
+                else:
+                    # For unknown types, try to infer from the type string
+                    self.logger.warning(
+                        f"Unknown provider type: {provider_type}, attempting to infer configuration"
+                    )
+                    provider_config = {
+                        "provider": provider_type,  # Use the type as-is for the provider name
+                        "provider_location": "external",
+                        "architecture": "external_semantic_service",
+                        "capabilities": {
+                            "media": ["video", "audio", "image"],
+                            "semantic": True,
+                        },
+                        "dataset_id": item.get("datasetId"),
+                        "endpoint": item.get("endpoint"),
+                        "auth": {
+                            "type": "bearer",
+                            "secret_arn": item.get("secretArn"),
+                        },
+                        "metadata_mapping": item.get("metadataMapping", {}),
+                        "name": item.get("name", f"Unknown Provider ({provider_type})"),
+                        "id": item.get("id"),
+                    }
+
+                configs.append(provider_config)
                 self.logger.info(
-                    f"Found Coactive configuration: {item.get('name', 'Coactive AI')}"
+                    f"Found {provider_type} configuration: {provider_config.get('name')}"
                 )
 
             return configs
@@ -226,33 +297,44 @@ class UnifiedSearchOrchestrator:
 
                 return response
             else:
-                # No suitable provider found - fall back to legacy search system
-                available_providers = (
-                    list(self._providers.keys()) if self._providers else []
-                )
-                self.logger.info(
-                    f"No suitable search provider found for query. Available providers: {available_providers}"
-                )
-                self.logger.info("Falling back to legacy search system")
-                return self._execute_legacy_search(query_params)
+                # No suitable provider found - handle based on search type
+                if search_query.search_type.value == "keyword":
+                    # Keyword search always works with OpenSearch directly
+                    self.logger.info(
+                        "Executing keyword search using OpenSearch directly"
+                    )
+                    result = self._execute_opensearch_search(query_params)
+
+                    # Add presigned URLs to keyword search results (same as semantic search)
+                    self._add_presigned_urls_to_search_results(result)
+
+                    return result
+                else:
+                    # For semantic searches, we need a configured provider
+                    available_providers = (
+                        list(self._providers.keys()) if self._providers else []
+                    )
+                    error_msg = f"No suitable search provider found for semantic search. Available providers: {available_providers}"
+                    self.logger.error(error_msg)
+                    raise RuntimeError(error_msg)
 
         except Exception as e:
             self.logger.error(f"Unified search failed: {str(e)}")
-            # Fall back to legacy search system on any error
-            self.logger.info("Falling back to legacy search system due to error")
-            return self._execute_legacy_search(query_params)
+            # Re-raise the error - no fallback needed since keyword search is handled directly
+            raise RuntimeError(f"Search system failure: {str(e)}")
 
     def _select_provider(self, query: SearchQuery) -> Optional[BaseSearchProvider]:
         """
         Select the most appropriate provider for the given query.
+        Note: Keyword search doesn't require a provider - it uses OpenSearch directly.
 
         Args:
             query: SearchQuery object
 
         Returns:
-            Selected provider or None if no suitable provider found
+            Selected provider or None (None for keyword search means use OpenSearch directly)
         """
-        # For semantic search, prefer external semantic services
+        # For semantic search, we need a configured provider
         if query.search_type.value == "semantic":
             # Look for external semantic service providers first
             for provider in self._providers.values():
@@ -278,37 +360,29 @@ class UnifiedSearchOrchestrator:
                     )
                     return provider
 
-        # For keyword search, prefer provider+store
+            # Use default provider if available for semantic search
+            if self._default_provider and self._default_provider.validate_query(query):
+                self.logger.info(
+                    f"Using default provider for semantic search: {self._default_provider.config.provider}"
+                )
+                return self._default_provider
+
+        # For keyword search, always use OpenSearch directly (no external providers)
         else:
-            for provider in self._providers.values():
-                if (
-                    provider.architecture == SearchArchitectureType.PROVIDER_PLUS_STORE
-                    and provider.validate_query(query)
-                ):
-                    self.logger.info(
-                        f"Selected provider+store for keyword: {provider.config.provider}"
-                    )
-                    return provider
-
-        # Use default provider only for semantic searches
-        if (
-            query.search_type.value == "semantic"
-            and self._default_provider
-            and self._default_provider.validate_query(query)
-        ):
             self.logger.info(
-                f"Using default provider for semantic search: {self._default_provider.config.provider}"
-            )
-            return self._default_provider
-
-        # For keyword searches, don't use semantic providers - return None to trigger legacy search
-        if query.search_type.value == "keyword":
-            self.logger.info(
-                "No keyword search provider found, will use legacy search system"
+                "Keyword search requested - bypassing all providers to use OpenSearch directly"
             )
             return None
 
-        self.logger.warning("No suitable provider found for query")
+        # No provider found - this is fine for keyword search (uses OpenSearch directly)
+        # but problematic for semantic search
+        if query.search_type.value == "semantic":
+            self.logger.warning("No suitable provider found for semantic search")
+        else:
+            self.logger.info(
+                "No provider configured for keyword search - will use OpenSearch directly"
+            )
+
         return None
 
     def _convert_to_medialake_response(
@@ -392,22 +466,101 @@ class UnifiedSearchOrchestrator:
             self.logger.warning(f"Failed to generate presigned URLs: {str(e)}")
             # Continue without URLs rather than failing the entire request
 
-    def _execute_legacy_search(self, query_params: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute search using legacy embedding store system"""
-        self.logger.info("Falling back to legacy search system")
+    def _add_presigned_urls_to_search_results(
+        self, search_response: Dict[str, Any]
+    ) -> None:
+        """Add presigned URLs to all results in a search response"""
+        try:
+            # Navigate to the results array in the search response
+            results = search_response.get("data", {}).get("results", [])
+
+            if not results:
+                self.logger.debug("No results found to add presigned URLs to")
+                return
+
+            # Process each result to add presigned URLs
+            for result in results:
+                self._add_presigned_urls(result)
+
+            self.logger.info(
+                f"Added presigned URLs to {len(results)} keyword search results"
+            )
+
+        except Exception as e:
+            self.logger.warning(
+                f"Failed to add presigned URLs to search results: {str(e)}"
+            )
+            # Continue without URLs rather than failing the entire request
+
+    def _execute_opensearch_search(
+        self, query_params: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Execute search using OpenSearch-based system for keyword search"""
+        self.logger.info("Executing keyword search using OpenSearch directly")
 
         try:
-            # Import and use existing search logic
+            # Import here to avoid circular imports
+            import os
+            import sys
+
+            # Add current directory to path for imports
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            if current_dir not in sys.path:
+                sys.path.insert(0, current_dir)
+
+            # Import the legacy search components
             from index import SearchParams, perform_search
 
-            # Convert query params to legacy SearchParams
-            params = SearchParams(**query_params)
+            # Convert query params to legacy SearchParams, handling missing optional fields
+            search_params = {}
+
+            # Required parameter
+            search_params["q"] = query_params.get("q", "")
+
+            # Optional parameters with defaults
+            search_params["page"] = int(query_params.get("page", 1))
+            search_params["pageSize"] = int(query_params.get("pageSize", 50))
+            search_params["min_score"] = float(query_params.get("min_score", 0.01))
+            search_params["semantic"] = (
+                query_params.get("semantic", "false").lower() == "true"
+            )
+
+            # Handle optional filter parameters
+            if "filters" in query_params:
+                search_params["filters"] = query_params["filters"]
+            if "search_fields" in query_params:
+                search_params["search_fields"] = query_params["search_fields"]
+            if "type" in query_params:
+                search_params["type"] = query_params["type"]
+            if "extension" in query_params:
+                search_params["extension"] = query_params["extension"]
+            if "LargerThan" in query_params:
+                search_params["LargerThan"] = query_params["LargerThan"]
+            if "asset_size_lte" in query_params:
+                search_params["asset_size_lte"] = query_params["asset_size_lte"]
+            if "asset_size_gte" in query_params:
+                search_params["asset_size_gte"] = query_params["asset_size_gte"]
+            if "ingested_date_lte" in query_params:
+                search_params["ingested_date_lte"] = query_params["ingested_date_lte"]
+            if "ingested_date_gte" in query_params:
+                search_params["ingested_date_gte"] = query_params["ingested_date_gte"]
+            if "filename" in query_params:
+                search_params["filename"] = query_params["filename"]
+            if "storageIdentifier" in query_params:
+                search_params["storageIdentifier"] = query_params["storageIdentifier"]
+
+            # Create SearchParams object
+            params = SearchParams(**search_params)
 
             # Execute legacy search
-            return perform_search(params)
+            result = perform_search(params)
+
+            self.logger.info("Legacy search completed successfully")
+            return result
 
         except Exception as e:
             self.logger.error(f"Legacy search fallback failed: {str(e)}")
+            self.logger.exception("Full traceback for legacy search failure")
 
             # Return empty result as last resort
             return {
@@ -416,8 +569,8 @@ class UnifiedSearchOrchestrator:
                 "data": {
                     "searchMetadata": {
                         "totalResults": 0,
-                        "page": 1,
-                        "pageSize": 50,
+                        "page": int(query_params.get("page", 1)),
+                        "pageSize": int(query_params.get("pageSize", 50)),
                         "searchTerm": query_params.get("q", ""),
                     },
                     "results": [],

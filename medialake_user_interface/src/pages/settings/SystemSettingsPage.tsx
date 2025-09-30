@@ -374,10 +374,20 @@ const SystemSettingsPage: React.FC = () => {
                         />
                         <Switch
                           checked={settings.isEnabled}
-                          onChange={(_evt, checked) =>
-                            handleToggleChange(checked)
-                          }
-                          disabled={false}
+                          onChange={async (_evt, checked) => {
+                            try {
+                              await handleToggleChange(checked);
+                            } catch (error) {
+                              showNotification(
+                                t(
+                                  "settings.systemSettings.search.toggleError",
+                                  "Failed to update semantic search status",
+                                ),
+                                "error",
+                              );
+                            }
+                          }}
+                          disabled={!settings.provider.config?.isConfigured}
                           color="success"
                           size="medium"
                         />

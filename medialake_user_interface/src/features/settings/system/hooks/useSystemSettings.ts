@@ -139,88 +139,59 @@ export const useSemanticSearchSettings = () => {
       },
     }));
 
-    if (enabled) {
-      // Handle enabling: only save if provider is configured
-      if (settings.current.provider.config?.isConfigured) {
-        try {
-          const embeddingStorePayload = {
-            type: settings.current.embeddingStore.type,
-            isEnabled: enabled,
-          };
+    // Only call API if a provider record already exists in the database
+    // This happens after the first POST creation
+    const hasExistingProvider =
+      settings.original.provider.config?.isConfigured ||
+      settings.original.provider.config?.id;
 
-          await updateProvider.mutateAsync({
-            isEnabled: enabled,
-            embeddingStore: embeddingStorePayload,
-          });
+    if (hasExistingProvider) {
+      try {
+        const { current } = settings;
 
-          // Update original state to reflect saved changes
-          setSettings((prev) => ({
-            ...prev,
-            original: {
-              ...prev.original,
-              isEnabled: enabled,
-            },
-          }));
-        } catch (error) {
-          console.error("Failed to save toggle state:", error);
-          // Revert local state on error
-          setSettings((prev) => ({
-            ...prev,
-            current: {
-              ...prev.current,
-              isEnabled: !enabled,
-            },
-          }));
-          throw error;
-        }
-      }
-      // If no provider configured, just keep local state - user needs to select provider first
-    } else {
-      // Handle disabling: delete the provider configuration and reset to default state
-      if (settings.original.provider.config?.id) {
-        try {
-          await deleteProvider.mutateAsync();
+        // Build embedding store payload
+        const embeddingStorePayload = {
+          type: current.embeddingStore.type,
+          isEnabled: enabled,
+        };
 
-          // Reset to default state (no provider selected)
-          const defaultSettings = {
-            isEnabled: false,
-            provider: {
-              type: "none" as const,
-              config: null,
-            },
-            embeddingStore: {
-              type: "opensearch" as const,
-            },
-          };
+        // Save the isEnabled status to deactivate/activate the provider
+        await updateProvider.mutateAsync({
+          isEnabled: enabled,
+          embeddingStore: embeddingStorePayload,
+        });
 
-          setSettings((prev) => ({
-            ...prev,
-            current: defaultSettings,
-            original: defaultSettings,
-          }));
-        } catch (error) {
-          console.error("Failed to delete provider:", error);
-          // Revert local state on error
-          setSettings((prev) => ({
-            ...prev,
-            current: {
-              ...prev.current,
-              isEnabled: !enabled,
-            },
-          }));
-          throw error;
-        }
-      } else {
-        // No provider exists, just update local state
+        // Update original settings to reflect the saved change
         setSettings((prev) => ({
           ...prev,
           original: {
             ...prev.original,
             isEnabled: enabled,
           },
+          hasChanges:
+            JSON.stringify({
+              ...prev.current,
+              isEnabled: enabled,
+            }) !==
+            JSON.stringify({
+              ...prev.original,
+              isEnabled: enabled,
+            }),
         }));
+      } catch (error) {
+        console.error("Error saving isEnabled status:", error);
+        // Revert the local state change if the API call failed
+        setSettings((prev) => ({
+          ...prev,
+          current: {
+            ...prev.current,
+            isEnabled: !enabled, // Revert to previous state
+          },
+        }));
+        throw error; // Re-throw to allow the UI to handle the error
       }
     }
+    // If no existing provider, just update local state (no API call)
   };
 
   // Handle provider type change
