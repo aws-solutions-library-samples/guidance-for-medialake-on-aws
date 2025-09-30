@@ -824,9 +824,6 @@ class AssetsConstruct(Construct):
         itemKey: "BULK_DOWNLOAD#{job_id}#{reverse_timestamp}"
         """
         # Use the existing user table for bulk download jobs
-
-        # self._bulk_download_table = props.user_table
-
         self._users_table = dynamodb.TableV2.from_table_name(
             self, "ImportedTable", f"{config.resource_prefix}-user-{config.environment}"
         )
@@ -885,7 +882,7 @@ class AssetsConstruct(Construct):
 
         # Common environment variables for all Lambda functions
         common_env_vars = {
-            "USER_TABLE_NAME": f"{config.resource_prefix}-user-{config.environment}",  # Using user table for bulk download jobs
+            "USER_TABLE_NAME": f"{config.resource_prefix}-user-{config.environment}",
             "MEDIA_ASSETS_BUCKET": props.media_assets_bucket.bucket_name,
             "EFS_MOUNT_PATH": "/mnt/bulk-downloads",
             "USE_ZIPMERGE": "true",  # Enable the use of zipmerge binary
@@ -1145,7 +1142,7 @@ class AssetsConstruct(Construct):
                     ],
                     resources=[
                         self._users_table.table_arn,
-                        f"{self._users_table.table_arn}/index/*",  # Allow access to all GSIs (user table)
+                        f"{self._users_table.table_arn}/index/*",  # Allow access to all GSIs
                     ],
                 )
             )
@@ -1933,9 +1930,10 @@ class AssetsConstruct(Construct):
         add_cors_options_method(user_resource)
 
     @property
-    def bulk_download_table(self) -> dynamodb.Table:
-        """Returns the user table that stores bulk download jobs."""
-        return self._users_table if hasattr(self, "_users_table") else None
+    def bulk_download_table(self) -> dynamodb.TableV2:
+        return (
+            self._bulk_download_table if hasattr(self, "_bulk_download_table") else None
+        )
 
     @property
     def efs_filesystem(self) -> efs.FileSystem:
