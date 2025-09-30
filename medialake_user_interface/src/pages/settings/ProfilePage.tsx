@@ -19,6 +19,7 @@ import {
   SelectChangeEvent,
   Stack,
 } from "@mui/material";
+import { UserAvatar } from "../../components/common/UserAvatar";
 import {
   Email as EmailIcon,
   Person as PersonIcon,
@@ -189,17 +190,13 @@ const ProfilePage: React.FC = () => {
           {/* Profile Overview */}
           <Grid item xs={12} md={4}>
             <Paper sx={{ p: 3, textAlign: "center" }}>
-              <Avatar
+              <UserAvatar
+                size={120}
+                fontSize="3rem"
                 sx={{
-                  width: 120,
-                  height: 120,
                   margin: "0 auto 16px",
-                  bgcolor: theme.palette.primary.main,
-                  fontSize: "3rem",
                 }}
-              >
-                {email !== unavailable ? email[0].toUpperCase() : "U"}
-              </Avatar>
+              />
               {(firstName || lastName) && (
                 <Typography
                   variant="h5"
