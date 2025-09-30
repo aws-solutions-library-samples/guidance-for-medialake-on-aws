@@ -341,7 +341,7 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
         # Group results by MediaLake asset UUID to create proper clips structure
         assets_with_clips = {}
         max_score = 1.0  # Since we're normalizing, max score will be 1.0
-        total_results = len(results)
+        len(results)
 
         for i, result in enumerate(results):
             self.logger.info(f"[CLIP_DEBUG] Processing result {i+1}/{len(results)}")
