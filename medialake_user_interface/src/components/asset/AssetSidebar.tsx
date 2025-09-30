@@ -1777,7 +1777,9 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
             (clip) =>
               clip.embedding_option === "visual-text" &&
               clip.score !== null &&
-              clip.score !== undefined,
+              clip.score !== undefined &&
+              (clip.start_timecode || clip.start_time) &&
+              (clip.end_timecode || clip.end_time),
           )
           .sort((a, b) => (b.score || 0) - (a.score || 0));
 
@@ -1785,8 +1787,8 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
           "All visual-text clips:",
           allVisualTextClips.map((c) => ({
             score: c.score,
-            start: c.start_timecode,
-            end: c.end_timecode,
+            start: c.start_timecode || c.start_time,
+            end: c.end_timecode || c.end_time,
           })),
         );
         console.log("Current score threshold:", scoreThreshold);
@@ -1797,8 +1799,8 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
         console.log(
           "All visual-text clips with scores:",
           allVisualTextClips.map((clip) => ({
-            start: clip.start_timecode,
-            end: clip.end_timecode,
+            start: clip.start_timecode || clip.start_time,
+            end: clip.end_timecode || clip.end_time,
             score: clip.score,
             embedding_option: clip.embedding_option,
           })),
@@ -1806,22 +1808,26 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
         console.log(
           `Selected ${selectedClips.length} visual-text clips:`,
           selectedClips.map((clip) => ({
-            start: clip.start_timecode,
-            end: clip.end_timecode,
+            start: clip.start_timecode || clip.start_time,
+            end: clip.end_timecode || clip.end_time,
             score: clip.score,
             embedding_option: clip.embedding_option,
           })),
         );
 
         selectedClips.forEach((clip, index) => {
+          // Handle both timecode formats - fallback to start_time if start_timecode is not available
+          const startTime = clip.start_timecode || clip.start_time;
+          const endTime = clip.end_timecode || clip.end_time;
+
           // Convert timecodes to seconds
-          const startSeconds = timecodeToSeconds(clip.start_timecode);
-          const endSeconds = timecodeToSeconds(clip.end_timecode);
+          const startSeconds = timecodeToSeconds(startTime);
+          const endSeconds = timecodeToSeconds(endTime);
 
           console.log(`Clip ${index + 1} times:`, {
             original: {
-              start: clip.start_timecode,
-              end: clip.end_timecode,
+              start: startTime,
+              end: endTime,
             },
             converted: {
               start: startSeconds,
@@ -1833,7 +1839,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
           const clipScore = clip.score !== undefined ? clip.score : null;
 
           // Generate a consistent ID based on timecode and index to ensure uniqueness
-          const newId = `clip_${clip.start_timecode}_${clip.end_timecode}_${index}`;
+          const newId = `clip_${startTime}_${endTime}_${index}`;
 
           const periodMarker = new PeriodMarker({
             timeObservation: {

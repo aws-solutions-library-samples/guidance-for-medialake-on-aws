@@ -341,8 +341,6 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
         # Group results by MediaLake asset UUID to create proper clips structure
         assets_with_clips = {}
         max_score = 1.0  # Since we're normalizing, max score will be 1.0
-        len(results)
-
         for i, result in enumerate(results):
             self.logger.info(f"[CLIP_DEBUG] Processing result {i+1}/{len(results)}")
 
@@ -362,7 +360,6 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
 
                 # Add timing information for video clips
                 if result.get("shot"):
-                    result["shot"]
                     coactive_metadata.update(
                         {
                             "start_time_ms": result["shot"].get("start_time_ms", 0),
@@ -389,7 +386,7 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
             if len(results) > 1:
                 # Use exponential decay to create meaningful score differences
                 # This ensures first result gets 1.0, and scores decrease meaningfully
-                ranking_score = max(0.1, 1.0 - (index * 0.8 / (len(results) - 1)))
+                ranking_score = max(0.1, 1.0 - (i * 0.8 / (len(results) - 1)))
             else:
                 ranking_score = 1.0
 
@@ -418,7 +415,7 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
             clip_data = {
                 "score": score,  # Use ranking score for sorting
                 "original_score": original_score,  # Keep original for reference
-                "ranking_position": index + 1,  # 1-based position for debugging
+                "ranking_position": i + 1,  # 1-based position for debugging
                 "coactive_metadata": coactive_metadata,
                 "coactive_result": result,  # Store full result for debugging
             }
@@ -531,17 +528,8 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
                             key=lambda x: x.get("score", 0),
                             reverse=True,
                         )
-                        for clip_data in sorted_clips:
+                        for clip_index, clip_data in enumerate(sorted_clips):
                             coactive_metadata = clip_data.get("coactive_metadata", {})
-                            self.logger.info(
-                                f"[CLIP_DEBUG] Clip {i+1} coactive_metadata keys: {list(coactive_metadata.keys())}"
-                            )
-                            self.logger.info(
-                                f"[CLIP_DEBUG] Clip {i+1} start_time_ms: {coactive_metadata.get('start_time_ms')}"
-                            )
-                            self.logger.info(
-                                f"[CLIP_DEBUG] Clip {i+1} end_time_ms: {coactive_metadata.get('end_time_ms')}"
-                            )
 
                             # Extract asset information from MediaLake source
                             digital_source_asset = enriched_source.get(
@@ -573,99 +561,25 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
                                 "embedding_option": "visual-text",
                             }
 
-                            # Add timing information from Coactive
+                            # Add timing information from Coactive with proper timecode conversion
                             if coactive_metadata.get("start_time_ms") is not None:
-                                self.logger.info(
-                                    f"[CLIP_DEBUG] Adding timecode for clip {i+1}"
-                                )
-                                # Convert milliseconds to timecode format (simplified)
                                 start_ms = coactive_metadata["start_time_ms"]
-                                end_ms = coactive_metadata["end_time_ms"]
+                                end_ms = coactive_metadata.get("end_time_ms", start_ms)
 
-                                # Simple conversion to HH:MM:SS:FF format (assuming 30fps)
-                                def ms_to_timecode(ms):
-                                    total_seconds = ms // 1000
-                                    frames = (ms % 1000) * 30 // 1000
-                                    hours = total_seconds // 3600
-                                    minutes = (total_seconds % 3600) // 60
-                                    seconds = total_seconds % 60
-                                    return f"{hours:02d}:{minutes:02d}:{seconds:02d}:{frames:02d}"
-
-                                clip["start_timecode"] = ms_to_timecode(start_ms)
-                                clip["end_timecode"] = ms_to_timecode(end_ms)
+                                # Convert milliseconds to timecode format
+                                clip["start_timecode"] = self._ms_to_timecode(start_ms)
+                                clip["end_timecode"] = self._ms_to_timecode(end_ms)
                                 clip["timestamp"] = digital_source_asset.get(
                                     "CreateDate", ""
                                 )
+
                                 self.logger.info(
-                                    f"[CLIP_DEBUG] Clip {i+1} timecodes - start: {clip['start_timecode']}, end: {clip['end_timecode']}"
+                                    f"Clip {clip_index + 1} timecodes - start: {clip['start_timecode']}, end: {clip['end_timecode']}"
                                 )
                             else:
-                                # Fallback: Generate timing for video clips when Coactive doesn't provide timing
-                                if hit.media_type.value == "video":
-                                    # Get video duration from MediaLake metadata
-                                    video_metadata = enriched_source.get(
-                                        "Metadata", {}
-                                    ).get("EmbeddedMetadata", {})
-                                    duration_str = video_metadata.get(
-                                        "general", {}
-                                    ).get("Duration")
-
-                                    if duration_str:
-                                        try:
-                                            # Parse duration (e.g., "32.280")
-                                            total_duration_ms = int(
-                                                float(duration_str) * 1000
-                                            )
-
-                                            # Create evenly distributed clips (assume 10-second clips or divide by number of clips)
-                                            num_clips = len(hit.source["clips"])
-                                            if num_clips > 0:
-                                                clip_duration_ms = min(
-                                                    10000,
-                                                    total_duration_ms // num_clips,
-                                                )  # Max 10 seconds per clip
-                                                clip_index = i  # Use clip index to determine timing
-
-                                                start_ms = clip_index * clip_duration_ms
-                                                end_ms = min(
-                                                    start_ms + clip_duration_ms,
-                                                    total_duration_ms,
-                                                )
-
-                                                # Only add timing if within video duration
-                                                if start_ms < total_duration_ms:
-
-                                                    def ms_to_timecode(ms):
-                                                        total_seconds = ms // 1000
-                                                        frames = (
-                                                            (ms % 1000) * 30 // 1000
-                                                        )  # Assume 30fps
-                                                        hours = total_seconds // 3600
-                                                        minutes = (
-                                                            total_seconds % 3600
-                                                        ) // 60
-                                                        seconds = total_seconds % 60
-                                                        return f"{hours:02d}:{minutes:02d}:{seconds:02d}:{frames:02d}"
-
-                                                    clip["start_timecode"] = (
-                                                        ms_to_timecode(start_ms)
-                                                    )
-                                                    clip["end_timecode"] = (
-                                                        ms_to_timecode(end_ms)
-                                                    )
-                                                    clip["timestamp"] = (
-                                                        digital_source_asset.get(
-                                                            "CreateDate", ""
-                                                        )
-                                                    )
-
-                                                    self.logger.info(
-                                                        f"Generated fallback timing for clip {i+1}: {clip['start_timecode']} - {clip['end_timecode']}"
-                                                    )
-                                        except (ValueError, TypeError) as e:
-                                            self.logger.warning(
-                                                f"Failed to parse duration '{duration_str}' for fallback timing: {e}"
-                                            )
+                                # Fallback timecodes if Coactive doesn't provide timing
+                                clip["start_timecode"] = "00:00:00:00"
+                                clip["end_timecode"] = "00:00:00:00"
 
                             clips.append(clip)
 
@@ -687,7 +601,6 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
             results.hits = enriched_hits
 
             # Update total_results to reflect the actual number of results after filtering
-            # This ensures the UI shows the correct count instead of the original Coactive count
             results.total_results = len(enriched_hits)
 
             enrichment_time = int((time.time() - start_time) * 1000)
@@ -703,6 +616,31 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
             )
             # Return original results on enrichment failure
             return results
+
+    def _ms_to_timecode(self, milliseconds):
+        """
+        Convert milliseconds to SMPTE timecode format (HH:MM:SS:FF).
+
+        Args:
+            milliseconds: Time in milliseconds
+
+        Returns:
+            String in format "HH:MM:SS:FF" (assuming 30fps)
+        """
+        if not isinstance(milliseconds, (int, float)) or milliseconds < 0:
+            return "00:00:00:00"
+
+        # Convert to seconds
+        total_seconds = milliseconds / 1000.0
+
+        # Extract hours, minutes, seconds, and frames (assuming 30fps)
+        hours = int(total_seconds // 3600)
+        minutes = int((total_seconds % 3600) // 60)
+        seconds = int(total_seconds % 60)
+        frames = int((total_seconds % 1) * 30)  # 30fps
+
+        # Format as timecode
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}:{frames:02d}"
 
     def _fetch_medialake_metadata(
         self, asset_ids: List[str], query: SearchQuery
@@ -859,116 +797,3 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
         }
 
         return field_mappings.get(filter_key, filter_key)
-
-    def _create_medialake_result_with_clips(
-        self,
-        hit: SearchHit,
-        medialake_source: Dict[str, Any],
-        query: SearchQuery,
-    ) -> Dict[str, Any]:
-        """Create MediaLake result with clips array from Coactive data"""
-        # Start with MediaLake asset data as base (similar to process_search_hit)
-        digital_source_asset = medialake_source.get("DigitalSourceAsset", {})
-        main_rep = digital_source_asset.get("MainRepresentation", {})
-        storage_info = main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
-        object_key = storage_info.get("ObjectKey", {})
-
-        # Create base result structure matching MediaLake format
-        result = {
-            "DigitalSourceAsset": digital_source_asset,
-            "score": hit.score,
-            # Add standard MediaLake fields
-            "assetType": digital_source_asset.get("Type", ""),
-            "format": main_rep.get("Format", ""),
-            "objectName": object_key.get("Name", ""),
-            "fullPath": object_key.get("FullPath", ""),
-            "bucket": storage_info.get("Bucket", ""),
-        }
-
-        # Handle file size
-        file_size = storage_info.get("FileSize", 0)
-        if not file_size and "FileInfo" in storage_info:
-            file_size = storage_info.get("FileInfo", {}).get("Size", 0)
-        result["fileSize"] = file_size
-
-        # Handle creation date
-        created_date = storage_info.get("CreateDate", "")
-        if not created_date and "FileInfo" in storage_info:
-            created_date = storage_info.get("FileInfo", {}).get("CreateDate", "")
-        if not created_date:
-            created_date = digital_source_asset.get("CreateDate", "")
-        result["createdAt"] = created_date
-
-        # Include consolidated metadata if available
-        if "Metadata" in medialake_source and "Consolidated" in medialake_source.get(
-            "Metadata", {}
-        ):
-            result["consolidatedMetadata"] = medialake_source["Metadata"][
-                "Consolidated"
-            ]
-
-        # Create clips array from Coactive results
-        clips = []
-        coactive_data = hit.source  # This contains our grouped clips data
-
-        if isinstance(coactive_data, dict) and "clips" in coactive_data:
-            for clip_data in coactive_data["clips"]:
-                # Create clip structure similar to process_clip but with Coactive timing data
-                clip = {
-                    "DigitalSourceAsset": digital_source_asset,
-                    "score": clip_data.get("score", 0.0),
-                    # Copy standard fields from parent asset
-                    "assetType": result["assetType"],
-                    "format": result["format"],
-                    "objectName": result["objectName"],
-                    "fullPath": result["fullPath"],
-                    "bucket": result["bucket"],
-                    "fileSize": result["fileSize"],
-                    "createdAt": result["createdAt"],
-                }
-
-                # Add Coactive-specific timing metadata for video clips
-                coactive_metadata = clip_data.get("coactive_metadata", {})
-                if coactive_metadata.get("start_time_ms") is not None:
-                    clip["startTimeMs"] = coactive_metadata["start_time_ms"]
-                    clip["endTimeMs"] = coactive_metadata["end_time_ms"]
-                    clip["timestampMs"] = coactive_metadata.get("timestamp_ms", 0)
-                    clip["shotId"] = coactive_metadata.get("shot_id")
-
-                # Add consolidated metadata to clips too
-                if "consolidatedMetadata" in result:
-                    clip["consolidatedMetadata"] = result["consolidatedMetadata"]
-
-                # Store Coactive metadata for debugging/reference
-                clip["coactiveMetadata"] = coactive_metadata
-
-                clips.append(clip)
-
-        # Sort clips by score (highest first)
-        clips.sort(key=lambda x: x.get("score", 0), reverse=True)
-        result["clips"] = clips
-
-        self.logger.info(
-            f"Created MediaLake result for asset {hit.asset_id} with {len(clips)} clips"
-        )
-
-        return result
-
-    def _merge_metadata(
-        self,
-        coactive_metadata: Dict[str, Any],
-        medialake_source: Dict[str, Any],
-        query: SearchQuery,
-    ) -> Dict[str, Any]:
-        """Legacy method - kept for backward compatibility"""
-        # Start with MediaLake data as base
-        merged = medialake_source.copy()
-
-        # Add Coactive-specific metadata under a separate key
-        merged["coactive_metadata"] = coactive_metadata
-
-        # Preserve any additional fields that might be useful
-        if "highlights" in coactive_metadata:
-            merged["highlights"] = coactive_metadata["highlights"]
-
-        return merged
