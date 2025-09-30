@@ -290,12 +290,23 @@ class UnifiedSearchOrchestrator:
                     )
                     return provider
 
-        # Use default provider if available
-        if self._default_provider and self._default_provider.validate_query(query):
+        # Use default provider only for semantic searches
+        if (
+            query.search_type.value == "semantic"
+            and self._default_provider
+            and self._default_provider.validate_query(query)
+        ):
             self.logger.info(
-                f"Using default provider: {self._default_provider.config.provider}"
+                f"Using default provider for semantic search: {self._default_provider.config.provider}"
             )
             return self._default_provider
+
+        # For keyword searches, don't use semantic providers - return None to trigger legacy search
+        if query.search_type.value == "keyword":
+            self.logger.info(
+                "No keyword search provider found, will use legacy search system"
+            )
+            return None
 
         self.logger.warning("No suitable provider found for query")
         return None
@@ -344,7 +355,7 @@ class UnifiedSearchOrchestrator:
         """Add presigned URLs for thumbnail and proxy representations"""
         try:
             # Import here to avoid circular imports
-            from search_utils import generate_presigned_url
+            from url_utils import generate_cloudfront_url
 
             derived_representations = result.get("DerivedRepresentations", [])
             thumbnail_url = None
@@ -358,7 +369,7 @@ class UnifiedSearchOrchestrator:
                 )
 
                 if rep_storage_info.get("StorageType") == "s3":
-                    presigned_url = generate_presigned_url(
+                    presigned_url = generate_cloudfront_url(
                         bucket=rep_storage_info.get("Bucket", ""),
                         key=rep_storage_info.get("ObjectKey", {}).get("FullPath", ""),
                     )

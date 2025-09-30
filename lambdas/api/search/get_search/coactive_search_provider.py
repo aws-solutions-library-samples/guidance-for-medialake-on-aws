@@ -188,11 +188,11 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
         start_time = time.time()
 
         try:
-            # Build Coactive request parameters (not payload for GET request)
-            params = self._build_coactive_params(query)
+            # Build Coactive request payload for POST request
+            payload = self._build_coactive_payload(query)
 
             # Make request to Coactive API
-            response = self._make_coactive_request(params)
+            response = self._make_coactive_request(payload)
 
             # Convert Coactive response to SearchResult
             search_result = self._convert_coactive_response(response, query)
@@ -219,16 +219,21 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
                 provider_location=ProviderLocation.EXTERNAL,
             )
 
-    def _build_coactive_params(self, query: SearchQuery) -> Dict[str, Any]:
-        """Build Coactive API request parameters matching working example"""
-        # Build parameters according to working Coactive search example
-        params = {
+    def _build_coactive_payload(self, query: SearchQuery) -> Dict[str, Any]:
+        """Build Coactive API request payload for new POST endpoint"""
+        payload = {
             "dataset_id": self.config.dataset_id,
-            "query": query.query_text,  # Use 'query' not 'text_query' for GET requests
+            "text_query": query.query_text,
+            "offset": query.page_offset,
+            "limit": query.page_size,
         }
 
-        self.logger.info(f"Built Coactive params: {params}")
-        return params
+        # Add asset_type filter for video if include_clips is true
+        if query.include_clips:
+            payload["asset_type"] = "video"
+
+        self.logger.info(f"Built Coactive payload: {payload}")
+        return payload
 
     def _map_field_name(self, field_name: str) -> str:
         """Map MediaLake field names to Coactive metadata field names"""
@@ -260,10 +265,10 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
 
         return operator_mappings.get(operator, operator)
 
-    def _make_coactive_request(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Make HTTP request to Coactive API using GET with query parameters"""
-        # Use the correct Coactive search endpoint based on working example
-        endpoint = "https://app.coactive.ai/api/v1/search"
+    def _make_coactive_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Make HTTP request to Coactive API using new POST endpoint"""
+        # Use the new Coactive search endpoint
+        endpoint = "https://api.coactive.ai/api/v1/search/text-to-image"
 
         # Get auth token from Secrets Manager
         auth_token = self._get_auth_token()
@@ -276,25 +281,21 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
         }
 
         self.logger.info(f"Making Coactive API request to {endpoint}")
-        self.logger.debug(f"Coactive request params: {json.dumps(params, indent=2)}")
+        self.logger.debug(f"Coactive request payload: {json.dumps(payload, indent=2)}")
 
-        # Use GET request with query parameters (matching working example)
-        # Parse the URL to extract host and path
-        from urllib.parse import urlencode, urlparse
+        # Use POST request with JSON payload
+        from urllib.parse import urlparse
 
         parsed_url = urlparse(endpoint)
         host = parsed_url.netloc
         path = parsed_url.path
 
-        # Build query string
-        query_string = urlencode(params)
-        full_path = f"{path}?{query_string}"
-
-        self.logger.info(f"Making request to {host}{full_path}")
+        self.logger.info(f"Making POST request to {host}{path}")
 
         # Make HTTP request using http.client
         conn = http.client.HTTPSConnection(host)
-        conn.request("GET", full_path, headers=headers)
+        body = json.dumps(payload)
+        conn.request("POST", path, body=body, headers=headers)
         response = conn.getresponse()
         response_data = response.read().decode("utf-8")
         conn.close()
@@ -316,9 +317,12 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
 
         # Group results by MediaLake asset UUID to create proper clips structure
         assets_with_clips = {}
-        max_score = 0.0
+        max_score = 1.0  # Since we're normalizing, max score will be 1.0
+        total_results = len(results)
 
-        for result in results:
+        for i, result in enumerate(results):
+            self.logger.info(f"[CLIP_DEBUG] Processing result {i+1}/{len(results)}")
+
             # Extract MediaLake UUID from different locations based on media type
             medialake_uuid = None
             coactive_metadata = {}
@@ -335,12 +339,13 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
 
                 # Add timing information for video clips
                 if result.get("shot"):
+                    result["shot"]
                     coactive_metadata.update(
                         {
-                            "start_time_ms": result["shot"].get("startTimeMs", 0),
-                            "end_time_ms": result["shot"].get("endTimeMs", 0),
+                            "start_time_ms": result["shot"].get("start_time_ms", 0),
+                            "end_time_ms": result["shot"].get("end_time_ms", 0),
                             "timestamp_ms": result.get("timestamp", 0),
-                            "shot_id": result["shot"].get("shotId"),
+                            "shot_id": result["shot"].get("shot_id"),
                         }
                     )
 
@@ -356,10 +361,16 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
                 )
                 continue
 
-            # Calculate score (default to 1.0 if not provided)
-            score = float(result.get("relevance_score") or result.get("score", 1.0))
-            if score > max_score:
-                max_score = score
+            # Calculate normalized score based on position in ordered results
+            # First result gets 1.0, last result gets close to 0.0
+            if total_results > 1:
+                score = 1.0 - (i / (total_results - 1))
+            else:
+                score = 1.0
+
+            self.logger.info(
+                f"[CLIP_DEBUG] Normalized score for result {i+1}: {score:.3f}"
+            )
 
             # Group clips by asset UUID
             if medialake_uuid not in assets_with_clips:
@@ -466,8 +477,20 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
                         and "clips" in hit.source
                     ):
                         clips = []
-                        for clip_data in hit.source["clips"]:
+                        self.logger.info(
+                            f"[CLIP_DEBUG] Processing {len(hit.source['clips'])} clips for video asset {hit.asset_id}"
+                        )
+                        for i, clip_data in enumerate(hit.source["clips"]):
                             coactive_metadata = clip_data.get("coactive_metadata", {})
+                            self.logger.info(
+                                f"[CLIP_DEBUG] Clip {i+1} coactive_metadata keys: {list(coactive_metadata.keys())}"
+                            )
+                            self.logger.info(
+                                f"[CLIP_DEBUG] Clip {i+1} start_time_ms: {coactive_metadata.get('start_time_ms')}"
+                            )
+                            self.logger.info(
+                                f"[CLIP_DEBUG] Clip {i+1} end_time_ms: {coactive_metadata.get('end_time_ms')}"
+                            )
 
                             # Extract asset information from MediaLake source
                             digital_source_asset = enriched_source.get(
@@ -501,6 +524,9 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
 
                             # Add timing information from Coactive
                             if coactive_metadata.get("start_time_ms") is not None:
+                                self.logger.info(
+                                    f"[CLIP_DEBUG] Adding timecode for clip {i+1}"
+                                )
                                 # Convert milliseconds to timecode format (simplified)
                                 start_ms = coactive_metadata["start_time_ms"]
                                 end_ms = coactive_metadata["end_time_ms"]
@@ -519,6 +545,76 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
                                 clip["timestamp"] = digital_source_asset.get(
                                     "CreateDate", ""
                                 )
+                                self.logger.info(
+                                    f"[CLIP_DEBUG] Clip {i+1} timecodes - start: {clip['start_timecode']}, end: {clip['end_timecode']}"
+                                )
+                            else:
+                                # Fallback: Generate timing for video clips when Coactive doesn't provide timing
+                                if hit.media_type.value == "video":
+                                    # Get video duration from MediaLake metadata
+                                    video_metadata = enriched_source.get(
+                                        "Metadata", {}
+                                    ).get("EmbeddedMetadata", {})
+                                    duration_str = video_metadata.get(
+                                        "general", {}
+                                    ).get("Duration")
+
+                                    if duration_str:
+                                        try:
+                                            # Parse duration (e.g., "32.280")
+                                            total_duration_ms = int(
+                                                float(duration_str) * 1000
+                                            )
+
+                                            # Create evenly distributed clips (assume 10-second clips or divide by number of clips)
+                                            num_clips = len(hit.source["clips"])
+                                            if num_clips > 0:
+                                                clip_duration_ms = min(
+                                                    10000,
+                                                    total_duration_ms // num_clips,
+                                                )  # Max 10 seconds per clip
+                                                clip_index = i  # Use clip index to determine timing
+
+                                                start_ms = clip_index * clip_duration_ms
+                                                end_ms = min(
+                                                    start_ms + clip_duration_ms,
+                                                    total_duration_ms,
+                                                )
+
+                                                # Only add timing if within video duration
+                                                if start_ms < total_duration_ms:
+
+                                                    def ms_to_timecode(ms):
+                                                        total_seconds = ms // 1000
+                                                        frames = (
+                                                            (ms % 1000) * 30 // 1000
+                                                        )  # Assume 30fps
+                                                        hours = total_seconds // 3600
+                                                        minutes = (
+                                                            total_seconds % 3600
+                                                        ) // 60
+                                                        seconds = total_seconds % 60
+                                                        return f"{hours:02d}:{minutes:02d}:{seconds:02d}:{frames:02d}"
+
+                                                    clip["start_timecode"] = (
+                                                        ms_to_timecode(start_ms)
+                                                    )
+                                                    clip["end_timecode"] = (
+                                                        ms_to_timecode(end_ms)
+                                                    )
+                                                    clip["timestamp"] = (
+                                                        digital_source_asset.get(
+                                                            "CreateDate", ""
+                                                        )
+                                                    )
+
+                                                    self.logger.info(
+                                                        f"Generated fallback timing for clip {i+1}: {clip['start_timecode']} - {clip['end_timecode']}"
+                                                    )
+                                        except (ValueError, TypeError) as e:
+                                            self.logger.warning(
+                                                f"Failed to parse duration '{duration_str}' for fallback timing: {e}"
+                                            )
 
                             clips.append(clip)
 
