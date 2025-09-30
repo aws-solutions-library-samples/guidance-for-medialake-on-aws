@@ -70,15 +70,13 @@ cache:
 #   variables:
 #     STACK_NAME: "medialake-us-west-2"
 #     ZIP_FILE_NAME: "medialake-source-${CI_COMMIT_SHORT_SHA}.zip"
-#     AWS_CREDS_TARGET_ROLE: $US_WEST_2_AWS_IAM_ROLE
-#     AWS_DEFAULT_ACCOUNT: $US_WEST_2_AWS_ACCOUNT_ID
-#     AWS_DEFAULT_REGION: "us-west-2"
-#     DEPLOY_REGION: "us-west-2"
+#     AWS_CREDS_TARGET_ROLE: $DEPLOY_AWS_IAM_ROLE
+#     AWS_DEFAULT_ACCOUNT: $DEPLOY_AWS_ACCOUNT_ID
+#     AWS_DEFAULT_REGION: $DEPLOY_AWS_REGION
+#     DEPLOY_REGION: $DEPLOY_AWS_REGION
 #     STACK_PREFIX: "medialake"
 #     ENVIRONMENT_NAME: "dev"
 #     DEPLOYMENT_SIZE: "small"
-#     ACCESS_KEY_ID: $US_WEST_2_ACCESS_KEY
-#     SECRET_ACCESS_KEY: $US_WEST_2_SECRET_KEY
 #   before_script: |
 #     # Install required dependencies
 #     yum update -y
@@ -87,28 +85,19 @@ cache:
 #     curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 #     unzip awscliv2.zip
 #     ./aws/install
-#     # Configure AWS credentials
-#     aws configure set aws_access_key_id $ACCESS_KEY_ID
-#     aws configure set aws_secret_access_key $SECRET_ACCESS_KEY
-#     aws configure set default.region $DEPLOY_REGION
-#     echo "AWS credentials configured for region: $DEPLOY_REGION"
 #     # Basic tool versions
 #     echo "login = $GITLAB_USER_LOGIN - using CICD credentials"
 #     npm --version
 #     node --version
 #     aws --version
 #     jq --version
-#     export AWS_ACCESS_KEY_ID="$ACCESS_KEY_ID"
-#     export AWS_SECRET_ACCESS_KEY="$SECRET_ACCESS_KEY"
-#     unset  AWS_SESSION_TOKEN          # ensure CLI doesn't reuse the vendor token
-#     echo "Environment credentials overridden"
 #   script:
 #     - echo "Deploying MediaLake to us-west-2 test account via CloudFormation"
 #     - echo "Using current account credentials for deployment"
 #     - 'echo "Using AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION"'
 #     - 'echo "Using DEPLOY_REGION: $DEPLOY_REGION"'
 #     - echo "Verifying AWS identity:"
-#     - aws sts get-caller-identity
+#     - aws sts get-caller-identity --profile default
 #     - |
 #       # Generate unique S3 bucket name using UUID
 #       echo "Generating unique S3 bucket name..."
@@ -117,11 +106,11 @@ cache:
 #       echo "Generated S3 bucket name: $S3_BUCKET_NAME"
 #       # Create S3 bucket in current account
 #       echo "Creating S3 bucket in current account..."
-#       aws s3 mb s3://$S3_BUCKET_NAME --region $DEPLOY_REGION
+#       aws s3 mb s3://$S3_BUCKET_NAME --region $DEPLOY_REGION --profile default
 #       echo "S3 bucket created successfully: $S3_BUCKET_NAME"
 #       # Test S3 access
 #       echo "Testing S3 bucket access..."
-#       aws s3 ls s3://$S3_BUCKET_NAME/ --region $DEPLOY_REGION
+#       aws s3 ls s3://$S3_BUCKET_NAME/ --region $DEPLOY_REGION --profile default
 #       echo "S3 bucket access confirmed"
 #     - echo "Infrastructure cleanup - checking for existing resources..."
 #     - |
@@ -131,6 +120,7 @@ cache:
 #         local stack_prefix="$STACK_PREFIX"
 #         # Get all stacks excluding DELETE_COMPLETE and filter case-insensitively for the prefix
 #         aws cloudformation list-stacks \
+#           --profile default \
 #           --region $region \
 #           --stack-status-filter CREATE_COMPLETE CREATE_FAILED CREATE_IN_PROGRESS REVIEW_IN_PROGRESS ROLLBACK_COMPLETE ROLLBACK_FAILED ROLLBACK_IN_PROGRESS UPDATE_COMPLETE UPDATE_COMPLETE_CLEANUP_IN_PROGRESS UPDATE_IN_PROGRESS UPDATE_ROLLBACK_COMPLETE UPDATE_ROLLBACK_COMPLETE_CLEANUP_IN_PROGRESS UPDATE_ROLLBACK_FAILED UPDATE_ROLLBACK_IN_PROGRESS DELETE_FAILED \
 #           --query "StackSummaries[].StackName" \
@@ -141,6 +131,7 @@ cache:
 #         local region=$1
 #         local stack_prefix="$STACK_PREFIX"
 #         local deleting_stacks=$(aws cloudformation list-stacks \
+#           --profile default \
 #           --region $region \
 #           --stack-status-filter DELETE_IN_PROGRESS \
 #           --query "StackSummaries[].StackName" \
@@ -173,27 +164,30 @@ cache:
 #             for stack in $stacks; do
 #               echo "Attempting to delete stack: $stack in region $DEPLOY_REGION"
 #               # Check if stack is in DELETE_FAILED state and try with retain resources
-#               stack_status=$(aws cloudformation describe-stacks --stack-name "$stack" --region "$DEPLOY_REGION" --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "STACK_NOT_FOUND")
+#               stack_status=$(aws cloudformation describe-stacks --stack-name "$stack" --region "$DEPLOY_REGION" --profile default --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "STACK_NOT_FOUND")
 #               if [ "$stack_status" == "DELETE_FAILED" ]; then
 #                 echo "Stack $stack is in DELETE_FAILED state. Attempting to get resources that failed to delete..."
 #                 # Get resources that might have failed to delete
-#                 resources=$(aws cloudformation list-stack-resources --stack-name "$stack" --region "$DEPLOY_REGION" --query "StackResourceSummaries[?ResourceStatus=='DELETE_FAILED'].LogicalResourceId" --output text || true)
+#                 resources=$(aws cloudformation list-stack-resources --stack-name "$stack" --region "$DEPLOY_REGION" --profile default --query "StackResourceSummaries[?ResourceStatus=='DELETE_FAILED'].LogicalResourceId" --output text || true)
 #                 if [ -n "$resources" ]; then
 #                   echo "Found resources that failed to delete: $resources"
 #                   echo "Attempting to delete stack with --retain-resources option"
 #                   aws cloudformation delete-stack \
+#                     --profile default \
 #                     --region $DEPLOY_REGION \
 #                     --stack-name $stack \
 #                     --retain-resources $resources || true
 #                 else
 #                   # Standard delete attempt
 #                   aws cloudformation delete-stack \
+#                     --profile default \
 #                     --region $DEPLOY_REGION \
 #                     --stack-name $stack || true
 #                 fi
 #               else
 #                 # Standard delete attempt
 #                 aws cloudformation delete-stack \
+#                   --profile default \
 #                   --region $DEPLOY_REGION \
 #                   --stack-name $stack || true
 #               fi
@@ -208,7 +202,7 @@ cache:
 #       # Check for existing CodePipelines that might conflict
 #       echo "Checking for existing CodePipelines..."
 #       for pipeline_candidate in "MediaLakeCDKPipeline" "CDKDeploymentPipeline"; do
-#         if aws codepipeline get-pipeline --name "$pipeline_candidate" --region $DEPLOY_REGION >/dev/null 2>&1; then
+#         if aws codepipeline get-pipeline --name "$pipeline_candidate" --region $DEPLOY_REGION --profile default >/dev/null 2>&1; then
 #           echo "Found existing pipeline: $pipeline_candidate - will be cleaned up with stack deletion"
 #         fi
 #       done
@@ -224,9 +218,9 @@ cache:
 #     - zip -r $ZIP_FILE_NAME . -x "*.git*" "*.venv*" "*__pycache__*" "*.pyc" "*node_modules*" "*.DS_Store*"
 #     - ls -la $ZIP_FILE_NAME
 #     - 'echo "Uploading zip file to S3 bucket: $S3_BUCKET_NAME"'
-#     - aws s3 cp $ZIP_FILE_NAME s3://$S3_BUCKET_NAME/$ZIP_FILE_NAME --region $DEPLOY_REGION
+#     - aws s3 cp $ZIP_FILE_NAME s3://$S3_BUCKET_NAME/$ZIP_FILE_NAME --region $DEPLOY_REGION --profile default
 #     - echo "Generating pre-signed URL for zip file..."
-#     - PRESIGNED_URL=$(aws s3 presign s3://$S3_BUCKET_NAME/$ZIP_FILE_NAME --expires-in 3600 --region $DEPLOY_REGION)
+#     - PRESIGNED_URL=$(aws s3 presign s3://$S3_BUCKET_NAME/$ZIP_FILE_NAME --expires-in 3600 --region $DEPLOY_REGION --profile default)
 #     - echo "Pre-signed URL generated successfully"
 #     - 'echo "Deploying CloudFormation stack: $STACK_NAME"'
 #     - |
@@ -242,12 +236,13 @@ cache:
 #           ParameterKey=MediaLakeEnvironmentName,ParameterValue="$ENVIRONMENT_NAME" \
 #           ParameterKey=OpenSearchDeploymentSize,ParameterValue="$DEPLOYMENT_SIZE" \
 #         --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
-#         --region $DEPLOY_REGION
+#         --region $DEPLOY_REGION \
+#         --profile default
 #     - echo "Waiting for stack creation to complete..."
-#     - aws cloudformation wait stack-create-complete --stack-name $STACK_NAME --region $DEPLOY_REGION
+#     - aws cloudformation wait stack-create-complete --stack-name $STACK_NAME --region $DEPLOY_REGION --profile default
 #     - echo "CloudFormation deployment completed successfully"
 #     - 'echo "Stack outputs:"'
-#     - aws cloudformation describe-stacks --stack-name $STACK_NAME --region $DEPLOY_REGION --query 'Stacks[0].Outputs'
+#     - aws cloudformation describe-stacks --stack-name $STACK_NAME --region $DEPLOY_REGION --profile default --query 'Stacks[0].Outputs'
 #     - |
 #       # Monitor CodePipeline execution similar to deploy-medialake.sh
 #       echo "Waiting for CodePipeline to be created by CloudFormation..."
@@ -255,7 +250,7 @@ cache:
 #       # Check for pipeline existence (try multiple possible names)
 #       PIPELINE_NAME=""
 #       for pipeline_candidate in "MediaLakeCDKPipeline" "CDKDeploymentPipeline"; do
-#         if aws codepipeline get-pipeline --name "$pipeline_candidate" --region $DEPLOY_REGION >/dev/null 2>&1; then
+#         if aws codepipeline get-pipeline --name "$pipeline_candidate" --region $DEPLOY_REGION --profile default >/dev/null 2>&1; then
 #           PIPELINE_NAME="$pipeline_candidate"
 #           echo "Found pipeline: $PIPELINE_NAME"
 #           break
@@ -275,6 +270,7 @@ cache:
 #           EXECUTION_STATUS=$(aws codepipeline list-pipeline-executions \
 #             --pipeline-name "$PIPELINE_NAME" \
 #             --region $DEPLOY_REGION \
+#             --profile default \
 #             --max-items 1 \
 #             --query "pipelineExecutionSummaries[0].status" \
 #             --output text 2>/dev/null | tr -d '\n\r' | sed 's/None//g' | xargs)
@@ -335,8 +331,8 @@ cache:
 #     - |
 #       # Clean up: Delete the temporary S3 bucket after deployment
 #       echo "Cleaning up temporary S3 bucket..."
-#       aws s3 rm s3://$S3_BUCKET_NAME --recursive --region $DEPLOY_REGION
-#       aws s3 rb s3://$S3_BUCKET_NAME --region $DEPLOY_REGION
+#       aws s3 rm s3://$S3_BUCKET_NAME --recursive --region $DEPLOY_REGION --profile default
+#       aws s3 rb s3://$S3_BUCKET_NAME --region $DEPLOY_REGION --profile default
 #       echo "Temporary S3 bucket deleted: $S3_BUCKET_NAME"
 
 # Pre-commit hooks job for merge requests to main (excluding ESLint)
@@ -431,12 +427,15 @@ playwright_e2e_test:
   #   - job: medialake_deploy_us_west_2
   #     artifacts: false
   variables:
-    AWS_CREDS_TARGET_ROLE: $US_WEST_2_AWS_IAM_ROLE
-    AWS_DEFAULT_ACCOUNT: $US_WEST_2_AWS_ACCOUNT_ID
-    AWS_DEFAULT_REGION: $DEPLOY_REGION
-    DEPLOY_REGION: $DEPLOY_REGION
-    ACCESS_KEY_ID: $US_WEST_2_ACCESS_KEY
-    SECRET_ACCESS_KEY: $US_WEST_2_SECRET_KEY
+    AWS_CREDS_TARGET_ROLE: $E2E_TEST_AWS_IAM_ROLE
+    AWS_DEFAULT_ACCOUNT: $E2E_TEST_AWS_ACCOUNT_ID
+    AWS_DEFAULT_REGION: $E2E_TEST_AWS_REGION
+    DEPLOY_REGION: $E2E_TEST_AWS_REGION
+    CDK_DEPLOY_ACCOUNT: $E2E_TEST_AWS_ACCOUNT_ID
+    CDK_DEFAULT_ACCOUNT: $E2E_TEST_AWS_ACCOUNT_ID
+    CDK_DEPLOY_REGION: $E2E_TEST_AWS_REGION
+    AWS_REGION: $E2E_TEST_AWS_REGION
+    AMAZON_REGION: $E2E_TEST_AWS_REGION
   before_script:
     # Install required dependencies including system packages for Playwright
     - yum update -y
@@ -447,25 +446,15 @@ playwright_e2e_test:
     - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
     - unzip awscliv2.zip
     - ./aws/install
-    # Configure AWS credentials for test execution
-    - aws configure set aws_access_key_id $ACCESS_KEY_ID
-    - aws configure set aws_secret_access_key $SECRET_ACCESS_KEY
-    - aws configure set default.region $DEPLOY_REGION
-    - echo "AWS credentials configured for testing in region $DEPLOY_REGION"
-    # Export AWS credentials as environment variables (matching deployment job pattern)
-    - export AWS_ACCESS_KEY_ID="$ACCESS_KEY_ID"
-    - export AWS_SECRET_ACCESS_KEY="$SECRET_ACCESS_KEY"
-    - unset AWS_SESSION_TOKEN
-    - echo "Environment credentials overridden for testing"
+    # Verify AWS access
+    - aws sts get-caller-identity --profile default
+    - echo "AWS identity verified for testing"
     # Navigate to UI directory and install dependencies
     - cd medialake_user_interface
     - npm install
     # Install Playwright browsers without system dependencies (we installed them manually)
     - npx playwright install chromium
     - echo "Playwright setup completed"
-    # Verify AWS access
-    - aws sts get-caller-identity
-    - echo "AWS identity verified for testing"
   script:
     - echo "Running comprehensive Playwright E2E test against deployed MediaLake infrastructure"
     - echo "Starting Playwright test execution..."
@@ -476,7 +465,7 @@ playwright_e2e_test:
 
     # Quick AWS connectivity verification
     - echo "Verifying AWS connectivity..."
-    - aws sts get-caller-identity --region $DEPLOY_REGION
+    - aws sts get-caller-identity --region $DEPLOY_REGION --profile default
 
     # Run with optimized settings for CI - Chromium only
     - echo "Executing Playwright test with optimized CI settings..."
