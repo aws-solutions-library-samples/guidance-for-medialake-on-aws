@@ -220,7 +220,6 @@ class SearchConstruct(Construct):
             )
         )
 
-        eiifcbevvtvnntrhirkutiljnggnftrureeietvcdgnr
         # Add Bedrock permissions for TwelveLabs embedding generation
         search_get_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
