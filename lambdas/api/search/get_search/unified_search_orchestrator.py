@@ -226,18 +226,21 @@ class UnifiedSearchOrchestrator:
 
                 return response
             else:
-                # No suitable provider found - raise error instead of fallback
+                # No suitable provider found - fall back to legacy search system
                 available_providers = (
                     list(self._providers.keys()) if self._providers else []
                 )
-                error_msg = f"No suitable search provider found for query. Available providers: {available_providers}"
-                self.logger.error(error_msg)
-                raise RuntimeError(error_msg)
+                self.logger.info(
+                    f"No suitable search provider found for query. Available providers: {available_providers}"
+                )
+                self.logger.info("Falling back to legacy search system")
+                return self._execute_legacy_search(query_params)
 
         except Exception as e:
             self.logger.error(f"Unified search failed: {str(e)}")
-            # Re-raise the error instead of falling back to legacy system
-            raise RuntimeError(f"Search system failure: {str(e)}")
+            # Fall back to legacy search system on any error
+            self.logger.info("Falling back to legacy search system due to error")
+            return self._execute_legacy_search(query_params)
 
     def _select_provider(self, query: SearchQuery) -> Optional[BaseSearchProvider]:
         """
