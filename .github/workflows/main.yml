@@ -35,7 +35,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/Github
-          aws-region: us-east-1
+          aws-region: us-west-2
 
       - name: Set up Python virtual environment
         run: python -m venv .venv
@@ -49,7 +49,7 @@ jobs:
       - name: Generate config from template
         run: |
           source .venv/bin/activate
-          python -c "
+          cat <<'EOF' > generate_config.py
 import json, boto3
 from pathlib import Path
 
@@ -72,7 +72,8 @@ output_path.parent.mkdir(exist_ok=True, parents=True)
 with open(output_path, 'w') as f:
     json.dump(config, f, indent=2)
 print(f'Wrote {output_path}')
-"
+EOF
+          python generate_config.py
 
       - name: Install CDK project dependencies
         run: |
