@@ -23,6 +23,11 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Install AWS CDK CLI
         run: npm install -g aws-cdk
 
@@ -35,18 +40,51 @@ jobs:
       - name: Set up Python virtual environment
         run: python -m venv .venv
 
-      - name: Install dependencies
+      - name: Upgrade pip and install boto3
         run: |
           source .venv/bin/activate
           pip install --upgrade pip
+          pip install boto3
+
+      - name: Generate config from template
+        run: |
+          source .venv/bin/activate
+          python -c "
+import json, boto3
+from pathlib import Path
+
+template_path = Path('.cicd/config.template')
+with open(template_path) as f:
+    config_template = f.read()
+
+config_template = config_template.replace('<env>', 'dev')
+config_template = config_template.replace('<initial_user_email>', 'medialake+test@amazon.com')
+
+sts = boto3.client('sts')
+account_id = sts.get_caller_identity()['Account']
+region = boto3.Session().region_name or 'us-west-2'
+config_template = config_template.replace('<aws_account_id>', account_id)
+config_template = config_template.replace('<aws_region>', region)
+
+config = json.loads(config_template)
+output_path = Path('guidance-for-medialake-on-aws/config.json')
+output_path.parent.mkdir(exist_ok=True, parents=True)
+with open(output_path, 'w') as f:
+    json.dump(config, f, indent=2)
+print(f'Wrote {output_path}')
+"
+
+      - name: Install CDK project dependencies
+        run: |
+          source .venv/bin/activate
           pip install -r requirements.txt
 
-      - name: CDK synth
+      - name: Synthesize CDK stacks
         run: |
           source .venv/bin/activate
           cdk synth
 
-      - name: CDK deploy
+      - name: Deploy all CDK stacks
         run: |
           source .venv/bin/activate
           cdk deploy --all --require-approval=never
