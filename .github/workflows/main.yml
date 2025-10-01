@@ -1,19 +1,30 @@
-name: Deploy CFN on PR
+name: Validate and Deploy Python CDK
 
 permissions:
   id-token: write
   contents: read
-  
+
 on:
   pull_request:
     types: [opened, synchronize, reopened]
 
 jobs:
-  deploy-cloudformation:
+  deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repo
+      - name: Checkout PR branch
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install AWS CDK CLI
+        run: npm install -g aws-cdk
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
@@ -21,14 +32,21 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/Github
           aws-region: us-east-1
 
-      - name: Deploy dummy CloudFormation stack
+      - name: Set up Python virtual environment
+        run: python -m venv .venv
+
+      - name: Install dependencies
         run: |
-          echo "
-          Resources:
-            DummyBucket:
-              Type: AWS::S3::Bucket
-          " > dummy-template.yaml
-          aws cloudformation deploy \
-            --template-file dummy-template.yaml \
-            --stack-name dummy-github-action-stack \
-            --capabilities CAPABILITY_NAMED_IAM
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: CDK synth
+        run: |
+          source .venv/bin/activate
+          cdk synth
+
+      - name: CDK deploy
+        run: |
+          source .venv/bin/activate
+          cdk deploy --all --require-approval=never
