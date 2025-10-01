@@ -40,7 +40,7 @@ jobs:
       - name: Set up Python virtual environment
         run: python -m venv .venv
 
-      - name: Upgrade pip and install dependencies
+      - name: Upgrade pip
         run: |
           source .venv/bin/activate
           pip install --upgrade pip
@@ -50,7 +50,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y jq moreutils
 
-      - name: Patch config.json with jq (GitLab-style!)
+      - name: Patch config.json with jq
         env:
           MediaLakeEnvironmentName: dev
           InitialUserEmail: 'medialake+test@amazon.com'
@@ -58,36 +58,37 @@ jobs:
           InitialUserLastName: 'User'
           OpenSearchDeploymentSize: 'large'
         run: |
-          # Use existing config, or copy template if needed
           if [ -f guidance-for-medialake-on-aws/config.json ]; then
             echo "Using existing config file";
           else
             echo "Creating config file";
-            cp .cicd/config.template guidance-for-medialake-on-aws/config.json;
+            cp guidance-for-medialake-on-aws/.cicd/config.template guidance-for-medialake-on-aws/config.json;
           fi
 
           AWS_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
           AWS_REGION="$(aws configure get region || echo 'us-west-2')"
 
-          jq --arg e "$MediaLakeEnvironmentName"  '.environment = $e'              guidance-for-medialake-on-aws/config.json | sponge guidance-for-medialake-on-aws/config.json
-          jq --arg a "$AWS_ACCOUNT_ID"           '.account_id = $a'                guidance-for-medialake-on-aws/config.json | sponge guidance-for-medialake-on-aws/config.json
-          jq --arg r "$AWS_REGION"               '.primary_region = $r'             guidance-for-medialake-on-aws/config.json | sponge guidance-for-medialake-on-aws/config.json
-          jq --arg u "$InitialUserEmail"         '.initial_user.email = $u'         guidance-for-medialake-on-aws/config.json | sponge guidance-for-medialake-on-aws/config.json
-          jq --arg f "$InitialUserFirstName"     '.initial_user.first_name = $f'    guidance-for-medialake-on-aws/config.json | sponge guidance-for-medialake-on-aws/config.json
-          jq --arg l "$InitialUserLastName"      '.initial_user.last_name = $l'     guidance-for-medialake-on-aws/config.json | sponge guidance-for-medialake-on-aws/config.json
-          jq --arg s "$OpenSearchDeploymentSize" '.opensearch_deployment_size = $s' guidance-for-medialake-on-aws/config.json | sponge guidance-for-medialake-on-aws/config.json
+          jq --arg e "$MediaLakeEnvironmentName"  '.environment = $e' guidance-for-medialake-on-aws/config.json | sponge guidance-for-medialake-on-aws/config.json
+          jq --arg a "$AWS_ACCOUNT_ID"            '.account_id = $a'  guidance-for-medialake-on-aws/config.json | sponge guidance-for-medialake-on-aws/config.json
+          jq --arg r "$AWS_REGION"                '.primary_region = $r' guidance-for-medialake-on-aws/config.json | sponge guidance-for-medialake-on-aws/config.json
+          jq --arg u "$InitialUserEmail"          '.initial_user.email = $u' guidance-for-medialake-on-aws/config.json | sponge guidance-for-medialake-on-aws/config.json
+          jq --arg f "$InitialUserFirstName"      '.initial_user.first_name = $f' guidance-for-medialake-on-aws/config.json | sponge guidance-for-medialake-on-aws/config.json
+          jq --arg l "$InitialUserLastName"       '.initial_user.last_name = $l' guidance-for-medialake-on-aws/config.json | sponge guidance-for-medialake-on-aws/config.json
+          jq --arg s "$OpenSearchDeploymentSize"  '.opensearch_deployment_size = $s' guidance-for-medialake-on-aws/config.json | sponge guidance-for-medialake-on-aws/config.json
 
-      - name: Install project dependencies
+      - name: Install CDK project dependencies
         run: |
           source .venv/bin/activate
-          pip install -r requirements.txt
+          pip install -r guidance-for-medialake-on-aws/requirements.txt
 
       - name: Synthesize CDK stacks
         run: |
           source .venv/bin/activate
+          cd guidance-for-medialake-on-aws
           cdk synth
 
       - name: Deploy all CDK stacks
         run: |
           source .venv/bin/activate
+          cd guidance-for-medialake-on-aws
           cdk deploy --all --require-approval=never
