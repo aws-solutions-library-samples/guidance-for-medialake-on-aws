@@ -1,0 +1,30 @@
+name: Deploy CFN on PR
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  deploy-cloudformation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/Github
+          aws-region: us-east-1
+
+      - name: Deploy dummy CloudFormation stack
+        run: |
+          echo "
+          Resources:
+            DummyBucket:
+              Type: AWS::S3::Bucket
+          " > dummy-template.yaml
+          aws cloudformation deploy \
+            --template-file dummy-template.yaml \
+            --stack-name dummy-github-action-stack \
+            --capabilities CAPABILITY_NAMED_IAM
