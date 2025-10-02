@@ -33,6 +33,7 @@ from medialake_stacks.cognito_update_stack import (
     CognitoUpdateStack,
     CognitoUpdateStackProps,
 )
+from medialake_stacks.edge_lambda_stack import EdgeLambdaStack
 from medialake_stacks.groups_stack import GroupsStack, GroupsStackProps
 from medialake_stacks.integrations_environment_stack import (
     IntegrationsEnvironmentStack,
@@ -73,6 +74,12 @@ else:
 
 cloudfront_waf_stack = CloudFrontWafStack(
     app, "MediaLakeCloudFrontWAF", env=env_us_east_1
+)
+
+# Create Edge Lambda Stack in us-east-1 (required for Lambda@Edge)
+# Lambda@Edge functions must be deployed in us-east-1 regardless of main stack region
+edge_lambda_stack = EdgeLambdaStack(
+    app, "MediaLakeEdgeLambda", env=env_us_east_1  # Must be us-east-1
 )
 
 # Create the BaseInfrastructureStack
@@ -518,6 +525,7 @@ user_interface_stack = UserInterfaceStack(
 # Add dependencies to ensure exports are available
 user_interface_stack.add_dependency(base_infrastructure)
 user_interface_stack.add_dependency(api_gateway_deployment_stack)
+user_interface_stack.add_dependency(edge_lambda_stack)
 
 # Create the Cognito Update Stack (between user_interface_stack and cleanup_stack)
 cognito_update_stack = CognitoUpdateStack(
