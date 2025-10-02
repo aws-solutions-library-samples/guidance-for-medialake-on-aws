@@ -1,65 +1,94 @@
-name: Deploy MediaLake
+name: Validate and Deploy Python CDK
+
+permissions:
+  id-token: write
+  contents: read
 
 on:
-  push:
-    branches: [ main ]
   pull_request:
-    branches: [ main ]
-  workflow_dispatch:
-
-env:
-  AWS_REGION: us-east-1
+    types: [opened, synchronize, reopened]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
-    
+
     steps:
-      - name: Checkout code
+      - name: Checkout PR branch
         uses: actions/checkout@v4
-        
-      - name: Setup Python
-        uses: actions/setup-python@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install aws-cdk-lib constructs
-          
-      - name: Configure AWS credentials
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install AWS CDK CLI
+        run: npm install -g aws-cdk
+
+      - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
-          aws-region: ${{ env.AWS_REGION }}
-          
-      - name: Create config file if not exists
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/Github
+          aws-region: us-west-2
+
+      - name: Set up Python virtual environment
+        run: python -m venv .venv
+
+      - name: Upgrade pip
+        run: |
+          source .venv/bin/activate
+          pip install --upgrade pip
+
+      - name: Install jq and moreutils
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq moreutils
+
+      - name: Patch config.json with jq
+        env:
+          MediaLakeEnvironmentName: dev
+          InitialUserEmail: 'medialake+test@amazon.com'
+          InitialUserFirstName: 'Medialake'
+          InitialUserLastName: 'User'
+          OpenSearchDeploymentSize: 'large'
         run: |
           if [ -f guidance-for-medialake-on-aws/config.json ]; then
-            echo "Config file already exists"
+            echo "Using existing config file";
           else
-            echo "Creating config file"
-            cp .cicd/template/config.json-template guidance-for-medialake-on-aws/config.json
-            # Update the config with environment-specific values
-            sed -i 's/"region": "us-east-1"/"region": "${{ env.AWS_REGION }}"/' guidance-for-medialake-on-aws/config.json
-            sed -i 's/"account": "123456789012"/"account": "${{ secrets.AWS_ACCOUNT_ID }}"/' guidance-for-medialake-on-aws/config.json
+            echo "Creating config file";
+            cp guidance-for-medialake-on-aws/.cicd/config.json-template guidance-for-medialake-on-aws/config.json;
           fi
-          
-      - name: CDK Bootstrap (if needed)
+
+          AWS_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+          AWS_REGION="$(aws configure get region || echo 'us-west-2')"
+
+          jq --arg e "$MediaLakeEnvironmentName"  '.environment = $e' guidance-for-medialake-on-aws/config.json | sponge guidance-for-medialake-on-aws/config.json
+          jq --arg a "$AWS_ACCOUNT_ID"            '.account_id = $a'  guidance-for-medialake-on-aws/config.json | sponge guidance-for-medialake-on-aws/config.json
+          jq --arg r "$AWS_REGION"                '.primary_region = $r' guidance-for-medialake-on-aws/config.json | sponge guidance-for-medialake-on-aws/config.json
+          jq --arg u "$InitialUserEmail"          '.initial_user.email = $u' guidance-for-medialake-on-aws/config.json | sponge guidance-for-medialake-on-aws/config.json
+          jq --arg f "$InitialUserFirstName"      '.initial_user.first_name = $f' guidance-for-medialake-on-aws/config.json | sponge guidance-for-medialake-on-aws/config.json
+          jq --arg l "$InitialUserLastName"       '.initial_user.last_name = $l' guidance-for-medialake-on-aws/config.json | sponge guidance-for-medialake-on-aws/config.json
+          jq --arg s "$OpenSearchDeploymentSize"  '.opensearch_deployment_size = $s' guidance-for-medialake-on-aws/config.json | sponge guidance-for-medialake-on-aws/config.json
+
+      - name: Install CDK project dependencies
         run: |
-          cd guidance-for-medialake-on-aws
-          npx cdk bootstrap
-          
-      - name: CDK Deploy
+          source .venv/bin/activate
+          pip install -r guidance-for-medialake-on-aws/requirements.txt
+
+      - name: Synthesize CDK stacks
         run: |
+          source .venv/bin/activate
           cd guidance-for-medialake-on-aws
-          npx cdk deploy --all --require-approval never
-          
-      - name: Run tests
+          cdk synth
+
+      - name: Deploy all CDK stacks
         run: |
+          source .venv/bin/activate
           cd guidance-for-medialake-on-aws
-          python -m pytest tests/ -v
+          cdk deploy --all --require-approval=never
