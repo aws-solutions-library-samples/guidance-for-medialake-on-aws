@@ -1,7 +1,7 @@
 import json
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
@@ -10,6 +10,13 @@ from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
+from collections_utils import (
+    COLLECTION_PK_PREFIX,
+    METADATA_SK,
+)
+
+# Import centralized utilities
+from user_auth import extract_user_context
 
 # Initialize PowerTools with configurable log level
 logger = Logger(
@@ -46,8 +53,6 @@ dynamodb = boto3.resource("dynamodb")
 TABLE_NAME = os.environ["COLLECTIONS_TABLE_NAME"]
 
 # Constants
-COLLECTION_PK_PREFIX = "COLL#"
-METADATA_SK = "METADATA"
 ITEM_SK_PREFIX = "ITEM#"
 CHILD_SK_PREFIX = "CHILD#"
 RULE_SK_PREFIX = "RULE#"
@@ -55,45 +60,6 @@ PERM_SK_PREFIX = "PERM#"
 VERSION_SK_PREFIX = "VERSION#"
 USER_PK_PREFIX = "USER#"
 COLLECTIONS_GSI5_PK = "COLLECTIONS"
-
-
-@tracer.capture_method
-def extract_user_context(event: Dict[str, Any]) -> Dict[str, Optional[str]]:
-    """
-    Extract user information from JWT token in event context
-
-    Args:
-        event: Lambda event
-
-    Returns:
-        Dictionary with user_id and username
-    """
-    try:
-        authorizer = event.get("requestContext", {}).get("authorizer", {})
-        claims = authorizer.get("claims", {})
-
-        user_id = claims.get("sub")
-        username = claims.get("cognito:username")
-
-        logger.debug(
-            {
-                "message": "User context extracted",
-                "user_id": user_id,
-                "username": username,
-                "operation": "extract_user_context",
-            }
-        )
-
-        return {"user_id": user_id, "username": username}
-    except Exception as e:
-        logger.warning(
-            {
-                "message": "Failed to extract user context",
-                "error": str(e),
-                "operation": "extract_user_context",
-            }
-        )
-        return {"user_id": None, "username": None}
 
 
 @tracer.capture_method

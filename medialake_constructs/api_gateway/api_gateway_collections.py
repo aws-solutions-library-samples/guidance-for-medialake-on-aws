@@ -13,11 +13,13 @@ and associated Lambda functions for managing collections. It handles:
 - Lambda function configuration
 """
 
+import os
 from dataclasses import dataclass
 
 from aws_cdk import Stack
 from aws_cdk import aws_apigateway as api_gateway
 from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_iam as iam
 from aws_cdk import aws_secretsmanager as secrets_manager
 from constructs import Construct
 
@@ -856,6 +858,59 @@ class CollectionsApi(Construct):
         cfn_method.authorization_type = "CUSTOM"
         cfn_method.authorizer_id = props.authorizer.authorizer_id
 
+        # /collections/{collectionId}/assets endpoints
+        assets_resource = collection_id_resource.add_resource("assets")
+
+        # GET /collections/{collectionId}/assets
+        assets_get_lambda = Lambda(
+            self,
+            "AssetsGetLambda",
+            config=LambdaConfig(
+                name="assets_get",
+                entry="lambdas/api/collections/collections/get_collection_assets",
+                environment_variables={
+                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+                    "COLLECTIONS_TABLE_NAME": self._collections_table.table_name,
+                    "COLLECTIONS_TABLE_ARN": self._collections_table.table_arn,
+                    "OPENSEARCH_ENDPOINT": os.environ.get("OPENSEARCH_ENDPOINT", ""),
+                    "OPENSEARCH_INDEX": os.environ.get("OPENSEARCH_INDEX", ""),
+                    "SCOPE": "es",
+                },
+            ),
+        )
+
+        self._collections_table.table.grant_read_data(assets_get_lambda.function)
+
+        # Grant OpenSearch access permissions
+        opensearch_policy = iam.PolicyStatement(
+            effect=iam.Effect.ALLOW,
+            actions=[
+                "es:ESHttpGet",
+                "es:ESHttpPost",
+                "es:ESHttpPut",
+            ],
+            resources=[
+                f"arn:aws:es:{Stack.of(self).region}:{Stack.of(self).account}:domain/*"
+            ],
+        )
+        assets_get_lambda.function.add_to_role_policy(opensearch_policy)
+
+        assets_get_integration = api_gateway.LambdaIntegration(
+            assets_get_lambda.function,
+            request_templates={
+                "application/json": '{ "collectionId": "$input.params(\'collectionId\')" }'
+            },
+        )
+
+        assets_get_method = assets_resource.add_method(
+            "GET",
+            assets_get_integration,
+        )
+
+        cfn_method = assets_get_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
+
         # Add CORS support to all resources
         add_cors_options_method(collection_types_resource)
         add_cors_options_method(collections_resource)
@@ -864,6 +919,7 @@ class CollectionsApi(Construct):
         add_cors_options_method(batch_resource)
         add_cors_options_method(batch_remove_resource)
         add_cors_options_method(item_id_resource)
+        add_cors_options_method(assets_resource)
         add_cors_options_method(rules_resource)
         add_cors_options_method(rule_id_resource)
         add_cors_options_method(share_resource)

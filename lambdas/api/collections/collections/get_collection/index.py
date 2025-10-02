@@ -10,6 +10,14 @@ from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
+from collections_utils import (
+    COLLECTION_PK_PREFIX,
+    METADATA_SK,
+    format_collection_item,
+)
+
+# Import centralized utilities
+from user_auth import extract_user_context
 
 # Initialize PowerTools with configurable log level
 logger = Logger(
@@ -32,9 +40,24 @@ cors_config = CORSConfig(
     ],
 )
 
+
+# Custom serializer to handle DynamoDB Decimal types
+def decimal_serializer(obj):
+    """Custom JSON serializer to handle DynamoDB Decimal types"""
+    from decimal import Decimal
+
+    if isinstance(obj, Decimal):
+        # Convert Decimal to int if it's a whole number, otherwise float
+        if obj % 1 == 0:
+            return int(obj)
+        else:
+            return float(obj)
+    return str(obj)
+
+
 # Initialize API Gateway resolver
 app = APIGatewayRestResolver(
-    serializer=lambda x: json.dumps(x, default=str),
+    serializer=lambda x: json.dumps(x, default=decimal_serializer),
     strip_prefixes=["/api"],
     cors=cors_config,
 )
@@ -69,8 +92,63 @@ def extract_user_context(event: Dict[str, Any]) -> Dict[str, Optional[str]]:
         Dictionary with user_id and username
     """
     try:
-        authorizer = event.get("requestContext", {}).get("authorizer", {})
-        claims = authorizer.get("claims", {})
+        request_context = event.get("requestContext")
+        if not isinstance(request_context, dict):
+            logger.debug(
+                {
+                    "message": "No valid requestContext found",
+                    "request_context_type": type(request_context).__name__,
+                    "operation": "extract_user_context",
+                }
+            )
+            return {"user_id": None, "username": None}
+
+        authorizer = request_context.get("authorizer")
+        if not isinstance(authorizer, dict):
+            logger.debug(
+                {
+                    "message": "No valid authorizer found",
+                    "authorizer_type": type(authorizer).__name__,
+                    "operation": "extract_user_context",
+                }
+            )
+            return {"user_id": None, "username": None}
+
+        claims = authorizer.get("claims")
+
+        # Handle claims as either dict or JSON string
+        if isinstance(claims, str):
+            try:
+                claims = json.loads(claims)
+                logger.debug(
+                    {
+                        "message": "Parsed claims from JSON string",
+                        "operation": "extract_user_context",
+                    }
+                )
+            except (json.JSONDecodeError, ValueError) as e:
+                logger.warning(
+                    {
+                        "message": "Failed to parse claims JSON string",
+                        "error": str(e),
+                        "claims_preview": (
+                            claims[:200]
+                            if isinstance(claims, str)
+                            else str(claims)[:200]
+                        ),
+                        "operation": "extract_user_context",
+                    }
+                )
+                return {"user_id": None, "username": None}
+        elif not isinstance(claims, dict):
+            logger.debug(
+                {
+                    "message": "Claims is neither dict nor string",
+                    "claims_type": type(claims).__name__,
+                    "operation": "extract_user_context",
+                }
+            )
+            return {"user_id": None, "username": None}
 
         user_id = claims.get("sub")
         username = claims.get("cognito:username")
@@ -91,6 +169,9 @@ def extract_user_context(event: Dict[str, Any]) -> Dict[str, Optional[str]]:
                 "message": "Failed to extract user context",
                 "error": str(e),
                 "operation": "extract_user_context",
+                "event_keys": (
+                    list(event.keys()) if isinstance(event, dict) else "event_not_dict"
+                ),
             }
         )
         return {"user_id": None, "username": None}
@@ -270,16 +351,44 @@ def get_collection_items(
         List of formatted collection items
     """
     try:
+        pk_value = f"{COLLECTION_PK_PREFIX}{collection_id}"
+        sk_prefix = ITEM_SK_PREFIX
+
+        # DIAGNOSTIC: Log query parameters
+        logger.error(
+            {
+                "message": "DIAGNOSTIC: get_collection_items query",
+                "collection_id": collection_id,
+                "pk_value": pk_value,
+                "sk_prefix": sk_prefix,
+                "table_name": table.table_name,
+                "operation": "get_collection_items_diagnostic",
+            }
+        )
+
         response = table.query(
             KeyConditionExpression="PK = :pk AND begins_with(SK, :sk_prefix)",
             ExpressionAttributeValues={
-                ":pk": f"{COLLECTION_PK_PREFIX}{collection_id}",
-                ":sk_prefix": ITEM_SK_PREFIX,
+                ":pk": pk_value,
+                ":sk_prefix": sk_prefix,
             },
             Limit=limit,
         )
 
         items = response.get("Items", [])
+
+        # DIAGNOSTIC: Log raw DynamoDB response
+        logger.error(
+            {
+                "message": "DIAGNOSTIC: DynamoDB query response",
+                "collection_id": collection_id,
+                "raw_item_count": len(items),
+                "raw_items": items[:3] if items else "NO_ITEMS_FOUND",
+                "full_response_keys": list(response.keys()),
+                "operation": "get_collection_items_diagnostic",
+            }
+        )
+
         formatted_items = [format_collection_item_simple(item) for item in items]
 
         logger.debug(
@@ -588,22 +697,17 @@ def get_collection(collection_id: str):
             )
 
             return {
-                "statusCode": 404,
-                "body": json.dumps(
-                    {
-                        "success": False,
-                        "error": {
-                            "code": "COLLECTION_NOT_FOUND",
-                            "message": f"Collection '{collection_id}' not found",
-                        },
-                        "meta": {
-                            "timestamp": datetime.utcnow().isoformat() + "Z",
-                            "version": "v1",
-                            "request_id": app.current_event.request_context.request_id,
-                        },
-                    }
-                ),
-            }
+                "success": False,
+                "error": {
+                    "code": "COLLECTION_NOT_FOUND",
+                    "message": f"Collection '{collection_id}' not found",
+                },
+                "meta": {
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "version": "v1",
+                    "request_id": app.current_event.request_context.request_id,
+                },
+            }, 404
 
         collection_item = response["Item"]
 
@@ -618,22 +722,17 @@ def get_collection(collection_id: str):
             )
 
             return {
-                "statusCode": 404,
-                "body": json.dumps(
-                    {
-                        "success": False,
-                        "error": {
-                            "code": "COLLECTION_NOT_FOUND",
-                            "message": f"Collection '{collection_id}' not found",
-                        },
-                        "meta": {
-                            "timestamp": datetime.utcnow().isoformat() + "Z",
-                            "version": "v1",
-                            "request_id": app.current_event.request_context.request_id,
-                        },
-                    }
-                ),
-            }
+                "success": False,
+                "error": {
+                    "code": "COLLECTION_NOT_FOUND",
+                    "message": f"Collection '{collection_id}' not found",
+                },
+                "meta": {
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "version": "v1",
+                    "request_id": app.current_event.request_context.request_id,
+                },
+            }, 404
 
         # TODO: Add permission check - user must have read access to collection
 
@@ -702,7 +801,7 @@ def get_collection(collection_id: str):
             }
         )
 
-        return {"statusCode": 200, "body": json.dumps(response_data)}
+        return response_data
 
     except ClientError as e:
         error_code = e.response["Error"]["Code"]
@@ -724,19 +823,14 @@ def get_collection(collection_id: str):
         )
 
         return {
-            "statusCode": 500,
-            "body": json.dumps(
-                {
-                    "success": False,
-                    "error": {"code": error_code, "message": error_message},
-                    "meta": {
-                        "timestamp": datetime.utcnow().isoformat() + "Z",
-                        "version": "v1",
-                        "request_id": app.current_event.request_context.request_id,
-                    },
-                }
-            ),
-        }
+            "success": False,
+            "error": {"code": error_code, "message": error_message},
+            "meta": {
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "version": "v1",
+                "request_id": app.current_event.request_context.request_id,
+            },
+        }, 500
 
     except Exception as e:
         logger.error(
@@ -753,22 +847,17 @@ def get_collection(collection_id: str):
         metrics.add_metric(name="UnexpectedErrors", unit=MetricUnit.Count, value=1)
 
         return {
-            "statusCode": 500,
-            "body": json.dumps(
-                {
-                    "success": False,
-                    "error": {
-                        "code": "InternalServerError",
-                        "message": "An unexpected error occurred",
-                    },
-                    "meta": {
-                        "timestamp": datetime.utcnow().isoformat() + "Z",
-                        "version": "v1",
-                        "request_id": app.current_event.request_context.request_id,
-                    },
-                }
-            ),
-        }
+            "success": False,
+            "error": {
+                "code": "InternalServerError",
+                "message": "An unexpected error occurred",
+            },
+            "meta": {
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "version": "v1",
+                "request_id": app.current_event.request_context.request_id,
+            },
+        }, 500
 
 
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)

@@ -135,6 +135,23 @@ export interface CollectionSharesResponse {
   };
 }
 
+export interface CollectionAssetsResponse {
+  success: boolean;
+  data: {
+    results: any[]; // Using any[] to match search results format
+    searchMetadata: {
+      totalResults: number;
+      page: number;
+      pageSize: number;
+    };
+  };
+  meta: {
+    timestamp: string;
+    version: string;
+    request_id: string;
+  };
+}
+
 // Hook to get all collections for the current user
 export const useGetCollections = (filters?: Record<string, any>) => {
   const { showError } = useErrorModal();
@@ -427,6 +444,50 @@ export const useGetCollectionShares = (id: string, enabled = true) => {
       } catch (error) {
         logger.error("Fetch collection shares error:", error);
         showError("Failed to fetch collection shares");
+        throw error;
+      }
+    },
+  });
+};
+
+// Hook to get collection assets for viewing
+export const useGetCollectionAssets = (
+  id: string,
+  filters?: {
+    page?: number;
+    pageSize?: number;
+    sortBy?: string;
+    sortDirection?: "asc" | "desc";
+  },
+  enabled = true,
+) => {
+  const { showError } = useErrorModal();
+
+  return useQuery<CollectionAssetsResponse, Error>({
+    queryKey: QUERY_KEYS.COLLECTIONS.assets(id, filters),
+    enabled: enabled && !!id,
+    queryFn: async ({ signal }) => {
+      try {
+        const params = new URLSearchParams();
+        if (filters) {
+          Object.entries(filters).forEach(([key, value]) => {
+            if (value !== undefined && value !== null) {
+              params.append(key, String(value));
+            }
+          });
+        }
+
+        const url = params.toString()
+          ? `${API_ENDPOINTS.COLLECTIONS.ASSETS(id)}?${params}`
+          : API_ENDPOINTS.COLLECTIONS.ASSETS(id);
+
+        const response = await apiClient.get<CollectionAssetsResponse>(url, {
+          signal,
+        });
+        return response.data;
+      } catch (error) {
+        logger.error("Fetch collection assets error:", error);
+        showError("Failed to fetch collection assets");
         throw error;
       }
     },

@@ -1,8 +1,6 @@
-import base64
 import json
 import os
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
@@ -11,6 +9,23 @@ from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
+from collections_utils import (
+    CHILD_SK_PREFIX,
+    COLLECTION_PK_PREFIX,
+    COLLECTIONS_GSI5_PK,
+    METADATA_SK,
+    USER_PK_PREFIX,
+    apply_field_selection,
+    apply_sorting,
+    create_cursor,
+    create_error_response,
+    create_success_response,
+    format_collection_item,
+    parse_cursor,
+)
+
+# Import centralized utilities
+from user_auth import extract_user_context
 
 # Initialize PowerTools with configurable log level
 logger = Logger(
@@ -47,366 +62,6 @@ dynamodb = boto3.resource("dynamodb")
 TABLE_NAME = os.environ["COLLECTIONS_TABLE_NAME"]
 DEFAULT_LIMIT = 20
 MAX_LIMIT = 100
-
-# Constants
-COLLECTION_PK_PREFIX = "COLL#"
-METADATA_SK = "METADATA"
-CHILD_SK_PREFIX = "CHILD#"
-USER_PK_PREFIX = "USER#"
-SYSTEM_PK = "SYSTEM"
-COLLECTION_TYPE_SK_PREFIX = "COLLTYPE#"
-COLLECTIONS_GSI5_PK = "COLLECTIONS"
-
-
-@tracer.capture_method
-def extract_user_context(event: Dict[str, Any]) -> Dict[str, Optional[str]]:
-    """
-    Extract user information from JWT token in event context
-
-    Args:
-        event: Lambda event
-
-    Returns:
-        Dictionary with user_id and username
-    """
-    try:
-        request_context = event.get("requestContext")
-        if not isinstance(request_context, dict):
-            logger.debug(
-                {
-                    "message": "No valid requestContext found",
-                    "request_context_type": type(request_context).__name__,
-                    "operation": "extract_user_context",
-                }
-            )
-            return {"user_id": None, "username": None}
-
-        authorizer = request_context.get("authorizer")
-        if not isinstance(authorizer, dict):
-            logger.debug(
-                {
-                    "message": "No valid authorizer found",
-                    "authorizer_type": type(authorizer).__name__,
-                    "operation": "extract_user_context",
-                }
-            )
-            return {"user_id": None, "username": None}
-
-        claims = authorizer.get("claims")
-
-        # Handle claims as either dict or JSON string
-        if isinstance(claims, str):
-            try:
-                import json
-
-                claims = json.loads(claims)
-                logger.debug(
-                    {
-                        "message": "Parsed claims from JSON string",
-                        "operation": "extract_user_context",
-                    }
-                )
-            except (json.JSONDecodeError, ValueError) as e:
-                logger.warning(
-                    {
-                        "message": "Failed to parse claims JSON string",
-                        "error": str(e),
-                        "claims_preview": (
-                            claims[:200]
-                            if isinstance(claims, str)
-                            else str(claims)[:200]
-                        ),
-                        "operation": "extract_user_context",
-                    }
-                )
-                return {"user_id": None, "username": None}
-        elif not isinstance(claims, dict):
-            logger.debug(
-                {
-                    "message": "Claims is neither dict nor string",
-                    "claims_type": type(claims).__name__,
-                    "operation": "extract_user_context",
-                }
-            )
-            return {"user_id": None, "username": None}
-
-        user_id = claims.get("sub")
-        username = claims.get("cognito:username")
-
-        logger.debug(
-            {
-                "message": "User context extracted",
-                "user_id": user_id,
-                "username": username,
-                "operation": "extract_user_context",
-            }
-        )
-
-        return {"user_id": user_id, "username": username}
-    except Exception as e:
-        logger.warning(
-            {
-                "message": "Failed to extract user context",
-                "error": str(e),
-                "operation": "extract_user_context",
-                "event_keys": (
-                    list(event.keys()) if isinstance(event, dict) else "event_not_dict"
-                ),
-            }
-        )
-        return {"user_id": None, "username": None}
-
-
-@tracer.capture_method
-def parse_cursor(cursor_str: Optional[str]) -> Optional[Dict[str, Any]]:
-    """
-    Parse base64-encoded cursor back to dictionary
-
-    Args:
-        cursor_str: Base64-encoded cursor string
-
-    Returns:
-        Parsed cursor dictionary or None if invalid
-    """
-    if not cursor_str:
-        return None
-
-    try:
-        decoded_bytes = base64.b64decode(cursor_str)
-        cursor_data = json.loads(decoded_bytes.decode("utf-8"))
-        logger.debug(
-            {
-                "message": "Cursor parsed successfully",
-                "cursor_data": cursor_data,
-                "operation": "parse_cursor",
-            }
-        )
-        return cursor_data
-    except Exception as e:
-        logger.warning(
-            {
-                "message": "Failed to parse cursor",
-                "cursor": cursor_str,
-                "error": str(e),
-                "operation": "parse_cursor",
-            }
-        )
-        return None
-
-
-@tracer.capture_method
-def create_cursor(
-    pk: str, sk: str, gsi_pk: Optional[str] = None, gsi_sk: Optional[str] = None
-) -> str:
-    """
-    Create base64-encoded cursor for pagination
-
-    Args:
-        pk: Primary key value
-        sk: Sort key value
-        gsi_pk: Optional GSI partition key
-        gsi_sk: Optional GSI sort key
-
-    Returns:
-        Base64-encoded cursor string
-    """
-    cursor_data = {"pk": pk, "sk": sk, "timestamp": datetime.utcnow().isoformat() + "Z"}
-
-    if gsi_pk:
-        cursor_data["gsi_pk"] = gsi_pk
-    if gsi_sk:
-        cursor_data["gsi_sk"] = gsi_sk
-
-    cursor_json = json.dumps(cursor_data, default=str)
-    cursor_b64 = base64.b64encode(cursor_json.encode("utf-8")).decode("utf-8")
-
-    logger.debug(
-        {
-            "message": "Cursor created",
-            "cursor_data": cursor_data,
-            "operation": "create_cursor",
-        }
-    )
-
-    return cursor_b64
-
-
-@tracer.capture_method
-def build_filter_expression(
-    filters: Dict[str, Any], expression_values: Dict[str, Any]
-) -> Optional[str]:
-    """
-    Build DynamoDB filter expression from query parameters
-
-    Args:
-        filters: Dictionary of filter parameters
-        expression_values: Dictionary to store expression attribute values
-
-    Returns:
-        Filter expression string or None
-    """
-    filter_conditions = []
-
-    # Status filter
-    if filters.get("status"):
-        filter_conditions.append("#status = :status")
-        expression_values[":status"] = filters["status"]
-
-    # Search filter (name or description contains search term)
-    if filters.get("search"):
-        filter_conditions.append(
-            "(contains(#name, :search) OR contains(description, :search))"
-        )
-        expression_values[":search"] = filters["search"]
-
-    # Collection type filter
-    if filters.get("type"):
-        filter_conditions.append("collectionTypeId = :collection_type")
-        expression_values[":collection_type"] = filters["type"]
-
-    return " AND ".join(filter_conditions) if filter_conditions else None
-
-
-@tracer.capture_method
-def apply_sorting(
-    items: List[Dict[str, Any]], sort_param: Optional[str]
-) -> List[Dict[str, Any]]:
-    """
-    Apply sorting to collections list
-
-    Args:
-        items: List of collection items
-        sort_param: Sort parameter (e.g., 'name', '-name', 'createdAt', etc.)
-
-    Returns:
-        Sorted list of items
-    """
-    if not sort_param or not items:
-        return items
-
-    # Parse sort direction and field
-    descending = sort_param.startswith("-")
-    sort_field = sort_param[1:] if descending else sort_param
-
-    logger.debug(
-        {
-            "message": "Applying sort to collections",
-            "sort_field": sort_field,
-            "descending": descending,
-            "item_count": len(items),
-            "operation": "apply_sorting",
-        }
-    )
-
-    # Define sorting key functions
-    sort_key_map = {
-        "name": lambda x: x.get("name", "").lower(),
-        "createdAt": lambda x: x.get("createdAt", ""),
-        "updatedAt": lambda x: x.get("updatedAt", ""),
-    }
-
-    sort_key_func = sort_key_map.get(sort_field, lambda x: x.get("updatedAt", ""))
-
-    try:
-        sorted_items = sorted(items, key=sort_key_func, reverse=descending)
-        logger.info(
-            {
-                "message": "Collections sorted successfully",
-                "sort_field": sort_field,
-                "descending": descending,
-                "sorted_count": len(sorted_items),
-                "operation": "apply_sorting",
-            }
-        )
-        return sorted_items
-    except Exception as e:
-        logger.error(
-            {
-                "message": "Failed to sort collections",
-                "sort_field": sort_field,
-                "error": str(e),
-                "operation": "apply_sorting",
-            }
-        )
-        return items
-
-
-@tracer.capture_method
-def apply_field_selection(
-    item: Dict[str, Any], fields: Optional[str]
-) -> Dict[str, Any]:
-    """
-    Apply field selection to limit returned fields
-
-    Args:
-        item: Collection item
-        fields: Comma-separated list of fields to return
-
-    Returns:
-        Filtered item dictionary
-    """
-    if not fields:
-        return item
-
-    field_list = [field.strip() for field in fields.split(",")]
-    return {key: value for key, value in item.items() if key in field_list}
-
-
-@tracer.capture_method
-def format_collection_item(
-    item: Dict[str, Any], user_context: Dict[str, Any]
-) -> Dict[str, Any]:
-    """
-    Format DynamoDB item to API response format
-
-    Args:
-        item: Raw DynamoDB item
-        user_context: User context information
-
-    Returns:
-        Formatted collection object
-    """
-    # Extract collection ID from PK
-    collection_id = item["PK"].replace(COLLECTION_PK_PREFIX, "")
-
-    formatted_item = {
-        "id": collection_id,
-        "name": item.get("name", ""),
-        "description": item.get("description", ""),
-        "collectionTypeId": item.get("collectionTypeId", ""),
-        "parentId": item.get("parentId"),
-        "ownerId": item.get("ownerId", ""),
-        "metadata": item.get("customMetadata", {}),
-        "tags": item.get("tags", {}),
-        "status": item.get("status", "ACTIVE"),
-        "itemCount": item.get("itemCount", 0),
-        "childCollectionCount": item.get("childCollectionCount", 0),
-        "isPublic": item.get("isPublic", False),
-        "createdAt": item.get("createdAt", ""),
-        "updatedAt": item.get("updatedAt", ""),
-    }
-
-    # Add user-specific fields if user context available
-    if user_context.get("user_id"):
-        formatted_item["isFavorite"] = False  # TODO: Query user collection relationship
-        if formatted_item["ownerId"] == user_context["user_id"]:
-            formatted_item["userRole"] = "owner"
-        else:
-            formatted_item["userRole"] = "viewer"  # TODO: Query actual permissions
-
-    # Add TTL if present
-    if item.get("expiresAt"):
-        formatted_item["expiresAt"] = item["expiresAt"]
-
-    logger.debug(
-        {
-            "message": "Collection item formatted",
-            "collection_id": collection_id,
-            "operation": "format_collection_item",
-        }
-    )
-
-    return formatted_item
 
 
 @tracer.capture_method
@@ -790,17 +445,13 @@ def list_collections():
             name="CollectionsReturned", unit=MetricUnit.Count, value=len(sorted_items)
         )
         print("right before response")
-        # Create response
-        response_data = {
-            "success": True,
-            "data": sorted_items,
-            "pagination": pagination,
-            "meta": {
-                "timestamp": datetime.utcnow().isoformat() + "Z",
-                "version": "v1",
-                "request_id": app.current_event.request_context.request_id,
-            },
-        }
+        # Create response using centralized function
+        response_data = create_success_response(
+            data=sorted_items,
+            pagination=pagination,
+            request_id=app.current_event.request_context.request_id,
+        )
+
         logger.info(
             {
                 "message": "Collections retrieved successfully",
@@ -831,15 +482,12 @@ def list_collections():
             name="FailedCollectionRetrievals", unit=MetricUnit.Count, value=1
         )
 
-        return {
-            "success": False,
-            "error": {"code": error_code, "message": error_message},
-            "meta": {
-                "timestamp": datetime.utcnow().isoformat() + "Z",
-                "version": "v1",
-                "request_id": app.current_event.request_context.request_id,
-            },
-        }, 500
+        return create_error_response(
+            error_code=error_code,
+            error_message=error_message,
+            status_code=500,
+            request_id=app.current_event.request_context.request_id,
+        )
 
     except Exception as e:
         logger.error(
@@ -854,18 +502,12 @@ def list_collections():
 
         metrics.add_metric(name="UnexpectedErrors", unit=MetricUnit.Count, value=1)
 
-        return {
-            "success": False,
-            "error": {
-                "code": "InternalServerError",
-                "message": "An unexpected error occurred",
-            },
-            "meta": {
-                "timestamp": datetime.utcnow().isoformat() + "Z",
-                "version": "v1",
-                "request_id": app.current_event.request_context.request_id,
-            },
-        }, 500
+        return create_error_response(
+            error_code="InternalServerError",
+            error_message="An unexpected error occurred",
+            status_code=500,
+            request_id=app.current_event.request_context.request_id,
+        )
 
 
 @metrics.log_metrics(capture_cold_start_metric=True)

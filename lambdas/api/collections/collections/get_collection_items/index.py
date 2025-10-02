@@ -1,4 +1,3 @@
-import base64
 import json
 import os
 from datetime import datetime
@@ -11,6 +10,17 @@ from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
+from collections_utils import (
+    COLLECTION_PK_PREFIX,
+    METADATA_SK,
+    apply_sorting,
+    create_cursor,
+    parse_cursor,
+    validate_collection_access,
+)
+
+# Import centralized utilities
+from user_auth import extract_user_context
 
 # Initialize PowerTools with configurable log level
 logger = Logger(

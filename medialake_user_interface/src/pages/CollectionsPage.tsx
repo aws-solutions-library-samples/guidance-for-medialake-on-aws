@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Typography,
@@ -59,6 +60,7 @@ const COLLAPSED_DRAWER_WIDTH = 60;
 const CollectionsPage: React.FC = () => {
   const { t } = useTranslation();
   const theme = useTheme();
+  const navigate = useNavigate();
   const [selectedTab, setSelectedTab] = useState<"my" | "shared" | "public">(
     "my",
   );
@@ -148,6 +150,10 @@ const CollectionsPage: React.FC = () => {
         console.error("Failed to delete collection:", error);
       }
     }
+  };
+
+  const handleViewCollection = (collection: Collection) => {
+    navigate(`/collections/${collection.id}/view`);
   };
 
   const getCollectionTypeIcon = (type: string) => {
@@ -660,7 +666,11 @@ const CollectionsPage: React.FC = () => {
                       </CardContent>
 
                       <CardActions sx={{ pt: 0, px: 2, pb: 2 }}>
-                        <Button size="small" sx={{ ml: "auto" }}>
+                        <Button
+                          size="small"
+                          sx={{ ml: "auto" }}
+                          onClick={() => handleViewCollection(collection)}
+                        >
                           {t("collectionsPage.actions.view")}
                         </Button>
                       </CardActions>
@@ -687,7 +697,14 @@ const CollectionsPage: React.FC = () => {
           horizontal: "right",
         }}
       >
-        <MenuItem onClick={handleMenuClose}>
+        <MenuItem
+          onClick={() => {
+            if (selectedCollection) {
+              handleViewCollection(selectedCollection);
+            }
+            handleMenuClose();
+          }}
+        >
           {t("collectionsPage.actions.view")}
         </MenuItem>
         <MenuItem onClick={handleMenuClose}>

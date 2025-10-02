@@ -1,0 +1,776 @@
+import React, { useState, useEffect, useCallback } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useFeatureFlag } from "@/utils/featureFlags";
+import { formatDate } from "@/utils/dateFormat";
+import {
+  Box,
+  Typography,
+  LinearProgress,
+  Paper,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Button,
+  Snackbar,
+  Alert,
+  Breadcrumbs,
+  Link,
+} from "@mui/material";
+import { Home as HomeIcon, Folder as FolderIcon } from "@mui/icons-material";
+import { AddToCollectionModal } from "@/components/collections/AddToCollectionModal";
+import {
+  useAddItemToCollection,
+  useGetCollection,
+} from "@/api/hooks/useCollections";
+import { useGetCollectionAssets } from "@/api/hooks/useCollections";
+import {
+  RightSidebar,
+  RightSidebarProvider,
+} from "../components/common/RightSidebar";
+import SearchFilters from "../components/search/SearchFilters";
+import AssetResultsView from "../components/shared/AssetResultsView";
+import { useAssetOperations } from "@/hooks/useAssetOperations";
+import {
+  type AssetBase,
+  type ImageItem,
+  type VideoItem,
+  type AudioItem,
+} from "@/types/search/searchResults";
+import { type SortingState, type CellContext } from "@tanstack/react-table";
+import { type AssetTableColumn } from "@/types/shared/assetComponents";
+import TabbedSidebar from "../components/common/RightSidebar/TabbedSidebar";
+import { useSearchParams } from "react-router-dom";
+import ApiStatusModal from "../components/ApiStatusModal";
+import { useViewPreferences } from "@/hooks/useViewPreferences";
+import { useAssetSelection } from "@/hooks/useAssetSelection";
+import { useAssetFavorites } from "@/hooks/useAssetFavorites";
+import { getOriginalAssetId } from "@/utils/clipTransformation";
+
+type AssetItem = (ImageItem | VideoItem | AudioItem) & {
+  DigitalSourceAsset: {
+    Type: string;
+  };
+};
+
+interface Filters {
+  mediaTypes: {
+    videos: boolean;
+    images: boolean;
+    audio: boolean;
+  };
+  time: {
+    recent: boolean;
+    lastWeek: boolean;
+    lastMonth: boolean;
+    lastYear: boolean;
+  };
+}
+
+const DEFAULT_PAGE_SIZE = 50;
+
+const CollectionViewPage: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentPage = parseInt(searchParams.get("page") || "1", 10);
+
+  const [pageSize, setPageSize] = useState<number>(
+    parseInt(searchParams.get("pageSize") || DEFAULT_PAGE_SIZE.toString(), 10),
+  );
+
+  // Add to Collection state
+  const [addToCollectionModalOpen, setAddToCollectionModalOpen] =
+    useState(false);
+  const [selectedAssetForCollection, setSelectedAssetForCollection] =
+    useState<AssetItem | null>(null);
+  const addItemToCollectionMutation = useAddItemToCollection();
+
+  // Get collection details
+  const { data: collectionResponse, isLoading: isLoadingCollection } =
+    useGetCollection(id!);
+  const collection = collectionResponse?.data;
+
+  // Get collection assets using the new hook
+  const {
+    data: assetsResponse,
+    isLoading,
+    isFetching,
+    error,
+  } = useGetCollectionAssets(id!, {
+    page: currentPage,
+    pageSize: pageSize,
+  });
+
+  // Extract assets data
+  const assetsData = assetsResponse?.data;
+  const assets = assetsData?.results || [];
+  const searchMetadata = assetsData?.searchMetadata;
+
+  // Check if multi-select feature is enabled
+  const multiSelectFeature = useFeatureFlag(
+    "search-multi-select-enabled",
+    false,
+  );
+
+  // Use custom hooks for view preferences, asset selection, and favorites
+  const viewPreferences = useViewPreferences({
+    initialViewMode: "card",
+    initialCardSize: "medium",
+    initialAspectRatio: "square",
+    initialThumbnailScale: "fit",
+    initialShowMetadata: true,
+    initialGroupByType: false,
+  });
+
+  const [editingAssetId, setEditingAssetId] = useState<string>();
+  const [editedName, setEditedName] = useState<string>();
+
+  // Asset accessors for hooks
+  const getAssetId = useCallback((asset: AssetItem) => asset.InventoryID, []);
+  const getAssetName = useCallback(
+    (asset: AssetItem) =>
+      asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
+        .ObjectKey.Name,
+    [],
+  );
+  const getAssetType = useCallback(
+    (asset: AssetItem) => asset.DigitalSourceAsset.Type,
+    [],
+  );
+  const getAssetThumbnail = useCallback(
+    (asset: AssetItem) => asset.thumbnailUrl || "",
+    [],
+  );
+
+  // Use custom hooks for asset selection and favorites
+  const assetSelection = useAssetSelection({
+    getAssetId,
+    getAssetName,
+    getAssetType,
+  });
+
+  const assetFavorites = useAssetFavorites({
+    getAssetId,
+    getAssetName,
+    getAssetType,
+    getAssetThumbnail,
+  });
+
+  const {
+    handleDeleteClick,
+    handleStartEditing,
+    handleNameChange,
+    handleNameEditComplete,
+    handleAction,
+    handleDeleteConfirm,
+    handleDeleteCancel,
+    handleDownloadClick,
+    editingAssetId: currentEditingAssetId,
+    editedName: currentEditedName,
+    isDeleteModalOpen,
+    selectedAsset,
+    alert,
+    handleAlertClose,
+    isLoading: assetOperationsLoading,
+    renamingAssetId,
+  } = useAssetOperations<AssetItem>();
+
+  const handleAssetClick = useCallback(
+    (asset: AssetItem) => {
+      const assetType = asset.DigitalSourceAsset.Type.toLowerCase();
+      // Special case for audio to use singular form
+      const pathPrefix = assetType === "audio" ? "/audio/" : `/${assetType}s/`;
+      // Always use the original asset ID, not the clip ID
+      const originalAssetId = getOriginalAssetId(asset);
+      navigate(`${pathPrefix}${originalAssetId}`, {
+        state: {
+          assetType: asset.DigitalSourceAsset.Type,
+          searchTerm: `Collection: ${collection?.name}`,
+          asset: asset,
+        },
+      });
+    },
+    [navigate, collection?.name],
+  );
+
+  // Handle Add to Collection click
+  const handleAddToCollectionClick = useCallback(
+    (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => {
+      console.log("CollectionViewPage: Add to Collection clicked!", asset);
+      event.stopPropagation();
+      setSelectedAssetForCollection(asset);
+      setAddToCollectionModalOpen(true);
+    },
+    [],
+  );
+
+  // Handle actually adding the asset to a collection
+  const handleAddToCollection = useCallback(
+    async (collectionId: string) => {
+      if (!selectedAssetForCollection) return;
+
+      const assetId = getOriginalAssetId(selectedAssetForCollection);
+
+      await addItemToCollectionMutation.mutateAsync({
+        collectionId,
+        data: {
+          type: "asset",
+          id: assetId,
+          metadata: {
+            assetType: selectedAssetForCollection.DigitalSourceAsset.Type,
+            fileName:
+              selectedAssetForCollection.DigitalSourceAsset.MainRepresentation
+                .StorageInfo.PrimaryLocation.ObjectKey.Name,
+          },
+        },
+      });
+    },
+    [selectedAssetForCollection, addItemToCollectionMutation],
+  );
+
+  // Update local state from useAssetOperations
+  useEffect(() => {
+    setEditingAssetId(currentEditingAssetId || undefined);
+    setEditedName(currentEditedName);
+  }, [currentEditingAssetId, currentEditedName]);
+
+  const formatFileSize = (sizeInBytes: number) => {
+    const sizes = ["B", "KB", "MB", "GB"];
+    let i = 0;
+    let size = sizeInBytes;
+    while (size >= 1024 && i < sizes.length - 1) {
+      size /= 1024;
+      i++;
+    }
+    return `${Math.round(size * 100) / 100} ${sizes[i]}`;
+  };
+
+  const [columns, setColumns] = useState<AssetTableColumn<AssetItem>[]>([
+    {
+      id: "name",
+      label: "Name",
+      visible: true,
+      minWidth: 200,
+      accessorFn: (row: AssetItem) =>
+        row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
+          .ObjectKey.Name,
+      cell: (info: CellContext<AssetItem, unknown>) =>
+        info.getValue() as string,
+      sortable: true,
+      sortingFn: (rowA, rowB) =>
+        rowA.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name.localeCompare(
+          rowB.original.DigitalSourceAsset.MainRepresentation.StorageInfo
+            .PrimaryLocation.ObjectKey.Name,
+        ),
+    },
+    {
+      id: "type",
+      label: "Type",
+      visible: true,
+      minWidth: 100,
+      accessorFn: (row: AssetItem) => row.DigitalSourceAsset.Type,
+      sortable: true,
+      sortingFn: (rowA, rowB) =>
+        rowA.original.DigitalSourceAsset.Type.localeCompare(
+          rowB.original.DigitalSourceAsset.Type,
+        ),
+    },
+    {
+      id: "format",
+      label: "Format",
+      visible: true,
+      minWidth: 100,
+      accessorFn: (row: AssetItem) =>
+        row.DigitalSourceAsset.MainRepresentation.Format,
+      sortable: true,
+      sortingFn: (rowA, rowB) =>
+        rowA.original.DigitalSourceAsset.MainRepresentation.Format.localeCompare(
+          rowB.original.DigitalSourceAsset.MainRepresentation.Format,
+        ),
+    },
+    {
+      id: "size",
+      label: "Size",
+      visible: true,
+      minWidth: 100,
+      accessorFn: (row: AssetItem) =>
+        row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
+          .FileInfo.Size,
+      cell: (info: CellContext<AssetItem, unknown>) =>
+        formatFileSize(info.getValue() as number),
+      sortable: true,
+      sortingFn: (rowA, rowB) => {
+        const a =
+          rowA.original.DigitalSourceAsset.MainRepresentation.StorageInfo
+            .PrimaryLocation.FileInfo.Size;
+        const b =
+          rowB.original.DigitalSourceAsset.MainRepresentation.StorageInfo
+            .PrimaryLocation.FileInfo.Size;
+        return a - b;
+      },
+    },
+    {
+      id: "date",
+      label: "Date Created",
+      visible: true,
+      minWidth: 150,
+      accessorFn: (row: AssetItem) => row.DigitalSourceAsset.CreateDate,
+      cell: (info: CellContext<AssetItem, unknown>) => {
+        return formatDate(info.getValue() as string);
+      },
+      sortable: true,
+      sortingFn: (rowA, rowB) => {
+        const a = new Date(
+          rowA.original.DigitalSourceAsset.CreateDate,
+        ).getTime();
+        const b = new Date(
+          rowB.original.DigitalSourceAsset.CreateDate,
+        ).getTime();
+        return a - b;
+      },
+    },
+  ]);
+
+  const handleColumnToggle = (columnId: string) => {
+    setColumns((prev) =>
+      prev.map((column) =>
+        column.id === columnId
+          ? { ...column, visible: !column.visible }
+          : column,
+      ),
+    );
+  };
+
+  const [filters, setFilters] = useState<Filters>({
+    mediaTypes: {
+      videos: true,
+      images: true,
+      audio: true,
+    },
+    time: {
+      recent: false,
+      lastWeek: false,
+      lastMonth: false,
+      lastYear: false,
+    },
+  });
+
+  const filteredResults =
+    assets?.filter((item) => {
+      const isImage =
+        item.DigitalSourceAsset.Type === "Image" && filters.mediaTypes.images;
+      const isVideo =
+        item.DigitalSourceAsset.Type === "Video" && filters.mediaTypes.videos;
+      const isAudio =
+        item.DigitalSourceAsset.Type === "Audio" && filters.mediaTypes.audio;
+
+      // Time-based filtering
+      const createdAt = new Date(item.DigitalSourceAsset.CreateDate);
+      const now = new Date();
+      const timeDiff = now.getTime() - createdAt.getTime();
+      const isRecent = filters.time.recent && timeDiff <= 24 * 60 * 60 * 1000;
+      const isLastWeek =
+        filters.time.lastWeek && timeDiff <= 7 * 24 * 60 * 60 * 1000;
+      const isLastMonth =
+        filters.time.lastMonth && timeDiff <= 30 * 24 * 60 * 60 * 1000;
+      const isLastYear =
+        filters.time.lastYear && timeDiff <= 365 * 24 * 60 * 60 * 1000;
+
+      const passesTimeFilter =
+        (!filters.time.recent &&
+          !filters.time.lastWeek &&
+          !filters.time.lastMonth &&
+          !filters.time.lastYear) ||
+        isRecent ||
+        isLastWeek ||
+        isLastMonth ||
+        isLastYear;
+
+      return (isImage || isVideo || isAudio) && passesTimeFilter;
+    }) || [];
+
+  const [expandedSections, setExpandedSections] = useState({
+    mediaTypes: true,
+    time: true,
+    status: true,
+  });
+
+  const handleFilterChange = (section: keyof Filters, filter: string) => {
+    setFilters((prev) => {
+      const newFilters = { ...prev };
+      if (section === "time") {
+        // Reset all time filters
+        Object.keys(newFilters.time).forEach((key) => {
+          newFilters.time[key as keyof typeof newFilters.time] = false;
+        });
+      }
+      (newFilters[section] as any)[filter] = !(prev[section] as any)[filter];
+      return newFilters;
+    });
+  };
+
+  const handleSectionToggle = (section: string) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section as keyof typeof prev],
+    }));
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setSearchParams((prev) => {
+      const newParams = new URLSearchParams(prev);
+      newParams.set("page", newPage.toString());
+      return newParams;
+    });
+  };
+
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize);
+    // Reset to first page when changing page size
+    setSearchParams((prev) => {
+      prev.set("pageSize", newPageSize.toString());
+      prev.set("page", "1");
+      return prev;
+    });
+  };
+
+  const renderCardField = useCallback((fieldId: string, asset: AssetItem) => {
+    switch (fieldId) {
+      case "name":
+        return getAssetName(asset);
+      case "type":
+        return getAssetType(asset);
+      case "size":
+        return formatFileSize(
+          asset.DigitalSourceAsset.MainRepresentation.StorageInfo
+            .PrimaryLocation.FileInfo.Size,
+        );
+      case "date":
+        return formatDate(asset.DigitalSourceAsset.CreateDate);
+      default:
+        return "";
+    }
+  }, []);
+
+  if (isLoadingCollection) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
+        <LinearProgress />
+      </Box>
+    );
+  }
+
+  if (!collection) {
+    return (
+      <Box sx={{ p: 4 }}>
+        <Typography variant="h6" color="error">
+          Collection not found
+        </Typography>
+      </Box>
+    );
+  }
+
+  return (
+    <RightSidebarProvider>
+      <>
+        <Box
+          sx={{
+            display: "flex",
+            minHeight: "100%",
+            bgcolor: "background.default",
+            position: "relative",
+            overflow: "auto",
+          }}
+        >
+          {isFetching && (
+            <LinearProgress
+              sx={{
+                position: "fixed",
+                top: 0,
+                left: 0,
+                right: 0,
+                zIndex: 9999,
+              }}
+            />
+          )}
+
+          {/* Main Content */}
+          <Box
+            sx={{
+              flexGrow: 1,
+              px: 4,
+              pt: 1,
+              pb: 2,
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+              minHeight: 0,
+              marginBottom: 4,
+            }}
+          >
+            {/* Breadcrumbs */}
+            <Box sx={{ mb: 2 }}>
+              <Breadcrumbs aria-label="breadcrumb">
+                <Link
+                  underline="hover"
+                  color="inherit"
+                  href="/"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate("/");
+                  }}
+                  sx={{ display: "flex", alignItems: "center" }}
+                >
+                  <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
+                  Home
+                </Link>
+                <Link
+                  underline="hover"
+                  color="inherit"
+                  href="/collections"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate("/collections");
+                  }}
+                  sx={{ display: "flex", alignItems: "center" }}
+                >
+                  <FolderIcon sx={{ mr: 0.5 }} fontSize="inherit" />
+                  Collections
+                </Link>
+                <Typography
+                  color="text.primary"
+                  sx={{ display: "flex", alignItems: "center" }}
+                >
+                  <FolderIcon sx={{ mr: 0.5 }} fontSize="inherit" />
+                  {collection.name}
+                </Typography>
+              </Breadcrumbs>
+            </Box>
+
+            {filteredResults.length > 0 && searchMetadata && !error ? (
+              <AssetResultsView
+                results={filteredResults}
+                searchMetadata={{
+                  totalResults: searchMetadata?.totalResults || 0,
+                  page: currentPage,
+                  pageSize: pageSize,
+                }}
+                onPageChange={handlePageChange}
+                onPageSizeChange={handlePageSizeChange}
+                searchTerm={`Collection: ${collection.name}`}
+                title={`Collection: ${collection.name}`}
+                groupByType={viewPreferences.groupByType}
+                onGroupByTypeChange={viewPreferences.handleGroupByTypeChange}
+                viewMode={viewPreferences.viewMode}
+                onViewModeChange={viewPreferences.handleViewModeChange}
+                cardSize={viewPreferences.cardSize}
+                onCardSizeChange={viewPreferences.handleCardSizeChange}
+                aspectRatio={viewPreferences.aspectRatio}
+                onAspectRatioChange={viewPreferences.handleAspectRatioChange}
+                thumbnailScale={viewPreferences.thumbnailScale}
+                onThumbnailScaleChange={
+                  viewPreferences.handleThumbnailScaleChange
+                }
+                showMetadata={viewPreferences.showMetadata}
+                onShowMetadataChange={viewPreferences.handleShowMetadataChange}
+                sorting={viewPreferences.sorting}
+                onSortChange={viewPreferences.handleSortChange}
+                cardFields={viewPreferences.cardFields}
+                onCardFieldToggle={viewPreferences.handleCardFieldToggle}
+                columns={columns}
+                onColumnToggle={handleColumnToggle}
+                onAssetClick={handleAssetClick}
+                onDeleteClick={handleDeleteClick}
+                onDownloadClick={handleDownloadClick}
+                onAddToCollectionClick={handleAddToCollectionClick}
+                onEditClick={handleStartEditing}
+                onEditNameChange={handleNameChange}
+                onEditNameComplete={handleNameEditComplete}
+                editingAssetId={editingAssetId}
+                editedName={editedName}
+                isAssetFavorited={assetFavorites.isAssetFavorited}
+                onFavoriteToggle={assetFavorites.handleFavoriteToggle}
+                // Only pass selection props if multi-select feature is enabled
+                isAssetSelected={
+                  multiSelectFeature.value
+                    ? (assetId: string) =>
+                        assetSelection.selectedAssetIds.includes(assetId)
+                    : undefined
+                }
+                onSelectToggle={
+                  multiSelectFeature.value
+                    ? assetSelection.handleSelectToggle
+                    : undefined
+                }
+                hasSelectedAssets={
+                  multiSelectFeature.value
+                    ? assetSelection.selectedAssets.length > 0
+                    : false
+                }
+                selectAllState={
+                  multiSelectFeature.value
+                    ? assetSelection.getSelectAllState(filteredResults)
+                    : "none"
+                }
+                onSelectAllToggle={
+                  multiSelectFeature.value
+                    ? () => {
+                        assetSelection.handleSelectAll(filteredResults);
+                      }
+                    : undefined
+                }
+                isRenaming={assetOperationsLoading.rename}
+                renamingAssetId={renamingAssetId}
+                error={
+                  error
+                    ? {
+                        status:
+                          (error as any).apiResponse?.status || error.name,
+                        message:
+                          (error as any).apiResponse?.message || error.message,
+                      }
+                    : undefined
+                }
+                isLoading={isLoading || isFetching}
+                getAssetId={getAssetId}
+                getAssetName={getAssetName}
+                getAssetType={getAssetType}
+                getAssetThumbnail={getAssetThumbnail}
+                renderCardField={renderCardField}
+              />
+            ) : (
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minHeight: "50vh",
+                  textAlign: "center",
+                  gap: 2,
+                }}
+              >
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 4,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 2,
+                    bgcolor: "background.paper",
+                    borderRadius: 2,
+                  }}
+                >
+                  <FolderIcon
+                    sx={{
+                      fontSize: 64,
+                      color: "text.secondary",
+                      mb: 2,
+                    }}
+                  />
+                  <Typography variant="h5" color="text.primary" gutterBottom>
+                    No assets found
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary">
+                    This collection doesn't contain any assets yet
+                  </Typography>
+                </Paper>
+              </Box>
+            )}
+          </Box>
+
+          <RightSidebar>
+            <TabbedSidebar
+              selectedAssets={assetSelection.selectedAssets}
+              onBatchDelete={assetSelection.handleBatchDelete}
+              onBatchDownload={assetSelection.handleBatchDownload}
+              onBatchShare={assetSelection.handleBatchShare}
+              onClearSelection={assetSelection.handleClearSelection}
+              onRemoveItem={assetSelection.handleRemoveAsset}
+              isDownloadLoading={assetSelection.isDownloadLoading}
+              filterComponent={
+                <>
+                  <SearchFilters
+                    filters={filters}
+                    expandedSections={expandedSections}
+                    onFilterChange={handleFilterChange}
+                    onSectionToggle={handleSectionToggle}
+                  />
+                </>
+              }
+            />
+          </RightSidebar>
+        </Box>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog
+          open={isDeleteModalOpen}
+          onClose={handleDeleteCancel}
+          aria-labelledby="delete-dialog-title"
+          aria-describedby="delete-dialog-description"
+        >
+          <DialogTitle id="delete-dialog-title">Confirm Delete</DialogTitle>
+          <DialogContent>
+            <DialogContentText id="delete-dialog-description">
+              Are you sure you want to delete this asset? This action cannot be
+              undone.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleDeleteCancel}>Cancel</Button>
+            <Button onClick={handleDeleteConfirm} color="error" autoFocus>
+              Delete
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* API Status Modal for bulk download */}
+        <ApiStatusModal
+          open={assetSelection.modalState.open}
+          onClose={assetSelection.handleModalClose}
+          status={assetSelection.modalState.status}
+          action={assetSelection.modalState.action}
+          message={assetSelection.modalState.message}
+        />
+
+        <Snackbar
+          open={!!alert}
+          autoHideDuration={6000}
+          onClose={handleAlertClose}
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        >
+          <Alert
+            onClose={handleAlertClose}
+            severity={alert?.severity}
+            sx={{ width: "100%" }}
+          >
+            {alert?.message}
+          </Alert>
+        </Snackbar>
+
+        {/* Add to Collection Modal */}
+        {selectedAssetForCollection && (
+          <AddToCollectionModal
+            open={addToCollectionModalOpen}
+            onClose={() => {
+              setAddToCollectionModalOpen(false);
+              setSelectedAssetForCollection(null);
+            }}
+            assetId={getOriginalAssetId(selectedAssetForCollection)}
+            assetName={
+              selectedAssetForCollection.DigitalSourceAsset.MainRepresentation
+                .StorageInfo.PrimaryLocation.ObjectKey.Name
+            }
+            assetType={selectedAssetForCollection.DigitalSourceAsset.Type}
+            onAddToCollection={handleAddToCollection}
+          />
+        )}
+      </>
+    </RightSidebarProvider>
+  );
+};
+
+export default CollectionViewPage;

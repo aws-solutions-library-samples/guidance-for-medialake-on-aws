@@ -11,6 +11,7 @@ import Home from "@/pages/Home";
 import SearchPage from "@/pages/SearchPage";
 import AssetsPage from "@/pages/AssetsPage";
 import CollectionsPage from "@/pages/CollectionsPage";
+import CollectionViewPage from "@/pages/CollectionViewPage";
 import UploadDemo from "@/pages/UploadDemo";
 import { S3Explorer } from "@/features/home/S3Explorer";
 import { ExecutionsPage } from "@/features/executions";
@@ -95,6 +96,10 @@ export const router = createBrowserRouter([
       {
         path: "collections",
         element: <CollectionsPage />,
+      },
+      {
+        path: "collections/:id/view",
+        element: <CollectionViewPage />,
       },
       {
         path: "executions",

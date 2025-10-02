@@ -79,6 +79,7 @@ export const API_ENDPOINTS = {
     SHARES: (id: string) => `/collections/${id}/shares`,
     SHARED: "/collections/shared",
     ITEMS: (id: string) => `/collections/${id}/items`,
+    ASSETS: (id: string) => `/collections/${id}/assets`,
     TYPES: "/collection-types",
   },
 };

@@ -179,6 +179,8 @@ export const QUERY_KEYS = {
       [...QUERY_KEYS.COLLECTIONS.detail(id), "shares"] as const,
     items: (id: string) =>
       [...QUERY_KEYS.COLLECTIONS.detail(id), "items"] as const,
+    assets: (id: string, filters?: Record<string, any>) =>
+      [...QUERY_KEYS.COLLECTIONS.detail(id), "assets", { filters }] as const,
     types: () => [...QUERY_KEYS.COLLECTIONS.all, "types"] as const,
   },
 } as const;
