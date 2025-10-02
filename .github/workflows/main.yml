@@ -58,11 +58,11 @@ jobs:
           InitialUserLastName: 'User'
           OpenSearchDeploymentSize: 'large'
         run: |
-          if [ -f guidance-for-medialake-on-aws/config.json ]; then
+          if [ -f config.json ]; then
             echo "Using existing config file";
           else
             echo "Creating config file";
-            cp .cicd/config.json-template guidance-for-medialake-on-aws/config.json;
+            cp .cicd/config.json-template config.json;
           fi
 
           AWS_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
