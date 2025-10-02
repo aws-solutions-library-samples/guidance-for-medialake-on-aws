@@ -62,7 +62,7 @@ jobs:
             echo "Using existing config file";
           else
             echo "Creating config file";
-            cp guidance-for-medialake-on-aws/.cicd/config.json-template guidance-for-medialake-on-aws/config.json;
+            cp .cicd/config.json-template guidance-for-medialake-on-aws/config.json;
           fi
 
           AWS_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
