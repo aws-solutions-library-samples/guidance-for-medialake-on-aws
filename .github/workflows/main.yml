@@ -68,27 +68,25 @@ jobs:
           AWS_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
           AWS_REGION="$(aws configure get region || echo 'us-west-2')"
 
-          jq --arg e "$MediaLakeEnvironmentName"  '.environment = $e' guidance-for-medialake-on-aws/config.json | sponge guidance-for-medialake-on-aws/config.json
-          jq --arg a "$AWS_ACCOUNT_ID"            '.account_id = $a'  guidance-for-medialake-on-aws/config.json | sponge guidance-for-medialake-on-aws/config.json
-          jq --arg r "$AWS_REGION"                '.primary_region = $r' guidance-for-medialake-on-aws/config.json | sponge guidance-for-medialake-on-aws/config.json
-          jq --arg u "$InitialUserEmail"          '.initial_user.email = $u' guidance-for-medialake-on-aws/config.json | sponge guidance-for-medialake-on-aws/config.json
-          jq --arg f "$InitialUserFirstName"      '.initial_user.first_name = $f' guidance-for-medialake-on-aws/config.json | sponge guidance-for-medialake-on-aws/config.json
-          jq --arg l "$InitialUserLastName"       '.initial_user.last_name = $l' guidance-for-medialake-on-aws/config.json | sponge guidance-for-medialake-on-aws/config.json
-          jq --arg s "$OpenSearchDeploymentSize"  '.opensearch_deployment_size = $s' guidance-for-medialake-on-aws/config.json | sponge guidance-for-medialake-on-aws/config.json
+          jq --arg e "$MediaLakeEnvironmentName"  '.environment = $e' config.json | sponge config.json
+          jq --arg a "$AWS_ACCOUNT_ID"            '.account_id = $a'  config.json | sponge config.json
+          jq --arg r "$AWS_REGION"                '.primary_region = $r' config.json | sponge config.json
+          jq --arg u "$InitialUserEmail"          '.initial_user.email = $u' config.json | sponge config.json
+          jq --arg f "$InitialUserFirstName"      '.initial_user.first_name = $f' config.json | sponge config.json
+          jq --arg l "$InitialUserLastName"       '.initial_user.last_name = $l' config.json | sponge config.json
+          jq --arg s "$OpenSearchDeploymentSize"  '.opensearch_deployment_size = $s' config.json | sponge config.json
 
       - name: Install CDK project dependencies
         run: |
           source .venv/bin/activate
-          pip install -r guidance-for-medialake-on-aws/requirements.txt
+          pip install -r requirements.txt
 
       - name: Synthesize CDK stacks
         run: |
           source .venv/bin/activate
-          cd guidance-for-medialake-on-aws
           cdk synth
 
       - name: Deploy all CDK stacks
         run: |
           source .venv/bin/activate
-          cd guidance-for-medialake-on-aws
           cdk deploy --all --require-approval=never
