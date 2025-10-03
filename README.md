@@ -4,7 +4,8 @@
 >
 > - [Overview](#overview)
 > - [Cost](#cost)
->   - [Base Services Cost Table](#base-services-cost-table)
+>   - [Base Services Cost Table - OpenSearch Deployment](#base-services-cost-table---opensearch-deployment)
+>   - [Base Services Cost Table - S3 Vectors Deployment](#base-services-cost-table---s3-vectors-deployment)
 >   - [Usage Based Cost Example Table](#usage-based-cost-example-table)
 > - [Quick Deployment (CloudFormation)](#quick-deployment-cloudformation)
 > - [Development Environment Setup and CDK Deployment](#development-environment-setup-and-cdk-deployment)
@@ -72,7 +73,7 @@
 You are responsible for the cost of the AWS services used while running this Guidance.
 
 **Base Infrastructure Cost (without variable workloads):**
-As of July 2025, the cost for running this Guidance with the **small deployment configuration** in the **US East (N. Virginia)** region is approximately **$423.62 per month** for the baseline services only.
+As of July 2025, the cost for running this Guidance with the **small deployment configuration** in the **US East (N. Virginia)** region is approximately **$73.20 per month** for the baseline services only.
 
 **Variable Workload Costs:**
 Additional costs will be incurred based on actual usage:
@@ -91,10 +92,9 @@ We recommend creating a **Budget through AWS Cost Explorer** to help manage cost
 | ---------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------- |
 | **Cognito (Users)**                | 50 active users signing in and using the system each month | \$2.00                                                  |
 | **OpenSearch Service (Search)**    | Search and index storage and compute                       | t3.small: \$28.72 (1 instance)<br>Storage: \$2.44 (gp3) |
-| **OpenSearch Ingestion (OSI)**     | Data ingestion processing units                            | \$350.40 (2 OCUs)                                       |
 | **NAT Gateway (VPC)**              | Outbound internet access from VPC                          | \$33.30                                                 |
 | **WAF (Web Application Firewall)** | API & web protection (rules + ACLs + requests)             | WebACL: \$5.00<br>Rules: \$2.00                         |
-| **TOTAL**                          | **Monthly cost estimate for small deployment**             | **\$423.60**                                            |
+| **TOTAL**                          | **Monthly cost estimate for small deployment**             | **\$73.20**                                             |
 
 ### Base Services Cost Table - S3 Vectors Deployment
 
