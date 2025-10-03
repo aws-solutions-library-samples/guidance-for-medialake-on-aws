@@ -391,6 +391,10 @@ sync-to-github:
     - rm -f secrets.txt
     - rm -rf docs/
     - rm -rf .roo/
+    - rm -rf github-repo/
+    - rm -rf .traycer/
+    - rm -rf memory-bank/
+    - rm -rf cdk-test-output/
     - rm -rf design/
     - rm -f setup-dev.sh
     - rm -f manage-hooks.sh
@@ -407,7 +411,7 @@ sync-to-github:
     - rm -rf medialake_user_interface/playwright-report/
     # Stage all changes and commit
     - git add -A
-    - git commit --allow-empty -m "release:Updates supporting S3 Vectors (Preview) as a vector store and bug fixes"
+    - git commit --allow-empty -m "release:Update to search results UI, omakase player version, and bug fix for amplify library"
     - echo "New commit created:" && git log --oneline -1
     # Push to GitHub main branch
     - git push origin main
