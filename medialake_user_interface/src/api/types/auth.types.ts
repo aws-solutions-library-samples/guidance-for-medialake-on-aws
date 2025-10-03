@@ -1,6 +1,10 @@
 // src/api/types/auth.types.ts
 
-import { AuthTokens, AuthUser as AmplifyAuthUser } from "@aws-amplify/auth";
+import type {
+  AuthUser as AmplifyAuthUser,
+  AuthTokens,
+  FetchUserAttributesOutput,
+} from "aws-amplify/auth";
 
 export interface AuthSession {
   accessToken: string;
@@ -12,7 +16,7 @@ export interface AuthSession {
 export interface AuthUser extends AmplifyAuthUser {
   username: string;
   email?: string;
-  attributes?: Record<string, any>; // Optional user attributes
+  attributes?: FetchUserAttributesOutput; // Optional user attributes
 }
 
 export interface AuthError {

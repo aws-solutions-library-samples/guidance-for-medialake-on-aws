@@ -89,7 +89,7 @@ export default {
   },
   home: {
     title: "Home",
-    description: "Guidance for your media, metadata, and workflows.",
+    description: "",
     statistics: "Statistics",
     collections: "Collections",
     sharedCollections: "Shared Collections",
@@ -148,7 +148,7 @@ export default {
       navigating: "Navigating from",
     },
     branding: {
-      name: "Media Lake",
+      name: "",
     },
   },
   search: {
@@ -686,8 +686,8 @@ export default {
       settings: "Settings",
     },
     home: {
-      welcome: "Welcome to Media Lake",
-      description: "Guidance for your media, metadata, and workflows.",
+      welcome: "",
+      description: "",
       statistics: "Statistics",
       collections: "Collections",
       sharedCollections: "Shared Collections",

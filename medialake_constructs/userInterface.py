@@ -20,6 +20,7 @@ from aws_cdk import aws_cloudfront as cloudfront
 from aws_cdk import aws_cloudfront_origins as origins
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_kms as cdk_kms
+from aws_cdk import aws_lambda as _lambda
 from aws_cdk import aws_logs as logs
 from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_s3_deployment as s3deploy
@@ -28,7 +29,6 @@ from aws_cdk import custom_resources as cr
 from constructs import Construct
 
 from config import config
-from medialake_constructs.edge_lambda_construct import EdgeLambdaConstruct
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
 
 
@@ -386,8 +386,34 @@ class UIConstruct(Construct):
         # Get media assets bucket name from SSM parameter to avoid circular dependency
         # Media assets bucket is now passed directly through props
 
-        # Create Edge Lambda construct
-        edge_lambda_construct = EdgeLambdaConstruct(self, "EdgeLambda")
+        # Import the Lambda@Edge version from us-east-1 SSM parameter
+        # Lambda@Edge functions must be deployed in us-east-1 regardless of the main stack region
+        edge_lambda_version_arn_param = cr.AwsCustomResource(
+            self,
+            "GetEdgeLambdaVersionArn",
+            on_update={
+                "service": "SSM",
+                "action": "getParameter",
+                "parameters": {
+                    "Name": f"/medialake/{config.environment}/edge-lambda-version-arn"
+                },
+                "region": "us-east-1",  # Must read from us-east-1
+                "physical_resource_id": cr.PhysicalResourceId.of(
+                    "edge-lambda-version-arn-param"
+                ),
+            },
+            policy=cr.AwsCustomResourcePolicy.from_statements(
+                [
+                    iam.PolicyStatement(
+                        actions=["ssm:GetParameter"],
+                        resources=["*"],
+                    )
+                ]
+            ),
+        )
+        edge_lambda_version_arn = edge_lambda_version_arn_param.get_response_field(
+            "Parameter.Value"
+        )
 
         # Create a shared CF Origin for static assets (S3)
         s3_orig = origins.S3BucketOrigin.with_origin_access_control(
@@ -446,7 +472,11 @@ class UIConstruct(Construct):
                     # Only use origin-request, not viewer-response
                     edge_lambdas=[
                         cloudfront.EdgeLambda(
-                            function_version=edge_lambda_construct.lambda_version,
+                            function_version=_lambda.Version.from_version_arn(
+                                self,
+                                "ImportedEdgeLambdaVersion",
+                                edge_lambda_version_arn,
+                            ),
                             event_type=cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
                         ),
                         # Remove the viewer-response Lambda
