@@ -35,6 +35,9 @@ interface AssetGridViewProps<T> {
   selectedSearchFields?: string[];
   isRenaming?: boolean; // Add isRenaming prop for loading state
   renamingAssetId?: string; // ID of the asset currently being renamed
+  // Semantic search confidence filtering for clips
+  isSemantic?: boolean;
+  confidenceThreshold?: number;
 }
 
 function AssetGridView<T>({
@@ -66,6 +69,9 @@ function AssetGridView<T>({
   selectedSearchFields,
   isRenaming,
   renamingAssetId,
+  // Semantic search confidence filtering for clips
+  isSemantic = false,
+  confidenceThreshold = 0,
 }: AssetGridViewProps<T>) {
   // Group results by type if needed
   const groupedResults = React.useMemo(() => {
@@ -94,7 +100,7 @@ function AssetGridView<T>({
   const getGridSizes = () => {
     switch (cardSize) {
       case "small":
-        return { xs: 12, sm: 6, md: 3, lg: 2 };
+        return { xs: 12, sm: 6, md: 3, lg: 2.4 };
       case "large":
         return { xs: 12, sm: 12, md: 6, lg: 4 };
       default: // medium
@@ -113,6 +119,7 @@ function AssetGridView<T>({
               thumbnailUrl={getAssetThumbnail(asset)}
               proxyUrl={getAssetProxy ? getAssetProxy(asset) : undefined}
               assetType={getAssetType(asset)}
+              clips={(asset as any).clips}
               fields={cardFields}
               renderField={(fieldId) => renderCardField(fieldId, asset)}
               onAssetClick={() => onAssetClick(asset)}
@@ -143,6 +150,8 @@ function AssetGridView<T>({
               }
               selectedSearchFields={selectedSearchFields}
               isRenaming={isRenaming && renamingAssetId === getAssetId(asset)}
+              isSemantic={isSemantic}
+              confidenceThreshold={confidenceThreshold}
             />
           </Grid>
         ))}
@@ -182,6 +191,7 @@ function AssetGridView<T>({
                         getAssetProxy ? getAssetProxy(asset) : undefined
                       }
                       assetType={getAssetType(asset)}
+                      clips={(asset as any).clips}
                       fields={cardFields}
                       renderField={(fieldId) => renderCardField(fieldId, asset)}
                       onAssetClick={() => onAssetClick(asset)}
@@ -222,6 +232,8 @@ function AssetGridView<T>({
                       isRenaming={
                         isRenaming && renamingAssetId === getAssetId(asset)
                       }
+                      isSemantic={isSemantic}
+                      confidenceThreshold={confidenceThreshold}
                     />
                   </Grid>
                 ))}

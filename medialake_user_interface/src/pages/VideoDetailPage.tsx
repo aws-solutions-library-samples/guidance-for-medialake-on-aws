@@ -66,6 +66,7 @@ import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import CodeOutlinedIcon from "@mui/icons-material/CodeOutlined";
 import LinkOutlinedIcon from "@mui/icons-material/LinkOutlined";
 import SubtitlesOutlinedIcon from "@mui/icons-material/SubtitlesOutlined";
+import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import MarkdownRenderer from "../components/common/MarkdownRenderer";
 
 import { VideoViewer, VideoViewerRef } from "../components/common/VideoViewer";
@@ -410,6 +411,7 @@ const SummaryTab = ({
 
 // Import the shared TranscriptionTab component
 import TranscriptionTab from "../components/shared/TranscriptionTab";
+import DescriptiveTab from "../components/shared/DescriptiveTab";
 
 const RelatedItemsTab: React.FC<{
   assetId: string;
@@ -707,7 +709,13 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
   // Handle keyboard navigation for tabs
   const handleTabKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
-      const tabs = ["summary", "technical", "transcription", "related"];
+      const tabs = [
+        "summary",
+        "technical",
+        "descriptive",
+        "transcription",
+        "related",
+      ];
       const currentIndex = tabs.indexOf(activeTab);
 
       if (event.key === "ArrowRight") {
@@ -950,6 +958,12 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
                 aria-controls="tabpanel-technical"
               />
               <Tab
+                value="descriptive"
+                label="Descriptive"
+                id="tab-descriptive"
+                aria-controls="tabpanel-descriptive"
+              />
+              <Tab
                 value="transcription"
                 label="Transcription"
                 id="tab-transcription"
@@ -992,6 +1006,9 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
                   availableCategories={availableCategoryKeys}
                   mediaType="video"
                 />
+              )}
+              {activeTab === "descriptive" && (
+                <DescriptiveTab assetData={assetData} />
               )}
               {activeTab === "transcription" && (
                 <TranscriptionTab

@@ -35,6 +35,8 @@ import {
 } from "@mui/icons-material";
 import { useSemanticSearchSettings } from "@/features/settings/system/hooks/useSystemSettings";
 import { SYSTEM_SETTINGS_CONFIG } from "@/features/settings/system/config";
+import { ApiKeyManagement } from "@/components/settings/api-keys";
+import { Can } from "@/permissions/components/Can";
 
 // Fallback notification hook
 const useNotificationWithFallback = () => {
@@ -297,6 +299,9 @@ const SystemSettingsPage: React.FC = () => {
             }}
           >
             <Tab label={t("settings.systemSettings.tabs.search", "Search")} />
+            <Tab
+              label={t("settings.systemSettings.tabs.apiKeys", "API Keys")}
+            />
           </Tabs>
         </Box>
 
@@ -425,6 +430,12 @@ const SystemSettingsPage: React.FC = () => {
                             handleProviderTypeChange(e.target.value as any)
                           }
                         >
+                          <MenuItem value="none">
+                            {t(
+                              "settings.systemSettings.search.selectProviderOption",
+                              "Select a provider...",
+                            )}
+                          </MenuItem>
                           <MenuItem value="twelvelabs-api">
                             {
                               SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API
@@ -588,6 +599,43 @@ const SystemSettingsPage: React.FC = () => {
                 </Box>
               </Box>
             )}
+          </TabPanel>
+
+          <TabPanel value={tabValue} index={1}>
+            <Can I="view" a="api-key">
+              <ApiKeyManagement />
+            </Can>
+            <Can I="view" a="api-key">
+              {(allowed) =>
+                !allowed && (
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: "100%",
+                      textAlign: "center",
+                      py: 8,
+                    }}
+                  >
+                    <Typography
+                      variant="h6"
+                      color="text.secondary"
+                      gutterBottom
+                    >
+                      {t("permissions.accessDenied", "Access Denied")}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {t(
+                        "permissions.apiKeyAccessDenied",
+                        "You don't have permission to view API keys.",
+                      )}
+                    </Typography>
+                  </Box>
+                )
+              }
+            </Can>
           </TabPanel>
         </Box>
       </Paper>

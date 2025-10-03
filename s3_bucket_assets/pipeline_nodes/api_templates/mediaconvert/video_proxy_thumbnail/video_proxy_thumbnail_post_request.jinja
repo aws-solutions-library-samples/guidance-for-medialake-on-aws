@@ -1,92 +1,122 @@
 {
-  "Role": "{{ variables.mediaconvert_role_arn }}",
   "Queue": "{{ variables.mediaconvert_queue_arn }}",
+  "UserMetadata": {},
+  "Role": "{{ variables.mediaconvert_role_arn }}",
   "Settings": {
-    "Inputs": [
-      {
-        "FileInput": "s3://{{ variables.input_bucket }}/{{ variables.input_key }}",
-        "AudioSelectors": { "Audio Selector 1": { "DefaultSelection": "DEFAULT" } },
-        "VideoSelector": {}
-      }
-    ],
-
     "OutputGroups": [
       {
         "Name": "Proxy Video",
-        "OutputGroupSettings": {
-          "Type": "FILE_GROUP_SETTINGS",
-          "FileGroupSettings": {
-            "Destination": "s3://{{ variables.output_bucket }}/{{ variables.output_key }}",
-            "DestinationSettings": {
-              "S3Settings": { "AccessControl": { "CannedAcl": "BUCKET_OWNER_FULL_CONTROL" } }
-            }
-          }
-        },
         "Outputs": [
           {
-            "NameModifier": "_proxy",
+            "ContainerSettings": {
+              "Container": "MP4",
+              "Mp4Settings": {
+                "MoovPlacement": "PROGRESSIVE_DOWNLOAD"
+              }
+            },
             "VideoDescription": {
+              "Width": 640,
+              "Height": 360,
               "CodecSettings": {
                 "Codec": "H_264",
                 "H264Settings": {
+                  "MaxBitrate": {{ (variables.proxy_max_kbps | default(1500)) * 1000 }},
                   "RateControlMode": "QVBR",
                   "SceneChangeDetect": "TRANSITION_DETECTION",
-                  "MaxBitrate": 2000000
+                  "QualityTuningLevel": "SINGLE_PASS_HQ",
+                  "CodecProfile": "MAIN",
+                  "CodecLevel": "LEVEL_3_2",
+                  "QvbrSettings": {
+                    "QvbrQualityLevel": {{ variables.proxy_qvbr_quality | default(8) }}
+                  }
                 }
               },
-              "Width": 640,
-              "Height": 360
+              "VideoPreprocessors": {
+                "Deinterlacer": {
+                  "Mode": "DEINTERLACE",
+                  "Algorithm": "INTERPOLATE"
+                }
+              }
             },
             "AudioDescriptions": [
               {
                 "CodecSettings": {
                   "Codec": "AAC",
                   "AacSettings": {
-                    "Bitrate": 96000,
+                    "Bitrate": {{ (variables.proxy_audio_kbps | default(128)) * 1000 }},
                     "CodingMode": "CODING_MODE_2_0",
-                    "SampleRate": 48000
+                    "SampleRate": 44100
                   }
-                }
+                },
+                "AudioSourceName": "Audio Selector 1"
               }
             ],
-            "ContainerSettings": { "Container": "MP4" }
+            "NameModifier": "_proxy"
           }
-        ]
+        ],
+        "OutputGroupSettings": {
+          "Type": "FILE_GROUP_SETTINGS",
+          "FileGroupSettings": {
+            "Destination": "s3://{{ variables.output_bucket }}/{{ variables.output_key }}",
+            "DestinationSettings": {
+              "S3Settings": {
+                "AccessControl": {
+                  "CannedAcl": "BUCKET_OWNER_FULL_CONTROL"
+                }
+              }
+            }
+          }
+        }
       },
       {
         "Name": "Thumbnail",
+        "Outputs": [
+          {
+            "ContainerSettings": {
+              "Container": "RAW"
+            },
+            "VideoDescription": {
+              "Width": {{ variables.thumbnail_width | default(300) }},
+              "Height": {{ variables.thumbnail_height | default(400) }},
+              "CodecSettings": {
+                "Codec": "FRAME_CAPTURE",
+                "FrameCaptureSettings": {
+                  "FramerateNumerator": 1,
+                  "FramerateDenominator": {{ variables.thumbnail_frame_denominator | default(4) }},
+                  "MaxCaptures": 1,
+                  "Quality": 80
+                }
+              }
+            },
+            "Extension": "jpg",
+            "NameModifier": "_thumbnail"
+          }
+        ],
         "OutputGroupSettings": {
           "Type": "FILE_GROUP_SETTINGS",
           "FileGroupSettings": {
             "Destination": "s3://{{ variables.output_bucket }}/{{ variables.output_key }}"
           }
-        },
-        "Outputs": [
-          {
-            "NameModifier": "_thumbnail",
-            "Extension": "jpg",
-            "VideoDescription": {
-              "CodecSettings": {
-                "Codec": "FRAME_CAPTURE",
-                "FrameCaptureSettings": {
-                  {% if variables.duration_frames %}
-                  "FramerateNumerator": 1,
-                  "FramerateDenominator": {{ (variables.duration_frames * 0.25) | int }},
-                  {% else %}
-                  "FramerateNumerator": 1,
-                  "FramerateDenominator": 4,
-                  {% endif %}
-                  "MaxCaptures": 1,
-                  "Quality": 80
-                }
-              },
-              "Width": {{ variables.thumbnail_width }},
-              "Height": {{ variables.thumbnail_height }}
-            },
-            "ContainerSettings": { "Container": "RAW" }
-          }
-        ]
+        }
       }
-    ]
-  }
+    ],
+    "Inputs": [
+      {
+        "AudioSelectors": {
+          "Audio Selector 1": {
+            "DefaultSelection": "DEFAULT"
+          }
+        },
+        "VideoSelector": {},
+        "FileInput": "s3://{{ variables.input_bucket }}/{{ variables.input_key }}"
+      }
+    ],
+    "FollowSource": 1
+  },
+  "BillingTagsSource": "JOB",
+  "AccelerationSettings": {
+    "Mode": "DISABLED"
+  },
+  "StatusUpdateInterval": "SECONDS_60",
+  "Priority": 0
 }

@@ -12,13 +12,28 @@ from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBPr
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 
+def apply_custom_authorization(
+    method: apigateway.Method, authorizer: apigateway.IAuthorizer
+) -> None:
+    """
+    Apply custom authorization to an API Gateway method.
+
+    Args:
+        method: The API Gateway method to apply authorization to
+        authorizer: The custom authorizer to use
+    """
+    cfn_method = method.node.default_child
+    cfn_method.authorization_type = "CUSTOM"
+    cfn_method.authorizer_id = authorizer.authorizer_id
+
+
 @dataclass
 class ApiGatewayEnvironmentsProps:
     """Configuration for Environments API Gateway."""
 
     api_resource: apigateway.IResource
     x_origin_verify_secret: secretsmanager.Secret
-    cognito_authorizer: apigateway.IAuthorizer
+    authorizer: apigateway.IAuthorizer
     integrations_table: dynamodb.TableV2
     post_integrations_handler: lambda_.Function
 
@@ -54,7 +69,7 @@ class ApiGatewayEnvironmentsConstruct(Construct):
         )
 
         # Create environments resource
-        environments_resource = props.api_resource.add_resource("environments")
+        environments_resource = props.api_resource.root.add_resource("environments")
 
         # GET /environments
         self._get_environments_handler = Lambda(
@@ -75,12 +90,11 @@ class ApiGatewayEnvironmentsConstruct(Construct):
             self._get_environments_handler.function
         )
 
-        environments_resource.add_method(
+        environments_get = environments_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(self._get_environments_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
         )
+        apply_custom_authorization(environments_get, props.authorizer)
 
         # POST /environments
         self._post_environments_handler = Lambda(
@@ -100,12 +114,11 @@ class ApiGatewayEnvironmentsConstruct(Construct):
             self._post_environments_handler.function
         )
 
-        environments_resource.add_method(
+        environments_post = environments_resource.add_method(
             "POST",
             apigateway.LambdaIntegration(self._post_environments_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
         )
+        apply_custom_authorization(environments_post, props.authorizer)
 
         # Environment ID specific endpoints
         environment_id_resource = environments_resource.add_resource("{id}")
@@ -129,12 +142,11 @@ class ApiGatewayEnvironmentsConstruct(Construct):
             self._put_environment_handler.function
         )
 
-        environment_id_resource.add_method(
+        environment_put = environment_id_resource.add_method(
             "PUT",
             apigateway.LambdaIntegration(self._put_environment_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
         )
+        apply_custom_authorization(environment_put, props.authorizer)
 
         # DELETE /environments/{id}
         self._del_environment_handler = Lambda(
@@ -157,12 +169,11 @@ class ApiGatewayEnvironmentsConstruct(Construct):
         props.integrations_table.grant_read_data(self._del_environment_handler.function)
         props.integrations_table.grant_read_data(self._del_environment_handler.function)
 
-        environment_id_resource.add_method(
+        environment_delete = environment_id_resource.add_method(
             "DELETE",
             apigateway.LambdaIntegration(self._del_environment_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
         )
+        apply_custom_authorization(environment_delete, props.authorizer)
 
         # Add CORS support to all API resources
         add_cors_options_method(environments_resource)

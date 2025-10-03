@@ -11,6 +11,33 @@ from aws_cdk import aws_iam as iam
 from aws_cdk import aws_lambda as lambda_
 from constructs import Construct
 
+# Global variable to store the shared authorizer Lambda instance
+_shared_authorizer_lambda: Optional[lambda_.Function] = None
+
+
+def _get_shared_authorizer_lambda(scope: Construct) -> lambda_.Function:
+    """
+    Get or create the shared authorizer Lambda instance.
+
+    Args:
+        scope: The construct scope
+
+    Returns:
+        lambda_.Function: The shared authorizer Lambda instance
+    """
+    global _shared_authorizer_lambda
+
+    if _shared_authorizer_lambda is None:
+        # Import the shared authorizer Lambda ARN
+        authorizer_lambda_arn = Fn.import_value("MediaLake-SharedAuthorizerLambdaArn")
+
+        # Create the Lambda function instance by ARN
+        _shared_authorizer_lambda = lambda_.Function.from_function_arn(
+            scope, "SharedAuthorizerLambda", authorizer_lambda_arn
+        )
+
+    return _shared_authorizer_lambda
+
 
 def create_shared_custom_authorizer(
     scope: Construct,
@@ -30,13 +57,8 @@ def create_shared_custom_authorizer(
     Returns:
         apigateway.RequestAuthorizer: Configured authorizer
     """
-    # Import the shared authorizer Lambda ARN
-    authorizer_lambda_arn = Fn.import_value("MediaLake-SharedAuthorizerLambdaArn")
-
-    # Import the Lambda function by ARN
-    authorizer_lambda = lambda_.Function.from_function_arn(
-        scope, f"{authorizer_id}ImportedLambda", authorizer_lambda_arn
-    )
+    # Get the shared authorizer Lambda instance
+    authorizer_lambda = _get_shared_authorizer_lambda(scope)
 
     # If a specific API Gateway ID is provided, add more granular permissions
     if api_gateway_id:
@@ -56,8 +78,8 @@ def create_shared_custom_authorizer(
         scope,
         authorizer_id,
         handler=authorizer_lambda,
-        identity_sources=["method.request.header.Authorization"],
-        results_cache_ttl=Duration.minutes(cache_ttl_minutes),
+        identity_sources=[],
+        results_cache_ttl=Duration.seconds(0),
     )
 
 
@@ -72,13 +94,8 @@ def add_api_gateway_permission_to_shared_authorizer(
         permission_id: Unique ID for this permission
         api_gateway_id: The API Gateway ID that needs permission
     """
-    # Import the shared authorizer Lambda ARN
-    authorizer_lambda_arn = Fn.import_value("MediaLake-SharedAuthorizerLambdaArn")
-
-    # Import the Lambda function by ARN
-    authorizer_lambda = lambda_.Function.from_function_arn(
-        scope, f"{permission_id}ImportedLambda", authorizer_lambda_arn
-    )
+    # Get the shared authorizer Lambda instance
+    authorizer_lambda = _get_shared_authorizer_lambda(scope)
 
     # Add permission for this specific API Gateway
     try:
@@ -107,13 +124,8 @@ def ensure_shared_authorizer_permissions(
         construct_id: Unique ID for this permission setup
         api_gateway: The API Gateway that needs permission to invoke the authorizer
     """
-    # Import the shared authorizer Lambda ARN
-    authorizer_lambda_arn = Fn.import_value("MediaLake-SharedAuthorizerLambdaArn")
-
-    # Import the Lambda function by ARN
-    authorizer_lambda = lambda_.Function.from_function_arn(
-        scope, f"{construct_id}AuthorizerLambda", authorizer_lambda_arn
-    )
+    # Get the shared authorizer Lambda instance
+    authorizer_lambda = _get_shared_authorizer_lambda(scope)
 
     # Add permission for this specific API Gateway
     authorizer_lambda.add_permission(

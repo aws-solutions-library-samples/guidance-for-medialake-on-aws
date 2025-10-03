@@ -35,14 +35,8 @@ from medialake_stacks.pipelines_executions_stack import (
 @dataclass
 class PipelineStackProps:
     iac_assets_bucket: s3.IBucket
-    # trigger_node_function_arn: str
-    # image_metadata_extractor_function_arn: str
-    # image_proxy_function_arn: str
-    # video_metadata_extractor_function_arn: str
-    # video_proxy_thumbnail_function_arn: str
-    # audio_metadata_extractor_function_arn: str
-    # audio_proxy_thumbnail_function_arn: str
-    # check_media_convert_status_function_arn: str
+    authorizer: apigateway.IAuthorizer
+    api_resource: apigateway.RestApi
     cognito_user_pool: cognito.UserPool
     cognito_app_client: cognito.UserPoolClient
     asset_table: dynamodb.TableV2
@@ -50,8 +44,6 @@ class PipelineStackProps:
     node_table: dynamodb.TableV2
     pipeline_table: dynamodb.TableV2
     integrations_table: dynamodb.TableV2
-    # image_proxy_lambda: lambda_.Function
-    # image_metadata_extractor_lambda: lambda_.Function
     iac_assets_bucket: s3.IBucket
     external_payload_bucket: s3.IBucket
     pipelines_nodes_templates_bucket: s3.IBucket
@@ -80,22 +72,21 @@ class PipelineStack(cdk.NestedStack):
     ):
         super().__init__(scope, construct_id, **kwargs)
 
-        api_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
-        root_resource_id = Fn.import_value("MediaLakeApiGatewayCore-RootResourceId")
+        Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
+        Fn.import_value("MediaLakeApiGatewayCore-RootResourceId")
 
-        api = apigateway.RestApi.from_rest_api_attributes(
-            self,
-            "PipelineStackApi",
-            rest_api_id=api_id,
-            root_resource_id=root_resource_id,
-        )
+        # api = apigateway.RestApi.from_rest_api_attributes(
+        #     self,
+        #     "PipelineStackApi",
+        #     rest_api_id=api_id,
+        #     root_resource_id=root_resource_id,
+        # )
 
-        self._api_authorizer = apigateway.CognitoUserPoolsAuthorizer(
-            self,
-            "PipelineStackApiAuthorizer",
-            identity_source="method.request.header.Authorization",
-            cognito_user_pools=[props.cognito_user_pool],
-        )
+        # Use the shared custom authorizer
+        # api_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
+        # self._api_authorizer = create_shared_custom_authorizer(
+        #     self, "PipelineCustomApiAuthorizer", api_gateway_id=api_id
+        # )
 
         self._pipelines_executions_stack = PipelinesExecutionsStack(
             self,
@@ -109,8 +100,8 @@ class PipelineStack(cdk.NestedStack):
             self,
             "PipelinesApiGateway",
             props=ApiGatewayPipelinesProps(
-                api_resource=api.root,
-                cognito_authorizer=self._api_authorizer,
+                api_resource=props.api_resource,
+                authorizer=props.authorizer,
                 x_origin_verify_secret=props.x_origin_verify_secret,
                 asset_table=props.asset_table,
                 connector_table=props.connector_table,

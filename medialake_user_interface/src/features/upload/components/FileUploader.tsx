@@ -47,10 +47,11 @@ function getAwsS3Plugin() {
   return require("@uppy/aws-s3").default;
 }
 
-function getAwsS3MultipartPlugin() {
-  if (typeof window === "undefined") return null;
-  return require("@uppy/aws-s3-multipart").default;
-}
+// Remove the deprecated multipart plugin function
+// function getAwsS3MultipartPlugin() {
+//   if (typeof window === "undefined") return null;
+//   return require("@uppy/aws-s3-multipart").default;
+// }
 
 function getProgressBarPlugin() {
   if (typeof window === "undefined") return null;
@@ -123,20 +124,21 @@ const FileUploader: React.FC<FileUploaderProps> = ({
         });
       }
 
-      const AwsS3Multipart = getAwsS3MultipartPlugin();
-      if (AwsS3Multipart) {
-        // @ts-ignore - Intentionally ignoring type issues with plugins
-        uppyInstance.use(AwsS3Multipart, {
-          id: "S3MultipartUploader",
-          limit: 5, // concurrent uploads
-          allowedMetaFields: ["connector_id"],
-          createMultipartUpload: async () => ({ uploadId: "", key: "" }),
-          listParts: async () => [],
-          prepareUploadParts: async () => [],
-          abortMultipartUpload: async () => {},
-          completeMultipartUpload: async () => ({ location: "" }),
-        });
-      }
+      // Remove the deprecated multipart plugin function
+      // const AwsS3Multipart = getAwsS3MultipartPlugin();
+      // if (AwsS3Multipart) {
+      //   // @ts-ignore - Intentionally ignoring type issues with plugins
+      //   uppyInstance.use(AwsS3Multipart, {
+      //     id: "S3MultipartUploader",
+      //     limit: 5, // concurrent uploads
+      //     allowedMetaFields: ["connector_id"],
+      //     createMultipartUpload: async () => ({ uploadId: "", key: "" }),
+      //     listParts: async () => [],
+      //     prepareUploadParts: async () => [],
+      //     abortMultipartUpload: async () => {},
+      //     completeMultipartUpload: async () => ({ location: "" }),
+      //   });
+      // }
     } catch (error) {
       console.error("Error initializing Uppy plugins:", error);
     }
@@ -230,38 +232,38 @@ const FileUploader: React.FC<FileUploaderProps> = ({
 
               if (result.multipart) {
                 // For multipart uploads, configure the multipart plugin
-                const s3MultipartPlugin = uppy.getPlugin("S3MultipartUploader");
-                if (s3MultipartPlugin) {
-                  // @ts-ignore - Plugin type incompatibility
-                  s3MultipartPlugin.setOptions({
-                    companionUrl: null,
-                    createMultipartUpload: async () => {
-                      return {
-                        uploadId: result.upload_id,
-                        key: result.key,
-                      };
-                    },
-                    listParts: async () => [],
-                    prepareUploadParts: async (partData: any) => {
-                      const { partNumbers } = partData;
-                      return partNumbers.map((partNumber: number) => {
-                        const partUrlData = result.part_urls?.find(
-                          (p) => p.part_number === partNumber,
-                        );
-                        return {
-                          url: partUrlData?.presigned_url,
-                          headers: {},
-                        };
-                      });
-                    },
-                    abortMultipartUpload: async () => {},
-                    completeMultipartUpload: async () => {
-                      return {
-                        location: `s3://${result.bucket}/${result.key}`,
-                      };
-                    },
-                  });
-                }
+                // const s3MultipartPlugin = uppy.getPlugin("S3MultipartUploader");
+                // if (s3MultipartPlugin) {
+                //   // @ts-ignore - Plugin type incompatibility
+                //   s3MultipartPlugin.setOptions({
+                //     companionUrl: null,
+                //     createMultipartUpload: async () => {
+                //       return {
+                //         uploadId: result.upload_id,
+                //         key: result.key,
+                //       };
+                //     },
+                //     listParts: async () => [],
+                //     prepareUploadParts: async (partData: any) => {
+                //       const { partNumbers } = partData;
+                //       return partNumbers.map((partNumber: number) => {
+                //         const partUrlData = result.part_urls?.find(
+                //           (p) => p.part_number === partNumber,
+                //         );
+                //         return {
+                //           url: partUrlData?.presigned_url,
+                //           headers: {},
+                //         };
+                //       });
+                //     },
+                //     abortMultipartUpload: async () => {},
+                //     completeMultipartUpload: async () => {
+                //       return {
+                //         location: `s3://${result.bucket}/${result.key}`,
+                //       };
+                //     },
+                //   });
+                // }
                 throw new Error(
                   "Please use multipart upload for this file size",
                 );

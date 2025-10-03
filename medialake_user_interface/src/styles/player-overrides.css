@@ -1,0 +1,16 @@
+/**
+ * Player Override Styles
+ *
+ * This file contains CSS overrides for third-party video/audio players
+ * to customize their appearance and behavior within the MediaLake application.
+ */
+
+/* ===== OMAKASE PLAYER OVERRIDES ===== */
+
+/* Remove poster frame/watermark from Omakase video player */
+.omakase-player .omakase-player-wrapper .omakase-background-image {
+  background-image: none !important;
+}
+
+/* Additional Omakase player customizations can be added here */
+/* Example: Hide specific UI elements, adjust colors, etc. */

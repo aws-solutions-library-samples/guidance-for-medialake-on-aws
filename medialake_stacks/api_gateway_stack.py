@@ -1,17 +1,20 @@
 from dataclasses import dataclass
 
 import aws_cdk as cdk
-from aws_cdk import Fn
+from aws_cdk import Duration, Fn
 from aws_cdk import aws_apigateway as apigateway
 from aws_cdk import aws_cognito as cognito
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_events as events
+from aws_cdk import aws_events_targets as targets
+from aws_cdk import aws_iam as iam
 from aws_cdk import aws_lambda as lambda_
 from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_secretsmanager as secretsmanager
 from constructs import Construct
 
+from constants import Lambda as LambdaConstants
 from medialake_constructs.api_gateway.api_gateway_assets import (
     AssetsConstruct,
     AssetsProps,
@@ -28,6 +31,9 @@ from medialake_constructs.api_gateway.api_gateway_search import (
     SearchConstruct,
     SearchProps,
 )
+from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
+
+# from medialake_constructs.auth.authorizer_utils import create_shared_custom_authorizer, ensure_shared_authorizer_permissions
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket
 
 
@@ -36,6 +42,12 @@ class ApiGatewayStackProps:
     """Configuration for API Gateway Stack."""
 
     asset_table: dynamodb.TableV2
+    auth_table_name: str
+    avp_policy_store_arn: str
+    avp_policy_store_id: str
+    cognito_user_pool_id: str
+    api_keys_table_name: str
+    api_keys_table_arn: str
     iac_assets_bucket: s3.Bucket
     media_assets_bucket: S3Bucket
     external_payload_bucket: s3.Bucket
@@ -55,13 +67,13 @@ class ApiGatewayStackProps:
     asset_sync_job_table: dynamodb.TableV2
     asset_sync_engine_lambda: lambda_.Function
     system_settings_table: str
-    rest_api: apigateway.RestApi
-    x_origin_verify_secret: secretsmanager.Secret
+    rest_api_id: str
+    x_origin_verify_secret_arn: str
     user_pool: cognito.UserPool
     identity_pool: str
     user_pool_client: str
     waf_acl_arn: str
-    user_table: dynamodb.TableV2
+    # user_table: dynamodb.TableV2
     s3_vector_bucket_name: str
 
 
@@ -77,20 +89,124 @@ class ApiGatewayStack(cdk.NestedStack):
         api_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
         root_resource_id = Fn.import_value("MediaLakeApiGatewayCore-RootResourceId")
 
-        api = apigateway.RestApi.from_rest_api_attributes(
+        # Create the RestApi object once and store it
+        self._rest_api = apigateway.RestApi.from_rest_api_attributes(
             self,
             "ApiGatewayImportedApi",
             rest_api_id=api_id,
             root_resource_id=root_resource_id,
         )
 
-        self._api_gateway_authorizer = apigateway.CognitoUserPoolsAuthorizer(
+        common_env_vars = {
+            "AUTH_TABLE_NAME": props.auth_table_name,
+            "AVP_POLICY_STORE_ID": props.avp_policy_store_id,
+            "COGNITO_USER_POOL_ID": props.cognito_user_pool_id,
+            "API_KEYS_TABLE_NAME": props.api_keys_table_name,
+            "DEBUG_MODE": "true",
+            "NAMESPACE": "MediaLake",
+            "TOKEN_TYPE": "identityToken",
+        }
+
+        self._authorizer_lambda = Lambda(
             self,
-            "ApiGatewayAuthorizer",
-            identity_source="method.request.header.Authorization",
-            cognito_user_pools=[props.user_pool],
+            "SharedCustomAuthorizerLambda",
+            config=LambdaConfig(
+                name="shared_custom_authorizer",
+                entry="lambdas/auth/custom_authorizer",
+                memory_size=256,
+                timeout_minutes=1,
+                snap_start=False,
+                environment_variables=common_env_vars,
+            ),
         )
 
+        self._authorizer_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "verifiedpermissions:IsAuthorizedWithToken",
+                    "verifiedpermissions:IsAuthorized",
+                ],
+                resources=[props.avp_policy_store_arn],
+            )
+        )
+
+        self._authorizer_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "dynamodb:GetItem",
+                    "dynamodb:Query",
+                ],
+                resources=[props.api_keys_table_arn],
+            )
+        )
+
+        self._authorizer_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "secretsmanager:GetSecretValue",
+                ],
+                resources=[
+                    f"arn:aws:secretsmanager:{cdk.Aws.REGION}:{cdk.Aws.ACCOUNT_ID}:secret:medialake/api-keys/*"
+                ],
+            )
+        )
+
+        self._authorizer_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "kms:Decrypt",
+                ],
+                resources=["*"],  # For AWS managed keys
+                conditions={
+                    "StringEquals": {
+                        "kms:ViaService": f"secretsmanager.{cdk.Aws.REGION}.amazonaws.com"
+                    }
+                },
+            )
+        )
+
+        events.Rule(
+            self,
+            "SharedAuthorizerWarmerRule",
+            schedule=events.Schedule.rate(
+                Duration.minutes(LambdaConstants.WARMER_INTERVAL_MINUTES)
+            ),
+            targets=[
+                targets.LambdaFunction(
+                    self._authorizer_lambda.function,
+                    event=events.RuleTargetInput.from_object({"lambda_warmer": True}),
+                ),
+            ],
+            description="Keeps shared custom authorizer Lambda warm via scheduled EventBridge rule.",
+        )
+
+        self._authorizer = apigateway.RequestAuthorizer(
+            self,
+            "SharedRequestAuthorizer",
+            handler=self._authorizer_lambda.function,
+            identity_sources=[apigateway.IdentitySource.context("requestId")],
+            results_cache_ttl=cdk.Duration.seconds(0),
+        )
+
+        # Add permission for API Gateway to invoke the authorizer Lambda
+        # The source_arn format should be: arn:aws:execute-api:region:account:api-id/authorizers/authorizer-id
+        self._authorizer_lambda.function.add_permission(
+            "ApiGatewayInvokePermission",
+            principal=iam.ServicePrincipal("apigateway.amazonaws.com"),
+            action="lambda:InvokeFunction",
+            source_arn=f"arn:aws:execute-api:{cdk.Aws.REGION}:{cdk.Aws.ACCOUNT_ID}:{api_id}/authorizers/{self._authorizer.authorizer_id}",
+        )
+
+        # Create the Secret object once and store it
+        self._x_origin_verify_secret = secretsmanager.Secret.from_secret_name_v2(
+            self, "XOriginVerifySecret", props.x_origin_verify_secret_arn
+        )
+
+        # Use the stored Secret object in all constructs
         self._connectors_api_gateway = ConnectorsConstruct(
             self,
             "ConnectorsApiGateway",
@@ -101,9 +217,9 @@ class ApiGatewayStack(cdk.NestedStack):
                 asset_table_s3_path_index_arn=props.asset_table_s3_path_index_arn,
                 iac_assets_bucket=props.iac_assets_bucket,
                 media_assets_bucket=props.media_assets_bucket,  # Added for cross-bucket deletion
-                api_resource=api,
-                cognito_authorizer=self._api_gateway_authorizer,
-                x_origin_verify_secret=props.x_origin_verify_secret,
+                api_resource=self._rest_api,
+                authorizer=self._authorizer,
+                x_origin_verify_secret=self._x_origin_verify_secret,
                 pipelines_event_bus=props.pipelines_event_bus.event_bus_name,
                 asset_sync_job_table=props.asset_sync_job_table,
                 asset_sync_engine_lambda=props.asset_sync_engine_lambda,
@@ -126,9 +242,9 @@ class ApiGatewayStack(cdk.NestedStack):
             props=SearchProps(
                 asset_table=props.asset_table,
                 media_assets_bucket=props.media_assets_bucket,
-                api_resource=api,
-                cognito_authorizer=self._api_gateway_authorizer,
-                x_origin_verify_secret=props.x_origin_verify_secret,
+                api_resource=self._rest_api,
+                authorizer=self._authorizer,
+                x_origin_verify_secret=self._x_origin_verify_secret,
                 open_search_endpoint=props.collection_endpoint,
                 open_search_arn=props.collection_arn,
                 open_search_index="media",
@@ -144,15 +260,15 @@ class ApiGatewayStack(cdk.NestedStack):
             "AssetsApiGateway",
             props=AssetsProps(
                 asset_table=props.asset_table,
-                api_resource=api,
-                cognito_authorizer=self._api_gateway_authorizer,
-                x_origin_verify_secret=props.x_origin_verify_secret,
+                api_resource=self._rest_api,
+                authorizer=self._authorizer,
+                x_origin_verify_secret=self._x_origin_verify_secret,
                 open_search_endpoint=props.collection_endpoint,
                 opensearch_index="media",
                 vpc=props.vpc,
                 security_group=props.security_group,
                 open_search_arn=props.collection_arn,
-                user_table=props.user_table,
+                media_assets_bucket=props.media_assets_bucket.bucket,
                 s3_vector_bucket_name=props.s3_vector_bucket_name,
             ),
         )
@@ -161,11 +277,16 @@ class ApiGatewayStack(cdk.NestedStack):
             self,
             "NodesApiGateway",
             props=ApiGatewayNodesProps(
-                api_resource=api,
-                x_origin_verify_secret=props.x_origin_verify_secret,
-                cognito_authorizer=self._api_gateway_authorizer,
+                api_resource=self._rest_api,
+                x_origin_verify_secret=self._x_origin_verify_secret,
+                authorizer=self._authorizer,
                 pipelines_nodes_table=props.pipelines_nodes_table,
             ),
+        )
+
+        # Create health endpoint
+        self._create_health_endpoint(
+            self._rest_api, self._x_origin_verify_secret, self._authorizer
         )
 
         # Create a list of dependencies for the deployment
@@ -177,10 +298,57 @@ class ApiGatewayStack(cdk.NestedStack):
             self._nodes_construct,
         ]
 
+    def _create_health_endpoint(
+        self,
+        api: apigateway.RestApi,
+        x_origin_verify_secret: secretsmanager.Secret,
+        authorizer: apigateway.RequestAuthorizer,
+    ) -> None:
+        """
+        Create the health check endpoint for the API.
+
+        Args:
+            api: The API Gateway REST API instance
+            x_origin_verify_secret: Secret for origin verification
+        """
+        # Create health resource
+        health_resource = api.root.add_resource("health")
+
+        # Create health Lambda function
+        health_lambda = Lambda(
+            self,
+            "HealthLambda",
+            config=LambdaConfig(
+                name="health_get",
+                entry="lambdas/api/health/get_health",
+                memory_size=128,
+                timeout_minutes=1,
+                environment_variables={
+                    "X_ORIGIN_VERIFY_SECRET_ARN": x_origin_verify_secret.secret_arn,
+                },
+            ),
+        )
+
+        # Grant permission to read the secret
+        x_origin_verify_secret.grant_read(health_lambda.function)
+
+        # Create GET method for health endpoint
+        health_get_method = health_resource.add_method(
+            "GET",
+            apigateway.LambdaIntegration(health_lambda.function),
+            authorizer=authorizer,
+        )
+
+        # Apply custom authorization to the health endpoint
+        # apply_custom_authorization(health_get_method, self._authorizer)
+
+        # Store reference to health lambda for external access if needed
+        self._health_lambda = health_lambda
+
     @property
     def rest_api(self) -> apigateway.RestApi:
         # Return from props instead of internal constructs
-        return self._props.rest_api
+        return self._rest_api
 
     @property
     def connector_table(self) -> dynamodb.TableV2:
@@ -189,11 +357,19 @@ class ApiGatewayStack(cdk.NestedStack):
     @property
     def x_origin_verify_secret(self) -> secretsmanager.Secret:
         # Return from props instead of internal constructs
-        return self._props.x_origin_verify_secret
+        return self._x_origin_verify_secret
 
     @property
     def connector_sync_lambda(self) -> lambda_.Function:
         return self._connectors_api_gateway.connector_sync_lambda
+
+    @property
+    def health_lambda(self) -> lambda_.Function:
+        return self._health_lambda.function
+
+    @property
+    def authorizer(self) -> apigateway.RequestAuthorizer:
+        return self._authorizer
 
     @property
     def api_resources(self):

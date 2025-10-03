@@ -15,12 +15,27 @@ from medialake_constructs.shared_constructs.lambda_layers import SearchLayer
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket
 
 
+def apply_custom_authorization(
+    method: apigateway.Method, authorizer: apigateway.IAuthorizer
+) -> None:
+    """
+    Apply custom authorization to an API Gateway method.
+
+    Args:
+        method: The API Gateway method to apply authorization to
+        authorizer: The custom authorizer to use
+    """
+    cfn_method = method.node.default_child
+    cfn_method.authorization_type = "CUSTOM"
+    cfn_method.authorizer_id = authorizer.authorizer_id
+
+
 @dataclass
 class SearchProps:
     asset_table: dynamodb.TableV2
     media_assets_bucket: S3Bucket
     api_resource: apigateway.IResource
-    cognito_authorizer: apigateway.IAuthorizer
+    authorizer: apigateway.IAuthorizer
     x_origin_verify_secret: secretsmanager.Secret
     open_search_endpoint: str
     open_search_arn: str
@@ -67,6 +82,11 @@ class SearchConstruct(Construct):
                     "SYSTEM_SETTINGS_TABLE": props.system_settings_table,
                     "S3_VECTOR_BUCKET_NAME": props.s3_vector_bucket_name,
                     "S3_VECTOR_INDEX_NAME": "media-vectors",
+                    # CLOUDFRONT_DISTRIBUTION_DOMAIN removed to break circular dependency
+                    # Lambda will fetch this from SSM parameter at runtime
+                    # Bedrock inference profile ID for TwelveLabs Marengo Embed v2.7
+                    # Using AWS system-defined cross-Region inference profile
+                    "BEDROCK_INFERENCE_PROFILE_ARN": "us.twelvelabs.marengo-embed-2-7-v1:0",
                 },
             ),
         )
@@ -185,8 +205,8 @@ class SearchConstruct(Construct):
                     # Foundation model ARN - required for InvokeModel calls
                     "arn:aws:bedrock:*::foundation-model/twelvelabs.marengo-embed-2-7-v1:0",
                     # System-defined cross-Region inference profile for TwelveLabs Marengo
-                    # Dynamically determine the correct regional inference profile based on deployment region
-                    f"arn:aws:bedrock:*:{Stack.of(self).account}:inference-profile/{self._get_regional_inference_profile_id()}",
+                    # The ARN includes the account ID for system-defined profiles
+                    f"arn:aws:bedrock:*:{Stack.of(self).account}:inference-profile/us.twelvelabs.marengo-embed-2-7-v1:0",
                 ],
             )
         )
@@ -203,12 +223,11 @@ class SearchConstruct(Construct):
             )
         )
 
-        search_resource.add_method(
+        search_get = search_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(search_get_lambda.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
         )
+        apply_custom_authorization(search_get, props.authorizer)
 
         # Add CORS support
 
@@ -259,41 +278,11 @@ class SearchConstruct(Construct):
         )
 
         # Add the GET method to the fields resource
-        fields_resource.add_method(
+        search_fields_get = fields_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(search_fields_lambda.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
         )
+        apply_custom_authorization(search_fields_get, props.authorizer)
 
         add_cors_options_method(search_resource)
         add_cors_options_method(fields_resource)
-
-    def _get_regional_inference_profile_id(self) -> str:
-        """
-        Get the appropriate TwelveLabs Marengo Embed v2.7 inference profile ID based on deployment region.
-
-        Returns:
-            Regional inference profile ID for TwelveLabs Marengo Embed v2.7
-        """
-        # Get the deployment region from the stack
-        deployment_region = Stack.of(self).region
-
-        # Common suffix for all TwelveLabs Marengo Embed v2.7 inference profiles
-        model_suffix = ".twelvelabs.marengo-embed-2-7-v1:0"
-
-        # Map regions to regional prefixes based on AWS documentation
-        if deployment_region.startswith("us-"):
-            # US regions: us-east-1, us-east-2, us-west-1, us-west-2
-            regional_prefix = "us"
-        elif deployment_region.startswith("eu-"):
-            # EU regions: eu-central-1, eu-central-2, eu-north-1, eu-south-1, eu-south-2, eu-west-1, eu-west-2, eu-west-3
-            regional_prefix = "eu"
-        elif deployment_region.startswith("ap-"):
-            # APAC regions: ap-northeast-1, ap-northeast-2, ap-northeast-3, ap-south-1, ap-south-2, ap-southeast-1, ap-southeast-2, ap-southeast-3, ap-southeast-4
-            regional_prefix = "apac"
-        else:
-            # Default to US profile for unknown regions
-            regional_prefix = "us"
-
-        return f"{regional_prefix}{model_suffix}"

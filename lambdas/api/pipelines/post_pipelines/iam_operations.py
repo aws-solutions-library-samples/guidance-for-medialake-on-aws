@@ -251,9 +251,22 @@ def standardize_policy_statement(statement: Dict[str, Any]) -> Dict[str, Any]:
             resources if isinstance(resources, list) else [resources]
         )
 
-    # Copy any other keys as-is
+    # Handle Condition (capitalize)
+    if "condition" in statement:
+        standardized["Condition"] = statement["condition"]
+    elif "Condition" in statement:
+        standardized["Condition"] = statement["Condition"]
+
+    # Copy any other keys as-is (excluding the ones we've already handled)
     for key, value in statement.items():
-        if key.lower() not in ["effect", "action", "actions", "resource", "resources"]:
+        if key.lower() not in [
+            "effect",
+            "action",
+            "actions",
+            "resource",
+            "resources",
+            "condition",
+        ]:
             standardized[key] = value
 
     return standardized
@@ -403,7 +416,9 @@ def process_policy_template(template_str: str) -> str:
     return result
 
 
-def create_lambda_execution_policy(role_name: str, yaml_data: Dict[str, Any]) -> None:
+def create_lambda_execution_policy(
+    role_name: str, yaml_data: Dict[str, Any], node: Any = None
+) -> None:
     """Create and attach the execution policy to the Lambda role based on YAML configuration."""
     iam = boto3.client("iam")
 
@@ -432,14 +447,23 @@ def create_lambda_execution_policy(role_name: str, yaml_data: Dict[str, Any]) ->
                 "Effect": "Allow",
                 "Action": ["dynamodb:GetItem", "dynamodb:PutItem"],
                 "Resource": [
-                    f"arn:aws:dynamodb:{os.environ.get('AWS_REGION', 'us-east-1')}:{os.environ['ACCOUNT_ID']}:table/{os.environ['NODE_TABLE']}",
+                    (
+                        os.environ["NODE_TABLE"]
+                        if os.environ["NODE_TABLE"].startswith("arn:")
+                        else f"arn:aws:dynamodb:{os.environ.get('AWS_REGION', 'us-east-1')}:{os.environ['ACCOUNT_ID']}:table/{os.environ['NODE_TABLE']}"
+                    ),
                 ],
             },
             {
                 "Effect": "Allow",
                 "Action": ["dynamodb:GetItem"],
                 "Resource": [
-                    MEDIALAKE_ASSET_TABLE,
+                    (
+                        MEDIALAKE_ASSET_TABLE
+                        if MEDIALAKE_ASSET_TABLE
+                        and MEDIALAKE_ASSET_TABLE.startswith("arn:")
+                        else f"arn:aws:dynamodb:{os.environ.get('AWS_REGION', 'us-east-1')}:{os.environ['ACCOUNT_ID']}:table/{MEDIALAKE_ASSET_TABLE}"
+                    ),
                 ],
             },
             {
@@ -530,6 +554,42 @@ def create_lambda_execution_policy(role_name: str, yaml_data: Dict[str, Any]) ->
                     f"Combined {len(processed_statements)} YAML statements with default policy"
                 )
 
+                # Add dynamic EventBus ARN permission if node has EventBus ARN parameter
+                if (
+                    node
+                    and hasattr(node, "data")
+                    and hasattr(node.data, "configuration")
+                ):
+                    # Check both direct configuration and parameters nested structure
+                    eventbus_arn = None
+
+                    # Try direct access first
+                    eventbus_arn = node.data.configuration.get("EventBus ARN")
+
+                    # If not found, try parameters structure
+                    if not eventbus_arn:
+                        parameters = node.data.configuration.get("parameters", {})
+                        eventbus_arn = parameters.get("EventBus ARN")
+
+                    if eventbus_arn and eventbus_arn.strip():
+                        # Process the EventBus ARN through template processing to resolve any variables
+                        processed_eventbus_arn = eventbus_arn
+                        if "${" in eventbus_arn:
+                            # Process the ARN string directly
+                            processed_eventbus_arn = process_policy_template(
+                                eventbus_arn
+                            )
+
+                        dynamic_eventbus_statement = {
+                            "Effect": "Allow",
+                            "Action": ["events:PutEvents"],
+                            "Resource": [processed_eventbus_arn],
+                        }
+                        policy_statements.append(dynamic_eventbus_statement)
+                        logger.info(
+                            f"Added dynamic EventBus permission for ARN: {processed_eventbus_arn}"
+                        )
+
                 # Deduplicate the combined statements
                 deduplicated_statements = deduplicate_policy_statements(
                     policy_statements
@@ -551,7 +611,42 @@ def create_lambda_execution_policy(role_name: str, yaml_data: Dict[str, Any]) ->
                 policy_document = default_policy
         else:
             # If no YAML policy, use the default policy
-            policy_document = default_policy
+            policy_statements = default_policy["Statement"].copy()
+
+            # Add dynamic EventBus ARN permission if node has EventBus ARN parameter
+            if node and hasattr(node, "data") and hasattr(node.data, "configuration"):
+                # Check both direct configuration and parameters nested structure
+                eventbus_arn = None
+
+                # Try direct access first
+                eventbus_arn = node.data.configuration.get("EventBus ARN")
+
+                # If not found, try parameters structure
+                if not eventbus_arn:
+                    parameters = node.data.configuration.get("parameters", {})
+                    eventbus_arn = parameters.get("EventBus ARN")
+
+                if eventbus_arn and eventbus_arn.strip():
+                    # Process the EventBus ARN through template processing to resolve any variables
+                    processed_eventbus_arn = eventbus_arn
+                    if "${" in eventbus_arn:
+                        # Process the ARN string directly
+                        processed_eventbus_arn = process_policy_template(eventbus_arn)
+
+                    dynamic_eventbus_statement = {
+                        "Effect": "Allow",
+                        "Action": ["events:PutEvents"],
+                        "Resource": [processed_eventbus_arn],
+                    }
+                    policy_statements.append(dynamic_eventbus_statement)
+                    logger.info(
+                        f"Added dynamic EventBus permission for ARN (no YAML policy): {processed_eventbus_arn}"
+                    )
+
+            policy_document = {
+                "Version": "2012-10-17",
+                "Statement": policy_statements,
+            }
 
         # Log the final policy document
         logger.info(f"Final policy document: {json.dumps(policy_document)}")
@@ -594,6 +689,7 @@ def create_lambda_role(
     yaml_data: Dict[str, Any],
     operation_id: str = "",
     lambda_function_name: str = "",
+    node: Any = None,
 ) -> str:
     """Create a Lambda execution role."""
     iam = boto3.client("iam")
@@ -714,7 +810,7 @@ def create_lambda_role(
                     f"Creating and attaching custom execution policy for {role_name}"
                 )
                 try:
-                    create_lambda_execution_policy(role_name, yaml_data)
+                    create_lambda_execution_policy(role_name, yaml_data, node)
                     logger.info(
                         f"Custom execution policy created and attached successfully for {role_name}"
                     )
@@ -827,9 +923,10 @@ def create_service_roles_from_yaml(
 
                 # Create a unique role name
                 sanitized_pipeline_name = sanitize_role_name(pipeline_name)
-                sanitized_role_name = (
+                base_role_name = (
                     f"{resource_prefix}_{sanitized_pipeline_name}_{node_id}_{role_name}"
                 )
+                sanitized_role_name = sanitize_role_name(base_role_name)
 
                 # Create the role
                 iam_client = boto3.client("iam")

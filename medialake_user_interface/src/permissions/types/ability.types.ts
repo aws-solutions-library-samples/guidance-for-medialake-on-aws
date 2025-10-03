@@ -23,6 +23,8 @@ export type Actions =
 
 // Define the possible subjects
 export type Subjects =
+  | "all"
+  | "api-key"
   | "asset"
   | "pipeline"
   | "connector"
@@ -32,8 +34,7 @@ export type Subjects =
   | "permission-set"
   | "integration"
   | "region"
-  | "system-settings"
-  | "all";
+  | "system-settings";
 
 // Define the conditions type for subject-based authorization
 export type Conditions = MongoQuery;

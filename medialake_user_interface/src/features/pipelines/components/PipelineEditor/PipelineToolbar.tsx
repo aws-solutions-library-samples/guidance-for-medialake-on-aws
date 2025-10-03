@@ -1697,7 +1697,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                 variant="contained"
                 color="primary"
                 onClick={onSave}
-                disabled={isLoading || !pipelineName.trim()}
+                disabled={isLoading || !pipelineName || !pipelineName.trim()}
                 sx={{
                   "&.Mui-disabled": {
                     opacity: 1,

@@ -61,6 +61,14 @@ class ApiGatewayCoreStack(Stack):
             export_name=f"{self.stack_name}-ApiGatwayWAFACLARN",
         )
 
+        # Export the X-Origin verify secret ARN to break circular dependencies
+        CfnOutput(
+            self,
+            "XOriginVerifySecretArn",
+            value=self._api_gateway.x_origin_verify_secret.secret_arn,
+            export_name=f"{self.stack_name}-XOriginVerifySecretArn",
+        )
+
     @property
     def rest_api(self):
         return self._api_gateway.rest_api

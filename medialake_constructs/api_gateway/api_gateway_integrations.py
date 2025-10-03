@@ -13,13 +13,28 @@ from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBPr
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 
+def apply_custom_authorization(
+    method: apigateway.Method, authorizer: apigateway.IAuthorizer
+) -> None:
+    """
+    Apply custom authorization to an API Gateway method.
+
+    Args:
+        method: The API Gateway method to apply authorization to
+        authorizer: The custom authorizer to use
+    """
+    cfn_method = method.node.default_child
+    cfn_method.authorization_type = "CUSTOM"
+    cfn_method.authorizer_id = authorizer.authorizer_id
+
+
 @dataclass
 class ApiGatewayIntegrationsProps:
     """Configuration for integrations API Gateway."""
 
-    api_resource: apigateway.IResource
+    api_resource: apigateway.RestApi
     x_origin_verify_secret: secretsmanager.Secret
-    cognito_authorizer: apigateway.IAuthorizer
+    authorizer: apigateway.IAuthorizer
     pipelines_nodes_table: dynamodb.TableV2
 
 
@@ -69,7 +84,7 @@ class ApiGatewayIntegrationsConstruct(Construct):
         )
 
         # Create integrations resource
-        integrations_resource = props.api_resource.add_resource("integrations")
+        integrations_resource = props.api_resource.root.add_resource("integrations")
 
         # GET /integrations
         self._get_integrations_handler = Lambda(
@@ -89,12 +104,11 @@ class ApiGatewayIntegrationsConstruct(Construct):
             self._get_integrations_handler.function
         )
 
-        integrations_resource.add_method(
+        integrations_get = integrations_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(self._get_integrations_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
         )
+        apply_custom_authorization(integrations_get, props.authorizer)
 
         # POST /integrations
         self._post_integrations_handler = Lambda(
@@ -129,12 +143,11 @@ class ApiGatewayIntegrationsConstruct(Construct):
             )
         )
 
-        integrations_resource.add_method(
+        integrations_post = integrations_resource.add_method(
             "POST",
             apigateway.LambdaIntegration(self._post_integrations_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
         )
+        apply_custom_authorization(integrations_post, props.authorizer)
 
         # integration ID specific endpoints
         integration_id_resource = integrations_resource.add_resource("{id}")
@@ -177,12 +190,11 @@ class ApiGatewayIntegrationsConstruct(Construct):
             )
         )
 
-        integration_id_resource.add_method(
+        integration_put = integration_id_resource.add_method(
             "PUT",
             apigateway.LambdaIntegration(self._put_integration_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
         )
+        apply_custom_authorization(integration_put, props.authorizer)
 
         # DELETE /integrations/{id}
         self._delete_integration_handler = Lambda(
@@ -222,12 +234,11 @@ class ApiGatewayIntegrationsConstruct(Construct):
             )
         )
 
-        integration_id_resource.add_method(
+        integration_delete = integration_id_resource.add_method(
             "DELETE",
             apigateway.LambdaIntegration(self._delete_integration_handler.function),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
         )
+        apply_custom_authorization(integration_delete, props.authorizer)
 
         # Add CORS support
         add_cors_options_method(integrations_resource)

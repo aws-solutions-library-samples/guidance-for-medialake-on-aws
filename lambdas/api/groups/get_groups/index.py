@@ -54,11 +54,21 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         authorizer = request_context.get("authorizer", {})
         logger.info("Authorizer context", extra={"authorizer": json.dumps(authorizer)})
 
-        claims = authorizer.get("claims", {})
-        logger.info("Claims", extra={"claims": json.dumps(claims)})
+        claims_str = authorizer.get("claims", "{}")
+        logger.info("Claims string", extra={"claims_str": claims_str})
+
+        # Parse the claims JSON string
+        try:
+            claims = (
+                json.loads(claims_str) if isinstance(claims_str, str) else claims_str
+            )
+            logger.info("Parsed claims", extra={"claims": claims})
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.warning(f"Failed to parse claims JSON: {e}, using empty dict")
+            claims = {}
 
         # Get the user ID from the Cognito claims or directly from the authorizer context
-        user_id = claims.get("sub")
+        user_id = claims.get("sub") if isinstance(claims, dict) else None
 
         # If not found in claims, try to get it directly from the authorizer context
         if not user_id:

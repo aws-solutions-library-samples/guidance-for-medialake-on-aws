@@ -201,6 +201,7 @@ export interface SearchState {
   // Domain state
   query: string;
   isSemantic: boolean;
+  semanticMode: "full" | "clip";
   filters: FacetFilters;
 
   // UI state
@@ -216,6 +217,7 @@ export interface SearchState {
     // Domain actions
     setQuery: (query: string) => void;
     setIsSemantic: (isSemantic: boolean) => void;
+    setSemanticMode: (mode: "full" | "clip") => void;
     setFilters: (filters: FacetFilters) => void;
     updateFilter: <K extends keyof FacetFilters>(
       key: K,
@@ -244,6 +246,7 @@ export const useSearchStore = create<SearchState>()(
       // Domain state
       query: "",
       isSemantic: false,
+      semanticMode: "full",
       filters: {},
 
       // UI state
@@ -260,6 +263,8 @@ export const useSearchStore = create<SearchState>()(
         setQuery: (query) => set({ query }),
 
         setIsSemantic: (isSemantic) => set({ isSemantic }),
+
+        setSemanticMode: (semanticMode) => set({ semanticMode }),
 
         setFilters: (filters) => {
           // Only update if different to prevent infinite loops
@@ -388,6 +393,7 @@ export const useSearchStore = create<SearchState>()(
       partialize: (state) => ({
         query: state.query,
         isSemantic: state.isSemantic,
+        semanticMode: state.semanticMode,
         filters: state.filters,
       }),
     },
@@ -398,6 +404,8 @@ export const useSearchStore = create<SearchState>()(
 export const useSearchQuery = () => useSearchStore((state) => state.query);
 export const useSemanticSearch = () =>
   useSearchStore((state) => state.isSemantic);
+export const useSemanticMode = () =>
+  useSearchStore((state) => state.semanticMode);
 export const useSearchFilters = () => useSearchStore((state) => state.filters);
 
 // UI state selectors
@@ -409,9 +417,22 @@ export const useFilterModalDraft = () =>
 // Action selectors
 export const useSearchActions = () => useSearchStore((state) => state.actions);
 export const useDomainActions = () => {
-  const { setQuery, setIsSemantic, setFilters, updateFilter, clearFilters } =
-    useSearchStore((state) => state.actions);
-  return { setQuery, setIsSemantic, setFilters, updateFilter, clearFilters };
+  const {
+    setQuery,
+    setIsSemantic,
+    setSemanticMode,
+    setFilters,
+    updateFilter,
+    clearFilters,
+  } = useSearchStore((state) => state.actions);
+  return {
+    setQuery,
+    setIsSemantic,
+    setSemanticMode,
+    setFilters,
+    updateFilter,
+    clearFilters,
+  };
 };
 export const useUIActions = () => {
   const {

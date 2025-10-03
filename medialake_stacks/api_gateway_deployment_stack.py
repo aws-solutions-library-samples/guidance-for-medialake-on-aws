@@ -117,6 +117,14 @@ def handler(event, context):
         # Add explicit dependency on the stage
         deployment_resource.node.add_dependency(self.api_deployment.stage)
 
+        # Export the stage name for cross-stack reference
+        cdk.CfnOutput(
+            self,
+            "ApiGatewayStageName",
+            value=self.api_deployment.stage.stage_name,
+            export_name=f"{self.stack_name}-StageName",
+        )
+
     @property
     def api_deployment_stage(self) -> apigateway.Stage:
         return self.api_deployment.stage

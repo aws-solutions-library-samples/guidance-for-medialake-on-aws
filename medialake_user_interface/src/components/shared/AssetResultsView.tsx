@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Typography, LinearProgress } from "@mui/material";
+import { Box, Typography, LinearProgress, Slider } from "@mui/material";
 import { type SortingState } from "@tanstack/react-table";
 import { type AssetTableColumn } from "@/types/shared/assetComponents";
 import AssetViewControls from "./AssetViewControls";
@@ -16,6 +16,7 @@ export interface AssetField {
 
 export interface AssetResultsViewProps<T> {
   results: T[];
+  originalResults?: T[]; // Original unfiltered results for confidence filtering
   searchMetadata: {
     totalResults: number;
     page: number;
@@ -25,6 +26,11 @@ export interface AssetResultsViewProps<T> {
   onPageSizeChange: (newPageSize: number) => void;
   searchTerm?: string;
   title?: string;
+
+  // Semantic search confidence filtering
+  isSemantic?: boolean;
+  confidenceThreshold?: number;
+  onConfidenceThresholdChange?: (threshold: number) => void;
 
   // Search fields
   selectedFields?: string[];
@@ -92,11 +98,18 @@ export interface AssetResultsViewProps<T> {
 
 function AssetResultsView<T>({
   results,
+  originalResults,
   searchMetadata,
   onPageChange,
   onPageSizeChange,
   searchTerm,
   title = "Results",
+
+  // Semantic search confidence filtering
+  isSemantic = false,
+  confidenceThreshold = 0.57,
+  onConfidenceThresholdChange,
+
   // Search fields
   selectedFields,
   availableFields,
@@ -146,6 +159,17 @@ function AssetResultsView<T>({
   getAssetProxy,
   renderCardField,
 }: AssetResultsViewProps<T>) {
+  // Local state for slider value during dragging (to prevent constant re-filtering)
+  const [sliderValue, setSliderValue] = React.useState(confidenceThreshold);
+  const [isSliderActive, setIsSliderActive] = React.useState(false);
+
+  // Update local slider value when confidence threshold changes from parent
+  React.useEffect(() => {
+    if (!isSliderActive) {
+      setSliderValue(confidenceThreshold);
+    }
+  }, [confidenceThreshold, isSliderActive]);
+
   // If there's an error, display the error component
   if (error) {
     return (
@@ -240,37 +264,119 @@ function AssetResultsView<T>({
         />
       )}
       <Box sx={{ mb: 2 }}>
-        <Typography
-          variant="h4"
-          component="h1"
+        <Box
           sx={{
-            fontWeight: 700,
-            background: (theme) =>
-              `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-            backgroundClip: "text",
-            WebkitBackgroundClip: "text",
-            color: "transparent",
-            display: "block",
-            visibility: "visible",
-            position: "relative",
-            zIndex: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            mb: 1,
+            flexWrap: "wrap",
+            gap: 2,
           }}
         >
-          {title}{" "}
-          {searchMetadata?.totalResults > 0 && searchTerm && (
-            <Typography
-              component="span"
+          <Typography
+            variant="h4"
+            component="h1"
+            sx={{
+              fontWeight: 700,
+              background: (theme) =>
+                `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+              backgroundClip: "text",
+              WebkitBackgroundClip: "text",
+              color: "transparent",
+              display: "block",
+              visibility: "visible",
+              position: "relative",
+              zIndex: 1,
+            }}
+          >
+            {title}{" "}
+            {searchMetadata?.totalResults > 0 && searchTerm && (
+              <Typography
+                component="span"
+                sx={{
+                  fontWeight: 300,
+                  fontSize: "0.5em",
+                  color: "text.secondary",
+                  opacity: 0.75,
+                }}
+              >
+                (Found{" "}
+                {isSemantic &&
+                confidenceThreshold > 0 &&
+                originalResults &&
+                results.length !== originalResults.length
+                  ? results.length
+                  : searchMetadata.totalResults}{" "}
+                results for "{searchTerm}")
+              </Typography>
+            )}
+          </Typography>
+
+          {/* Confidence Slider - Only show for semantic search */}
+          {isSemantic && (
+            <Box
               sx={{
-                fontWeight: 300,
-                fontSize: "0.5em",
-                color: "text.secondary",
-                opacity: 0.75,
+                display: "flex",
+                alignItems: "center",
+                gap: 1.5,
+                minWidth: 280,
+                flexShrink: 0,
               }}
             >
-              (Found {searchMetadata.totalResults} results for "{searchTerm}")
-            </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontSize: "0.875rem",
+                  color: "text.secondary",
+                  whiteSpace: "nowrap",
+                  pr: 0.5,
+                }}
+              >
+                Confidence:
+              </Typography>
+              <Slider
+                value={sliderValue}
+                onChange={(_, value) => {
+                  setSliderValue(value as number);
+                  setIsSliderActive(true);
+                }}
+                onChangeCommitted={(_, value) => {
+                  setIsSliderActive(false);
+                  onConfidenceThresholdChange?.(value as number);
+                }}
+                min={0}
+                max={1}
+                step={0.01}
+                size="small"
+                sx={{
+                  width: 140,
+                  "& .MuiSlider-thumb": {
+                    width: 16,
+                    height: 16,
+                  },
+                  "& .MuiSlider-track": {
+                    height: 3,
+                  },
+                  "& .MuiSlider-rail": {
+                    height: 3,
+                  },
+                }}
+              />
+              <Typography
+                variant="body2"
+                sx={{
+                  minWidth: 40,
+                  fontSize: "0.875rem",
+                  color: "text.secondary",
+                  textAlign: "right",
+                }}
+              >
+                {sliderValue.toFixed(2)}
+              </Typography>
+            </Box>
           )}
-        </Typography>
+        </Box>
       </Box>
       <AssetViewControls
         viewMode={viewMode}
@@ -407,6 +513,8 @@ function AssetResultsView<T>({
             selectedSearchFields={selectedFields}
             isRenaming={isRenaming}
             renamingAssetId={renamingAssetId}
+            isSemantic={isSemantic}
+            confidenceThreshold={confidenceThreshold}
           />
         ) : (
           <AssetTableView
@@ -448,9 +556,22 @@ function AssetResultsView<T>({
       <AssetPagination
         page={searchMetadata.page}
         pageSize={searchMetadata.pageSize}
-        totalResults={searchMetadata.totalResults}
+        totalResults={
+          isSemantic &&
+          confidenceThreshold > 0 &&
+          originalResults &&
+          results.length !== originalResults.length
+            ? results.length
+            : searchMetadata.totalResults
+        }
         onPageChange={(_, page) => onPageChange(page)}
         onPageSizeChange={onPageSizeChange}
+        isFiltered={
+          isSemantic &&
+          confidenceThreshold > 0 &&
+          originalResults &&
+          results.length !== originalResults.length
+        }
       />
     </Box>
   );

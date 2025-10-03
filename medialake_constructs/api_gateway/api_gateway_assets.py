@@ -34,20 +34,35 @@ from medialake_constructs.shared_constructs.lambda_layers import (
 )
 
 
+def apply_custom_authorization(
+    method: api_gateway.Method, authorizer: api_gateway.IAuthorizer
+) -> None:
+    """
+    Apply custom authorization to an API Gateway method.
+
+    Args:
+        method: The API Gateway method to apply authorization to
+        authorizer: The custom authorizer to use
+    """
+    cfn_method = method.node.default_child
+    cfn_method.authorization_type = "CUSTOM"
+    cfn_method.authorizer_id = authorizer.authorizer_id
+
+
 @dataclass
 class AssetsProps:
     """Configuration for Assets API endpoints."""
 
     asset_table: dynamodb.TableV2
     api_resource: api_gateway.IResource
-    cognito_authorizer: api_gateway.IAuthorizer
+    authorizer: api_gateway.IAuthorizer
     x_origin_verify_secret: secretsmanager.Secret
     open_search_endpoint: str
     opensearch_index: str
     open_search_arn: str
-    user_table: (
-        dynamodb.Table
-    )  # User table for bulk download jobs (replaces dedicated bulk download table)
+    # user_table: (
+    #     dynamodb.Table
+    # )
 
     # S3 Vector Store configuration
     s3_vector_bucket_name: str
@@ -130,12 +145,11 @@ class AssetsConstruct(Construct):
             )
         )
 
-        self._assets_resource.add_method(
+        assets_get = self._assets_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(get_assets_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
         )
+        apply_custom_authorization(assets_get, props.authorizer)
         # /{id} Lambda
         get_asset_lambda = Lambda(
             self,
@@ -230,6 +244,16 @@ class AssetsConstruct(Construct):
             )
         )
 
+        # Add SSM permissions for CloudFront domain retrieval
+        get_asset_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["ssm:GetParameter"],
+                resources=[
+                    f"arn:aws:ssm:{Stack.of(self).region}:{Stack.of(self).account}:parameter/medialake/*/cloudfront-distribution-domain"
+                ],
+            )
+        )
+
         # Add EC2 permissions for VPC access
         get_asset_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -317,7 +341,7 @@ class AssetsConstruct(Construct):
         )
 
         # Add GET method to /assets/{id}
-        asset_resource.add_method(
+        asset_get = asset_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(
                 get_asset_lambda.function,
@@ -331,8 +355,6 @@ class AssetsConstruct(Construct):
                     )
                 ],
             ),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
             method_responses=[
                 api_gateway.MethodResponse(
                     status_code="200",
@@ -342,9 +364,10 @@ class AssetsConstruct(Construct):
                 )
             ],
         )
+        apply_custom_authorization(asset_get, props.authorizer)
 
         # Add DELETE method to /assets/{id}
-        asset_resource.add_method(
+        asset_delete = asset_resource.add_method(
             "DELETE",
             api_gateway.LambdaIntegration(
                 delete_asset_lambda.function,
@@ -358,8 +381,6 @@ class AssetsConstruct(Construct):
                     )
                 ],
             ),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
             method_responses=[
                 api_gateway.MethodResponse(
                     status_code="200",
@@ -369,6 +390,7 @@ class AssetsConstruct(Construct):
                 )
             ],
         )
+        apply_custom_authorization(asset_delete, props.authorizer)
 
         # Add POST /assets/generate-presigned-url endpoint
         presigned_url_resource = self._assets_resource.add_resource(
@@ -426,7 +448,7 @@ class AssetsConstruct(Construct):
         )
 
         # Add POST method to /assets/generate-presigned-url
-        presigned_url_resource.add_method(
+        presigned_url_post = presigned_url_resource.add_method(
             "POST",
             api_gateway.LambdaIntegration(
                 generate_presigned_url_lambda.function,
@@ -440,8 +462,6 @@ class AssetsConstruct(Construct):
                     )
                 ],
             ),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
             method_responses=[
                 api_gateway.MethodResponse(
                     status_code="200",
@@ -451,6 +471,7 @@ class AssetsConstruct(Construct):
                 )
             ],
         )
+        apply_custom_authorization(presigned_url_post, props.authorizer)
 
         # Add POST /assets/generate-presigned-url endpoint
         upload_resource = self._assets_resource.add_resource("upload")
@@ -496,7 +517,7 @@ class AssetsConstruct(Construct):
         )
 
         # Add POST method to /assets/upload
-        upload_resource.add_method(
+        upload_post = upload_resource.add_method(
             "POST",
             api_gateway.LambdaIntegration(
                 upload_lambda.function,
@@ -510,8 +531,6 @@ class AssetsConstruct(Construct):
                     )
                 ],
             ),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
             method_responses=[
                 api_gateway.MethodResponse(
                     status_code="200",
@@ -521,6 +540,7 @@ class AssetsConstruct(Construct):
                 )
             ],
         )
+        apply_custom_authorization(upload_post, props.authorizer)
 
         # Add POST /assets/{id}/rename endpoint
         rename_resource = asset_resource.add_resource("rename")
@@ -581,7 +601,7 @@ class AssetsConstruct(Construct):
         )
 
         # Add POST method to /assets/{id}/rename
-        rename_resource.add_method(
+        rename_post = rename_resource.add_method(
             "POST",
             api_gateway.LambdaIntegration(
                 rename_asset_lambda.function,
@@ -595,8 +615,6 @@ class AssetsConstruct(Construct):
                     )
                 ],
             ),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
             method_responses=[
                 api_gateway.MethodResponse(
                     status_code="200",
@@ -606,6 +624,7 @@ class AssetsConstruct(Construct):
                 )
             ],
         )
+        apply_custom_authorization(rename_post, props.authorizer)
 
         # Add GET /assets/{id}/relatedversions endpoint
         related_versions_resource = asset_resource.add_resource("relatedversions")
@@ -681,12 +700,11 @@ class AssetsConstruct(Construct):
             )
         )
 
-        related_versions_resource.add_method(
+        related_versions_get = related_versions_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(related_versions_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
         )
+        apply_custom_authorization(related_versions_get, props.authorizer)
 
         related_versions_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -754,7 +772,7 @@ class AssetsConstruct(Construct):
         )
 
         # Add GET method to /assets/{id}/transcript
-        transcript_resource.add_method(
+        transcript_get = transcript_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(
                 transcript_asset_lambda.function,
@@ -768,8 +786,6 @@ class AssetsConstruct(Construct):
                     )
                 ],
             ),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
             method_responses=[
                 api_gateway.MethodResponse(
                     status_code="200",
@@ -779,6 +795,7 @@ class AssetsConstruct(Construct):
                 )
             ],
         )
+        apply_custom_authorization(transcript_get, props.authorizer)
 
         # Add CORS support to all API resources
         add_cors_options_method(self._assets_resource)
@@ -807,7 +824,9 @@ class AssetsConstruct(Construct):
         itemKey: "BULK_DOWNLOAD#{job_id}#{reverse_timestamp}"
         """
         # Use the existing user table for bulk download jobs
-        self._bulk_download_table = props.user_table
+        self._users_table = dynamodb.TableV2.from_table_name(
+            self, "ImportedTable", f"{config.resource_prefix}-user-{config.environment}"
+        )
 
         # Create EFS filesystem for temporary storage
         self._efs_filesystem = efs.FileSystem(
@@ -863,7 +882,7 @@ class AssetsConstruct(Construct):
 
         # Common environment variables for all Lambda functions
         common_env_vars = {
-            "USER_TABLE_NAME": props.user_table.table_name,  # Using user table for bulk download jobs
+            "USER_TABLE_NAME": f"{config.resource_prefix}-user-{config.environment}",
             "MEDIA_ASSETS_BUCKET": props.media_assets_bucket.bucket_name,
             "EFS_MOUNT_PATH": "/mnt/bulk-downloads",
             "USE_ZIPMERGE": "true",  # Enable the use of zipmerge binary
@@ -978,25 +997,6 @@ class AssetsConstruct(Construct):
             ),
         )
 
-        # UNUSED: Create Lambda for finalizing zip file (keep for backward compatibility)
-        # self._finalize_zip_lambda = Lambda(
-        #     self,
-        #     "AssetsBulkDownloadFinalizeZipLambda",
-        #     config=LambdaConfig(
-        #         name="assets_bulk_download_finalize_zip",
-        #         entry="lambdas/api/assets/download/bulk/post_bulk/finalize_zip",
-        #         environment_variables={
-        #             **common_env_vars,
-        #         },
-        #         vpc=props.vpc,
-        #         security_groups=[props.security_group],
-        #         timeout_minutes=15,
-        #         memory_size=1024,
-        #         filesystem_access_point=self._efs_access_point,
-        #         filesystem_mount_path="/mnt/bulk-downloads",
-        #     ),
-        # )
-
         # Create Lambda for getting parts manifest
         self._get_parts_manifest_lambda = Lambda(
             self,
@@ -1045,95 +1045,6 @@ class AssetsConstruct(Construct):
             ),
         )
 
-        # UNUSED: Create a custom Lambda function with EFS filesystem
-        # self._handle_small_lambda = Lambda(
-        #     self,
-        #     "AssetsBulkDownloadHandleSmallLambda",
-        #     config=LambdaConfig(
-        #         name="assets_bulk_download_handle_small",
-        #         entry="lambdas/api/assets/download/bulk/post_bulk/handle_small",
-        #         environment_variables={
-        #             **common_env_vars,
-        #             "ASSET_TABLE": props.asset_table.table_name,
-        #             "RESOURCE_PREFIX": config.resource_prefix,
-        #             "ENVIRONMENT": config.environment,
-        #             "METRICS_NAMESPACE": config.resource_prefix,
-        #         },
-        #         vpc=props.vpc,
-        #         security_groups=[props.security_group],
-        #         timeout_minutes=15,
-        #         memory_size=10240,  # Maximum memory for Lambda to handle large files
-        #         filesystem_access_point=self._efs_access_point,
-        #         filesystem_mount_path="/mnt/bulk-downloads",
-        #     ),
-        # )
-
-        # UNUSED: Handle Large Files Lambda
-        # self._handle_large_lambda = Lambda(
-        #     self,
-        #     "AssetsBulkDownloadHandleLargeLambda",
-        #     config=LambdaConfig(
-        #         name="assets_bulk_download_handle_large",
-        #         entry="lambdas/api/assets/download/bulk/post_bulk/handle_large",
-        #         environment_variables={
-        #             **common_env_vars,
-        #             "ASSET_TABLE": props.asset_table.table_name,
-        #         },
-        #         vpc=props.vpc,
-        #         security_groups=[props.security_group],
-        #         timeout_minutes=15,
-        #         memory_size=10240,  # Maximum memory for Lambda to handle large files
-        #         filesystem_access_point=self._efs_access_point,
-        #         filesystem_mount_path="/mnt/bulk-downloads",
-        #     ),
-        # )
-
-        # UNUSED: Create Lambda for merging batches of zip files with ZipmergeLayer
-        # self._merge_batch_lambda = Lambda(
-        #     self,
-        #     "AssetsBulkDownloadMergeBatchLambda",
-        #     config=LambdaConfig(
-        #         name="assets_bulk_download_merge_batch",
-        #         entry="lambdas/api/assets/download/bulk/post_bulk/merge_batch",
-        #         environment_variables={
-        #             **common_env_vars,
-        #             "RESOURCE_PREFIX": config.resource_prefix,
-        #             "ENVIRONMENT": config.environment,
-        #             "METRICS_NAMESPACE": config.resource_prefix,
-        #         },
-        #         layers=[zipmerge_layer.layer],  # Add the ZipmergeLayer
-        #         vpc=props.vpc,
-        #         security_groups=[props.security_group],
-        #         timeout_minutes=15,
-        #         memory_size=10240,  # Maximum memory for Lambda to handle large files
-        #         filesystem_access_point=self._efs_access_point,
-        #         filesystem_mount_path="/mnt/bulk-downloads",
-        #     ),
-        # )
-
-        # UNUSED: Create Lambda for final merge of batch results with ZipmergeLayer
-        # self._final_merge_lambda = Lambda(
-        #     self,
-        #     "AssetsBulkDownloadFinalMergeLambda",
-        #     config=LambdaConfig(
-        #         name="assets_bulk_download_final_merge",
-        #         entry="lambdas/api/assets/download/bulk/post_bulk/final_merge",
-        #         environment_variables={
-        #             **common_env_vars,
-        #             "RESOURCE_PREFIX": config.resource_prefix,
-        #             "ENVIRONMENT": config.environment,
-        #             "METRICS_NAMESPACE": config.resource_prefix,
-        #         },
-        #         layers=[zipmerge_layer.layer],  # Add the ZipmergeLayer
-        #         vpc=props.vpc,
-        #         security_groups=[props.security_group],
-        #         timeout_minutes=15,
-        #         memory_size=10240,  # Maximum memory for Lambda to handle large files
-        #         filesystem_access_point=self._efs_access_point,
-        #         filesystem_mount_path="/mnt/bulk-downloads",
-        #     ),
-        # )
-
         # Status Lambda
         self._status_lambda = Lambda(
             self,
@@ -1177,21 +1088,6 @@ class AssetsConstruct(Construct):
                 memory_size=1024,
             ),
         )
-
-        # UNUSED: Complete Mixed Job Lambda
-        # self._complete_mixed_job_lambda = Lambda(
-        #     self,
-        #     "AssetsBulkDownloadCompleteMixedJobLambda",
-        #     config=LambdaConfig(
-        #         name="assets_bulk_complete_mixed",
-        #         entry="lambdas/api/assets/download/bulk/post_bulk/complete_mixed_job",
-        #         environment_variables={
-        #             **common_env_vars,
-        #         },
-        #         timeout_minutes=1,
-        #         memory_size=512,
-        #     ),
-        # )
 
         # Delete Lambda
         self._delete_bulk_download_lambda = Lambda(
@@ -1245,8 +1141,8 @@ class AssetsConstruct(Construct):
                         "dynamodb:Query",
                     ],
                     resources=[
-                        self._bulk_download_table.table_arn,
-                        f"{self._bulk_download_table.table_arn}/index/*",  # Allow access to all GSIs (user table)
+                        self._users_table.table_arn,
+                        f"{self._users_table.table_arn}/index/*",  # Allow access to all GSIs
                     ],
                 )
             )
@@ -1254,8 +1150,6 @@ class AssetsConstruct(Construct):
         # Asset table permissions for assess scale and handler lambdas
         for lambda_function in [
             self._assess_scale_lambda,
-            # self._handle_small_lambda,  # UNUSED
-            # self._handle_large_lambda,  # UNUSED
             self._append_to_zip_lambda,
             self._handle_large_individual_lambda,
         ]:
@@ -1269,13 +1163,8 @@ class AssetsConstruct(Construct):
         # S3 permissions for handler and merge lambdas
         # Add EC2 permissions for VPC access to Lambda functions
         for lambda_function in [
-            # self._handle_small_lambda,  # UNUSED
-            # self._handle_large_lambda,  # UNUSED
-            # self._merge_batch_lambda,  # UNUSED
-            # self._final_merge_lambda,  # UNUSED
             self._init_zip_lambda,
             self._append_to_zip_lambda,
-            # self._finalize_zip_lambda,  # UNUSED
             self._init_multipart_lambda,
             self._upload_part_lambda,
             self._complete_multipart_lambda,
@@ -1293,8 +1182,6 @@ class AssetsConstruct(Construct):
 
         # Add S3 GetObject permission for all resources to handle_small_lambda and handle_large_lambda
         for lambda_function in [
-            # self._handle_small_lambda,  # UNUSED
-            # self._handle_large_lambda,  # UNUSED
             self._append_to_zip_lambda,
             self._handle_large_individual_lambda,
         ]:
@@ -1312,12 +1199,7 @@ class AssetsConstruct(Construct):
 
         # Add S3 permissions for handler and merge lambdas
         for lambda_function in [
-            # self._handle_small_lambda,  # UNUSED
-            # self._handle_large_lambda,  # UNUSED
-            # self._merge_batch_lambda,  # UNUSED
-            # self._final_merge_lambda,  # UNUSED
             self._append_to_zip_lambda,
-            # self._finalize_zip_lambda,  # UNUSED
             self._init_multipart_lambda,
             self._upload_part_lambda,
             self._complete_multipart_lambda,
@@ -1340,12 +1222,7 @@ class AssetsConstruct(Construct):
             )
         # Add comprehensive KMS permissions for all Lambda functions that interact with S3
         for lambda_function in [
-            # self._handle_small_lambda,  # UNUSED
-            # self._handle_large_lambda,  # UNUSED
-            # self._merge_batch_lambda,  # UNUSED
-            # self._final_merge_lambda,  # UNUSED
             self._append_to_zip_lambda,
-            # self._finalize_zip_lambda,  # UNUSED
             self._init_multipart_lambda,
             self._upload_part_lambda,
             self._complete_multipart_lambda,
@@ -1623,7 +1500,7 @@ class AssetsConstruct(Construct):
                 name="assets_bulk_download_single_file",
                 entry="lambdas/api/assets/download/bulk/post_bulk/single_file",
                 environment_variables={
-                    "USER_TABLE_NAME": self._bulk_download_table.table_name,
+                    "USER_TABLE_NAME": f"{config.resource_prefix}-user-{config.environment}",
                     "ASSET_TABLE": asset_table_name,
                 },
                 timeout_minutes=1,
@@ -1638,7 +1515,7 @@ class AssetsConstruct(Construct):
                     "dynamodb:GetItem",
                     "dynamodb:UpdateItem",
                 ],
-                resources=[self._bulk_download_table.table_arn],
+                resources=[self._users_table.table_arn],
             )
         )
 
@@ -1932,12 +1809,6 @@ class AssetsConstruct(Construct):
         # Connect complete multipart task to success state
         complete_multipart_task.next(success_state)
 
-        # Simplified approach - reuse existing workflow structure
-        # The key change is that ProcessLargeFilesMap now generates presigned URLs instead of chunking
-
-        # Build the simplified main workflow
-        # All job types except SINGLE_FILE use the same multipart workflow
-        # The difference is in how ProcessLargeFilesMap handles large files (presigned URLs vs chunking)
         workflow = assess_scale_task.next(
             job_size_choice.when(
                 sfn.Condition.string_equals("$.jobType", "SINGLE_FILE"),
@@ -1951,8 +1822,6 @@ class AssetsConstruct(Construct):
                 multipart_workflow
             )  # Used for SMALL, MIXED, and legacy job types
         )
-
-        # Note: single_file_task already connected to success_state in the workflow definition
 
         # Final merge task is already connected to success_state in the workflow definition
 
@@ -1992,9 +1861,7 @@ class AssetsConstruct(Construct):
                     "kms:GenerateDataKey",
                     "kms:Encrypt",
                 ],
-                resources=[
-                    "*"
-                ],  # Use a wildcard for now since we don't have the exact ARN
+                resources=["*"],
             )
         )
 
@@ -2021,45 +1888,40 @@ class AssetsConstruct(Construct):
         job_resource = bulk_resource.add_resource("{jobId}")
 
         # POST /assets/download/bulk - Start a new bulk download job
-        bulk_resource.add_method(
+        bulk_post = bulk_resource.add_method(
             "POST",
             api_gateway.LambdaIntegration(self._kickoff_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
         )
+        apply_custom_authorization(bulk_post, props.authorizer)
 
         # GET /assets/download/bulk/{jobId} - Get job status
-        job_resource.add_method(
+        job_get = job_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(self._status_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
         )
+        apply_custom_authorization(job_get, props.authorizer)
 
         # PUT /assets/download/bulk/{jobId} - Mark job as downloaded
-        job_resource.add_method(
+        job_put = job_resource.add_method(
             "PUT",
             api_gateway.LambdaIntegration(self._mark_downloaded_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
         )
+        apply_custom_authorization(job_put, props.authorizer)
 
         # DELETE /assets/download/bulk/{jobId} - Delete job and cleanup resources
-        job_resource.add_method(
+        job_delete = job_resource.add_method(
             "DELETE",
             api_gateway.LambdaIntegration(self._delete_bulk_download_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
         )
+        apply_custom_authorization(job_delete, props.authorizer)
 
         # GET /assets/download/bulk/user - List user's bulk download jobs
         user_resource = bulk_resource.add_resource("user")
-        user_resource.add_method(
+        user_get = user_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(self._status_lambda.function),
-            authorization_type=api_gateway.AuthorizationType.COGNITO,
-            authorizer=props.cognito_authorizer,
         )
+        apply_custom_authorization(user_get, props.authorizer)
 
         # Add CORS support to bulk download API resources
         add_cors_options_method(download_resource)
@@ -2068,8 +1930,7 @@ class AssetsConstruct(Construct):
         add_cors_options_method(user_resource)
 
     @property
-    def bulk_download_table(self) -> dynamodb.Table:
-        """Returns the user table that stores bulk download jobs."""
+    def bulk_download_table(self) -> dynamodb.TableV2:
         return (
             self._bulk_download_table if hasattr(self, "_bulk_download_table") else None
         )

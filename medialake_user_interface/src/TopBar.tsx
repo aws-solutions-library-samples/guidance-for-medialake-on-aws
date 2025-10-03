@@ -37,11 +37,13 @@ import {
   useSearchFilters,
   useSearchQuery,
   useSemanticSearch,
+  useSemanticMode,
   useDomainActions,
   useUIActions,
 } from "./stores/searchStore";
 import { NotificationCenter } from "./components/NotificationCenter";
 import { QUERY_KEYS } from "./api/queryKeys";
+import SemanticModeToggle from "./components/TopBar/SemanticModeToggle";
 
 interface SearchTag {
   key: string;
@@ -65,8 +67,10 @@ function TopBar() {
   // Get search state from store
   const storeQuery = useSearchQuery();
   const storeIsSemantic = useSemanticSearch();
+  const storeSemanticMode = useSemanticMode();
   const filters = useSearchFilters();
-  const { setQuery, setIsSemantic, setFilters } = useDomainActions();
+  const { setQuery, setIsSemantic, setSemanticMode, setFilters } =
+    useDomainActions();
   const { openFilterModal } = useUIActions();
   const [searchResults, setSearchResults] = useState<any>(null);
   const [searchBoxWidth, setSearchBoxWidth] = useState<number>(0);
@@ -596,6 +600,9 @@ function TopBar() {
                 },
               }}
             />
+
+            {/* Semantic Mode Toggle */}
+            <SemanticModeToggle isVisible={storeIsSemantic} />
 
             {/* Filter Button */}
             <IconButton

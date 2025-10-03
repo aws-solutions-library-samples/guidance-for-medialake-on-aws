@@ -10,6 +10,7 @@ node:
       lambda:
         handler: integration/TwelveLabsBedrockInvokeLambdaDeployment
         runtime: python3.12
+        timeout: 900 # 15 minutes to handle extreme throttling cases
         iam_policy:
           statements:
             - effect: Allow
@@ -55,6 +56,12 @@ actions:
         name: Model ID
         required: false
         default: "twelvelabs.marengo-embed-2-7-v1:0"
+        schema:
+          type: string
+      - in: body
+        name: Region
+        required: false
+        default: "us-east-1"
         schema:
           type: string
       - in: body

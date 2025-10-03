@@ -1,0 +1,33 @@
+spec: v1.0.0
+node:
+  id: trigger_video_processing_completed
+  title: Video Processing Completed
+  description: Trigger when a video processing pipeline execution is completed
+  version: 1.0.0
+  type: trigger
+  integration:
+    config:
+      aws_eventbridge:
+        aws_eventbridge_rule: pipeline_execution_completed
+        event_pattern:
+          detail:
+            metadata:
+              pipelineName: ["Default Video Pipeline"]
+              pipelineStatus: ["Completed"]
+
+actions:
+  trigger:
+    summary: Trigger after video processing is completed
+    description: This step will trigger after video processing is completed
+    operationId: triggerVideoProcessingCompleted
+    parameters:
+      - in: body
+        name: Prefix
+        required: false
+        schema:
+          type: string
+    connections:
+      incoming:
+        type: [any]
+      outgoing:
+        type: [video]

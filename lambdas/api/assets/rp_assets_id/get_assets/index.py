@@ -30,7 +30,8 @@ from opensearchpy import (
     RequestsAWSV4SignerAuth,
     RequestsHttpConnection,
 )
-from utils import generate_presigned_url, replace_binary_data
+from url_utils import generate_cloudfront_url
+from utils import replace_binary_data
 
 # Initialize AWS Lambda Powertools
 logger = Logger(service="asset-details-service")
@@ -228,7 +229,7 @@ def get_url_for_purpose(asset, purpose):
         if rep.get("Purpose") == purpose:
             storage = rep.get("StorageInfo", {}).get("PrimaryLocation", {})
             if storage.get("StorageType") == "s3":
-                return generate_presigned_url(
+                return generate_cloudfront_url(
                     bucket=storage["Bucket"], key=storage["ObjectKey"]["FullPath"]
                 )
     return None

@@ -558,7 +558,7 @@ def create_lambda_function(
     config_params = get_lambda_config_with_defaults(lambda_config)
 
     role_arn = create_lambda_role(
-        pipeline_name, node.data.id, yaml_data, operation_id, function_name
+        pipeline_name, node.data.id, yaml_data, operation_id, function_name, node
     )
 
     # Wait for the role to propagate before attempting to create the Lambda function

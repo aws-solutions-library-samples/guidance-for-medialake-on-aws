@@ -2,7 +2,7 @@ spec: v1.0.0
 node:
   id: publish_event
   title: Publish Event
-  description: Publish event on the given eventBus
+  description: Publish asset data to an eventbus with configurable source and detail type
   version: 1.0.0
   type: utility
   integration:
@@ -16,20 +16,42 @@ node:
               actions:
                 - events:PutEvents
               resources:
-                - - arn:aws:events:${AWS::Region}:${AWS::AccountId}:event-bus/${INGEST_EVENT_BUS_NAME}
+                - arn:aws:events:${AWS::Region}:${AWS::AccountId}:event-bus/*
+            - effect: Allow
+              actions:
+                - events:PutEvents
+              resources:
+                - arn:aws:events:*:*:event-bus/*
+              condition:
+                StringEquals:
+                  "events:source": ["medialake.pipeline", "medialake.*"]
 
 actions:
   generate:
     summary: Publish Event
-    description: Publish event on the given eventBus
+    description: Publish asset data to an eventbus with configurable source and detail type
     operationId: publishEvent
     parameters:
       - in: body
         name: EventBus ARN
         required: true
-        default: ${INGEST_EVENT_BUS_NAME}
+        default: ${PIPELINES_EVENT_BUS_NAME}
         schema:
           type: string
+      - in: body
+        name: source
+        required: false
+        default: medialake.pipeline
+        schema:
+          type: string
+          description: Event source identifier (e.g., medialake.pipeline)
+      - in: body
+        name: detail_type
+        required: false
+        default: AssetIngested
+        schema:
+          type: string
+          description: Event detail type (e.g., AssetIngested, PipelineStepCompleted)
     connections:
       incoming:
         type: [any]

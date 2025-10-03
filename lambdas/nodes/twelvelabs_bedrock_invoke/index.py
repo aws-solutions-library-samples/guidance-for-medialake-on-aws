@@ -32,7 +32,7 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
 
         # Get configuration from environment variables (set during pipeline deployment)
         model_id = os.environ.get("MODEL_ID", "twelvelabs.marengo-embed-2-7-v1:0")
-        region = os.environ.get("AWS_REGION", "us-east-1")
+        region = os.environ.get("REGION", "us-east-1")
         s3_output_bucket = os.environ.get("EXTERNAL_PAYLOAD_BUCKET")
 
         # Get input type from environment variable set during pipeline deployment

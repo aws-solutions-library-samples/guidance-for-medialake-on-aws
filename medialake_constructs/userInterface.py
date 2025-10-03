@@ -19,14 +19,16 @@ from aws_cdk import (
 from aws_cdk import aws_cloudfront as cloudfront
 from aws_cdk import aws_cloudfront_origins as origins
 from aws_cdk import aws_iam as iam
+from aws_cdk import aws_kms as cdk_kms
 from aws_cdk import aws_logs as logs
 from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_s3_deployment as s3deploy
-from aws_cdk import aws_secretsmanager as secretsmanager
+from aws_cdk import aws_ssm as ssm
 from aws_cdk import custom_resources as cr
 from constructs import Construct
 
 from config import config
+from medialake_constructs.edge_lambda_construct import EdgeLambdaConstruct
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
 
 
@@ -73,6 +75,8 @@ class LocalBundling:
 @dataclass
 class UIConstructProps:
     access_log_bucket: s3.IBucket
+    media_assets_bucket: s3.IBucket
+    media_assets_bucket_kms_key_arn: str
     api_gateway_rest_id: str
     api_gateway_stage: str
     cognito_user_pool_id: str
@@ -81,6 +85,7 @@ class UIConstructProps:
     cognito_identity_pool: str
     cognito_domain_prefix: str
     cognito_construct: Optional[Construct] = None
+    parameter_name: Optional[str] = None
     app_path: str = os.path.join(
         os.path.dirname(os.path.dirname(__file__)), "medialake_user_interface"
     )
@@ -144,17 +149,6 @@ class UIConstruct(Construct):
             ),
         )
 
-        x_origin_verify_secret = secretsmanager.Secret(
-            self,
-            "X-Origin-Verify-Secret",
-            removal_policy=props.removal_policy,
-            generate_secret_string=secretsmanager.SecretStringGenerator(
-                exclude_punctuation=props.exclude_punctuation,
-                generate_string_key=props.generate_secret_string_key,
-                secret_string_template="{}",
-            ),
-        )
-
         self.user_interface_waf_log_group = logs.LogGroup(
             self,
             "WafLogGroup",
@@ -176,8 +170,8 @@ class UIConstruct(Construct):
                         "style-src-attr 'self' 'unsafe-inline'; "
                         "img-src 'self' data: https: blob:; "
                         "font-src 'self' data:; "
-                        "media-src 'self' blob: data: https://*.amazonaws.com; "
-                        f"connect-src 'self' https://*.amazonaws.com https://*.amazoncognito.com{' http://localhost:* http://127.0.0.1:*' if config.environment == 'dev' else ''}; "
+                        "media-src 'self' blob: data: https://*.amazonaws.com https://*.cloudfront.net; "
+                        f"connect-src 'self' https://*.amazonaws.com https://*.amazoncognito.com https://*.cloudfront.net{' http://localhost:* http://127.0.0.1:*' if config.environment == 'dev' else ''}; "
                         "frame-ancestors 'none'; "
                         "base-uri 'self'; "
                         "form-action 'self'; "
@@ -221,9 +215,8 @@ class UIConstruct(Construct):
                     "Authorization",
                     "authorization",
                     "Content-Type",
+                    "x-api-key",
                     "X-Api-Key",
-                    "X-Amz-Date",
-                    "X-Amz-Security-Token",
                     "X-Forwarded-User",
                 ],
                 access_control_allow_methods=[
@@ -251,7 +244,8 @@ class UIConstruct(Construct):
                         "style-src 'self' 'unsafe-inline'; "
                         "img-src 'self' data: https: blob:; "
                         "font-src 'self' data:; "
-                        "connect-src 'self' http://localhost:5173 https://*.amazonaws.com https://*.amazoncognito.com; "
+                        "media-src 'self' blob: data: https://*.amazonaws.com https://*.cloudfront.net; "
+                        "connect-src 'self' http://localhost:5173 https://*.amazonaws.com https://*.amazoncognito.com https://*.cloudfront.net; "
                         "frame-ancestors 'none'; "
                         "base-uri 'self'; "
                         "form-action 'self'; "
@@ -297,8 +291,6 @@ class UIConstruct(Construct):
                     "authorization",
                     "Content-Type",
                     "X-Api-Key",
-                    "X-Amz-Date",
-                    "X-Amz-Security-Token",
                     "X-Forwarded-User",
                     "Cache-Control",
                     "Pragma",
@@ -318,6 +310,47 @@ class UIConstruct(Construct):
             ),
         )
 
+        media_response_headers_policy = cloudfront.ResponseHeadersPolicy(
+            self,
+            "MediaSecurityHeadersPolicy",
+            security_headers_behavior=cloudfront.ResponseSecurityHeadersBehavior(
+                strict_transport_security={
+                    "override": True,
+                    "access_control_max_age": Duration.seconds(31536000),
+                    "include_subdomains": True,
+                    "preload": True,
+                },
+                content_type_options={"override": True},
+                referrer_policy={
+                    "referrer_policy": cloudfront.HeadersReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN,
+                    "override": True,
+                },
+            ),
+            cors_behavior=cloudfront.ResponseHeadersCorsBehavior(
+                access_control_allow_credentials=False,
+                access_control_allow_headers=[
+                    "Range",
+                    "If-Range",
+                    "If-Modified-Since",
+                    "If-None-Match",
+                    "Content-Type",
+                ],
+                access_control_allow_methods=[
+                    "GET",
+                    "HEAD",
+                    "OPTIONS",
+                ],
+                access_control_allow_origins=["*"],
+                origin_override=True,
+                access_control_expose_headers=[
+                    "Content-Length",
+                    "Content-Range",
+                    "Accept-Ranges",
+                ],
+                access_control_max_age=Duration.seconds(7200),
+            ),
+        )
+
         # Create a custom cache policy for static assets
         static_assets_cache_policy = cloudfront.CachePolicy(
             self,
@@ -333,9 +366,37 @@ class UIConstruct(Construct):
             enable_accept_encoding_brotli=True,
         )
 
+        # Create a custom cache policy for media assets with shorter TTLs
+        media_cache_policy = cloudfront.CachePolicy(
+            self,
+            "MediaCachePolicy",
+            comment="Cache policy for media assets (videos, audio, documents)",
+            default_ttl=Duration.hours(6),
+            min_ttl=Duration.minutes(1),
+            max_ttl=Duration.days(30),
+            cookie_behavior=cloudfront.CacheCookieBehavior.none(),
+            header_behavior=cloudfront.CacheHeaderBehavior.allow_list(
+                "Range", "If-Range", "If-Modified-Since", "If-None-Match"
+            ),
+            query_string_behavior=cloudfront.CacheQueryStringBehavior.none(),
+            enable_accept_encoding_gzip=True,
+            enable_accept_encoding_brotli=True,
+        )
+
+        # Get media assets bucket name from SSM parameter to avoid circular dependency
+        # Media assets bucket is now passed directly through props
+
+        # Create Edge Lambda construct
+        edge_lambda_construct = EdgeLambdaConstruct(self, "EdgeLambda")
+
         # Create a shared CF Origin for static assets (S3)
         s3_orig = origins.S3BucketOrigin.with_origin_access_control(
-            medialake_ui_s3_bucket.bucket,
+            medialake_ui_s3_bucket.concrete_bucket,
+        )
+
+        # Create CF Origin for media assets bucket
+        media_origin = origins.S3BucketOrigin.with_origin_access_control(
+            props.media_assets_bucket,
         )
 
         self.cloudfront_distribution = cloudfront.Distribution(
@@ -373,6 +434,24 @@ class UIConstruct(Construct):
                     response_headers_policy=ui_response_headers_policy,
                     compress=True,
                 ),
+                "/media/*": cloudfront.BehaviorOptions(
+                    origin=media_origin,
+                    viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+                    allowed_methods=cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+                    cached_methods=cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
+                    cache_policy=media_cache_policy,
+                    origin_request_policy=cloudfront.OriginRequestPolicy.CORS_S3_ORIGIN,
+                    response_headers_policy=media_response_headers_policy,
+                    compress=True,
+                    # Only use origin-request, not viewer-response
+                    edge_lambdas=[
+                        cloudfront.EdgeLambda(
+                            function_version=edge_lambda_construct.lambda_version,
+                            event_type=cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
+                        ),
+                        # Remove the viewer-response Lambda
+                    ],
+                ),
                 f"/{config.api_path}/*": cloudfront.BehaviorOptions(
                     origin=origins.HttpOrigin(
                         f"{props.api_gateway_rest_id}.execute-api.{scope.region}.amazonaws.com",
@@ -391,9 +470,10 @@ class UIConstruct(Construct):
             },
             minimum_protocol_version=cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
             ssl_support_method=cloudfront.SSLMethod.SNI,
-            enable_logging=True,
-            log_bucket=props.access_log_bucket,
-            log_file_prefix="medialake-cloudfront-logs",
+            # Disable CloudFront logging to avoid circular dependency with access_log_bucket
+            # enable_logging=True,
+            # log_bucket=props.access_log_bucket,
+            # log_file_prefix="medialake-cloudfront-logs",
             price_class=cloudfront.PriceClass.PRICE_CLASS_100,
             default_root_object=props.distribution_default_root_object,
             # geo_restriction=cloudfront.GeoRestriction.allowlist("US", "GB"),
@@ -412,6 +492,141 @@ class UIConstruct(Construct):
                 ),
             ],
         )
+
+        # Add policy statement to media assets bucket for CloudFront access
+        # Note: For imported buckets, we can't add resource policies directly
+        # This would need to be handled through a custom resource or Lambda function
+        # For now, we'll skip this policy addition for imported buckets
+        if hasattr(props.media_assets_bucket, "add_to_resource_policy"):
+            props.media_assets_bucket.add_to_resource_policy(
+                iam.PolicyStatement(
+                    principals=[iam.ServicePrincipal("cloudfront.amazonaws.com")],
+                    actions=["s3:GetObject"],
+                    resources=[props.media_assets_bucket.arn_for_objects("*")],
+                    conditions={
+                        "StringEquals": {
+                            "AWS:SourceArn": self.cloudfront_distribution.distribution_arn
+                        }
+                    },
+                )
+            )
+
+        update_bucket_policy = cr.AwsCustomResource(
+            self,
+            "UpdateMediaBucketPolicy",
+            on_create=cr.AwsSdkCall(
+                service="S3",
+                action="putBucketPolicy",
+                parameters={
+                    "Bucket": props.media_assets_bucket.bucket_name,
+                    "Policy": json.dumps(
+                        {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Sid": "AllowCloudFrontServicePrincipal",
+                                    "Effect": "Allow",
+                                    "Principal": {
+                                        "Service": "cloudfront.amazonaws.com"
+                                    },
+                                    "Action": "s3:GetObject",
+                                    "Resource": f"{props.media_assets_bucket.bucket_arn}/*",
+                                    "Condition": {
+                                        "StringEquals": {
+                                            "AWS:SourceArn": self.cloudfront_distribution.distribution_arn
+                                        }
+                                    },
+                                }
+                            ],
+                        }
+                    ),
+                },
+                physical_resource_id=cr.PhysicalResourceId.of(
+                    f"{config.resource_prefix}-media-bucket-policy"
+                ),
+            ),
+            policy=cr.AwsCustomResourcePolicy.from_statements(
+                [
+                    iam.PolicyStatement(
+                        actions=["s3:PutBucketPolicy", "s3:GetBucketPolicy"],
+                        resources=[props.media_assets_bucket.bucket_arn],
+                    )
+                ]
+            ),
+        )
+
+        media_bucket_kms_key = cdk_kms.Key.from_key_arn(
+            self, "ImportedKey", key_arn=props.media_assets_bucket_kms_key_arn
+        )
+        media_bucket_kms_key_arn = media_bucket_kms_key.key_arn
+
+        update_kms_policy = cr.AwsCustomResource(
+            self,
+            "UpdateKMSPolicy",
+            on_create=cr.AwsSdkCall(
+                service="KMS",
+                action="putKeyPolicy",
+                parameters={
+                    "KeyId": media_bucket_kms_key_arn,
+                    "PolicyName": "default",
+                    "Policy": json.dumps(
+                        {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Sid": "Enable IAM User Permissions",
+                                    "Effect": "Allow",
+                                    "Principal": {
+                                        "AWS": f"arn:aws:iam::{stack.account}:root"
+                                    },
+                                    "Action": "kms:*",
+                                    "Resource": "*",
+                                },
+                                {
+                                    "Sid": "Allow CloudFront",
+                                    "Effect": "Allow",
+                                    "Principal": {
+                                        "Service": "cloudfront.amazonaws.com"
+                                    },
+                                    "Action": [
+                                        "kms:Decrypt",
+                                        "kms:GenerateDataKey",
+                                    ],
+                                    "Resource": "*",
+                                    "Condition": {
+                                        "StringEquals": {
+                                            "AWS:SourceArn": self.cloudfront_distribution.distribution_arn
+                                        }
+                                    },
+                                },
+                            ],
+                        }
+                    ),
+                },
+                physical_resource_id=cr.PhysicalResourceId.of(
+                    f"{config.resource_prefix}-kms-policy-update"
+                ),
+            ),
+            policy=cr.AwsCustomResourcePolicy.from_statements(
+                [
+                    iam.PolicyStatement(
+                        actions=["kms:PutKeyPolicy", "kms:GetKeyPolicy"],
+                        resources=[media_bucket_kms_key_arn],
+                    )
+                ]
+            ),
+        )
+
+        # Store CloudFront distribution domain in SSM Parameter Store
+        # Only create parameter if not provided externally
+        if props.parameter_name is None:
+            ssm.StringParameter(
+                self,
+                "CloudFrontDistributionDomainParameter",
+                parameter_name="/medialake/cloudfront-distribution-domain",
+                string_value=self.cloudfront_distribution.distribution_domain_name,
+                description="CloudFront distribution domain for MediaLake UI",
+            )
 
         print(f"Cognito domain prefix: {props.cognito_domain_prefix}")
         print(

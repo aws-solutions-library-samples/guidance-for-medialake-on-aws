@@ -18,6 +18,7 @@ import { useAssetResults } from "@/hooks/useAssetResults";
 import { useAssetOperations } from "@/hooks/useAssetOperations";
 import { sortAssets } from "@/utils/sortAssets";
 import { type AssetViewControlsProps } from "@/types/shared/assetComponents";
+import { getOriginalAssetId } from "@/utils/clipTransformation";
 
 export interface AssetResultsConfig<T extends AssetBase> {
   assetType: string;
@@ -193,8 +194,10 @@ function AssetResults<T extends AssetBase>({
 
   const handleAssetClick = (asset: T) => {
     const assetType = asset.DigitalSourceAsset.Type.toLowerCase();
+    // Always use the original asset ID, not the clip ID
+    const originalAssetId = getOriginalAssetId(asset);
     navigate(
-      `/${assetType}s/${asset.InventoryID}${
+      `/${assetType}s/${originalAssetId}${
         searchTerm ? `?searchTerm=${encodeURIComponent(searchTerm)}` : ""
       }`,
     );
@@ -228,6 +231,7 @@ function AssetResults<T extends AssetBase>({
         thumbnailUrl={asset.thumbnailUrl}
         proxyUrl={asset.proxyUrl}
         assetType={assetType}
+        clips={(asset as any).clips}
         fields={cardFields}
         renderField={(fieldId) => renderCardField(fieldId, asset)}
         onAssetClick={() => handleAssetClick(asset)}

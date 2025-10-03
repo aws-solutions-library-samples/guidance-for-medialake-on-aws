@@ -318,14 +318,15 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         API Gateway response
     """
     try:
-        # Get user ID from Cognito identity
-        user_id = (
-            event.get("requestContext", {})
-            .get("authorizer", {})
-            .get("claims", {})
-            .get("sub")
-        )
+        # Extract user ID from Cognito authorizer context
+        request_context = event.get("requestContext", {})
+        authorizer = request_context.get("authorizer", {})
+
+        # Get the user ID directly from the authorizer context
+        user_id = authorizer.get("userId")
+
         if not user_id:
+            logger.error("Missing user_id in authorizer context")
             raise BulkDownloadDeleteError("User ID not found in request", 401)
 
         # Extract job ID from path parameters
