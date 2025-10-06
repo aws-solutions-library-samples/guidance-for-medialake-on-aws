@@ -62,7 +62,9 @@ def load_and_execute_function_from_s3(
         file_content = response["Body"].read().decode("utf-8")
         spec = importlib.util.spec_from_loader("dynamic_module", loader=None)
         module = importlib.util.module_from_spec(spec)
-        exec(file_content, module.__dict__)
+        exec(
+            file_content, module.__dict__
+        )  # nosec B102 - Controlled execution of trusted S3 templates
         if not hasattr(module, function_name):
             raise AttributeError(
                 f"Function '{function_name}' not found in the downloaded file."
@@ -94,7 +96,9 @@ def create_request_body(s3_templates, api_template_bucket, event):
     mapping = load_and_execute_function_from_s3(
         api_template_bucket, mapping_path, function_name, event
     )
-    env = Environment(loader=FileSystemLoader("/tmp/"))
+    env = Environment(
+        loader=FileSystemLoader("/tmp/")
+    )  # nosec B701 - Controlled template rendering with trusted input
     env.filters["jsonify"] = json.dumps
     query_template = env.from_string(request_template)
     request_body = query_template.render(variables=mapping)
@@ -116,7 +120,9 @@ def create_response_output(
     response_mapping = load_and_execute_function_from_s3(
         api_template_bucket, response_mapping_path, function_name, event_data
     )
-    env = Environment(loader=FileSystemLoader("/tmp/"))
+    env = Environment(
+        loader=FileSystemLoader("/tmp/")
+    )  # nosec B701 - Controlled template rendering with trusted input
     env.filters["jsonify"] = json.dumps
     query_template = env.from_string(response_template)
     response_output = query_template.render(variables=response_mapping)

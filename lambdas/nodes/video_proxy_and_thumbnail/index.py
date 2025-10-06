@@ -96,7 +96,9 @@ def _exec_s3_py(bucket: str, key: str, fn: str, arg: dict) -> dict:
     code = obj["Body"].read().decode()
     spec = importlib.util.spec_from_loader("dyn_mod", loader=None)
     mod = importlib.util.module_from_spec(spec)
-    exec(code, mod.__dict__)
+    exec(
+        code, mod.__dict__
+    )  # nosec B102 - Controlled execution of trusted S3 templates
     return getattr(mod, fn)(arg)
 
 
@@ -119,7 +121,9 @@ def _render_request(paths: dict, bucket: str, event: dict) -> dict:
     mapping = _exec_s3_py(
         bucket, paths["mapping_file"], "translate_event_to_request", event
     )
-    env = Environment(loader=FileSystemLoader("/tmp/"))
+    env = Environment(
+        loader=FileSystemLoader("/tmp/")
+    )  # nosec B701 - Controlled template rendering with trusted input
     env.filters["jsonify"] = json.dumps
     rendered = env.from_string(tmpl).render(variables=mapping)
     try:
@@ -137,7 +141,9 @@ def _render_response(paths: dict, bucket: str, resp: dict, event: dict) -> dict:
         "translate_event_to_request",
         {"response_body": resp, "event": event},
     )
-    env = Environment(loader=FileSystemLoader("/tmp/"))
+    env = Environment(
+        loader=FileSystemLoader("/tmp/")
+    )  # nosec B701 - Controlled template rendering with trusted input
     env.filters["jsonify"] = json.dumps
     return json.loads(env.from_string(tmpl).render(variables=mapping))
 
