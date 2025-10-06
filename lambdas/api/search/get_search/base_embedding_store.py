@@ -97,6 +97,46 @@ class BaseEmbeddingStore(ABC):
         else:
             return self._generate_embedding_via_twelvelabs_api(query_text, start_time)
 
+    def _get_regional_inference_profile(self) -> str:
+        """
+        Get the appropriate TwelveLabs Marengo Embed v2.7 inference profile based on AWS region.
+
+        Returns:
+            Regional inference profile ID for TwelveLabs Marengo Embed v2.7
+        """
+        # Allow override via environment variable
+        if "BEDROCK_INFERENCE_PROFILE_ARN" in os.environ:
+            return os.environ["BEDROCK_INFERENCE_PROFILE_ARN"]
+
+        # Get current AWS region
+        aws_region = os.environ.get("AWS_REGION", "us-east-1")
+
+        # Common suffix for all TwelveLabs Marengo Embed v2.7 inference profiles
+        model_suffix = ".twelvelabs.marengo-embed-2-7-v1:0"
+
+        # Map regions to regional prefixes based on AWS documentation
+        if aws_region.startswith("us-"):
+            # US regions: us-east-1, us-east-2, us-west-1, us-west-2
+            regional_prefix = "us"
+        elif aws_region.startswith("eu-"):
+            # EU regions: eu-central-1, eu-central-2, eu-north-1, eu-south-1, eu-south-2, eu-west-1, eu-west-2, eu-west-3
+            regional_prefix = "eu"
+        elif aws_region.startswith("ap-"):
+            # APAC regions: ap-northeast-1, ap-northeast-2, ap-northeast-3, ap-south-1, ap-south-2, ap-southeast-1, ap-southeast-2, ap-southeast-3, ap-southeast-4
+            regional_prefix = "apac"
+        else:
+            # Default to US profile for unknown regions
+            self.logger.warning(
+                f"Unknown AWS region: {aws_region}, defaulting to US inference profile"
+            )
+            regional_prefix = "us"
+
+        inference_profile_id = f"{regional_prefix}{model_suffix}"
+        self.logger.info(
+            f"Selected inference profile {inference_profile_id} for region {aws_region}"
+        )
+        return inference_profile_id
+
     def _generate_embedding_via_bedrock(
         self, query_text: str, start_time: float
     ) -> List[float]:
@@ -119,11 +159,8 @@ class BaseEmbeddingStore(ABC):
                 f"[PERF] Bedrock client initialization took: {time.time() - bedrock_init_start:.3f}s"
             )
 
-            # Use AWS system-defined cross-Region inference profile for TwelveLabs Marengo Embed v2.7
-            # This is a pre-built inference profile provided by AWS
-            inference_profile_id = os.environ.get(
-                "BEDROCK_INFERENCE_PROFILE_ARN", "us.twelvelabs.marengo-embed-2-7-v1:0"
-            )
+            # Determine the correct inference profile based on AWS region
+            inference_profile_id = self._get_regional_inference_profile()
 
             self.logger.info(f"Using Bedrock inference profile: {inference_profile_id}")
 
