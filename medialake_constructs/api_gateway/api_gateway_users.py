@@ -171,6 +171,15 @@ class UsersApi(Construct):
         cfn_method.authorization_type = "CUSTOM"
         cfn_method.authorizer_id = props.authorizer.authorizer_id
 
+        # DELETE /users/{user_id} - Delete user
+        user_delete_method = user_id_resource.add_method(
+            "DELETE",
+            lambda_integration,
+        )
+        cfn_method = user_delete_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
+
         # POST /users/{user_id}/enable - Enable user
         user_enable_method = user_enable_resource.add_method(
             "POST",

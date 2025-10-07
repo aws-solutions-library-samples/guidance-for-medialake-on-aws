@@ -1,7 +1,6 @@
 """PUT /users/{user_id} - Update user details"""
 
-import json
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from aws_lambda_powertools.metrics import MetricUnit
 from botocore.exceptions import ClientError
@@ -20,8 +19,138 @@ class UserResponse(BaseModel):
     data: Dict[str, Any] = Field(..., description="User data from Cognito")
 
 
+def _get_user_groups(cognito, user_pool_id: str, user_id: str, logger) -> List[str]:
+    """Get current groups for a user"""
+    try:
+        response = cognito.admin_list_groups_for_user(
+            UserPoolId=user_pool_id, Username=user_id
+        )
+        return [group["GroupName"] for group in response.get("Groups", [])]
+    except ClientError as e:
+        logger.error(
+            f"Failed to list user groups", extra={"error": str(e), "user_id": user_id}
+        )
+        return []
+
+
+def _update_user_groups(
+    cognito, user_pool_id: str, user_id: str, new_groups: List[str], logger, metrics
+) -> Dict[str, Any]:
+    """
+    Update user group memberships
+
+    Returns:
+        Dict with groups_added, groups_removed, groups_failed
+    """
+    # Get current groups
+    current_groups = set(_get_user_groups(cognito, user_pool_id, user_id, logger))
+    new_groups_set = set(new_groups)
+
+    # Determine which groups to add and remove
+    groups_to_add = new_groups_set - current_groups
+    groups_to_remove = current_groups - new_groups_set
+
+    groups_added = []
+    groups_removed = []
+    groups_failed = []
+
+    # Add user to new groups
+    for group_name in groups_to_add:
+        try:
+            cognito.admin_add_user_to_group(
+                UserPoolId=user_pool_id, Username=user_id, GroupName=group_name
+            )
+            groups_added.append(group_name)
+            logger.info(
+                {
+                    "message": "Added user to group",
+                    "user_id": user_id,
+                    "group": group_name,
+                }
+            )
+        except ClientError as e:
+            error_code = e.response["Error"]["Code"]
+            error_message = e.response["Error"]["Message"]
+            groups_failed.append(
+                {
+                    "group": group_name,
+                    "error_code": error_code,
+                    "error_message": error_message,
+                    "action": "add",
+                }
+            )
+            logger.error(
+                {
+                    "message": "Failed to add user to group",
+                    "user_id": user_id,
+                    "group": group_name,
+                    "error": error_message,
+                }
+            )
+
+    # Remove user from old groups
+    for group_name in groups_to_remove:
+        try:
+            cognito.admin_remove_user_from_group(
+                UserPoolId=user_pool_id, Username=user_id, GroupName=group_name
+            )
+            groups_removed.append(group_name)
+            logger.info(
+                {
+                    "message": "Removed user from group",
+                    "user_id": user_id,
+                    "group": group_name,
+                }
+            )
+        except ClientError as e:
+            error_code = e.response["Error"]["Code"]
+            error_message = e.response["Error"]["Message"]
+            groups_failed.append(
+                {
+                    "group": group_name,
+                    "error_code": error_code,
+                    "error_message": error_message,
+                    "action": "remove",
+                }
+            )
+            logger.error(
+                {
+                    "message": "Failed to remove user from group",
+                    "user_id": user_id,
+                    "group": group_name,
+                    "error": error_message,
+                }
+            )
+
+    # Log metrics
+    if groups_added:
+        metrics.add_metric(
+            name="GroupsAdded", unit=MetricUnit.Count, value=len(groups_added)
+        )
+    if groups_removed:
+        metrics.add_metric(
+            name="GroupsRemoved", unit=MetricUnit.Count, value=len(groups_removed)
+        )
+    if groups_failed:
+        metrics.add_metric(
+            name="GroupUpdatesFailed", unit=MetricUnit.Count, value=len(groups_failed)
+        )
+
+    return {
+        "groups_added": groups_added,
+        "groups_removed": groups_removed,
+        "groups_failed": groups_failed,
+    }
+
+
 def _update_cognito_user(
-    cognito, user_pool_id: str, user_id: str, update_data: Dict[str, Any], logger, metrics, tracer
+    cognito,
+    user_pool_id: str,
+    user_id: str,
+    update_data: Dict[str, Any],
+    logger,
+    metrics,
+    tracer,
 ) -> Dict[str, Any]:
     """
     Update user attributes in Cognito User Pool
@@ -52,25 +181,31 @@ def _update_cognito_user(
                 UserAttributes=user_attributes,
             )
 
-            # Get updated user details
-            response = cognito.admin_get_user(UserPoolId=user_pool_id, Username=user_id)
+        # Get updated user details
+        response = cognito.admin_get_user(UserPoolId=user_pool_id, Username=user_id)
 
-            # Transform Cognito response into a cleaner format
-            updated_attributes = {
-                attr["Name"]: attr["Value"]
-                for attr in response.get("UserAttributes", [])
-            }
+        # Transform Cognito response into a cleaner format
+        updated_attributes = {
+            attr["Name"]: attr["Value"] for attr in response.get("UserAttributes", [])
+        }
 
-            return {
-                "username": response.get("Username"),
-                "user_status": response.get("UserStatus"),
-                "enabled": response.get("Enabled", False),
-                "user_created": response.get("UserCreateDate").isoformat(),
-                "last_modified": response.get("UserLastModifiedDate").isoformat(),
-                "attributes": updated_attributes,
-            }
-        else:
-            raise ValueError("No valid attributes provided for update")
+        result = {
+            "username": response.get("Username"),
+            "user_status": response.get("UserStatus"),
+            "enabled": response.get("Enabled", False),
+            "user_created": response.get("UserCreateDate").isoformat(),
+            "last_modified": response.get("UserLastModifiedDate").isoformat(),
+            "attributes": updated_attributes,
+        }
+
+        # Handle group updates if provided
+        if "groups" in update_data and isinstance(update_data["groups"], list):
+            group_result = _update_user_groups(
+                cognito, user_pool_id, user_id, update_data["groups"], logger, metrics
+            )
+            result["group_changes"] = group_result
+
+        return result
 
     except cognito.exceptions.UserNotFoundException:
         logger.warning(f"User not found", extra={"user_id": user_id})
@@ -96,7 +231,9 @@ def _create_error_response(status_code: int, message: str) -> Dict[str, Any]:
     }
 
 
-def handle_put_user(user_id: str, app, cognito, user_pool_id: str, logger, metrics, tracer) -> Dict[str, Any]:
+def handle_put_user(
+    user_id: str, app, cognito, user_pool_id: str, logger, metrics, tracer
+) -> Dict[str, Any]:
     """
     Lambda handler to update user details in Cognito User Pool
     """
@@ -114,8 +251,18 @@ def handle_put_user(user_id: str, app, cognito, user_pool_id: str, logger, metri
             )
             return _create_error_response(400, "Missing user_id parameter")
 
-        # Update user attributes in Cognito
-        updated_user = _update_cognito_user(cognito, user_pool_id, user_id, body, logger, metrics, tracer)
+        logger.info(
+            {
+                "message": "Processing user update request",
+                "user_id": user_id,
+                "has_groups": "groups" in body,
+            }
+        )
+
+        # Update user attributes and groups in Cognito
+        updated_user = _update_cognito_user(
+            cognito, user_pool_id, user_id, body, logger, metrics, tracer
+        )
 
         # Create success response
         response = UserResponse(

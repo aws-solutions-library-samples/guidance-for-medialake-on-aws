@@ -23,6 +23,7 @@ from routes.profile_get import handle_get_profile
 from routes.profile_put import handle_put_profile
 from routes.settings_get import handle_get_settings
 from routes.settings_put import handle_put_setting
+from routes.users_delete import handle_delete_user
 from routes.users_disable_post import handle_disable_user
 from routes.users_enable_post import handle_enable_user
 from routes.users_get import handle_get_user
@@ -63,7 +64,7 @@ dynamodb = boto3.resource("dynamodb")
 
 # Get environment variables
 USER_POOL_ID = os.environ["COGNITO_USER_POOL_ID"]
-USER_TABLE_NAME = os.environ.get("USER_TABLE_NAME")
+USER_TABLE_NAME = os.environ["USER_TABLE_NAME"]
 
 
 # Register routes
@@ -89,6 +90,13 @@ def get_user(user_id: str):
 def put_user(user_id: str):
     """PUT /users/{user_id} - Update user details"""
     return handle_put_user(user_id, app, cognito, USER_POOL_ID, logger, metrics, tracer)
+
+
+@app.delete("/users/<user_id>")
+@tracer.capture_method
+def delete_user(user_id: str):
+    """DELETE /users/{user_id} - Delete a user"""
+    return handle_delete_user(user_id, cognito, USER_POOL_ID, logger, metrics, tracer)
 
 
 @app.post("/users/<user_id>/disable")

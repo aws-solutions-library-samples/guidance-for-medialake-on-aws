@@ -27,16 +27,12 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import LockIcon from "@mui/icons-material/Lock";
 import LockOpenIcon from "@mui/icons-material/LockOpen";
-import AddIcon from "@mui/icons-material/Add";
-import CloseIcon from "@mui/icons-material/Close";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import { User } from "@/api/types/api.types";
 import { useGetGroups } from "@/api/hooks/useGroups";
 import { useGetPermissionSets } from "@/api/hooks/usePermissionSets";
-import {
-  useAddGroupMembers,
-  useRemoveGroupMember,
-} from "@/api/hooks/useGroups";
 import { useListUserAssignments } from "@/api/hooks/useAssignments";
+import { useUpdateUser } from "@/api/hooks/useUsers";
 import { useTranslation } from "react-i18next";
 import { UserFilterPopover } from "./UserFilterPopover";
 import {
@@ -82,7 +78,7 @@ const PermissionSetCell: React.FC<{
   );
 };
 
-// Helper component for managing group chips
+// Helper component for managing single group selection
 const GroupChips: React.FC<{
   user: User;
   theme: any;
@@ -90,10 +86,9 @@ const GroupChips: React.FC<{
 }> = ({ user, theme, groups }) => {
   const { t } = useTranslation();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const addGroupMembersMutation = useAddGroupMembers();
-  const removeGroupMemberMutation = useRemoveGroupMember();
+  const updateUserMutation = useUpdateUser();
 
-  const handleAddClick = (event: React.MouseEvent<HTMLElement>) => {
+  const handleClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
   };
 
@@ -101,89 +96,73 @@ const GroupChips: React.FC<{
     setAnchorEl(null);
   };
 
-  const handleAddToGroup = async (groupId: string) => {
+  const handleGroupChange = async (groupName: string) => {
     try {
-      await addGroupMembersMutation.mutateAsync({
-        groupId,
-        request: { userIds: [user.username] },
+      await updateUserMutation.mutateAsync({
+        username: user.username,
+        updates: {
+          username: user.username,
+          groups: [groupName], // Single group only
+        },
       });
       handleClose();
     } catch (error) {
-      console.error("Error adding user to group:", error);
+      console.error("Error updating user group:", error);
     }
   };
 
-  const handleRemoveFromGroup = async (groupId: string) => {
-    try {
-      await removeGroupMemberMutation.mutateAsync({
-        groupId,
-        userId: user.username,
-      });
-    } catch (error) {
-      console.error("Error removing user from group:", error);
-    }
-  };
-
-  // Filter out groups the user is not a member of
-  const availableGroups =
-    groups?.filter((group) => !user.groups?.includes(group.name)) || [];
+  // Get the current group (first one if multiple exist)
+  const currentGroup =
+    user.groups && user.groups.length > 0 ? user.groups[0] : null;
+  const currentGroupName = currentGroup || t("common.noGroup", "No Group");
 
   return (
     <Box
       sx={{
         display: "flex",
-        flexWrap: "wrap",
-        gap: 1,
         alignItems: "center",
+        gap: 0.5,
       }}
     >
-      {user.groups && user.groups.length > 0 ? (
-        user.groups.map((groupName) => (
-          <Chip
-            key={groupName}
-            label={groupName}
-            size="small"
-            onDelete={() => {
-              const group = groups?.find((g) => g.name === groupName);
-              if (group) {
-                handleRemoveFromGroup(group.id);
-              }
-            }}
-            deleteIcon={<CloseIcon fontSize="small" />}
-            sx={{
-              backgroundColor: alpha(theme.palette.primary.main, 0.1),
-              color: theme.palette.primary.main,
-              fontWeight: 600,
-              borderRadius: "6px",
-              height: "24px",
-              "& .MuiChip-label": {
-                px: 1.5,
-              },
-            }}
-          />
-        ))
-      ) : (
-        <Typography variant="body2" color="text.secondary">
-          {t("common.noGroups")}
-        </Typography>
-      )}
-
-      <IconButton
-        size="small"
-        onClick={handleAddClick}
+      <Box
+        onClick={handleClick}
         sx={{
-          width: 24,
-          height: 24,
-          backgroundColor: alpha(theme.palette.primary.main, 0.1),
+          display: "flex",
+          alignItems: "center",
+          gap: 0.5,
+          cursor: "pointer",
+          padding: "4px 8px",
+          borderRadius: "6px",
+          backgroundColor: currentGroup
+            ? alpha(theme.palette.primary.main, 0.1)
+            : alpha(theme.palette.grey[500], 0.1),
+          color: currentGroup
+            ? theme.palette.primary.main
+            : theme.palette.text.secondary,
+          fontWeight: currentGroup ? 600 : 400,
+          fontSize: "0.875rem",
+          transition: "background-color 0.2s",
+          "&:hover": {
+            backgroundColor: currentGroup
+              ? alpha(theme.palette.primary.main, 0.15)
+              : alpha(theme.palette.grey[500], 0.15),
+          },
         }}
       >
-        <AddIcon fontSize="small" />
-      </IconButton>
+        <Typography variant="body2" sx={{ fontSize: "0.875rem" }}>
+          {currentGroupName}
+        </Typography>
+        <KeyboardArrowDownIcon fontSize="small" />
+      </Box>
 
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleClose}>
-        {availableGroups.length > 0 ? (
-          availableGroups.map((group) => (
-            <MenuItem key={group.id} onClick={() => handleAddToGroup(group.id)}>
+        {groups && groups.length > 0 ? (
+          groups.map((group) => (
+            <MenuItem
+              key={group.id}
+              onClick={() => handleGroupChange(group.name)}
+              selected={currentGroup === group.name}
+            >
               {group.name}
             </MenuItem>
           ))
