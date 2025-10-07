@@ -107,6 +107,28 @@ export default {
     yourFavoriteAssets: "Your Favorite Assets",
     noFavoriteAssets: "No favorite assets yet",
   },
+  collectionsPage: {
+    title: "Collections",
+    createCollection: "Create Collection",
+    myCollections: "My Collections",
+    sharedCollections: "Shared with Me",
+    publicCollections: "Public Collections",
+    noCollections: "No collections found",
+    actions: {
+      createNew: "Create New Collection",
+      view: "View",
+      edit: "Edit",
+      share: "Share",
+      delete: "Delete",
+    },
+    deleteDialog: {
+      title: "Delete Collection",
+      description:
+        "Are you sure you want to delete this collection? This action cannot be undone.",
+      cancel: "Cancel",
+      confirm: "Delete",
+    },
+  },
   sidebar: {
     menu: {
       home: "Home",
