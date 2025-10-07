@@ -1,24 +1,11 @@
-import os
+"""DELETE /users/favorites/{itemType}/{itemId} - Remove a favorite"""
+
 import time
 from typing import Any, Dict
 
-import boto3
-from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import MetricUnit
-from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
 from pydantic import BaseModel, Field
-
-# Initialize AWS PowerTools
-logger = Logger(
-    service="user-favorites-service", level=os.getenv("LOG_LEVEL", "WARNING")
-)
-tracer = Tracer(service="user-favorites-service")
-metrics = Metrics(namespace="medialake", service="users-favorites-delete")
-
-# Initialize DynamoDB client
-dynamodb = boto3.resource("dynamodb")
 
 
 class ErrorResponse(BaseModel):
@@ -33,116 +20,8 @@ class DeleteResponse(BaseModel):
     data: Dict[str, Any] = Field(..., description="Deletion result")
 
 
-@tracer.capture_lambda_handler
-@logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
-@metrics.log_metrics(capture_cold_start_metric=True)
-def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
-    """
-    Lambda handler to remove an item from user favorites
-    """
-    try:
-        # Extract user ID from Cognito authorizer context
-        request_context = event.get("requestContext", {})
-        authorizer = request_context.get("authorizer", {})
-
-        # Get the user ID directly from the authorizer context
-        user_id = authorizer.get("userId")
-
-        if not user_id:
-            logger.error("Missing user_id in authorizer context")
-            metrics.add_metric(
-                name="MissingUserIdError", unit=MetricUnit.Count, value=1
-            )
-            return _create_error_response(400, "Unable to identify user")
-
-        # Get the user table name from environment variable
-        user_table_name = os.getenv("USER_TABLE_NAME")
-        if not user_table_name:
-            logger.error("USER_TABLE_NAME environment variable not set")
-            metrics.add_metric(
-                name="MissingConfigError", unit=MetricUnit.Count, value=1
-            )
-            return _create_error_response(500, "Internal configuration error")
-
-        # Extract itemType and itemId from path parameters
-        path_params = event.get("pathParameters", {}) or {}
-        item_type = path_params.get("itemType")
-        item_id = path_params.get("itemId")
-
-        # Check if we have the required parameters
-        if not item_type or not item_id:
-            logger.error("Missing itemType or itemId in path parameters")
-            metrics.add_metric(
-                name="MissingParametersError", unit=MetricUnit.Count, value=1
-            )
-            return _create_error_response(400, "Missing itemType or itemId parameters")
-
-        # Validate itemType
-        valid_item_types = ["ASSET", "PIPELINE", "COLLECTION"]
-        if item_type not in valid_item_types:
-            logger.error(f"Invalid itemType: {item_type}")
-            metrics.add_metric(
-                name="InvalidParameterError", unit=MetricUnit.Count, value=1
-            )
-            return _create_error_response(
-                400, f"Invalid itemType. Must be one of: {', '.join(valid_item_types)}"
-            )
-
-        # Remove the favorite from DynamoDB
-        result = _remove_favorite(user_table_name, user_id, item_type, item_id)
-
-        # Create success response
-        response = DeleteResponse(
-            status="200",
-            message=(
-                "Favorite removed successfully"
-                if result["removed"]
-                else "Favorite not found"
-            ),
-            data=result,
-        )
-
-        logger.info(
-            "Successfully processed favorite removal request",
-            extra={
-                "user_id": user_id,
-                "item_id": item_id,
-                "item_type": item_type,
-                "removed": result["removed"],
-            },
-        )
-        metrics.add_metric(
-            name="SuccessfulFavoriteRemoval", unit=MetricUnit.Count, value=1
-        )
-
-        # TODO: Generate audit event for favorite removal
-        if result["removed"]:
-            logger.info(
-                "Audit: User favorite removed",
-                extra={
-                    "user_id": user_id,
-                    "action": "REMOVE_FAVORITE",
-                    "item_id": item_id,
-                    "item_type": item_type,
-                    "timestamp": time.time(),
-                },
-            )
-
-        return {
-            "statusCode": 200,
-            "headers": {"Content-Type": "application/json"},
-            "body": response.model_dump_json(),
-        }
-
-    except Exception as e:
-        logger.exception("Error processing request")
-        metrics.add_metric(name="UnhandledError", unit=MetricUnit.Count, value=1)
-        return _create_error_response(500, f"Internal server error: {str(e)}")
-
-
-@tracer.capture_method
 def _remove_favorite(
-    table_name: str, user_id: str, item_type: str, item_id: str
+    dynamodb, table_name: str, user_id: str, item_type: str, item_id: str, logger, metrics
 ) -> Dict[str, Any]:
     """
     Remove a favorite item for a user from DynamoDB
@@ -217,3 +96,102 @@ def _create_error_response(status_code: int, message: str) -> Dict[str, Any]:
         "headers": {"Content-Type": "application/json"},
         "body": error_response.model_dump_json(),
     }
+
+
+def handle_delete_favorite(
+    item_type: str, item_id: str, app, dynamodb, user_table_name: str, logger, metrics, tracer
+) -> Dict[str, Any]:
+    """
+    Lambda handler to remove an item from user favorites
+    """
+    try:
+        # Extract user ID from Cognito authorizer context
+        request_context = app.current_event.raw_event.get("requestContext", {})
+        authorizer = request_context.get("authorizer", {})
+
+        # Get the user ID directly from the authorizer context
+        user_id = authorizer.get("userId")
+
+        if not user_id:
+            logger.error("Missing user_id in authorizer context")
+            metrics.add_metric(
+                name="MissingUserIdError", unit=MetricUnit.Count, value=1
+            )
+            return _create_error_response(400, "Unable to identify user")
+
+        if not user_table_name:
+            logger.error("USER_TABLE_NAME environment variable not set")
+            metrics.add_metric(
+                name="MissingConfigError", unit=MetricUnit.Count, value=1
+            )
+            return _create_error_response(500, "Internal configuration error")
+
+        # Check if we have the required parameters
+        if not item_type or not item_id:
+            logger.error("Missing itemType or itemId in path parameters")
+            metrics.add_metric(
+                name="MissingParametersError", unit=MetricUnit.Count, value=1
+            )
+            return _create_error_response(400, "Missing itemType or itemId parameters")
+
+        # Validate itemType
+        valid_item_types = ["ASSET", "PIPELINE", "COLLECTION"]
+        if item_type not in valid_item_types:
+            logger.error(f"Invalid itemType: {item_type}")
+            metrics.add_metric(
+                name="InvalidParameterError", unit=MetricUnit.Count, value=1
+            )
+            return _create_error_response(
+                400, f"Invalid itemType. Must be one of: {', '.join(valid_item_types)}"
+            )
+
+        # Remove the favorite from DynamoDB
+        result = _remove_favorite(dynamodb, user_table_name, user_id, item_type, item_id, logger, metrics)
+
+        # Create success response
+        response = DeleteResponse(
+            status="200",
+            message=(
+                "Favorite removed successfully"
+                if result["removed"]
+                else "Favorite not found"
+            ),
+            data=result,
+        )
+
+        logger.info(
+            "Successfully processed favorite removal request",
+            extra={
+                "user_id": user_id,
+                "item_id": item_id,
+                "item_type": item_type,
+                "removed": result["removed"],
+            },
+        )
+        metrics.add_metric(
+            name="SuccessfulFavoriteRemoval", unit=MetricUnit.Count, value=1
+        )
+
+        # Audit event for favorite removal
+        if result["removed"]:
+            logger.info(
+                "Audit: User favorite removed",
+                extra={
+                    "user_id": user_id,
+                    "action": "REMOVE_FAVORITE",
+                    "item_id": item_id,
+                    "item_type": item_type,
+                    "timestamp": time.time(),
+                },
+            )
+
+        return {
+            "statusCode": 200,
+            "headers": {"Content-Type": "application/json"},
+            "body": response.model_dump_json(),
+        }
+
+    except Exception as e:
+        logger.exception("Error processing request")
+        metrics.add_metric(name="UnhandledError", unit=MetricUnit.Count, value=1)
+        return _create_error_response(500, f"Internal server error: {str(e)}")
