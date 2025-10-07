@@ -114,6 +114,17 @@ export default {
     sharedCollections: "Shared with Me",
     publicCollections: "Public Collections",
     noCollections: "No collections found",
+    collectionTypes: {
+      public: "Public",
+      private: "Private",
+      shared: "Shared",
+    },
+    stats: {
+      itemCount: "{{count}} items",
+      childCount: "{{count}} sub-collections",
+      createdBy: "Created by {{owner}}",
+      lastModified: "Last modified {{date}}",
+    },
     actions: {
       createNew: "Create New Collection",
       view: "View",
@@ -125,8 +136,27 @@ export default {
       title: "Delete Collection",
       description:
         "Are you sure you want to delete this collection? This action cannot be undone.",
+      cascadeWarning:
+        "All items and sub-collections within this collection will also be removed.",
       cancel: "Cancel",
       confirm: "Delete",
+      deleting: "Deleting...",
+    },
+    form: {
+      name: "Collection Name",
+      namePlaceholder: "Enter collection name",
+      description: "Description",
+      descriptionPlaceholder: "Enter a description for this collection",
+      type: "Collection Type",
+      parentCollection: "Parent Collection",
+      selectParent: "None (Root Level)",
+      isPublic: "Make this collection public",
+      validation: {
+        nameRequired: "Collection name is required",
+        nameMinLength: "Collection name must be at least 2 characters",
+        nameMaxLength: "Collection name must not exceed 100 characters",
+        descriptionMaxLength: "Description must not exceed 500 characters",
+      },
     },
   },
   sidebar: {

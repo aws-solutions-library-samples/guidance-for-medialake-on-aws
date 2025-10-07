@@ -328,6 +328,12 @@ class MediaLakeStack(cdk.Stack):
                 x_origin_verify_secret=self.shared_x_origin_secret,
                 authorizer=api_gateway_stack.authorizer,
                 api_resource=self.shared_rest_api,
+                collection_endpoint=props.base_infrastructure.collection_endpoint,
+                collection_arn=props.base_infrastructure.collection_arn,
+                opensearch_index="media",
+                vpc=props.base_infrastructure.vpc,
+                security_group=props.base_infrastructure.security_group,
+                media_assets_bucket=props.base_infrastructure.media_assets_s3_bucket,
             ),
         )
         collections_stack.add_dependency(props.authorization_stack)

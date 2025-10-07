@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import aws_cdk as cdk
 from aws_cdk import aws_apigateway as apigateway
 from aws_cdk import aws_cognito as cognito
+from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_secretsmanager as secretsmanager
 from constructs import Construct
 
@@ -10,6 +11,7 @@ from medialake_constructs.api_gateway.api_gateway_collections import (
     CollectionsApi,
     CollectionsApiProps,
 )
+from medialake_constructs.shared_constructs.s3bucket import S3Bucket
 
 
 @dataclass
@@ -20,6 +22,12 @@ class CollectionsStackProps:
     authorizer: apigateway.IAuthorizer
     api_resource: apigateway.RestApi
     x_origin_verify_secret: secretsmanager.Secret
+    collection_endpoint: str
+    collection_arn: str
+    opensearch_index: str
+    vpc: ec2.IVpc
+    security_group: ec2.SecurityGroup
+    media_assets_bucket: S3Bucket
 
 
 class CollectionsStack(cdk.NestedStack):
@@ -51,6 +59,12 @@ class CollectionsStack(cdk.NestedStack):
                 api_resource=props.api_resource,
                 authorizer=props.authorizer,
                 x_origin_verify_secret=props.x_origin_verify_secret,
+                open_search_endpoint=props.collection_endpoint,
+                open_search_arn=props.collection_arn,
+                opensearch_index=props.opensearch_index,
+                vpc=props.vpc,
+                security_group=props.security_group,
+                media_assets_bucket=props.media_assets_bucket,
             ),
         )
 

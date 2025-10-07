@@ -1,7 +1,11 @@
-import json
 import os
+import sys
 
 import boto3
+
+# Add common_libraries to path
+sys.path.insert(0, "/opt/python")
+from common_libraries.cors_utils import create_response
 
 
 def get_medialake_buckets_from_ddb():
@@ -67,29 +71,21 @@ def lambda_handler(event, context):
         ]
         print(f"Filtered buckets: {filtered_buckets}")
 
-        return {
-            "statusCode": 200,
-            "headers": {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*",
+        return create_response(
+            200,
+            {
+                "status": "200",
+                "message": "ok",
+                "data": {"buckets": filtered_buckets},
             },
-            "body": json.dumps(
-                {
-                    "status": "200",
-                    "message": "ok",
-                    "data": {"buckets": filtered_buckets},
-                }
-            ),
-        }
+        )
 
     except Exception as e:
-        return {
-            "statusCode": 500,
-            "headers": {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*",
+        return create_response(
+            500,
+            {
+                "status": "500",
+                "message": str(e),
+                "data": {"buckets": []},
             },
-            "body": json.dumps(
-                {"status": "500", "message": str(e), "data": {"buckets": []}}
-            ),
-        }
+        )

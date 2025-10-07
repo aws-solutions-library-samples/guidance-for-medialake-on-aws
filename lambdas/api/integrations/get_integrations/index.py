@@ -1,8 +1,12 @@
-import json
 import os
+import sys
 from typing import Dict
 
 import boto3
+
+# Add common_libraries to path
+sys.path.insert(0, "/opt/python")
+from common_libraries.cors_utils import create_response
 
 dynamodb = boto3.resource("dynamodb")
 integrations_table = dynamodb.Table(os.environ["INTEGRATIONS_TABLE"])
@@ -39,29 +43,17 @@ def lambda_handler(event, context):
         # Format each integration
         formatted_integrations = [format_integration(item) for item in integrations]
 
-        return {
-            "statusCode": 200,
-            "headers": {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*",
+        return create_response(
+            200,
+            {
+                "status": "success",
+                "message": "Integrations retrieved successfully",
+                "data": formatted_integrations,
             },
-            "body": json.dumps(
-                {
-                    "status": "success",
-                    "message": "Integrations retrieved successfully",
-                    "data": formatted_integrations,
-                }
-            ),
-        }
+        )
 
     except Exception as e:
-        return {
-            "statusCode": 500,
-            "headers": {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*",
-            },
-            "body": json.dumps(
-                {"status": "error", "message": f"Error getting integrations: {str(e)}"}
-            ),
-        }
+        return create_response(
+            500,
+            {"status": "error", "message": f"Error getting integrations: {str(e)}"},
+        )
