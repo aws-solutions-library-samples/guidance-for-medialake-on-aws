@@ -57,12 +57,20 @@ export interface ShareCollectionRequest {
 }
 
 export interface AddItemToCollectionRequest {
-  assetId: string;
+  // Bulk mode (new, preferred)
+  items?: Array<{
+    assetId: string;
+    clips?: Array<{ startTime: string; endTime: string }>;
+  }>;
+
+  // Single item mode (backward compatibility)
+  assetId?: string;
   clipBoundary?: {
     startTime?: string;
     endTime?: string;
   };
   addAllClips?: boolean;
+  clips?: Array<{ startTime: string; endTime: string }>;
   // Legacy fields for backward compatibility
   type?: "asset" | "workflow" | "collection";
   id?: string;
