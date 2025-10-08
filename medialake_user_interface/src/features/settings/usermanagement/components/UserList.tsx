@@ -58,6 +58,7 @@ interface UserListProps {
   onRemoveSort?: (columnId: string) => void;
   onFilterChange?: (columnId: string, value: string) => void;
   onSortChange?: (columnId: string, desc: boolean) => void;
+  handleMutation: (options: any, variables: any) => Promise<any>;
 }
 
 // Helper component for managing permission set chips
@@ -83,7 +84,8 @@ const GroupChips: React.FC<{
   user: User;
   theme: any;
   groups: any[] | undefined;
-}> = ({ user, theme, groups }) => {
+  handleMutation: (options: any, variables: any) => Promise<any>;
+}> = ({ user, theme, groups, handleMutation }) => {
   const { t } = useTranslation();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const updateUserMutation = useUpdateUser();
@@ -97,18 +99,27 @@ const GroupChips: React.FC<{
   };
 
   const handleGroupChange = async (groupId: string) => {
-    try {
-      await updateUserMutation.mutateAsync({
+    // Close dropdown immediately on selection
+    handleClose();
+
+    await handleMutation(
+      {
+        mutation: updateUserMutation,
+        actionMessages: {
+          loading: t("users.apiMessages.updating.loading"),
+          success: t("users.apiMessages.updating.success"),
+          successMessage: t("users.apiMessages.updating.successMessage"),
+          error: t("users.apiMessages.updating.error"),
+        },
+      },
+      {
         username: user.username,
         updates: {
           username: user.username,
           groups: [groupId], // Use group.id (actual Cognito group name)
         },
-      });
-      handleClose();
-    } catch (error) {
-      console.error("Error updating user group:", error);
-    }
+      },
+    );
   };
 
   // Get the current group (first one if multiple exist)
@@ -256,6 +267,7 @@ const UserList: React.FC<UserListProps> = ({
   onRemoveSort,
   onFilterChange,
   onSortChange,
+  handleMutation,
 }) => {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -452,7 +464,12 @@ const UserList: React.FC<UserListProps> = ({
         enableFiltering: true,
         cell: ({ row }) => {
           return (
-            <GroupChips user={row.original} theme={theme} groups={groups} />
+            <GroupChips
+              user={row.original}
+              theme={theme}
+              groups={groups}
+              handleMutation={handleMutation}
+            />
           );
         },
       },
@@ -609,6 +626,7 @@ const UserList: React.FC<UserListProps> = ({
     onToggleUserStatus,
     groups,
     permissionSets,
+    handleMutation,
   ]);
 
   const table = useReactTable({

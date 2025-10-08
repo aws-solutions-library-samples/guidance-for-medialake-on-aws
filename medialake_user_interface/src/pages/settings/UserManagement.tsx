@@ -264,6 +264,7 @@ const UserManagement: React.FC = () => {
           onToggleUserStatus={handleToggleUserStatus}
           activeFilters={activeFilters}
           activeSorting={activeSorting}
+          handleMutation={handleMutation}
           onRemoveFilter={(columnId) => {
             setActiveFilters((filters) =>
               filters.filter((f) => f.columnId !== columnId),
