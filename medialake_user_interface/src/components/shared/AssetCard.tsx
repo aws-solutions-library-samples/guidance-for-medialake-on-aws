@@ -205,8 +205,9 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                   };
 
                   // For clip mode, we should only show the marker for this specific clip
-                  // Check if this is a clip asset (has clipData property)
-                  const isClipAsset = id.includes("_clip_");
+                  // Check if this is a clip asset (ID contains #CLIP# or _clip_)
+                  const isClipAsset =
+                    id.includes("#CLIP#") || id.includes("_clip_");
 
                   console.log(`🎬 INITIAL Asset ${id}:`);
                   console.log(`  - isClipAsset: ${isClipAsset}`);
@@ -342,12 +343,16 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                           `  ✅ Added marker: ${start}s - ${end}s (color: ${markerColor})`,
                         );
 
-                        // For clip assets, seek to the beginning of the clip
-                        if (isClipAsset) {
+                        // For clip assets or single-clip items, seek to the beginning of the clip
+                        // This includes collection items with a specific clip boundary
+                        if (
+                          isClipAsset ||
+                          (filteredClips.length === 1 && index === 0)
+                        ) {
                           try {
                             omakasePlayer.video.seekToTime(start);
                             console.log(
-                              `  🎯 Seeked to clip start time: ${start}s for clip asset ${id}`,
+                              `  🎯 Seeked to clip start time: ${start}s for ${isClipAsset ? "clip asset" : "single-clip item"} ${id}`,
                             );
                           } catch (seekError) {
                             console.warn(

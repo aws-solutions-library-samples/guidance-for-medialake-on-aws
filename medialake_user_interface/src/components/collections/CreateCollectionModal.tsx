@@ -14,7 +14,6 @@ import {
   FormControlLabel,
   Switch,
   Box,
-  Typography,
   CircularProgress,
   Alert,
 } from "@mui/material";
@@ -164,10 +163,8 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
         },
       }}
     >
-      <DialogTitle>
-        <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
-          {t("collectionsPage.createCollection")}
-        </Typography>
+      <DialogTitle sx={{ fontWeight: 600 }}>
+        {t("collectionsPage.createCollection")}
       </DialogTitle>
 
       <DialogContent sx={{ pb: 2 }}>

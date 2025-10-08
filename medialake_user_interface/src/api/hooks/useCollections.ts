@@ -57,8 +57,15 @@ export interface ShareCollectionRequest {
 }
 
 export interface AddItemToCollectionRequest {
-  type: "asset" | "workflow" | "collection";
-  id: string;
+  assetId: string;
+  clipBoundary?: {
+    startTime?: string;
+    endTime?: string;
+  };
+  addAllClips?: boolean;
+  // Legacy fields for backward compatibility
+  type?: "asset" | "workflow" | "collection";
+  id?: string;
   sortOrder?: number;
   metadata?: Record<string, any>;
 }

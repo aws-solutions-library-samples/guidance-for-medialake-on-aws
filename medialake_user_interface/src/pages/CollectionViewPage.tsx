@@ -17,12 +17,25 @@ import {
   Alert,
   Breadcrumbs,
   Link,
+  TextField,
+  IconButton,
+  Menu,
+  MenuItem,
+  Stack,
 } from "@mui/material";
-import { Home as HomeIcon, Folder as FolderIcon } from "@mui/icons-material";
+import {
+  Home as HomeIcon,
+  Folder as FolderIcon,
+  MoreVert as MoreVertIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+} from "@mui/icons-material";
 import { AddToCollectionModal } from "@/components/collections/AddToCollectionModal";
 import {
   useAddItemToCollection,
   useGetCollection,
+  useUpdateCollection,
+  useDeleteCollection,
 } from "@/api/hooks/useCollections";
 import { useGetCollectionAssets } from "@/api/hooks/useCollections";
 import {
@@ -52,6 +65,12 @@ type AssetItem = (ImageItem | VideoItem | AudioItem) & {
   DigitalSourceAsset: {
     Type: string;
   };
+  clipBoundary?: {
+    startTime?: string;
+    endTime?: string;
+  };
+  addedAt?: string;
+  addedBy?: string;
 };
 
 interface Filters {
@@ -86,6 +105,19 @@ const CollectionViewPage: React.FC = () => {
   const [selectedAssetForCollection, setSelectedAssetForCollection] =
     useState<AssetItem | null>(null);
   const addItemToCollectionMutation = useAddItemToCollection();
+
+  // Collection Edit/Delete state
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [editedDescription, setEditedDescription] = useState("");
+  const [collectionAlert, setCollectionAlert] = useState<{
+    severity: "success" | "error" | "info" | "warning";
+    message: string;
+  } | null>(null);
+
+  const updateCollectionMutation = useUpdateCollection();
+  const deleteCollectionMutation = useDeleteCollection();
 
   // Get collection details
   const { data: collectionResponse, isLoading: isLoadingCollection } =
@@ -128,7 +160,24 @@ const CollectionViewPage: React.FC = () => {
   const [editedName, setEditedName] = useState<string>();
 
   // Asset accessors for hooks
-  const getAssetId = useCallback((asset: AssetItem) => asset.InventoryID, []);
+  const getAssetId = useCallback((asset: AssetItem) => {
+    // Create unique key combining InventoryID with clip boundary or timestamp
+    // This prevents duplicate keys when the same asset appears multiple times
+    // (e.g., once as full file, once as clip)
+    const baseId = asset.InventoryID;
+    const clipBoundary = asset.clipBoundary;
+
+    if (clipBoundary && clipBoundary.startTime && clipBoundary.endTime) {
+      // For clips, create key like: assetId#CLIP#startTime_endTime
+      const sanitizedStart = clipBoundary.startTime.replace(/:/g, "-");
+      const sanitizedEnd = clipBoundary.endTime.replace(/:/g, "-");
+      return `${baseId}#CLIP#${sanitizedStart}_${sanitizedEnd}`;
+    } else {
+      // For full files, use addedAt to ensure uniqueness
+      // (in case the same full file is added multiple times)
+      return `${baseId}#FULL#${asset.addedAt}`;
+    }
+  }, []);
   const getAssetName = useCallback(
     (asset: AssetItem) =>
       asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
@@ -141,6 +190,10 @@ const CollectionViewPage: React.FC = () => {
   );
   const getAssetThumbnail = useCallback(
     (asset: AssetItem) => asset.thumbnailUrl || "",
+    [],
+  );
+  const getAssetProxy = useCallback(
+    (asset: AssetItem) => asset.proxyUrl || "",
     [],
   );
 
@@ -213,22 +266,106 @@ const CollectionViewPage: React.FC = () => {
 
       const assetId = getOriginalAssetId(selectedAssetForCollection);
 
+      // Check if this asset has clip data
+      const clipData = (selectedAssetForCollection as any).clipData;
+      let clipBoundary = undefined;
+
+      if (clipData && clipData.start_timecode && clipData.end_timecode) {
+        clipBoundary = {
+          startTime: clipData.start_timecode,
+          endTime: clipData.end_timecode,
+        };
+      }
+
       await addItemToCollectionMutation.mutateAsync({
         collectionId,
         data: {
-          type: "asset",
-          id: assetId,
-          metadata: {
-            assetType: selectedAssetForCollection.DigitalSourceAsset.Type,
-            fileName:
-              selectedAssetForCollection.DigitalSourceAsset.MainRepresentation
-                .StorageInfo.PrimaryLocation.ObjectKey.Name,
-          },
+          assetId: assetId,
+          clipBoundary: clipBoundary,
         },
       });
     },
     [selectedAssetForCollection, addItemToCollectionMutation],
   );
+
+  // Collection menu handlers
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  // Edit collection handlers
+  const handleEditClick = () => {
+    setEditedDescription(collection?.description || "");
+    setIsEditDialogOpen(true);
+    handleMenuClose();
+  };
+
+  const handleEditClose = () => {
+    setIsEditDialogOpen(false);
+    setEditedDescription("");
+  };
+
+  const handleEditSave = async () => {
+    if (!id) return;
+
+    try {
+      await updateCollectionMutation.mutateAsync({
+        id,
+        data: {
+          description: editedDescription,
+        },
+      });
+      setCollectionAlert({
+        severity: "success",
+        message: "Collection updated successfully",
+      });
+      handleEditClose();
+    } catch (error) {
+      setCollectionAlert({
+        severity: "error",
+        message: "Failed to update collection",
+      });
+    }
+  };
+
+  // Delete collection handlers
+  const handleCollectionDeleteClick = () => {
+    setIsDeleteDialogOpen(true);
+    handleMenuClose();
+  };
+
+  const handleCollectionDeleteClose = () => {
+    setIsDeleteDialogOpen(false);
+  };
+
+  const handleCollectionDeleteConfirm = async () => {
+    if (!id) return;
+
+    try {
+      await deleteCollectionMutation.mutateAsync(id);
+      setCollectionAlert({
+        severity: "success",
+        message: "Collection deleted successfully",
+      });
+      handleCollectionDeleteClose();
+      // Navigate to collections list after successful deletion
+      setTimeout(() => {
+        navigate("/collections");
+      }, 1000);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to delete collection";
+      setCollectionAlert({
+        severity: "error",
+        message: errorMessage,
+      });
+      handleCollectionDeleteClose();
+    }
+  };
 
   // Update local state from useAssetOperations
   useEffect(() => {
@@ -549,7 +686,69 @@ const CollectionViewPage: React.FC = () => {
               </Breadcrumbs>
             </Box>
 
-            {filteredResults.length > 0 && searchMetadata && !error ? (
+            {/* Collection Header */}
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                mb: 2,
+              }}
+            >
+              <Box>
+                <Typography variant="h4" gutterBottom>
+                  {collection.name}
+                </Typography>
+                {collection.description && (
+                  <Typography variant="body1" color="text.secondary">
+                    {collection.description}
+                  </Typography>
+                )}
+              </Box>
+              <IconButton
+                onClick={handleMenuOpen}
+                aria-label="collection options"
+              >
+                <MoreVertIcon />
+              </IconButton>
+              <Menu
+                anchorEl={anchorEl}
+                open={Boolean(anchorEl)}
+                onClose={handleMenuClose}
+              >
+                <MenuItem onClick={handleEditClick}>
+                  <EditIcon sx={{ mr: 1 }} fontSize="small" />
+                  Edit Description
+                </MenuItem>
+                <MenuItem onClick={handleCollectionDeleteClick}>
+                  <DeleteIcon sx={{ mr: 1 }} fontSize="small" />
+                  Delete Collection
+                </MenuItem>
+              </Menu>
+            </Box>
+
+            {isLoading || isFetching ? (
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minHeight: "50vh",
+                  textAlign: "center",
+                  gap: 2,
+                }}
+              >
+                <LinearProgress sx={{ width: "100%", maxWidth: 400 }} />
+                <Typography
+                  variant="body1"
+                  color="text.secondary"
+                  sx={{ mt: 2 }}
+                >
+                  Loading assets...
+                </Typography>
+              </Box>
+            ) : filteredResults.length > 0 && searchMetadata && !error ? (
               <AssetResultsView
                 results={filteredResults}
                 searchMetadata={{
@@ -561,6 +760,7 @@ const CollectionViewPage: React.FC = () => {
                 onPageSizeChange={handlePageSizeChange}
                 searchTerm={`Collection: ${collection.name}`}
                 title={`Collection: ${collection.name}`}
+                isSemantic={false}
                 groupByType={viewPreferences.groupByType}
                 onGroupByTypeChange={viewPreferences.handleGroupByTypeChange}
                 viewMode={viewPreferences.viewMode}
@@ -638,6 +838,7 @@ const CollectionViewPage: React.FC = () => {
                 getAssetName={getAssetName}
                 getAssetType={getAssetType}
                 getAssetThumbnail={getAssetThumbnail}
+                getAssetProxy={getAssetProxy}
                 renderCardField={renderCardField}
               />
             ) : (
@@ -705,7 +906,7 @@ const CollectionViewPage: React.FC = () => {
           </RightSidebar>
         </Box>
 
-        {/* Delete Confirmation Dialog */}
+        {/* Delete Asset Confirmation Dialog */}
         <Dialog
           open={isDeleteModalOpen}
           onClose={handleDeleteCancel}
@@ -727,6 +928,70 @@ const CollectionViewPage: React.FC = () => {
           </DialogActions>
         </Dialog>
 
+        {/* Edit Collection Dialog */}
+        <Dialog
+          open={isEditDialogOpen}
+          onClose={handleEditClose}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Edit Collection</DialogTitle>
+          <DialogContent>
+            <TextField
+              autoFocus
+              margin="dense"
+              label="Description"
+              type="text"
+              fullWidth
+              multiline
+              rows={4}
+              value={editedDescription}
+              onChange={(e) => setEditedDescription(e.target.value)}
+              placeholder="Enter collection description"
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleEditClose}>Cancel</Button>
+            <Button
+              onClick={handleEditSave}
+              variant="contained"
+              disabled={updateCollectionMutation.isPending}
+            >
+              {updateCollectionMutation.isPending ? "Saving..." : "Save"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Delete Collection Confirmation Dialog */}
+        <Dialog
+          open={isDeleteDialogOpen}
+          onClose={handleCollectionDeleteClose}
+          aria-labelledby="delete-collection-dialog-title"
+          aria-describedby="delete-collection-dialog-description"
+        >
+          <DialogTitle id="delete-collection-dialog-title">
+            Delete Collection
+          </DialogTitle>
+          <DialogContent>
+            <DialogContentText id="delete-collection-dialog-description">
+              Are you sure you want to delete this collection? This will
+              permanently delete the collection and remove all items from it.
+              This action cannot be undone.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCollectionDeleteClose}>Cancel</Button>
+            <Button
+              onClick={handleCollectionDeleteConfirm}
+              color="error"
+              variant="contained"
+              disabled={deleteCollectionMutation.isPending}
+            >
+              {deleteCollectionMutation.isPending ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
         {/* API Status Modal for bulk download */}
         <ApiStatusModal
           open={assetSelection.modalState.open}
@@ -736,6 +1001,7 @@ const CollectionViewPage: React.FC = () => {
           message={assetSelection.modalState.message}
         />
 
+        {/* Asset operation alerts */}
         <Snackbar
           open={!!alert}
           autoHideDuration={6000}
@@ -748,6 +1014,22 @@ const CollectionViewPage: React.FC = () => {
             sx={{ width: "100%" }}
           >
             {alert?.message}
+          </Alert>
+        </Snackbar>
+
+        {/* Collection operation alerts */}
+        <Snackbar
+          open={!!collectionAlert}
+          autoHideDuration={6000}
+          onClose={() => setCollectionAlert(null)}
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        >
+          <Alert
+            onClose={() => setCollectionAlert(null)}
+            severity={collectionAlert?.severity}
+            sx={{ width: "100%" }}
+          >
+            {collectionAlert?.message}
           </Alert>
         </Snackbar>
 

@@ -11,6 +11,7 @@ import { useFeatureFlag } from "@/utils/featureFlags";
 import {
   useSearchQuery,
   useSemanticSearch,
+  useSemanticMode,
   useSearchFilters,
   useDomainActions,
   useUIActions,
@@ -42,6 +43,7 @@ const SearchPageContainer: React.FC = () => {
   // Core search state
   const query = useSearchQuery();
   const semantic = useSemanticSearch();
+  const semanticMode = useSemanticMode();
   const filters = useSearchFilters();
 
   // Confidence threshold state for semantic search
@@ -240,21 +242,41 @@ const SearchPageContainer: React.FC = () => {
 
       const assetId = getOriginalAssetId(selectedAssetForCollection);
 
+      // Determine clip boundary based on semantic mode
+      let clipBoundary = {};
+      let addAllClips = false;
+
+      if (semantic && semanticMode === "clip") {
+        // In clip mode - add specific clip
+        const clipData = (selectedAssetForCollection as any).clipData;
+        if (clipData && clipData.start_timecode && clipData.end_timecode) {
+          clipBoundary = {
+            startTime: clipData.start_timecode,
+            endTime: clipData.end_timecode,
+          };
+        }
+      } else if (semantic && semanticMode === "full") {
+        // In full mode with semantic search - add all clips
+        addAllClips = true;
+      }
+      // Otherwise (non-semantic), add full file without clips
+
       await addItemToCollectionMutation.mutateAsync({
         collectionId,
         data: {
-          type: "asset",
-          id: assetId,
-          metadata: {
-            assetType: selectedAssetForCollection.DigitalSourceAsset.Type,
-            fileName:
-              selectedAssetForCollection.DigitalSourceAsset.MainRepresentation
-                .StorageInfo.PrimaryLocation.ObjectKey.Name,
-          },
+          assetId: assetId,
+          clipBoundary:
+            Object.keys(clipBoundary).length > 0 ? clipBoundary : undefined,
+          addAllClips: addAllClips,
         },
       });
     },
-    [selectedAssetForCollection, addItemToCollectionMutation],
+    [
+      selectedAssetForCollection,
+      addItemToCollectionMutation,
+      semantic,
+      semanticMode,
+    ],
   );
 
   return (

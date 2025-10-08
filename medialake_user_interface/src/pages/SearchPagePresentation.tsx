@@ -25,6 +25,7 @@ import { AddToCollectionModal } from "@/components/collections/AddToCollectionMo
 import { useAddItemToCollection } from "@/api/hooks/useCollections";
 import { type AssetItem, type Filters, type ExpandedSections } from "./types";
 import { getOriginalAssetId } from "@/utils/clipTransformation";
+import { useSemanticMode } from "@/stores/searchStore";
 
 interface SearchPagePresentationProps {
   // Search data
@@ -201,6 +202,7 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
   const [selectedAssetForCollection, setSelectedAssetForCollection] =
     useState<AssetItem | null>(null);
   const addItemToCollectionMutation = useAddItemToCollection();
+  const semanticMode = useSemanticMode();
 
   const handleAssetClick = useCallback(
     (asset: AssetItem) => {
@@ -238,21 +240,41 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
 
       const assetId = getOriginalAssetId(selectedAssetForCollection);
 
+      // Determine clip boundary based on semantic mode
+      let clipBoundary = {};
+      let addAllClips = false;
+
+      if (semantic && semanticMode === "clip") {
+        // In clip mode - add specific clip
+        const clipData = (selectedAssetForCollection as any).clipData;
+        if (clipData && clipData.start_timecode && clipData.end_timecode) {
+          clipBoundary = {
+            startTime: clipData.start_timecode,
+            endTime: clipData.end_timecode,
+          };
+        }
+      } else if (semantic && semanticMode === "full") {
+        // In full mode with semantic search - add all clips
+        addAllClips = true;
+      }
+      // Otherwise (non-semantic), add full file without clips
+
       await addItemToCollectionMutation.mutateAsync({
         collectionId,
         data: {
-          type: "asset",
-          id: assetId,
-          metadata: {
-            assetType: selectedAssetForCollection.DigitalSourceAsset.Type,
-            fileName:
-              selectedAssetForCollection.DigitalSourceAsset.MainRepresentation
-                .StorageInfo.PrimaryLocation.ObjectKey.Name,
-          },
+          assetId: assetId,
+          clipBoundary:
+            Object.keys(clipBoundary).length > 0 ? clipBoundary : undefined,
+          addAllClips: addAllClips,
         },
       });
     },
-    [selectedAssetForCollection, addItemToCollectionMutation],
+    [
+      selectedAssetForCollection,
+      addItemToCollectionMutation,
+      semantic,
+      semanticMode,
+    ],
   );
 
   const handlePageChange = (newPage: number) => {

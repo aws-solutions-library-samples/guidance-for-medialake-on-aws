@@ -50,6 +50,7 @@ import {
   useGetCollections,
   useGetSharedCollections,
   useDeleteCollection,
+  useUpdateCollection,
   type Collection,
 } from "../api/hooks/useCollections";
 import { CreateCollectionModal } from "../components/collections/CreateCollectionModal";
@@ -68,6 +69,8 @@ const CollectionsPage: React.FC = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editedDescription, setEditedDescription] = useState("");
   const [selectedCollection, setSelectedCollection] =
     useState<Collection | null>(null);
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
@@ -78,6 +81,7 @@ const CollectionsPage: React.FC = () => {
   const { data: sharedCollectionsResponse, isLoading: isLoadingShared } =
     useGetSharedCollections();
   const deleteCollectionMutation = useDeleteCollection();
+  const updateCollectionMutation = useUpdateCollection();
 
   const collections = collectionsResponse?.data || [];
   const sharedCollections = sharedCollectionsResponse?.data || [];
@@ -133,6 +137,32 @@ const CollectionsPage: React.FC = () => {
   const handleMenuClose = () => {
     setMenuAnchorEl(null);
     setSelectedCollection(null);
+  };
+
+  const handleEditClick = () => {
+    if (selectedCollection) {
+      setEditedDescription(selectedCollection.description || "");
+      setEditDialogOpen(true);
+      handleMenuClose();
+    }
+  };
+
+  const handleEditSave = async () => {
+    if (selectedCollection) {
+      try {
+        await updateCollectionMutation.mutateAsync({
+          id: selectedCollection.id,
+          data: {
+            description: editedDescription,
+          },
+        });
+        setEditDialogOpen(false);
+        setSelectedCollection(null);
+        setEditedDescription("");
+      } catch (error) {
+        console.error("Failed to update collection:", error);
+      }
+    }
   };
 
   const handleDeleteClick = () => {
@@ -707,7 +737,7 @@ const CollectionsPage: React.FC = () => {
         >
           {t("collectionsPage.actions.view")}
         </MenuItem>
-        <MenuItem onClick={handleMenuClose}>
+        <MenuItem onClick={handleEditClick}>
           {t("collectionsPage.actions.edit")}
         </MenuItem>
         <MenuItem onClick={handleMenuClose}>
@@ -718,6 +748,40 @@ const CollectionsPage: React.FC = () => {
           {t("collectionsPage.actions.delete")}
         </MenuItem>
       </Menu>
+
+      {/* Edit Collection Dialog */}
+      <Dialog
+        open={editDialogOpen}
+        onClose={() => setEditDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Edit Collection</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Description"
+            type="text"
+            fullWidth
+            multiline
+            rows={4}
+            value={editedDescription}
+            onChange={(e) => setEditedDescription(e.target.value)}
+            placeholder="Enter collection description"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+          <Button
+            onClick={handleEditSave}
+            variant="contained"
+            disabled={updateCollectionMutation.isPending}
+          >
+            {updateCollectionMutation.isPending ? "Saving..." : "Save"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog

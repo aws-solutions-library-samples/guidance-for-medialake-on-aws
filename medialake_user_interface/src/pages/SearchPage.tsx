@@ -61,6 +61,7 @@ type AssetItem = (ImageItem | VideoItem | AudioItem) & {
 import { useSearchState } from "../hooks/useSearchState";
 import { FacetFilters } from "../types/facetSearch";
 import { getOriginalAssetId } from "@/utils/clipTransformation";
+import { useSemanticMode } from "@/stores/searchStore";
 
 interface LocationState {
   query?: string;
@@ -172,6 +173,7 @@ const SearchPage: React.FC = () => {
   // Get current values from the search state
   const currentQuery = searchState.query;
   const currentSemantic = searchState.isSemantic;
+  const semanticMode = useSemanticMode();
   const facetFilters = searchState.filters;
 
   // State for selected fields
@@ -384,21 +386,41 @@ const SearchPage: React.FC = () => {
 
       const assetId = getOriginalAssetId(selectedAssetForCollection);
 
+      // Determine clip boundary based on semantic mode
+      let clipBoundary = {};
+      let addAllClips = false;
+
+      if (currentSemantic && semanticMode === "clip") {
+        // In clip mode - add specific clip
+        const clipData = (selectedAssetForCollection as any).clipData;
+        if (clipData && clipData.start_timecode && clipData.end_timecode) {
+          clipBoundary = {
+            startTime: clipData.start_timecode,
+            endTime: clipData.end_timecode,
+          };
+        }
+      } else if (currentSemantic && semanticMode === "full") {
+        // In full mode with semantic search - add all clips
+        addAllClips = true;
+      }
+      // Otherwise (non-semantic), add full file without clips
+
       await addItemToCollectionMutation.mutateAsync({
         collectionId,
         data: {
-          type: "asset",
-          id: assetId,
-          metadata: {
-            assetType: selectedAssetForCollection.DigitalSourceAsset.Type,
-            fileName:
-              selectedAssetForCollection.DigitalSourceAsset.MainRepresentation
-                .StorageInfo.PrimaryLocation.ObjectKey.Name,
-          },
+          assetId: assetId,
+          clipBoundary:
+            Object.keys(clipBoundary).length > 0 ? clipBoundary : undefined,
+          addAllClips: addAllClips,
         },
       });
     },
-    [selectedAssetForCollection, addItemToCollectionMutation],
+    [
+      selectedAssetForCollection,
+      addItemToCollectionMutation,
+      currentSemantic,
+      semanticMode,
+    ],
   );
 
   // Update local state from useAssetOperations
