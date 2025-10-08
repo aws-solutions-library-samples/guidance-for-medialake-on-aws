@@ -56,7 +56,7 @@ class AssetTableStream(Construct):
                 queue_name="asset-table-stream-dlq",
                 visibility_timeout=Duration.seconds(60),
                 retention_period=Duration.days(14),
-                encryption=True,
+                encryption=False,  # Use SSE-SQS (AWS managed) for consistency with other queues
                 enforce_ssl=True,
                 max_receive_count=0,  # No DLQ for this queue as it's already a DLQ
                 removal_policy=(
@@ -105,6 +105,9 @@ class AssetTableStream(Construct):
         # Grant stream read permissions
         props.asset_table.grant_stream_read(self._asset_sync_engine_lambda.function)
 
+        # Add explicit queue access policy to prevent public access
+        self._add_queue_access_policy()
+
     def _add_permissions(self, props: AssetTableStreamProps) -> None:
         """Add IAM permissions to the Lambda function."""
 
@@ -146,23 +149,6 @@ class AssetTableStream(Construct):
             )
         )
 
-        # KMS permissions for SQS queue encryption
-        if self.storage_ingest_connector_dlq.encryption_key:
-            self._asset_sync_engine_lambda.function.add_to_role_policy(
-                iam.PolicyStatement(
-                    actions=[
-                        "kms:Encrypt",
-                        "kms:Decrypt",
-                        "kms:ReEncrypt*",
-                        "kms:GenerateDataKey*",
-                        "kms:DescribeKey",
-                    ],
-                    resources=[
-                        self.storage_ingest_connector_dlq.encryption_key.key_arn
-                    ],
-                )
-            )
-
         # EC2 permissions for VPC Lambda functions
         if props.vpc:
             self._asset_sync_engine_lambda.function.add_to_role_policy(
@@ -176,6 +162,42 @@ class AssetTableStream(Construct):
                     resources=["*"],
                 )
             )
+
+    def _add_queue_access_policy(self) -> None:
+        """Add explicit access policy to the DLQ to prevent public access."""
+        # Allow only the Lambda function to send messages to the queue
+        self.storage_ingest_connector_dlq.queue.add_to_resource_policy(
+            iam.PolicyStatement(
+                sid="AllowLambdaSendMessage",
+                effect=iam.Effect.ALLOW,
+                principals=[iam.ServicePrincipal("lambda.amazonaws.com")],
+                actions=[
+                    "sqs:SendMessage",
+                    "sqs:GetQueueAttributes",
+                    "sqs:GetQueueUrl",
+                ],
+                resources=[self.storage_ingest_connector_dlq.queue_arn],
+                conditions={
+                    "ArnEquals": {
+                        "aws:SourceArn": self._asset_sync_engine_lambda.function.function_arn
+                    }
+                },
+            )
+        )
+
+        # Explicitly deny all actions from any principal outside the account
+        self.storage_ingest_connector_dlq.queue.add_to_resource_policy(
+            iam.PolicyStatement(
+                sid="DenyPublicAccess",
+                effect=iam.Effect.DENY,
+                principals=[iam.AnyPrincipal()],
+                actions=["sqs:*"],
+                resources=[self.storage_ingest_connector_dlq.queue_arn],
+                conditions={
+                    "StringNotEquals": {"aws:PrincipalAccount": self.account_id}
+                },
+            )
+        )
 
     @property
     def lambda_function(self) -> Lambda:
