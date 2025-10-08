@@ -52,6 +52,7 @@ class UsersApi(Construct):
             config=LambdaConfig(
                 name="users_unified",
                 entry="lambdas/api/users_unified",
+                lambda_handler="index.lambda_handler",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": (
                         props.x_origin_verify_secret.secret_arn

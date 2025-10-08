@@ -96,13 +96,13 @@ const GroupChips: React.FC<{
     setAnchorEl(null);
   };
 
-  const handleGroupChange = async (groupName: string) => {
+  const handleGroupChange = async (groupId: string) => {
     try {
       await updateUserMutation.mutateAsync({
         username: user.username,
         updates: {
           username: user.username,
-          groups: [groupName], // Single group only
+          groups: [groupId], // Use group.id (actual Cognito group name)
         },
       });
       handleClose();
@@ -112,9 +112,18 @@ const GroupChips: React.FC<{
   };
 
   // Get the current group (first one if multiple exist)
-  const currentGroup =
+  // user.groups contains the actual Cognito group name (group.id)
+  const currentGroupId =
     user.groups && user.groups.length > 0 ? user.groups[0] : null;
-  const currentGroupName = currentGroup || t("common.noGroup", "No Group");
+
+  // Find the matching group object to get the display name
+  const currentGroupObj = currentGroupId
+    ? groups?.find((g) => g.id === currentGroupId)
+    : null;
+
+  const currentGroupDisplayName = currentGroupObj
+    ? currentGroupObj.name
+    : t("common.noGroup", "No Group");
 
   return (
     <Box
@@ -133,24 +142,24 @@ const GroupChips: React.FC<{
           cursor: "pointer",
           padding: "4px 8px",
           borderRadius: "6px",
-          backgroundColor: currentGroup
+          backgroundColor: currentGroupId
             ? alpha(theme.palette.primary.main, 0.1)
             : alpha(theme.palette.grey[500], 0.1),
-          color: currentGroup
+          color: currentGroupId
             ? theme.palette.primary.main
             : theme.palette.text.secondary,
-          fontWeight: currentGroup ? 600 : 400,
+          fontWeight: currentGroupId ? 600 : 400,
           fontSize: "0.875rem",
           transition: "background-color 0.2s",
           "&:hover": {
-            backgroundColor: currentGroup
+            backgroundColor: currentGroupId
               ? alpha(theme.palette.primary.main, 0.15)
               : alpha(theme.palette.grey[500], 0.15),
           },
         }}
       >
         <Typography variant="body2" sx={{ fontSize: "0.875rem" }}>
-          {currentGroupName}
+          {currentGroupDisplayName}
         </Typography>
         <KeyboardArrowDownIcon fontSize="small" />
       </Box>
@@ -160,8 +169,8 @@ const GroupChips: React.FC<{
           groups.map((group) => (
             <MenuItem
               key={group.id}
-              onClick={() => handleGroupChange(group.name)}
-              selected={currentGroup === group.name}
+              onClick={() => handleGroupChange(group.id)}
+              selected={currentGroupId === group.id}
             >
               {group.name}
             </MenuItem>
