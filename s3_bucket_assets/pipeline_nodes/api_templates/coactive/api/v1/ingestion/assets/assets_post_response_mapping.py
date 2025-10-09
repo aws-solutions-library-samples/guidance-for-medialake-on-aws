@@ -51,7 +51,15 @@ def translate_event_to_request(
     response_data = response_body
 
     # Extract key information from Coactive response
-    job_id = response_data.get("id")
+    # The job ID can be at the top level or nested in details
+    job_id = response_data.get("id") or response_data.get("details", {}).get("id")
+
+    # Validate that we have a job ID - fail fast if missing
+    if not job_id:
+        raise RuntimeError(
+            f"Coactive API response missing job ID. Response structure: {json.dumps(response_data, indent=2)}"
+        )
+
     dataset_id = response_data.get("dataset_id")
     status = response_data.get("status")
     total_assets = response_data.get("total_assets", 0)
