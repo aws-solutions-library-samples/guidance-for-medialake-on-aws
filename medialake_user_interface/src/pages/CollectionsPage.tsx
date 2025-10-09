@@ -143,7 +143,7 @@ const CollectionsPage: React.FC = () => {
     if (selectedCollection) {
       setEditedDescription(selectedCollection.description || "");
       setEditDialogOpen(true);
-      handleMenuClose();
+      setMenuAnchorEl(null); // Close menu but keep selectedCollection
     }
   };
 
@@ -165,9 +165,15 @@ const CollectionsPage: React.FC = () => {
     }
   };
 
+  const handleEditCancel = () => {
+    setEditDialogOpen(false);
+    setSelectedCollection(null);
+    setEditedDescription("");
+  };
+
   const handleDeleteClick = () => {
     setDeleteDialogOpen(true);
-    handleMenuClose();
+    setMenuAnchorEl(null); // Close menu but keep selectedCollection
   };
 
   const handleDeleteConfirm = async () => {
@@ -180,6 +186,11 @@ const CollectionsPage: React.FC = () => {
         console.error("Failed to delete collection:", error);
       }
     }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setSelectedCollection(null);
   };
 
   const handleViewCollection = (collection: Collection) => {
@@ -752,7 +763,7 @@ const CollectionsPage: React.FC = () => {
       {/* Edit Collection Dialog */}
       <Dialog
         open={editDialogOpen}
-        onClose={() => setEditDialogOpen(false)}
+        onClose={handleEditCancel}
         maxWidth="sm"
         fullWidth
       >
@@ -772,7 +783,7 @@ const CollectionsPage: React.FC = () => {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleEditCancel}>Cancel</Button>
           <Button
             onClick={handleEditSave}
             variant="contained"
@@ -786,7 +797,7 @@ const CollectionsPage: React.FC = () => {
       {/* Delete Confirmation Dialog */}
       <Dialog
         open={deleteDialogOpen}
-        onClose={() => setDeleteDialogOpen(false)}
+        onClose={handleDeleteCancel}
         maxWidth="sm"
         fullWidth
       >
@@ -802,7 +813,7 @@ const CollectionsPage: React.FC = () => {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>
+          <Button onClick={handleDeleteCancel}>
             {t("collectionsPage.deleteDialog.cancel")}
           </Button>
           <Button

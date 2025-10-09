@@ -74,12 +74,21 @@ def register_route(app, dynamodb, table_name):
                 update_expr_parts.append("tags = :tags")
                 expr_attr_values[":tags"] = request_data.tags
 
-            table.update_item(
-                Key={"PK": f"{COLLECTION_PK_PREFIX}{collection_id}", "SK": METADATA_SK},
-                UpdateExpression=f"SET {', '.join(update_expr_parts)}",
-                ExpressionAttributeValues=expr_attr_values,
-                ExpressionAttributeNames=expr_attr_names if expr_attr_names else None,
-            )
+            # Build update_item parameters
+            update_params = {
+                "Key": {
+                    "PK": f"{COLLECTION_PK_PREFIX}{collection_id}",
+                    "SK": METADATA_SK,
+                },
+                "UpdateExpression": f"SET {', '.join(update_expr_parts)}",
+                "ExpressionAttributeValues": expr_attr_values,
+            }
+
+            # Only add ExpressionAttributeNames if there are any
+            if expr_attr_names:
+                update_params["ExpressionAttributeNames"] = expr_attr_names
+
+            table.update_item(**update_params)
 
             logger.info(f"Collection updated: {collection_id}")
             metrics.add_metric(

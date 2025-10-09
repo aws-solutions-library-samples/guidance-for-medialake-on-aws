@@ -16,11 +16,11 @@
     "variant": "off"
   },
   "search-multi-select-enabled": {
-    "value": false,
+    "value": true,
     "variant": "off"
   },
   "user-favorites-enabled": {
-    "value": false,
+    "value": true,
     "variant": "off"
   },
   "manual-pipeline-trigger-enabled": {
