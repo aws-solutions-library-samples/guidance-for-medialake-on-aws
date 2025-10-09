@@ -6,7 +6,6 @@ Handles endpoints for retrieving collection assets with full OpenSearch data:
 """
 
 import os
-import sys
 from typing import Any, Dict, List, Optional
 
 import boto3
@@ -17,9 +16,6 @@ from aws_lambda_powertools.event_handler.exceptions import (
 )
 from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.parser import ValidationError
-from opensearchpy import OpenSearch, RequestsAWSV4SignerAuth, RequestsHttpConnection
-
-sys.path.insert(0, "/opt/python")
 from collections_utils import (
     COLLECTION_PK_PREFIX,
     METADATA_SK,
@@ -29,7 +25,8 @@ from collections_utils import (
 
 # Import Pydantic models
 from models import GetCollectionAssetsQueryParams
-from url_utils import collect_cloudfront_url_requests, generate_cloudfront_urls
+from opensearchpy import OpenSearch, RequestsAWSV4SignerAuth, RequestsHttpConnection
+from url_utils import generate_cloudfront_urls_batch
 from user_auth import extract_user_context
 
 logger = Logger(
@@ -86,6 +83,49 @@ def get_opensearch_client() -> Optional[OpenSearch]:
             return None
 
     return _opensearch_client
+
+
+def collect_cloudfront_url_requests(
+    asset_data: Dict[str, Any], inventory_id: str
+) -> List[Dict[str, str]]:
+    """
+    Collect CloudFront URL requests from asset data.
+    Returns a list of {request_id, bucket, key} dicts.
+    """
+    url_requests = []
+
+    # Get thumbnail and proxy URL requests
+    derived_reps = asset_data.get("DerivedRepresentations", [])
+    for rep in derived_reps:
+        purpose = rep.get("Purpose", "").lower()
+        storage_info = rep.get("StorageInfo", {}).get("PrimaryLocation", {})
+        bucket = storage_info.get("Bucket")
+        object_key = storage_info.get("ObjectKey", {})
+
+        if isinstance(object_key, dict):
+            key = object_key.get("FullPath", "")
+        else:
+            key = str(object_key)
+
+        if bucket and key:
+            if purpose == "thumbnail":
+                url_requests.append(
+                    {
+                        "request_id": f"{inventory_id}_thumbnail",
+                        "bucket": bucket,
+                        "key": key,
+                    }
+                )
+            elif purpose == "proxy":
+                url_requests.append(
+                    {
+                        "request_id": f"{inventory_id}_proxy",
+                        "bucket": bucket,
+                        "key": key,
+                    }
+                )
+
+    return url_requests
 
 
 def fetch_assets_from_opensearch(asset_ids: List[str]) -> Dict[str, Dict]:
@@ -188,14 +228,15 @@ def format_asset_as_search_result(
     return result
 
 
-def register_routes(app, dynamodb, table_name):
-    """Register collection assets routes"""
+def register_route(app, dynamodb, table_name):
+    """Register collection assets route"""
 
     @app.get("/collections/<collection_id>/assets")
     @tracer.capture_method
     def collections_ID_assets_get(collection_id: str):
         """Get collection assets with OpenSearch data and CloudFront URLs"""
         try:
+            # Validate user authentication
             extract_user_context(app.current_event.raw_event)
             table = dynamodb.Table(table_name)
 
@@ -214,7 +255,7 @@ def register_routes(app, dynamodb, table_name):
 
             logger.info(
                 f"[ASSETS_HANDLER] Getting assets for collection {collection_id}, "
-                f"page={query_params.page}, pageSize={query_params.pageSize}"
+                f"page={query_params.page}, pageSize={query_params.page_size}"
             )
 
             # Verify collection exists
@@ -253,8 +294,8 @@ def register_routes(app, dynamodb, table_name):
             ]
 
             # Apply pagination
-            start_idx = (query_params.page - 1) * query_params.pageSize
-            end_idx = start_idx + query_params.pageSize
+            start_idx = (query_params.page - 1) * query_params.page_size
+            end_idx = start_idx + query_params.page_size
             paginated_items = asset_items[start_idx:end_idx]
 
             # Extract unique asset IDs from paginated items
@@ -281,7 +322,7 @@ def register_routes(app, dynamodb, table_name):
                 )
 
             # Collect CloudFront URL requests
-            url_requests = {}
+            url_requests = []
             for item in paginated_items:
                 if item["SK"].startswith(ASSET_SK_PREFIX):
                     inventory_id = item.get("assetId", "")
@@ -292,12 +333,12 @@ def register_routes(app, dynamodb, table_name):
                 asset_data = assets_data.get(inventory_id)
                 if asset_data:
                     requests = collect_cloudfront_url_requests(asset_data, inventory_id)
-                    url_requests.update(requests)
+                    url_requests.extend(requests)
 
             logger.info(f"[URL_COLLECTION] Collected {len(url_requests)} URL requests")
 
             # Generate CloudFront URLs
-            cloudfront_urls = generate_cloudfront_urls(url_requests)
+            cloudfront_urls = generate_cloudfront_urls_batch(url_requests)
             logger.info(
                 f"[URL_GENERATION] Generated {len(cloudfront_urls)} CloudFront URLs"
             )
@@ -336,7 +377,7 @@ def register_routes(app, dynamodb, table_name):
                     "results": results,
                     "searchMetadata": {
                         "page": query_params.page,
-                        "pageSize": query_params.pageSize,
+                        "pageSize": query_params.page_size,
                         "totalResults": len(asset_items),
                         "hasMore": end_idx < len(asset_items),
                     },

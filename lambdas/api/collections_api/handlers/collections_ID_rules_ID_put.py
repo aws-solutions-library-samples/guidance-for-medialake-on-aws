@@ -1,12 +1,9 @@
 """PUT /collections/<collection_id>/rules/<rule_id> - Update rule."""
 
 import os
-import sys
 from datetime import datetime
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
-
-sys.path.insert(0, "/opt/python")
 from collections_utils import (
     COLLECTION_PK_PREFIX,
     create_error_response,

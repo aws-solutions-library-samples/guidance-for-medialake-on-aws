@@ -74,8 +74,13 @@ class GetCollectionAssetsQueryParams(BaseModel):
     """Query parameters for getting collection assets."""
 
     page: int = Field(default=1, ge=1, description="Page number")
-    pageSize: int = Field(
-        default=50, ge=1, le=100, description="Page size", alias="page_size"
+    page_size: int = Field(
+        default=50, ge=1, le=100, description="Page size", alias="pageSize"
     )
 
     model_config = ConfigDict(populate_by_name=True)
+
+    @property
+    def pageSize(self) -> int:
+        """Alias property for backwards compatibility."""
+        return self.page_size

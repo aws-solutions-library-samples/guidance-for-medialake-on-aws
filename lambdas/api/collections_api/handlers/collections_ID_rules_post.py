@@ -2,14 +2,11 @@
 
 import json
 import os
-import sys
 import uuid
 from datetime import datetime
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.metrics import MetricUnit
-
-sys.path.insert(0, "/opt/python")
 from collections_utils import COLLECTION_PK_PREFIX
 from user_auth import extract_user_context
 from utils.formatting_utils import format_rule

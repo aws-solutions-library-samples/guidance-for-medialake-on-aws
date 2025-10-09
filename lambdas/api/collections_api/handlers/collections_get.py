@@ -1,14 +1,11 @@
 """GET /collections - List collections with filtering and pagination."""
 
 import os
-import sys
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler.exceptions import BadRequestError
 from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.parser import ValidationError
-
-sys.path.insert(0, "/opt/python")
 from collections_utils import (
     CHILD_SK_PREFIX,
     COLLECTION_PK_PREFIX,

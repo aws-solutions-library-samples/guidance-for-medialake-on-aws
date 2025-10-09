@@ -1,11 +1,8 @@
 """DELETE /collections/<collection_id>/share/<user_id> - Remove share."""
 
 import os
-import sys
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
-
-sys.path.insert(0, "/opt/python")
 from collections_utils import (
     COLLECTION_PK_PREFIX,
     USER_PK_PREFIX,

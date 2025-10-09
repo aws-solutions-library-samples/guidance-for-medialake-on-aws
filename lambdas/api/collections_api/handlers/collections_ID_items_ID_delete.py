@@ -1,12 +1,9 @@
 """DELETE /collections/<collection_id>/items/<item_id> - Remove item from collection."""
 
 import os
-import sys
 from datetime import datetime
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
-
-sys.path.insert(0, "/opt/python")
 from collections_utils import (
     COLLECTION_PK_PREFIX,
     METADATA_SK,

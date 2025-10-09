@@ -2,7 +2,6 @@
 
 import json
 import os
-import sys
 import uuid
 from datetime import datetime
 
@@ -10,8 +9,6 @@ from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler.exceptions import BadRequestError
 from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.parser import ValidationError, parse
-
-sys.path.insert(0, "/opt/python")
 from collections_utils import (
     COLLECTION_PK_PREFIX,
     COLLECTIONS_GSI5_PK,

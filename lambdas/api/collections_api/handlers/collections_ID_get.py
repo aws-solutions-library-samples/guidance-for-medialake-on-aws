@@ -1,13 +1,10 @@
 """GET /collections/<collection_id> - Get collection details."""
 
 import os
-import sys
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler.exceptions import NotFoundError
 from aws_lambda_powertools.metrics import MetricUnit
-
-sys.path.insert(0, "/opt/python")
 from collections_utils import (
     COLLECTION_PK_PREFIX,
     METADATA_SK,

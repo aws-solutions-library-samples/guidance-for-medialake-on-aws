@@ -1,12 +1,9 @@
 """GET /collections/shared-with-me - Get collections shared with current user."""
 
 import os
-import sys
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler.exceptions import BadRequestError
-
-sys.path.insert(0, "/opt/python")
 from collections_utils import (
     USER_PK_PREFIX,
     create_error_response,
