@@ -2,10 +2,19 @@
 Collections API Lambda Handler.
 
 This is the main entry point for the unified Collections API Lambda function.
-It uses AWS Lambda Powertools APIGatewayRestResolver for routing all
-collections-related endpoints to their respective handlers.
+It uses AWS Lambda Powertools APIGatewayRestResolver with Pydantic V2 validation
+for routing all collections-related endpoints to their respective handlers.
 
-All routes are defined in the routes/ directory and imported here.
+All handlers are defined in the handlers/ directory with resource-path-based naming:
+- collections.py: GET/POST /collections
+- collections_ID.py: GET/PATCH/DELETE /collections/<id>
+- collections_ID_items.py: GET/POST/DELETE /collections/<id>/items
+- collections_ID_assets.py: GET /collections/<id>/assets
+- collections_ID_share.py: GET/POST/DELETE /collections/<id>/share
+- collections_ID_rules.py: GET/POST/PUT/DELETE /collections/<id>/rules
+- collection_types.py: GET/POST /collection-types
+
+All request validation is handled by Pydantic V2 models in the models/ directory.
 """
 
 import json
@@ -50,26 +59,11 @@ dynamodb = boto3.resource("dynamodb")
 # Get environment variables
 TABLE_NAME = os.environ.get("COLLECTIONS_TABLE_NAME")
 
-# Import all route handlers
-# These imports will register their routes with the app resolver
-from routes import (
-    assets_routes,
-    collection_detail_routes,
-    collection_types_routes,
-    collections_routes,
-    items_routes,
-    rules_routes,
-    shares_routes,
-)
+# Import handlers and register all routes
+# This uses the new Pydantic V2 validated handlers
+from handlers import register_all_routes
 
-# Register route modules with the app
-collection_types_routes.register_routes(app, dynamodb, TABLE_NAME)
-collections_routes.register_routes(app, dynamodb, TABLE_NAME)
-collection_detail_routes.register_routes(app, dynamodb, TABLE_NAME)
-items_routes.register_routes(app, dynamodb, TABLE_NAME)
-rules_routes.register_routes(app, dynamodb, TABLE_NAME)
-shares_routes.register_routes(app, dynamodb, TABLE_NAME)
-assets_routes.register_routes(app, dynamodb, TABLE_NAME)
+register_all_routes(app, dynamodb, TABLE_NAME)
 
 
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
