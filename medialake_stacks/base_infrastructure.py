@@ -460,6 +460,9 @@ class BaseInfrastructureStack(Stack):
             )
 
             # Create asset table stream construct
+            # Batch size optimized for both small and large syncs
+            # - Small batches (1-100 assets): Process quickly with minimal latency
+            # - Large batches (10M+ assets): Use bulk API for high throughput
             self._asset_table_stream = AssetTableStream(
                 self,
                 "AssetTableStreamConstruct",
@@ -471,7 +474,9 @@ class BaseInfrastructureStack(Stack):
                     opensearch_index_name=opensearch_index_name,
                     vpc=self._vpc.vpc,
                     security_group=self._security_group,
-                    batch_size=100,
+                    batch_size=500,  # Bulk API batch size
+                    max_batch_size=1000,  # DynamoDB stream batch size
+                    reserved_concurrency=10,  # Limit concurrent executions
                 ),
             )
 
