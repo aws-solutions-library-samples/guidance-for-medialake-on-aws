@@ -75,6 +75,14 @@ const UserManagement: React.FC = () => {
       );
 
       if (updatedUser) {
+        // Log for debugging
+        console.log("Checking if editingUser needs sync:", {
+          editingUserGroups: editingUser.groups,
+          updatedUserGroups: updatedUser.groups,
+          editingUserEmail: editingUser.email,
+          updatedUserEmail: updatedUser.email,
+        });
+
         // Only update if specific fields have changed to avoid unnecessary re-renders
         const hasChanges =
           JSON.stringify(updatedUser.groups) !==
@@ -85,7 +93,10 @@ const UserManagement: React.FC = () => {
           updatedUser.enabled !== editingUser.enabled;
 
         if (hasChanges) {
-          console.log("Syncing editingUser with fresh data:", updatedUser);
+          console.log("Syncing editingUser with fresh data:", {
+            old: editingUser,
+            new: updatedUser,
+          });
           setEditingUser(updatedUser);
         }
       } else {
@@ -94,7 +105,7 @@ const UserManagement: React.FC = () => {
         setEditingUser(undefined);
       }
     }
-  }, [users, editingUser]);
+  }, [users]);
 
   const handleAddUser = () => {
     setEditingUser(undefined);
