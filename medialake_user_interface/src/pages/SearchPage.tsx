@@ -386,37 +386,32 @@ const SearchPage: React.FC = () => {
 
       const assetId = getOriginalAssetId(selectedAssetForCollection);
 
-      // Build item object
-      const item: any = { assetId };
+      // Determine clip boundary based on semantic mode
+      let clipBoundary = {};
+      let addAllClips = false;
 
       if (currentSemantic && semanticMode === "clip") {
-        // Single clip mode
+        // In clip mode - add specific clip
         const clipData = (selectedAssetForCollection as any).clipData;
-        if (clipData?.start_timecode && clipData?.end_timecode) {
-          item.clips = [
-            {
-              startTime: clipData.start_timecode,
-              endTime: clipData.end_timecode,
-            },
-          ];
+        if (clipData && clipData.start_timecode && clipData.end_timecode) {
+          clipBoundary = {
+            startTime: clipData.start_timecode,
+            endTime: clipData.end_timecode,
+          };
         }
       } else if (currentSemantic && semanticMode === "full") {
-        // Full mode with multiple clips
-        const clipsArray = (selectedAssetForCollection as any).clips || [];
-        if (clipsArray.length > 0) {
-          item.clips = clipsArray.map((clip: any) => ({
-            startTime: clip.start_timecode,
-            endTime: clip.end_timecode,
-          }));
-        }
-        // If no clips, item.clips stays undefined (full file)
+        // In full mode with semantic search - add all clips
+        addAllClips = true;
       }
-      // Non-semantic: item.clips stays undefined (full file)
+      // Otherwise (non-semantic), add full file without clips
 
       await addItemToCollectionMutation.mutateAsync({
         collectionId,
         data: {
-          items: [item], // Single item wrapped in array
+          assetId: assetId,
+          clipBoundary:
+            Object.keys(clipBoundary).length > 0 ? clipBoundary : undefined,
+          addAllClips: addAllClips,
         },
       });
     },
