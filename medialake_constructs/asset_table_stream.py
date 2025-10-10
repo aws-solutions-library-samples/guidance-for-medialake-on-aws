@@ -51,12 +51,15 @@ class AssetTableStream(Construct):
         self.account_id = stack.account
 
         # Create DLQ for failed stream processing
+        # Visibility timeout must be >= Lambda timeout (15 min) + buffer
         self.storage_ingest_connector_dlq = SQSConstruct(
             self,
             "AssetTableStreamDLQ",
             props=SQSProps(
                 queue_name="asset-table-stream-dlq",
-                visibility_timeout=Duration.seconds(60),
+                visibility_timeout=Duration.minutes(
+                    20
+                ),  # 15 min Lambda timeout + 5 min buffer
                 retention_period=Duration.days(14),
                 encryption=False,  # Use SSE-SQS (AWS managed) for consistency with other queues
                 enforce_ssl=True,
@@ -122,6 +125,9 @@ class AssetTableStream(Construct):
 
         # Add explicit queue access policy to prevent public access
         self._add_queue_access_policy()
+
+        # Create DLQ processor Lambda
+        self._create_dlq_processor(props, search_layer)
 
     def _add_permissions(self, props: AssetTableStreamProps) -> None:
         """Add IAM permissions to the Lambda function."""
@@ -214,6 +220,81 @@ class AssetTableStream(Construct):
             )
         )
 
+    def _create_dlq_processor(self, props: AssetTableStreamProps, search_layer) -> None:
+        """Create Lambda function to reprocess failed messages from DLQ."""
+
+        # Create the DLQ processor Lambda
+        self._dlq_processor_lambda = Lambda(
+            self,
+            "DLQProcessor",
+            LambdaConfig(
+                name="asset-table-stream-dlq-processor",
+                entry="lambdas/back_end/asset_table_stream_dlq_processor",
+                timeout_minutes=15,
+                memory_size=2048,
+                vpc=props.vpc,
+                security_groups=(
+                    [props.security_group] if props.security_group else None
+                ),
+                layers=[search_layer.layer],
+                environment_variables={
+                    "OS_DOMAIN_REGION": props.opensearch_cluster_region,
+                    "OPENSEARCH_ENDPOINT": props.opensearch_cluster_domain_endpoint,
+                    "OPENSEARCH_INDEX": props.opensearch_index_name,
+                },
+            ),
+        )
+
+        # Add OpenSearch permissions for DLQ processor
+        self._dlq_processor_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "es:ESHttpHead",
+                    "es:ESHttpPost",
+                    "es:ESHttpGet",
+                    "es:ESHttpPut",
+                ],
+                resources=[f"{props.opensearch_cluster_domain_arn}/*"],
+            )
+        )
+
+        # Add SQS permissions for reading from DLQ
+        self._dlq_processor_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "sqs:ReceiveMessage",
+                    "sqs:DeleteMessage",
+                    "sqs:GetQueueAttributes",
+                    "sqs:GetQueueUrl",
+                ],
+                resources=[self.storage_ingest_connector_dlq.queue_arn],
+            )
+        )
+
+        # Add EC2 permissions if using VPC
+        if props.vpc:
+            self._dlq_processor_lambda.function.add_to_role_policy(
+                iam.PolicyStatement(
+                    effect=iam.Effect.ALLOW,
+                    actions=[
+                        "ec2:CreateNetworkInterface",
+                        "ec2:DescribeNetworkInterfaces",
+                        "ec2:DeleteNetworkInterface",
+                    ],
+                    resources=["*"],
+                )
+            )
+
+        # Add SQS event source (disabled by default - enable manually when needed)
+        self._dlq_processor_lambda.function.add_event_source(
+            lambda_event_sources.SqsEventSource(
+                self.storage_ingest_connector_dlq.queue,
+                batch_size=10,  # Small batch size for DLQ processing
+                max_batching_window=Duration.minutes(1),
+                enabled=False,  # Disabled by default - enable manually when needed
+            )
+        )
+
     @property
     def lambda_function(self) -> Lambda:
         """Returns the asset table stream Lambda function."""
@@ -223,3 +304,8 @@ class AssetTableStream(Construct):
     def dlq(self) -> SQSConstruct:
         """Returns the dead letter queue for failed stream processing."""
         return self.storage_ingest_connector_dlq
+
+    @property
+    def dlq_processor(self) -> Lambda:
+        """Returns the DLQ processor Lambda function."""
+        return self._dlq_processor_lambda
