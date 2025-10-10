@@ -148,7 +148,7 @@ export default {
       navigating: "Navigating from",
     },
     branding: {
-      name: "",
+      name: "Media Lake",
     },
   },
   search: {
@@ -686,8 +686,8 @@ export default {
       settings: "Settings",
     },
     home: {
-      welcome: "",
-      description: "",
+      welcome: "Welcome to Media Lake",
+      description: "Guide your media, metadata, and workflows.",
       statistics: "Statistics",
       collections: "Collections",
       sharedCollections: "Shared Collections",
