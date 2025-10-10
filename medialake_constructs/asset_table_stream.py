@@ -51,12 +51,15 @@ class AssetTableStream(Construct):
         self.account_id = stack.account
 
         # Create DLQ for failed stream processing
+        # Visibility timeout must be >= Lambda timeout (15 min) + buffer
         self.storage_ingest_connector_dlq = SQSConstruct(
             self,
             "AssetTableStreamDLQ",
             props=SQSProps(
                 queue_name="asset-table-stream-dlq",
-                visibility_timeout=Duration.seconds(60),
+                visibility_timeout=Duration.minutes(
+                    20
+                ),  # 15 min Lambda timeout + 5 min buffer
                 retention_period=Duration.days(14),
                 encryption=False,  # Use SSE-SQS (AWS managed) for consistency with other queues
                 enforce_ssl=True,
