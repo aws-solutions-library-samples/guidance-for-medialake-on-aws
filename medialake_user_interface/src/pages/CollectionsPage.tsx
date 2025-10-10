@@ -93,17 +93,25 @@ const CollectionsPage: React.FC = () => {
     switch (selectedTab) {
       case "my":
         // Show collections where user is the owner and not public
-        collectionsToFilter = collections.filter((c) => !c.isPublic);
+        // Exclude child collections (those with parentId) - they show in parent view
+        collectionsToFilter = collections.filter(
+          (c) => !c.isPublic && !c.parentId,
+        );
         break;
       case "shared":
-        collectionsToFilter = sharedCollections;
+        // Exclude child collections from shared view too
+        collectionsToFilter = sharedCollections.filter((c) => !c.parentId);
         break;
       case "public":
         // Show collections that are marked as public
-        collectionsToFilter = collections.filter((c) => c.isPublic);
+        // Exclude child collections from public view
+        collectionsToFilter = collections.filter(
+          (c) => c.isPublic && !c.parentId,
+        );
         break;
       default:
-        collectionsToFilter = collections;
+        // Exclude child collections from default view
+        collectionsToFilter = collections.filter((c) => !c.parentId);
     }
 
     return collectionsToFilter.filter(

@@ -22,6 +22,11 @@ import {
   Menu,
   MenuItem,
   Stack,
+  Grid,
+  Card,
+  CardContent,
+  CardActionArea,
+  Chip,
 } from "@mui/material";
 import {
   Home as HomeIcon,
@@ -34,6 +39,7 @@ import { AddToCollectionModal } from "@/components/collections/AddToCollectionMo
 import {
   useAddItemToCollection,
   useGetCollection,
+  useGetChildCollections,
   useUpdateCollection,
   useDeleteCollection,
 } from "@/api/hooks/useCollections";
@@ -139,6 +145,10 @@ const CollectionViewPage: React.FC = () => {
   const assetsData = assetsResponse?.data;
   const assets = assetsData?.results || [];
   const searchMetadata = assetsData?.searchMetadata;
+
+  // Get child collections
+  const { data: childCollectionsResponse, isLoading: isLoadingChildren } =
+    useGetChildCollections(id!);
 
   // Check if multi-select feature is enabled
   const multiSelectFeature = useFeatureFlag(
@@ -726,6 +736,121 @@ const CollectionViewPage: React.FC = () => {
                 </MenuItem>
               </Menu>
             </Box>
+
+            {/* Child Collections Section */}
+            {childCollectionsResponse?.data &&
+              childCollectionsResponse.data.length > 0 && (
+                <Box sx={{ mb: 4 }}>
+                  <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
+                    Sub-Collections ({childCollectionsResponse.data.length})
+                  </Typography>
+                  <Grid container spacing={2}>
+                    {childCollectionsResponse.data.map((childCollection) => (
+                      <Grid
+                        item
+                        xs={12}
+                        sm={6}
+                        md={4}
+                        lg={3}
+                        key={childCollection.id}
+                      >
+                        <Card
+                          elevation={2}
+                          sx={{
+                            height: "100%",
+                            display: "flex",
+                            flexDirection: "column",
+                            transition: "all 0.2s ease-in-out",
+                            "&:hover": {
+                              transform: "translateY(-4px)",
+                              boxShadow: 4,
+                            },
+                          }}
+                        >
+                          <CardActionArea
+                            onClick={() =>
+                              navigate(
+                                `/collections/${childCollection.id}/view`,
+                              )
+                            }
+                            sx={{ flexGrow: 1 }}
+                          >
+                            <CardContent>
+                              <Stack spacing={1.5}>
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1,
+                                  }}
+                                >
+                                  <FolderIcon
+                                    color="primary"
+                                    sx={{ fontSize: 32 }}
+                                  />
+                                  <Typography
+                                    variant="h6"
+                                    component="div"
+                                    sx={{
+                                      fontWeight: 600,
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    {childCollection.name}
+                                  </Typography>
+                                </Box>
+
+                                {childCollection.description && (
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                    sx={{
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      display: "-webkit-box",
+                                      WebkitLineClamp: 2,
+                                      WebkitBoxOrient: "vertical",
+                                      minHeight: "40px",
+                                    }}
+                                  >
+                                    {childCollection.description}
+                                  </Typography>
+                                )}
+
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    gap: 1,
+                                    flexWrap: "wrap",
+                                    mt: "auto",
+                                  }}
+                                >
+                                  <Chip
+                                    size="small"
+                                    label={`${childCollection.itemCount} items`}
+                                    color="primary"
+                                    variant="outlined"
+                                  />
+                                  {childCollection.childCollectionCount > 0 && (
+                                    <Chip
+                                      size="small"
+                                      label={`${childCollection.childCollectionCount} sub-collections`}
+                                      color="secondary"
+                                      variant="outlined"
+                                    />
+                                  )}
+                                </Box>
+                              </Stack>
+                            </CardContent>
+                          </CardActionArea>
+                        </Card>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
+              )}
 
             {isLoading || isFetching ? (
               <Box

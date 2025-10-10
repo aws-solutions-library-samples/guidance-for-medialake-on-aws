@@ -182,5 +182,7 @@ export const QUERY_KEYS = {
     assets: (id: string, filters?: Record<string, any>) =>
       [...QUERY_KEYS.COLLECTIONS.detail(id), "assets", { filters }] as const,
     types: () => [...QUERY_KEYS.COLLECTIONS.all, "types"] as const,
+    children: (parentId: string) =>
+      [...QUERY_KEYS.COLLECTIONS.detail(parentId), "children"] as const,
   },
 } as const;

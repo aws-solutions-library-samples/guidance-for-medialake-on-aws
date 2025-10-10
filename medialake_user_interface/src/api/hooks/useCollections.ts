@@ -238,6 +238,32 @@ export const useGetCollection = (id: string, enabled = true) => {
   });
 };
 
+// Hook to get child collections for a parent collection
+export const useGetChildCollections = (parentId: string, enabled = true) => {
+  const { showError } = useErrorModal();
+
+  return useQuery<CollectionsResponse, Error>({
+    queryKey: QUERY_KEYS.COLLECTIONS.children(parentId),
+    enabled: enabled && !!parentId,
+    queryFn: async ({ signal }) => {
+      try {
+        const params = new URLSearchParams();
+        params.append("filter[parentId]", parentId);
+
+        const response = await apiClient.get<CollectionsResponse>(
+          `${API_ENDPOINTS.COLLECTIONS.BASE}?${params}`,
+          { signal },
+        );
+        return response.data;
+      } catch (error) {
+        logger.error("Fetch child collections error:", error);
+        showError("Failed to fetch child collections");
+        throw error;
+      }
+    },
+  });
+};
+
 // Hook to get collection types
 export const useGetCollectionTypes = () => {
   const { showError } = useErrorModal();
