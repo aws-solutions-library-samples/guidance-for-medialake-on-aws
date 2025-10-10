@@ -303,10 +303,10 @@ def chunk_bulk_actions(actions: List[dict]) -> List[List[dict]]:
     return chunks
 
 
-@retry_with_backoff(max_retries=5, base_delay=2, max_delay=60)
+@retry_with_backoff(max_retries=10, base_delay=5, max_delay=120)
 def execute_bulk_operation(actions: List[dict]) -> Tuple[int, List[dict]]:
     """
-    Execute bulk operation on OpenSearch.
+    Execute bulk operation on OpenSearch with retry logic for 429 errors.
 
     Returns:
         Tuple of (success_count, failed_actions)
@@ -325,13 +325,31 @@ def execute_bulk_operation(actions: List[dict]) -> Tuple[int, List[dict]]:
     )
 
     failed_actions = []
+    has_429_errors = False
+
     if failed:
         for item in failed:
             failed_actions.append(item)
-            logger.error(
-                "Bulk operation item failed",
-                extra={"error": item.get("error"), "item": item},
-            )
+            error_info = item.get("index", item.get("update", item.get("delete", {})))
+            status = error_info.get("status", 0)
+
+            if status == 429:
+                has_429_errors = True
+                logger.warning(
+                    "Bulk operation item failed with 429 - Too Many Requests",
+                    extra={"item_id": error_info.get("_id"), "status": status},
+                )
+            else:
+                logger.error(
+                    "Bulk operation item failed",
+                    extra={"error": error_info.get("error"), "status": status},
+                )
+
+    # If we got 429 errors, raise exception to trigger retry with backoff
+    if has_429_errors:
+        raise Exception(
+            f"OpenSearch returned 429 errors for {len([f for f in failed if (f.get('index', f.get('update', f.get('delete', {}))).get('status') == 429)])} items"
+        )
 
     metrics.add_metric(name="BulkOperationSuccess", unit="Count", value=success)
     metrics.add_metric(name="BulkOperationFailed", unit="Count", value=len(failed))
