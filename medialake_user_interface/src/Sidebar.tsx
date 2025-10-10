@@ -218,7 +218,7 @@ function Sidebar() {
         {
           text: t("sidebar.submenu.usersAndGroups", "Users and Groups"),
           icon: <GroupIcon />,
-          path: "/settings/users-groups",
+          path: "/settings/users",
           visible:
             safePermissionCheck("view", "user") ||
             safePermissionCheck("view", "group") ||
@@ -732,7 +732,7 @@ function Sidebar() {
                         // Check if this is a system settings item that requires permission
                         const isSystemSettings =
                           subItem.path === "/settings/system" ||
-                          subItem.path === "/settings/users-groups" ||
+                          subItem.path === "/settings/users" ||
                           subItem.path === "/settings/permission-sets";
 
                         // Wrap system settings items with Can component
