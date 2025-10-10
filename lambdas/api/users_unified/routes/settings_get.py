@@ -1,24 +1,10 @@
-import os
+"""GET /users/settings - Get user settings"""
+
 from typing import Any, Dict, Optional
 
-import boto3
-from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import MetricUnit
-from aws_lambda_powertools.utilities.parser.models import APIGatewayProxyEventModel
-from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
 from pydantic import BaseModel, Field
-
-# Initialize AWS PowerTools
-logger = Logger(
-    service="user-settings-service", level=os.getenv("LOG_LEVEL", "WARNING")
-)
-tracer = Tracer(service="user-settings-service")
-metrics = Metrics(namespace="medialake", service="users-settings-get")
-
-# Initialize DynamoDB client
-dynamodb = boto3.resource("dynamodb")
 
 
 class ErrorResponse(BaseModel):
@@ -33,74 +19,8 @@ class SettingsResponse(BaseModel):
     data: Dict[str, Any] = Field(..., description="User settings data")
 
 
-@tracer.capture_lambda_handler
-@logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
-@metrics.log_metrics(capture_cold_start_metric=True)
-def lambda_handler(
-    event: APIGatewayProxyEventModel, context: LambdaContext
-) -> Dict[str, Any]:
-    """
-    Lambda handler to fetch user settings from DynamoDB
-    """
-    try:
-        # Extract user ID from Cognito authorizer context
-        request_context = event.get("requestContext", {})
-        authorizer = request_context.get("authorizer", {})
-        claims = authorizer.get("claims", {})
-
-        # Get the user ID from the Cognito claims
-        user_id = claims.get("sub")
-
-        if not user_id:
-            logger.error("Missing user_id in Cognito claims")
-            metrics.add_metric(
-                name="MissingUserIdError", unit=MetricUnit.Count, value=1
-            )
-            return _create_error_response(400, "Unable to identify user")
-
-        # Get the user table name from environment variable
-        user_table_name = os.getenv("USER_TABLE_NAME")
-        if not user_table_name:
-            logger.error("USER_TABLE_NAME environment variable not set")
-            metrics.add_metric(
-                name="MissingConfigError", unit=MetricUnit.Count, value=1
-            )
-            return _create_error_response(500, "Internal configuration error")
-
-        # Check if namespace filter is provided in query parameters
-        query_params = event.get("queryStringParameters", {}) or {}
-        namespace = query_params.get("namespace")
-
-        # Fetch user settings from DynamoDB
-        user_settings = _get_user_settings(user_table_name, user_id, namespace)
-
-        # Create success response
-        response = SettingsResponse(
-            status="200",
-            message="User settings retrieved successfully",
-            data=user_settings,
-        )
-
-        logger.info("Successfully retrieved user settings", extra={"user_id": user_id})
-        metrics.add_metric(
-            name="SuccessfulSettingsLookup", unit=MetricUnit.Count, value=1
-        )
-
-        return {
-            "statusCode": 200,
-            "headers": {"Content-Type": "application/json"},
-            "body": response.model_dump_json(),
-        }
-
-    except Exception as e:
-        logger.exception("Error processing request")
-        metrics.add_metric(name="UnhandledError", unit=MetricUnit.Count, value=1)
-        return _create_error_response(500, f"Internal server error: {str(e)}")
-
-
-@tracer.capture_method
 def _get_user_settings(
-    table_name: str, user_id: str, namespace: Optional[str] = None
+    dynamodb, table_name: str, user_id: str, namespace: Optional[str], logger, metrics
 ) -> Dict[str, Any]:
     """
     Fetch user settings from DynamoDB
@@ -175,3 +95,61 @@ def _create_error_response(status_code: int, message: str) -> Dict[str, Any]:
         "headers": {"Content-Type": "application/json"},
         "body": error_response.model_dump_json(),
     }
+
+
+def handle_get_settings(app, dynamodb, user_table_name: str, logger, metrics, tracer) -> Dict[str, Any]:
+    """
+    Lambda handler to fetch user settings from DynamoDB
+    """
+    try:
+        # Extract user ID from Cognito authorizer context
+        request_context = app.current_event.raw_event.get("requestContext", {})
+        authorizer = request_context.get("authorizer", {})
+        claims = authorizer.get("claims", {})
+
+        # Get the user ID from the Cognito claims
+        user_id = claims.get("sub")
+
+        if not user_id:
+            logger.error("Missing user_id in Cognito claims")
+            metrics.add_metric(
+                name="MissingUserIdError", unit=MetricUnit.Count, value=1
+            )
+            return _create_error_response(400, "Unable to identify user")
+
+        if not user_table_name:
+            logger.error("USER_TABLE_NAME environment variable not set")
+            metrics.add_metric(
+                name="MissingConfigError", unit=MetricUnit.Count, value=1
+            )
+            return _create_error_response(500, "Internal configuration error")
+
+        # Check if namespace filter is provided in query parameters
+        query_params = app.current_event.query_string_parameters or {}
+        namespace = query_params.get("namespace")
+
+        # Fetch user settings from DynamoDB
+        user_settings = _get_user_settings(dynamodb, user_table_name, user_id, namespace, logger, metrics)
+
+        # Create success response
+        response = SettingsResponse(
+            status="200",
+            message="User settings retrieved successfully",
+            data=user_settings,
+        )
+
+        logger.info("Successfully retrieved user settings", extra={"user_id": user_id})
+        metrics.add_metric(
+            name="SuccessfulSettingsLookup", unit=MetricUnit.Count, value=1
+        )
+
+        return {
+            "statusCode": 200,
+            "headers": {"Content-Type": "application/json"},
+            "body": response.model_dump_json(),
+        }
+
+    except Exception as e:
+        logger.exception("Error processing request")
+        metrics.add_metric(name="UnhandledError", unit=MetricUnit.Count, value=1)
+        return _create_error_response(500, f"Internal server error: {str(e)}")

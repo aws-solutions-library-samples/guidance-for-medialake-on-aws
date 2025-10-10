@@ -22,7 +22,7 @@ export const API_ENDPOINTS = {
     BULK_DOWNLOAD_DELETE: (jobId: string) => `/assets/download/bulk/${jobId}`,
   },
   USERS: "/settings/users",
-  USER: "/users/user",
+  USER: "/users",
   ROLES: "/settings/roles",
   PERMISSION_SETS: {
     BASE: "/permissions",
@@ -57,8 +57,8 @@ export const API_ENDPOINTS = {
         `/assignments/groups/${groupId}/permission-sets/${permissionSetId}`,
     },
   },
-  DISABLE_USER: (userId: string) => `/users/user/${userId}/disableuser`,
-  ENABLE_USER: (userId: string) => `/users/user/${userId}/enableuser`,
+  DISABLE_USER: (userId: string) => `/users/${userId}/disable`,
+  ENABLE_USER: (userId: string) => `/users/${userId}/enable`,
   SYSTEM_SETTINGS: {
     GET: "/settings/system",
     SEARCH: "/settings/system/search",

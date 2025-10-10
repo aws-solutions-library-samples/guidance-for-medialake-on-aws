@@ -1,52 +1,13 @@
+"""POST /users - Create a new user"""
+
 import json
-import os
 from typing import Any, Dict
 
-import boto3
-from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools.event_handler import APIGatewayRestResolver, CORSConfig
-from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import MetricUnit
-from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
 
-# Initialize PowerTools with configurable log level
-logger = Logger(
-    service="user-creation",
-    level=os.environ.get("LOG_LEVEL", "WARNING"),
-    json_default=str,
-)
-tracer = Tracer(service="user-creation")
-metrics = Metrics(namespace="medialake", service="user-creation")
 
-# Configure CORS
-cors_config = CORSConfig(
-    allow_origin="*",
-    allow_headers=[
-        "Content-Type",
-        "X-Amz-Date",
-        "Authorization",
-        "X-Api-Key",
-        "X-Amz-Security-Token",
-    ],
-)
-
-# Initialize API Gateway resolver
-app = APIGatewayRestResolver(
-    serializer=lambda x: json.dumps(x, default=str),
-    strip_prefixes=["/api"],
-    cors=cors_config,
-)
-
-# Initialize Cognito client
-cognito = boto3.client("cognito-idp")
-
-# Get environment variables
-USER_POOL_ID = os.environ["COGNITO_USER_POOL_ID"]
-
-
-@tracer.capture_method
-def validate_groups_exist(group_ids: list) -> tuple[list, list]:
+def validate_groups_exist(cognito, user_pool_id: str, group_ids: list, logger, tracer) -> tuple[list, list]:
     """
     Validate that the specified groups exist in Cognito
 
@@ -64,7 +25,7 @@ def validate_groups_exist(group_ids: list) -> tuple[list, list]:
 
     try:
         # Get all groups in the user pool
-        response = cognito.list_groups(UserPoolId=USER_POOL_ID)
+        response = cognito.list_groups(UserPoolId=user_pool_id)
         existing_group_names = {
             group["GroupName"] for group in response.get("Groups", [])
         }
@@ -109,9 +70,7 @@ def validate_groups_exist(group_ids: list) -> tuple[list, list]:
     return valid_groups, invalid_groups
 
 
-@app.post("/users/user")
-@tracer.capture_method
-def create_user():
+def handle_create_user(app, cognito, user_pool_id: str, logger, metrics, tracer) -> Dict[str, Any]:
     """Create a new user in Cognito user pool"""
     try:
         # Get request body from the event
@@ -150,11 +109,9 @@ def create_user():
 
         # Create user in Cognito using the configured invitation template
         response = cognito.admin_create_user(
-            UserPoolId=USER_POOL_ID,
+            UserPoolId=user_pool_id,
             Username=request_data["email"],
             UserAttributes=user_attributes,
-            # Remove TemporaryPassword to use the configured invite template
-            # MessageAction defaults to "SEND" which will use the invite_message_template
         )
         logger.info(
             {
@@ -180,7 +137,9 @@ def create_user():
                 }
             )
 
-            valid_groups, invalid_groups = validate_groups_exist(request_data["groups"])
+            valid_groups, invalid_groups = validate_groups_exist(
+                cognito, user_pool_id, request_data["groups"], logger, tracer
+            )
 
             # Log about invalid groups
             if invalid_groups:
@@ -204,7 +163,7 @@ def create_user():
                 )
                 try:
                     cognito.admin_add_user_to_group(
-                        UserPoolId=USER_POOL_ID,
+                        UserPoolId=user_pool_id,
                         Username=request_data["email"],
                         GroupName=group_id,
                     )
@@ -385,18 +344,3 @@ def create_user():
                 }
             ),
         }
-
-
-@logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
-@tracer.capture_lambda_handler
-@metrics.log_metrics(capture_cold_start_metric=True)
-def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
-    """Lambda handler"""
-    logger.debug(
-        {
-            "message": "Lambda handler invoked",
-            "event": event,
-            "operation": "lambda_handler",
-        }
-    )
-    return app.resolve(event, context)

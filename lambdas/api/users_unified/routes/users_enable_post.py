@@ -1,23 +1,10 @@
-import os
+"""POST /users/{user_id}/enable - Enable a user"""
+
 from typing import Any, Dict
 
-import boto3
-from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools.event_handler.api_gateway import APIGatewayProxyEvent
-from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import MetricUnit
-from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
 from pydantic import BaseModel, Field
-
-# Initialize PowerTools
-logger = Logger(service="user-management", level=os.getenv("LOG_LEVEL", "INFO"))
-tracer = Tracer(service="user-management")
-metrics = Metrics(namespace="UserManagement", service="user-service")
-
-# Initialize Cognito client
-session = boto3.Session()
-cognito = session.client("cognito-idp")
 
 
 class EnableUserRequest(BaseModel):
@@ -31,26 +18,11 @@ class CognitoError(Exception):
         super().__init__(self.message)
 
 
-@tracer.capture_lambda_handler
-@logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
-@metrics.log_metrics(capture_cold_start_metric=True)
-def lambda_handler(
-    event: APIGatewayProxyEvent, context: LambdaContext
-) -> Dict[str, Any]:
+def handle_enable_user(user_id: str, cognito, user_pool_id: str, logger, metrics, tracer) -> Dict[str, Any]:
     """
     Lambda handler to enable a Cognito user
-
-    Parameters:
-        event: API Gateway event
-        context: Lambda context
-
-    Returns:
-        API Gateway response object
     """
     try:
-        # Extract user_id from path parameters
-        user_id = event.get("pathParameters", {}).get("user_id")
-
         if not user_id:
             logger.error("Missing user_id in path parameters")
             return {
@@ -61,12 +33,6 @@ def lambda_handler(
         # Validate user_id using Pydantic
         EnableUserRequest(user_id=user_id)
 
-        # Get User Pool ID from environment variables
-        user_pool_id = os.getenv("COGNITO_USER_POOL_ID")
-        if not user_pool_id:
-            logger.error("COGNITO_USER_POOL_ID environment variable not set")
-            raise CognitoError("Configuration error", 500)
-
         logger.debug(
             {
                 "message": "Attempting to enable user",
@@ -76,11 +42,7 @@ def lambda_handler(
         )
 
         # Enable user in Cognito
-        @tracer.capture_method
-        def enable_user():
-            return cognito.admin_enable_user(UserPoolId=user_pool_id, Username=user_id)
-
-        response = enable_user()
+        response = cognito.admin_enable_user(UserPoolId=user_pool_id, Username=user_id)
         logger.info(response)
 
         # Add custom metrics

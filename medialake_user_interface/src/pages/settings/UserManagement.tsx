@@ -65,6 +65,48 @@ const UserManagement: React.FC = () => {
   const disableUserMutation = useDisableUser();
   const enableUserMutation = useEnableUser();
 
+  // Sync editingUser with fresh data from the users list
+  // This ensures the form always shows the latest user data even if it was updated elsewhere
+  React.useEffect(() => {
+    if (editingUser && users) {
+      // Find the updated user in the fresh users list
+      const updatedUser = users.find(
+        (u) => u.username === editingUser.username,
+      );
+
+      if (updatedUser) {
+        // Log for debugging
+        console.log("Checking if editingUser needs sync:", {
+          editingUserGroups: editingUser.groups,
+          updatedUserGroups: updatedUser.groups,
+          editingUserEmail: editingUser.email,
+          updatedUserEmail: updatedUser.email,
+        });
+
+        // Only update if specific fields have changed to avoid unnecessary re-renders
+        const hasChanges =
+          JSON.stringify(updatedUser.groups) !==
+            JSON.stringify(editingUser.groups) ||
+          updatedUser.email !== editingUser.email ||
+          updatedUser.given_name !== editingUser.given_name ||
+          updatedUser.family_name !== editingUser.family_name ||
+          updatedUser.enabled !== editingUser.enabled;
+
+        if (hasChanges) {
+          console.log("Syncing editingUser with fresh data:", {
+            old: editingUser,
+            new: updatedUser,
+          });
+          setEditingUser(updatedUser);
+        }
+      } else {
+        // If the user no longer exists (was deleted), clear editingUser
+        console.log("User no longer exists, clearing editingUser");
+        setEditingUser(undefined);
+      }
+    }
+  }, [users]);
+
   const handleAddUser = () => {
     setEditingUser(undefined);
     setOpenUserForm(true);
@@ -264,6 +306,7 @@ const UserManagement: React.FC = () => {
           onToggleUserStatus={handleToggleUserStatus}
           activeFilters={activeFilters}
           activeSorting={activeSorting}
+          handleMutation={handleMutation}
           onRemoveFilter={(columnId) => {
             setActiveFilters((filters) =>
               filters.filter((f) => f.columnId !== columnId),
