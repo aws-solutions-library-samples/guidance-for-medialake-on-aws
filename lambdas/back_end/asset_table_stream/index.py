@@ -14,7 +14,7 @@ from requests_aws4auth import AWS4Auth
 
 logger = Logger(service="ddb-to-os-index")
 tracer = Tracer()
-metrics = Metrics()
+metrics = Metrics(namespace="MediaLake/AssetIndexing", service="ddb-to-os-index")
 
 # OpenSearch configuration
 REGION = os.environ["OS_DOMAIN_REGION"]

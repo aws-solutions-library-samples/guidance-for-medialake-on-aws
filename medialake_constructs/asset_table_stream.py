@@ -73,6 +73,7 @@ class AssetTableStream(Construct):
         search_layer = SearchLayer(self, "SearchLayer")
 
         # Create the asset table stream Lambda
+        # Memory set to maximum (10240 MB) to handle bulk operations with large batches
         self._asset_sync_engine_lambda = Lambda(
             self,
             "AssetTableStream",
@@ -80,6 +81,7 @@ class AssetTableStream(Construct):
                 name="asset-table-stream",
                 entry="lambdas/back_end/asset_table_stream",
                 timeout_minutes=15,
+                memory_size=10240,
                 vpc=props.vpc,
                 security_groups=[props.security_group],
                 layers=[search_layer.layer],
