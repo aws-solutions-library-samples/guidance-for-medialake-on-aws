@@ -378,16 +378,9 @@ sync-to-github:
     - ssh-keyscan github.com >> ~/.ssh/known_hosts
     - git config --global user.email "medialake@amazon.com"
     - git config --global user.name "Media Lake CI"
-    # Extract the merge request title from the most recent merge commit
-    # GitLab merge commits have format: "Merge branch 'X' into 'Y'\n\n<MR Title>\n\n..."
-    - export RELEASE_COMMIT_MESSAGE=$(git log -1 --merges --pretty=format:%B | sed -n '3p' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-    # Fallback to the merge commit subject if the title extraction fails
-    - |
-      if [ -z "$RELEASE_COMMIT_MESSAGE" ]; then
-        echo "Could not extract MR title, using merge commit subject as fallback"
-        export RELEASE_COMMIT_MESSAGE=$(git log -1 --pretty=format:%s)
-      fi
-    - echo "Using commit message: ${RELEASE_COMMIT_MESSAGE}"
+    # Capture subject of the latest non-merge commit on the release branch
+    - export RELEASE_COMMIT_MESSAGE=$(git log -1 --no-merges --pretty=format:%s)
+    - echo "Using commit message:${RELEASE_COMMIT_MESSAGE}"
     # Clone GitHub repository to maintain its git history
     - git clone git@github.com:aws-solutions-library-samples/guidance-for-medialake-on-aws.git github-repo
     - cd github-repo
@@ -398,10 +391,6 @@ sync-to-github:
     - rm -f secrets.txt
     - rm -rf docs/
     - rm -rf .roo/
-    - rm -rf github-repo/
-    - rm -rf .traycer/
-    - rm -rf memory-bank/
-    - rm -rf cdk-test-output/
     - rm -rf design/
     - rm -f setup-dev.sh
     - rm -f manage-hooks.sh
@@ -418,86 +407,87 @@ sync-to-github:
     - rm -rf medialake_user_interface/playwright-report/
     # Stage all changes and commit
     - git add -A
-    - git commit --allow-empty -m "${RELEASE_COMMIT_MESSAGE}"
+    - git commit --allow-empty -m "release: Quality of life updates and bug fixes - Collapsing of the /users and /groups API into a single lambda per resource and bug fixes in users screen"
     - echo "New commit created:" && git log --oneline -1
     # Push to GitHub main branch
     - git push origin main
-# playwright_e2e_test:
-#   stage: test
-#   timeout: 1h
-#   tags:
-#     - arch:amd64
-#     - size:large
-#   rules:
-#     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
-#       when: on_success
-#     - when: never
-#   # Commented out for faster testing iteration
-#   # needs:
-#   #   - job: medialake_deploy_us_west_2
-#   #     artifacts: false
-#   variables:
-#     AWS_CREDS_TARGET_ROLE: $E2E_TEST_AWS_IAM_ROLE
-#     AWS_DEFAULT_ACCOUNT: $E2E_TEST_AWS_ACCOUNT_ID
-#     AWS_DEFAULT_REGION: $E2E_TEST_AWS_REGION
-#     DEPLOY_REGION: $E2E_TEST_AWS_REGION
-#     CDK_DEPLOY_ACCOUNT: $E2E_TEST_AWS_ACCOUNT_ID
-#     CDK_DEFAULT_ACCOUNT: $E2E_TEST_AWS_ACCOUNT_ID
-#     CDK_DEPLOY_REGION: $E2E_TEST_AWS_REGION
-#     AWS_REGION: $E2E_TEST_AWS_REGION
-#     AMAZON_REGION: $E2E_TEST_AWS_REGION
-#   before_script:
-#     # Install required dependencies including system packages for Playwright
-#     - yum update -y
-#     - yum install -y python3 python3-pip nodejs npm git jq unzip which findutils
-#     # Install minimal system dependencies for headless Chromium
-#     - yum install -y alsa-lib atk cups-libs gtk3 libXcomposite libXdamage libXext libXrandr libXScrnSaver libXtst pango at-spi2-atk xorg-x11-server-Xvfb fontconfig
-#     # Install AWS CLI
-#     - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-#     - unzip awscliv2.zip
-#     - ./aws/install
-#     # Verify AWS access
-#     - aws sts get-caller-identity --profile default
-#     - echo "AWS identity verified for testing"
-#     # Navigate to UI directory and install dependencies
-#     - cd medialake_user_interface
-#     - npm install
-#     # Install Playwright browsers without system dependencies (we installed them manually)
-#     - npx playwright install chromium
-#     - echo "Playwright setup completed"
-#   script:
-#     - echo "Running comprehensive Playwright E2E test against deployed MediaLake infrastructure"
-#     - echo "Starting Playwright test execution..."
 
-#     # Set minimal environment variables for CI
-#     - export NODE_ENV=test
-#     - export PLAYWRIGHT_JUNIT_OUTPUT_NAME=results.xml
+playwright_e2e_test:
+  stage: test
+  timeout: 1h
+  tags:
+    - arch:amd64
+    - size:large
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
+      when: on_success
+    - when: never
+  # Commented out for faster testing iteration
+  # needs:
+  #   - job: medialake_deploy_us_west_2
+  #     artifacts: false
+  variables:
+    AWS_CREDS_TARGET_ROLE: $E2E_TEST_AWS_IAM_ROLE
+    AWS_DEFAULT_ACCOUNT: $E2E_TEST_AWS_ACCOUNT_ID
+    AWS_DEFAULT_REGION: $E2E_TEST_AWS_REGION
+    DEPLOY_REGION: $E2E_TEST_AWS_REGION
+    CDK_DEPLOY_ACCOUNT: $E2E_TEST_AWS_ACCOUNT_ID
+    CDK_DEFAULT_ACCOUNT: $E2E_TEST_AWS_ACCOUNT_ID
+    CDK_DEPLOY_REGION: $E2E_TEST_AWS_REGION
+    AWS_REGION: $E2E_TEST_AWS_REGION
+    AMAZON_REGION: $E2E_TEST_AWS_REGION
+  before_script:
+    # Install required dependencies including system packages for Playwright
+    - yum update -y
+    - yum install -y python3 python3-pip nodejs npm git jq unzip which findutils
+    # Install minimal system dependencies for headless Chromium
+    - yum install -y alsa-lib atk cups-libs gtk3 libXcomposite libXdamage libXext libXrandr libXScrnSaver libXtst pango at-spi2-atk xorg-x11-server-Xvfb fontconfig
+    # Install AWS CLI
+    - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+    - unzip awscliv2.zip
+    - ./aws/install
+    # Verify AWS access
+    - aws sts get-caller-identity --profile default
+    - echo "AWS identity verified for testing"
+    # Navigate to UI directory and install dependencies
+    - cd medialake_user_interface
+    - npm install
+    # Install Playwright browsers without system dependencies (we installed them manually)
+    - npx playwright install chromium
+    - echo "Playwright setup completed"
+  script:
+    - echo "Running comprehensive Playwright E2E test against deployed MediaLake infrastructure"
+    - echo "Starting Playwright test execution..."
 
-#     # Quick AWS connectivity verification
-#     - echo "Verifying AWS connectivity..."
-#     - aws sts get-caller-identity --region $DEPLOY_REGION --profile default
+    # Set minimal environment variables for CI
+    - export NODE_ENV=test
+    - export PLAYWRIGHT_JUNIT_OUTPUT_NAME=results.xml
 
-#     # Run with optimized settings for CI - Chromium only
-#     - echo "Executing Playwright test with optimized CI settings..."
-#     - mkdir -p test-results
-#     - timeout 1200 npx playwright test tests/integration/comprehensive-user-lifecycle-e2e.spec.ts --project=chromium --reporter=junit --reporter=html --timeout=180000 --max-failures=1 --workers=1
-#     - echo "Playwright E2E test completed successfully"
+    # Quick AWS connectivity verification
+    - echo "Verifying AWS connectivity..."
+    - aws sts get-caller-identity --region $DEPLOY_REGION --profile default
 
-#     # Ensure test results are in the expected location
-#     - echo "Verifying test artifacts..."
-#     - ls -la test-results/ || echo "No test-results directory found"
-#     - ls -la playwright-report/ || echo "No playwright-report directory found"
-#     - find . -name "*.xml" -type f || echo "No XML files found"
-#     - echo "Contents of test-results directory:"
-#     - ls -la test-results/ 2>/dev/null || echo "test-results directory not accessible"
-#   artifacts:
-#     when: always
-#     paths:
-#       - medialake_user_interface/test-results/
-#       - medialake_user_interface/playwright-report/
-#     expire_in: 1 week
-#     reports:
-#       junit: medialake_user_interface/test-results/*.xml
-#   after_script:
-#     - echo "E2E test execution completed"
-#     - echo "Test artifacts available in test-results/ and playwright-report/ directories"
+    # Run with optimized settings for CI - Chromium only
+    - echo "Executing Playwright test with optimized CI settings..."
+    - mkdir -p test-results
+    - timeout 1200 npx playwright test tests/integration/comprehensive-user-lifecycle-e2e.spec.ts --project=chromium --reporter=junit --reporter=html --timeout=180000 --max-failures=1 --workers=1
+    - echo "Playwright E2E test completed successfully"
+
+    # Ensure test results are in the expected location
+    - echo "Verifying test artifacts..."
+    - ls -la test-results/ || echo "No test-results directory found"
+    - ls -la playwright-report/ || echo "No playwright-report directory found"
+    - find . -name "*.xml" -type f || echo "No XML files found"
+    - echo "Contents of test-results directory:"
+    - ls -la test-results/ 2>/dev/null || echo "test-results directory not accessible"
+  artifacts:
+    when: always
+    paths:
+      - medialake_user_interface/test-results/
+      - medialake_user_interface/playwright-report/
+    expire_in: 1 week
+    reports:
+      junit: medialake_user_interface/test-results/*.xml
+  after_script:
+    - echo "E2E test execution completed"
+    - echo "Test artifacts available in test-results/ and playwright-report/ directories"
