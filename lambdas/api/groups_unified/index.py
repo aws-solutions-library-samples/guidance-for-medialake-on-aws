@@ -16,13 +16,13 @@ from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
 # Import route handlers
-from routes.groups_get import handle_get_groups
-from routes.groups_groupId_delete import handle_delete_group
-from routes.groups_groupId_get import handle_get_group
-from routes.groups_groupId_members_post import handle_post_group_members
-from routes.groups_groupId_members_userId_delete import handle_delete_group_member
-from routes.groups_groupId_put import handle_put_group
-from routes.groups_post import handle_post_groups
+from groups_get import handle_get_groups
+from groups_groupId_delete import handle_delete_group
+from groups_groupId_get import handle_get_group
+from groups_groupId_members_post import handle_post_group_members
+from groups_groupId_members_userId_delete import handle_delete_group_member
+from groups_groupId_put import handle_put_group
+from groups_post import handle_post_groups
 
 # Initialize PowerTools
 logger = Logger(
