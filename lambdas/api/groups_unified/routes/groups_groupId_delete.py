@@ -1,25 +1,11 @@
-import json
-import os
+"""DELETE /groups/{groupId} - Delete a group"""
+
 from typing import Any, Dict
 
-import boto3
-from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import MetricUnit
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.utilities.validation import validate
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 from pydantic import BaseModel, Field
-
-# Initialize AWS PowerTools
-logger = Logger(service="groups-service", level=os.getenv("LOG_LEVEL", "WARNING"))
-tracer = Tracer(service="groups-service")
-metrics = Metrics(namespace="medialake", service="groups-delete")
-
-# Initialize AWS clients
-dynamodb = boto3.resource("dynamodb")
-cognito_client = boto3.client("cognito-idp")
 
 
 class ErrorResponse(BaseModel):
@@ -36,149 +22,8 @@ class SuccessResponse(BaseModel):
     )
 
 
-# Validation schema for request
-input_schema = {
-    "type": "object",
-    "properties": {
-        "pathParameters": {
-            "type": "object",
-            "properties": {"groupId": {"type": "string"}},
-            "required": ["groupId"],
-        }
-    },
-    "required": ["pathParameters"],
-}
-
-
-@tracer.capture_lambda_handler
-@logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
-@metrics.log_metrics(capture_cold_start_metric=True)
-@validate(inbound_schema=input_schema)
-def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
-    """
-    Lambda handler to delete a group from both DynamoDB and Cognito
-
-    This function handles requests to delete a group with:
-    - DynamoDB cleanup (group metadata and memberships)
-    - Cognito group deletion
-    - Proper rollback if either operation fails
-    """
-    logger.info("Received event", extra={"event": json.dumps(event)})
-
-    # Handle Lambda warmer
-    if event.get("lambda_warmer"):
-        logger.info("Lambda warmer request received")
-        return {"statusCode": 200, "body": "Lambda warmed"}
-
-    try:
-        # Extract user ID from Cognito authorizer context
-        request_context = event.get("requestContext", {})
-        logger.info(
-            "Request context", extra={"request_context": json.dumps(request_context)}
-        )
-
-        authorizer = request_context.get("authorizer", {})
-        logger.info("Authorizer context", extra={"authorizer": json.dumps(authorizer)})
-
-        claims = authorizer.get("claims", {})
-        logger.info("Claims", extra={"claims": json.dumps(claims)})
-
-        # Get the user ID from the Cognito claims or directly from the authorizer context
-        user_id = claims.get("sub")
-
-        # If not found in claims, try to get it directly from the authorizer context
-        if not user_id:
-            user_id = authorizer.get("userId")
-            logger.info(
-                "Using userId from authorizer context", extra={"user_id": user_id}
-            )
-        else:
-            logger.info("Using sub from claims", extra={"user_id": user_id})
-
-        if not user_id:
-            logger.error(
-                "Missing user_id in both Cognito claims and authorizer context"
-            )
-            metrics.add_metric(
-                name="MissingUserIdError", unit=MetricUnit.Count, value=1
-            )
-            return _create_error_response(
-                400,
-                "Unable to identify user - missing from both claims and authorizer context",
-            )
-
-        # Get required environment variables
-        auth_table_name = os.getenv("AUTH_TABLE_NAME")
-        cognito_user_pool_id = os.getenv("COGNITO_USER_POOL_ID")
-
-        if not auth_table_name:
-            logger.error("AUTH_TABLE_NAME environment variable not set")
-            metrics.add_metric(
-                name="MissingConfigError", unit=MetricUnit.Count, value=1
-            )
-            return _create_error_response(
-                500, "Internal configuration error - missing table name"
-            )
-
-        if not cognito_user_pool_id:
-            logger.error("COGNITO_USER_POOL_ID environment variable not set")
-            metrics.add_metric(
-                name="MissingConfigError", unit=MetricUnit.Count, value=1
-            )
-            return _create_error_response(
-                500, "Internal configuration error - missing user pool ID"
-            )
-
-        # Get the group ID from path parameters
-        path_parameters = event.get("pathParameters", {})
-        if not path_parameters:
-            logger.error("Missing path parameters")
-            metrics.add_metric(
-                name="MissingPathParamsError", unit=MetricUnit.Count, value=1
-            )
-            return _create_error_response(400, "Missing group ID")
-
-        group_id = path_parameters.get("groupId")
-        if not group_id:
-            logger.error("Missing groupId in path parameters")
-            metrics.add_metric(
-                name="MissingGroupIdError", unit=MetricUnit.Count, value=1
-            )
-            return _create_error_response(400, "Missing group ID")
-
-        # Delete the group with rollback handling
-        _delete_group_with_rollback(auth_table_name, cognito_user_pool_id, group_id)
-
-        # Create success response
-        response = SuccessResponse(
-            status="200", message="Group deleted successfully", data={}
-        )
-
-        logger.info("Successfully deleted group", extra={"group_id": group_id})
-        metrics.add_metric(
-            name="SuccessfulGroupDeletion", unit=MetricUnit.Count, value=1
-        )
-
-        return {
-            "statusCode": 200,
-            "headers": {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-                "Access-Control-Allow-Methods": "OPTIONS,GET,PUT,POST,DELETE,PATCH",
-            },
-            "body": response.model_dump_json(),
-        }
-
-    except Exception as e:
-        logger.exception("Error processing request")
-        metrics.add_metric(name="UnhandledError", unit=MetricUnit.Count, value=1)
-        return _create_error_response(500, f"Internal server error: {str(e)}")
-
-
-@tracer.capture_method
 def _delete_group_with_rollback(
-    table_name: str, cognito_user_pool_id: str, group_id: str
+    dynamodb, table_name: str, cognito_user_pool_id: str, group_id: str, cognito, logger, metrics
 ) -> None:
     """
     Delete a group from both DynamoDB and Cognito with rollback handling
@@ -223,7 +68,7 @@ def _delete_group_with_rollback(
         # Step 3: Delete from Cognito first
         logger.info(f"Deleting Cognito group: {group_id}")
         try:
-            cognito_client.delete_group(
+            cognito.delete_group(
                 GroupName=group_id, UserPoolId=cognito_user_pool_id
             )
             cognito_deleted = True
@@ -286,7 +131,7 @@ def _delete_group_with_rollback(
                         break
 
                 if group_metadata:
-                    cognito_client.create_group(
+                    cognito.create_group(
                         GroupName=group_id,
                         UserPoolId=cognito_user_pool_id,
                         Description=group_metadata.get("description", "Restored group"),
@@ -329,3 +174,75 @@ def _create_error_response(status_code: int, message: str) -> Dict[str, Any]:
         },
         "body": error_response.model_dump_json(),
     }
+
+
+def handle_delete_group(
+    group_id: str, dynamodb, user_pool_id: str, table_name: str, logger, metrics, tracer
+) -> Dict[str, Any]:
+    """
+    Lambda handler to delete a group from both DynamoDB and Cognito
+
+    This function handles requests to delete a group with:
+    - DynamoDB cleanup (group metadata and memberships)
+    - Cognito group deletion
+    - Proper rollback if either operation fails
+    """
+    try:
+        if not group_id:
+            logger.error("Missing groupId in path parameters")
+            metrics.add_metric(
+                name="MissingGroupIdError", unit=MetricUnit.Count, value=1
+            )
+            return _create_error_response(400, "Missing group ID")
+
+        if not table_name:
+            logger.error("AUTH_TABLE_NAME environment variable not set")
+            metrics.add_metric(
+                name="MissingConfigError", unit=MetricUnit.Count, value=1
+            )
+            return _create_error_response(
+                500, "Internal configuration error - missing table name"
+            )
+
+        if not user_pool_id:
+            logger.error("COGNITO_USER_POOL_ID environment variable not set")
+            metrics.add_metric(
+                name="MissingConfigError", unit=MetricUnit.Count, value=1
+            )
+            return _create_error_response(
+                500, "Internal configuration error - missing user pool ID"
+            )
+
+        # Initialize cognito client (passed from main handler)
+        import boto3
+        cognito = boto3.client("cognito-idp")
+
+        # Delete the group with rollback handling
+        _delete_group_with_rollback(dynamodb, table_name, user_pool_id, group_id, cognito, logger, metrics)
+
+        # Create success response
+        response = SuccessResponse(
+            status="200", message="Group deleted successfully", data={}
+        )
+
+        logger.info("Successfully deleted group", extra={"group_id": group_id})
+        metrics.add_metric(
+            name="SuccessfulGroupDeletion", unit=MetricUnit.Count, value=1
+        )
+
+        return {
+            "statusCode": 200,
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
+                "Access-Control-Allow-Methods": "OPTIONS,GET,PUT,POST,DELETE,PATCH",
+            },
+            "body": response.model_dump_json(),
+        }
+
+    except Exception as e:
+        logger.exception("Error processing request")
+        metrics.add_metric(name="UnhandledError", unit=MetricUnit.Count, value=1)
+        return _create_error_response(500, f"Internal server error: {str(e)}")
+

@@ -1,25 +1,12 @@
+"""POST /groups - Create a new group"""
+
 import json
-import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-import boto3
-from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import MetricUnit
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools.utilities.validation import validate
 from botocore.exceptions import ClientError
 from pydantic import BaseModel, Field, validator
-
-# Initialize AWS PowerTools
-logger = Logger(service="groups-service", level=os.getenv("LOG_LEVEL", "WARNING"))
-tracer = Tracer(service="groups-service")
-metrics = Metrics(namespace="medialake", service="groups-create")
-
-# Initialize AWS clients
-dynamodb = boto3.resource("dynamodb")
-cognito_client = boto3.client("cognito-idp")
 
 
 class GroupRequest(BaseModel):
@@ -69,153 +56,16 @@ class GroupResponse(BaseModel):
     data: Dict[str, Any] = Field(..., description="Created group data")
 
 
-# Validation schema for request
-input_schema = {
-    "type": "object",
-    "properties": {"body": {"type": "string"}},
-    "required": ["body"],
-}
-
-
-@tracer.capture_lambda_handler
-@logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
-@metrics.log_metrics(capture_cold_start_metric=True)
-@validate(inbound_schema=input_schema)
-def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
-    """
-    Lambda handler to create a new group in both DynamoDB and Cognito
-
-    This function handles requests from the frontend to create a new group with:
-    - DynamoDB entry following the auth table schema
-    - Cognito group for user management
-    - Proper rollback if either operation fails
-    """
-    logger.info("Received event", extra={"event": json.dumps(event)})
-
-    # Handle Lambda warmer
-    if event.get("lambda_warmer"):
-        logger.info("Lambda warmer request received")
-        return {"statusCode": 200, "body": "Lambda warmed"}
-
-    try:
-        # Extract user ID from Cognito authorizer context
-        request_context = event.get("requestContext", {})
-        logger.info(
-            "Request context", extra={"request_context": json.dumps(request_context)}
-        )
-
-        authorizer = request_context.get("authorizer", {})
-        logger.info("Authorizer context", extra={"authorizer": json.dumps(authorizer)})
-
-        claims = authorizer.get("claims", {})
-        logger.info("Claims", extra={"claims": json.dumps(claims)})
-
-        # Get the user ID from the Cognito claims or directly from the authorizer context
-        user_id = claims.get("sub")
-
-        # If not found in claims, try to get it directly from the authorizer context
-        if not user_id:
-            user_id = authorizer.get("userId")
-            logger.info(
-                "Using userId from authorizer context", extra={"user_id": user_id}
-            )
-        else:
-            logger.info("Using sub from claims", extra={"user_id": user_id})
-
-        if not user_id:
-            logger.error(
-                "Missing user_id in both Cognito claims and authorizer context"
-            )
-            metrics.add_metric(
-                name="MissingUserIdError", unit=MetricUnit.Count, value=1
-            )
-            return _create_error_response(
-                400,
-                "Unable to identify user - missing from both claims and authorizer context",
-            )
-
-        # Get required environment variables
-        auth_table_name = os.getenv("AUTH_TABLE_NAME")
-        cognito_user_pool_id = os.getenv("COGNITO_USER_POOL_ID")
-
-        if not auth_table_name:
-            logger.error("AUTH_TABLE_NAME environment variable not set")
-            metrics.add_metric(
-                name="MissingConfigError", unit=MetricUnit.Count, value=1
-            )
-            return _create_error_response(
-                500, "Internal configuration error - missing table name"
-            )
-
-        if not cognito_user_pool_id:
-            logger.error("COGNITO_USER_POOL_ID environment variable not set")
-            metrics.add_metric(
-                name="MissingConfigError", unit=MetricUnit.Count, value=1
-            )
-            return _create_error_response(
-                500, "Internal configuration error - missing user pool ID"
-            )
-
-        # Parse the request body
-        try:
-            body = json.loads(event.get("body", "{}"))
-            logger.info("Request body", extra={"body": json.dumps(body)})
-            group_request = GroupRequest(**body)
-        except Exception as e:
-            logger.error(f"Invalid request body: {str(e)}")
-            metrics.add_metric(
-                name="InvalidRequestError", unit=MetricUnit.Count, value=1
-            )
-            return _create_error_response(400, f"Invalid request: {str(e)}")
-
-        # Create the group with rollback handling
-        group = _create_group_with_rollback(
-            auth_table_name, cognito_user_pool_id, group_request, user_id
-        )
-
-        # Create success response
-        try:
-            response = GroupResponse(
-                status="201",
-                message="Group created successfully",
-                data=group,
-            )
-
-            logger.info("Successfully created group", extra={"group_id": group["id"]})
-            metrics.add_metric(
-                name="SuccessfulGroupCreation", unit=MetricUnit.Count, value=1
-            )
-
-            # Try to serialize the response
-            response_json = response.model_dump_json()
-            logger.info(f"Response JSON: {response_json}")
-
-            return {
-                "statusCode": 201,
-                "headers": {
-                    "Content-Type": "application/json",
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-                    "Access-Control-Allow-Methods": "OPTIONS,GET,PUT,POST,DELETE,PATCH",
-                },
-                "body": response_json,
-            }
-        except Exception as e:
-            logger.error(f"Error creating response: {str(e)}")
-            return _create_error_response(500, f"Error creating response: {str(e)}")
-
-    except Exception as e:
-        logger.exception(f"Error processing request: {str(e)}")
-        metrics.add_metric(name="UnhandledError", unit=MetricUnit.Count, value=1)
-        return _create_error_response(500, f"Internal server error: {str(e)}")
-
-
-@tracer.capture_method
 def _create_group_with_rollback(
     table_name: str,
     cognito_user_pool_id: str,
     group_request: GroupRequest,
     created_by: str,
+    cognito,
+    dynamodb,
+    logger,
+    metrics,
+    tracer,
 ) -> Dict[str, Any]:
     """
     Create a new group in both DynamoDB and Cognito with rollback handling
@@ -233,7 +83,7 @@ def _create_group_with_rollback(
         # Step 1: Create the Cognito group first
         logger.info(f"Creating Cognito group: {group_request.id}")
         try:
-            cognito_client.create_group(
+            cognito.create_group(
                 GroupName=group_request.id,
                 UserPoolId=cognito_user_pool_id,
                 Description=group_request.description,
@@ -358,7 +208,7 @@ def _create_group_with_rollback(
         if cognito_created:
             try:
                 logger.info(f"Rolling back Cognito group: {group_request.id}")
-                cognito_client.delete_group(
+                cognito.delete_group(
                     GroupName=group_request.id, UserPoolId=cognito_user_pool_id
                 )
                 logger.info(
@@ -393,3 +243,91 @@ def _create_error_response(status_code: int, message: str) -> Dict[str, Any]:
         },
         "body": error_response.model_dump_json(),
     }
+
+
+def handle_post_groups(
+    app, cognito, dynamodb, table_name: str, user_pool_id: str, logger, metrics, tracer
+) -> Dict[str, Any]:
+    """
+    Lambda handler to create a new group in both DynamoDB and Cognito
+
+    This function handles requests from the frontend to create a new group with:
+    - DynamoDB entry following the auth table schema
+    - Cognito group for user management
+    - Proper rollback if either operation fails
+    """
+    try:
+        # Extract user ID from Cognito authorizer context
+        request_context = app.current_event.raw_event.get("requestContext", {})
+        authorizer = request_context.get("authorizer", {})
+        claims = authorizer.get("claims", {})
+
+        # Get the user ID from the Cognito claims or directly from the authorizer context
+        user_id = claims.get("sub")
+
+        # If not found in claims, try to get it directly from the authorizer context
+        if not user_id:
+            user_id = authorizer.get("userId")
+            logger.info(
+                "Using userId from authorizer context", extra={"user_id": user_id}
+            )
+        else:
+            logger.info("Using sub from claims", extra={"user_id": user_id})
+
+        if not user_id:
+            logger.error(
+                "Missing user_id in both Cognito claims and authorizer context"
+            )
+            metrics.add_metric(
+                name="MissingUserIdError", unit=MetricUnit.Count, value=1
+            )
+            return _create_error_response(
+                400,
+                "Unable to identify user - missing from both claims and authorizer context",
+            )
+
+        # Parse the request body
+        try:
+            body = app.current_event.json_body
+            logger.info("Request body", extra={"body": json.dumps(body)})
+            group_request = GroupRequest(**body)
+        except Exception as e:
+            logger.error(f"Invalid request body: {str(e)}")
+            metrics.add_metric(
+                name="InvalidRequestError", unit=MetricUnit.Count, value=1
+            )
+            return _create_error_response(400, f"Invalid request: {str(e)}")
+
+        # Create the group with rollback handling
+        group = _create_group_with_rollback(
+            table_name, user_pool_id, group_request, user_id, cognito, dynamodb, logger, metrics, tracer
+        )
+
+        # Create success response
+        response = GroupResponse(
+            status="201",
+            message="Group created successfully",
+            data=group,
+        )
+
+        logger.info("Successfully created group", extra={"group_id": group["id"]})
+        metrics.add_metric(
+            name="SuccessfulGroupCreation", unit=MetricUnit.Count, value=1
+        )
+
+        return {
+            "statusCode": 201,
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
+                "Access-Control-Allow-Methods": "OPTIONS,GET,PUT,POST,DELETE,PATCH",
+            },
+            "body": response.model_dump_json(),
+        }
+
+    except Exception as e:
+        logger.exception(f"Error processing request: {str(e)}")
+        metrics.add_metric(name="UnhandledError", unit=MetricUnit.Count, value=1)
+        return _create_error_response(500, f"Internal server error: {str(e)}")
+
