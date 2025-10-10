@@ -150,6 +150,16 @@ const CollectionViewPage: React.FC = () => {
   const { data: childCollectionsResponse, isLoading: isLoadingChildren } =
     useGetChildCollections(id!);
 
+  // Debug: Log child collections response
+  useEffect(() => {
+    console.log("[CollectionViewPage] Child collections response:", {
+      hasData: !!childCollectionsResponse,
+      data: childCollectionsResponse?.data,
+      count: childCollectionsResponse?.data?.length || 0,
+      isLoading: isLoadingChildren,
+    });
+  }, [childCollectionsResponse, isLoadingChildren]);
+
   // Check if multi-select feature is enabled
   const multiSelectFeature = useFeatureFlag(
     "search-multi-select-enabled",
@@ -735,6 +745,30 @@ const CollectionViewPage: React.FC = () => {
                   Delete Collection
                 </MenuItem>
               </Menu>
+            </Box>
+
+            {/* Debug Info - Remove after testing */}
+            <Box sx={{ mb: 2, p: 2, bgcolor: "info.light", borderRadius: 1 }}>
+              <Typography variant="caption" component="div">
+                DEBUG: Child Collections Status
+              </Typography>
+              <Typography variant="caption" component="div">
+                - Response exists:{" "}
+                {childCollectionsResponse ? "✅ Yes" : "❌ No"}
+              </Typography>
+              <Typography variant="caption" component="div">
+                - Data array exists:{" "}
+                {childCollectionsResponse?.data ? "✅ Yes" : "❌ No"}
+              </Typography>
+              <Typography variant="caption" component="div">
+                - Count: {childCollectionsResponse?.data?.length || 0}
+              </Typography>
+              <Typography variant="caption" component="div">
+                - Is Loading: {isLoadingChildren ? "Yes" : "No"}
+              </Typography>
+              <Typography variant="caption" component="div">
+                - Collection ID: {id}
+              </Typography>
             </Box>
 
             {/* Child Collections Section */}
