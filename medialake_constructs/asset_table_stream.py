@@ -25,6 +25,8 @@ class AssetTableStreamProps:
     vpc: Optional[ec2.Vpc] = None
     security_group: Optional[ec2.SecurityGroup] = None
     batch_size: int = 100
+    max_batch_size: int = 1000
+    reserved_concurrency: Optional[int] = 10
 
 
 class AssetTableStream(Construct):
@@ -71,6 +73,7 @@ class AssetTableStream(Construct):
         search_layer = SearchLayer(self, "SearchLayer")
 
         # Create the asset table stream Lambda
+        # Memory set to maximum (10240 MB) to handle bulk operations with large batches
         self._asset_sync_engine_lambda = Lambda(
             self,
             "AssetTableStream",
@@ -78,6 +81,7 @@ class AssetTableStream(Construct):
                 name="asset-table-stream",
                 entry="lambdas/back_end/asset_table_stream",
                 timeout_minutes=15,
+                memory_size=10240,
                 vpc=props.vpc,
                 security_groups=[props.security_group],
                 layers=[search_layer.layer],
@@ -86,19 +90,30 @@ class AssetTableStream(Construct):
                     "OPENSEARCH_ENDPOINT": props.opensearch_cluster_domain_endpoint,
                     "OPENSEARCH_INDEX": props.opensearch_index_name,
                     "SQS_URL": self.storage_ingest_connector_dlq.queue_url,
+                    "BULK_BATCH_SIZE": str(props.batch_size),
+                    "MAX_BULK_SIZE_MB": "5",
+                    "ERROR_THRESHOLD": "0.3",
+                    "CIRCUIT_TIMEOUT": "60",
                 },
+                reserved_concurrent_executions=props.reserved_concurrency,
             ),
         )
 
         # Add IAM permissions
         self._add_permissions(props)
 
-        # Add DynamoDB stream event source
+        # Add DynamoDB stream event source with dynamic batch size
+        # Use smaller batch size for normal operations, larger for bulk syncs
         self._asset_sync_engine_lambda.function.add_event_source(
             lambda_event_sources.DynamoEventSource(
                 props.asset_table,
                 starting_position=lambda_.StartingPosition.LATEST,
-                batch_size=props.batch_size,
+                batch_size=props.max_batch_size,
+                max_batching_window=Duration.seconds(5),
+                retry_attempts=3,
+                on_failure=lambda_event_sources.SqsDlq(
+                    self.storage_ingest_connector_dlq.queue
+                ),
             )
         )
 
