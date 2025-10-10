@@ -46,12 +46,12 @@ class UsersApi(Construct):
         Stack.of(self).account
 
         # Create unified users Lambda function
-        users_unified_lambda = Lambda(
+        users_lambda = Lambda(
             self,
-            "UsersUnifiedLambda",
+            "UsersLambda",
             config=LambdaConfig(
-                name="users_unified",
-                entry="lambdas/api/users_unified",
+                name="users",
+                entry="lambdas/api/users",
                 lambda_handler="index.lambda_handler",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": (
@@ -64,11 +64,11 @@ class UsersApi(Construct):
         )
 
         # Grant permissions to the unified Lambda
-        props.user_table.grant_read_write_data(users_unified_lambda.function)
-        props.x_origin_verify_secret.grant_read(users_unified_lambda.function)
+        props.user_table.grant_read_write_data(users_lambda.function)
+        props.x_origin_verify_secret.grant_read(users_lambda.function)
 
         # Grant Cognito permissions
-        users_unified_lambda.function.add_to_role_policy(
+        users_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     # Read-only actions
@@ -139,7 +139,7 @@ class UsersApi(Construct):
 
         # Create Lambda integration (proxy integration for all methods)
         lambda_integration = api_gateway.LambdaIntegration(
-            users_unified_lambda.function,
+            users_lambda.function,
             proxy=True,
         )
 
@@ -276,9 +276,9 @@ class UsersApi(Construct):
         add_cors_options_method(favorites_item_type_item_id_resource)
 
         # Store reference to the unified Lambda
-        self._users_unified_lambda = users_unified_lambda
+        self._users_lambda = users_lambda
 
     @property
-    def users_unified_lambda(self):
+    def users_lambda(self):
         """Return the unified users Lambda function"""
-        return self._users_unified_lambda
+        return self._users_lambda

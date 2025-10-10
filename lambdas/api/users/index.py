@@ -32,12 +32,12 @@ from routes.users_put import handle_put_user
 
 # Initialize PowerTools
 logger = Logger(
-    service="users-unified",
+    service="users",
     level=os.environ.get("LOG_LEVEL", "WARNING"),
     json_default=str,
 )
-tracer = Tracer(service="users-unified")
-metrics = Metrics(namespace="medialake", service="users-unified")
+tracer = Tracer(service="users")
+metrics = Metrics(namespace="medialake", service="users")
 
 # Configure CORS
 cors_config = CORSConfig(
