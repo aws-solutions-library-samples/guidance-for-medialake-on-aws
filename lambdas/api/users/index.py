@@ -16,19 +16,19 @@ from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
 # Import route handlers
-from routes.favorites_delete import handle_delete_favorite
-from routes.favorites_get import handle_get_favorites
-from routes.favorites_post import handle_post_favorite
-from routes.profile_get import handle_get_profile
-from routes.profile_put import handle_put_profile
-from routes.settings_get import handle_get_settings
-from routes.settings_put import handle_put_setting
-from routes.users_delete import handle_delete_user
-from routes.users_disable_post import handle_disable_user
-from routes.users_enable_post import handle_enable_user
-from routes.users_get import handle_get_user
-from routes.users_post import handle_create_user
-from routes.users_put import handle_put_user
+from favorites_delete import handle_delete_favorite
+from favorites_get import handle_get_favorites
+from favorites_post import handle_post_favorite
+from profile_get import handle_get_profile
+from profile_put import handle_put_profile
+from settings_get import handle_get_settings
+from settings_put import handle_put_setting
+from users_delete import handle_delete_user
+from users_disable_post import handle_disable_user
+from users_enable_post import handle_enable_user
+from users_get import handle_get_user
+from users_post import handle_create_user
+from users_put import handle_put_user
 
 # Initialize PowerTools
 logger = Logger(
