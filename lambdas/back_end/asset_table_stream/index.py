@@ -303,7 +303,7 @@ def chunk_bulk_actions(actions: List[dict]) -> List[List[dict]]:
     return chunks
 
 
-@retry_with_backoff(max_retries=10, base_delay=5, max_delay=120)
+@retry_with_backoff(max_retries=15, base_delay=3, max_delay=60)
 def execute_bulk_operation(actions: List[dict]) -> Tuple[int, List[dict]]:
     """
     Execute bulk operation on OpenSearch with retry logic for 429 errors.
