@@ -157,7 +157,7 @@ export function defineAbilityFor(
             );
             can("view", "user" as Subjects);
             can("view", "group" as Subjects);
-            // Grant manage on group for the users-groups route
+            // Grant manage on group for the users route
             if (action === "edit") {
               can("manage", "group" as Subjects);
             }

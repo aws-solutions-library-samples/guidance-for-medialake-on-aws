@@ -327,7 +327,9 @@ def _load_module_from_s3(bucket: str, key: str, alias: str):
     code = s3.Object(bucket, key).get()["Body"].read().decode("utf-8")
     spec = importlib.util.spec_from_loader(alias, loader=None)
     module = importlib.util.module_from_spec(spec)
-    exec(code, module.__dict__)
+    exec(
+        code, module.__dict__
+    )  # nosec B102 - Controlled execution of trusted S3 templates
     return module
 
 

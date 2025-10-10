@@ -1,30 +1,30 @@
 {
   "advanced-permissions-enabled": {
-    "value": true,
+    "value": false,
     "variant": "off"
   },
   "chat-enabled": {
-    "value": true,
+    "value": false,
     "variant": "off"
   },
   "file-upload-enabled": {
-    "value": true,
+    "value": false,
     "variant": "off"
   },
   "notification-enabled": {
-    "value": true,
+    "value": false,
     "variant": "off"
   },
   "search-multi-select-enabled": {
-    "value": true,
+    "value": false,
     "variant": "off"
   },
   "user-favorites-enabled": {
-    "value": true,
+    "value": false,
     "variant": "off"
   },
   "manual-pipeline-trigger-enabled": {
-    "value": true,
+    "value": false,
     "variant": "on"
   }
 }

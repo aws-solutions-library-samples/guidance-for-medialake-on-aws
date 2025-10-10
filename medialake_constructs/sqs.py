@@ -106,10 +106,13 @@ class SQSConstruct(Construct):
             if self.props.content_based_deduplication:
                 queue_props["content_based_deduplication"] = True
 
-        # Add encryption if enabled
+        # Add encryption - use KMS if enabled, otherwise use SQS-managed encryption
         if self.props.encryption:
             queue_props["encryption"] = sqs.QueueEncryption.KMS
             queue_props["encryption_master_key"] = encryption_key
+        else:
+            # Use SQS-managed encryption (SSE-SQS) for consistency
+            queue_props["encryption"] = sqs.QueueEncryption.SQS_MANAGED
 
         # Add DLQ if available
         if dlq:

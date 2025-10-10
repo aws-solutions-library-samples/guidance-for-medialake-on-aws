@@ -183,7 +183,7 @@ export const useDeleteUser = () => {
 
   return useMutation<void, Error, string>({
     mutationFn: async (username) => {
-      await apiClient.delete(`${API_ENDPOINTS.USERS}/${username}`);
+      await apiClient.delete(`${API_ENDPOINTS.USER}/${username}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.USERS] });

@@ -78,7 +78,9 @@ def load_and_execute_function_from_s3(
     )
     spec = importlib.util.spec_from_loader("dynamic_module", loader=None)
     mod = importlib.util.module_from_spec(spec)
-    exec(code, mod.__dict__)
+    exec(
+        code, mod.__dict__
+    )  # nosec B102 - Controlled execution of trusted S3 templates
     if not hasattr(mod, fn_name):
         raise AttributeError(f"{fn_name} not found in {key}")
     return getattr(mod, fn_name)(event)
@@ -97,7 +99,9 @@ def create_request_body(
     mapping = load_and_execute_function_from_s3(
         tmpl_bucket, tmpl_paths["mapping_file"], "translate_event_to_request", event
     )
-    env = Environment(loader=FileSystemLoader("/tmp/"))  # nosec B701
+    env = Environment(
+        loader=FileSystemLoader("/tmp/")
+    )  # nosec B701 - Controlled template rendering with trusted input
     env.filters["jsonify"] = json.dumps
     return json.loads(env.from_string(tmpl).render(variables=mapping))
 
@@ -117,7 +121,9 @@ def create_response_output(
         "translate_event_to_request",
         {"response_body": resp, "event": event},
     )
-    env = Environment(loader=FileSystemLoader("/tmp/"))  # nosec B701
+    env = Environment(
+        loader=FileSystemLoader("/tmp/")
+    )  # nosec B701 - Controlled template rendering with trusted input
     env.filters["jsonify"] = json.dumps
     return json.loads(env.from_string(tmpl).render(variables=mapping))
 

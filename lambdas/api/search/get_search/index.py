@@ -195,8 +195,9 @@ def get_opensearch_client() -> OpenSearch:
 def build_search_query(params: SearchParams) -> Dict:
     """Build search query from search parameters"""
     start_time = time.time()
+    terms = params.q.split() if params.q else []
     logger.info(
-        f"[PERF] Starting search query build - semantic: {params.semantic}, query: {params.q}"
+        f"[PERF] Starting search query build - semantic: {params.semantic}, query: {params.q}, terms: {len(terms)}"
     )
 
     if params.semantic:
@@ -239,8 +240,12 @@ def build_search_query(params: SearchParams) -> Dict:
 
     parse_start = time.time()
     clean_query, parsed_filters = parse_search_query(params.q)
+    query_terms = clean_query.split() if clean_query else []
     logger.info(f"[PERF] Query parsing took: {time.time() - parse_start:.3f}s")
-    logger.info("Parsed search query", extra={"clean_query": clean_query})
+    logger.info(
+        "Parsed search query",
+        extra={"clean_query": clean_query, "term_count": len(query_terms)},
+    )
 
     name_fields = [
         "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name^3",
@@ -268,80 +273,111 @@ def build_search_query(params: SearchParams) -> Dict:
     # Handle search terms
     if clean_query:
         terms = clean_query.split()
-        query["bool"]["should"] = [
-            # Exact prefix match on the file name with highest boost
-            {
-                "prefix": {
-                    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name.keyword": {
-                        "value": clean_query,
-                        "boost": 4.0,
-                    }
-                }
-            },
-            # Enhanced phrase prefix matching
-            {
-                "match_phrase_prefix": {
-                    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name": {
-                        "query": clean_query,
-                        "boost": 3.0,
-                    }
-                }
-            },
-            {
-                "multi_match": {
-                    "query": clean_query,
-                    "fields": name_fields,
-                    "type": "best_fields",
-                    "fuzziness": "AUTO",
-                    "prefix_length": 10,
-                    "minimum_should_match": "80%",
-                    "boost": 2,
-                }
-            },
-            {
-                "multi_match": {
-                    "query": clean_query,
-                    "fields": type_fields,
-                    "type": "cross_fields",
-                    "operator": "or",
-                    "minimum_should_match": "1",
-                    "boost": 1,
-                }
-            },
-            {
-                "query_string": {
-                    "query": f"*{clean_query}*",
-                    "fields": name_fields,
-                    "analyze_wildcard": True,
-                    "boost": 0.7,
-                }
-            },
-            # Add metadata search using multi_match for all metadata fields
-            {
-                "multi_match": {
-                    "query": clean_query,
-                    "fields": ["Metadata.*"],
-                    "type": "best_fields",
-                    "boost": 0.8,
-                    "lenient": True,
-                }
-            },
-        ]
 
-        # Add individual term matches for multi-keyword search with OR logic
+        # For multi-term queries, use a simpler approach to avoid too many clauses
         if len(terms) > 1:
-            for term in terms:
-                query["bool"]["should"].append(
-                    {
-                        "multi_match": {
-                            "query": term,
-                            "fields": name_fields + type_fields,
-                            "type": "best_fields",
-                            "fuzziness": "AUTO",
-                            "boost": 0.5,
+            query["bool"]["should"] = [
+                # Exact phrase match with highest boost
+                {
+                    "match_phrase": {
+                        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name": {
+                            "query": clean_query,
+                            "boost": 4.0,
                         }
                     }
-                )
+                },
+                # Multi-match for name fields with reduced complexity
+                {
+                    "multi_match": {
+                        "query": clean_query,
+                        "fields": name_fields,
+                        "type": "best_fields",
+                        "operator": "and",
+                        "boost": 3.0,
+                    }
+                },
+                # Multi-match for type fields
+                {
+                    "multi_match": {
+                        "query": clean_query,
+                        "fields": type_fields,
+                        "type": "best_fields",
+                        "operator": "or",
+                        "boost": 2.0,
+                    }
+                },
+                # Simple wildcard search for partial matches
+                {
+                    "wildcard": {
+                        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name.keyword": {
+                            "value": f"*{clean_query}*",
+                            "boost": 1.0,
+                        }
+                    }
+                },
+            ]
+        else:
+            # Single term - use the original complex query structure
+            query["bool"]["should"] = [
+                # Exact prefix match on the file name with highest boost
+                {
+                    "prefix": {
+                        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name.keyword": {
+                            "value": clean_query,
+                            "boost": 4.0,
+                        }
+                    }
+                },
+                # Enhanced phrase prefix matching
+                {
+                    "match_phrase_prefix": {
+                        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name": {
+                            "query": clean_query,
+                            "boost": 3.0,
+                        }
+                    }
+                },
+                {
+                    "multi_match": {
+                        "query": clean_query,
+                        "fields": name_fields,
+                        "type": "best_fields",
+                        "fuzziness": "AUTO",
+                        "prefix_length": 10,
+                        "minimum_should_match": "80%",
+                        "boost": 2,
+                    }
+                },
+                {
+                    "multi_match": {
+                        "query": clean_query,
+                        "fields": type_fields,
+                        "type": "cross_fields",
+                        "operator": "or",
+                        "minimum_should_match": "1",
+                        "boost": 1,
+                    }
+                },
+                {
+                    "query_string": {
+                        "query": f"*{clean_query}*",
+                        "fields": name_fields,
+                        "analyze_wildcard": True,
+                        "boost": 0.7,
+                    }
+                },
+                # Metadata search disabled to avoid field expansion limit (1024 fields)
+                # The Metadata.* wildcard was causing: "field expansion matches too many fields, limit: 1024, got: 1065"
+                # {
+                #     "multi_match": {
+                #         "query": clean_query,
+                #         "fields": ["Metadata.*"],
+                #         "type": "best_fields",
+                #         "boost": 0.8,
+                #         "lenient": True,
+                #     }
+                # },
+            ]
 
         query["bool"]["minimum_should_match"] = 1
     else:
@@ -1034,7 +1070,60 @@ def perform_search(params: SearchParams) -> Dict:
                 "Executing OpenSearch query", extra={"semantic": params.semantic}
             )
             opensearch_start = time.time()
-            response = client.search(body=search_body, index=index_name)
+
+            try:
+                response = client.search(body=search_body, index=index_name)
+            except Exception as e:
+                # Handle "too many nested clauses" error with a simpler fallback query
+                if "too_many_nested_clauses" in str(e) or "maxClauseCount" in str(e):
+                    logger.warning(
+                        f"Query too complex, using simplified fallback query: {str(e)}"
+                    )
+
+                    # Create a much simpler fallback query
+                    fallback_query = {
+                        "query": {
+                            "bool": {
+                                "must": [
+                                    {"exists": {"field": "InventoryID"}},
+                                    {
+                                        "bool": {
+                                            "must_not": {"term": {"InventoryID": ""}}
+                                        }
+                                    },
+                                ],
+                                "must_not": [{"term": {"embedding_scope": "clip"}}],
+                                "should": [
+                                    {
+                                        "match": {
+                                            "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name": {
+                                                "query": params.q,
+                                                "boost": 2.0,
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "match": {
+                                            "DigitalSourceAsset.Type": {
+                                                "query": params.q,
+                                                "boost": 1.0,
+                                            }
+                                        }
+                                    },
+                                ],
+                                "minimum_should_match": 1,
+                            }
+                        },
+                        "size": params.size,
+                        "from": params.from_,
+                    }
+
+                    logger.info("Executing simplified fallback query")
+                    response = client.search(body=fallback_query, index=index_name)
+                else:
+                    # Re-raise other exceptions
+                    raise e
+
             opensearch_time = time.time() - opensearch_start
             logger.info(
                 f"[PERF] OpenSearch query execution took: {opensearch_time:.3f}s"

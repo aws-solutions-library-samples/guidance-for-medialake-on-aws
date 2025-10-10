@@ -59,12 +59,6 @@ actions:
         schema:
           type: string
       - in: body
-        name: Region
-        required: false
-        default: "us-east-1"
-        schema:
-          type: string
-      - in: body
         name: S3 Output Bucket
         required: false
         default: "${EXTERNAL_PAYLOAD_BUCKET}"

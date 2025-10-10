@@ -10,6 +10,9 @@ node:
       lambda:
         handler: utility/ImageProxyLambdaDeployment
         runtime: python3.12
+        memory_size: 10240
+        ephemeral_storage: 10240
+        timeout: 900
         layers:
           - ResvgCli
         iam_policy:

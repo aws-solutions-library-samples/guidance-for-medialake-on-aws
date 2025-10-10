@@ -8,7 +8,6 @@ from aws_cdk import aws_secretsmanager as secretsmanager
 from constructs import Construct
 
 from config import config
-from medialake_constructs.api_gateway.api_gateway_upsf import UPSFApi, UPSFApiProps
 from medialake_constructs.api_gateway.api_gateway_users import UsersApi, UsersApiProps
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 
@@ -176,23 +175,11 @@ class UsersGroupsStack(cdk.NestedStack):
         )
         self._settings_table = DynamoDB(self, "SettingsTable", settings_table_props)
 
-        # Create Users API construct
+        # Create Users API construct (unified with profile, settings, and favorites)
         self._users_api = UsersApi(
             self,
             "UsersApiGateway",
             props=UsersApiProps(
-                api_resource=props.api_resource,
-                authorizer=props.authorizer,
-                cognito_user_pool=props.cognito_user_pool,
-                x_origin_verify_secret=props.x_origin_verify_secret,
-            ),
-        )
-
-        # Create the UPSF API construct
-        self._upsf_api = UPSFApi(
-            self,
-            "UPSFApi",
-            props=UPSFApiProps(
                 api_resource=props.api_resource,
                 authorizer=props.authorizer,
                 cognito_user_pool=props.cognito_user_pool,

@@ -1,0 +1,101 @@
+"""GET /users/{user_id} - Get user details"""
+
+from typing import Any, Dict
+
+from aws_lambda_powertools.metrics import MetricUnit
+from botocore.exceptions import ClientError
+from pydantic import BaseModel, Field
+
+
+class ErrorResponse(BaseModel):
+    status: str = Field(..., description="Error status code")
+    message: str = Field(..., description="Error message")
+    data: Dict = Field(default={}, description="Empty data object for errors")
+
+
+class UserResponse(BaseModel):
+    status: str = Field(..., description="Success status code")
+    message: str = Field(..., description="Success message")
+    data: Dict[str, Any] = Field(..., description="User data from Cognito")
+
+
+def _get_cognito_user(cognito, user_pool_id: str, user_id: str, logger, metrics, tracer) -> Dict[str, Any]:
+    """
+    Fetch user details from Cognito User Pool
+    """
+    try:
+        response = cognito.admin_get_user(UserPoolId=user_pool_id, Username=user_id)
+
+        # Transform Cognito response into a cleaner format
+        user_attributes = {
+            attr["Name"]: attr["Value"] for attr in response.get("UserAttributes", [])
+        }
+
+        return {
+            "username": response.get("Username"),
+            "user_status": response.get("UserStatus"),
+            "enabled": response.get("Enabled", False),
+            "user_created": response.get("UserCreateDate").isoformat(),
+            "last_modified": response.get("UserLastModifiedDate").isoformat(),
+            "attributes": user_attributes,
+        }
+
+    except cognito.exceptions.UserNotFoundException:
+        logger.warning(f"User not found", extra={"user_id": user_id})
+        metrics.add_metric(name="UserNotFound", unit=MetricUnit.Count, value=1)
+        raise ValueError("User not found")
+
+    except ClientError as e:
+        logger.error(f"Cognito API error", extra={"error": str(e)})
+        metrics.add_metric(name="CognitoAPIError", unit=MetricUnit.Count, value=1)
+        raise
+
+
+def _create_error_response(status_code: int, message: str) -> Dict[str, Any]:
+    """
+    Create standardized error response
+    """
+    error_response = ErrorResponse(status=str(status_code), message=message, data={})
+
+    return {
+        "statusCode": status_code,
+        "headers": {"Content-Type": "application/json"},
+        "body": error_response.model_dump_json(),
+    }
+
+
+def handle_get_user(user_id: str, cognito, user_pool_id: str, logger, metrics, tracer) -> Dict[str, Any]:
+    """
+    Lambda handler to fetch user details from Cognito User Pool
+    """
+    try:
+        if not user_id:
+            logger.error("Missing user_id in path parameters")
+            metrics.add_metric(
+                name="MissingUserIdError", unit=MetricUnit.Count, value=1
+            )
+            return _create_error_response(400, "Missing user_id parameter")
+
+        # Fetch user details from Cognito
+        user_details = _get_cognito_user(cognito, user_pool_id, user_id, logger, metrics, tracer)
+
+        # Create success response
+        response = UserResponse(
+            status="200",
+            message="User details retrieved successfully",
+            data=user_details,
+        )
+
+        logger.info("Successfully retrieved user details", extra={"user_id": user_id})
+        metrics.add_metric(name="SuccessfulUserLookup", unit=MetricUnit.Count, value=1)
+
+        return {
+            "statusCode": 200,
+            "headers": {"Content-Type": "application/json"},
+            "body": response.model_dump_json(),
+        }
+
+    except Exception:
+        logger.exception("Error processing request")
+        metrics.add_metric(name="UnhandledError", unit=MetricUnit.Count, value=1)
+        return _create_error_response(500, "Internal server error")
