@@ -1,0 +1,92 @@
+name: Validate and Deploy Python CDK
+
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install AWS CDK CLI
+        run: npm install -g aws-cdk
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/Github
+          aws-region: us-west-2
+
+      - name: Set up Python virtual environment
+        run: python -m venv .venv
+
+      - name: Upgrade pip
+        run: |
+          source .venv/bin/activate
+          pip install --upgrade pip
+
+      - name: Install jq and moreutils
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq moreutils
+
+      - name: Patch config.json with jq
+        env:
+          MediaLakeEnvironmentName: dev
+          InitialUserEmail: 'medialake+test@amazon.com'
+          InitialUserFirstName: 'Medialake'
+          InitialUserLastName: 'User'
+          OpenSearchDeploymentSize: 'large'
+        run: |
+          if [ -f config.json ]; then
+            echo "Using existing config file";
+          else
+            echo "Creating config file";
+            cp .cicd/config.json-template config.json;
+          fi
+
+          AWS_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+          AWS_REGION="$(aws configure get region || echo 'us-west-2')"
+
+          jq --arg e "$MediaLakeEnvironmentName"  '.environment = $e' config.json | sponge config.json
+          jq --arg a "$AWS_ACCOUNT_ID"            '.account_id = $a'  config.json | sponge config.json
+          jq --arg r "$AWS_REGION"                '.primary_region = $r' config.json | sponge config.json
+          jq --arg u "$InitialUserEmail"          '.initial_user.email = $u' config.json | sponge config.json
+          jq --arg f "$InitialUserFirstName"      '.initial_user.first_name = $f' config.json | sponge config.json
+          jq --arg l "$InitialUserLastName"       '.initial_user.last_name = $l' config.json | sponge config.json
+          jq --arg s "$OpenSearchDeploymentSize"  '.opensearch_deployment_size = $s' config.json | sponge config.json
+
+      - name: Install CDK project dependencies
+        run: |
+          source .venv/bin/activate
+          pip install -r requirements.txt
+
+      - name: Synthesize CDK stacks
+        run: |
+          source .venv/bin/activate
+          cdk synth
+
+      - name: Deploy all CDK stacks
+        run: |
+          source .venv/bin/activate
+          cdk deploy --all --require-approval=never
