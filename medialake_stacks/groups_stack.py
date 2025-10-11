@@ -79,7 +79,6 @@ class GroupsStack(cdk.NestedStack):
             config=LambdaConfig(
                 name="groups-unified",
                 entry="lambdas/api/groups_unified",
-                lambda_handler="index.lambda_handler",
                 environment_variables=common_env_vars,
             ),
         )
