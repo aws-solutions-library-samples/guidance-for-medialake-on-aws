@@ -43,11 +43,18 @@ export const UserForm: React.FC<UserFormProps> = ({
           groups:
             user.groups && user.groups.length > 0
               ? (() => {
-                  // Convert first group name to group ID for the form
-                  const group = availableGroups.find(
-                    (g) => g.name === user.groups[0],
+                  // user.groups contains group IDs (e.g., "read-only", "superAdministrators")
+                  // Check if the ID exists in availableGroups, otherwise default to "editors"
+                  const groupId = user.groups[0];
+                  const groupExists = availableGroups.find(
+                    (g) => g.id === groupId,
                   );
-                  return group ? group.id : "editors";
+                  console.log("UserForm defaultValues - looking up group:", {
+                    groupId,
+                    groupExists,
+                    availableGroups,
+                  });
+                  return groupExists ? groupId : "editors";
                 })()
               : "editors",
         }
@@ -67,15 +74,24 @@ export const UserForm: React.FC<UserFormProps> = ({
             groups:
               user.groups && user.groups.length > 0
                 ? (() => {
-                    // Convert first group name to group ID for the form
-                    const group = availableGroups.find(
-                      (g) => g.name === user.groups[0],
+                    // user.groups contains group IDs (e.g., "read-only", "superAdministrators")
+                    // Check if the ID exists in availableGroups, otherwise default to "editors"
+                    const groupId = user.groups[0];
+                    const groupExists = availableGroups.find(
+                      (g) => g.id === groupId,
                     );
-                    return group ? group.id : "editors";
+                    console.log("UserForm reset - looking up group:", {
+                      groupId,
+                      groupExists,
+                      availableGroups,
+                      userProp: user,
+                    });
+                    return groupExists ? groupId : "editors";
                   })()
                 : "editors",
           }
         : createUserFormDefaults;
+      console.log("UserForm resetting with values:", defaultVals);
       form.reset(defaultVals);
     } else {
       // Optionally reset to blank defaults when closed, if desired

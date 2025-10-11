@@ -72,20 +72,23 @@ class GroupsStack(cdk.NestedStack):
             "COGNITO_USER_POOL_ID": props.cognito_user_pool.user_pool_id,
         }
 
-        # POST /groups - Create a new Group
-        post_groups_lambda = Lambda(
+        # Single unified Lambda for all groups operations
+        groups_unified_lambda = Lambda(
             self,
-            "post-groups",
+            "groups-unified",
             config=LambdaConfig(
-                name="post-groups",
-                entry="lambdas/api/groups/post_groups",
+                name="groups-unified",
+                entry="lambdas/api/groups_unified",
+                lambda_handler="index.lambda_handler",
                 environment_variables=common_env_vars,
             ),
         )
-        props.auth_table.grant_read_write_data(post_groups_lambda.function)
-
+        
+        # Grant permissions
+        props.auth_table.grant_read_write_data(groups_unified_lambda.function)
+        
         # Grant permissions for Cognito group management
-        post_groups_lambda.function.add_to_role_policy(
+        groups_unified_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=[
@@ -98,9 +101,10 @@ class GroupsStack(cdk.NestedStack):
             )
         )
 
+        # POST /groups - Create a new Group
         groups_post_method = groups_resource.add_method(
             "POST",
-            api_gateway.LambdaIntegration(post_groups_lambda.function),
+            api_gateway.LambdaIntegration(groups_unified_lambda.function),
             # authorization_type=api_gateway.AuthorizationType.CUSTOM,
             # authorizer=props.authorizer,
         )
@@ -110,20 +114,9 @@ class GroupsStack(cdk.NestedStack):
         cfn_method.authorizer_id = props.authorizer.authorizer_id
 
         # GET /groups - List all Groups
-        authorization_groups_get = Lambda(
-            self,
-            "authorization-groups-get",
-            config=LambdaConfig(
-                name="authorization-groups-get",
-                entry="lambdas/api/groups/get_groups",
-                environment_variables=common_env_vars,
-            ),
-        )
-        props.auth_table.grant_read_data(authorization_groups_get.function)
-
         groups_get_method = groups_resource.add_method(
             "GET",
-            api_gateway.LambdaIntegration(authorization_groups_get.function),
+            api_gateway.LambdaIntegration(groups_unified_lambda.function),
             # authorization_type=api_gateway.AuthorizationType.CUSTOM,
             # authorizer=props.authorizer,
         )
@@ -136,21 +129,10 @@ class GroupsStack(cdk.NestedStack):
         group_id_resource = groups_resource.add_resource("{groupId}")
 
         # GET /groups/{groupId} - Get details of a specific Group
-        authorization_groups_group_id_get = Lambda(
-            self,
-            "authorization-groups-group-id-get",
-            config=LambdaConfig(
-                name="authorization-groups-group-id-get",
-                entry="lambdas/api/groups/get_group",
-                environment_variables=common_env_vars,
-            ),
-        )
-        props.auth_table.grant_read_data(authorization_groups_group_id_get.function)
-
         group_id_get_method = group_id_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(
-                authorization_groups_group_id_get.function,
+                groups_unified_lambda.function,
                 request_templates={
                     "application/json": '{ "groupId": "$input.params(\'groupId\')" }'
                 },
@@ -164,23 +146,10 @@ class GroupsStack(cdk.NestedStack):
         cfn_method.authorizer_id = props.authorizer.authorizer_id
 
         # PUT /groups/{groupId} - Update an existing Group
-        authorization_groups_group_id_put = Lambda(
-            self,
-            "authorization-groups-group-id-put",
-            config=LambdaConfig(
-                name="authorization-groups-group-id-put",
-                entry="lambdas/api/groups/update_group",
-                environment_variables=common_env_vars,
-            ),
-        )
-        props.auth_table.grant_read_write_data(
-            authorization_groups_group_id_put.function
-        )
-
         group_id_put_method = group_id_resource.add_method(
             "PUT",
             api_gateway.LambdaIntegration(
-                authorization_groups_group_id_put.function,
+                groups_unified_lambda.function,
                 request_templates={
                     "application/json": '{ "groupId": "$input.params(\'groupId\')" }'
                 },
@@ -193,37 +162,10 @@ class GroupsStack(cdk.NestedStack):
         cfn_method.authorizer_id = props.authorizer.authorizer_id
 
         # DELETE /groups/{groupId} - Delete a Group
-        authorization_groups_group_id_delete = Lambda(
-            self,
-            "authorization-groups-group-id-delete",
-            config=LambdaConfig(
-                name="authorization-groups-group-id-delete",
-                entry="lambdas/api/groups/rp_groupId/del_groupId",
-                environment_variables=common_env_vars,
-            ),
-        )
-        props.auth_table.grant_read_write_data(
-            authorization_groups_group_id_delete.function
-        )
-
-        # Grant permissions for Cognito group management
-        authorization_groups_group_id_delete.function.add_to_role_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "cognito-idp:CreateGroup",
-                    "cognito-idp:DeleteGroup",
-                    "cognito-idp:GetGroup",
-                    "cognito-idp:ListGroups",
-                ],
-                resources=[props.cognito_user_pool.user_pool_arn],
-            )
-        )
-
         group_id_delete_method = group_id_resource.add_method(
             "DELETE",
             api_gateway.LambdaIntegration(
-                authorization_groups_group_id_delete.function,
+                groups_unified_lambda.function,
                 request_templates={
                     "application/json": '{ "groupId": "$input.params(\'groupId\')" }'
                 },
@@ -239,21 +181,10 @@ class GroupsStack(cdk.NestedStack):
         group_members_resource = group_id_resource.add_resource("members")
 
         # POST /groups/{groupId}/members - Add members to a Group
-        add_group_members_lambda = Lambda(
-            self,
-            "authorization-groups-group-id-members-post",
-            config=LambdaConfig(
-                name="authorization-groups-group-id-members-post",
-                entry="lambdas/api/groups/add_group_members",
-                environment_variables=common_env_vars,
-            ),
-        )
-        props.auth_table.grant_read_write_data(add_group_members_lambda.function)
-
         group_members_post_method = group_members_resource.add_method(
             "POST",
             api_gateway.LambdaIntegration(
-                add_group_members_lambda.function,
+                groups_unified_lambda.function,
                 request_templates={
                     "application/json": '{ "groupId": "$input.params(\'groupId\')" }'
                 },
@@ -269,21 +200,10 @@ class GroupsStack(cdk.NestedStack):
         group_member_id_resource = group_members_resource.add_resource("{userId}")
 
         # DELETE /groups/{groupId}/members/{userId} - Remove a member from a Group
-        remove_group_member_lambda = Lambda(
-            self,
-            "RemoveGroupMemberLambda",
-            config=LambdaConfig(
-                name="remove_group_member",
-                entry="lambdas/api/groups/remove_group_member",
-                environment_variables=common_env_vars,
-            ),
-        )
-        props.auth_table.grant_read_write_data(remove_group_member_lambda.function)
-
         group_member_id_delete_method = group_member_id_resource.add_method(
             "DELETE",
             api_gateway.LambdaIntegration(
-                remove_group_member_lambda.function,
+                groups_unified_lambda.function,
                 request_templates={
                     "application/json": '{ "groupId": "$input.params(\'groupId\')", "userId": "$input.params(\'userId\')" }'
                 },

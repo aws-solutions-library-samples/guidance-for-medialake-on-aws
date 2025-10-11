@@ -460,6 +460,9 @@ class BaseInfrastructureStack(Stack):
             )
 
             # Create asset table stream construct
+            # AGGRESSIVE throttling to prevent OpenSearch 429 errors
+            # - Concurrency: 1 (sequential processing only)
+            # - Batch sizes: Very small to minimize OpenSearch load
             self._asset_table_stream = AssetTableStream(
                 self,
                 "AssetTableStreamConstruct",
@@ -471,7 +474,9 @@ class BaseInfrastructureStack(Stack):
                     opensearch_index_name=opensearch_index_name,
                     vpc=self._vpc.vpc,
                     security_group=self._security_group,
-                    batch_size=100,
+                    batch_size=50,  # Bulk API batch size (reduced from 250)
+                    max_batch_size=100,  # DynamoDB stream batch size (reduced from 500)
+                    reserved_concurrency=1,  # Sequential processing only (reduced from 3)
                 ),
             )
 

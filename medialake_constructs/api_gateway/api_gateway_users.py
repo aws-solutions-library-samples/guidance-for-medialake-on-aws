@@ -1,13 +1,9 @@
 """
-API Gateway Connectors module for MediaLake.
+API Gateway Users module for MediaLake.
 
-This module defines the ConnectorsConstruct class which sets up API Gateway endpoints
-and associated Lambda functions for managing media connectors. It handles:
-- S3 bucket connections
-- DynamoDB table management
-- IAM roles and permissions
-- API Gateway integration
-- Lambda function configuration
+This module defines the UsersApi class which sets up API Gateway endpoints
+and associated Lambda function for managing users. It consolidates all user-related
+endpoints (CRUD, profile, settings, favorites) into a single Lambda with AWS Powertools routing.
 """
 
 from dataclasses import dataclass
@@ -21,7 +17,6 @@ from aws_cdk import aws_secretsmanager as secrets_manager
 from constructs import Construct
 
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
-from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 
@@ -31,11 +26,12 @@ class UsersApiProps:
     api_resource: api_gateway.RestApi
     authorizer: api_gateway.IAuthorizer
     cognito_user_pool: cognito.UserPool
+    user_table: dynamodb.Table
 
 
 class UsersApi(Construct):
     """
-    Users API API Gateway deployment
+    Users API Gateway deployment with unified Lambda for all user endpoints
     """
 
     def __init__(
@@ -46,49 +42,36 @@ class UsersApi(Construct):
     ) -> None:
         super().__init__(scope, constructor_id)
 
-        from config import config
-
         # Get the current account ID
         Stack.of(self).account
 
-        self._users_table = DynamoDB(
+        # Create unified users Lambda function
+        users_lambda = Lambda(
             self,
-            "UsersTable",
-            props=DynamoDBProps(
-                name=f"{config.resource_prefix}_users_table_{config.environment}",
-                partition_key_name="id",
-                partition_key_type=dynamodb.AttributeType.STRING,
-            ),
-        )
-
-        # Create connectors resource
-        users_resource = props.api_resource.root.add_resource("users")
-
-        # Add connector_id path parameter resource
-        users_user_resource = users_resource.add_resource("user")
-
-        users_user_id_resources = users_user_resource.add_resource("{user_id}")
-
-        user_id_get_lambda = Lambda(
-            self,
-            "UsersUserGetLambda",
+            "UsersLambda",
             config=LambdaConfig(
-                name="userid_get_lambda",
-                entry="lambdas/api/users/user/rp_userid/get_userid",
+                name="users",
+                entry="lambdas/api/users",
+                lambda_handler="index.lambda_handler",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": (
                         props.x_origin_verify_secret.secret_arn
                     ),
-                    "MEDIALAKE_USER_TABLE": self._users_table.table_arn,
                     "COGNITO_USER_POOL_ID": props.cognito_user_pool.user_pool_id,
+                    "USER_TABLE_NAME": props.user_table.table_name,
                 },
             ),
         )
 
-        self._users_table.table.grant_read_data(user_id_get_lambda.function)
-        user_id_get_lambda.function.add_to_role_policy(
+        # Grant permissions to the unified Lambda
+        props.user_table.grant_read_write_data(users_lambda.function)
+        props.x_origin_verify_secret.grant_read(users_lambda.function)
+
+        # Grant Cognito permissions
+        users_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
+                    # Read-only actions
                     "cognito-idp:AdminGetUser",
                     "cognito-idp:GetUser",
                     "cognito-idp:ListUsers",
@@ -97,80 +80,7 @@ class UsersApi(Construct):
                     "cognito-idp:AdminListGroupsForUser",
                     "cognito-idp:ListUserPoolClients",
                     "cognito-idp:ListUserPools",
-                ],
-                resources=[
-                    props.cognito_user_pool.user_pool_arn,
-                ],
-            )
-        )
-
-        api_gateway_get_user_id_integration = api_gateway.LambdaIntegration(
-            user_id_get_lambda.function,
-            request_templates={
-                "application/json": '{ "user_id": "$input.params(\'user_id\')" }'
-            },
-        )
-
-        # users_user_id_resources.add_cors_preflight(
-        #     allow_origins=["http://localhost:5173"],
-        #     allow_methods=["GET", "PUT", "DELETE", "POST"],
-        #     allow_headers=[
-        #         "Content-Type",
-        #         "Authorization",
-        #         "X-Amz-Date",
-        #         "X-Api-Key",
-        #         "X-Amz-Security-Token",
-        #     ],
-        #     allow_credentials=True,
-        #     max_age=Duration.seconds(300),
-        # )
-
-        users_user_get_method = users_user_id_resources.add_method(
-            "GET",
-            api_gateway_get_user_id_integration,
-            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            # authorizer=props.authorizer,
-        )
-
-        cfn_method = users_user_get_method.node.default_child
-        cfn_method.authorization_type = "CUSTOM"
-        cfn_method.authorizer_id = props.authorizer.authorizer_id
-
-        users_user_id_put_lambda = Lambda(
-            self,
-            "UsersUserIdPutLambda",
-            config=LambdaConfig(
-                name="users_user_id_put",
-                entry="lambdas/api/users/user/rp_userid/put_userid",
-                environment_variables={
-                    "X_ORIGIN_VERIFY_SECRET_ARN": (
-                        props.x_origin_verify_secret.secret_arn
-                    ),
-                    "MEDIALAKE_USER_TABLE": self._users_table.table_arn,
-                    "COGNITO_USER_POOL_ID": props.cognito_user_pool.user_pool_id,
-                },
-            ),
-        )
-
-        api_gateway_put_users_user_id_integration = api_gateway.LambdaIntegration(
-            users_user_id_put_lambda.function,
-            request_templates={
-                "application/json": '{ "user_id": "$input.params(\'user_id\')" }'
-            },
-        )
-
-        self._users_table.table.grant_read_data(users_user_id_put_lambda.function)
-        users_user_id_put_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "cognito-idp:AdminGetUser",
-                    "cognito-idp:GetUser",
-                    "cognito-idp:ListUsers",
-                    "cognito-idp:ListUsersInGroup",
-                    "cognito-idp:ListGroups",
-                    "cognito-idp:AdminListGroupsForUser",
-                    "cognito-idp:ListUserPoolClients",
-                    "cognito-idp:ListUserPools",
+                    # Write actions
                     "cognito-idp:AdminCreateUser",
                     "cognito-idp:AdminAddUserToGroup",
                     "cognito-idp:AdminUpdateUserAttributes",
@@ -190,209 +100,185 @@ class UsersApi(Construct):
             )
         )
 
-        users_user_id_put_method = users_user_id_resources.add_method(
+        # Create API Gateway resources with simplified RESTful paths
+        users_resource = props.api_resource.root.add_resource("users")
+
+        # /users/{user_id} resource
+        user_id_resource = users_resource.add_resource("{user_id}")
+
+        # /users/{user_id}/enable resource
+        user_enable_resource = user_id_resource.add_resource("enable")
+
+        # /users/{user_id}/disable resource
+        user_disable_resource = user_id_resource.add_resource("disable")
+
+        # /users/profile resource
+        profile_resource = users_resource.add_resource("profile")
+
+        # /users/settings resource
+        settings_resource = users_resource.add_resource("settings")
+
+        # /users/settings/{namespace} resource
+        settings_namespace_resource = settings_resource.add_resource("{namespace}")
+
+        # /users/settings/{namespace}/{key} resource
+        settings_namespace_key_resource = settings_namespace_resource.add_resource(
+            "{key}"
+        )
+
+        # /users/favorites resource
+        favorites_resource = users_resource.add_resource("favorites")
+
+        # /users/favorites/{itemType} resource
+        favorites_item_type_resource = favorites_resource.add_resource("{itemType}")
+
+        # /users/favorites/{itemType}/{itemId} resource
+        favorites_item_type_item_id_resource = (
+            favorites_item_type_resource.add_resource("{itemId}")
+        )
+
+        # Create Lambda integration (proxy integration for all methods)
+        lambda_integration = api_gateway.LambdaIntegration(
+            users_lambda.function,
+            proxy=True,
+        )
+
+        # Add methods to resources
+
+        # POST /users - Create user
+        users_post_method = users_resource.add_method(
+            "POST",
+            lambda_integration,
+        )
+        cfn_method = users_post_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
+
+        # GET /users/{user_id} - Get user
+        user_get_method = user_id_resource.add_method(
+            "GET",
+            lambda_integration,
+        )
+        cfn_method = user_get_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
+
+        # PUT /users/{user_id} - Update user
+        user_put_method = user_id_resource.add_method(
             "PUT",
-            api_gateway_put_users_user_id_integration,
-            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            # authorizer=props.authorizer,
+            lambda_integration,
         )
-
-        cfn_method = users_user_id_put_method.node.default_child
+        cfn_method = user_put_method.node.default_child
         cfn_method.authorization_type = "CUSTOM"
         cfn_method.authorizer_id = props.authorizer.authorizer_id
 
-        users_user_post_lambda = Lambda(
-            self,
-            "UsersUserPostLambda",
-            config=LambdaConfig(
-                name="users_user_post",
-                entry="lambdas/api/users/user/post_user",
-                environment_variables={
-                    "X_ORIGIN_VERIFY_SECRET_ARN": (
-                        props.x_origin_verify_secret.secret_arn
-                    ),
-                    "MEDIALAKE_USER_TABLE": self._users_table.table_arn,
-                    "COGNITO_USER_POOL_ID": props.cognito_user_pool.user_pool_id,
-                },
-            ),
+        # DELETE /users/{user_id} - Delete user
+        user_delete_method = user_id_resource.add_method(
+            "DELETE",
+            lambda_integration,
         )
+        cfn_method = user_delete_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
 
-        # # Add CORS preflight for POST method
-        # users_user_resource.add_cors_preflight(
-        #     allow_origins=["http://localhost:5173"],
-        #     allow_methods=["GET", "PUT", "OPTIONS", "DELETE", "POST"],
-        #     allow_headers=[
-        #         "Content-Type",
-        #         "Authorization",
-        #         "X-Amz-Date",
-        #         "X-Api-Key",
-        #         "X-Amz-Security-Token",
-        #     ],
-        #     allow_credentials=True,
-        #     max_age=Duration.seconds(300),
-        # )
-
-        users_user_post_method = users_user_resource.add_method(
+        # POST /users/{user_id}/enable - Enable user
+        user_enable_method = user_enable_resource.add_method(
             "POST",
-            api_gateway.LambdaIntegration(users_user_post_lambda.function),
-            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            # authorizer=props.authorizer,
+            lambda_integration,
         )
-
-        cfn_method = users_user_post_method.node.default_child
+        cfn_method = user_enable_method.node.default_child
         cfn_method.authorization_type = "CUSTOM"
         cfn_method.authorizer_id = props.authorizer.authorizer_id
 
-        self._users_table.table.grant_read_data(users_user_post_lambda.function)
-        users_user_post_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "cognito-idp:AdminGetUser",
-                    "cognito-idp:GetUser",
-                    "cognito-idp:ListUsers",
-                    "cognito-idp:ListUsersInGroup",
-                    "cognito-idp:ListGroups",
-                    "cognito-idp:AdminListGroupsForUser",
-                    "cognito-idp:ListUserPoolClients",
-                    "cognito-idp:ListUserPools",
-                    "cognito-idp:AdminCreateUser",
-                    "cognito-idp:AdminAddUserToGroup",
-                    "cognito-idp:AdminUpdateUserAttributes",
-                    "cognito-idp:AdminSetUserPassword",
-                    "cognito-idp:AdminInitiateAuth",
-                    "cognito-idp:AdminRespondToAuthChallenge",
-                ],
-                resources=[
-                    props.cognito_user_pool.user_pool_arn,
-                ],
-            )
-        )
-
-        users_user_id_disableuser_resource = users_user_id_resources.add_resource(
-            "disableuser"
-        )
-
-        users_user_id_disableuser_post_lambda = Lambda(
-            self,
-            "UsersUserDisableUserPostLambda",
-            config=LambdaConfig(
-                name="users_user_id_disableuser_post",
-                entry="lambdas/api/users/user/rp_userid/disableuser/post_disableuser",
-                environment_variables={
-                    "X_ORIGIN_VERIFY_SECRET_ARN": (
-                        props.x_origin_verify_secret.secret_arn
-                    ),
-                    "MEDIALAKE_USER_TABLE": self._users_table.table_arn,
-                    "COGNITO_USER_POOL_ID": props.cognito_user_pool.user_pool_id,
-                },
-            ),
-        )
-
-        self._users_table.table.grant_read_data(
-            users_user_id_disableuser_post_lambda.function
-        )
-        users_user_id_disableuser_post_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    # Read-only actions
-                    "cognito-idp:AdminGetUser",
-                    "cognito-idp:GetUser",
-                    "cognito-idp:ListUsers",
-                    "cognito-idp:AdminListGroupsForUser",
-                    "cognito-idp:ListUserPoolClients",
-                    "cognito-idp:ListUserPools",
-                    # Disable user action
-                    "cognito-idp:AdminDisableUser",
-                ],
-                resources=[
-                    props.cognito_user_pool.user_pool_arn,
-                ],
-            )
-        )
-
-        api_post_users_user_id_disableuser_integration = api_gateway.LambdaIntegration(
-            users_user_id_disableuser_post_lambda.function,
-            request_templates={
-                "application/json": '{ "user_id": "$input.params(\'user_id\')" }'
-            },
-        )
-
-        users_user_id_disableuser_post_method = users_user_id_disableuser_resource.add_method(
+        # POST /users/{user_id}/disable - Disable user
+        user_disable_method = user_disable_resource.add_method(
             "POST",
-            api_post_users_user_id_disableuser_integration,
-            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            # authorizer=props.authorizer,
+            lambda_integration,
         )
-
-        cfn_method = users_user_id_disableuser_post_method.node.default_child
+        cfn_method = user_disable_method.node.default_child
         cfn_method.authorization_type = "CUSTOM"
         cfn_method.authorizer_id = props.authorizer.authorizer_id
 
-        users_user_id_enableuser_resource = users_user_id_resources.add_resource(
-            "enableuser"
+        # GET /users/profile - Get user profile
+        profile_get_method = profile_resource.add_method(
+            "GET",
+            lambda_integration,
         )
+        cfn_method = profile_get_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
 
-        users_user_id_enableuser_post_lambda = Lambda(
-            self,
-            "UsersUserEnableUserPostLambda",
-            config=LambdaConfig(
-                name="users_user_id_enableuser_post",
-                entry="lambdas/api/users/user/rp_userid/enableuser/post_enableuser",
-                environment_variables={
-                    "X_ORIGIN_VERIFY_SECRET_ARN": (
-                        props.x_origin_verify_secret.secret_arn
-                    ),
-                    "MEDIALAKE_USER_TABLE": self._users_table.table_arn,
-                    "COGNITO_USER_POOL_ID": props.cognito_user_pool.user_pool_id,
-                },
-            ),
+        # PUT /users/profile - Update user profile
+        profile_put_method = profile_resource.add_method(
+            "PUT",
+            lambda_integration,
         )
+        cfn_method = profile_put_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
 
-        self._users_table.table.grant_read_data(
-            users_user_id_enableuser_post_lambda.function
+        # GET /users/settings - Get user settings
+        settings_get_method = settings_resource.add_method(
+            "GET",
+            lambda_integration,
         )
-        users_user_id_enableuser_post_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    # Read-only actions
-                    "cognito-idp:AdminGetUser",
-                    "cognito-idp:GetUser",
-                    "cognito-idp:ListUsers",
-                    "cognito-idp:ListUsersInGroup",
-                    "cognito-idp:ListGroups",
-                    "cognito-idp:AdminListGroupsForUser",
-                    "cognito-idp:ListUserPoolClients",
-                    "cognito-idp:ListUserPools",
-                    # Enable user action
-                    "cognito-idp:AdminEnableUser",
-                ],
-                resources=[
-                    props.cognito_user_pool.user_pool_arn,
-                ],
-            )
-        )
+        cfn_method = settings_get_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
 
-        api_post_users_user_id_enableuser_integration = api_gateway.LambdaIntegration(
-            users_user_id_enableuser_post_lambda.function,
-            request_templates={
-                "application/json": '{ "user_id": "$input.params(\'user_id\')" }'
-            },
+        # PUT /users/settings/{namespace}/{key} - Update user setting
+        settings_put_method = settings_namespace_key_resource.add_method(
+            "PUT",
+            lambda_integration,
         )
+        cfn_method = settings_put_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
 
-        users_user_id_enableuser_post_method = users_user_id_enableuser_resource.add_method(
+        # GET /users/favorites - Get user favorites
+        favorites_get_method = favorites_resource.add_method(
+            "GET",
+            lambda_integration,
+        )
+        cfn_method = favorites_get_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
+
+        # POST /users/favorites - Add a favorite
+        favorites_post_method = favorites_resource.add_method(
             "POST",
-            api_post_users_user_id_enableuser_integration,
-            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            # authorizer=props.authorizer,
+            lambda_integration,
         )
-
-        cfn_method = users_user_id_enableuser_post_method.node.default_child
+        cfn_method = favorites_post_method.node.default_child
         cfn_method.authorization_type = "CUSTOM"
         cfn_method.authorizer_id = props.authorizer.authorizer_id
 
-        # Add CORS support
+        # DELETE /users/favorites/{itemType}/{itemId} - Remove a favorite
+        favorites_delete_method = favorites_item_type_item_id_resource.add_method(
+            "DELETE",
+            lambda_integration,
+        )
+        cfn_method = favorites_delete_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
+
+        # Add CORS support to all resources
         add_cors_options_method(users_resource)
-        add_cors_options_method(users_user_resource)
-        add_cors_options_method(users_user_id_resources)
-        add_cors_options_method(users_user_id_disableuser_resource)
-        add_cors_options_method(users_user_id_enableuser_resource)
+        add_cors_options_method(user_id_resource)
+        add_cors_options_method(user_enable_resource)
+        add_cors_options_method(user_disable_resource)
+        add_cors_options_method(profile_resource)
+        add_cors_options_method(settings_resource)
+        add_cors_options_method(settings_namespace_resource)
+        add_cors_options_method(settings_namespace_key_resource)
+        add_cors_options_method(favorites_resource)
+        add_cors_options_method(favorites_item_type_resource)
+        add_cors_options_method(favorites_item_type_item_id_resource)
+
+        # Store reference to the unified Lambda
+        self._users_lambda = users_lambda
+
+    @property
+    def users_lambda(self):
+        """Return the unified users Lambda function"""
+        return self._users_lambda

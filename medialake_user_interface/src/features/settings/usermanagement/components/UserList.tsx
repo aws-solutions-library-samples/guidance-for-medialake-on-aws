@@ -27,16 +27,12 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import LockIcon from "@mui/icons-material/Lock";
 import LockOpenIcon from "@mui/icons-material/LockOpen";
-import AddIcon from "@mui/icons-material/Add";
-import CloseIcon from "@mui/icons-material/Close";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import { User } from "@/api/types/api.types";
 import { useGetGroups } from "@/api/hooks/useGroups";
 import { useGetPermissionSets } from "@/api/hooks/usePermissionSets";
-import {
-  useAddGroupMembers,
-  useRemoveGroupMember,
-} from "@/api/hooks/useGroups";
 import { useListUserAssignments } from "@/api/hooks/useAssignments";
+import { useUpdateUser } from "@/api/hooks/useUsers";
 import { useTranslation } from "react-i18next";
 import { UserFilterPopover } from "./UserFilterPopover";
 import {
@@ -62,6 +58,7 @@ interface UserListProps {
   onRemoveSort?: (columnId: string) => void;
   onFilterChange?: (columnId: string, value: string) => void;
   onSortChange?: (columnId: string, desc: boolean) => void;
+  handleMutation: (options: any, variables: any) => Promise<any>;
 }
 
 // Helper component for managing permission set chips
@@ -82,18 +79,18 @@ const PermissionSetCell: React.FC<{
   );
 };
 
-// Helper component for managing group chips
+// Helper component for managing single group selection
 const GroupChips: React.FC<{
   user: User;
   theme: any;
   groups: any[] | undefined;
-}> = ({ user, theme, groups }) => {
+  handleMutation: (options: any, variables: any) => Promise<any>;
+}> = ({ user, theme, groups, handleMutation }) => {
   const { t } = useTranslation();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const addGroupMembersMutation = useAddGroupMembers();
-  const removeGroupMemberMutation = useRemoveGroupMember();
+  const updateUserMutation = useUpdateUser();
 
-  const handleAddClick = (event: React.MouseEvent<HTMLElement>) => {
+  const handleClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
   };
 
@@ -101,89 +98,91 @@ const GroupChips: React.FC<{
     setAnchorEl(null);
   };
 
-  const handleAddToGroup = async (groupId: string) => {
-    try {
-      await addGroupMembersMutation.mutateAsync({
-        groupId,
-        request: { userIds: [user.username] },
-      });
-      handleClose();
-    } catch (error) {
-      console.error("Error adding user to group:", error);
-    }
+  const handleGroupChange = async (groupId: string) => {
+    // Close dropdown immediately on selection
+    handleClose();
+
+    await handleMutation(
+      {
+        mutation: updateUserMutation,
+        actionMessages: {
+          loading: t("users.apiMessages.updating.loading"),
+          success: t("users.apiMessages.updating.success"),
+          successMessage: t("users.apiMessages.updating.successMessage"),
+          error: t("users.apiMessages.updating.error"),
+        },
+      },
+      {
+        username: user.username,
+        updates: {
+          username: user.username,
+          groups: [groupId], // Use group.id (actual Cognito group name)
+        },
+      },
+    );
   };
 
-  const handleRemoveFromGroup = async (groupId: string) => {
-    try {
-      await removeGroupMemberMutation.mutateAsync({
-        groupId,
-        userId: user.username,
-      });
-    } catch (error) {
-      console.error("Error removing user from group:", error);
-    }
-  };
+  // Get the current group (first one if multiple exist)
+  // user.groups contains the actual Cognito group name (group.id)
+  const currentGroupId =
+    user.groups && user.groups.length > 0 ? user.groups[0] : null;
 
-  // Filter out groups the user is not a member of
-  const availableGroups =
-    groups?.filter((group) => !user.groups?.includes(group.name)) || [];
+  // Find the matching group object to get the display name
+  const currentGroupObj = currentGroupId
+    ? groups?.find((g) => g.id === currentGroupId)
+    : null;
+
+  const currentGroupDisplayName = currentGroupObj
+    ? currentGroupObj.name
+    : t("common.noGroup", "No Group");
 
   return (
     <Box
       sx={{
         display: "flex",
-        flexWrap: "wrap",
-        gap: 1,
         alignItems: "center",
+        gap: 0.5,
       }}
     >
-      {user.groups && user.groups.length > 0 ? (
-        user.groups.map((groupName) => (
-          <Chip
-            key={groupName}
-            label={groupName}
-            size="small"
-            onDelete={() => {
-              const group = groups?.find((g) => g.name === groupName);
-              if (group) {
-                handleRemoveFromGroup(group.id);
-              }
-            }}
-            deleteIcon={<CloseIcon fontSize="small" />}
-            sx={{
-              backgroundColor: alpha(theme.palette.primary.main, 0.1),
-              color: theme.palette.primary.main,
-              fontWeight: 600,
-              borderRadius: "6px",
-              height: "24px",
-              "& .MuiChip-label": {
-                px: 1.5,
-              },
-            }}
-          />
-        ))
-      ) : (
-        <Typography variant="body2" color="text.secondary">
-          {t("common.noGroups")}
-        </Typography>
-      )}
-
-      <IconButton
-        size="small"
-        onClick={handleAddClick}
+      <Box
+        onClick={handleClick}
         sx={{
-          width: 24,
-          height: 24,
-          backgroundColor: alpha(theme.palette.primary.main, 0.1),
+          display: "flex",
+          alignItems: "center",
+          gap: 0.5,
+          cursor: "pointer",
+          padding: "4px 8px",
+          borderRadius: "6px",
+          backgroundColor: currentGroupId
+            ? alpha(theme.palette.primary.main, 0.1)
+            : alpha(theme.palette.grey[500], 0.1),
+          color: currentGroupId
+            ? theme.palette.primary.main
+            : theme.palette.text.secondary,
+          fontWeight: currentGroupId ? 600 : 400,
+          fontSize: "0.875rem",
+          transition: "background-color 0.2s",
+          "&:hover": {
+            backgroundColor: currentGroupId
+              ? alpha(theme.palette.primary.main, 0.15)
+              : alpha(theme.palette.grey[500], 0.15),
+          },
         }}
       >
-        <AddIcon fontSize="small" />
-      </IconButton>
+        <Typography variant="body2" sx={{ fontSize: "0.875rem" }}>
+          {currentGroupDisplayName}
+        </Typography>
+        <KeyboardArrowDownIcon fontSize="small" />
+      </Box>
 
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleClose}>
-        {availableGroups.length > 0 ? (
-          availableGroups.map((group) => (
-            <MenuItem key={group.id} onClick={() => handleAddToGroup(group.id)}>
+        {groups && groups.length > 0 ? (
+          groups.map((group) => (
+            <MenuItem
+              key={group.id}
+              onClick={() => handleGroupChange(group.id)}
+              selected={currentGroupId === group.id}
+            >
               {group.name}
             </MenuItem>
           ))
@@ -268,6 +267,7 @@ const UserList: React.FC<UserListProps> = ({
   onRemoveSort,
   onFilterChange,
   onSortChange,
+  handleMutation,
 }) => {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -464,7 +464,12 @@ const UserList: React.FC<UserListProps> = ({
         enableFiltering: true,
         cell: ({ row }) => {
           return (
-            <GroupChips user={row.original} theme={theme} groups={groups} />
+            <GroupChips
+              user={row.original}
+              theme={theme}
+              groups={groups}
+              handleMutation={handleMutation}
+            />
           );
         },
       },
@@ -621,6 +626,7 @@ const UserList: React.FC<UserListProps> = ({
     onToggleUserStatus,
     groups,
     permissionSets,
+    handleMutation,
   ]);
 
   const table = useReactTable({

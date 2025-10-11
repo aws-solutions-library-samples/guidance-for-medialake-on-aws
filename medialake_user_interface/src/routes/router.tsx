@@ -178,15 +178,6 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: "settings/users-groups",
-        element: (
-          <RoutePermissionGuard
-            permission={{ action: "manage", subject: "group" }}
-            element={<UserManagement />}
-          />
-        ),
-      },
-      {
         path: "settings/roles",
         element: (
           <RoutePermissionGuard
