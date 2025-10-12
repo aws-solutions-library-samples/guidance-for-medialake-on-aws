@@ -10,7 +10,19 @@ from aws_lambda_powertools.event_handler.exceptions import (
     NotFoundError,
 )
 from aws_lambda_powertools.metrics import MetricUnit
-from collections_utils import COLLECTION_PK_PREFIX, METADATA_SK, create_error_response
+from collections_utils import (
+    CHILD_SK_PREFIX,
+    COLLECTION_PK_PREFIX,
+    METADATA_SK,
+    create_error_response,
+)
+from db_models import (
+    ChildReferenceModel,
+    CollectionItemModel,
+    CollectionModel,
+    UserRelationshipModel,
+)
+from pynamodb.exceptions import DoesNotExist
 from user_auth import extract_user_context
 
 logger = Logger(
@@ -20,33 +32,125 @@ tracer = Tracer(service="collections-ID-delete")
 metrics = Metrics(namespace="medialake", service="collection-detail")
 
 
-def register_route(app, dynamodb, table_name):
+def _delete_collection_recursive(collection_id, user_id, current_timestamp):
+    """Recursively delete a collection and all its children using PynamoDB"""
+    logger.info(f"[CASCADE] Deleting collection: {collection_id}")
+
+    # Step 1: Query for child collections using CHILD# references
+    child_refs = []
+    try:
+        for child_ref in ChildReferenceModel.query(
+            f"{COLLECTION_PK_PREFIX}{collection_id}",
+            ChildReferenceModel.SK.startswith(CHILD_SK_PREFIX),
+        ):
+            child_refs.append(child_ref)
+    except Exception as e:
+        logger.warning(f"[CASCADE] Error querying child references: {e}")
+
+    logger.info(f"[CASCADE] Found {len(child_refs)} children for {collection_id}")
+
+    # Step 2: Recursively delete each child first
+    for child_ref in child_refs:
+        child_id = child_ref.childCollectionId
+        if child_id:
+            logger.info(f"[CASCADE] Recursively deleting child: {child_id}")
+            _delete_collection_recursive(child_id, user_id, current_timestamp)
+
+    # Step 3: Delete this collection's items (query all items in partition)
+    deleted_count = 0
+    items_to_delete = []
+
+    # Query all items for this collection (different SK prefixes: METADATA, ITEM#, ASSET#, PERM#, RULE#, CHILD#)
+    # We need to scan the partition
+    try:
+        # Use scan on the partition key to get all items
+        for item in CollectionModel.query(f"{COLLECTION_PK_PREFIX}{collection_id}"):
+            items_to_delete.append((item.PK, item.SK))
+            deleted_count += 1
+    except Exception as e:
+        logger.warning(f"[CASCADE] Error querying collection items: {e}")
+
+    # Step 4: Query user relationships (GSI2) - users who have access to this collection
+    try:
+        # UserRelationshipModel has GSI2_PK = COLL#{collection_id}
+        # We need to query the GSI to find all user relationships
+        for user_rel in UserRelationshipModel.GSI2_PK_index.query(
+            f"{COLLECTION_PK_PREFIX}{collection_id}"
+        ):
+            items_to_delete.append((user_rel.PK, user_rel.SK))
+            deleted_count += 1
+    except AttributeError:
+        # GSI2 index not defined, query directly
+        logger.warning("[CASCADE] GSI2 index not available for user relationships")
+    except Exception as e:
+        logger.warning(f"[CASCADE] Error querying user relationships: {e}")
+
+    # Step 5: Delete all items in batches
+    if items_to_delete:
+        # PynamoDB batch delete
+        batch_size = 25
+        for i in range(0, len(items_to_delete), batch_size):
+            batch = items_to_delete[i : i + batch_size]
+            with CollectionModel.batch_write() as batch_writer:
+                for pk, sk in batch:
+                    # Determine which model to use based on SK prefix
+                    if sk == METADATA_SK:
+                        batch_writer.delete(CollectionModel(pk, sk))
+                    elif sk.startswith("USER#"):
+                        batch_writer.delete(UserRelationshipModel(pk, sk))
+                    elif sk.startswith(CHILD_SK_PREFIX):
+                        batch_writer.delete(ChildReferenceModel(pk, sk))
+                    elif sk.startswith("ASSET#") or sk.startswith("ITEM#"):
+                        batch_writer.delete(CollectionItemModel(pk, sk))
+                    elif sk.startswith("PERM#"):
+                        # ShareModel would be here
+                        try:
+                            from db_models import ShareModel
+
+                            batch_writer.delete(ShareModel(pk, sk))
+                        except Exception:
+                            pass
+                    elif sk.startswith("RULE#"):
+                        # RuleModel would be here
+                        try:
+                            from db_models import RuleModel
+
+                            batch_writer.delete(RuleModel(pk, sk))
+                        except Exception:
+                            pass
+
+    logger.info(
+        f"[CASCADE] Deleted {deleted_count} items from collection {collection_id}"
+    )
+    return deleted_count
+
+
+def register_route(app):
     """Register DELETE /collections/<collection_id> route"""
 
     @app.delete("/collections/<collection_id>")
     @tracer.capture_method
     def collections_ID_delete(collection_id: str):
-        """Delete collection and all its items (hard delete)"""
+        """Delete collection and all its children (cascade delete)"""
         try:
             user_context = extract_user_context(app.current_event.raw_event)
             user_id = user_context.get("user_id")
-            table = dynamodb.Table(table_name)
             current_timestamp = datetime.utcnow().isoformat() + "Z"
 
             logger.info(
-                f"[DELETE] Starting hard delete for collection: {collection_id}"
+                f"[DELETE] Starting cascade delete for collection: {collection_id}"
             )
 
             # Step 1: Verify collection exists and user has permission
-            collection_response = table.get_item(
-                Key={"PK": f"{COLLECTION_PK_PREFIX}{collection_id}", "SK": METADATA_SK}
-            )
-            if "Item" not in collection_response:
+            try:
+                collection = CollectionModel.get(
+                    f"{COLLECTION_PK_PREFIX}{collection_id}", METADATA_SK
+                )
+            except DoesNotExist:
                 logger.warning(f"[DELETE] Collection not found: {collection_id}")
                 raise NotFoundError(f"Collection '{collection_id}' not found")
 
-            collection = collection_response["Item"]
-            if collection.get("ownerId") != user_id:
+            if collection.ownerId != user_id:
                 logger.warning(
                     f"[DELETE] User {user_id} is not owner of collection {collection_id}"
                 )
@@ -54,77 +158,55 @@ def register_route(app, dynamodb, table_name):
                     "You do not have permission to delete this collection"
                 )
 
-            # Step 2: Query all items in the collection
-            items_to_delete = []
-            paginator_kwargs = {
-                "KeyConditionExpression": "PK = :pk",
-                "ExpressionAttributeValues": {
-                    ":pk": f"{COLLECTION_PK_PREFIX}{collection_id}"
-                },
-            }
-            while True:
-                response = table.query(**paginator_kwargs)
-                items_to_delete.extend(response.get("Items", []))
-                if "LastEvaluatedKey" not in response:
-                    break
-                paginator_kwargs["ExclusiveStartKey"] = response["LastEvaluatedKey"]
-            logger.info(
-                f"[DELETE] Found {len(items_to_delete)} items in collection partition"
+            # Step 2: Recursively delete this collection and all children
+            total_deleted = _delete_collection_recursive(
+                collection_id, user_id, current_timestamp
             )
 
-            # Step 3: Query user relationships (GSI2)
-            user_relationships = []
-            gsi_kwargs = {
-                "IndexName": "ItemCollectionsGSI",
-                "KeyConditionExpression": "GSI2_PK = :collection_pk",
-                "ExpressionAttributeValues": {
-                    ":collection_pk": f"{COLLECTION_PK_PREFIX}{collection_id}"
-                },
-            }
-            while True:
-                response = table.query(**gsi_kwargs)
-                user_relationships.extend(response.get("Items", []))
-                if "LastEvaluatedKey" not in response:
-                    break
-                gsi_kwargs["ExclusiveStartKey"] = response["LastEvaluatedKey"]
-            logger.info(f"[DELETE] Found {len(user_relationships)} user relationships")
-
-            # Combine and deduplicate
-            all_items_to_delete = items_to_delete + user_relationships
-            seen = set()
-            unique_items = []
-            for item in all_items_to_delete:
-                key = (item["PK"], item["SK"])
-                if key not in seen:
-                    seen.add(key)
-                    unique_items.append(item)
-            logger.info(f"[DELETE] Total unique items to delete: {len(unique_items)}")
-
-            # Step 4: Delete all items in batches
-            if unique_items:
-                batch_size = 25
-                deleted_count = 0
-                for i in range(0, len(unique_items), batch_size):
-                    batch = unique_items[i : i + batch_size]
-                    with table.batch_writer() as batch_writer:
-                        for item in batch:
-                            batch_writer.delete_item(
-                                Key={"PK": item["PK"], "SK": item["SK"]}
-                            )
-                            deleted_count += 1
-                    logger.info(
-                        f"[DELETE] Deleted batch {i//batch_size + 1}: {len(batch)} items"
+            # Step 3: If this is a child collection, remove CHILD# reference from parent
+            parent_id = (
+                collection.parentId
+                if hasattr(collection, "parentId") and collection.parentId
+                else None
+            )
+            if parent_id:
+                logger.info(
+                    f"[DELETE] Removing CHILD# reference from parent: {parent_id}"
+                )
+                try:
+                    # Delete the CHILD# reference item
+                    child_ref = ChildReferenceModel(
+                        f"{COLLECTION_PK_PREFIX}{parent_id}",
+                        f"{CHILD_SK_PREFIX}{collection_id}",
                     )
-                logger.info(f"[DELETE] Successfully deleted {deleted_count} items")
+                    child_ref.delete()
 
-            logger.info(f"[DELETE] Collection hard delete complete: {collection_id}")
+                    # Decrement parent's childCollectionCount
+                    parent = CollectionModel.get(
+                        f"{COLLECTION_PK_PREFIX}{parent_id}", METADATA_SK
+                    )
+                    parent.update(
+                        actions=[
+                            CollectionModel.childCollectionCount.add(-1),
+                            CollectionModel.updatedAt.set(current_timestamp),
+                        ]
+                    )
+                    logger.info(
+                        "[DELETE] Successfully removed CHILD# reference and decremented count"
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"[DELETE] Failed to remove CHILD# reference from parent {parent_id}: {e}"
+                    )
+
+            logger.info(f"[DELETE] Cascade delete complete: {collection_id}")
             metrics.add_metric(
                 name="SuccessfulCollectionDeletions", unit=MetricUnit.Count, value=1
             )
             metrics.add_metric(
                 name="CollectionItemsDeleted",
                 unit=MetricUnit.Count,
-                value=len(unique_items),
+                value=total_deleted,
             )
 
             return {
@@ -135,7 +217,8 @@ def register_route(app, dynamodb, table_name):
                         "data": {
                             "id": collection_id,
                             "status": "DELETED",
-                            "itemsDeleted": len(unique_items),
+                            "itemsDeleted": total_deleted,
+                            "deletionType": "CASCADE",
                         },
                         "meta": {
                             "timestamp": current_timestamp,

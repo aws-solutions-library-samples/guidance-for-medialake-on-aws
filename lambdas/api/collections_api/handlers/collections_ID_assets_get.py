@@ -17,7 +17,9 @@ from aws_lambda_powertools.event_handler.exceptions import (
 from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.parser import ValidationError
 from collections_utils import (
+    ASSET_SK_PREFIX,
     COLLECTION_PK_PREFIX,
+    ITEM_SK_PREFIX,
     METADATA_SK,
     create_error_response,
     create_success_response,
@@ -26,6 +28,7 @@ from collections_utils import (
 # Import Pydantic models
 from models import GetCollectionAssetsQueryParams
 from opensearchpy import OpenSearch, RequestsAWSV4SignerAuth, RequestsHttpConnection
+from pynamodb.exceptions import DoesNotExist
 from url_utils import generate_cloudfront_urls_batch
 from user_auth import extract_user_context
 
@@ -34,10 +37,6 @@ logger = Logger(
 )
 tracer = Tracer(service="collection-assets-handler")
 metrics = Metrics(namespace="medialake", service="collection-assets")
-
-# Constants
-ITEM_SK_PREFIX = "ITEM#"
-ASSET_SK_PREFIX = "ASSET#"
 
 # Environment variables
 OPENSEARCH_ENDPOINT = os.environ.get("OPENSEARCH_ENDPOINT", "")
@@ -228,8 +227,11 @@ def format_asset_as_search_result(
     return result
 
 
-def register_route(app, dynamodb, table_name):
+def register_route(app):
     """Register collection assets route"""
+
+    # Import PynamoDB models here to avoid circular dependencies
+    from db_models import CollectionItemModel, CollectionModel
 
     @app.get("/collections/<collection_id>/assets")
     @tracer.capture_method
@@ -238,7 +240,6 @@ def register_route(app, dynamodb, table_name):
         try:
             # Validate user authentication
             extract_user_context(app.current_event.raw_event)
-            table = dynamodb.Table(table_name)
 
             # Parse and validate query parameters with Pydantic
             try:
@@ -259,34 +260,55 @@ def register_route(app, dynamodb, table_name):
             )
 
             # Verify collection exists
-            collection_response = table.get_item(
-                Key={"PK": f"{COLLECTION_PK_PREFIX}{collection_id}", "SK": METADATA_SK}
-            )
-            if "Item" not in collection_response:
+            try:
+                CollectionModel.get(
+                    f"{COLLECTION_PK_PREFIX}{collection_id}", METADATA_SK
+                )
+            except DoesNotExist:
                 raise NotFoundError(f"Collection '{collection_id}' not found")
 
             # Get all items from the collection (both old ITEM# and new ASSET# formats)
             all_items = []
 
             # Query for old ITEM# format
-            response = table.query(
-                KeyConditionExpression="PK = :pk AND begins_with(SK, :sk_prefix)",
-                ExpressionAttributeValues={
-                    ":pk": f"{COLLECTION_PK_PREFIX}{collection_id}",
-                    ":sk_prefix": ITEM_SK_PREFIX,
-                },
-            )
-            all_items.extend(response.get("Items", []))
+            for item in CollectionItemModel.query(
+                f"{COLLECTION_PK_PREFIX}{collection_id}",
+                CollectionItemModel.SK.startswith(ITEM_SK_PREFIX),
+            ):
+                all_items.append(
+                    {
+                        "PK": item.PK,
+                        "SK": item.SK,
+                        "itemType": item.itemType,
+                        "itemId": item.itemId if item.itemId else None,
+                        "assetId": item.assetId if item.assetId else None,
+                        "addedAt": item.addedAt,
+                        "addedBy": item.addedBy,
+                        "clipBoundary": (
+                            item.clipBoundary.as_dict() if item.clipBoundary else {}
+                        ),
+                    }
+                )
 
             # Query for new ASSET# format
-            response = table.query(
-                KeyConditionExpression="PK = :pk AND begins_with(SK, :sk_prefix)",
-                ExpressionAttributeValues={
-                    ":pk": f"{COLLECTION_PK_PREFIX}{collection_id}",
-                    ":sk_prefix": ASSET_SK_PREFIX,
-                },
-            )
-            all_items.extend(response.get("Items", []))
+            for item in CollectionItemModel.query(
+                f"{COLLECTION_PK_PREFIX}{collection_id}",
+                CollectionItemModel.SK.startswith(ASSET_SK_PREFIX),
+            ):
+                all_items.append(
+                    {
+                        "PK": item.PK,
+                        "SK": item.SK,
+                        "itemType": item.itemType,
+                        "itemId": item.itemId if item.itemId else None,
+                        "assetId": item.assetId if item.assetId else None,
+                        "addedAt": item.addedAt,
+                        "addedBy": item.addedBy,
+                        "clipBoundary": (
+                            item.clipBoundary.as_dict() if item.clipBoundary else {}
+                        ),
+                    }
+                )
 
             # Filter for asset items only
             asset_items = [

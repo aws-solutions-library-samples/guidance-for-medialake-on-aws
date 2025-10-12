@@ -73,6 +73,7 @@ export const API_ENDPOINTS = {
     GET: (id: string) => `/collections/${id}`,
     UPDATE: (id: string) => `/collections/${id}`,
     DELETE: (id: string) => `/collections/${id}`,
+    ANCESTORS: (id: string) => `/collections/${id}/ancestors`,
     SHARE: (id: string) => `/collections/${id}/share`,
     UNSHARE: (id: string, userId: string) =>
       `/collections/${id}/share/${userId}`,

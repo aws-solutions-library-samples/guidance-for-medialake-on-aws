@@ -8,8 +8,11 @@ from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler.exceptions import BadRequestError
 from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.parser import ValidationError, parse
-from collections_utils import COLLECTION_PK_PREFIX, USER_PK_PREFIX
+from collections_utils import COLLECTION_PK_PREFIX, PERM_SK_PREFIX, USER_PK_PREFIX
+from db_models import ShareModel, UserRelationshipModel
 from models import ShareCollectionRequest
+from pynamodb.connection import Connection
+from pynamodb.transactions import TransactWrite
 from user_auth import extract_user_context
 from utils.formatting_utils import format_share
 
@@ -19,10 +22,8 @@ logger = Logger(
 tracer = Tracer(service="collections-ID-share-post")
 metrics = Metrics(namespace="medialake", service="collection-shares")
 
-PERM_SK_PREFIX = "PERM#"
 
-
-def register_route(app, dynamodb, table_name):
+def register_route(app):
     """Register POST /collections/<collection_id>/share route"""
 
     @app.post("/collections/<collection_id>/share")
@@ -47,53 +48,62 @@ def register_route(app, dynamodb, table_name):
             target_id = request_data.targetUserId
             role = request_data.accessLevel.value
 
-            # Create permission item
-            permission_item = {
-                "PK": f"{COLLECTION_PK_PREFIX}{collection_id}",
-                "SK": f"{PERM_SK_PREFIX}{target_id}",
-                "targetType": "user",
-                "targetId": target_id,
-                "role": role,
-                "grantedBy": user_context.get("user_id"),
-                "grantedAt": current_timestamp,
-            }
+            # Create permission model instance
+            permission = ShareModel()
+            permission.PK = f"{COLLECTION_PK_PREFIX}{collection_id}"
+            permission.SK = f"{PERM_SK_PREFIX}{target_id}"
+            permission.targetType = "user"
+            permission.targetId = target_id
+            permission.role = role
+            permission.grantedBy = user_context.get("user_id")
+            permission.grantedAt = current_timestamp
 
             if request_data.message:
-                permission_item["message"] = request_data.message
+                permission.message = request_data.message
 
-            # Create user relationship item
-            user_relationship_item = {
-                "PK": f"{USER_PK_PREFIX}{target_id}",
-                "SK": f"{COLLECTION_PK_PREFIX}{collection_id}",
-                "relationship": role.upper(),
-                "addedAt": current_timestamp,
-                "lastAccessed": current_timestamp,
-                "isFavorite": False,
-                "GSI1_PK": f"{USER_PK_PREFIX}{target_id}",
-                "GSI1_SK": current_timestamp,
-                "GSI2_PK": f"{COLLECTION_PK_PREFIX}{collection_id}",
-                "GSI2_SK": f"{USER_PK_PREFIX}{target_id}",
-            }
+            # Create user relationship model instance
+            user_relationship = UserRelationshipModel()
+            user_relationship.PK = f"{USER_PK_PREFIX}{target_id}"
+            user_relationship.SK = f"{COLLECTION_PK_PREFIX}{collection_id}"
+            user_relationship.relationship = role.upper()
+            user_relationship.addedAt = current_timestamp
+            user_relationship.lastAccessed = current_timestamp
+            user_relationship.isFavorite = False
+            user_relationship.GSI1_PK = f"{USER_PK_PREFIX}{target_id}"
+            user_relationship.GSI1_SK = current_timestamp
+            user_relationship.GSI2_PK = f"{COLLECTION_PK_PREFIX}{collection_id}"
+            user_relationship.GSI2_SK = f"{USER_PK_PREFIX}{target_id}"
 
             # Transactional write
-            dynamodb.meta.client.transact_write_items(
-                TransactItems=[
-                    {"Put": {"TableName": table_name, "Item": permission_item}},
-                    {"Put": {"TableName": table_name, "Item": user_relationship_item}},
-                ]
-            )
+            connection = Connection(region=os.environ.get("AWS_REGION", "us-east-1"))
+            with TransactWrite(connection=connection) as transaction:
+                transaction.save(permission)
+                transaction.save(user_relationship)
 
             logger.info(f"Collection {collection_id} shared with {target_id}")
             metrics.add_metric(
                 name="SuccessfulShareOperations", unit=MetricUnit.Count, value=1
             )
 
+            # Convert to dict for formatting
+            permission_dict = {
+                "PK": permission.PK,
+                "SK": permission.SK,
+                "targetType": permission.targetType,
+                "targetId": permission.targetId,
+                "role": permission.role,
+                "grantedBy": permission.grantedBy,
+                "grantedAt": permission.grantedAt,
+            }
+            if permission.message:
+                permission_dict["message"] = permission.message
+
             return {
                 "statusCode": 201,
                 "body": json.dumps(
                     {
                         "success": True,
-                        "data": format_share(permission_item),
+                        "data": format_share(permission_dict),
                         "meta": {
                             "timestamp": current_timestamp,
                             "version": "v1",

@@ -12,6 +12,8 @@ from collections_utils import (
     create_success_response,
     format_collection_item,
 )
+from db_models import CollectionModel
+from pynamodb.exceptions import DoesNotExist
 from user_auth import extract_user_context
 
 logger = Logger(service="collections-ID-get", level=os.environ.get("LOG_LEVEL", "INFO"))
@@ -19,7 +21,7 @@ tracer = Tracer(service="collections-ID-get")
 metrics = Metrics(namespace="medialake", service="collection-detail")
 
 
-def register_route(app, dynamodb, table_name):
+def register_route(app):
     """Register GET /collections/<collection_id> route"""
 
     @app.get("/collections/<collection_id>")
@@ -28,17 +30,43 @@ def register_route(app, dynamodb, table_name):
         """Get collection details with optional includes"""
         try:
             user_context = extract_user_context(app.current_event.raw_event)
-            table = dynamodb.Table(table_name)
 
-            response = table.get_item(
-                Key={"PK": f"{COLLECTION_PK_PREFIX}{collection_id}", "SK": METADATA_SK}
-            )
-
-            if "Item" not in response:
+            # Get collection from DynamoDB using PynamoDB
+            try:
+                collection = CollectionModel.get(
+                    f"{COLLECTION_PK_PREFIX}{collection_id}", METADATA_SK
+                )
+            except DoesNotExist:
                 raise NotFoundError(f"Collection '{collection_id}' not found")
 
-            collection_item = response["Item"]
-            formatted_collection = format_collection_item(collection_item, user_context)
+            # Convert PynamoDB model to dict for formatting
+            collection_dict = {
+                "PK": collection.PK,
+                "SK": collection.SK,
+                "name": collection.name,
+                "ownerId": collection.ownerId,
+                "status": collection.status,
+                "itemCount": collection.itemCount,
+                "childCollectionCount": collection.childCollectionCount,
+                "isPublic": collection.isPublic,
+                "createdAt": collection.createdAt,
+                "updatedAt": collection.updatedAt,
+            }
+
+            if collection.description:
+                collection_dict["description"] = collection.description
+            if collection.collectionTypeId:
+                collection_dict["collectionTypeId"] = collection.collectionTypeId
+            if collection.parentId:
+                collection_dict["parentId"] = collection.parentId
+            if collection.customMetadata:
+                collection_dict["customMetadata"] = dict(collection.customMetadata)
+            if collection.tags:
+                collection_dict["tags"] = list(collection.tags)
+            if collection.expiresAt:
+                collection_dict["expiresAt"] = collection.expiresAt
+
+            formatted_collection = format_collection_item(collection_dict, user_context)
 
             metrics.add_metric(
                 name="SuccessfulCollectionRetrievals", unit=MetricUnit.Count, value=1

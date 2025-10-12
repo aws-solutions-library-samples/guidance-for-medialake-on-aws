@@ -9,6 +9,7 @@ from . import (
     collection_types_get,
     collection_types_post,
     collections_get,
+    collections_ID_ancestors_get,
     collections_ID_assets_get,
     collections_ID_delete,
     collections_ID_get,
@@ -34,6 +35,7 @@ __all__ = [
     "collections_ID_get",
     "collections_ID_patch",
     "collections_ID_delete",
+    "collections_ID_ancestors_get",
     "collections_ID_items_get",
     "collections_ID_items_post",
     "collections_ID_items_ID_delete",
@@ -50,44 +52,44 @@ __all__ = [
 ]
 
 
-def register_all_routes(app, dynamodb, table_name):
+def register_all_routes(app):
     """
     Register all handler routes with the API Gateway resolver.
 
     Args:
         app: APIGatewayRestResolver instance
-        dynamodb: DynamoDB resource
-        table_name: Collections table name
     """
     # Collection types endpoints
-    collection_types_get.register_route(app, dynamodb, table_name)
-    collection_types_post.register_route(app, dynamodb, table_name)
+    collection_types_get.register_route(app)
+    collection_types_post.register_route(app)
 
     # Collections endpoints
-    collections_get.register_route(app, dynamodb, table_name)
-    collections_post.register_route(app, dynamodb, table_name)
-    collections_shared_with_me_get.register_route(app, dynamodb, table_name)
+    collections_get.register_route(app)
+    collections_post.register_route(app)
+    # TODO: Convert to PynamoDB - temporarily disabled
+    # collections_shared_with_me_get.register_route(app)
 
     # Individual collection endpoints
-    collections_ID_get.register_route(app, dynamodb, table_name)
-    collections_ID_patch.register_route(app, dynamodb, table_name)
-    collections_ID_delete.register_route(app, dynamodb, table_name)
+    collections_ID_get.register_route(app)
+    collections_ID_patch.register_route(app)
+    collections_ID_delete.register_route(app)
+    collections_ID_ancestors_get.register_route(app)
 
     # Collection items endpoints
-    collections_ID_items_get.register_route(app, dynamodb, table_name)
-    collections_ID_items_post.register_route(app, dynamodb, table_name)
-    collections_ID_items_ID_delete.register_route(app, dynamodb, table_name)
+    collections_ID_items_get.register_route(app)
+    collections_ID_items_post.register_route(app)
+    collections_ID_items_ID_delete.register_route(app)
 
     # Collection assets endpoints
-    collections_ID_assets_get.register_route(app, dynamodb, table_name)
+    collections_ID_assets_get.register_route(app)
 
     # Collection share endpoints
-    collections_ID_share_get.register_route(app, dynamodb, table_name)
-    collections_ID_share_post.register_route(app, dynamodb, table_name)
-    collections_ID_share_ID_delete.register_route(app, dynamodb, table_name)
+    collections_ID_share_get.register_route(app)
+    collections_ID_share_post.register_route(app)
+    collections_ID_share_ID_delete.register_route(app)
 
     # Collection rules endpoints
-    collections_ID_rules_get.register_route(app, dynamodb, table_name)
-    collections_ID_rules_post.register_route(app, dynamodb, table_name)
-    collections_ID_rules_ID_put.register_route(app, dynamodb, table_name)
-    collections_ID_rules_ID_delete.register_route(app, dynamodb, table_name)
+    collections_ID_rules_get.register_route(app)
+    collections_ID_rules_post.register_route(app)
+    collections_ID_rules_ID_put.register_route(app)
+    collections_ID_rules_ID_delete.register_route(app)

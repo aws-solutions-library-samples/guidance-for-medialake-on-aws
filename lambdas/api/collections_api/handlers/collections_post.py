@@ -10,13 +10,17 @@ from aws_lambda_powertools.event_handler.exceptions import BadRequestError
 from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.parser import ValidationError, parse
 from collections_utils import (
+    CHILD_SK_PREFIX,
     COLLECTION_PK_PREFIX,
     COLLECTIONS_GSI5_PK,
     METADATA_SK,
     USER_PK_PREFIX,
     format_collection_item,
 )
+from db_models import ChildReferenceModel, CollectionModel, UserRelationshipModel
 from models import CreateCollectionRequest
+from pynamodb.connection import Connection
+from pynamodb.transactions import TransactWrite
 from user_auth import extract_user_context
 
 logger = Logger(service="collections-post", level=os.environ.get("LOG_LEVEL", "INFO"))
@@ -24,7 +28,7 @@ tracer = Tracer(service="collections-post")
 metrics = Metrics(namespace="medialake", service="collections")
 
 
-def register_route(app, dynamodb, table_name):
+def register_route(app):
     """Register POST /collections route"""
 
     @app.post("/collections")
@@ -57,56 +61,84 @@ def register_route(app, dynamodb, table_name):
             collection_id = f"col_{str(uuid.uuid4())[:8]}"
             current_timestamp = datetime.utcnow().isoformat() + "Z"
 
-            # Build collection item from validated Pydantic model
-            collection_item = {
-                "PK": f"{COLLECTION_PK_PREFIX}{collection_id}",
-                "SK": METADATA_SK,
-                "name": request_data.name,
-                "ownerId": user_id,
-                "status": "ACTIVE",
-                "itemCount": 0,
-                "childCollectionCount": 0,
-                "isPublic": request_data.isPublic,
-                "createdAt": current_timestamp,
-                "updatedAt": current_timestamp,
-                "GSI5_PK": COLLECTIONS_GSI5_PK,
-                "GSI5_SK": current_timestamp,
-            }
+            # Create collection model instance
+            collection = CollectionModel()
+            collection.PK = f"{COLLECTION_PK_PREFIX}{collection_id}"
+            collection.SK = METADATA_SK
+            collection.name = request_data.name
+            collection.ownerId = user_id
+            collection.status = "ACTIVE"
+            collection.itemCount = 0
+            collection.childCollectionCount = 0
+            collection.isPublic = request_data.isPublic
+            collection.createdAt = current_timestamp
+            collection.updatedAt = current_timestamp
+            collection.GSI5_PK = COLLECTIONS_GSI5_PK
+            collection.GSI5_SK = current_timestamp
 
             # Add optional fields from Pydantic model
             if request_data.description:
-                collection_item["description"] = request_data.description
+                collection.description = request_data.description
             if request_data.collectionTypeId:
-                collection_item["collectionTypeId"] = request_data.collectionTypeId
-                collection_item["GSI3_PK"] = request_data.collectionTypeId
-                collection_item["GSI3_SK"] = f"{COLLECTION_PK_PREFIX}{collection_id}"
+                collection.collectionTypeId = request_data.collectionTypeId
+                collection.GSI3_PK = request_data.collectionTypeId
+                collection.GSI3_SK = f"{COLLECTION_PK_PREFIX}{collection_id}"
             if request_data.parentId:
-                collection_item["parentId"] = request_data.parentId
+                collection.parentId = request_data.parentId
             if request_data.metadata:
-                collection_item["customMetadata"] = request_data.metadata
+                collection.customMetadata = request_data.metadata
             if request_data.tags:
-                collection_item["tags"] = request_data.tags
+                collection.tags = request_data.tags
 
-            # User relationship item
-            user_relationship_item = {
-                "PK": f"{USER_PK_PREFIX}{user_id}",
-                "SK": f"{COLLECTION_PK_PREFIX}{collection_id}",
-                "relationship": "OWNER",
-                "addedAt": current_timestamp,
-                "lastAccessed": current_timestamp,
-                "isFavorite": False,
-                "GSI1_PK": f"{USER_PK_PREFIX}{user_id}",
-                "GSI1_SK": current_timestamp,
-            }
+            # Create user relationship model instance
+            user_relationship = UserRelationshipModel()
+            user_relationship.PK = f"{USER_PK_PREFIX}{user_id}"
+            user_relationship.SK = f"{COLLECTION_PK_PREFIX}{collection_id}"
+            user_relationship.relationship = "OWNER"
+            user_relationship.addedAt = current_timestamp
+            user_relationship.lastAccessed = current_timestamp
+            user_relationship.isFavorite = False
+            user_relationship.GSI1_PK = f"{USER_PK_PREFIX}{user_id}"
+            user_relationship.GSI1_SK = current_timestamp
+            user_relationship.GSI2_PK = f"{COLLECTION_PK_PREFIX}{collection_id}"
+            user_relationship.GSI2_SK = f"{USER_PK_PREFIX}{user_id}"
 
-            # Prepare transactional write
-            transact_items = [
-                {"Put": {"TableName": table_name, "Item": collection_item}},
-                {"Put": {"TableName": table_name, "Item": user_relationship_item}},
-            ]
+            # Execute transactional write
+            # Create a proper Connection object for transactions
+            connection = Connection(region=os.environ.get("AWS_REGION", "us-east-1"))
+            with TransactWrite(connection=connection) as transaction:
+                transaction.save(collection)
+                transaction.save(user_relationship)
 
-            # Execute transaction
-            dynamodb.meta.client.transact_write_items(TransactItems=transact_items)
+                # If this is a child collection, create CHILD# reference in parent
+                if request_data.parentId:
+                    # Create child reference item in parent's partition
+                    child_reference = ChildReferenceModel()
+                    child_reference.PK = (
+                        f"{COLLECTION_PK_PREFIX}{request_data.parentId}"
+                    )
+                    child_reference.SK = f"{CHILD_SK_PREFIX}{collection_id}"
+                    child_reference.childCollectionId = collection_id
+                    child_reference.childCollectionName = request_data.name
+                    child_reference.addedAt = current_timestamp
+                    child_reference.type = "CHILD_COLLECTION"
+                    child_reference.GSI4_PK = f"CHILD#{collection_id}"
+                    child_reference.GSI4_SK = (
+                        f"{COLLECTION_PK_PREFIX}{request_data.parentId}"
+                    )
+
+                    transaction.save(child_reference)
+
+                    # Increment parent's childCollectionCount and update timestamp
+                    parent_pk = f"{COLLECTION_PK_PREFIX}{request_data.parentId}"
+                    parent = CollectionModel.get(parent_pk, METADATA_SK)
+                    transaction.update(
+                        parent,
+                        actions=[
+                            CollectionModel.childCollectionCount.add(1),
+                            CollectionModel.updatedAt.set(current_timestamp),
+                        ],
+                    )
 
             logger.info(
                 f"Collection created: {collection_id}",
@@ -116,8 +148,31 @@ def register_route(app, dynamodb, table_name):
                 name="SuccessfulCollectionCreations", unit=MetricUnit.Count, value=1
             )
 
-            # Format response
-            response_data = format_collection_item(collection_item, user_context)
+            # Format response - convert PynamoDB model to dict for formatting
+            collection_dict = {
+                "PK": collection.PK,
+                "SK": collection.SK,
+                "name": collection.name,
+                "ownerId": collection.ownerId,
+                "status": collection.status,
+                "itemCount": collection.itemCount,
+                "childCollectionCount": collection.childCollectionCount,
+                "isPublic": collection.isPublic,
+                "createdAt": collection.createdAt,
+                "updatedAt": collection.updatedAt,
+            }
+            if collection.description:
+                collection_dict["description"] = collection.description
+            if collection.collectionTypeId:
+                collection_dict["collectionTypeId"] = collection.collectionTypeId
+            if collection.parentId:
+                collection_dict["parentId"] = collection.parentId
+            if collection.customMetadata:
+                collection_dict["customMetadata"] = dict(collection.customMetadata)
+            if collection.tags:
+                collection_dict["tags"] = list(collection.tags)
+
+            response_data = format_collection_item(collection_dict, user_context)
 
             return {
                 "statusCode": 201,

@@ -18,9 +18,6 @@ import {
   Breadcrumbs,
   Link,
   TextField,
-  IconButton,
-  Menu,
-  MenuItem,
   Stack,
   Grid,
   Card,
@@ -31,15 +28,16 @@ import {
 import {
   Home as HomeIcon,
   Folder as FolderIcon,
-  MoreVert as MoreVertIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
 } from "@mui/icons-material";
 import { AddToCollectionModal } from "@/components/collections/AddToCollectionModal";
+import { CollectionTreeView } from "@/components/collections/CollectionTreeView";
 import {
   useAddItemToCollection,
   useGetCollection,
   useGetChildCollections,
+  useGetCollectionAncestors,
   useUpdateCollection,
   useDeleteCollection,
 } from "@/api/hooks/useCollections";
@@ -113,7 +111,6 @@ const CollectionViewPage: React.FC = () => {
   const addItemToCollectionMutation = useAddItemToCollection();
 
   // Collection Edit/Delete state
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [editedDescription, setEditedDescription] = useState("");
@@ -150,15 +147,9 @@ const CollectionViewPage: React.FC = () => {
   const { data: childCollectionsResponse, isLoading: isLoadingChildren } =
     useGetChildCollections(id!);
 
-  // Debug: Log child collections response
-  useEffect(() => {
-    console.log("[CollectionViewPage] Child collections response:", {
-      hasData: !!childCollectionsResponse,
-      data: childCollectionsResponse?.data,
-      count: childCollectionsResponse?.data?.length || 0,
-      isLoading: isLoadingChildren,
-    });
-  }, [childCollectionsResponse, isLoadingChildren]);
+  // Get collection ancestors for breadcrumbs
+  const { data: ancestorsResponse } = useGetCollectionAncestors(id!);
+  const ancestors = ancestorsResponse?.data || [];
 
   // Check if multi-select feature is enabled
   const multiSelectFeature = useFeatureFlag(
@@ -308,20 +299,10 @@ const CollectionViewPage: React.FC = () => {
     [selectedAssetForCollection, addItemToCollectionMutation],
   );
 
-  // Collection menu handlers
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  };
-
   // Edit collection handlers
   const handleEditClick = () => {
     setEditedDescription(collection?.description || "");
     setIsEditDialogOpen(true);
-    handleMenuClose();
   };
 
   const handleEditClose = () => {
@@ -355,7 +336,6 @@ const CollectionViewPage: React.FC = () => {
   // Delete collection handlers
   const handleCollectionDeleteClick = () => {
     setIsDeleteDialogOpen(true);
-    handleMenuClose();
   };
 
   const handleCollectionDeleteClose = () => {
@@ -653,6 +633,22 @@ const CollectionViewPage: React.FC = () => {
             />
           )}
 
+          {/* Left Sidebar - Collection Tree */}
+          <Box
+            sx={{
+              width: 280,
+              flexShrink: 0,
+              borderRight: 1,
+              borderColor: "divider",
+              height: "100vh",
+              position: "sticky",
+              top: 0,
+              overflowY: "auto",
+            }}
+          >
+            <CollectionTreeView currentCollectionId={id} />
+          </Box>
+
           {/* Main Content */}
           <Box
             sx={{
@@ -667,8 +663,15 @@ const CollectionViewPage: React.FC = () => {
               marginBottom: 4,
             }}
           >
-            {/* Breadcrumbs */}
-            <Box sx={{ mb: 2 }}>
+            {/* Breadcrumbs with Action Buttons */}
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                mb: 3,
+              }}
+            >
               <Breadcrumbs aria-label="breadcrumb">
                 <Link
                   underline="hover"
@@ -696,6 +699,23 @@ const CollectionViewPage: React.FC = () => {
                   <FolderIcon sx={{ mr: 0.5 }} fontSize="inherit" />
                   Collections
                 </Link>
+                {/* Show full path from ancestors */}
+                {ancestors.slice(0, -1).map((ancestor) => (
+                  <Link
+                    key={ancestor.id}
+                    underline="hover"
+                    color="inherit"
+                    href={`/collections/${ancestor.id}/view`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      navigate(`/collections/${ancestor.id}/view`);
+                    }}
+                    sx={{ display: "flex", alignItems: "center" }}
+                  >
+                    <FolderIcon sx={{ mr: 0.5 }} fontSize="inherit" />
+                    {ancestor.name}
+                  </Link>
+                ))}
                 <Typography
                   color="text.primary"
                   sx={{ display: "flex", alignItems: "center" }}
@@ -704,71 +724,27 @@ const CollectionViewPage: React.FC = () => {
                   {collection.name}
                 </Typography>
               </Breadcrumbs>
-            </Box>
 
-            {/* Collection Header */}
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "flex-start",
-                mb: 2,
-              }}
-            >
-              <Box>
-                <Typography variant="h4" gutterBottom>
-                  {collection.name}
-                </Typography>
-                {collection.description && (
-                  <Typography variant="body1" color="text.secondary">
-                    {collection.description}
-                  </Typography>
-                )}
+              {/* Action Buttons */}
+              <Box sx={{ display: "flex", gap: 2 }}>
+                <Button
+                  variant="outlined"
+                  startIcon={<EditIcon />}
+                  onClick={handleEditClick}
+                  size="small"
+                >
+                  Edit
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  startIcon={<DeleteIcon />}
+                  onClick={handleCollectionDeleteClick}
+                  size="small"
+                >
+                  Delete
+                </Button>
               </Box>
-              <IconButton
-                onClick={handleMenuOpen}
-                aria-label="collection options"
-              >
-                <MoreVertIcon />
-              </IconButton>
-              <Menu
-                anchorEl={anchorEl}
-                open={Boolean(anchorEl)}
-                onClose={handleMenuClose}
-              >
-                <MenuItem onClick={handleEditClick}>
-                  <EditIcon sx={{ mr: 1 }} fontSize="small" />
-                  Edit Description
-                </MenuItem>
-                <MenuItem onClick={handleCollectionDeleteClick}>
-                  <DeleteIcon sx={{ mr: 1 }} fontSize="small" />
-                  Delete Collection
-                </MenuItem>
-              </Menu>
-            </Box>
-
-            {/* Debug Info - Remove after testing */}
-            <Box sx={{ mb: 2, p: 2, bgcolor: "info.light", borderRadius: 1 }}>
-              <Typography variant="caption" component="div">
-                DEBUG: Child Collections Status
-              </Typography>
-              <Typography variant="caption" component="div">
-                - Response exists:{" "}
-                {childCollectionsResponse ? "✅ Yes" : "❌ No"}
-              </Typography>
-              <Typography variant="caption" component="div">
-                - Data array exists:{" "}
-                {childCollectionsResponse?.data ? "✅ Yes" : "❌ No"}
-              </Typography>
-              <Typography variant="caption" component="div">
-                - Count: {childCollectionsResponse?.data?.length || 0}
-              </Typography>
-              <Typography variant="caption" component="div">
-                - Is Loading: {isLoadingChildren ? "Yes" : "No"}
-              </Typography>
-              <Typography variant="caption" component="div">
-                - Collection ID: {id}
-              </Typography>
             </Box>
 
             {/* Child Collections Section */}

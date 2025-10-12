@@ -9,7 +9,9 @@ from aws_lambda_powertools.event_handler.exceptions import BadRequestError
 from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.parser import ValidationError, parse
 from collections_utils import COLLECTION_PK_PREFIX, METADATA_SK, create_error_response
+from db_models import CollectionItemModel, CollectionModel
 from models import AddItemToCollectionRequest
+from pynamodb.exceptions import PutError
 from user_auth import extract_user_context
 from utils.formatting_utils import format_collection_item
 from utils.item_utils import generate_asset_sk
@@ -22,7 +24,7 @@ tracer = Tracer(service="collections-ID-items-post")
 metrics = Metrics(namespace="medialake", service="collection-items")
 
 
-def register_route(app, dynamodb, table_name):
+def register_route(app):
     """Register POST /collections/<collection_id>/items route"""
 
     @app.post("/collections/<collection_id>/items")
@@ -42,7 +44,6 @@ def register_route(app, dynamodb, table_name):
                 logger.warning(f"Validation error adding item: {e}")
                 raise BadRequestError(f"Validation error: {str(e)}")
 
-            table = dynamodb.Table(table_name)
             current_timestamp = datetime.utcnow().isoformat() + "Z"
             user_id = user_context.get("user_id")
 
@@ -83,37 +84,62 @@ def register_route(app, dynamodb, table_name):
                     }
                 )
 
-            # Add all items to DynamoDB
+            # Add all items to DynamoDB using PynamoDB
             added_items = []
             for item_data in items_to_add:
-                item = {
-                    "PK": f"{COLLECTION_PK_PREFIX}{collection_id}",
-                    "SK": item_data["SK"],
-                    "itemType": "asset",
-                    "assetId": item_data["assetId"],
-                    "clipBoundary": item_data["clipBoundary"],
-                    "addedAt": current_timestamp,
-                    "addedBy": user_id,
-                }
+                item = CollectionItemModel()
+                item.PK = f"{COLLECTION_PK_PREFIX}{collection_id}"
+                item.SK = item_data["SK"]
+                item.itemType = "asset"
+                item.assetId = item_data["assetId"]
+                item.clipBoundary = item_data["clipBoundary"]
+                item.addedAt = current_timestamp
+                item.addedBy = user_id
 
                 if request_data.sortOrder is not None:
-                    item["sortOrder"] = request_data.sortOrder
+                    item.sortOrder = request_data.sortOrder
                 if request_data.metadata:
-                    item["metadata"] = request_data.metadata
+                    item.metadata = request_data.metadata
 
-                table.put_item(Item=item)
-                added_items.append(item)
-                logger.info(f"[ADD_ITEM] Added item with SK: {item_data['SK']}")
+                # Set GSI2 for reverse lookup (item to collections)
+                item.GSI2_PK = item_data["SK"]
+                item.GSI2_SK = f"{COLLECTION_PK_PREFIX}{collection_id}"
+
+                try:
+                    item.save()
+
+                    # Convert to dict for formatting
+                    item_dict = {
+                        "PK": item.PK,
+                        "SK": item.SK,
+                        "itemType": item.itemType,
+                        "assetId": item.assetId,
+                        "clipBoundary": (
+                            dict(item.clipBoundary) if item.clipBoundary else {}
+                        ),
+                        "sortOrder": item.sortOrder if item.sortOrder else 0,
+                        "metadata": dict(item.metadata) if item.metadata else {},
+                        "addedAt": item.addedAt,
+                        "addedBy": item.addedBy,
+                    }
+                    added_items.append(item_dict)
+                    logger.info(f"[ADD_ITEM] Added item with SK: {item_data['SK']}")
+                except PutError as e:
+                    logger.error(f"[ADD_ITEM] Error adding item: {e}")
 
             # Update collection item count
-            table.update_item(
-                Key={"PK": f"{COLLECTION_PK_PREFIX}{collection_id}", "SK": METADATA_SK},
-                UpdateExpression="ADD itemCount :inc SET updatedAt = :timestamp",
-                ExpressionAttributeValues={
-                    ":inc": len(added_items),
-                    ":timestamp": current_timestamp,
-                },
-            )
+            try:
+                collection = CollectionModel.get(
+                    f"{COLLECTION_PK_PREFIX}{collection_id}", METADATA_SK
+                )
+                collection.update(
+                    actions=[
+                        CollectionModel.itemCount.add(len(added_items)),
+                        CollectionModel.updatedAt.set(current_timestamp),
+                    ]
+                )
+            except Exception as e:
+                logger.warning(f"[ADD_ITEM] Failed to update item count: {e}")
 
             logger.info(
                 f"[ADD_ITEM] Added {len(added_items)} item(s) to collection {collection_id}"

@@ -5,11 +5,16 @@ import os
 from datetime import datetime
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools.event_handler.exceptions import BadRequestError
+from aws_lambda_powertools.event_handler.exceptions import (
+    BadRequestError,
+    NotFoundError,
+)
 from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.parser import ValidationError, parse
 from collections_utils import COLLECTION_PK_PREFIX, METADATA_SK, create_error_response
+from db_models import CollectionModel
 from models import UpdateCollectionRequest
+from pynamodb.exceptions import DoesNotExist, UpdateError
 from user_auth import extract_user_context
 
 logger = Logger(
@@ -19,7 +24,7 @@ tracer = Tracer(service="collections-ID-patch")
 metrics = Metrics(namespace="medialake", service="collection-detail")
 
 
-def register_route(app, dynamodb, table_name):
+def register_route(app):
     """Register PATCH /collections/<collection_id> route"""
 
     @app.patch("/collections/<collection_id>")
@@ -40,55 +45,47 @@ def register_route(app, dynamodb, table_name):
                 logger.warning(f"Validation error updating collection: {e}")
                 raise BadRequestError(f"Validation error: {str(e)}")
 
-            table = dynamodb.Table(table_name)
             current_timestamp = datetime.utcnow().isoformat() + "Z"
 
-            # Build update expression from validated model
-            update_expr_parts = ["updatedAt = :timestamp"]
-            expr_attr_values = {":timestamp": current_timestamp}
-            expr_attr_names = {}
+            # Get the collection
+            try:
+                collection = CollectionModel.get(
+                    f"{COLLECTION_PK_PREFIX}{collection_id}", METADATA_SK
+                )
+            except DoesNotExist:
+                raise NotFoundError(f"Collection '{collection_id}' not found")
+
+            # Build update actions for PynamoDB
+            actions = [CollectionModel.updatedAt.set(current_timestamp)]
 
             if request_data.name is not None:
-                update_expr_parts.append("#name = :name")
-                expr_attr_values[":name"] = request_data.name
-                expr_attr_names["#name"] = "name"
+                actions.append(CollectionModel.name.set(request_data.name))
 
             if request_data.description is not None:
-                update_expr_parts.append("description = :description")
-                expr_attr_values[":description"] = request_data.description
+                actions.append(
+                    CollectionModel.description.set(request_data.description)
+                )
 
             if request_data.status is not None:
-                update_expr_parts.append("#status = :status")
-                expr_attr_values[":status"] = request_data.status.value
-                expr_attr_names["#status"] = "status"
+                actions.append(CollectionModel.status.set(request_data.status.value))
 
             if request_data.isPublic is not None:
-                update_expr_parts.append("isPublic = :isPublic")
-                expr_attr_values[":isPublic"] = request_data.isPublic
+                actions.append(CollectionModel.isPublic.set(request_data.isPublic))
 
             if request_data.metadata is not None:
-                update_expr_parts.append("customMetadata = :metadata")
-                expr_attr_values[":metadata"] = request_data.metadata
+                actions.append(
+                    CollectionModel.customMetadata.set(request_data.metadata)
+                )
 
             if request_data.tags is not None:
-                update_expr_parts.append("tags = :tags")
-                expr_attr_values[":tags"] = request_data.tags
+                actions.append(CollectionModel.tags.set(request_data.tags))
 
-            # Build update_item parameters
-            update_params = {
-                "Key": {
-                    "PK": f"{COLLECTION_PK_PREFIX}{collection_id}",
-                    "SK": METADATA_SK,
-                },
-                "UpdateExpression": f"SET {', '.join(update_expr_parts)}",
-                "ExpressionAttributeValues": expr_attr_values,
-            }
-
-            # Only add ExpressionAttributeNames if there are any
-            if expr_attr_names:
-                update_params["ExpressionAttributeNames"] = expr_attr_names
-
-            table.update_item(**update_params)
+            # Perform update
+            try:
+                collection.update(actions=actions)
+            except UpdateError as e:
+                logger.error(f"Error updating collection: {e}")
+                raise BadRequestError("Failed to update collection")
 
             logger.info(f"Collection updated: {collection_id}")
             metrics.add_metric(
@@ -110,7 +107,7 @@ def register_route(app, dynamodb, table_name):
                 ),
             }
 
-        except BadRequestError:
+        except (BadRequestError, NotFoundError):
             raise
         except Exception as e:
             logger.exception("Error updating collection", exc_info=e)

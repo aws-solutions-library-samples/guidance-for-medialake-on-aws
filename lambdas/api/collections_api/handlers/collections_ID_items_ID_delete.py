@@ -10,6 +10,8 @@ from collections_utils import (
     create_error_response,
     create_success_response,
 )
+from db_models import CollectionItemModel, CollectionModel
+from pynamodb.exceptions import DeleteError, DoesNotExist
 from utils.item_utils import ASSET_SK_PREFIX, ITEM_SK_PREFIX
 
 logger = Logger(
@@ -19,7 +21,7 @@ tracer = Tracer(service="collections-ID-items-ID-delete")
 metrics = Metrics(namespace="medialake", service="collection-items")
 
 
-def register_route(app, dynamodb, table_name):
+def register_route(app):
     """Register DELETE /collections/<collection_id>/items/<item_id> route"""
 
     @app.delete("/collections/<collection_id>/items/<item_id>")
@@ -27,7 +29,6 @@ def register_route(app, dynamodb, table_name):
     def collections_ID_items_ID_delete(collection_id: str, item_id: str):
         """Remove item from collection"""
         try:
-            table = dynamodb.Table(table_name)
             current_timestamp = datetime.utcnow().isoformat() + "Z"
 
             # Support both old ITEM# and new ASSET# formats
@@ -37,19 +38,31 @@ def register_route(app, dynamodb, table_name):
                 else f"{ITEM_SK_PREFIX}{item_id}"
             )
 
-            table.delete_item(
-                Key={
-                    "PK": f"{COLLECTION_PK_PREFIX}{collection_id}",
-                    "SK": sk,
-                }
-            )
+            # Delete the item using PynamoDB
+            try:
+                item = CollectionItemModel(f"{COLLECTION_PK_PREFIX}{collection_id}", sk)
+                item.delete()
+            except DoesNotExist:
+                logger.warning(
+                    f"Item not found: {item_id} in collection {collection_id}"
+                )
+            except DeleteError as e:
+                logger.error(f"Error deleting item: {e}")
+                raise
 
             # Update collection item count
-            table.update_item(
-                Key={"PK": f"{COLLECTION_PK_PREFIX}{collection_id}", "SK": METADATA_SK},
-                UpdateExpression="ADD itemCount :dec SET updatedAt = :timestamp",
-                ExpressionAttributeValues={":dec": -1, ":timestamp": current_timestamp},
-            )
+            try:
+                collection = CollectionModel.get(
+                    f"{COLLECTION_PK_PREFIX}{collection_id}", METADATA_SK
+                )
+                collection.update(
+                    actions=[
+                        CollectionModel.itemCount.add(-1),
+                        CollectionModel.updatedAt.set(current_timestamp),
+                    ]
+                )
+            except Exception as e:
+                logger.warning(f"Failed to update item count: {e}")
 
             logger.info(f"Item removed from collection {collection_id}")
 

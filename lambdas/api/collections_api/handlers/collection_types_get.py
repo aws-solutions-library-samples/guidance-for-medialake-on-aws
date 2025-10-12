@@ -7,6 +7,8 @@ from datetime import datetime
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.metrics import MetricUnit
 from botocore.exceptions import ClientError
+from db_models import CollectionTypeModel
+from pynamodb.exceptions import QueryError
 from utils.formatting_utils import format_collection_type
 from utils.pagination_utils import apply_sorting, create_cursor, parse_cursor
 
@@ -22,7 +24,7 @@ DEFAULT_LIMIT = 20
 MAX_LIMIT = 100
 
 
-def register_route(app, dynamodb, table_name):
+def register_route(app):
     """Register GET /collection-types route"""
 
     @app.get("/collection-types")
@@ -49,32 +51,67 @@ def register_route(app, dynamodb, table_name):
                 },
             )
 
-            table = dynamodb.Table(table_name)
-
             # Parse cursor for pagination
             start_key = None
             parsed_cursor = parse_cursor(cursor)
             if parsed_cursor:
-                start_key = {
-                    "PK": parsed_cursor.get("pk"),
-                    "SK": parsed_cursor.get("sk"),
+                start_key = parsed_cursor.get("pk"), parsed_cursor.get("sk")
+
+            # Query for collection types using PynamoDB
+            items = []
+            try:
+                query_kwargs = {}
+                if start_key:
+                    query_kwargs["last_evaluated_key"] = {
+                        "PK": start_key[0],
+                        "SK": start_key[1],
+                    }
+
+                results = CollectionTypeModel.query(
+                    SYSTEM_PK,
+                    CollectionTypeModel.SK.startswith(COLLECTION_TYPE_SK_PREFIX),
+                    limit=limit + 1,
+                    **query_kwargs,
+                )
+
+                for item in results:
+                    items.append(
+                        {
+                            "PK": item.PK,
+                            "SK": item.SK,
+                            "name": item.name,
+                            "description": (
+                                item.description if item.description else None
+                            ),
+                            "isActive": item.isActive,
+                            "allowedItemTypes": (
+                                list(item.allowedItemTypes)
+                                if item.allowedItemTypes
+                                else []
+                            ),
+                            "schema": dict(item.schema) if item.schema else None,
+                            "createdAt": item.createdAt,
+                            "updatedAt": item.updatedAt,
+                        }
+                    )
+
+            except QueryError as e:
+                logger.error("PynamoDB query error", exc_info=e)
+                return {
+                    "statusCode": 500,
+                    "body": json.dumps(
+                        {
+                            "success": False,
+                            "error": {
+                                "code": "QUERY_ERROR",
+                                "message": "Error querying collection types",
+                            },
+                            "meta": {
+                                "request_id": app.current_event.request_context.request_id
+                            },
+                        }
+                    ),
                 }
-
-            # Query for collection types
-            query_params = {
-                "KeyConditionExpression": "PK = :pk AND begins_with(SK, :sk_prefix)",
-                "ExpressionAttributeValues": {
-                    ":pk": SYSTEM_PK,
-                    ":sk_prefix": COLLECTION_TYPE_SK_PREFIX,
-                },
-                "Limit": limit + 1,
-            }
-
-            if start_key:
-                query_params["ExclusiveStartKey"] = start_key
-
-            response = table.query(**query_params)
-            items = response.get("Items", [])
 
             logger.info(f"Retrieved {len(items)} collection types from DynamoDB")
 

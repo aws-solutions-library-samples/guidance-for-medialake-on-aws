@@ -184,5 +184,7 @@ export const QUERY_KEYS = {
     types: () => [...QUERY_KEYS.COLLECTIONS.all, "types"] as const,
     children: (parentId: string) =>
       [...QUERY_KEYS.COLLECTIONS.detail(parentId), "children"] as const,
+    ancestors: (id: string) =>
+      [...QUERY_KEYS.COLLECTIONS.detail(id), "ancestors"] as const,
   },
 } as const;

@@ -21,11 +21,21 @@ import json
 import os
 from typing import Any, Dict
 
-import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver, CORSConfig
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
+
+# Import PynamoDB models
+from db_models import (
+    ChildReferenceModel,
+    CollectionItemModel,
+    CollectionModel,
+    CollectionTypeModel,
+    RuleModel,
+    ShareModel,
+    UserRelationshipModel,
+)
 
 # Initialize PowerTools
 logger = Logger(service="collections-api", level=os.environ.get("LOG_LEVEL", "INFO"))
@@ -53,17 +63,29 @@ app = APIGatewayRestResolver(
     cors=cors_config,
 )
 
-# Initialize DynamoDB client (shared across routes)
-dynamodb = boto3.resource("dynamodb")
+# Initialize PynamoDB models with environment configuration
+table_name = os.environ.get("COLLECTIONS_TABLE_NAME")
+region = os.environ.get("AWS_REGION", "us-east-1")
 
-# Get environment variables
-TABLE_NAME = os.environ.get("COLLECTIONS_TABLE_NAME")
+# Set table name and region for all models
+for model in [
+    CollectionModel,
+    ChildReferenceModel,
+    UserRelationshipModel,
+    CollectionItemModel,
+    ShareModel,
+    RuleModel,
+    CollectionTypeModel,
+]:
+    model.Meta.table_name = table_name
+    model.Meta.region = region
 
-# Import handlers and register all routes
-# This uses the new Pydantic V2 validated handlers
-from handlers import register_all_routes
+logger.info(f"PynamoDB models initialized for table: {table_name} in region: {region}")
 
-register_all_routes(app, dynamodb, TABLE_NAME)
+# Register all routes - import is done after model initialization
+from handlers import register_all_routes  # noqa: E402
+
+register_all_routes(app)
 
 
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)

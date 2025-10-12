@@ -526,3 +526,37 @@ export const useGetCollectionAssets = (
     },
   });
 };
+
+// Hook to get collection ancestors (breadcrumb trail)
+export interface CollectionAncestor {
+  id: string;
+  name: string;
+  parentId?: string;
+}
+
+export interface CollectionAncestorsResponse {
+  success: boolean;
+  data: CollectionAncestor[];
+}
+
+export const useGetCollectionAncestors = (id: string, enabled = true) => {
+  const { showError } = useErrorModal();
+
+  return useQuery<CollectionAncestorsResponse, Error>({
+    queryKey: QUERY_KEYS.COLLECTIONS.ancestors(id),
+    enabled: enabled && !!id,
+    queryFn: async ({ signal }) => {
+      try {
+        const response = await apiClient.get<CollectionAncestorsResponse>(
+          API_ENDPOINTS.COLLECTIONS.ANCESTORS(id),
+          { signal },
+        );
+        return response.data;
+      } catch (error) {
+        logger.error("Fetch collection ancestors error:", error);
+        showError("Failed to fetch collection ancestors");
+        throw error;
+      }
+    },
+  });
+};

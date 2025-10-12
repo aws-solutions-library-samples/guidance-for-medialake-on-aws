@@ -1,26 +1,12 @@
-import React, { useState } from "react";
-import { useTranslation } from "react-i18next";
+import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box,
   Typography,
-  Paper,
   useTheme,
   alpha,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  ListItemButton,
-  Divider,
-  CircularProgress,
-  TextField,
-  InputAdornment,
-  IconButton,
   Button,
   Chip,
-  Menu,
-  MenuItem,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -29,130 +15,95 @@ import {
   Card,
   CardContent,
   CardActions,
-  Grid,
+  Snackbar,
+  Alert,
+  TextField,
 } from "@mui/material";
 import {
   Folder as FolderIcon,
   FolderOpen as FolderOpenIcon,
-  Search as SearchIcon,
-  Clear as ClearIcon,
-  ChevronLeft,
-  ChevronRight,
   Add as AddIcon,
-  MoreVert as MoreVertIcon,
   Public as PublicIcon,
   Lock as PrivateIcon,
-  Share as SharedIcon,
-  Person as PersonIcon,
-  Schedule as ScheduleIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Refresh as RefreshIcon,
+  CalendarToday as CalendarIcon,
+  AccountTree as TreeIcon,
+  PhotoLibrary as PhotoLibraryIcon,
 } from "@mui/icons-material";
+import { PageHeader, PageContent } from "@/components/common/layout";
 import {
   useGetCollections,
-  useGetSharedCollections,
   useDeleteCollection,
   useUpdateCollection,
   type Collection,
 } from "../api/hooks/useCollections";
 import { CreateCollectionModal } from "../components/collections/CreateCollectionModal";
-
-const DRAWER_WIDTH = 280;
-const COLLAPSED_DRAWER_WIDTH = 60;
+import { formatDate } from "@/utils/dateFormat";
 
 const CollectionsPage: React.FC = () => {
-  const { t } = useTranslation();
   const theme = useTheme();
   const navigate = useNavigate();
-  const [selectedTab, setSelectedTab] = useState<"my" | "shared" | "public">(
-    "my",
-  );
-  const [filterText, setFilterText] = useState("");
-  const [isCollapsed, setIsCollapsed] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editedDescription, setEditedDescription] = useState("");
   const [selectedCollection, setSelectedCollection] =
     useState<Collection | null>(null);
-  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
+  const [editedDescription, setEditedDescription] = useState("");
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [alert, setAlert] = useState<{
+    message: string;
+    severity: "success" | "error";
+  } | null>(null);
 
   // API hooks
-  const { data: collectionsResponse, isLoading: isLoadingCollections } =
-    useGetCollections();
-  const { data: sharedCollectionsResponse, isLoading: isLoadingShared } =
-    useGetSharedCollections();
+  const {
+    data: collectionsResponse,
+    isLoading,
+    error,
+    refetch,
+  } = useGetCollections();
   const deleteCollectionMutation = useDeleteCollection();
   const updateCollectionMutation = useUpdateCollection();
 
-  const collections = collectionsResponse?.data || [];
-  const sharedCollections = sharedCollectionsResponse?.data || [];
+  const allCollections = collectionsResponse?.data || [];
 
-  // Filter collections based on search text and selected tab
-  const getFilteredCollections = () => {
-    let collectionsToFilter: Collection[] = [];
-
-    switch (selectedTab) {
-      case "my":
-        // Show collections where user is the owner and not public
-        // Exclude child collections (those with parentId) - they show in parent view
-        collectionsToFilter = collections.filter(
-          (c) => !c.isPublic && !c.parentId,
-        );
-        break;
-      case "shared":
-        // Exclude child collections from shared view too
-        collectionsToFilter = sharedCollections.filter((c) => !c.parentId);
-        break;
-      case "public":
-        // Show collections that are marked as public
-        // Exclude child collections from public view
-        collectionsToFilter = collections.filter(
-          (c) => c.isPublic && !c.parentId,
-        );
-        break;
-      default:
-        // Exclude child collections from default view
-        collectionsToFilter = collections.filter((c) => !c.parentId);
-    }
-
-    return collectionsToFilter.filter(
-      (collection) =>
-        collection.name.toLowerCase().includes(filterText.toLowerCase()) ||
-        collection.description
-          ?.toLowerCase()
-          .includes(filterText.toLowerCase()),
-    );
+  // Calculate total descendant count recursively
+  const calculateTotalDescendants = (
+    collectionId: string,
+    collections: Collection[],
+  ): number => {
+    const children = collections.filter((c) => c.parentId === collectionId);
+    let count = children.length;
+    children.forEach((child) => {
+      count += calculateTotalDescendants(child.id, collections);
+    });
+    return count;
   };
 
-  const filteredCollections = getFilteredCollections();
+  // Only show root collections (no parentId) and hide shared collections for now
+  const rootCollections = useMemo(() => {
+    return allCollections
+      .filter((c) => !c.parentId)
+      .map((c) => ({
+        ...c,
+        totalDescendants: calculateTotalDescendants(c.id, allCollections),
+      }));
+  }, [allCollections]);
 
-  const handleClearFilter = () => {
-    setFilterText("");
+  // Handle refresh
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    refetch().finally(() => {
+      setIsRefreshing(false);
+    });
   };
 
-  const toggleDrawer = () => {
-    setIsCollapsed(!isCollapsed);
-  };
-
-  const handleMenuOpen = (
-    event: React.MouseEvent<HTMLElement>,
-    collection: Collection,
-  ) => {
-    event.stopPropagation();
+  const handleEditClick = (collection: Collection) => {
     setSelectedCollection(collection);
-    setMenuAnchorEl(event.currentTarget);
-  };
-
-  const handleMenuClose = () => {
-    setMenuAnchorEl(null);
-    setSelectedCollection(null);
-  };
-
-  const handleEditClick = () => {
-    if (selectedCollection) {
-      setEditedDescription(selectedCollection.description || "");
-      setEditDialogOpen(true);
-      setMenuAnchorEl(null); // Close menu but keep selectedCollection
-    }
+    setEditedDescription(collection.description || "");
+    setEditDialogOpen(true);
   };
 
   const handleEditSave = async () => {
@@ -167,8 +118,18 @@ const CollectionsPage: React.FC = () => {
         setEditDialogOpen(false);
         setSelectedCollection(null);
         setEditedDescription("");
+        setAlert({
+          message: "Collection updated successfully",
+          severity: "success",
+        });
       } catch (error) {
-        console.error("Failed to update collection:", error);
+        setAlert({
+          message: "Failed to update collection",
+          severity: "error",
+        });
+        setEditDialogOpen(false);
+        setSelectedCollection(null);
+        setEditedDescription("");
       }
     }
   };
@@ -179,9 +140,9 @@ const CollectionsPage: React.FC = () => {
     setEditedDescription("");
   };
 
-  const handleDeleteClick = () => {
+  const handleDeleteClick = (collection: Collection) => {
+    setSelectedCollection(collection);
     setDeleteDialogOpen(true);
-    setMenuAnchorEl(null); // Close menu but keep selectedCollection
   };
 
   const handleDeleteConfirm = async () => {
@@ -190,8 +151,17 @@ const CollectionsPage: React.FC = () => {
         await deleteCollectionMutation.mutateAsync(selectedCollection.id);
         setDeleteDialogOpen(false);
         setSelectedCollection(null);
+        setAlert({
+          message: "Collection deleted successfully",
+          severity: "success",
+        });
       } catch (error) {
-        console.error("Failed to delete collection:", error);
+        setAlert({
+          message: "Failed to delete collection",
+          severity: "error",
+        });
+        setDeleteDialogOpen(false);
+        setSelectedCollection(null);
       }
     }
   };
@@ -205,568 +175,324 @@ const CollectionsPage: React.FC = () => {
     navigate(`/collections/${collection.id}/view`);
   };
 
-  const getCollectionTypeIcon = (type: string) => {
-    switch (type) {
-      case "public":
-        return <PublicIcon fontSize="small" />;
-      case "private":
-        return <PrivateIcon fontSize="small" />;
-      case "shared":
-        return <SharedIcon fontSize="small" />;
-      default:
-        return <FolderIcon fontSize="small" />;
-    }
+  const handleAlertClose = () => {
+    setAlert(null);
   };
-
-  const getCollectionTypeBadge = (type: string) => {
-    const colors = {
-      public: { color: "#2e7d32", bgcolor: "#e8f5e8" },
-      private: { color: "#1976d2", bgcolor: "#e3f2fd" },
-      shared: { color: "#ed6c02", bgcolor: "#fff3e0" },
-    };
-
-    const config = colors[type as keyof typeof colors] || colors.private;
-
-    return (
-      <Chip
-        label={t(`collectionsPage.collectionTypes.${type}`)}
-        size="small"
-        icon={getCollectionTypeIcon(type)}
-        sx={{
-          color: config.color,
-          bgcolor: config.bgcolor,
-          border: `1px solid ${alpha(config.color, 0.3)}`,
-          "& .MuiChip-icon": {
-            color: config.color,
-          },
-        }}
-      />
-    );
-  };
-
-  const isLoading = isLoadingCollections || isLoadingShared;
 
   return (
     <Box
-      sx={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-        px: 4,
-        pt: 0,
-        mt: -1.5,
-      }}
+      sx={{ p: 3, height: "100%", display: "flex", flexDirection: "column" }}
     >
-      {/* Collections title with gradient styling */}
-      <Box sx={{ mb: 0.75 }}>
-        <Typography
-          variant="h4"
-          component="h1"
-          sx={{
-            fontWeight: 700,
-            mb: 0,
-            background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-            backgroundClip: "text",
-            WebkitBackgroundClip: "text",
-            color: "transparent",
-          }}
-        >
-          {t("collectionsPage.title")}
-        </Typography>
-      </Box>
-
-      {/* Main content area with sidebar and content */}
-      <Box
-        sx={{
-          display: "flex",
-          flexGrow: 1,
-          height: "calc(100% - 28px)",
-          position: "relative",
-        }}
-      >
-        {/* Left Panel - Collection tabs and filters */}
-        <Box
-          sx={{
-            width: isCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH,
-            minWidth: isCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH,
-            mr: 3,
-            height: "100%",
-            display: "flex",
-            flexDirection: "column",
-            backgroundColor: "background.paper",
-            borderRadius: 2,
-            transition: theme.transitions.create(
-              ["width", "margin", "min-width"],
-              {
-                easing: theme.transitions.easing.sharp,
-                duration: theme.transitions.duration.enteringScreen,
-              },
-            ),
-            overflow: "visible",
-            position: "relative",
-            zIndex: 1,
-          }}
-        >
-          {/* Collapse/Expand Button */}
-          <Button
-            onClick={toggleDrawer}
-            sx={{
-              position: "absolute",
-              right: -16,
-              top: "50%",
-              transform: "translateY(-50%)",
-              minWidth: "32px",
-              width: "32px",
-              height: "32px",
-              bgcolor: "background.paper",
-              borderRadius: "8px",
-              boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.15)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              border: "1px solid",
-              borderColor: "divider",
-              zIndex: 1200,
-              padding: 0,
-              "&:hover": {
-                bgcolor: "background.paper",
-                boxShadow: "0px 6px 12px rgba(0, 0, 0, 0.2)",
-              },
-            }}
-          >
-            {isCollapsed ? (
-              <ChevronRight sx={{ fontSize: 20 }} />
-            ) : (
-              <ChevronLeft sx={{ fontSize: 20 }} />
-            )}
-          </Button>
-
-          {isCollapsed ? (
-            // Collapsed view - show only the icon, centered
-            <Box
+      <PageHeader
+        title="Collections"
+        description="Organize and manage your media assets in collections"
+        action={
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Button
+              onClick={handleRefresh}
+              disabled={isLoading || isRefreshing}
               sx={{
-                height: "100%",
-                width: "100%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                pl: 0,
-                pr: 2,
+                backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                color: theme.palette.primary.main,
+                "&:hover": {
+                  backgroundColor: alpha(theme.palette.primary.main, 0.2),
+                },
               }}
-            >
-              <FolderIcon
-                sx={{
-                  color: theme.palette.primary.main,
-                  fontSize: 24,
-                }}
-              />
-            </Box>
-          ) : (
-            // Expanded view - show full content
-            <>
-              <Box sx={{ p: 1.5, pb: 1 }}>
-                <Box
+              startIcon={
+                <RefreshIcon
                   sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    mb: 1,
-                  }}
-                >
-                  <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                    {t("collectionsPage.title")}
-                  </Typography>
-                  <Button
-                    size="small"
-                    startIcon={<AddIcon />}
-                    onClick={() => setCreateModalOpen(true)}
-                    sx={{ minWidth: "auto" }}
-                  >
-                    {t("collectionsPage.createCollection")}
-                  </Button>
-                </Box>
-
-                {/* Search field */}
-                <TextField
-                  fullWidth
-                  size="small"
-                  placeholder={t("common.search")}
-                  value={filterText}
-                  onChange={(e) => setFilterText(e.target.value)}
-                  sx={{
-                    mb: 1,
-                    width: "90%",
-                    mx: "auto",
-                    "& .MuiInputBase-root": {
-                      height: 32,
-                      fontSize: "0.875rem",
+                    animation: isRefreshing
+                      ? "spin 1s linear infinite"
+                      : "none",
+                    "@keyframes spin": {
+                      "0%": {
+                        transform: "rotate(0deg)",
+                      },
+                      "100%": {
+                        transform: "rotate(360deg)",
+                      },
                     },
-                    "& .MuiInputBase-input": {
-                      py: 0.5,
-                    },
-                  }}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchIcon fontSize="small" sx={{ fontSize: 18 }} />
-                      </InputAdornment>
-                    ),
-                    endAdornment: filterText ? (
-                      <InputAdornment position="end">
-                        <IconButton
-                          size="small"
-                          onClick={handleClearFilter}
-                          edge="end"
-                          sx={{ p: 0.5 }}
-                        >
-                          <ClearIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </InputAdornment>
-                    ) : null,
                   }}
                 />
-              </Box>
+              }
+            >
+              Refresh
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setCreateModalOpen(true)}
+              sx={{
+                borderRadius: 2,
+                textTransform: "none",
+                px: 3,
+                height: 40,
+              }}
+            >
+              Create Collection
+            </Button>
+          </Box>
+        }
+      />
 
-              <Divider />
-
-              {/* Collection type tabs */}
-              <Box sx={{ p: 1 }}>
-                <List dense disablePadding>
-                  <ListItem disablePadding>
-                    <ListItemButton
-                      selected={selectedTab === "my"}
-                      onClick={() => setSelectedTab("my")}
-                      sx={{
-                        borderRadius: 1,
-                        "&.Mui-selected": {
-                          backgroundColor: alpha(
-                            theme.palette.primary.main,
-                            0.1,
-                          ),
-                        },
-                      }}
-                    >
-                      <ListItemIcon sx={{ minWidth: 36 }}>
-                        <PrivateIcon fontSize="small" />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={t("collectionsPage.myCollections")}
-                      />
-                    </ListItemButton>
-                  </ListItem>
-                  <ListItem disablePadding>
-                    <ListItemButton
-                      selected={selectedTab === "shared"}
-                      onClick={() => setSelectedTab("shared")}
-                      sx={{
-                        borderRadius: 1,
-                        "&.Mui-selected": {
-                          backgroundColor: alpha(
-                            theme.palette.primary.main,
-                            0.1,
-                          ),
-                        },
-                      }}
-                    >
-                      <ListItemIcon sx={{ minWidth: 36 }}>
-                        <SharedIcon fontSize="small" />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={t("collectionsPage.sharedCollections")}
-                      />
-                    </ListItemButton>
-                  </ListItem>
-                  <ListItem disablePadding>
-                    <ListItemButton
-                      selected={selectedTab === "public"}
-                      onClick={() => setSelectedTab("public")}
-                      sx={{
-                        borderRadius: 1,
-                        "&.Mui-selected": {
-                          backgroundColor: alpha(
-                            theme.palette.primary.main,
-                            0.1,
-                          ),
-                        },
-                      }}
-                    >
-                      <ListItemIcon sx={{ minWidth: 36 }}>
-                        <PublicIcon fontSize="small" />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={t("collectionsPage.publicCollections")}
-                      />
-                    </ListItemButton>
-                  </ListItem>
-                </List>
-              </Box>
-            </>
-          )}
-        </Box>
-
-        {/* Main Content Area - Collections Grid */}
-        <Box
-          sx={{
-            flexGrow: 1,
-            height: "100%",
-            overflow: "auto",
-            backgroundColor: alpha(theme.palette.background.default, 0.5),
-          }}
-        >
-          <Paper
-            elevation={0}
+      <PageContent isLoading={isLoading} error={error as Error}>
+        {rootCollections.length === 0 ? (
+          <Box
             sx={{
-              height: "100%",
-              borderRadius: "12px",
-              border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-              backgroundColor: theme.palette.background.paper,
-              overflow: "hidden",
-              p: 3,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              minHeight: "400px",
+              textAlign: "center",
             }}
           >
-            {isLoading ? (
-              <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
-                <CircularProgress />
-              </Box>
-            ) : filteredCollections.length === 0 ? (
-              <Box
+            <FolderOpenIcon
+              sx={{
+                fontSize: 64,
+                color: alpha(theme.palette.text.secondary, 0.5),
+                mb: 2,
+              }}
+            />
+            <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
+              No collections found
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              Create your first collection to get started
+            </Typography>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setCreateModalOpen(true)}
+            >
+              Create Collection
+            </Button>
+          </Box>
+        ) : (
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "1fr",
+                sm: "repeat(auto-fill, minmax(300px, 1fr))",
+                md: "repeat(auto-fill, minmax(350px, 1fr))",
+              },
+              gap: 3,
+            }}
+          >
+            {rootCollections.map((collection) => (
+              <Card
+                key={collection.id}
                 sx={{
                   display: "flex",
                   flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  height: "100%",
-                  textAlign: "center",
+                  transition:
+                    "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
+                  "&:hover": {
+                    transform: "translateY(-4px)",
+                    boxShadow: theme.shadows[6],
+                    cursor: "pointer",
+                  },
                 }}
+                onClick={() => handleViewCollection(collection)}
               >
-                <FolderOpenIcon
-                  sx={{
-                    fontSize: 64,
-                    color: alpha(theme.palette.text.secondary, 0.5),
-                    mb: 2,
-                  }}
-                />
-                <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
-                  {t("collectionsPage.noCollections")}
-                </Typography>
-                <Button
-                  variant="contained"
-                  startIcon={<AddIcon />}
-                  onClick={() => setCreateModalOpen(true)}
-                >
-                  {t("collectionsPage.actions.createNew")}
-                </Button>
-              </Box>
-            ) : (
-              <Grid container spacing={3}>
-                {filteredCollections.map((collection) => (
-                  <Grid item xs={12} sm={6} md={4} lg={3} key={collection.id}>
-                    <Card
+                <CardContent sx={{ flexGrow: 1, pb: 2 }}>
+                  {/* Header with icon and name */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      mb: 2,
+                    }}
+                  >
+                    <FolderIcon
                       sx={{
-                        height: "100%",
-                        display: "flex",
-                        flexDirection: "column",
-                        transition:
-                          "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
-                        "&:hover": {
-                          transform: "translateY(-2px)",
-                          boxShadow: theme.shadows[4],
-                        },
+                        color: theme.palette.primary.main,
+                        fontSize: 32,
+                        mr: 1.5,
+                      }}
+                    />
+                    <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                      <Typography
+                        variant="h6"
+                        component="h3"
+                        sx={{
+                          fontWeight: 600,
+                          fontSize: "1.1rem",
+                          lineHeight: 1.3,
+                          mb: 1,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {collection.name}
+                      </Typography>
+                      {/* Public/Private Badge */}
+                      <Chip
+                        label={collection.isPublic ? "Public" : "Private"}
+                        size="small"
+                        icon={
+                          collection.isPublic ? <PublicIcon /> : <PrivateIcon />
+                        }
+                        sx={{
+                          height: 22,
+                          color: collection.isPublic
+                            ? "#2e7d32"
+                            : theme.palette.primary.main,
+                          bgcolor: collection.isPublic
+                            ? "#e8f5e8"
+                            : alpha(theme.palette.primary.main, 0.1),
+                          border: `1px solid ${collection.isPublic ? "#2e7d32" : theme.palette.primary.main}`,
+                          "& .MuiChip-icon": {
+                            color: collection.isPublic
+                              ? "#2e7d32"
+                              : theme.palette.primary.main,
+                            fontSize: 14,
+                          },
+                        }}
+                      />
+                    </Box>
+                  </Box>
+
+                  {/* Description */}
+                  {collection.description && (
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{
+                        mb: 2,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        minHeight: "40px",
                       }}
                     >
-                      <CardContent sx={{ flexGrow: 1, pb: 1 }}>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "flex-start",
-                            mb: 1,
-                          }}
-                        >
-                          <FolderIcon
-                            sx={{
-                              color: theme.palette.primary.main,
-                              mr: 1,
-                              mt: 0.5,
-                            }}
-                          />
-                          <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                            <Typography
-                              variant="h6"
-                              component="h3"
-                              sx={{
-                                fontWeight: 600,
-                                fontSize: "1rem",
-                                lineHeight: 1.2,
-                                mb: 0.5,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {collection.name}
-                            </Typography>
-                            {getCollectionTypeBadge(collection.type)}
-                          </Box>
-                          <IconButton
-                            size="small"
-                            onClick={(e) => handleMenuOpen(e, collection)}
-                            sx={{ ml: 1 }}
-                          >
-                            <MoreVertIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
+                      {collection.description}
+                    </Typography>
+                  )}
 
-                        {collection.description && (
-                          <Typography
-                            variant="body2"
-                            color="text.secondary"
-                            sx={{
-                              mb: 2,
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              display: "-webkit-box",
-                              WebkitLineClamp: 2,
-                              WebkitBoxOrient: "vertical",
-                            }}
-                          >
-                            {collection.description}
-                          </Typography>
-                        )}
+                  {/* Stats */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 1,
+                      mt: 2,
+                    }}
+                  >
+                    {/* Item count */}
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                      }}
+                    >
+                      <PhotoLibraryIcon
+                        sx={{ fontSize: 16, color: "text.secondary" }}
+                      />
+                      <Typography variant="body2" color="text.secondary">
+                        {collection.itemCount} item
+                        {collection.itemCount !== 1 ? "s" : ""}
+                      </Typography>
+                    </Box>
 
-                        <Box
-                          sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 1,
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 2,
-                            }}
-                          >
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              {t("collectionsPage.stats.itemCount", {
-                                count: collection.itemCount,
-                              })}
-                            </Typography>
-                            {collection.childCount > 0 && (
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
-                                {t("collectionsPage.stats.childCount", {
-                                  count: collection.childCount,
-                                })}
-                              </Typography>
-                            )}
-                          </Box>
+                    {/* Sub-collections count */}
+                    {collection.totalDescendants > 0 && (
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                        }}
+                      >
+                        <TreeIcon
+                          sx={{ fontSize: 16, color: "text.secondary" }}
+                        />
+                        <Typography variant="body2" color="text.secondary">
+                          {collection.totalDescendants} sub-collection
+                          {collection.totalDescendants !== 1 ? "s" : ""}
+                        </Typography>
+                      </Box>
+                    )}
 
-                          {collection.ownerName &&
-                            collection.type === "shared" && (
-                              <Box
-                                sx={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 0.5,
-                                }}
-                              >
-                                <PersonIcon
-                                  sx={{ fontSize: 14, color: "text.secondary" }}
-                                />
-                                <Typography
-                                  variant="caption"
-                                  color="text.secondary"
-                                >
-                                  {t("collectionsPage.stats.createdBy", {
-                                    name: collection.ownerName,
-                                  })}
-                                </Typography>
-                              </Box>
-                            )}
+                    {/* Created date */}
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                      }}
+                    >
+                      <CalendarIcon
+                        sx={{ fontSize: 16, color: "text.secondary" }}
+                      />
+                      <Typography variant="body2" color="text.secondary">
+                        Created: {formatDate(collection.createdAt)}
+                      </Typography>
+                    </Box>
 
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 0.5,
-                            }}
-                          >
-                            <ScheduleIcon
-                              sx={{ fontSize: 14, color: "text.secondary" }}
-                            />
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              {t("collectionsPage.stats.lastModified", {
-                                date: new Date(
-                                  collection.updatedAt,
-                                ).toLocaleDateString(),
-                              })}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </CardContent>
+                    {/* Modified date */}
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                      }}
+                    >
+                      <CalendarIcon
+                        sx={{ fontSize: 16, color: "text.secondary" }}
+                      />
+                      <Typography variant="body2" color="text.secondary">
+                        Modified: {formatDate(collection.updatedAt)}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </CardContent>
 
-                      <CardActions sx={{ pt: 0, px: 2, pb: 2 }}>
-                        <Button
-                          size="small"
-                          sx={{ ml: "auto" }}
-                          onClick={() => handleViewCollection(collection)}
-                        >
-                          {t("collectionsPage.actions.view")}
-                        </Button>
-                      </CardActions>
-                    </Card>
-                  </Grid>
-                ))}
-              </Grid>
-            )}
-          </Paper>
-        </Box>
-      </Box>
-
-      {/* Context Menu */}
-      <Menu
-        anchorEl={menuAnchorEl}
-        open={Boolean(menuAnchorEl)}
-        onClose={handleMenuClose}
-        anchorOrigin={{
-          vertical: "bottom",
-          horizontal: "right",
-        }}
-        transformOrigin={{
-          vertical: "top",
-          horizontal: "right",
-        }}
-      >
-        <MenuItem
-          onClick={() => {
-            if (selectedCollection) {
-              handleViewCollection(selectedCollection);
-            }
-            handleMenuClose();
-          }}
-        >
-          {t("collectionsPage.actions.view")}
-        </MenuItem>
-        <MenuItem onClick={handleEditClick}>
-          {t("collectionsPage.actions.edit")}
-        </MenuItem>
-        <MenuItem onClick={handleMenuClose}>
-          {t("collectionsPage.actions.share")}
-        </MenuItem>
-        <Divider />
-        <MenuItem onClick={handleDeleteClick} sx={{ color: "error.main" }}>
-          {t("collectionsPage.actions.delete")}
-        </MenuItem>
-      </Menu>
+                {/* Actions */}
+                <CardActions
+                  sx={{
+                    pt: 0,
+                    px: 2,
+                    pb: 2,
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    gap: 1,
+                  }}
+                >
+                  <Button
+                    size="small"
+                    startIcon={<EditIcon />}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEditClick(collection);
+                    }}
+                    sx={{ textTransform: "none" }}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    size="small"
+                    color="error"
+                    startIcon={<DeleteIcon />}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteClick(collection);
+                    }}
+                    sx={{ textTransform: "none" }}
+                  >
+                    Delete
+                  </Button>
+                </CardActions>
+              </Card>
+            ))}
+          </Box>
+        )}
+      </PageContent>
 
       {/* Edit Collection Dialog */}
       <Dialog
@@ -788,6 +514,7 @@ const CollectionsPage: React.FC = () => {
             value={editedDescription}
             onChange={(e) => setEditedDescription(e.target.value)}
             placeholder="Enter collection description"
+            sx={{ mt: 1 }}
           />
         </DialogContent>
         <DialogActions>
@@ -809,30 +536,34 @@ const CollectionsPage: React.FC = () => {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>{t("collectionsPage.deleteDialog.title")}</DialogTitle>
+        <DialogTitle>Delete Collection</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            {t("collectionsPage.deleteDialog.description")}
+            Are you sure you want to delete "{selectedCollection?.name}"? This
+            will permanently delete the collection and all its contents. This
+            action cannot be undone.
           </DialogContentText>
-          {selectedCollection && selectedCollection.childCount > 0 && (
-            <DialogContentText sx={{ mt: 1, color: "warning.main" }}>
-              {t("collectionsPage.deleteDialog.cascadeWarning")}
-            </DialogContentText>
-          )}
+          {selectedCollection &&
+            (selectedCollection as any).totalDescendants > 0 && (
+              <DialogContentText sx={{ mt: 2, color: "warning.main" }}>
+                Warning: This collection has{" "}
+                {(selectedCollection as any).totalDescendants} sub-collection
+                {(selectedCollection as any).totalDescendants !== 1
+                  ? "s"
+                  : ""}{" "}
+                that will also be deleted.
+              </DialogContentText>
+            )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleDeleteCancel}>
-            {t("collectionsPage.deleteDialog.cancel")}
-          </Button>
+          <Button onClick={handleDeleteCancel}>Cancel</Button>
           <Button
             onClick={handleDeleteConfirm}
             color="error"
             variant="contained"
             disabled={deleteCollectionMutation.isPending}
           >
-            {deleteCollectionMutation.isPending
-              ? t("collectionsPage.deleteDialog.deleting")
-              : t("collectionsPage.deleteDialog.confirm")}
+            {deleteCollectionMutation.isPending ? "Deleting..." : "Delete"}
           </Button>
         </DialogActions>
       </Dialog>
@@ -842,6 +573,22 @@ const CollectionsPage: React.FC = () => {
         open={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
       />
+
+      {/* Alert Snackbar */}
+      <Snackbar
+        open={!!alert}
+        autoHideDuration={6000}
+        onClose={handleAlertClose}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+      >
+        <Alert
+          onClose={handleAlertClose}
+          severity={alert?.severity}
+          sx={{ width: "100%" }}
+        >
+          {alert?.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
