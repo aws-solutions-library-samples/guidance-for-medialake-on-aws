@@ -36,7 +36,9 @@ import {
 import { useSemanticSearchSettings } from "@/features/settings/system/hooks/useSystemSettings";
 import { SYSTEM_SETTINGS_CONFIG } from "@/features/settings/system/config";
 import { ApiKeyManagement } from "@/components/settings/api-keys";
+import { UpgradeSection } from "@/components/settings/UpgradeSection";
 import { Can } from "@/permissions/components/Can";
+import { useFeatureFlag } from "@/utils/featureFlags";
 
 // Fallback notification hook
 const useNotificationWithFallback = () => {
@@ -111,6 +113,9 @@ const SystemSettingsPage: React.FC = () => {
   const { t } = useTranslation();
   const theme = useTheme();
   const [tabValue, setTabValue] = useState(0);
+  
+  // Feature flags
+  const systemUpgradesEnabled = useFeatureFlag('system-upgrades-enabled', false);
 
   // Notification
   const {
@@ -302,6 +307,11 @@ const SystemSettingsPage: React.FC = () => {
             <Tab
               label={t("settings.systemSettings.tabs.apiKeys", "API Keys")}
             />
+            {systemUpgradesEnabled.value && (
+              <Tab
+                label={t("settings.systemSettings.tabs.upgrades", "Upgrades")}
+              />
+            )}
           </Tabs>
         </Box>
 
@@ -637,6 +647,13 @@ const SystemSettingsPage: React.FC = () => {
               }
             </Can>
           </TabPanel>
+
+          {systemUpgradesEnabled.value && (
+            <TabPanel value={tabValue} index={2}>
+              {/* Temporarily removed permission check for debugging */}
+              <UpgradeSection />
+            </TabPanel>
+          )}
         </Box>
       </Paper>
 
