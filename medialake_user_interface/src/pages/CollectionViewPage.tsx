@@ -37,9 +37,9 @@ import {
   useAddItemToCollection,
   useGetCollection,
   useGetChildCollections,
-  useGetCollectionAncestors,
   useUpdateCollection,
   useDeleteCollection,
+  useDeleteItemFromCollection,
 } from "@/api/hooks/useCollections";
 import { useGetCollectionAssets } from "@/api/hooks/useCollections";
 import {
@@ -109,6 +109,7 @@ const CollectionViewPage: React.FC = () => {
   const [selectedAssetForCollection, setSelectedAssetForCollection] =
     useState<AssetItem | null>(null);
   const addItemToCollectionMutation = useAddItemToCollection();
+  const deleteItemMutation = useDeleteItemFromCollection();
 
   // Collection Edit/Delete state
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -147,9 +148,8 @@ const CollectionViewPage: React.FC = () => {
   const { data: childCollectionsResponse, isLoading: isLoadingChildren } =
     useGetChildCollections(id!);
 
-  // Get collection ancestors for breadcrumbs
-  const { data: ancestorsResponse } = useGetCollectionAncestors(id!);
-  const ancestors = ancestorsResponse?.data || [];
+  // Get ancestors from collection data (now included in collection response)
+  const ancestors = collection?.ancestors || [];
 
   // Check if multi-select feature is enabled
   const multiSelectFeature = useFeatureFlag(
@@ -251,7 +251,7 @@ const CollectionViewPage: React.FC = () => {
       navigate(`${pathPrefix}${originalAssetId}`, {
         state: {
           assetType: asset.DigitalSourceAsset.Type,
-          searchTerm: `Collection: ${collection?.name}`,
+          searchTerm: "",
           asset: asset,
         },
       });
@@ -259,15 +259,28 @@ const CollectionViewPage: React.FC = () => {
     [navigate, collection?.name],
   );
 
-  // Handle Add to Collection click
-  const handleAddToCollectionClick = useCallback(
+  // Handle Remove from Collection click
+  const handleRemoveFromCollectionClick = useCallback(
     (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => {
-      console.log("CollectionViewPage: Add to Collection clicked!", asset);
+      console.log("CollectionViewPage: Remove from Collection clicked!", asset);
       event.stopPropagation();
-      setSelectedAssetForCollection(asset);
-      setAddToCollectionModalOpen(true);
+
+      // Use the collectionItemId (SK) if available, otherwise fall back to InventoryID
+      // The collectionItemId is the SK from DynamoDB (e.g., "ITEM#uuid" or "ASSET#uuid")
+      const itemId = (asset as any).collectionItemId || asset.InventoryID;
+
+      console.log("CollectionViewPage: Attempting to delete", {
+        collectionId: id,
+        itemId,
+        hasCollectionItemId: !!(asset as any).collectionItemId,
+        inventoryID: asset.InventoryID,
+      });
+
+      if (id && itemId) {
+        deleteItemMutation.mutate({ collectionId: id, itemId });
+      }
     },
-    [],
+    [id, deleteItemMutation],
   );
 
   // Handle actually adding the asset to a collection
@@ -297,6 +310,15 @@ const CollectionViewPage: React.FC = () => {
       });
     },
     [selectedAssetForCollection, addItemToCollectionMutation],
+  );
+
+  // Handle collection selection from tree (soft navigation)
+  const handleCollectionSelect = useCallback(
+    (collectionId: string) => {
+      // Use navigate without replace to allow back button
+      navigate(`/collections/${collectionId}/view`);
+    },
+    [navigate],
   );
 
   // Edit collection handlers
@@ -646,7 +668,10 @@ const CollectionViewPage: React.FC = () => {
               overflowY: "auto",
             }}
           >
-            <CollectionTreeView currentCollectionId={id} />
+            <CollectionTreeView
+              currentCollectionId={id}
+              onCollectionSelect={handleCollectionSelect}
+            />
           </Box>
 
           {/* Main Content */}
@@ -747,121 +772,6 @@ const CollectionViewPage: React.FC = () => {
               </Box>
             </Box>
 
-            {/* Child Collections Section */}
-            {childCollectionsResponse?.data &&
-              childCollectionsResponse.data.length > 0 && (
-                <Box sx={{ mb: 4 }}>
-                  <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
-                    Sub-Collections ({childCollectionsResponse.data.length})
-                  </Typography>
-                  <Grid container spacing={2}>
-                    {childCollectionsResponse.data.map((childCollection) => (
-                      <Grid
-                        item
-                        xs={12}
-                        sm={6}
-                        md={4}
-                        lg={3}
-                        key={childCollection.id}
-                      >
-                        <Card
-                          elevation={2}
-                          sx={{
-                            height: "100%",
-                            display: "flex",
-                            flexDirection: "column",
-                            transition: "all 0.2s ease-in-out",
-                            "&:hover": {
-                              transform: "translateY(-4px)",
-                              boxShadow: 4,
-                            },
-                          }}
-                        >
-                          <CardActionArea
-                            onClick={() =>
-                              navigate(
-                                `/collections/${childCollection.id}/view`,
-                              )
-                            }
-                            sx={{ flexGrow: 1 }}
-                          >
-                            <CardContent>
-                              <Stack spacing={1.5}>
-                                <Box
-                                  sx={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 1,
-                                  }}
-                                >
-                                  <FolderIcon
-                                    color="primary"
-                                    sx={{ fontSize: 32 }}
-                                  />
-                                  <Typography
-                                    variant="h6"
-                                    component="div"
-                                    sx={{
-                                      fontWeight: 600,
-                                      overflow: "hidden",
-                                      textOverflow: "ellipsis",
-                                      whiteSpace: "nowrap",
-                                    }}
-                                  >
-                                    {childCollection.name}
-                                  </Typography>
-                                </Box>
-
-                                {childCollection.description && (
-                                  <Typography
-                                    variant="body2"
-                                    color="text.secondary"
-                                    sx={{
-                                      overflow: "hidden",
-                                      textOverflow: "ellipsis",
-                                      display: "-webkit-box",
-                                      WebkitLineClamp: 2,
-                                      WebkitBoxOrient: "vertical",
-                                      minHeight: "40px",
-                                    }}
-                                  >
-                                    {childCollection.description}
-                                  </Typography>
-                                )}
-
-                                <Box
-                                  sx={{
-                                    display: "flex",
-                                    gap: 1,
-                                    flexWrap: "wrap",
-                                    mt: "auto",
-                                  }}
-                                >
-                                  <Chip
-                                    size="small"
-                                    label={`${childCollection.itemCount} items`}
-                                    color="primary"
-                                    variant="outlined"
-                                  />
-                                  {childCollection.childCollectionCount > 0 && (
-                                    <Chip
-                                      size="small"
-                                      label={`${childCollection.childCollectionCount} sub-collections`}
-                                      color="secondary"
-                                      variant="outlined"
-                                    />
-                                  )}
-                                </Box>
-                              </Stack>
-                            </CardContent>
-                          </CardActionArea>
-                        </Card>
-                      </Grid>
-                    ))}
-                  </Grid>
-                </Box>
-              )}
-
             {isLoading || isFetching ? (
               <Box
                 sx={{
@@ -893,8 +803,8 @@ const CollectionViewPage: React.FC = () => {
                 }}
                 onPageChange={handlePageChange}
                 onPageSizeChange={handlePageSizeChange}
-                searchTerm={`Collection: ${collection.name}`}
-                title={`Collection: ${collection.name}`}
+                searchTerm=""
+                title=""
                 isSemantic={false}
                 groupByType={viewPreferences.groupByType}
                 onGroupByTypeChange={viewPreferences.handleGroupByTypeChange}
@@ -919,7 +829,8 @@ const CollectionViewPage: React.FC = () => {
                 onAssetClick={handleAssetClick}
                 onDeleteClick={handleDeleteClick}
                 onDownloadClick={handleDownloadClick}
-                onAddToCollectionClick={handleAddToCollectionClick}
+                onAddToCollectionClick={handleRemoveFromCollectionClick}
+                showRemoveButton={true}
                 onEditClick={handleStartEditing}
                 onEditNameChange={handleNameChange}
                 onEditNameComplete={handleNameEditComplete}

@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { Box, Typography, Paper } from "@mui/material";
 import { RichTreeView } from "@mui/x-tree-view/RichTreeView";
 import { TreeViewBaseItem } from "@mui/x-tree-view/models";
@@ -21,6 +21,7 @@ export const CollectionTreeView: React.FC<CollectionTreeViewProps> = ({
   onCollectionSelect,
 }) => {
   const navigate = useNavigate();
+  const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
   // Get all collections (not just root)
   const { data: allCollectionsResponse, isLoading: isLoadingRoot } =
@@ -60,12 +61,52 @@ export const CollectionTreeView: React.FC<CollectionTreeViewProps> = ({
     return rootCollections.map((root) => buildTree(root, allCollections));
   }, [allCollectionsResponse]);
 
+  // Function to get all ancestor IDs for a given collection
+  const getAncestorIds = (
+    collectionId: string,
+    allCollections: Collection[],
+  ): string[] => {
+    const ancestors: string[] = [];
+    let currentId = collectionId;
+
+    while (currentId) {
+      const collection = allCollections.find((c) => c.id === currentId);
+      if (!collection || !collection.parentId) break;
+
+      ancestors.push(collection.parentId);
+      currentId = collection.parentId;
+    }
+
+    return ancestors;
+  };
+
+  // Auto-expand to the current collection when it changes
+  useEffect(() => {
+    if (currentCollectionId && allCollectionsResponse?.data) {
+      const allCollections = allCollectionsResponse.data;
+      const ancestorIds = getAncestorIds(currentCollectionId, allCollections);
+
+      // Merge with existing expanded items to maintain user's manual expansions
+      setExpandedItems((prev) => {
+        const newExpanded = new Set([...prev, ...ancestorIds]);
+        return Array.from(newExpanded);
+      });
+    }
+  }, [currentCollectionId, allCollectionsResponse]);
+
   const handleItemClick = (event: React.SyntheticEvent, itemId: string) => {
     if (onCollectionSelect) {
       onCollectionSelect(itemId);
     } else {
       navigate(`/collections/${itemId}/view`);
     }
+  };
+
+  const handleExpandedItemsChange = (
+    event: React.SyntheticEvent,
+    itemIds: string[],
+  ) => {
+    setExpandedItems(itemIds);
   };
 
   if (isLoadingRoot) {
@@ -108,6 +149,8 @@ export const CollectionTreeView: React.FC<CollectionTreeViewProps> = ({
         <RichTreeView
           items={treeData}
           selectedItems={currentCollectionId ? [currentCollectionId] : []}
+          expandedItems={expandedItems}
+          onExpandedItemsChange={handleExpandedItemsChange}
           onItemClick={handleItemClick}
           sx={{
             "& .MuiTreeItem-content": {

@@ -17,6 +17,7 @@ interface AssetGridViewProps<T> {
     asset: T,
     event: React.MouseEvent<HTMLElement>,
   ) => void;
+  showRemoveButton?: boolean;
   onEditClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onEditNameComplete: (asset: T, save: boolean, value?: string) => void;
@@ -56,6 +57,7 @@ function AssetGridView<T>({
   onDeleteClick,
   onDownloadClick,
   onAddToCollectionClick,
+  showRemoveButton = false,
   onEditClick,
   onEditNameChange,
   onEditNameComplete,
@@ -142,6 +144,7 @@ function AssetGridView<T>({
                   ? (e) => onAddToCollectionClick(asset, e)
                   : undefined
               }
+              showRemoveButton={showRemoveButton}
               onEditClick={(e) => onEditClick(asset, e)}
               isEditing={editingAssetId === getAssetId(asset)}
               editedName={editedName}
@@ -219,6 +222,7 @@ function AssetGridView<T>({
                           ? (e) => onAddToCollectionClick(asset, e)
                           : undefined
                       }
+                      showRemoveButton={showRemoveButton}
                       onEditClick={(e) => onEditClick(asset, e)}
                       isEditing={editingAssetId === getAssetId(asset)}
                       editedName={editedName}

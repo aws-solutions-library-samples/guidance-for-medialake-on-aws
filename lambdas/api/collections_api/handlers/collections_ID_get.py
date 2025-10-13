@@ -21,6 +21,38 @@ tracer = Tracer(service="collections-ID-get")
 metrics = Metrics(namespace="medialake", service="collection-detail")
 
 
+def get_collection_ancestors(collection_id: str, max_depth: int = 10):
+    """Get the ancestor chain for a collection (from root to current)"""
+    ancestors = []
+    current_id = collection_id
+    depth = 0
+
+    while current_id and depth < max_depth:
+        try:
+            collection = CollectionModel.get(
+                f"{COLLECTION_PK_PREFIX}{current_id}", METADATA_SK
+            )
+        except DoesNotExist:
+            logger.warning(f"[ANCESTORS] Collection not found: {current_id}")
+            break
+
+        parent_id = collection.parentId if collection.parentId else None
+        ancestors.append(
+            {
+                "id": current_id,
+                "name": collection.name,
+                "parentId": parent_id,
+            }
+        )
+
+        current_id = parent_id
+        depth += 1
+
+    # Reverse to get root -> current order
+    ancestors.reverse()
+    return ancestors
+
+
 def register_route(app):
     """Register GET /collections/<collection_id> route"""
 
@@ -67,6 +99,10 @@ def register_route(app):
                 collection_dict["expiresAt"] = collection.expiresAt
 
             formatted_collection = format_collection_item(collection_dict, user_context)
+
+            # Add ancestors to the response
+            ancestors = get_collection_ancestors(collection_id)
+            formatted_collection["ancestors"] = ancestors
 
             metrics.add_metric(
                 name="SuccessfulCollectionRetrievals", unit=MetricUnit.Count, value=1

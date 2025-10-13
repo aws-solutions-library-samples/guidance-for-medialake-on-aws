@@ -127,6 +127,31 @@ def collect_cloudfront_url_requests(
     return url_requests
 
 
+def add_common_fields(result: Dict) -> Dict:
+    """Add commonly needed fields to the root level of the result object"""
+    # Access the nested structure
+    digital_source_asset = result.get("DigitalSourceAsset", {})
+    main_rep = digital_source_asset.get("MainRepresentation", {})
+    storage_info = main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
+    storage_info.get("ObjectKey", {})
+    inventory_id = result.get("InventoryID", "")
+
+    # Add ID fields
+    if inventory_id:
+        # Extract the UUID part from the inventory ID
+        if ":" in inventory_id:
+            uuid_part = inventory_id.split(":")[-1]
+            result["id"] = uuid_part
+        else:
+            result["id"] = inventory_id
+
+    # Include consolidated metadata directly
+    if "Metadata" in result and "Consolidated" in result.get("Metadata", {}):
+        result["metadata"] = result["Metadata"].get("Consolidated", {})
+
+    return result
+
+
 def fetch_assets_from_opensearch(asset_ids: List[str]) -> Dict[str, Dict]:
     """Fetch asset data from OpenSearch"""
     client = get_opensearch_client()
@@ -197,6 +222,10 @@ def format_asset_as_search_result(
     # Extract UUID part from inventory ID for id field
     asset_id = inventory_id.split(":")[-1] if ":" in inventory_id else inventory_id
 
+    # Extract the item ID from SK for deletion purposes
+    # SK is like "ITEM#uuid" or "ASSET#uuid", we need to keep this for deletion
+    collection_item_id = collection_item["SK"]
+
     result = {
         "InventoryID": inventory_id,
         "DigitalSourceAsset": asset_data.get("DigitalSourceAsset", {}),
@@ -207,6 +236,7 @@ def format_asset_as_search_result(
         "thumbnailUrl": thumbnail_url,
         "proxyUrl": proxy_url,
         "id": asset_id,
+        "collectionItemId": collection_item_id,  # Add the SK for deletion
         "addedAt": collection_item.get("addedAt", ""),
         "addedBy": collection_item.get("addedBy", ""),
         "clipBoundary": clip_boundary,
@@ -223,6 +253,9 @@ def format_asset_as_search_result(
         ]
     elif all_clips_for_asset:
         result["clips"] = all_clips_for_asset
+
+    # Add common fields to match search API format
+    result = add_common_fields(result)
 
     return result
 

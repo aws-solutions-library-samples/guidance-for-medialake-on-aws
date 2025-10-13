@@ -16,6 +16,7 @@ interface AssetTableViewProps<T> {
     asset: T,
     event: React.MouseEvent<HTMLElement>,
   ) => void;
+  showRemoveButton?: boolean;
   onEditClick?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onEditNameComplete?: (asset: T, save: boolean, value?: string) => void;
@@ -44,6 +45,7 @@ function AssetTableView<T>({
   onDeleteClick,
   onDownloadClick,
   onAddToCollectionClick,
+  showRemoveButton = false,
   onEditClick,
   onEditNameChange,
   onEditNameComplete,
@@ -101,6 +103,7 @@ function AssetTableView<T>({
         onDeleteClick={onDeleteClick}
         onDownloadClick={onDownloadClick}
         onAddToCollectionClick={onAddToCollectionClick}
+        showRemoveButton={showRemoveButton}
         onEditClick={onEditClick}
         onAssetClick={onAssetClick}
         getThumbnailUrl={getAssetThumbnail}
@@ -151,6 +154,7 @@ function AssetTableView<T>({
               onDeleteClick={onDeleteClick}
               onDownloadClick={onDownloadClick}
               onAddToCollectionClick={onAddToCollectionClick}
+              showRemoveButton={showRemoveButton}
               onEditClick={onEditClick}
               onAssetClick={onAssetClick}
               getThumbnailUrl={getAssetThumbnail}

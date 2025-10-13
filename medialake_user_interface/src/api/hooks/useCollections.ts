@@ -23,6 +23,11 @@ export interface Collection {
   createdAt: string;
   updatedAt: string;
   sharedWith?: string[];
+  ancestors?: Array<{
+    id: string;
+    name: string;
+    parentId?: string;
+  }>;
 }
 
 export interface CollectionType {
@@ -371,6 +376,38 @@ export const useDeleteCollection = () => {
       });
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.COLLECTIONS.shared(),
+      });
+    },
+  });
+};
+
+// Hook to delete item from collection
+export const useDeleteItemFromCollection = () => {
+  const queryClient = useQueryClient();
+  const { showError } = useErrorModal();
+
+  return useMutation<void, Error, { collectionId: string; itemId: string }>({
+    mutationFn: async ({ collectionId, itemId }) => {
+      try {
+        // URL-encode the itemId to handle special characters like #
+        const encodedItemId = encodeURIComponent(itemId);
+        await apiClient.delete(
+          `/collections/${collectionId}/items/${encodedItemId}`,
+        );
+      } catch (error) {
+        logger.error("Delete item from collection error:", error);
+        showError("Failed to remove item from collection");
+        throw error;
+      }
+    },
+    onSuccess: (_, variables) => {
+      // Invalidate the specific collection's assets query
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.COLLECTIONS.assets(variables.collectionId),
+      });
+      // Also invalidate the collection details to update item count
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.COLLECTIONS.detail(variables.collectionId),
       });
     },
   });

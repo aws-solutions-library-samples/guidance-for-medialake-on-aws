@@ -17,6 +17,7 @@ import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import InfoIcon from "@mui/icons-material/Info";
 import AddIcon from "@mui/icons-material/Add";
+import RemoveIcon from "@mui/icons-material/Remove";
 import {
   PLACEHOLDER_IMAGE,
   VIDEO_PLACEHOLDER_IMAGE,
@@ -55,6 +56,7 @@ export interface AssetCardProps {
   onDeleteClick: (event: React.MouseEvent<HTMLElement>) => void;
   onDownloadClick: (event: React.MouseEvent<HTMLElement>) => void;
   onAddToCollectionClick?: (event: React.MouseEvent<HTMLElement>) => void;
+  showRemoveButton?: boolean;
   onEditClick?: (event: React.MouseEvent<HTMLElement>) => void;
   placeholderImage?: string;
   onImageError?: (event: React.SyntheticEvent<HTMLImageElement, Event>) => void;
@@ -91,6 +93,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
     onDeleteClick,
     onDownloadClick,
     onAddToCollectionClick,
+    showRemoveButton = false,
     onEditClick,
     placeholderImage = PLACEHOLDER_IMAGE,
     onImageError,
@@ -894,9 +897,17 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                       color: "primary.contrastText",
                     },
                   }}
-                  title="Add to Collection"
+                  title={
+                    showRemoveButton
+                      ? "Remove from Collection"
+                      : "Add to Collection"
+                  }
                 >
-                  <AddIcon fontSize="small" />
+                  {showRemoveButton ? (
+                    <RemoveIcon fontSize="small" />
+                  ) : (
+                    <AddIcon fontSize="small" />
+                  )}
                 </IconButton>
 
                 <Button
@@ -1008,9 +1019,17 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                       color: "primary.contrastText",
                     },
                   }}
-                  title="Add to Collection"
+                  title={
+                    showRemoveButton
+                      ? "Remove from Collection"
+                      : "Add to Collection"
+                  }
                 >
-                  <AddIcon fontSize="small" />
+                  {showRemoveButton ? (
+                    <RemoveIcon fontSize="small" />
+                  ) : (
+                    <AddIcon fontSize="small" />
+                  )}
                 </IconButton>
 
                 {(() => {
@@ -1228,9 +1247,17 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                       color: "primary.contrastText",
                     },
                   }}
-                  title="Add to Collection"
+                  title={
+                    showRemoveButton
+                      ? "Remove from Collection"
+                      : "Add to Collection"
+                  }
                 >
-                  <AddIcon fontSize="small" />
+                  {showRemoveButton ? (
+                    <RemoveIcon fontSize="small" />
+                  ) : (
+                    <AddIcon fontSize="small" />
+                  )}
                 </IconButton>
 
                 <Button

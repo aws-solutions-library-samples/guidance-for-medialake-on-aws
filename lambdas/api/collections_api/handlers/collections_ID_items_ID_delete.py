@@ -2,6 +2,7 @@
 
 import os
 from datetime import datetime
+from urllib.parse import unquote
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from collections_utils import (
@@ -31,23 +32,38 @@ def register_route(app):
         try:
             current_timestamp = datetime.utcnow().isoformat() + "Z"
 
+            # URL decode the item_id (API Gateway doesn't auto-decode path parameters)
+            decoded_item_id = unquote(item_id)
+
+            logger.info(f"[DELETE] Received item_id (raw): {item_id}")
+            logger.info(f"[DELETE] Decoded item_id: {decoded_item_id}")
+            logger.info(f"[DELETE] Collection: {collection_id}")
+
             # Support both old ITEM# and new ASSET# formats
             sk = (
-                item_id
-                if item_id.startswith(ASSET_SK_PREFIX)
-                else f"{ITEM_SK_PREFIX}{item_id}"
+                decoded_item_id
+                if decoded_item_id.startswith(ASSET_SK_PREFIX)
+                or decoded_item_id.startswith(ITEM_SK_PREFIX)
+                else f"{ITEM_SK_PREFIX}{decoded_item_id}"
             )
+
+            logger.info(f"[DELETE] Final SK to delete: {sk}")
+            logger.info(f"[DELETE] PK: {COLLECTION_PK_PREFIX}{collection_id}")
 
             # Delete the item using PynamoDB
             try:
                 item = CollectionItemModel(f"{COLLECTION_PK_PREFIX}{collection_id}", sk)
+                logger.info(
+                    f"[DELETE] Attempting to delete item with PK={item.PK}, SK={item.SK}"
+                )
                 item.delete()
+                logger.info(f"[DELETE] Successfully deleted item")
             except DoesNotExist:
                 logger.warning(
-                    f"Item not found: {item_id} in collection {collection_id}"
+                    f"[DELETE] Item not found: {decoded_item_id} (SK: {sk}) in collection {collection_id}"
                 )
             except DeleteError as e:
-                logger.error(f"Error deleting item: {e}")
+                logger.error(f"[DELETE] Error deleting item: {e}")
                 raise
 
             # Update collection item count
@@ -55,19 +71,23 @@ def register_route(app):
                 collection = CollectionModel.get(
                     f"{COLLECTION_PK_PREFIX}{collection_id}", METADATA_SK
                 )
+                logger.info(f"[DELETE] Current itemCount: {collection.itemCount}")
                 collection.update(
                     actions=[
                         CollectionModel.itemCount.add(-1),
                         CollectionModel.updatedAt.set(current_timestamp),
                     ]
                 )
+                logger.info(
+                    f"[DELETE] Updated itemCount to: {collection.itemCount - 1}"
+                )
             except Exception as e:
-                logger.warning(f"Failed to update item count: {e}")
+                logger.warning(f"[DELETE] Failed to update item count: {e}")
 
-            logger.info(f"Item removed from collection {collection_id}")
+            logger.info(f"[DELETE] Item removed from collection {collection_id}")
 
             return create_success_response(
-                data={"id": item_id, "removed": True},
+                data={"id": decoded_item_id, "removed": True},
                 request_id=app.current_event.request_context.request_id,
             )
 

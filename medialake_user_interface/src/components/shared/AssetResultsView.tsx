@@ -72,6 +72,7 @@ export interface AssetResultsViewProps<T> {
     asset: T,
     event: React.MouseEvent<HTMLElement>,
   ) => void;
+  showRemoveButton?: boolean; // Show - icon instead of + for collection view
   onEditClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onEditNameComplete: (asset: T, save: boolean, value?: string) => void;
@@ -140,6 +141,7 @@ function AssetResultsView<T>({
   onDeleteClick,
   onDownloadClick,
   onAddToCollectionClick,
+  showRemoveButton = false,
   onEditClick,
   onEditNameChange,
   onEditNameComplete,
@@ -508,6 +510,7 @@ function AssetResultsView<T>({
             onDeleteClick={onDeleteClick}
             onDownloadClick={onDownloadClick}
             onAddToCollectionClick={onAddToCollectionClick}
+            showRemoveButton={showRemoveButton}
             onEditClick={onEditClick}
             onEditNameChange={onEditNameChange}
             onEditNameComplete={onEditNameComplete}
@@ -540,6 +543,7 @@ function AssetResultsView<T>({
             onDeleteClick={onDeleteClick}
             onDownloadClick={onDownloadClick}
             onAddToCollectionClick={onAddToCollectionClick}
+            showRemoveButton={showRemoveButton}
             onEditClick={onEditClick}
             onEditNameChange={onEditNameChange}
             onEditNameComplete={onEditNameComplete}

@@ -41,6 +41,7 @@ export interface AssetTableProps<T> {
     item: T,
     event: React.MouseEvent<HTMLElement>,
   ) => void;
+  showRemoveButton?: boolean;
   onEditClick?: (item: T, event: React.MouseEvent<HTMLElement>) => void;
   onAssetClick: (item: T) => void;
   getThumbnailUrl: (item: T) => string;
