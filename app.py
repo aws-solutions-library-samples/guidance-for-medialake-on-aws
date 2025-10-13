@@ -43,6 +43,7 @@ from medialake_stacks.nodes_stack import NodesStack, NodesStackProps
 from medialake_stacks.pipeline_stack import PipelineStack, PipelineStackProps
 from medialake_stacks.settings_api_stack import SettingsApiStack, SettingsApiStackProps
 from medialake_stacks.settings_stack import SettingsStack, SettingsStackProps
+from medialake_stacks.updates_api_stack import UpdatesApiStack, UpdatesApiStackProps
 from medialake_stacks.user_interface_stack import (
     UserInterfaceStack,
     UserInterfaceStackProps,
@@ -415,6 +416,24 @@ class MediaLakeStack(cdk.Stack):
         # Store the SettingsApiStack reference for potential resource registration
         self._settings_api_stack = _
 
+        # Create Updates API Stack for auto-upgrade system
+        updates_api_stack = UpdatesApiStack(
+            self,
+            "MediaLakeUpdatesApi",
+            props=UpdatesApiStackProps(
+                authorizer=api_gateway_stack.authorizer,
+                api_resource=self.shared_rest_api,
+                cognito_user_pool=props.cognito_stack.user_pool,
+                cognito_app_client=props.cognito_stack.user_pool_client_id,
+                x_origin_verify_secret=self.shared_x_origin_secret,
+                system_settings_table_name=settings_stack.system_settings_table_name,
+                system_settings_table_arn=settings_stack.system_settings_table_arn,
+            ),
+        )
+
+        # Store the UpdatesApiStack reference
+        self._updates_api_stack = updates_api_stack
+
         # # Create the Permissions Stack as a nested stack
         # _ = PermissionsStack(
         #     "MediaLakePermissionsStack",
@@ -452,6 +471,10 @@ class MediaLakeStack(cdk.Stack):
         # Register the settings API stack if it has resources
         if hasattr(self, "_settings_api_stack"):
             props.resource_collector.add_resource(self._settings_api_stack)
+
+        # Register the updates API stack if it has resources
+        if hasattr(self, "_updates_api_stack"):
+            props.resource_collector.add_resource(self._updates_api_stack)
 
         # Register other important stacks that might have resources
         if hasattr(self, "_users_groups_roles_stack"):

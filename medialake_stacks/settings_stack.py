@@ -66,6 +66,7 @@ class SettingsStack(cdk.NestedStack):
                     or "",
                     "USER_INTERFACE_BUCKET_NAME": props.user_interface_bucket_name
                     or "",
+                    "CURRENT_VERSION": "main",  # Initialize with main branch
                 },
             ),
         )
