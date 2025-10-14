@@ -32,6 +32,7 @@ import {
   Delete as DeleteIcon,
 } from "@mui/icons-material";
 import { AddToCollectionModal } from "@/components/collections/AddToCollectionModal";
+import { EditCollectionModal } from "@/components/collections/EditCollectionModal";
 import { CollectionTreeView } from "@/components/collections/CollectionTreeView";
 import {
   useAddItemToCollection,
@@ -112,15 +113,13 @@ const CollectionViewPage: React.FC = () => {
   const deleteItemMutation = useDeleteItemFromCollection();
 
   // Collection Edit/Delete state
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [editedDescription, setEditedDescription] = useState("");
   const [collectionAlert, setCollectionAlert] = useState<{
     severity: "success" | "error" | "info" | "warning";
     message: string;
   } | null>(null);
 
-  const updateCollectionMutation = useUpdateCollection();
   const deleteCollectionMutation = useDeleteCollection();
 
   // Get collection details
@@ -323,36 +322,11 @@ const CollectionViewPage: React.FC = () => {
 
   // Edit collection handlers
   const handleEditClick = () => {
-    setEditedDescription(collection?.description || "");
-    setIsEditDialogOpen(true);
+    setIsEditModalOpen(true);
   };
 
-  const handleEditClose = () => {
-    setIsEditDialogOpen(false);
-    setEditedDescription("");
-  };
-
-  const handleEditSave = async () => {
-    if (!id) return;
-
-    try {
-      await updateCollectionMutation.mutateAsync({
-        id,
-        data: {
-          description: editedDescription,
-        },
-      });
-      setCollectionAlert({
-        severity: "success",
-        message: "Collection updated successfully",
-      });
-      handleEditClose();
-    } catch (error) {
-      setCollectionAlert({
-        severity: "error",
-        message: "Failed to update collection",
-      });
-    }
+  const handleEditModalClose = () => {
+    setIsEditModalOpen(false);
   };
 
   // Delete collection handlers
@@ -974,39 +948,12 @@ const CollectionViewPage: React.FC = () => {
           </DialogActions>
         </Dialog>
 
-        {/* Edit Collection Dialog */}
-        <Dialog
-          open={isEditDialogOpen}
-          onClose={handleEditClose}
-          maxWidth="sm"
-          fullWidth
-        >
-          <DialogTitle>Edit Collection</DialogTitle>
-          <DialogContent>
-            <TextField
-              autoFocus
-              margin="dense"
-              label="Description"
-              type="text"
-              fullWidth
-              multiline
-              rows={4}
-              value={editedDescription}
-              onChange={(e) => setEditedDescription(e.target.value)}
-              placeholder="Enter collection description"
-            />
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleEditClose}>Cancel</Button>
-            <Button
-              onClick={handleEditSave}
-              variant="contained"
-              disabled={updateCollectionMutation.isPending}
-            >
-              {updateCollectionMutation.isPending ? "Saving..." : "Save"}
-            </Button>
-          </DialogActions>
-        </Dialog>
+        {/* Edit Collection Modal */}
+        <EditCollectionModal
+          open={isEditModalOpen}
+          onClose={handleEditModalClose}
+          collection={collection || null}
+        />
 
         {/* Delete Collection Confirmation Dialog */}
         <Dialog

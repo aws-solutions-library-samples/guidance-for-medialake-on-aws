@@ -1,6 +1,5 @@
 import json
 import os
-import sys
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
@@ -11,10 +10,6 @@ from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.validation import validate
 from aws_lambda_powertools.utilities.validation.exceptions import SchemaValidationError
 from common import AssetProcessor, DecimalEncoder, ErrorType, JobStatus, logger
-
-# Add common_libraries to path
-sys.path.insert(0, "/opt/python")
-from common_libraries.cors_utils import create_response
 
 # Initialize powertools
 tracer = Tracer()
@@ -35,11 +30,15 @@ INPUT_SCHEMA = {
 
 
 def api_response(status_code: int, body: Dict[str, Any]) -> Dict[str, Any]:
-    """Format API Gateway response with proper CORS headers"""
-    response = create_response(status_code, body)
-    # Use DecimalEncoder for the body since we're working with DynamoDB
-    response["body"] = json.dumps(body, cls=DecimalEncoder)
-    return response
+    """Format API Gateway response"""
+    return {
+        "statusCode": status_code,
+        "headers": {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+        },
+        "body": json.dumps(body, cls=DecimalEncoder),
+    }
 
 
 @tracer.capture_method

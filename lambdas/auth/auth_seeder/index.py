@@ -105,6 +105,13 @@ DEFAULT_PERMISSION_SETS = [
                     "edit": True,
                     "delete": True,
                 },
+                "collection-types": {
+                    "create": True,
+                    "view": True,
+                    "edit": True,
+                    "delete": True,
+                    "manage": True,
+                },
             },
         },
     },

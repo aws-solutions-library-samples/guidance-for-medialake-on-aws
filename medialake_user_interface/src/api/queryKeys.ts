@@ -181,10 +181,18 @@ export const QUERY_KEYS = {
       [...QUERY_KEYS.COLLECTIONS.detail(id), "items"] as const,
     assets: (id: string, filters?: Record<string, any>) =>
       [...QUERY_KEYS.COLLECTIONS.detail(id), "assets", { filters }] as const,
-    types: () => [...QUERY_KEYS.COLLECTIONS.all, "types"] as const,
     children: (parentId: string) =>
       [...QUERY_KEYS.COLLECTIONS.detail(parentId), "children"] as const,
     ancestors: (id: string) =>
       [...QUERY_KEYS.COLLECTIONS.detail(id), "ancestors"] as const,
+  },
+  COLLECTION_TYPES: {
+    all: ["collection-types"] as const,
+    lists: () => [...QUERY_KEYS.COLLECTION_TYPES.all, "list"] as const,
+    list: (filters?: Record<string, any>) =>
+      [...QUERY_KEYS.COLLECTION_TYPES.lists(), filters] as const,
+    details: () => [...QUERY_KEYS.COLLECTION_TYPES.all, "detail"] as const,
+    detail: (id: string) =>
+      [...QUERY_KEYS.COLLECTION_TYPES.details(), id] as const,
   },
 } as const;

@@ -31,16 +31,50 @@ import {
   CalendarToday as CalendarIcon,
   AccountTree as TreeIcon,
   PhotoLibrary as PhotoLibraryIcon,
+  Work,
+  Campaign,
+  Assignment,
+  Archive,
+  Label,
+  Movie,
+  Collections as CollectionsIcon,
+  Dashboard,
+  Storage,
+  Inventory,
+  Category,
+  BookmarkBorder,
+  LocalOffer,
 } from "@mui/icons-material";
 import { PageHeader, PageContent } from "@/components/common/layout";
 import {
   useGetCollections,
   useDeleteCollection,
   useUpdateCollection,
+  useGetCollectionTypes,
   type Collection,
 } from "../api/hooks/useCollections";
 import { CreateCollectionModal } from "../components/collections/CreateCollectionModal";
 import { formatDate } from "@/utils/dateFormat";
+
+// Map of icon names to Material-UI icon components
+const ICON_MAP: Record<string, React.ReactElement> = {
+  Folder: <FolderIcon />,
+  FolderOpen: <FolderOpenIcon />,
+  Work: <Work />,
+  Campaign: <Campaign />,
+  Assignment: <Assignment />,
+  Archive: <Archive />,
+  PhotoLibrary: <PhotoLibraryIcon />,
+  Label: <Label />,
+  Movie: <Movie />,
+  Collections: <CollectionsIcon />,
+  Dashboard: <Dashboard />,
+  Storage: <Storage />,
+  Inventory: <Inventory />,
+  Category: <Category />,
+  BookmarkBorder: <BookmarkBorder />,
+  LocalOffer: <LocalOffer />,
+};
 
 const CollectionsPage: React.FC = () => {
   const theme = useTheme();
@@ -64,10 +98,52 @@ const CollectionsPage: React.FC = () => {
     error,
     refetch,
   } = useGetCollections();
+  const { data: collectionTypesResponse } = useGetCollectionTypes();
   const deleteCollectionMutation = useDeleteCollection();
   const updateCollectionMutation = useUpdateCollection();
 
   const allCollections = collectionsResponse?.data || [];
+  const collectionTypes = collectionTypesResponse?.data || [];
+
+  // Helper to get icon and color for a collection
+  const getCollectionStyle = (collection: Collection) => {
+    if (!collection.collectionTypeId) {
+      return {
+        icon: <FolderIcon />,
+        color: theme.palette.primary.main,
+        borderColor: "divider",
+      };
+    }
+
+    const collectionType = collectionTypes.find(
+      (type) => type.id === collection.collectionTypeId,
+    );
+
+    if (!collectionType) {
+      return {
+        icon: <FolderIcon />,
+        color: theme.palette.primary.main,
+        borderColor: "divider",
+      };
+    }
+
+    const iconComponent =
+      collectionType.icon && ICON_MAP[collectionType.icon] ? (
+        React.cloneElement(ICON_MAP[collectionType.icon], {
+          sx: { color: collectionType.color, fontSize: 32, mr: 1.5 },
+        })
+      ) : (
+        <FolderIcon
+          sx={{ color: collectionType.color, fontSize: 32, mr: 1.5 }}
+        />
+      );
+
+    return {
+      icon: iconComponent,
+      color: collectionType.color,
+      borderColor: collectionType.color,
+    };
+  };
 
   // Calculate total descendant count recursively
   const calculateTotalDescendants = (
@@ -278,130 +354,151 @@ const CollectionsPage: React.FC = () => {
                 md: "repeat(auto-fill, minmax(350px, 1fr))",
               },
               gap: 3,
+              pt: 0.5, // Add padding to prevent clipping on hover
             }}
           >
-            {rootCollections.map((collection) => (
-              <Card
-                key={collection.id}
-                sx={{
-                  display: "flex",
-                  flexDirection: "column",
-                  transition:
-                    "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
-                  "&:hover": {
-                    transform: "translateY(-4px)",
-                    boxShadow: theme.shadows[6],
-                    cursor: "pointer",
-                  },
-                }}
-                onClick={() => handleViewCollection(collection)}
-              >
-                <CardContent sx={{ flexGrow: 1, pb: 2 }}>
-                  {/* Header with icon and name */}
-                  <Box
+            {rootCollections.map((collection) => {
+              const style = getCollectionStyle(collection);
+              return (
+                <Card
+                  key={collection.id}
+                  sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    borderRadius: 3,
+                    border: `2px solid`,
+                    borderColor: style.borderColor,
+                    overflow: "visible", // Prevent clipping on hover
+                    transition:
+                      "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
+                    "&:hover": {
+                      transform: "translateY(-4px)",
+                      boxShadow: theme.shadows[6],
+                      cursor: "pointer",
+                    },
+                  }}
+                  onClick={() => handleViewCollection(collection)}
+                >
+                  <CardContent
                     sx={{
-                      display: "flex",
-                      alignItems: "flex-start",
-                      mb: 2,
-                    }}
-                  >
-                    <FolderIcon
-                      sx={{
-                        color: theme.palette.primary.main,
-                        fontSize: 32,
-                        mr: 1.5,
-                      }}
-                    />
-                    <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                      <Typography
-                        variant="h6"
-                        component="h3"
-                        sx={{
-                          fontWeight: 600,
-                          fontSize: "1.1rem",
-                          lineHeight: 1.3,
-                          mb: 1,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {collection.name}
-                      </Typography>
-                      {/* Public/Private Badge */}
-                      <Chip
-                        label={collection.isPublic ? "Public" : "Private"}
-                        size="small"
-                        icon={
-                          collection.isPublic ? <PublicIcon /> : <PrivateIcon />
-                        }
-                        sx={{
-                          height: 22,
-                          color: collection.isPublic
-                            ? "#2e7d32"
-                            : theme.palette.primary.main,
-                          bgcolor: collection.isPublic
-                            ? "#e8f5e8"
-                            : alpha(theme.palette.primary.main, 0.1),
-                          border: `1px solid ${collection.isPublic ? "#2e7d32" : theme.palette.primary.main}`,
-                          "& .MuiChip-icon": {
-                            color: collection.isPublic
-                              ? "#2e7d32"
-                              : theme.palette.primary.main,
-                            fontSize: 14,
-                          },
-                        }}
-                      />
-                    </Box>
-                  </Box>
-
-                  {/* Description */}
-                  {collection.description && (
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{
-                        mb: 2,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        display: "-webkit-box",
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: "vertical",
-                        minHeight: "40px",
-                      }}
-                    >
-                      {collection.description}
-                    </Typography>
-                  )}
-
-                  {/* Stats */}
-                  <Box
-                    sx={{
+                      flexGrow: 1,
+                      pb: 2,
                       display: "flex",
                       flexDirection: "column",
-                      gap: 1,
-                      mt: 2,
                     }}
                   >
-                    {/* Item count */}
+                    {/* Header with icon and name */}
                     <Box
                       sx={{
                         display: "flex",
-                        alignItems: "center",
-                        gap: 1,
+                        alignItems: "flex-start",
+                        mb: 2,
                       }}
                     >
-                      <PhotoLibraryIcon
-                        sx={{ fontSize: 16, color: "text.secondary" }}
-                      />
-                      <Typography variant="body2" color="text.secondary">
-                        {collection.itemCount} item
-                        {collection.itemCount !== 1 ? "s" : ""}
-                      </Typography>
+                      {style.icon}
+                      <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                        <Typography
+                          variant="h6"
+                          component="h3"
+                          sx={{
+                            fontWeight: 600,
+                            fontSize: "1.1rem",
+                            lineHeight: 1.3,
+                            mb: 1,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {collection.name}
+                        </Typography>
+                        {/* Badges: Public/Private and Collection Type */}
+                        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                          <Chip
+                            label={collection.isPublic ? "Public" : "Private"}
+                            size="small"
+                            icon={
+                              collection.isPublic ? (
+                                <PublicIcon />
+                              ) : (
+                                <PrivateIcon />
+                              )
+                            }
+                            sx={{
+                              height: 22,
+                              color: collection.isPublic
+                                ? "#2e7d32"
+                                : theme.palette.primary.main,
+                              bgcolor: collection.isPublic
+                                ? "#e8f5e8"
+                                : alpha(theme.palette.primary.main, 0.1),
+                              border: `1px solid ${collection.isPublic ? "#2e7d32" : theme.palette.primary.main}`,
+                              "& .MuiChip-icon": {
+                                color: collection.isPublic
+                                  ? "#2e7d32"
+                                  : theme.palette.primary.main,
+                                fontSize: 14,
+                              },
+                            }}
+                          />
+                          {collection.collectionTypeId &&
+                            (() => {
+                              const collectionType = collectionTypes.find(
+                                (type) =>
+                                  type.id === collection.collectionTypeId,
+                              );
+                              return collectionType ? (
+                                <Chip
+                                  label={collectionType.name}
+                                  size="small"
+                                  sx={{
+                                    height: 22,
+                                    color: collectionType.color,
+                                    bgcolor: alpha(collectionType.color, 0.1),
+                                    border: `1px solid ${collectionType.color}`,
+                                    fontWeight: 500,
+                                  }}
+                                />
+                              ) : null;
+                            })()}
+                        </Box>
+                      </Box>
                     </Box>
 
-                    {/* Sub-collections count */}
-                    {collection.totalDescendants > 0 && (
+                    {/* Description - Always render container for consistent spacing */}
+                    <Box
+                      sx={{
+                        minHeight: collection.description ? "40px" : "0px",
+                        mb: 2,
+                      }}
+                    >
+                      {collection.description && (
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            display: "-webkit-box",
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: "vertical",
+                          }}
+                        >
+                          {collection.description}
+                        </Typography>
+                      )}
+                    </Box>
+
+                    {/* Stats */}
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 1,
+                        mt: "auto", // Push to bottom
+                      }}
+                    >
+                      {/* Item count */}
                       <Box
                         sx={{
                           display: "flex",
@@ -409,87 +506,106 @@ const CollectionsPage: React.FC = () => {
                           gap: 1,
                         }}
                       >
-                        <TreeIcon
+                        <PhotoLibraryIcon
                           sx={{ fontSize: 16, color: "text.secondary" }}
                         />
                         <Typography variant="body2" color="text.secondary">
-                          {collection.totalDescendants} sub-collection
-                          {collection.totalDescendants !== 1 ? "s" : ""}
+                          {collection.itemCount} item
+                          {collection.itemCount !== 1 ? "s" : ""}
                         </Typography>
                       </Box>
-                    )}
 
-                    {/* Created date */}
-                    <Box
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 1,
-                      }}
-                    >
-                      <CalendarIcon
-                        sx={{ fontSize: 16, color: "text.secondary" }}
-                      />
-                      <Typography variant="body2" color="text.secondary">
-                        Created: {formatDate(collection.createdAt)}
-                      </Typography>
+                      {/* Sub-collections count */}
+                      {collection.totalDescendants > 0 && (
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                          }}
+                        >
+                          <TreeIcon
+                            sx={{ fontSize: 16, color: "text.secondary" }}
+                          />
+                          <Typography variant="body2" color="text.secondary">
+                            {collection.totalDescendants} sub-collection
+                            {collection.totalDescendants !== 1 ? "s" : ""}
+                          </Typography>
+                        </Box>
+                      )}
+
+                      {/* Created date */}
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                        }}
+                      >
+                        <CalendarIcon
+                          sx={{ fontSize: 16, color: "text.secondary" }}
+                        />
+                        <Typography variant="body2" color="text.secondary">
+                          Created: {formatDate(collection.createdAt)}
+                        </Typography>
+                      </Box>
+
+                      {/* Modified date */}
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                        }}
+                      >
+                        <CalendarIcon
+                          sx={{ fontSize: 16, color: "text.secondary" }}
+                        />
+                        <Typography variant="body2" color="text.secondary">
+                          Modified: {formatDate(collection.updatedAt)}
+                        </Typography>
+                      </Box>
                     </Box>
+                  </CardContent>
 
-                    {/* Modified date */}
-                    <Box
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 1,
+                  {/* Actions */}
+                  <CardActions
+                    sx={{
+                      pt: 0,
+                      px: 2,
+                      pb: 2,
+                      display: "flex",
+                      justifyContent: "flex-end",
+                      gap: 1,
+                    }}
+                  >
+                    <Button
+                      size="small"
+                      startIcon={<EditIcon />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditClick(collection);
                       }}
+                      sx={{ textTransform: "none" }}
                     >
-                      <CalendarIcon
-                        sx={{ fontSize: 16, color: "text.secondary" }}
-                      />
-                      <Typography variant="body2" color="text.secondary">
-                        Modified: {formatDate(collection.updatedAt)}
-                      </Typography>
-                    </Box>
-                  </Box>
-                </CardContent>
-
-                {/* Actions */}
-                <CardActions
-                  sx={{
-                    pt: 0,
-                    px: 2,
-                    pb: 2,
-                    display: "flex",
-                    justifyContent: "flex-end",
-                    gap: 1,
-                  }}
-                >
-                  <Button
-                    size="small"
-                    startIcon={<EditIcon />}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleEditClick(collection);
-                    }}
-                    sx={{ textTransform: "none" }}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    size="small"
-                    color="error"
-                    startIcon={<DeleteIcon />}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteClick(collection);
-                    }}
-                    sx={{ textTransform: "none" }}
-                  >
-                    Delete
-                  </Button>
-                </CardActions>
-              </Card>
-            ))}
+                      Edit
+                    </Button>
+                    <Button
+                      size="small"
+                      color="error"
+                      startIcon={<DeleteIcon />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteClick(collection);
+                      }}
+                      sx={{ textTransform: "none" }}
+                    >
+                      Delete
+                    </Button>
+                  </CardActions>
+                </Card>
+              );
+            })}
           </Box>
         )}
       </PageContent>

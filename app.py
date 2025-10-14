@@ -33,6 +33,10 @@ from medialake_stacks.cognito_update_stack import (
     CognitoUpdateStack,
     CognitoUpdateStackProps,
 )
+from medialake_stacks.collection_types_stack import (
+    CollectionTypesStack,
+    CollectionTypesStackProps,
+)
 from medialake_stacks.collections_stack import CollectionsStack, CollectionsStackProps
 from medialake_stacks.edge_lambda_stack import EdgeLambdaStack
 from medialake_stacks.groups_stack import GroupsStack, GroupsStackProps
@@ -341,6 +345,24 @@ class MediaLakeStack(cdk.Stack):
         # Store reference to collections_stack
         self._collections_stack = collections_stack
 
+        # Create the Collection Types Settings Stack
+        collection_types_stack = CollectionTypesStack(
+            self,
+            "MediaLakeCollectionTypesSettings",
+            props=CollectionTypesStackProps(
+                cognito_user_pool=props.cognito_stack.user_pool,
+                authorizer=api_gateway_stack.authorizer,
+                api_resource=self.shared_rest_api,
+                x_origin_verify_secret=self.shared_x_origin_secret,
+                collections_table=collections_stack.collections_table,
+            ),
+        )
+        collection_types_stack.add_dependency(collections_stack)
+        collection_types_stack.add_dependency(api_gateway_stack)
+
+        # Store reference to collection_types_stack
+        self._collection_types_stack = collection_types_stack
+
         groups_stack = GroupsStack(
             self,
             "MediaLakeGroups",
@@ -491,6 +513,9 @@ class MediaLakeStack(cdk.Stack):
 
         if hasattr(self, "_collections_stack"):
             props.resource_collector.add_resource(self._collections_stack)
+
+        if hasattr(self, "_collection_types_stack"):
+            props.resource_collector.add_resource(self._collection_types_stack)
 
     @property
     def connector_table(self):

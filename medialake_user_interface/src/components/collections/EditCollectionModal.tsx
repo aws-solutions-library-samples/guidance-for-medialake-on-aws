@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Dialog,
@@ -18,19 +18,22 @@ import {
   Alert,
 } from "@mui/material";
 import {
-  useCreateCollection,
+  useUpdateCollection,
   useGetCollections,
   useGetCollectionTypes,
+  type Collection,
 } from "../../api/hooks/useCollections";
 
-interface CreateCollectionModalProps {
+interface EditCollectionModalProps {
   open: boolean;
   onClose: () => void;
+  collection: Collection | null;
 }
 
-export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
+export const EditCollectionModal: React.FC<EditCollectionModalProps> = ({
   open,
   onClose,
+  collection,
 }) => {
   const { t } = useTranslation();
   const [formData, setFormData] = useState({
@@ -43,12 +46,26 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // API hooks
-  const createCollectionMutation = useCreateCollection();
+  const updateCollectionMutation = useUpdateCollection();
   const { data: collectionsResponse } = useGetCollections();
   const { data: collectionTypesResponse } = useGetCollectionTypes();
 
   const collections = collectionsResponse?.data || [];
   const collectionTypes = collectionTypesResponse?.data || [];
+
+  // Populate form when collection changes
+  useEffect(() => {
+    if (collection && open) {
+      setFormData({
+        name: collection.name || "",
+        description: collection.description || "",
+        parentId: collection.parentId || "",
+        isPublic: collection.isPublic || false,
+        collectionTypeId: collection.collectionTypeId || "",
+      });
+      setErrors({});
+    }
+  }, [collection, open]);
 
   const handleInputChange =
     (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -107,12 +124,12 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
   };
 
   const handleSubmit = async () => {
-    if (!validateForm()) {
+    if (!collection || !validateForm()) {
       return;
     }
 
     try {
-      const createData = {
+      const updateData = {
         name: formData.name.trim(),
         description: formData.description.trim() || undefined,
         parentId: formData.parentId || undefined,
@@ -120,32 +137,20 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
         collectionTypeId: formData.collectionTypeId || undefined,
       };
 
-      await createCollectionMutation.mutateAsync(createData);
-
-      // Reset form and close modal
-      setFormData({
-        name: "",
-        description: "",
-        parentId: "",
-        isPublic: false,
-        collectionTypeId: "",
+      await updateCollectionMutation.mutateAsync({
+        id: collection.id,
+        data: updateData,
       });
-      setErrors({});
+
+      // Close modal
       onClose();
     } catch (error) {
-      console.error("Failed to create collection:", error);
+      console.error("Failed to update collection:", error);
     }
   };
 
   const handleClose = () => {
-    if (!createCollectionMutation.isPending) {
-      setFormData({
-        name: "",
-        description: "",
-        parentId: "",
-        isPublic: false,
-        collectionTypeId: "",
-      });
+    if (!updateCollectionMutation.isPending) {
       setErrors({});
       onClose();
     }
@@ -164,7 +169,7 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
       }}
     >
       <DialogTitle sx={{ fontWeight: 600 }}>
-        {t("collectionsPage.createCollection")}
+        {t("collectionsPage.editCollection", "Edit Collection")}
       </DialogTitle>
 
       <DialogContent sx={{ pb: 2 }}>
@@ -179,7 +184,7 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
             error={Boolean(errors.name)}
             helperText={errors.name}
             required
-            disabled={createCollectionMutation.isPending}
+            disabled={updateCollectionMutation.isPending}
           />
 
           {/* Description */}
@@ -193,14 +198,14 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
             helperText={errors.description}
             multiline
             rows={3}
-            disabled={createCollectionMutation.isPending}
+            disabled={updateCollectionMutation.isPending}
           />
 
           {/* Collection Type */}
           {collectionTypes.length > 0 && (
             <FormControl
               fullWidth
-              disabled={createCollectionMutation.isPending}
+              disabled={updateCollectionMutation.isPending}
             >
               <InputLabel>{t("collectionsPage.form.type")}</InputLabel>
               <Select
@@ -242,7 +247,7 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
           {collections.length > 0 && (
             <FormControl
               fullWidth
-              disabled={createCollectionMutation.isPending}
+              disabled={updateCollectionMutation.isPending}
             >
               <InputLabel>
                 {t("collectionsPage.form.parentCollection")}
@@ -255,11 +260,13 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
                 <MenuItem value="">
                   <em>{t("collectionsPage.form.selectParent")}</em>
                 </MenuItem>
-                {collections.map((collection) => (
-                  <MenuItem key={collection.id} value={collection.id}>
-                    {collection.name}
-                  </MenuItem>
-                ))}
+                {collections
+                  .filter((c) => c.id !== collection?.id) // Don't allow selecting itself
+                  .map((col) => (
+                    <MenuItem key={col.id} value={col.id}>
+                      {col.name}
+                    </MenuItem>
+                  ))}
               </Select>
             </FormControl>
           )}
@@ -270,14 +277,14 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
               <Switch
                 checked={formData.isPublic}
                 onChange={handleInputChange("isPublic")}
-                disabled={createCollectionMutation.isPending}
+                disabled={updateCollectionMutation.isPending}
               />
             }
             label={t("collectionsPage.form.isPublic")}
           />
 
           {/* Error Alert */}
-          {createCollectionMutation.isError && (
+          {updateCollectionMutation.isError && (
             <Alert severity="error">{t("common.error")}</Alert>
           )}
         </Box>
@@ -286,21 +293,21 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
       <DialogActions sx={{ px: 3, pb: 3 }}>
         <Button
           onClick={handleClose}
-          disabled={createCollectionMutation.isPending}
+          disabled={updateCollectionMutation.isPending}
         >
           {t("common.cancel")}
         </Button>
         <Button
           onClick={handleSubmit}
           variant="contained"
-          disabled={createCollectionMutation.isPending || !formData.name.trim()}
+          disabled={updateCollectionMutation.isPending || !formData.name.trim()}
           startIcon={
-            createCollectionMutation.isPending ? (
+            updateCollectionMutation.isPending ? (
               <CircularProgress size={20} />
             ) : null
           }
         >
-          {createCollectionMutation.isPending
+          {updateCollectionMutation.isPending
             ? t("common.saving")
             : t("common.save")}
         </Button>

@@ -6,8 +6,6 @@ Each file handles exactly one API endpoint (method + resource).
 """
 
 from . import (
-    collection_types_get,
-    collection_types_post,
     collections_get,
     collections_ID_ancestors_get,
     collections_ID_assets_get,
@@ -47,8 +45,6 @@ __all__ = [
     "collections_ID_rules_post",
     "collections_ID_rules_ID_put",
     "collections_ID_rules_ID_delete",
-    "collection_types_get",
-    "collection_types_post",
 ]
 
 
@@ -59,10 +55,6 @@ def register_all_routes(app):
     Args:
         app: APIGatewayRestResolver instance
     """
-    # Collection types endpoints
-    collection_types_get.register_route(app)
-    collection_types_post.register_route(app)
-
     # Collections endpoints
     collections_get.register_route(app)
     collections_post.register_route(app)

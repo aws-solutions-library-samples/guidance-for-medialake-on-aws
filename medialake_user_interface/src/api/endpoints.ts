@@ -81,6 +81,12 @@ export const API_ENDPOINTS = {
     SHARED: "/collections/shared",
     ITEMS: (id: string) => `/collections/${id}/items`,
     ASSETS: (id: string) => `/collections/${id}/assets`,
-    TYPES: "/collection-types",
+  },
+  COLLECTION_TYPES: {
+    BASE: "/settings/collection-types",
+    GET: (id: string) => `/settings/collection-types/${id}`,
+    UPDATE: (id: string) => `/settings/collection-types/${id}`,
+    DELETE: (id: string) => `/settings/collection-types/${id}`,
+    MIGRATE: (id: string) => `/settings/collection-types/${id}/migrate`,
   },
 };

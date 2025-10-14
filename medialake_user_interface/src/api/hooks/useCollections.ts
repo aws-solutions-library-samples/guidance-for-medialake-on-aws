@@ -12,6 +12,7 @@ export interface Collection {
   description?: string;
   type: "public" | "private" | "shared";
   parentId?: string;
+  collectionTypeId?: string;
   ownerId: string;
   ownerName?: string;
   itemCount: number;
@@ -34,9 +35,32 @@ export interface CollectionType {
   id: string;
   name: string;
   description?: string;
+  color: string;
+  icon: string;
   isActive: boolean;
+  isSystem: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CreateCollectionTypeRequest {
+  name: string;
+  description?: string;
+  color: string;
+  icon: string;
+  isActive?: boolean;
+}
+
+export interface UpdateCollectionTypeRequest {
+  name?: string;
+  description?: string;
+  color?: string;
+  icon?: string;
+  isActive?: boolean;
+}
+
+export interface MigrateCollectionTypeRequest {
+  targetTypeId: string;
 }
 
 export interface CreateCollectionRequest {
@@ -45,6 +69,7 @@ export interface CreateCollectionRequest {
   parentId?: string;
   isPublic?: boolean;
   type?: string;
+  collectionTypeId?: string;
 }
 
 export interface UpdateCollectionRequest {
@@ -52,6 +77,7 @@ export interface UpdateCollectionRequest {
   description?: string;
   parentId?: string;
   isPublic?: boolean;
+  collectionTypeId?: string;
 }
 
 export interface ShareCollectionRequest {
@@ -122,6 +148,28 @@ export interface CollectionTypesResponse {
     limit: number;
     next_cursor?: string;
     prev_cursor?: string;
+  };
+  meta: {
+    timestamp: string;
+    version: string;
+    request_id: string;
+  };
+}
+
+export interface CollectionTypeResponse {
+  success: boolean;
+  data: CollectionType;
+  meta: {
+    timestamp: string;
+    version: string;
+    request_id: string;
+  };
+}
+
+export interface MigrateCollectionTypeResponse {
+  success: boolean;
+  data: {
+    migratedCount: number;
   };
   meta: {
     timestamp: string;
@@ -263,28 +311,6 @@ export const useGetChildCollections = (parentId: string, enabled = true) => {
       } catch (error) {
         logger.error("Fetch child collections error:", error);
         showError("Failed to fetch child collections");
-        throw error;
-      }
-    },
-  });
-};
-
-// Hook to get collection types
-export const useGetCollectionTypes = () => {
-  const { showError } = useErrorModal();
-
-  return useQuery<CollectionTypesResponse, Error>({
-    queryKey: QUERY_KEYS.COLLECTIONS.types(),
-    queryFn: async ({ signal }) => {
-      try {
-        const response = await apiClient.get<CollectionTypesResponse>(
-          API_ENDPOINTS.COLLECTIONS.TYPES,
-          { signal },
-        );
-        return response.data;
-      } catch (error) {
-        logger.error("Fetch collection types error:", error);
-        showError("Failed to fetch collection types");
         throw error;
       }
     },
@@ -594,6 +620,193 @@ export const useGetCollectionAncestors = (id: string, enabled = true) => {
         showError("Failed to fetch collection ancestors");
         throw error;
       }
+    },
+  });
+};
+
+// =============================================================================
+// Collection Types Hooks
+// =============================================================================
+
+/**
+ * Hook to fetch all collection types
+ */
+export const useGetCollectionTypes = (filters?: Record<string, any>) => {
+  const { showError } = useErrorModal();
+
+  return useQuery<CollectionTypesResponse, Error>({
+    queryKey: QUERY_KEYS.COLLECTION_TYPES.list(filters),
+    queryFn: async ({ signal }) => {
+      try {
+        const response = await apiClient.get<CollectionTypesResponse>(
+          API_ENDPOINTS.COLLECTION_TYPES.BASE,
+          { params: filters, signal },
+        );
+        return response.data;
+      } catch (error) {
+        logger.error("Fetch collection types error:", error);
+        showError("Failed to fetch collection types");
+        throw error;
+      }
+    },
+  });
+};
+
+/**
+ * Hook to fetch a single collection type by ID
+ */
+export const useGetCollectionType = (id: string, enabled = true) => {
+  const { showError } = useErrorModal();
+
+  return useQuery<CollectionTypeResponse, Error>({
+    queryKey: QUERY_KEYS.COLLECTION_TYPES.detail(id),
+    enabled: enabled && !!id,
+    queryFn: async ({ signal }) => {
+      try {
+        const response = await apiClient.get<CollectionTypeResponse>(
+          API_ENDPOINTS.COLLECTION_TYPES.GET(id),
+          { signal },
+        );
+        return response.data;
+      } catch (error) {
+        logger.error("Fetch collection type error:", error);
+        showError("Failed to fetch collection type");
+        throw error;
+      }
+    },
+  });
+};
+
+/**
+ * Hook to create a new collection type
+ */
+export const useCreateCollectionType = () => {
+  const queryClient = useQueryClient();
+  const { showError } = useErrorModal();
+
+  return useMutation({
+    mutationFn: async (data: CreateCollectionTypeRequest) => {
+      try {
+        const response = await apiClient.post<CollectionTypeResponse>(
+          API_ENDPOINTS.COLLECTION_TYPES.BASE,
+          data,
+        );
+        return response.data;
+      } catch (error) {
+        logger.error("Create collection type error:", error);
+        showError("Failed to create collection type");
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      // Invalidate and refetch collection types
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.COLLECTION_TYPES.lists(),
+      });
+    },
+  });
+};
+
+/**
+ * Hook to update a collection type
+ */
+export const useUpdateCollectionType = () => {
+  const queryClient = useQueryClient();
+  const { showError } = useErrorModal();
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: UpdateCollectionTypeRequest;
+    }) => {
+      try {
+        const response = await apiClient.put<CollectionTypeResponse>(
+          API_ENDPOINTS.COLLECTION_TYPES.UPDATE(id),
+          data,
+        );
+        return response.data;
+      } catch (error) {
+        logger.error("Update collection type error:", error);
+        showError("Failed to update collection type");
+        throw error;
+      }
+    },
+    onSuccess: (_, variables) => {
+      // Invalidate the specific type and lists
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.COLLECTION_TYPES.detail(variables.id),
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.COLLECTION_TYPES.lists(),
+      });
+    },
+  });
+};
+
+/**
+ * Hook to delete a collection type
+ */
+export const useDeleteCollectionType = () => {
+  const queryClient = useQueryClient();
+  const { showError } = useErrorModal();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      try {
+        await apiClient.delete(API_ENDPOINTS.COLLECTION_TYPES.DELETE(id));
+      } catch (error) {
+        logger.error("Delete collection type error:", error);
+        showError("Failed to delete collection type");
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      // Invalidate collection types list
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.COLLECTION_TYPES.lists(),
+      });
+    },
+  });
+};
+
+/**
+ * Hook to migrate collections from one type to another
+ */
+export const useMigrateCollectionType = () => {
+  const queryClient = useQueryClient();
+  const { showError } = useErrorModal();
+
+  return useMutation({
+    mutationFn: async ({
+      sourceTypeId,
+      targetTypeId,
+    }: {
+      sourceTypeId: string;
+      targetTypeId: string;
+    }) => {
+      try {
+        const response = await apiClient.post<MigrateCollectionTypeResponse>(
+          API_ENDPOINTS.COLLECTION_TYPES.MIGRATE(sourceTypeId),
+          { targetTypeId },
+        );
+        return response.data;
+      } catch (error) {
+        logger.error("Migrate collection type error:", error);
+        showError("Failed to migrate collections");
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      // Invalidate collection types and collections
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.COLLECTION_TYPES.lists(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.COLLECTIONS.lists(),
+      });
     },
   });
 };
