@@ -357,8 +357,8 @@ class MediaLakeStack(cdk.Stack):
                 api_resource=self.shared_rest_api,
                 x_origin_verify_secret=self.shared_x_origin_secret,
                 collections_table=collections_stack.collections_table,
-                system_settings_table=settings_stack.system_settings_table,
-                api_keys_table=settings_stack.api_keys_table,
+                system_settings_table=settings_stack.system_settings_table.table,
+                api_keys_table=settings_stack.api_keys_table.table,
             ),
         )
         collection_types_stack.add_dependency(collections_stack)
