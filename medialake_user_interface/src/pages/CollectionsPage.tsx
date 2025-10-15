@@ -98,7 +98,8 @@ const CollectionsPage: React.FC = () => {
     error,
     refetch,
   } = useGetCollections();
-  const { data: collectionTypesResponse } = useGetCollectionTypes();
+  const { data: collectionTypesResponse, isLoading: isLoadingTypes } =
+    useGetCollectionTypes();
   const deleteCollectionMutation = useDeleteCollection();
   const updateCollectionMutation = useUpdateCollection();
 
@@ -107,7 +108,7 @@ const CollectionsPage: React.FC = () => {
 
   // Helper to get icon and color for a collection
   const getCollectionStyle = (collection: Collection) => {
-    if (!collection.collectionTypeId) {
+    if (!collection.collectionTypeId || isLoadingTypes) {
       return {
         icon: <FolderIcon />,
         color: theme.palette.primary.main,
@@ -442,6 +443,7 @@ const CollectionsPage: React.FC = () => {
                             }}
                           />
                           {collection.collectionTypeId &&
+                            !isLoadingTypes &&
                             (() => {
                               const collectionType = collectionTypes.find(
                                 (type) =>

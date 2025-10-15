@@ -59,17 +59,18 @@ export const CollectionCard: React.FC<CollectionCardProps> = ({
   onOpen,
 }) => {
   // Fetch collection types to get icon and color
-  const { data: collectionTypesResponse } = useGetCollectionTypes();
+  const { data: collectionTypesResponse, isLoading: isLoadingTypes } =
+    useGetCollectionTypes();
   const collectionTypes = collectionTypesResponse?.data || [];
 
   // Find the collection type for this collection
   const collectionType = useMemo(() => {
-    if (!collection.collectionTypeId) return null;
+    if (!collection.collectionTypeId || isLoadingTypes) return null;
     return (
       collectionTypes.find((type) => type.id === collection.collectionTypeId) ||
       null
     );
-  }, [collection.collectionTypeId, collectionTypes]);
+  }, [collection.collectionTypeId, collectionTypes, isLoadingTypes]);
 
   // Get the icon to display
   const displayIcon = useMemo(() => {

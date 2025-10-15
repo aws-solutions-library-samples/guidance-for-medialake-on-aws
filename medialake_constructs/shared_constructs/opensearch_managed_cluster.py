@@ -1,6 +1,5 @@
 import hashlib
 import json
-import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -410,7 +409,8 @@ class OpenSearchCluster(Construct):
                 service_token=provider.service_token,
                 properties={
                     "code_hash": code_hash,
-                    "timestamp": str(int(time.time())),
+                    # Removed timestamp to prevent updates on every deploy
+                    # Index creation will only re-run if code_hash changes
                 },
                 resource_type="Custom::OpenSearchCreateIndex",
             )
