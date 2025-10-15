@@ -1,3 +1,15 @@
+"""
+Collection Types Settings Stack for MediaLake.
+
+This stack creates the Settings API endpoints for managing all settings including:
+- Collection types management (CRUD + migration)
+- System settings
+- API keys management
+
+The stack follows MediaLake patterns and integrates with the existing
+authorization and API Gateway infrastructure.
+"""
+
 from dataclasses import dataclass
 
 import aws_cdk as cdk
@@ -22,14 +34,18 @@ class CollectionTypesStackProps:
     api_resource: apigateway.RestApi
     x_origin_verify_secret: secretsmanager.Secret
     collections_table: dynamodb.ITable
+    system_settings_table: dynamodb.ITable
+    api_keys_table: dynamodb.ITable
 
 
 class CollectionTypesStack(cdk.NestedStack):
     """
-    Stack for Collection Types Settings API.
+    Stack for Collection Types and Settings API.
 
-    This stack creates the Settings API endpoints for managing collection types including:
-    - Collection types management (CRUD + migration)
+    This stack creates the Settings API endpoints for managing:
+    - Collection types (CRUD + migration)
+    - System settings
+    - API keys
 
     The stack follows MediaLake patterns and integrates with the existing
     authorization and API Gateway infrastructure.
@@ -49,26 +65,28 @@ class CollectionTypesStack(cdk.NestedStack):
                 authorizer=props.authorizer,
                 x_origin_verify_secret=props.x_origin_verify_secret,
                 collections_table=props.collections_table,
+                system_settings_table=props.system_settings_table,
+                api_keys_table=props.api_keys_table,
             ),
         )
 
     @property
-    def collection_types_api(self):
+    def settings_api(self):
         """
-        Return the Collection Types Settings API construct.
+        Return the Settings API construct.
 
         Returns:
             SettingsApi: The Settings API Gateway construct containing
-                collection-types endpoint definitions and Lambda function
+                all settings endpoint definitions and Lambda function
         """
         return self._settings_api
 
     @property
     def lambda_function(self):
         """
-        Return the Collection Types Settings Lambda function.
+        Return the Settings Lambda function.
 
         Returns:
-            Lambda function handling collection-types endpoints
+            Lambda function handling all settings endpoints
         """
         return self._settings_api.lambda_function

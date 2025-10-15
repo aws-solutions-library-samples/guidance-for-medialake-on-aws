@@ -24,14 +24,20 @@ import {
   CardContent,
   CardActionArea,
   Chip,
+  useTheme,
 } from "@mui/material";
 import {
   Home as HomeIcon,
   Folder as FolderIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
+  Add as AddIcon,
+  ChevronLeft,
+  ChevronRight,
+  AccountTree as CollectionsTreeIcon,
 } from "@mui/icons-material";
 import { AddToCollectionModal } from "@/components/collections/AddToCollectionModal";
+import { CreateCollectionModal } from "@/components/collections/CreateCollectionModal";
 import { EditCollectionModal } from "@/components/collections/EditCollectionModal";
 import { CollectionTreeView } from "@/components/collections/CollectionTreeView";
 import {
@@ -93,16 +99,22 @@ interface Filters {
 }
 
 const DEFAULT_PAGE_SIZE = 50;
+const DRAWER_WIDTH = 280;
+const COLLAPSED_DRAWER_WIDTH = 60;
 
 const CollectionViewPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const theme = useTheme();
   const [searchParams, setSearchParams] = useSearchParams();
   const currentPage = parseInt(searchParams.get("page") || "1", 10);
 
   const [pageSize, setPageSize] = useState<number>(
     parseInt(searchParams.get("pageSize") || DEFAULT_PAGE_SIZE.toString(), 10),
   );
+
+  // Sidebar collapse state
+  const [isTreeCollapsed, setIsTreeCollapsed] = useState(false);
 
   // Add to Collection state
   const [addToCollectionModalOpen, setAddToCollectionModalOpen] =
@@ -115,6 +127,8 @@ const CollectionViewPage: React.FC = () => {
   // Collection Edit/Delete state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isCreateSubCollectionOpen, setIsCreateSubCollectionOpen] =
+    useState(false);
   const [collectionAlert, setCollectionAlert] = useState<{
     severity: "success" | "error" | "info" | "warning";
     message: string;
@@ -319,6 +333,11 @@ const CollectionViewPage: React.FC = () => {
     },
     [navigate],
   );
+
+  // Toggle sidebar
+  const toggleTreeSidebar = () => {
+    setIsTreeCollapsed(!isTreeCollapsed);
+  };
 
   // Edit collection handlers
   const handleEditClick = () => {
@@ -587,15 +606,8 @@ const CollectionViewPage: React.FC = () => {
     }
   }, []);
 
-  if (isLoadingCollection) {
-    return (
-      <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
-        <LinearProgress />
-      </Box>
-    );
-  }
-
-  if (!collection) {
+  // Show error if collection not found and not loading
+  if (!isLoadingCollection && !collection) {
     return (
       <Box sx={{ p: 4 }}>
         <Typography variant="h6" color="error">
@@ -617,7 +629,8 @@ const CollectionViewPage: React.FC = () => {
             overflow: "auto",
           }}
         >
-          {isFetching && (
+          {/* Show loading indicator for both initial load and navigation */}
+          {(isLoadingCollection || isFetching) && (
             <LinearProgress
               sx={{
                 position: "fixed",
@@ -629,23 +642,97 @@ const CollectionViewPage: React.FC = () => {
             />
           )}
 
-          {/* Left Sidebar - Collection Tree */}
+          {/* Left Sidebar - Collection Tree (Collapsible) */}
           <Box
             sx={{
-              width: 280,
+              width: isTreeCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH,
+              minWidth: isTreeCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH,
               flexShrink: 0,
-              borderRight: 1,
-              borderColor: "divider",
               height: "100vh",
               position: "sticky",
               top: 0,
-              overflowY: "auto",
+              display: "flex",
+              flexDirection: "column",
+              backgroundColor: "background.paper",
+              borderRadius: 2,
+              transition: theme.transitions.create(["width", "min-width"], {
+                easing: theme.transitions.easing.sharp,
+                duration: theme.transitions.duration.enteringScreen,
+              }),
+              overflow: "visible",
+              zIndex: 1,
+              mr: 3,
             }}
           >
-            <CollectionTreeView
-              currentCollectionId={id}
-              onCollectionSelect={handleCollectionSelect}
-            />
+            {/* Collapse/Expand Button */}
+            <Button
+              onClick={toggleTreeSidebar}
+              sx={{
+                position: "absolute",
+                right: -16,
+                top: "50%",
+                transform: "translateY(-50%)",
+                minWidth: "32px",
+                width: "32px",
+                height: "32px",
+                bgcolor: "background.paper",
+                borderRadius: "8px",
+                boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.15)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                border: "1px solid",
+                borderColor: "divider",
+                zIndex: 1200,
+                padding: 0,
+                "&:hover": {
+                  bgcolor: "background.paper",
+                  boxShadow: "0px 6px 12px rgba(0, 0, 0, 0.2)",
+                },
+              }}
+            >
+              {isTreeCollapsed ? (
+                <ChevronRight sx={{ fontSize: 20 }} />
+              ) : (
+                <ChevronLeft sx={{ fontSize: 20 }} />
+              )}
+            </Button>
+
+            {isTreeCollapsed ? (
+              // Collapsed view - show only the icon, centered
+              <Box
+                sx={{
+                  height: "100%",
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  pl: 0,
+                  pr: 2,
+                }}
+              >
+                <CollectionsTreeIcon
+                  sx={{
+                    color: (theme) => theme.palette.primary.main,
+                    fontSize: 24,
+                  }}
+                />
+              </Box>
+            ) : (
+              // Expanded view - show tree
+              <Box
+                sx={{
+                  flexGrow: 1,
+                  overflowY: "auto",
+                  overflowX: "hidden",
+                }}
+              >
+                <CollectionTreeView
+                  currentCollectionId={id}
+                  onCollectionSelect={handleCollectionSelect}
+                />
+              </Box>
+            )}
           </Box>
 
           {/* Main Content */}
@@ -726,6 +813,14 @@ const CollectionViewPage: React.FC = () => {
 
               {/* Action Buttons */}
               <Box sx={{ display: "flex", gap: 2 }}>
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={() => setIsCreateSubCollectionOpen(true)}
+                  size="small"
+                >
+                  Create Sub-Collection
+                </Button>
                 <Button
                   variant="outlined"
                   startIcon={<EditIcon />}
@@ -947,6 +1042,13 @@ const CollectionViewPage: React.FC = () => {
             </Button>
           </DialogActions>
         </Dialog>
+
+        {/* Create Sub-Collection Modal */}
+        <CreateCollectionModal
+          open={isCreateSubCollectionOpen}
+          onClose={() => setIsCreateSubCollectionOpen(false)}
+          defaultParentId={id}
+        />
 
         {/* Edit Collection Modal */}
         <EditCollectionModal

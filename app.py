@@ -46,7 +46,8 @@ from medialake_stacks.integrations_environment_stack import (
 )
 from medialake_stacks.nodes_stack import NodesStack, NodesStackProps
 from medialake_stacks.pipeline_stack import PipelineStack, PipelineStackProps
-from medialake_stacks.settings_api_stack import SettingsApiStack, SettingsApiStackProps
+
+# from medialake_stacks.settings_api_stack import SettingsApiStack, SettingsApiStackProps  # Deprecated - now using CollectionTypesStack
 from medialake_stacks.settings_stack import SettingsStack, SettingsStackProps
 from medialake_stacks.user_interface_stack import (
     UserInterfaceStack,
@@ -355,10 +356,13 @@ class MediaLakeStack(cdk.Stack):
                 api_resource=self.shared_rest_api,
                 x_origin_verify_secret=self.shared_x_origin_secret,
                 collections_table=collections_stack.collections_table,
+                system_settings_table=settings_stack.system_settings_table,
+                api_keys_table=settings_stack.api_keys_table,
             ),
         )
         collection_types_stack.add_dependency(collections_stack)
         collection_types_stack.add_dependency(api_gateway_stack)
+        collection_types_stack.add_dependency(settings_stack)
 
         # Store reference to collection_types_stack
         self._collection_types_stack = collection_types_stack
@@ -439,26 +443,26 @@ class MediaLakeStack(cdk.Stack):
             pipeline_stack.post_pipelines_async_handler
         )
 
-        _ = SettingsApiStack(
-            self,
-            "MediaLakeSettingsApi",
-            props=SettingsApiStackProps(
-                authorizer=api_gateway_stack.authorizer.authorizer_id,
-                # Use shared RestApi object instead of creating new one
-                api_resource=self.shared_rest_api,
-                cognito_user_pool=props.cognito_stack.user_pool,
-                cognito_app_client=props.cognito_stack.user_pool_client_id,
-                # Use shared Secret object instead of creating new one
-                x_origin_verify_secret=self.shared_x_origin_secret,
-                system_settings_table_name=settings_stack.system_settings_table_name,
-                system_settings_table_arn=settings_stack.system_settings_table_arn,
-                api_keys_table_name=settings_stack.api_keys_table_name,
-                api_keys_table_arn=settings_stack.api_keys_table_arn,
-            ),
-        )
-
-        # Store the SettingsApiStack reference for potential resource registration
-        self._settings_api_stack = _
+        # NOTE: SettingsApiStack is now deprecated and replaced by CollectionTypesStack
+        # which consolidates all settings endpoints (collection-types, system settings, API keys)
+        # into a single Lambda function for better maintainability
+        #
+        # _ = SettingsApiStack(
+        #     self,
+        #     "MediaLakeSettingsApi",
+        #     props=SettingsApiStackProps(
+        #         authorizer=api_gateway_stack.authorizer.authorizer_id,
+        #         api_resource=self.shared_rest_api,
+        #         cognito_user_pool=props.cognito_stack.user_pool,
+        #         cognito_app_client=props.cognito_stack.user_pool_client_id,
+        #         x_origin_verify_secret=self.shared_x_origin_secret,
+        #         system_settings_table_name=settings_stack.system_settings_table_name,
+        #         system_settings_table_arn=settings_stack.system_settings_table_arn,
+        #         api_keys_table_name=settings_stack.api_keys_table_name,
+        #         api_keys_table_arn=settings_stack.api_keys_table_arn,
+        #     ),
+        # )
+        # self._settings_api_stack = _
 
         # # Create the Permissions Stack as a nested stack
         # _ = PermissionsStack(
@@ -495,8 +499,9 @@ class MediaLakeStack(cdk.Stack):
             )
 
         # Register the settings API stack if it has resources
-        if hasattr(self, "_settings_api_stack"):
-            props.resource_collector.add_resource(self._settings_api_stack)
+        # NOTE: SettingsApiStack is now deprecated - using CollectionTypesStack instead
+        # if hasattr(self, "_settings_api_stack"):
+        #     props.resource_collector.add_resource(self._settings_api_stack)
 
         # Register other important stacks that might have resources
         if hasattr(self, "_users_groups_roles_stack"):

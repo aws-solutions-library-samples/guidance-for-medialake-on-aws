@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  keepPreviousData,
+} from "@tanstack/react-query";
 import { apiClient } from "@/api/apiClient";
 import { API_ENDPOINTS } from "@/api/endpoints";
 import { QUERY_KEYS } from "@/api/queryKeys";
@@ -275,6 +280,7 @@ export const useGetCollection = (id: string, enabled = true) => {
   return useQuery<CollectionResponse, Error>({
     queryKey: QUERY_KEYS.COLLECTIONS.detail(id),
     enabled: enabled && !!id,
+    placeholderData: keepPreviousData, // Keep previous collection visible during navigation
     queryFn: async ({ signal }) => {
       try {
         const response = await apiClient.get<CollectionResponse>(
@@ -298,6 +304,7 @@ export const useGetChildCollections = (parentId: string, enabled = true) => {
   return useQuery<CollectionsResponse, Error>({
     queryKey: QUERY_KEYS.COLLECTIONS.children(parentId),
     enabled: enabled && !!parentId,
+    placeholderData: keepPreviousData, // Keep previous children visible during navigation
     queryFn: async ({ signal }) => {
       try {
         const params = new URLSearchParams();
@@ -562,6 +569,7 @@ export const useGetCollectionAssets = (
   return useQuery<CollectionAssetsResponse, Error>({
     queryKey: QUERY_KEYS.COLLECTIONS.assets(id, filters),
     enabled: enabled && !!id,
+    placeholderData: keepPreviousData, // Keep previous assets visible during navigation
     queryFn: async ({ signal }) => {
       try {
         const params = new URLSearchParams();

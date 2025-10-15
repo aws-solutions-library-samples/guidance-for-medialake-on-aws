@@ -26,17 +26,19 @@ import {
 interface CreateCollectionModalProps {
   open: boolean;
   onClose: () => void;
+  defaultParentId?: string;
 }
 
 export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
   open,
   onClose,
+  defaultParentId,
 }) => {
   const { t } = useTranslation();
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    parentId: "",
+    parentId: defaultParentId || "",
     isPublic: false,
     collectionTypeId: "",
   });
@@ -126,7 +128,7 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
       setFormData({
         name: "",
         description: "",
-        parentId: "",
+        parentId: defaultParentId || "",
         isPublic: false,
         collectionTypeId: "",
       });
@@ -142,7 +144,7 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
       setFormData({
         name: "",
         description: "",
-        parentId: "",
+        parentId: defaultParentId || "",
         isPublic: false,
         collectionTypeId: "",
       });
@@ -238,8 +240,8 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
             </FormControl>
           )}
 
-          {/* Parent Collection */}
-          {collections.length > 0 && (
+          {/* Parent Collection - Only show if no default parent is set */}
+          {!defaultParentId && collections.length > 0 && (
             <FormControl
               fullWidth
               disabled={createCollectionMutation.isPending}
