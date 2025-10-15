@@ -156,7 +156,7 @@ def _normalize_event(evt: dict) -> dict:
     return assets[0]
 
 
-@lambda_middleware(event_bus_name=os.getenv("EVENT_BUSINESS", "default-event-bus"))
+@lambda_middleware(event_bus_name=os.getenv("EVENT_BUS_NAME", "default-event-bus"))
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
 def lambda_handler(event: Dict[str, Any], _: LambdaContext) -> Dict[str, Any]:

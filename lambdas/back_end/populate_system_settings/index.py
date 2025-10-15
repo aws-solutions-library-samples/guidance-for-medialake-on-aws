@@ -62,8 +62,29 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     }
                 )
 
+                # Initialize version tracking in system settings
+                current_version = os.environ.get("CURRENT_VERSION", "main")
+                table.put_item(
+                    Item={
+                        "PK": "SYSTEM_UPGRADE",
+                        "SK": "VERSION_CURRENT",
+                        "setting_value": {
+                            "currentVersion": current_version,
+                            "lastUpgradeTime": None,
+                            "upgradeStatus": "idle",
+                            "pipelineExecutionId": None,
+                        },
+                        "description": "Current MediaLake version and upgrade status",
+                        "created_by": "system",
+                        "last_updated": context.aws_request_id,
+                    }
+                )
+
                 print(
                     f"Successfully stored {len(bucket_names)} MediaLake bucket names in system settings"
+                )
+                print(
+                    f"Initialized version tracking with current version: {current_version}"
                 )
                 response_data["BucketCount"] = len(bucket_names)
                 response_data["Buckets"] = bucket_names
@@ -83,7 +104,13 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     table.delete_item(
                         Key={"PK": "SYSTEM_SETTINGS", "SK": "MEDIALAKE_BUCKETS"}
                     )
-                    print("Cleaned up MediaLake buckets setting from system table")
+                    # Also clean up version tracking
+                    table.delete_item(
+                        Key={"PK": "SYSTEM_UPGRADE", "SK": "VERSION_CURRENT"}
+                    )
+                    print(
+                        "Cleaned up MediaLake buckets and version settings from system table"
+                    )
             except Exception as e:
                 print(f"Error cleaning up setting (non-critical): {str(e)}")
 
