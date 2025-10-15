@@ -3,32 +3,29 @@ Main handler for MediaLake Auto-Upgrade System API endpoints.
 Uses AWS Lambda Powertools APIGatewayRestResolver for routing.
 """
 
-import os
 import logging
-from typing import Dict, Any
+import os
+from typing import Any, Dict
 
-from aws_lambda_powertools import Logger, Tracer, Metrics
+from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.event_handler.exceptions import (
     BadRequestError,
-    NotFoundError,
     InternalServerError,
-    UnauthorizedError
+    NotFoundError,
+    UnauthorizedError,
 )
-from aws_lambda_powertools.utilities.parser import parse, ValidationError
-from aws_lambda_powertools.utilities.parser.models import APIGatewayProxyEventModel
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import MetricUnit
-
-from utils.auth import validate_super_admin_access
-from utils.response import create_success_response, create_error_response, handle_exception
-from handlers.get_versions import handle_get_versions
-from handlers.post_trigger import handle_post_trigger
-from handlers.get_status import handle_get_status
-from handlers.post_schedule import handle_post_schedule
-from handlers.get_scheduled import handle_get_scheduled
 from handlers.delete_schedule_id import handle_delete_schedule_id
 from handlers.get_history import handle_get_history
+from handlers.get_scheduled import handle_get_scheduled
+from handlers.get_status import handle_get_status
+from handlers.get_versions import handle_get_versions
+from handlers.post_schedule import handle_post_schedule
+from handlers.post_trigger import handle_post_trigger
+from utils.auth import validate_super_admin_access
+from utils.response import create_error_response
 
 # Initialize AWS Lambda Powertools
 app = APIGatewayRestResolver(strip_prefixes=["/updates"])
@@ -46,23 +43,25 @@ def get_versions():
     """Get available versions (branches and tags) from GitHub repository."""
     try:
         logger.info(">>> GET /versions - Starting request")
-        
+
         # Validate super administrator access
         logger.info("Step 1: Validating super administrator access...")
         user_email = validate_super_admin_access(app.current_event.raw_event)
         logger.info(f"Step 1: ✓ Access validated for user: {user_email}")
-        
+
         # Add custom metrics
         metrics.add_metric(name="GetVersionsRequests", unit=MetricUnit.Count, value=1)
-        
+
         # Handle the request
         logger.info("Step 2: Fetching available versions from GitHub...")
         result = handle_get_versions()
         logger.info(f"Step 2: ✓ Successfully fetched versions")
-        
-        logger.info(f"<<< GET /versions - Request completed successfully for user: {user_email}")
+
+        logger.info(
+            f"<<< GET /versions - Request completed successfully for user: {user_email}"
+        )
         return result
-        
+
     except UnauthorizedError as e:
         logger.warning(f"✗ Unauthorized access attempt: {str(e)}")
         metrics.add_metric(name="UnauthorizedRequests", unit=MetricUnit.Count, value=1)
@@ -81,16 +80,18 @@ def post_trigger():
     try:
         # Validate super administrator access
         user_email = validate_super_admin_access(app.current_event.raw_event)
-        
+
         # Add custom metrics
-        metrics.add_metric(name="TriggerUpgradeRequests", unit=MetricUnit.Count, value=1)
-        
+        metrics.add_metric(
+            name="TriggerUpgradeRequests", unit=MetricUnit.Count, value=1
+        )
+
         # Handle the request
         result = handle_post_trigger(app.current_event.json_body, user_email)
-        
+
         logger.info(f"Successfully triggered upgrade for user: {user_email}")
         return result
-        
+
     except UnauthorizedError as e:
         logger.warning(f"Unauthorized access attempt: {str(e)}")
         metrics.add_metric(name="UnauthorizedRequests", unit=MetricUnit.Count, value=1)
@@ -111,23 +112,25 @@ def get_status():
     """Get current upgrade status and information."""
     try:
         logger.info(">>> GET /status - Starting request")
-        
+
         # Validate super administrator access
         logger.info("Step 1: Validating super administrator access...")
         user_email = validate_super_admin_access(app.current_event.raw_event)
         logger.info(f"Step 1: ✓ Access validated for user: {user_email}")
-        
+
         # Add custom metrics
         metrics.add_metric(name="GetStatusRequests", unit=MetricUnit.Count, value=1)
-        
+
         # Handle the request
         logger.info("Step 2: Fetching current upgrade status...")
         result = handle_get_status()
         logger.info(f"Step 2: ✓ Successfully fetched status")
-        
-        logger.info(f"<<< GET /status - Request completed successfully for user: {user_email}")
+
+        logger.info(
+            f"<<< GET /status - Request completed successfully for user: {user_email}"
+        )
         return result
-        
+
     except UnauthorizedError as e:
         logger.warning(f"✗ Unauthorized access attempt: {str(e)}")
         metrics.add_metric(name="UnauthorizedRequests", unit=MetricUnit.Count, value=1)
@@ -146,16 +149,18 @@ def post_schedule():
     try:
         # Validate super administrator access
         user_email = validate_super_admin_access(app.current_event.raw_event)
-        
+
         # Add custom metrics
-        metrics.add_metric(name="ScheduleUpgradeRequests", unit=MetricUnit.Count, value=1)
-        
+        metrics.add_metric(
+            name="ScheduleUpgradeRequests", unit=MetricUnit.Count, value=1
+        )
+
         # Handle the request
         result = handle_post_schedule(app.current_event.json_body, user_email)
-        
+
         logger.info(f"Successfully scheduled upgrade for user: {user_email}")
         return result
-        
+
     except UnauthorizedError as e:
         logger.warning(f"Unauthorized access attempt: {str(e)}")
         metrics.add_metric(name="UnauthorizedRequests", unit=MetricUnit.Count, value=1)
@@ -177,16 +182,16 @@ def get_scheduled():
     try:
         # Validate super administrator access
         user_email = validate_super_admin_access(app.current_event.raw_event)
-        
+
         # Add custom metrics
         metrics.add_metric(name="GetScheduledRequests", unit=MetricUnit.Count, value=1)
-        
+
         # Handle the request
         result = handle_get_scheduled()
-        
+
         logger.info(f"Successfully fetched scheduled upgrades for user: {user_email}")
         return result
-        
+
     except UnauthorizedError as e:
         logger.warning(f"Unauthorized access attempt: {str(e)}")
         metrics.add_metric(name="UnauthorizedRequests", unit=MetricUnit.Count, value=1)
@@ -204,16 +209,20 @@ def delete_schedule_id(schedule_id: str):
     try:
         # Validate super administrator access
         user_email = validate_super_admin_access(app.current_event.raw_event)
-        
+
         # Add custom metrics
-        metrics.add_metric(name="CancelScheduleRequests", unit=MetricUnit.Count, value=1)
-        
+        metrics.add_metric(
+            name="CancelScheduleRequests", unit=MetricUnit.Count, value=1
+        )
+
         # Handle the request
         result = handle_delete_schedule_id(schedule_id, user_email)
-        
-        logger.info(f"Successfully cancelled scheduled upgrade {schedule_id} for user: {user_email}")
+
+        logger.info(
+            f"Successfully cancelled scheduled upgrade {schedule_id} for user: {user_email}"
+        )
         return result
-        
+
     except UnauthorizedError as e:
         logger.warning(f"Unauthorized access attempt: {str(e)}")
         metrics.add_metric(name="UnauthorizedRequests", unit=MetricUnit.Count, value=1)
@@ -235,19 +244,19 @@ def get_history():
     try:
         # Validate super administrator access
         user_email = validate_super_admin_access(app.current_event.raw_event)
-        
+
         # Add custom metrics
         metrics.add_metric(name="GetHistoryRequests", unit=MetricUnit.Count, value=1)
-        
+
         # Get query parameters
         query_params = app.current_event.query_string_parameters or {}
-        
+
         # Handle the request
         result = handle_get_history(query_params)
-        
+
         logger.info(f"Successfully fetched upgrade history for user: {user_email}")
         return result
-        
+
     except UnauthorizedError as e:
         logger.warning(f"Unauthorized access attempt: {str(e)}")
         metrics.add_metric(name="UnauthorizedRequests", unit=MetricUnit.Count, value=1)
@@ -268,11 +277,11 @@ def get_history():
 def lambda_handler(event: Dict[str, Any], context) -> Dict[str, Any]:
     """
     Main Lambda handler for auto-upgrade system API endpoints.
-    
+
     Args:
         event: API Gateway event
         context: Lambda context
-        
+
     Returns:
         API Gateway response
     """
@@ -284,33 +293,35 @@ def lambda_handler(event: Dict[str, Any], context) -> Dict[str, Any]:
         logger.info(f"Resource: {event.get('resource')}")
         logger.info(f"Event keys: {list(event.keys())}")
         logger.debug(f"Full event: {event}")
-        
+
         # Add environment info to logs
         logger.append_keys(
-            environment=os.environ.get('ENVIRONMENT', 'unknown'),
+            environment=os.environ.get("ENVIRONMENT", "unknown"),
             function_name=context.function_name,
             function_version=context.function_version,
-            request_id=context.aws_request_id
+            request_id=context.aws_request_id,
         )
-        
+
         logger.info("Resolving request with APIGatewayRestResolver...")
         result = app.resolve(event, context)
-        
-        logger.info(f"Request completed successfully. Status: {result.get('statusCode')}")
+
+        logger.info(
+            f"Request completed successfully. Status: {result.get('statusCode')}"
+        )
         logger.info(f"Response: {result}")
         logger.info("=" * 80)
-        
+
         return result
-        
+
     except Exception as e:
         logger.error("=" * 80)
         logger.error(f"UNHANDLED ERROR in lambda_handler: {str(e)}")
         logger.exception("Full exception details:")
         logger.error("=" * 80)
         metrics.add_metric(name="UnhandledErrors", unit=MetricUnit.Count, value=1)
-        
+
         return create_error_response(
             error_code="INTERNAL_SERVER_ERROR",
             error_message=f"An unexpected error occurred: {str(e)}",
-            status_code=500
+            status_code=500,
         )

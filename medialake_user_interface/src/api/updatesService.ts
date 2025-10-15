@@ -2,11 +2,11 @@
  * API service for MediaLake Auto-Upgrade System
  */
 
-import { apiClient } from './apiClient';
+import { apiClient } from "./apiClient";
 
 export interface Version {
   name: string;
-  type: 'branch' | 'tag';
+  type: "branch" | "tag";
   sha: string;
   date: string;
   message?: string;
@@ -21,7 +21,7 @@ export interface VersionsResponse {
 
 export interface TriggerUpgradeRequest {
   target_version: string;
-  version_type: 'branch' | 'tag';
+  version_type: "branch" | "tag";
   confirm_upgrade: boolean;
 }
 
@@ -49,7 +49,7 @@ export interface ActiveUpgrade {
 
 export interface UpgradeStatusResponse {
   current_version: string;
-  upgrade_status: 'idle' | 'in_progress' | 'completed' | 'failed';
+  upgrade_status: "idle" | "in_progress" | "completed" | "failed";
   last_upgrade?: {
     version: string;
     timestamp: string;
@@ -62,7 +62,7 @@ export interface UpgradeRecord {
   upgrade_id: string;
   from_version: string;
   to_version: string;
-  status: 'completed' | 'failed';
+  status: "completed" | "failed";
   start_time: string;
   end_time: string;
   duration: number;
@@ -86,18 +86,18 @@ export interface UpgradeHistoryResponse {
  * Get available versions (branches and tags) from GitHub
  */
 export const getVersions = async (): Promise<VersionsResponse> => {
-  console.log('📡 getVersions: Making API call...');
-  const response = await apiClient.get<{ body: string }>('/updates/versions');
-  console.log('📡 getVersions: Raw response:', response);
-  console.log('📡 getVersions: response.data:', response.data);
-  
+  console.log("📡 getVersions: Making API call...");
+  const response = await apiClient.get<{ body: string }>("/updates/versions");
+  console.log("📡 getVersions: Raw response:", response);
+  console.log("📡 getVersions: response.data:", response.data);
+
   // Parse the body string to get the actual data
   const parsedBody = JSON.parse(response.data.body);
-  console.log('📡 getVersions: Parsed body:', parsedBody);
-  console.log('📡 getVersions: parsedBody.data:', parsedBody.data);
-  
+  console.log("📡 getVersions: Parsed body:", parsedBody);
+  console.log("📡 getVersions: parsedBody.data:", parsedBody.data);
+
   const result = parsedBody.data;
-  console.log('📡 getVersions: Returning:', result);
+  console.log("📡 getVersions: Returning:", result);
   return result;
 };
 
@@ -105,9 +105,12 @@ export const getVersions = async (): Promise<VersionsResponse> => {
  * Trigger immediate upgrade to selected version
  */
 export const triggerUpgrade = async (
-  request: TriggerUpgradeRequest
+  request: TriggerUpgradeRequest,
 ): Promise<TriggerUpgradeResponse> => {
-  const response = await apiClient.post<{ body: string }>('/updates/trigger', request);
+  const response = await apiClient.post<{ body: string }>(
+    "/updates/trigger",
+    request,
+  );
   const parsedBody = JSON.parse(response.data.body);
   return parsedBody.data;
 };
@@ -116,7 +119,7 @@ export const triggerUpgrade = async (
  * Get current upgrade status
  */
 export const getUpgradeStatus = async (): Promise<UpgradeStatusResponse> => {
-  const response = await apiClient.get<{ body: string }>('/updates/status');
+  const response = await apiClient.get<{ body: string }>("/updates/status");
   const parsedBody = JSON.parse(response.data.body);
   return parsedBody.data;
 };
@@ -126,17 +129,19 @@ export const getUpgradeStatus = async (): Promise<UpgradeStatusResponse> => {
  */
 export const getUpgradeHistory = async (
   limit: number = 10,
-  cursor?: string
+  cursor?: string,
 ): Promise<UpgradeHistoryResponse> => {
   const params = new URLSearchParams();
-  params.append('limit', limit.toString());
+  params.append("limit", limit.toString());
   if (cursor) {
-    params.append('cursor', cursor);
+    params.append("cursor", cursor);
   }
-  
-  const response = await apiClient.get<{ body: string }>(`/updates/history?${params.toString()}`);
+
+  const response = await apiClient.get<{ body: string }>(
+    `/updates/history?${params.toString()}`,
+  );
   const parsedBody = JSON.parse(response.data.body);
-  
+
   return {
     data: parsedBody.data,
     pagination: parsedBody.pagination,

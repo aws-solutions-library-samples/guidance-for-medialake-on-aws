@@ -1,5 +1,5 @@
-import json
 import os
+import sys
 from typing import Any, List
 
 import boto3
@@ -7,6 +7,10 @@ from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.event_handler.api_gateway import APIGatewayProxyEvent
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
+
+# Add common_libraries to path
+sys.path.insert(0, "/opt/python")
+from common_libraries.cors_utils import create_error_response, create_response
 
 # Initialize AWS Lambda Powertools
 logger = Logger()
@@ -25,27 +29,18 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext):
 
         if not connector_id:
             logger.error("No connector_id provided in path parameters")
-            return {
-                "statusCode": 400,
-                "body": json.dumps({"message": "Connector ID is required"}),
-            }
+            return create_error_response(400, "Connector ID is required")
 
         # Get connector details from DynamoDB
         try:
             response = table.get_item(Key={"id": connector_id})
         except ClientError as e:
             logger.error(f"DynamoDB get_item failed: {str(e)}")
-            return {
-                "statusCode": 500,
-                "body": json.dumps({"message": "Failed to retrieve connector details"}),
-            }
+            return create_error_response(500, "Failed to retrieve connector details")
 
         if "Item" not in response:
             logger.warning(f"Connector not found with ID: {connector_id}")
-            return {
-                "statusCode": 404,
-                "body": json.dumps({"message": "Connector not found"}),
-            }
+            return create_error_response(404, "Connector not found")
 
         connector = response["Item"]
         region = connector.get(
@@ -58,10 +53,7 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext):
 
         if not all([queue_url, bucket_name, lambda_arn, iam_role_arn]):
             logger.error(f"Invalid connector configuration for ID: {connector_id}")
-            return {
-                "statusCode": 400,
-                "body": json.dumps({"message": "Invalid connector configuration"}),
-            }
+            return create_error_response(400, "Invalid connector configuration")
 
         # Create AWS clients in the specified region
         lambda_client = boto3.client("lambda", region_name=region)
@@ -323,38 +315,29 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext):
             try:
                 table.delete_item(Key={"id": connector_id})
                 logger.info(f"Successfully deleted connector with ID: {connector_id}")
-                return {
-                    "statusCode": 200,
-                    "body": json.dumps({"message": "Connector deleted successfully"}),
-                }
+                return create_response(
+                    200, {"message": "Connector deleted successfully"}
+                )
             except ClientError as e:
                 logger.error(f"Failed to delete connector from DynamoDB: {str(e)}")
-                return {
-                    "statusCode": 500,
-                    "body": json.dumps(
-                        {
-                            "message": "Failed to delete connector record",
-                            "error": str(e),
-                        }
-                    ),
-                }
+                return create_response(
+                    500,
+                    {
+                        "message": "Failed to delete connector record",
+                        "error": str(e),
+                    },
+                )
         else:
             logger.error(
                 f"Errors occurred while deleting connector {connector_id}: {errors}"
             )
-            return {
-                "statusCode": 500,
-                "body": json.dumps(
-                    {"message": "Error deleting connector", "errors": errors}
-                ),
-            }
+            return create_response(
+                500, {"message": "Error deleting connector", "errors": errors}
+            )
 
     except Exception as e:
         logger.exception("Unexpected error occurred")
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"message": "Internal server error", "error": str(e)}),
-        }
+        return create_error_response(500, f"Internal server error: {str(e)}")
 
 
 def remove_event_notification_by_name(

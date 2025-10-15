@@ -3,9 +3,7 @@ API Gateway construct for MediaLake Auto-Upgrade System endpoints.
 """
 
 from dataclasses import dataclass
-from typing import Optional
 
-import aws_cdk as cdk
 from aws_cdk import aws_apigateway as apigateway
 from aws_cdk import aws_cognito as cognito
 from aws_cdk import aws_lambda as lambda_
@@ -13,12 +11,15 @@ from aws_cdk import aws_secretsmanager as secretsmanager
 from constructs import Construct
 
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
-from medialake_constructs.auth.authorizer_utils import ensure_shared_authorizer_permissions
+from medialake_constructs.auth.authorizer_utils import (
+    ensure_shared_authorizer_permissions,
+)
 
 
 @dataclass
 class UpdatesConstructProps:
     """Properties for the Updates API Gateway construct."""
+
     api_resource: apigateway.RestApi
     authorizer: apigateway.IAuthorizer
     cognito_user_pool: cognito.UserPool
@@ -30,7 +31,7 @@ class UpdatesConstructProps:
 class UpdatesConstruct(Construct):
     """
     API Gateway construct for auto-upgrade system endpoints.
-    
+
     This construct creates all the /updates endpoints and integrates them
     with a single Lambda function using proxy integration.
     """
@@ -64,10 +65,10 @@ class UpdatesConstruct(Construct):
                     response_parameters={
                         "method.response.header.Access-Control-Allow-Origin": "'*'",
                         "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
-                        "method.response.header.Access-Control-Allow-Methods": "'GET,POST,PUT,DELETE,OPTIONS'"
-                    }
+                        "method.response.header.Access-Control-Allow-Methods": "'GET,POST,PUT,DELETE,OPTIONS'",
+                    },
                 )
-            ]
+            ],
         )
 
         # Add ANY method to proxy resource for all HTTP methods
@@ -80,10 +81,10 @@ class UpdatesConstruct(Construct):
                     response_parameters={
                         "method.response.header.Access-Control-Allow-Origin": True,
                         "method.response.header.Access-Control-Allow-Headers": True,
-                        "method.response.header.Access-Control-Allow-Methods": True
-                    }
+                        "method.response.header.Access-Control-Allow-Methods": True,
+                    },
                 )
-            ]
+            ],
         )
 
         # Set authorization on the method
@@ -101,10 +102,10 @@ class UpdatesConstruct(Construct):
                     response_parameters={
                         "method.response.header.Access-Control-Allow-Origin": True,
                         "method.response.header.Access-Control-Allow-Headers": True,
-                        "method.response.header.Access-Control-Allow-Methods": True
-                    }
+                        "method.response.header.Access-Control-Allow-Methods": True,
+                    },
                 )
-            ]
+            ],
         )
 
         # Set authorization on the root updates method

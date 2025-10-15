@@ -68,6 +68,11 @@ export interface AssetResultsViewProps<T> {
   onAssetClick: (asset: T) => void;
   onDeleteClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onDownloadClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
+  onAddToCollectionClick?: (
+    asset: T,
+    event: React.MouseEvent<HTMLElement>,
+  ) => void;
+  showRemoveButton?: boolean; // Show - icon instead of + for collection view
   onEditClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onEditNameComplete: (asset: T, save: boolean, value?: string) => void;
@@ -135,6 +140,8 @@ function AssetResultsView<T>({
   onAssetClick,
   onDeleteClick,
   onDownloadClick,
+  onAddToCollectionClick,
+  showRemoveButton = false,
   onEditClick,
   onEditNameChange,
   onEditNameComplete,
@@ -159,6 +166,13 @@ function AssetResultsView<T>({
   getAssetProxy,
   renderCardField,
 }: AssetResultsViewProps<T>) {
+  // Debug: Check if we're receiving the onAddToCollectionClick prop
+  console.log(
+    "AssetResultsView: onAddToCollectionClick prop is:",
+    typeof onAddToCollectionClick,
+    onAddToCollectionClick,
+  );
+
   // Local state for slider value during dragging (to prevent constant re-filtering)
   const [sliderValue, setSliderValue] = React.useState(confidenceThreshold);
   const [isSliderActive, setIsSliderActive] = React.useState(false);
@@ -495,6 +509,8 @@ function AssetResultsView<T>({
             onAssetClick={onAssetClick}
             onDeleteClick={onDeleteClick}
             onDownloadClick={onDownloadClick}
+            onAddToCollectionClick={onAddToCollectionClick}
+            showRemoveButton={showRemoveButton}
             onEditClick={onEditClick}
             onEditNameChange={onEditNameChange}
             onEditNameComplete={onEditNameComplete}
@@ -526,6 +542,8 @@ function AssetResultsView<T>({
             onAssetClick={onAssetClick}
             onDeleteClick={onDeleteClick}
             onDownloadClick={onDownloadClick}
+            onAddToCollectionClick={onAddToCollectionClick}
+            showRemoveButton={showRemoveButton}
             onEditClick={onEditClick}
             onEditNameChange={onEditNameChange}
             onEditNameComplete={onEditNameComplete}

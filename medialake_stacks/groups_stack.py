@@ -82,10 +82,10 @@ class GroupsStack(cdk.NestedStack):
                 environment_variables=common_env_vars,
             ),
         )
-        
+
         # Grant permissions
         props.auth_table.grant_read_write_data(groups_unified_lambda.function)
-        
+
         # Grant permissions for Cognito group management
         groups_unified_lambda.function.add_to_role_policy(
             iam.PolicyStatement(

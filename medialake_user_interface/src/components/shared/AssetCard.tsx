@@ -16,6 +16,8 @@ import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import InfoIcon from "@mui/icons-material/Info";
+import AddIcon from "@mui/icons-material/Add";
+import RemoveIcon from "@mui/icons-material/Remove";
 import {
   PLACEHOLDER_IMAGE,
   VIDEO_PLACEHOLDER_IMAGE,
@@ -53,6 +55,8 @@ export interface AssetCardProps {
   onAssetClick: () => void;
   onDeleteClick: (event: React.MouseEvent<HTMLElement>) => void;
   onDownloadClick: (event: React.MouseEvent<HTMLElement>) => void;
+  onAddToCollectionClick?: (event: React.MouseEvent<HTMLElement>) => void;
+  showRemoveButton?: boolean;
   onEditClick?: (event: React.MouseEvent<HTMLElement>) => void;
   placeholderImage?: string;
   onImageError?: (event: React.SyntheticEvent<HTMLImageElement, Event>) => void;
@@ -88,6 +92,8 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
     onAssetClick,
     onDeleteClick,
     onDownloadClick,
+    onAddToCollectionClick,
+    showRemoveButton = false,
     onEditClick,
     placeholderImage = PLACEHOLDER_IMAGE,
     onImageError,
@@ -202,8 +208,9 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                   };
 
                   // For clip mode, we should only show the marker for this specific clip
-                  // Check if this is a clip asset (has clipData property)
-                  const isClipAsset = id.includes("_clip_");
+                  // Check if this is a clip asset (ID contains #CLIP# or _clip_)
+                  const isClipAsset =
+                    id.includes("#CLIP#") || id.includes("_clip_");
 
                   console.log(`🎬 INITIAL Asset ${id}:`);
                   console.log(`  - isClipAsset: ${isClipAsset}`);
@@ -339,12 +346,16 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                           `  ✅ Added marker: ${start}s - ${end}s (color: ${markerColor})`,
                         );
 
-                        // For clip assets, seek to the beginning of the clip
-                        if (isClipAsset) {
+                        // For clip assets or single-clip items, seek to the beginning of the clip
+                        // This includes collection items with a specific clip boundary
+                        if (
+                          isClipAsset ||
+                          (filteredClips.length === 1 && index === 0)
+                        ) {
                           try {
                             omakasePlayer.video.seekToTime(start);
                             console.log(
-                              `  🎯 Seeked to clip start time: ${start}s for clip asset ${id}`,
+                              `  🎯 Seeked to clip start time: ${start}s for ${isClipAsset ? "clip asset" : "single-clip item"} ${id}`,
                             );
                           } catch (seekError) {
                             console.warn(
@@ -860,6 +871,45 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                   <DownloadIcon fontSize="small" />
                 </IconButton>
 
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    console.log("AssetCard: Add to Collection clicked!", e);
+                    console.log(
+                      "AssetCard: onAddToCollectionClick prop is:",
+                      typeof onAddToCollectionClick,
+                      onAddToCollectionClick,
+                    );
+                    e.stopPropagation();
+                    if (onAddToCollectionClick) {
+                      console.log("AssetCard: Calling onAddToCollectionClick");
+                      onAddToCollectionClick(e);
+                    } else {
+                      console.log(
+                        "AssetCard: onAddToCollectionClick is undefined!",
+                      );
+                    }
+                  }}
+                  sx={{
+                    color: "primary.main",
+                    "&:hover": {
+                      bgcolor: "primary.main",
+                      color: "primary.contrastText",
+                    },
+                  }}
+                  title={
+                    showRemoveButton
+                      ? "Remove from Collection"
+                      : "Add to Collection"
+                  }
+                >
+                  {showRemoveButton ? (
+                    <RemoveIcon fontSize="small" />
+                  ) : (
+                    <AddIcon fontSize="small" />
+                  )}
+                </IconButton>
+
                 <Button
                   size="small"
                   variant="outlined"
@@ -953,6 +1003,33 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                   title="Download"
                 >
                   <DownloadIcon fontSize="small" />
+                </IconButton>
+
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    console.log("AssetCard: Add to Collection clicked!", e);
+                    e.stopPropagation();
+                    onAddToCollectionClick?.(e);
+                  }}
+                  sx={{
+                    color: "primary.main",
+                    "&:hover": {
+                      bgcolor: "primary.main",
+                      color: "primary.contrastText",
+                    },
+                  }}
+                  title={
+                    showRemoveButton
+                      ? "Remove from Collection"
+                      : "Add to Collection"
+                  }
+                >
+                  {showRemoveButton ? (
+                    <RemoveIcon fontSize="small" />
+                  ) : (
+                    <AddIcon fontSize="small" />
+                  )}
                 </IconButton>
 
                 {(() => {
@@ -1155,6 +1232,33 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                     <DownloadIcon fontSize="small" />
                   </IconButton>
                 )}
+
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    console.log("AssetCard: Add to Collection clicked!", e);
+                    e.stopPropagation();
+                    onAddToCollectionClick?.(e);
+                  }}
+                  sx={{
+                    color: "primary.main",
+                    "&:hover": {
+                      bgcolor: "primary.main",
+                      color: "primary.contrastText",
+                    },
+                  }}
+                  title={
+                    showRemoveButton
+                      ? "Remove from Collection"
+                      : "Add to Collection"
+                  }
+                >
+                  {showRemoveButton ? (
+                    <RemoveIcon fontSize="small" />
+                  ) : (
+                    <AddIcon fontSize="small" />
+                  )}
+                </IconButton>
 
                 <Button
                   size="small"

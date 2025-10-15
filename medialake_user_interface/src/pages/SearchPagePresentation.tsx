@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box,
@@ -21,8 +21,11 @@ import SearchFilters from "@/components/search/SearchFilters";
 import MasterResultsView from "@/components/search/MasterResultsView";
 import TabbedSidebar from "@/components/common/RightSidebar/TabbedSidebar";
 import ApiStatusModal from "@/components/ApiStatusModal";
+import { AddToCollectionModal } from "@/components/collections/AddToCollectionModal";
+import { useAddItemToCollection } from "@/api/hooks/useCollections";
 import { type AssetItem, type Filters, type ExpandedSections } from "./types";
 import { getOriginalAssetId } from "@/utils/clipTransformation";
+import { useSemanticMode } from "@/stores/searchStore";
 
 interface SearchPagePresentationProps {
   // Search data
@@ -145,6 +148,12 @@ interface SearchPagePresentationProps {
     selectedAsset?: AssetItem;
   };
 
+  // Add to Collection handler
+  onAddToCollectionClick?: (
+    asset: AssetItem,
+    event: React.MouseEvent<HTMLElement>,
+  ) => void;
+
   // Feature flags
   multiSelectEnabled: boolean;
 
@@ -177,6 +186,7 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
   assetSelection,
   assetFavorites,
   assetOperations,
+  onAddToCollectionClick,
   multiSelectEnabled,
   isLoading,
   isFetching,
@@ -185,6 +195,14 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
   fieldsError,
 }) => {
   const navigate = useNavigate();
+
+  // Add to Collection state
+  const [addToCollectionModalOpen, setAddToCollectionModalOpen] =
+    useState(false);
+  const [selectedAssetForCollection, setSelectedAssetForCollection] =
+    useState<AssetItem | null>(null);
+  const addItemToCollectionMutation = useAddItemToCollection();
+  const semanticMode = useSemanticMode();
 
   const handleAssetClick = useCallback(
     (asset: AssetItem) => {
@@ -202,6 +220,61 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
       });
     },
     [navigate, query],
+  );
+
+  // Handle Add to Collection click
+  const handleAddToCollectionClick = useCallback(
+    (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => {
+      console.log("Add to Collection clicked!", asset);
+      event.stopPropagation();
+      setSelectedAssetForCollection(asset);
+      setAddToCollectionModalOpen(true);
+    },
+    [],
+  );
+
+  // Handle actually adding the asset to a collection
+  const handleAddToCollection = useCallback(
+    async (collectionId: string) => {
+      if (!selectedAssetForCollection) return;
+
+      const assetId = getOriginalAssetId(selectedAssetForCollection);
+
+      // Determine clip boundary based on semantic mode
+      let clipBoundary = {};
+      let addAllClips = false;
+
+      if (semantic && semanticMode === "clip") {
+        // In clip mode - add specific clip
+        const clipData = (selectedAssetForCollection as any).clipData;
+        if (clipData && clipData.start_timecode && clipData.end_timecode) {
+          clipBoundary = {
+            startTime: clipData.start_timecode,
+            endTime: clipData.end_timecode,
+          };
+        }
+      } else if (semantic && semanticMode === "full") {
+        // In full mode with semantic search - add all clips
+        addAllClips = true;
+      }
+      // Otherwise (non-semantic), add full file without clips
+
+      await addItemToCollectionMutation.mutateAsync({
+        collectionId,
+        data: {
+          assetId: assetId,
+          clipBoundary:
+            Object.keys(clipBoundary).length > 0 ? clipBoundary : undefined,
+          addAllClips: addAllClips,
+        },
+      });
+    },
+    [
+      selectedAssetForCollection,
+      addItemToCollectionMutation,
+      semantic,
+      semanticMode,
+    ],
   );
 
   const handlePageChange = (newPage: number) => {
@@ -472,6 +545,7 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
                 onAssetClick={handleAssetClick}
                 onDeleteClick={assetOperations.handleDeleteClick}
                 onMenuClick={assetOperations.handleDownloadClick}
+                onAddToCollectionClick={onAddToCollectionClick}
                 onEditClick={assetOperations.handleStartEditing}
                 onEditNameChange={assetOperations.handleNameChange}
                 onEditNameComplete={assetOperations.handleNameEditComplete}
@@ -580,6 +654,24 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
           action={assetSelection.modalState.action}
           message={assetSelection.modalState.message}
         />
+
+        {/* Add to Collection Modal */}
+        {selectedAssetForCollection && (
+          <AddToCollectionModal
+            open={addToCollectionModalOpen}
+            onClose={() => {
+              setAddToCollectionModalOpen(false);
+              setSelectedAssetForCollection(null);
+            }}
+            assetId={getOriginalAssetId(selectedAssetForCollection)}
+            assetName={
+              selectedAssetForCollection.DigitalSourceAsset.MainRepresentation
+                .StorageInfo.PrimaryLocation.ObjectKey.Name
+            }
+            assetType={selectedAssetForCollection.DigitalSourceAsset.Type}
+            onAddToCollection={handleAddToCollection}
+          />
+        )}
       </>
     </RightSidebarProvider>
   );

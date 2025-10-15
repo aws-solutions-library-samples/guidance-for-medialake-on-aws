@@ -7,7 +7,6 @@ from dataclasses import dataclass
 import aws_cdk as cdk
 from aws_cdk import aws_apigateway as apigateway
 from aws_cdk import aws_cognito as cognito
-from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_secretsmanager as secretsmanager
 from constructs import Construct
@@ -36,7 +35,7 @@ class UpdatesApiStackProps:
 class UpdatesApiStack(cdk.NestedStack):
     """
     Stack for MediaLake Auto-Upgrade System API endpoints.
-    
+
     This stack creates:
     - Single Lambda function with APIGatewayRestResolver for all /updates endpoints
     - API Gateway integration with proxy resources

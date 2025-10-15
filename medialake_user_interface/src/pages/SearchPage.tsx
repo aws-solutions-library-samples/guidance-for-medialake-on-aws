@@ -21,6 +21,8 @@ import {
   Snackbar,
   Alert,
 } from "@mui/material";
+import { AddToCollectionModal } from "@/components/collections/AddToCollectionModal";
+import { useAddItemToCollection } from "@/api/hooks/useCollections";
 import SearchOffIcon from "@mui/icons-material/SearchOff";
 import {
   RightSidebar,
@@ -59,6 +61,7 @@ type AssetItem = (ImageItem | VideoItem | AudioItem) & {
 import { useSearchState } from "../hooks/useSearchState";
 import { FacetFilters } from "../types/facetSearch";
 import { getOriginalAssetId } from "@/utils/clipTransformation";
+import { useSemanticMode } from "@/stores/searchStore";
 
 interface LocationState {
   query?: string;
@@ -105,6 +108,13 @@ interface SelectedAsset {
 
 const SearchPage: React.FC = () => {
   const location = useLocation();
+
+  // Add to Collection state
+  const [addToCollectionModalOpen, setAddToCollectionModalOpen] =
+    useState(false);
+  const [selectedAssetForCollection, setSelectedAssetForCollection] =
+    useState<AssetItem | null>(null);
+  const addItemToCollectionMutation = useAddItemToCollection();
   const {
     query,
     isSemantic,
@@ -163,6 +173,7 @@ const SearchPage: React.FC = () => {
   // Get current values from the search state
   const currentQuery = searchState.query;
   const currentSemantic = searchState.isSemantic;
+  const semanticMode = useSemanticMode();
   const facetFilters = searchState.filters;
 
   // State for selected fields
@@ -355,6 +366,61 @@ const SearchPage: React.FC = () => {
       });
     },
     [navigate, currentQuery],
+  );
+
+  // Handle Add to Collection click
+  const handleAddToCollectionClick = useCallback(
+    (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => {
+      console.log("SearchPage: Add to Collection clicked!", asset);
+      event.stopPropagation();
+      setSelectedAssetForCollection(asset);
+      setAddToCollectionModalOpen(true);
+    },
+    [],
+  );
+
+  // Handle actually adding the asset to a collection
+  const handleAddToCollection = useCallback(
+    async (collectionId: string) => {
+      if (!selectedAssetForCollection) return;
+
+      const assetId = getOriginalAssetId(selectedAssetForCollection);
+
+      // Determine clip boundary based on semantic mode
+      let clipBoundary = {};
+      let addAllClips = false;
+
+      if (currentSemantic && semanticMode === "clip") {
+        // In clip mode - add specific clip
+        const clipData = (selectedAssetForCollection as any).clipData;
+        if (clipData && clipData.start_timecode && clipData.end_timecode) {
+          clipBoundary = {
+            startTime: clipData.start_timecode,
+            endTime: clipData.end_timecode,
+          };
+        }
+      } else if (currentSemantic && semanticMode === "full") {
+        // In full mode with semantic search - add all clips
+        addAllClips = true;
+      }
+      // Otherwise (non-semantic), add full file without clips
+
+      await addItemToCollectionMutation.mutateAsync({
+        collectionId,
+        data: {
+          assetId: assetId,
+          clipBoundary:
+            Object.keys(clipBoundary).length > 0 ? clipBoundary : undefined,
+          addAllClips: addAllClips,
+        },
+      });
+    },
+    [
+      selectedAssetForCollection,
+      addItemToCollectionMutation,
+      currentSemantic,
+      semanticMode,
+    ],
   );
 
   // Update local state from useAssetOperations
@@ -708,6 +774,7 @@ const SearchPage: React.FC = () => {
                 onAssetClick={handleAssetClick}
                 onDeleteClick={handleDeleteClick}
                 onMenuClick={handleDownloadClick}
+                onAddToCollectionClick={handleAddToCollectionClick}
                 onEditClick={handleStartEditing}
                 onEditNameChange={handleNameChange}
                 onEditNameComplete={handleNameEditComplete}
@@ -832,6 +899,24 @@ const SearchPage: React.FC = () => {
             {alert?.message}
           </Alert>
         </Snackbar>
+
+        {/* Add to Collection Modal */}
+        {selectedAssetForCollection && (
+          <AddToCollectionModal
+            open={addToCollectionModalOpen}
+            onClose={() => {
+              setAddToCollectionModalOpen(false);
+              setSelectedAssetForCollection(null);
+            }}
+            assetId={getOriginalAssetId(selectedAssetForCollection)}
+            assetName={
+              selectedAssetForCollection.DigitalSourceAsset.MainRepresentation
+                .StorageInfo.PrimaryLocation.ObjectKey.Name
+            }
+            assetType={selectedAssetForCollection.DigitalSourceAsset.Type}
+            onAddToCollection={handleAddToCollection}
+          />
+        )}
       </>
     </RightSidebarProvider>
   );

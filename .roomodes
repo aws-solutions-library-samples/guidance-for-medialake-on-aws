@@ -72,7 +72,6 @@ customModes:
       - Maintain .roo/task-state.json
       - Preserve context between task executions
       - Track inputs/outputs for audit trail
-
   - slug: code
     name: 💻 Code
     roleDefinition: |
@@ -97,7 +96,6 @@ customModes:
       - Write efficient, maintainable code with comprehensive tests
       - Optimize performance and manage technical debt
       - Document code following project standards
-
   - slug: architect
     name: 🏛️ Architect
     roleDefinition: |
@@ -125,7 +123,6 @@ customModes:
          - Create context/container/component diagrams
          - Document interfaces and contracts
          - Record design decisions with explicit rationales
-
   - slug: ask
     name: ❓ Ask
     roleDefinition: |
@@ -153,7 +150,6 @@ customModes:
          - Apply source diversification
          - Maintain detailed logs of sources
          - Track confidence levels
-
   - slug: debug
     name: 🪲 Debug
     roleDefinition: |
@@ -183,7 +179,6 @@ customModes:
       3. Hypothesis Formation:
          - Generate potential explanations
          - Rank by likelihood
-
   - slug: memory
     name: 💾 Memory
     roleDefinition: |
@@ -211,7 +206,6 @@ customModes:
          - Apply consistent taxonomies
          - Create searchable indices
          - Maintain versioning
-
   - slug: deep-research-agent
     name: 🔍 Deep Research
     roleDefinition: |
@@ -241,7 +235,6 @@ customModes:
       3. Deep Investigation:
          - Examine primary sources
          - Document evidence systematically
-
   - slug: notebook-code
     name: 📓 Notebook Code
     roleDefinition: |
@@ -254,14 +247,6 @@ customModes:
       System Integration: Connect components following architectural patterns
       Quality Engineering: Deliver reliable, scalable solutions through testing and optimization
     whenToUse: For implementing features in Jupyter notebooks and Jinja templates
-    groups:
-      - read
-      - - edit
-        - fileRegex: \.js$|\.ts$|\.tsx$|\.py$|\.html$|\.css$|\.json$|\.yaml$|\.yml$|\.hpp$|\.h$ |\.cpp$|\.java$|\.go$|\.rs$|\.c$|\.sh$|\.md$|\.ipynb$|\.j2$|\.jinja$|\.jinja2$
-          description: Code files, Jupyter notebooks, and Jinja templates
-      - browser
-      - command
-      - mcp
     customInstructions: |
       # Core Responsibilities
       - Implement technical solutions with appropriate design patterns
@@ -282,3 +267,12 @@ customModes:
       - Use proper variable scoping and filters
       - Include template documentation and usage examples
       - Ensure templates are secure and handle edge cases
+    groups:
+      - read
+      - - edit
+        - fileRegex: \.js$|\.ts$|\.tsx$|\.py$|\.html$|\.css$|\.json$|\.yaml$|\.yml$|\.hpp$|\.h$ |\.cpp$|\.java$|\.go$|\.rs$|\.c$|\.sh$|\.md$|\.ipynb$|\.j2$|\.jinja$|\.jinja2$
+          description: Code files, Jupyter notebooks, and Jinja templates
+      - browser
+      - command
+      - mcp
+    source: project

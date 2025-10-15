@@ -1,14 +1,17 @@
-import json
 import os
+import sys
 import time
 from functools import lru_cache
 
 # Import boto3 and Key inside handler
 import boto3
 
+# Add common_libraries to path
+sys.path.insert(0, "/opt/python")
 # Add AWS PowerTools for better tracing and performance measurement
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from boto3.dynamodb.conditions import Key
+from common_libraries.cors_utils import create_response
 
 logger = Logger()
 tracer = Tracer()
@@ -71,38 +74,26 @@ def lambda_handler(event, context):
 
         if not table_name:
             logger.error("MEDIALAKE_CONNECTOR_TABLE environment variable not set")
-            return {
-                "statusCode": 500,
-                "headers": {
-                    "Content-Type": "application/json",
-                    "Access-Control-Allow-Origin": "*",
+            return create_response(
+                500,
+                {
+                    "status": "error",
+                    "message": "Configuration error: Missing MEDIALAKE_CONNECTOR_TABLE environment variable",
                 },
-                "body": json.dumps(
-                    {
-                        "status": "error",
-                        "message": "Configuration error: Missing MEDIALAKE_CONNECTOR_TABLE environment variable",
-                    }
-                ),
-            }
+            )
 
         # Get connector with caching
         connector = get_connector(connector_id, table_name)
 
         if not connector:
             logger.warning(f"Connector {connector_id} not found")
-            return {
-                "statusCode": 404,
-                "headers": {
-                    "Content-Type": "application/json",
-                    "Access-Control-Allow-Origin": "*",
+            return create_response(
+                404,
+                {
+                    "status": "error",
+                    "message": f"Connector {connector_id} not found",
                 },
-                "body": json.dumps(
-                    {
-                        "status": "error",
-                        "message": f"Connector {connector_id} not found",
-                    }
-                ),
-            }
+            )
 
         bucket = connector.get("storageIdentifier")
         object_prefix = connector.get("objectPrefix", "")
@@ -112,19 +103,13 @@ def lambda_handler(event, context):
 
         if not bucket:
             logger.warning(f"Bucket not configured for connector {connector_id}")
-            return {
-                "statusCode": 400,
-                "headers": {
-                    "Content-Type": "application/json",
-                    "Access-Control-Allow-Origin": "*",
+            return create_response(
+                400,
+                {
+                    "status": "error",
+                    "message": "Bucket not configured for connector",
                 },
-                "body": json.dumps(
-                    {
-                        "status": "error",
-                        "message": "Bucket not configured for connector",
-                    }
-                ),
-            }
+            )
 
         # List S3 objects
         params = {
@@ -185,32 +170,23 @@ def lambda_handler(event, context):
             "nextContinuationToken": response.get("NextContinuationToken"),
         }
 
-        return {
-            "statusCode": 200,
-            "headers": {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*",
-                "Cache-Control": "max-age=60",  # Add caching header for frontend
+        response = create_response(
+            200,
+            {
+                "status": "success",
+                "message": "Objects retrieved successfully",
+                "data": result,
             },
-            "body": json.dumps(
-                {
-                    "status": "success",
-                    "message": "Objects retrieved successfully",
-                    "data": result,
-                }
-            ),
-        }
+        )
+        # Add caching header for frontend
+        response["headers"]["Cache-Control"] = "max-age=60"
+        return response
 
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}", exc_info=True)
         error_message = str(e)
         status_code = 400 if "NoSuchBucket" in error_message else 500
 
-        return {
-            "statusCode": status_code,
-            "headers": {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*",
-            },
-            "body": json.dumps({"status": "error", "message": error_message}),
-        }
+        return create_response(
+            status_code, {"status": "error", "message": error_message}
+        )

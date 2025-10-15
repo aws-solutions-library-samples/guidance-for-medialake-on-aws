@@ -72,7 +72,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                             "currentVersion": current_version,
                             "lastUpgradeTime": None,
                             "upgradeStatus": "idle",
-                            "pipelineExecutionId": None
+                            "pipelineExecutionId": None,
                         },
                         "description": "Current MediaLake version and upgrade status",
                         "created_by": "system",
@@ -83,7 +83,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 print(
                     f"Successfully stored {len(bucket_names)} MediaLake bucket names in system settings"
                 )
-                print(f"Initialized version tracking with current version: {current_version}")
+                print(
+                    f"Initialized version tracking with current version: {current_version}"
+                )
                 response_data["BucketCount"] = len(bucket_names)
                 response_data["Buckets"] = bucket_names
             else:
@@ -106,7 +108,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     table.delete_item(
                         Key={"PK": "SYSTEM_UPGRADE", "SK": "VERSION_CURRENT"}
                     )
-                    print("Cleaned up MediaLake buckets and version settings from system table")
+                    print(
+                        "Cleaned up MediaLake buckets and version settings from system table"
+                    )
             except Exception as e:
                 print(f"Error cleaning up setting (non-critical): {str(e)}")
 
