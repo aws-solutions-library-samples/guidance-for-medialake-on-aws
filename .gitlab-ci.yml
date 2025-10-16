@@ -396,6 +396,7 @@ sync-to-github:
     - rm -f secrets.txt
     - rm -rf docs/
     - rm -rf .roo/
+    - rm -rf .kiro/
     - rm -rf github-repo/
     - rm -rf .traycer/
     - rm -rf INTERNAL-ai-documentation/
@@ -406,6 +407,8 @@ sync-to-github:
     - rm -f manage-hooks.sh
     - rm -f .gitleaksignore
     - rm -f fix.sh
+    - rm -rf tests/
+    - rm -rf scripts/
     - rm -f .roomodes
     - rm -f .pre-commit-config.yaml
     - rm -f .secrets.baseline
@@ -417,7 +420,7 @@ sync-to-github:
     - rm -rf medialake_user_interface/playwright-report/
     # Stage all changes and commit
     - git add -A
-    - git commit --allow-empty -m "release - Quality of life updates and bug fixes - Collapsing of the /users and /groups API into a single lambda per resource and bug fixes in users screen"
+    - git commit --allow-empty -m "release - Initial collections feature and updates to moving to a single lambda per root API resource for users, collections, and settings"
     - echo "New commit created:" && git log --oneline -1
     # Push to GitHub main branch
     - git push origin main
