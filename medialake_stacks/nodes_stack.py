@@ -408,9 +408,9 @@ class NodesStack(cdk.NestedStack):
     def create_mediaconvert_role(self):
         mediaconvert_role = iam.Role(
             self,
-            "MediaConvertRole",
+            "MediaConvertProxyRole",
             assumed_by=iam.ServicePrincipal("mediaconvert.amazonaws.com"),
-            role_name=f"{config.resource_prefix}_MediaConvert_Role",
+            role_name=f"{config.resource_prefix}_MediaConvert_Proxy_Role",
             description="IAM role for MediaConvert",
         )
 
