@@ -79,14 +79,13 @@ class GroupsStack(cdk.NestedStack):
             config=LambdaConfig(
                 name="groups-unified",
                 entry="lambdas/api/groups_unified",
-                lambda_handler="index.lambda_handler",
                 environment_variables=common_env_vars,
             ),
         )
-        
+
         # Grant permissions
         props.auth_table.grant_read_write_data(groups_unified_lambda.function)
-        
+
         # Grant permissions for Cognito group management
         groups_unified_lambda.function.add_to_role_policy(
             iam.PolicyStatement(

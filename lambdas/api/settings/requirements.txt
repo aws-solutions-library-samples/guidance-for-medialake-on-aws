@@ -1,0 +1,12 @@
+# AWS Lambda Powertools for structured logging, tracing, and metrics
+aws-lambda-powertools[all]>=2.31.0
+
+# DynamoDB ORM for collection types
+pynamodb>=6.0.0
+
+# Data validation
+pydantic>=2.5.0
+
+# AWS SDK
+boto3>=1.34.0
+botocore>=1.34.0

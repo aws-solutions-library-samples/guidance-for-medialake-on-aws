@@ -66,6 +66,12 @@ export default {
     viewDetails: "View Details",
     retry: "Retry",
     retryFromCurrent: "Retry from current position",
+    addToCollection: "Add to Collection",
+    addToCollectionSuccess: "Asset added to collection successfully",
+    addToCollectionError: "Failed to add asset to collection",
+    selectCollection: "Select a collection to add this asset to",
+    noCollectionsAvailable: "No collections available",
+    createCollectionFirst: "Create a collection first to organize your assets",
   },
   assetExplorer: {
     noConnectorSelected: "Select a connector to view assets",
@@ -101,10 +107,63 @@ export default {
     yourFavoriteAssets: "Your Favorite Assets",
     noFavoriteAssets: "No favorite assets yet",
   },
+  collectionsPage: {
+    title: "Collections",
+    createCollection: "Create Collection",
+    myCollections: "My Collections",
+    sharedCollections: "Shared with Me",
+    publicCollections: "Public Collections",
+    noCollections: "No collections found",
+    collectionTypes: {
+      public: "Public",
+      private: "Private",
+      shared: "Shared",
+    },
+    stats: {
+      itemCount: "{{count}} items",
+      childCount: "{{count}} sub-collections",
+      createdBy: "Created by {{owner}}",
+      lastModified: "Last modified {{date}}",
+    },
+    actions: {
+      createNew: "Create New Collection",
+      view: "View",
+      edit: "Edit",
+      share: "Share",
+      delete: "Delete",
+    },
+    deleteDialog: {
+      title: "Delete Collection",
+      description:
+        "Are you sure you want to delete this collection? This action cannot be undone.",
+      cascadeWarning:
+        "All items and sub-collections within this collection will also be removed.",
+      cancel: "Cancel",
+      confirm: "Delete",
+      deleting: "Deleting...",
+    },
+    form: {
+      name: "Collection Name",
+      namePlaceholder: "Enter collection name",
+      description: "Description",
+      descriptionPlaceholder: "Enter a description for this collection",
+      type: "Collection Type",
+      parentCollection: "Parent Collection",
+      selectParent: "None (Root Level)",
+      isPublic: "Make this collection public",
+      validation: {
+        nameRequired: "Collection name is required",
+        nameMinLength: "Collection name must be at least 2 characters",
+        nameMaxLength: "Collection name must not exceed 100 characters",
+        descriptionMaxLength: "Description must not exceed 500 characters",
+      },
+    },
+  },
   sidebar: {
     menu: {
       home: "Home",
       assets: "Assets",
+      collections: "Collections",
       pipelines: "Pipelines",
       pipelineExecutions: "Pipeline Executions",
       settings: "Settings",
@@ -148,7 +207,7 @@ export default {
       navigating: "Navigating from",
     },
     branding: {
-      name: "",
+      name: "Media Lake",
     },
   },
   search: {
@@ -686,8 +745,8 @@ export default {
       settings: "Settings",
     },
     home: {
-      welcome: "",
-      description: "",
+      welcome: "Welcome to Media Lake",
+      description: "Guide your media, metadata, and workflows.",
       statistics: "Statistics",
       collections: "Collections",
       sharedCollections: "Shared Collections",

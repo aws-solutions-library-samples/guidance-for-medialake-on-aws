@@ -13,6 +13,11 @@ interface AssetGridViewProps<T> {
   onAssetClick: (asset: T) => void;
   onDeleteClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onDownloadClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
+  onAddToCollectionClick?: (
+    asset: T,
+    event: React.MouseEvent<HTMLElement>,
+  ) => void;
+  showRemoveButton?: boolean;
   onEditClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onEditNameComplete: (asset: T, save: boolean, value?: string) => void;
@@ -51,6 +56,8 @@ function AssetGridView<T>({
   onAssetClick,
   onDeleteClick,
   onDownloadClick,
+  onAddToCollectionClick,
+  showRemoveButton = false,
   onEditClick,
   onEditNameChange,
   onEditNameComplete,
@@ -73,6 +80,13 @@ function AssetGridView<T>({
   isSemantic = false,
   confidenceThreshold = 0,
 }: AssetGridViewProps<T>) {
+  // Debug: Check if we're receiving the onAddToCollectionClick prop
+  console.log(
+    "AssetGridView: onAddToCollectionClick prop is:",
+    typeof onAddToCollectionClick,
+    onAddToCollectionClick,
+  );
+
   // Group results by type if needed
   const groupedResults = React.useMemo(() => {
     if (!groupByType) return { all: results };
@@ -125,6 +139,12 @@ function AssetGridView<T>({
               onAssetClick={() => onAssetClick(asset)}
               onDeleteClick={(e) => onDeleteClick(asset, e)}
               onDownloadClick={(e) => onDownloadClick(asset, e)}
+              onAddToCollectionClick={
+                onAddToCollectionClick
+                  ? (e) => onAddToCollectionClick(asset, e)
+                  : undefined
+              }
+              showRemoveButton={showRemoveButton}
               onEditClick={(e) => onEditClick(asset, e)}
               isEditing={editingAssetId === getAssetId(asset)}
               editedName={editedName}
@@ -197,6 +217,12 @@ function AssetGridView<T>({
                       onAssetClick={() => onAssetClick(asset)}
                       onDeleteClick={(e) => onDeleteClick(asset, e)}
                       onDownloadClick={(e) => onDownloadClick(asset, e)}
+                      onAddToCollectionClick={
+                        onAddToCollectionClick
+                          ? (e) => onAddToCollectionClick(asset, e)
+                          : undefined
+                      }
+                      showRemoveButton={showRemoveButton}
                       onEditClick={(e) => onEditClick(asset, e)}
                       isEditing={editingAssetId === getAssetId(asset)}
                       editedName={editedName}

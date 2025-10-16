@@ -39,6 +39,7 @@ import {
   Extension as IntegrationIcon,
   Cloud as EnvironmentIcon,
   Terrain as LogoIcon,
+  Folder as FolderIcon,
 } from "@mui/icons-material";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTheme as useCustomTheme } from "./hooks/useTheme";
@@ -186,6 +187,12 @@ function Sidebar() {
       icon: <MediaAssetsIcon />,
       path: "/assets",
       visible: true, // Assets should always be shown
+    },
+    {
+      text: t("sidebar.menu.collections"),
+      icon: <FolderIcon />,
+      path: "/collections",
+      visible: true, // Collections should always be shown to authenticated users
     },
     {
       text: t("sidebar.menu.pipelines"),

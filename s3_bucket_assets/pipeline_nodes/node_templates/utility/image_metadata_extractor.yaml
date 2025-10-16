@@ -10,7 +10,8 @@ node:
       lambda:
         handler: utility/ImageMetadataExtractorLambdaDeployment
         runtime: nodejs18.x
-
+        memory_size: 10240
+        timeout: 900
         iam_policy:
           statements:
             - effect: Allow

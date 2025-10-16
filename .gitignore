@@ -59,6 +59,7 @@ CLAUDE.md
 *.claude
 *.claude-ignore
 *.roomodes
+.kiro/
 
 # Playwrght testing
 playwright-report/

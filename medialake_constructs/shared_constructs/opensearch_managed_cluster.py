@@ -1,6 +1,6 @@
 import hashlib
 import json
-import time
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional
@@ -115,13 +115,13 @@ class OpenSearchCluster(Construct):
                 security_group_id=config.vpc.security_groups.existing_groups.opensearch_sg,
             )
         else:
+            unique_id = str(uuid.uuid4())[:8]
+            sg_base_name = config.vpc.security_groups.new_groups["opensearch_sg"].name
             os_security_group = ec2.SecurityGroup(
                 self,
                 "OpenSearchSG",
                 vpc=props.vpc,
-                security_group_name=config.vpc.security_groups.new_groups[
-                    "opensearch_sg"
-                ].name,
+                security_group_name=f"{sg_base_name}-{unique_id}",
                 description=config.vpc.security_groups.new_groups[
                     "opensearch_sg"
                 ].description,
@@ -409,7 +409,8 @@ class OpenSearchCluster(Construct):
                 service_token=provider.service_token,
                 properties={
                     "code_hash": code_hash,
-                    "timestamp": str(int(time.time())),
+                    # Removed timestamp to prevent updates on every deploy
+                    # Index creation will only re-run if code_hash changes
                 },
                 resource_type="Custom::OpenSearchCreateIndex",
             )

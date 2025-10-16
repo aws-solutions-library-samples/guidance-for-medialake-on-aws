@@ -36,7 +36,10 @@ import {
 import { useSemanticSearchSettings } from "@/features/settings/system/hooks/useSystemSettings";
 import { SYSTEM_SETTINGS_CONFIG } from "@/features/settings/system/config";
 import { ApiKeyManagement } from "@/components/settings/api-keys";
+import { UpgradeSection } from "@/components/settings/UpgradeSection";
 import { Can } from "@/permissions/components/Can";
+import CollectionTypesManagement from "@/components/settings/CollectionTypesManagement";
+import { useFeatureFlag } from "@/utils/featureFlags";
 
 // Fallback notification hook
 const useNotificationWithFallback = () => {
@@ -111,6 +114,12 @@ const SystemSettingsPage: React.FC = () => {
   const { t } = useTranslation();
   const theme = useTheme();
   const [tabValue, setTabValue] = useState(0);
+
+  // Feature flags
+  const systemUpgradesEnabled = useFeatureFlag(
+    "system-upgrades-enabled",
+    false,
+  );
 
   // Notification
   const {
@@ -302,6 +311,17 @@ const SystemSettingsPage: React.FC = () => {
             <Tab
               label={t("settings.systemSettings.tabs.apiKeys", "API Keys")}
             />
+            <Tab
+              label={t(
+                "settings.systemSettings.tabs.collections",
+                "Collections",
+              )}
+            />
+            {systemUpgradesEnabled.value && (
+              <Tab
+                label={t("settings.systemSettings.tabs.upgrades", "Upgrades")}
+              />
+            )}
           </Tabs>
         </Box>
 
@@ -637,6 +657,49 @@ const SystemSettingsPage: React.FC = () => {
               }
             </Can>
           </TabPanel>
+
+          <TabPanel value={tabValue} index={2}>
+            <Can I="manage" a="collection-types">
+              <CollectionTypesManagement />
+            </Can>
+            <Can I="manage" a="collection-types">
+              {(allowed) =>
+                !allowed && (
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: "100%",
+                      textAlign: "center",
+                      py: 8,
+                    }}
+                  >
+                    <Typography
+                      variant="h6"
+                      color="text.secondary"
+                      gutterBottom
+                    >
+                      {t("permissions.accessDenied", "Access Denied")}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {t(
+                        "permissions.collectionTypesAccessDenied",
+                        "You don't have permission to manage collection types.",
+                      )}
+                    </Typography>
+                  </Box>
+                )
+              }
+            </Can>
+          </TabPanel>
+          {systemUpgradesEnabled.value && (
+            <TabPanel value={tabValue} index={2}>
+              {/* Temporarily removed permission check for debugging */}
+              <UpgradeSection />
+            </TabPanel>
+          )}
         </Box>
       </Paper>
 

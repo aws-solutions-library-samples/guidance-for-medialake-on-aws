@@ -1,0 +1,2 @@
+opensearch-py>=2.0.0
+pynamodb>=6.0.0

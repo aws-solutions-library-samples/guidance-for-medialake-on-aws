@@ -4,6 +4,7 @@ export interface Collection {
   description: string;
   thumbnailUrl?: string;
   itemCount: number;
+  collectionTypeId?: string;
   createdAt: string;
   lastModified: string;
 }

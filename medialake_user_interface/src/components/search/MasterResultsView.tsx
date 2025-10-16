@@ -90,6 +90,10 @@ interface MasterResultsViewProps {
     event: React.MouseEvent<HTMLElement>,
   ) => void;
   onMenuClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
+  onAddToCollectionClick?: (
+    asset: AssetItem,
+    event: React.MouseEvent<HTMLElement>,
+  ) => void;
   onEditClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onEditNameComplete: (asset: AssetItem, save: boolean, value?: string) => void;
@@ -165,6 +169,7 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   onAssetClick,
   onDeleteClick,
   onMenuClick,
+  onAddToCollectionClick,
   onEditClick,
   onEditNameChange,
   onEditNameComplete,
@@ -183,6 +188,13 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   isRenaming = false,
   renamingAssetId,
 }) => {
+  // Debug: Check if we're receiving the onAddToCollectionClick prop
+  console.log(
+    "MasterResultsView: onAddToCollectionClick prop is:",
+    typeof onAddToCollectionClick,
+    onAddToCollectionClick,
+  );
+
   // Get semantic mode from store
   const semanticMode = useSemanticMode();
 
@@ -360,6 +372,7 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       onAssetClick={onAssetClick}
       onDeleteClick={onDeleteClick}
       onDownloadClick={onMenuClick}
+      onAddToCollectionClick={onAddToCollectionClick}
       onEditClick={onEditClick}
       onEditNameChange={onEditNameChange}
       onEditNameComplete={onEditNameComplete}

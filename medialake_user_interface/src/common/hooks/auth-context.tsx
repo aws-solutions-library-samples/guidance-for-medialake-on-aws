@@ -31,7 +31,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const awsConfig = useAwsConfig();
 
   const checkAuthStatus = useCallback(async () => {
-    console.log("AuthContext: Starting auth status check...");
     setIsLoading(true);
 
     try {
@@ -45,22 +44,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         (window.location.hash.includes("id_token") ||
           window.location.search.includes("code="))
       ) {
-        console.log("Detected SAML redirect, waiting for session...");
         // Don't try to get current user yet, just wait for session
         try {
           const session = await fetchAuthSession();
-          console.log("Got session after SAML redirect:", session);
           const token = session.tokens?.idToken?.toString();
           if (token) {
-            console.log("=== SAML Redirect Token ===");
-            const tokenParts = token.split(".");
-            if (tokenParts.length === 3) {
-              const payload = JSON.parse(atob(tokenParts[1]));
-              console.log("Token claims:", JSON.stringify(payload, null, 2));
-              console.log("cognito:groups:", payload["cognito:groups"]);
-              console.log("custom:permissions:", payload["custom:permissions"]);
-            }
-
             StorageHelper.setToken(token);
             setIsAuthenticated(true);
           } else {
@@ -68,7 +56,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             StorageHelper.clearToken();
           }
         } catch (samlError) {
-          console.error("Failed to handle SAML redirect:", samlError);
           setIsAuthenticated(false);
           StorageHelper.clearToken();
         }
@@ -76,47 +63,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Not a SAML redirect, proceed with normal auth check
         try {
           const session = await fetchAuthSession();
-          console.log("Auth session:", session);
           const token = session.tokens?.idToken?.toString();
           if (token) {
-            console.log("=== Regular Auth Token ===");
-            const tokenParts = token.split(".");
-            if (tokenParts.length === 3) {
-              const payload = JSON.parse(atob(tokenParts[1]));
-              console.log("Token claims:", JSON.stringify(payload, null, 2));
-              console.log("cognito:groups:", payload["cognito:groups"]);
-              console.log("custom:permissions:", payload["custom:permissions"]);
-            }
-            console.log("========================");
             StorageHelper.setToken(token);
             setIsAuthenticated(true);
             // Only try to get user after we have a valid token
             try {
               const user = await getCurrentUser();
-              console.log("Current user:", user);
             } catch (userError) {
-              console.log(
-                "Could not get user but have valid token:",
-                userError,
-              );
+              // Silent fail
             }
           } else {
-            console.log("No valid token found, user is not authenticated");
             setIsAuthenticated(false);
             StorageHelper.clearToken();
           }
         } catch (error) {
-          console.log("No valid session:", error);
           setIsAuthenticated(false);
           StorageHelper.clearToken();
         }
       }
     } catch (error) {
-      console.error("Auth status check failed:", error);
       setIsAuthenticated(false);
       StorageHelper.clearToken();
     } finally {
-      console.log("AuthContext: Auth status check completed");
       setIsLoading(false);
       setIsInitialized(true);
     }
@@ -132,7 +101,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         StorageHelper.clearToken();
       }
     } catch (error) {
-      console.error("Session refresh failed:", error);
       setIsAuthenticated(false);
       StorageHelper.clearToken();
     }

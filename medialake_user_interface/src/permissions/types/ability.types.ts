@@ -34,7 +34,8 @@ export type Subjects =
   | "permission-set"
   | "integration"
   | "region"
-  | "system-settings";
+  | "system-settings"
+  | "collection-types";
 
 // Define the conditions type for subject-based authorization
 export type Conditions = MongoQuery;
