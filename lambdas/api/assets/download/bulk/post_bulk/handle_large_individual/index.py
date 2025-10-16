@@ -16,7 +16,8 @@ The function implements AWS best practices including:
 import os
 import unicodedata
 from datetime import datetime, timedelta
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
+from urllib.parse import urlparse
 
 import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
@@ -169,6 +170,23 @@ def get_asset_details(asset_id: str) -> Dict[str, Any]:
 
 
 @tracer.capture_method
+def split_s3_uri(s3_uri: str) -> Tuple[str, str]:
+    """
+    Split an S3 URI into its constituent parts
+
+    Args:
+        s3_uri: the S3 uri to parse
+
+    Returns:
+        A Tuple containing the Bucket and Key Name
+    """
+    parsed = urlparse(s3_uri)
+    bucket = parsed.netloc
+    key = parsed.path.lstrip("/")
+    return bucket, key
+
+
+@tracer.capture_method
 def generate_presigned_url(bucket: str, key: str, filename: str) -> str:
     """
     Generate a presigned URL for an S3 object.
@@ -230,33 +248,61 @@ def process_large_files(
     quality = options.get("quality", "original")  # original or proxy
 
     for large_file in large_files:
-        asset_id = large_file.get("assetId")
+        file_path = None
+        bucket = None
+        asset_id = None
 
         try:
-            # Get asset details
-            asset = get_asset_details(asset_id)
+            # Determine whether we need to get the asset location from DynamoDB or
+            # have a direct S3 URI
+            if large_file.get("type") == "S3_URI":
+                # Get asset location from S3 URI
+                asset_id = "S3_URI_ASSET_LOCATION"
+                uri: str = large_file.get("outputLocation", "")
+                if not uri and uri.startswith("s3://") and len(uri) > 5:
+                    logger.error(
+                        "S3 URI not found in large file",
+                        extra={"jobId": job_id, "largeFile": large_file},
+                    )
+                    continue
+                bucket, file_path = split_s3_uri(uri)
 
-            # Determine file path based on quality option
-            file_path = None
-            bucket = None
+            else:  # Get the asset details from DynamoDB
+                asset_id = large_file.get("assetId")
 
-            if quality == "proxy":
-                # Look for proxy representation
-                for rep in asset.get("DerivedRepresentations", []):
-                    if rep.get("Purpose") == "proxy":
-                        storage_info = rep.get("StorageInfo", {}).get(
+                # Get asset details
+                asset = get_asset_details(asset_id)
+
+                # Determine file path based on quality option
+                if quality == "proxy":
+                    # Look for proxy representation
+                    for rep in asset.get("DerivedRepresentations", []):
+                        if rep.get("Purpose") == "proxy":
+                            storage_info = rep.get("StorageInfo", {}).get(
+                                "PrimaryLocation", {}
+                            )
+                            bucket = storage_info.get("Bucket")
+                            file_path = storage_info.get("ObjectKey", {}).get(
+                                "FullPath"
+                            )
+                            break
+
+                    # If no proxy found, use original
+                    if not file_path:
+                        logger.warning(
+                            "No proxy representation found, using original",
+                            extra={"assetId": asset_id},
+                        )
+                        main_rep = asset.get("DigitalSourceAsset", {}).get(
+                            "MainRepresentation", {}
+                        )
+                        storage_info = main_rep.get("StorageInfo", {}).get(
                             "PrimaryLocation", {}
                         )
                         bucket = storage_info.get("Bucket")
                         file_path = storage_info.get("ObjectKey", {}).get("FullPath")
-                        break
-
-                # If no proxy found, use original
-                if not file_path:
-                    logger.warning(
-                        "No proxy representation found, using original",
-                        extra={"assetId": asset_id},
-                    )
+                else:
+                    # Use original representation
                     main_rep = asset.get("DigitalSourceAsset", {}).get(
                         "MainRepresentation", {}
                     )
@@ -265,23 +311,13 @@ def process_large_files(
                     )
                     bucket = storage_info.get("Bucket")
                     file_path = storage_info.get("ObjectKey", {}).get("FullPath")
-            else:
-                # Use original representation
-                main_rep = asset.get("DigitalSourceAsset", {}).get(
-                    "MainRepresentation", {}
-                )
-                storage_info = main_rep.get("StorageInfo", {}).get(
-                    "PrimaryLocation", {}
-                )
-                bucket = storage_info.get("Bucket")
-                file_path = storage_info.get("ObjectKey", {}).get("FullPath")
 
-            if not file_path or not bucket:
-                logger.error(
-                    f"Could not determine file path or bucket for asset {asset_id}",
-                    extra={"assetId": asset_id},
-                )
-                continue
+                if not file_path or not bucket:
+                    logger.error(
+                        f"Could not determine file path or bucket for asset {asset_id}",
+                        extra={"assetId": asset_id},
+                    )
+                    continue
 
             # Get file name from path
             file_name = os.path.basename(file_path)
