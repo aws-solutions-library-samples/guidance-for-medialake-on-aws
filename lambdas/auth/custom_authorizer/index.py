@@ -298,7 +298,6 @@ def decode_and_verify_token(token: str, correlation_id: str) -> Dict[str, Any]:
             "verify_exp": True,
             "verify_iat": True,
             "verify_aud": False,  # We'll handle audience validation manually
-            "verify_at_hash": False,  # Skip at_hash validation (we only have ID token, not access token)
         }
 
         # If we have a specific client ID to validate against, enable audience verification

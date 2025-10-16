@@ -1,6 +1,4 @@
 # import json
-import uuid
-
 import aws_cdk as cdk
 from aws_cdk import CfnOutput, Duration, RemovalPolicy, Stack
 from aws_cdk import aws_dynamodb as dynamodb
@@ -178,13 +176,13 @@ class BaseInfrastructureStack(Stack):
                 security_group_id=config.vpc.security_groups.existing_groups.media_lake_sg,
             )
         else:
-            unique_id = str(uuid.uuid4())[:8]
-            sg_base_name = config.vpc.security_groups.new_groups["media_lake_sg"].name
             self._security_group = ec2.SecurityGroup(
                 self,
                 "MediaLakeSecurityGroup",
                 vpc=self._vpc.vpc,
-                security_group_name=f"{sg_base_name}-{unique_id}",
+                security_group_name=config.vpc.security_groups.new_groups[
+                    "media_lake_sg"
+                ].name,
                 description=config.vpc.security_groups.new_groups[
                     "media_lake_sg"
                 ].description,

@@ -74,7 +74,6 @@ DEFAULT_PERMISSION_SETS = [
                 "edit": True,
                 "delete": True,
             },
-            "search": { "view": True },
             "pipelines": {"create": True, "view": True, "edit": True, "delete": True},
             "pipelinesExecutions": {"view": True, "retry": True, "cancel": True},
             "collections": {"create": True, "view": True, "edit": True, "delete": True},
@@ -123,7 +122,6 @@ DEFAULT_PERMISSION_SETS = [
                 "edit": True,
                 "delete": True,
             },
-            "search": { "view": True },
             "pipelines": {"create": True, "view": True, "edit": True, "delete": True},
             "pipelinesExecutions": {"view": True, "retry": True, "cancel": True},
             "collections": {"create": True, "view": True, "edit": True, "delete": True},
@@ -149,7 +147,6 @@ DEFAULT_PERMISSION_SETS = [
                 "edit": False,
                 "delete": False,
             },
-            "search": { "view": True },
             "pipelinesExecutions": {"view": True, "retry": False, "cancel": False},
             "collections": {
                 "create": False,
