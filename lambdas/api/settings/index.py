@@ -2,7 +2,7 @@
 Settings API Lambda Handler.
 
 This is the main entry point for the unified Settings API Lambda function.
-It uses AWS Lambda Powertools APIGatewayRestResolver for routing all 
+It uses AWS Lambda Powertools APIGatewayRestResolver for routing all
 settings-related endpoints to their respective handlers.
 
 Handles:
@@ -10,6 +10,7 @@ Handles:
 - System settings: GET/POST/PUT/DELETE /settings/system
 - API keys: GET/POST/PUT/DELETE /settings/api-keys
 - Search providers: GET/POST/PUT/DELETE /settings/system/search
+- Users: GET /settings/users
 
 All handlers are defined in the handlers/ directory following resource-path naming.
 """
@@ -100,4 +101,3 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                 }
             ),
         }
-

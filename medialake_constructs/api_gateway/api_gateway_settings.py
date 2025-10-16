@@ -8,7 +8,9 @@ The module handles:
 - Collection types management (/settings/collection-types)
 - System settings (/settings/system)
 - API keys management (/settings/api-keys)
+- Users listing from Cognito (/settings/users)
 - DynamoDB integration for system settings, API keys, and collections
+- Cognito integration for user management
 - IAM roles and permissions
 - API Gateway integration with proxy integration
 - Lambda function configuration
@@ -17,6 +19,7 @@ The module handles:
 from dataclasses import dataclass
 
 from aws_cdk import aws_apigateway as api_gateway
+from aws_cdk import aws_cognito as cognito
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_secretsmanager as secrets_manager
@@ -36,6 +39,7 @@ class SettingsApiProps:
     collections_table: dynamodb.ITable
     system_settings_table: dynamodb.ITable
     api_keys_table: dynamodb.ITable
+    cognito_user_pool: cognito.UserPool
 
 
 class SettingsApi(Construct):
@@ -43,7 +47,7 @@ class SettingsApi(Construct):
     Settings API Gateway deployment with single Lambda and routing.
 
     This construct creates a Lambda function that handles all /settings/* endpoints
-    including collection-types, system settings, and API keys management.
+    including collection-types, system settings, API keys management, and user listing.
     """
 
     def __init__(
@@ -71,6 +75,7 @@ class SettingsApi(Construct):
                     "SYSTEM_SETTINGS_TABLE_ARN": props.system_settings_table.table_arn,
                     "API_KEYS_TABLE_NAME": props.api_keys_table.table_name,
                     "API_KEYS_TABLE_ARN": props.api_keys_table.table_arn,
+                    "COGNITO_USER_POOL_ID": props.cognito_user_pool.user_pool_id,
                     "ENVIRONMENT": config.environment,
                 },
             ),
@@ -96,6 +101,20 @@ class SettingsApi(Construct):
                     "secretsmanager:DeleteSecret",
                 ],
                 resources=["*"],  # Restrict this in production
+            )
+        )
+
+        # Grant Cognito permissions for user management
+        settings_lambda.function.add_to_role_policy(
+            statement=iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "cognito-idp:ListUsers",
+                    "cognito-idp:AdminGetUser",
+                    "cognito-idp:AdminListGroupsForUser",
+                    "cognito-idp:ListGroups",
+                ],
+                resources=[props.cognito_user_pool.user_pool_arn],
             )
         )
 
@@ -184,11 +203,26 @@ class SettingsApi(Construct):
         add_cors_options_method(api_keys_resource)
         add_cors_options_method(api_keys_proxy)
 
+        # ===================================================================
+        # /settings/users resource and methods
+        # ===================================================================
+        users_resource = settings_resource.add_resource("users")
+
+        # Add GET method to /settings/users
+        m = users_resource.add_method("GET", lambda_integration)
+        cfn_method = m.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
+
+        # Add CORS for users
+        add_cors_options_method(users_resource)
+
         # Store references
         self._lambda = settings_lambda
         self._collection_types_resource = collection_types_resource
         self._system_resource = system_resource
         self._api_keys_resource = api_keys_resource
+        self._users_resource = users_resource
 
     @property
     def lambda_function(self):
@@ -209,3 +243,8 @@ class SettingsApi(Construct):
     def api_keys_resource(self):
         """Return the api-keys API Gateway resource."""
         return self._api_keys_resource
+
+    @property
+    def users_resource(self):
+        """Return the users API Gateway resource."""
+        return self._users_resource

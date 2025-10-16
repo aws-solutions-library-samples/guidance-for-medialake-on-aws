@@ -5,6 +5,7 @@ This stack creates the Settings API endpoints for managing all settings includin
 - Collection types management (CRUD + migration)
 - System settings
 - API keys management
+- Users listing from Cognito
 
 The stack follows MediaLake patterns and integrates with the existing
 authorization and API Gateway infrastructure.
@@ -46,6 +47,7 @@ class CollectionTypesStack(cdk.NestedStack):
     - Collection types (CRUD + migration)
     - System settings
     - API keys
+    - Users listing from Cognito
 
     The stack follows MediaLake patterns and integrates with the existing
     authorization and API Gateway infrastructure.
@@ -67,6 +69,7 @@ class CollectionTypesStack(cdk.NestedStack):
                 collections_table=props.collections_table,
                 system_settings_table=props.system_settings_table,
                 api_keys_table=props.api_keys_table,
+                cognito_user_pool=props.cognito_user_pool,
             ),
         )
 
