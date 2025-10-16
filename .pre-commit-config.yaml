@@ -60,7 +60,8 @@ repos:
         exclude: |
           (?x)^(
             lambdas/nodes/image_metadata_extractor/.*|
-            lambdas/layers/warmer/nodejs/.*
+            lambdas/layers/warmer/nodejs/.*|
+            \.kiro/.*
           )$
 
   # Commit message validation (Phase 1)
@@ -84,7 +85,8 @@ repos:
             lambdas/api/collections/collections-openapi\.json|
             INTERNAL-ai-documentation/.*|
             lambdas/nodes/image_metadata_extractor/.*|
-            lambdas/layers/warmer/nodejs/.*
+            lambdas/layers/warmer/nodejs/.*|
+            \.kiro/.*
           )$
 
   # Python security scanning (Phase 2)

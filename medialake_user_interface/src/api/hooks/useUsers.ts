@@ -15,11 +15,8 @@ interface UsersResponse {
   message: string;
   data: {
     users: User[];
-    searchMetadata: {
-      totalResults: number;
-      page: number;
-      pageSize: number;
-    };
+    count: number;
+    paginationToken?: string;
   };
 }
 
@@ -40,14 +37,11 @@ export const useGetUsers = () => {
   return useQuery<User[], Error>({
     queryKey: [QUERY_KEYS.USERS],
     queryFn: async () => {
-      const { data } = await apiClient.get<{
-        statusCode: number;
-        body: string;
-      }>(API_ENDPOINTS.USERS);
-      const parsedBody = JSON.parse(data.body) as UsersResponse;
-      console.log("Raw user data:", JSON.stringify(parsedBody.data.users[0]));
+      // Updated to match the standard format used by consolidated settings Lambda
+      const { data } = await apiClient.get<UsersResponse>(API_ENDPOINTS.USERS);
+      console.log("Raw user data:", JSON.stringify(data.data.users[0]));
       // Map API response to include permissions if not present
-      return parsedBody.data.users.map((user) => ({
+      return data.data.users.map((user) => ({
         ...user,
         permissions: user.permissions || [], // Ensure permissions is always present
       }));

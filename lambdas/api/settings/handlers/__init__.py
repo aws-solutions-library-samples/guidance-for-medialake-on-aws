@@ -6,7 +6,7 @@ All handlers follow the pattern of defining a `register_route(app)` function tha
 registers their routes with the provided APIGatewayRestResolver instance.
 """
 
-from . import (  # Collection types handlers; System settings handlers; API keys handlers
+from . import (  # Collection types handlers; System settings handlers; API keys handlers; Users handlers
     api_keys_get,
     api_keys_ID_delete,
     api_keys_ID_get,
@@ -17,6 +17,7 @@ from . import (  # Collection types handlers; System settings handlers; API keys
     collection_types_ID_migrate_post,
     collection_types_ID_put,
     collection_types_post,
+    settings_users_get,
     system_get,
     system_search_delete,
     system_search_get,
@@ -40,6 +41,7 @@ __all__ = [
     "api_keys_ID_get",
     "api_keys_ID_put",
     "api_keys_ID_delete",
+    "settings_users_get",
 ]
 
 
@@ -70,3 +72,6 @@ def register_all_routes(app):
     api_keys_ID_get.register_route(app)
     api_keys_ID_put.register_route(app)
     api_keys_ID_delete.register_route(app)
+
+    # Users endpoints (/settings/users)
+    settings_users_get.register_route(app)
