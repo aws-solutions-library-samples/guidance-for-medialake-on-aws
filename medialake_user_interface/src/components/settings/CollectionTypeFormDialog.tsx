@@ -252,9 +252,9 @@ const CollectionTypeFormDialog: React.FC<CollectionTypeFormDialogProps> = ({
                 alignItems: "center",
                 gap: 2,
                 p: 2,
-                border: "1px solid #ddd",
+                border: (theme) => `1px solid ${theme.palette.divider}`,
                 borderRadius: 1,
-                backgroundColor: "#f5f5f5",
+                backgroundColor: (theme) => theme.palette.background.paper,
               }}
             >
               <Box

@@ -147,6 +147,7 @@ class CollectionsApi(Construct):
                 entry="lambdas/api/collections_api",
                 vpc=props.vpc,
                 security_groups=[props.security_group],
+                provisioned_concurrent_executions=1,
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "COLLECTIONS_TABLE_NAME": self._collections_table.table_name,

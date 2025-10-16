@@ -171,6 +171,9 @@ class LambdaConfig:
         log_removal_policy (Optional[RemovalPolicy]): Removal policy for the CloudWatch log group (default: DESTROY)
         python_bundling (Optional[BundlingOptions]): Bundling options for Python functions
         nodejs_bundling (Optional[NodeJSBundlingOptions]): Bundling options for Node.js functions
+        reserved_concurrent_executions (Optional[int]): Maximum concurrent executions allowed (limits concurrency)
+        provisioned_concurrent_executions (Optional[int]): Number of pre-initialized instances to keep warm.
+            Use this to reduce cold starts. Creates a Lambda alias with provisioned concurrency.
         filesystem_access_point (Optional[efs.IAccessPoint]): EFS access point for Lambda filesystem
         filesystem_mount_path (Optional[str]): Mount path for EFS filesystem
         snap_start (Optional[bool]): Enable SnapStart for faster cold starts (default: False).
@@ -194,6 +197,7 @@ class LambdaConfig:
     python_bundling: Optional[BundlingOptions] = None
     nodejs_bundling: Optional[NodeJSBundlingOptions] = None
     reserved_concurrent_executions: Optional[int] = None
+    provisioned_concurrent_executions: Optional[int] = None
     filesystem_access_point: Optional[efs.IAccessPoint] = None
     filesystem_mount_path: Optional[str] = None
     snap_start: Optional[bool] = False
@@ -513,6 +517,31 @@ class Lambda(Construct):
                 self._function_version = None
             # --- End SnapStart versioning ---
 
+            # --- Provisioned Concurrency: Create version and alias with provisioned concurrency ---
+            if config.provisioned_concurrent_executions is not None:
+                logger.debug(
+                    f"Setting up provisioned concurrent executions: {config.provisioned_concurrent_executions}"
+                )
+
+                # Create a version for provisioned concurrency
+                self._function_version = self._function.current_version
+
+                # Create an alias pointing to the current version
+                self._function_alias = lambda_.Alias(
+                    self,
+                    "ProvisionedAlias",
+                    alias_name="provisioned",
+                    version=self._function_version,
+                    provisioned_concurrent_executions=config.provisioned_concurrent_executions,
+                )
+
+                logger.info(
+                    f"Provisioned concurrency configured with {config.provisioned_concurrent_executions} instances"
+                )
+            else:
+                self._function_alias = None
+            # --- End Provisioned Concurrency ---
+
         except Exception as e:
             logger.error(f"Failed to create Lambda function: {str(e)}", exc_info=True)
             raise
@@ -730,9 +759,23 @@ class Lambda(Construct):
     @property
     def function_version(self) -> Optional[lambda_.Version]:
         """
-        Get the versioned Lambda function (if SnapStart is enabled).
+        Get the versioned Lambda function (if SnapStart or provisioned concurrency is enabled).
 
         Returns:
             lambda_.Version | None: The versioned Lambda function, or None if not versioned
         """
         return getattr(self, "_function_version", None)
+
+    @property
+    def function_alias(self) -> Optional[lambda_.Alias]:
+        """
+        Get the Lambda function alias (if provisioned concurrency is enabled).
+
+        When provisioned concurrency is configured, you should use this alias instead
+        of the base function for integrations (API Gateway, event sources, etc.) to
+        ensure requests are routed to the warmed instances.
+
+        Returns:
+            lambda_.Alias | None: The Lambda alias with provisioned concurrency, or None if not configured
+        """
+        return getattr(self, "_function_alias", None)

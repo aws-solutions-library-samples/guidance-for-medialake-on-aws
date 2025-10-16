@@ -807,38 +807,40 @@ const CollectionViewPage: React.FC = () => {
                   sx={{ display: "flex", alignItems: "center" }}
                 >
                   <FolderIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-                  {collection.name}
+                  {collection?.name || "Loading..."}
                 </Typography>
               </Breadcrumbs>
 
               {/* Action Buttons */}
-              <Box sx={{ display: "flex", gap: 2 }}>
-                <Button
-                  variant="contained"
-                  startIcon={<AddIcon />}
-                  onClick={() => setIsCreateSubCollectionOpen(true)}
-                  size="small"
-                >
-                  Create Sub-Collection
-                </Button>
-                <Button
-                  variant="outlined"
-                  startIcon={<EditIcon />}
-                  onClick={handleEditClick}
-                  size="small"
-                >
-                  Edit
-                </Button>
-                <Button
-                  variant="outlined"
-                  color="error"
-                  startIcon={<DeleteIcon />}
-                  onClick={handleCollectionDeleteClick}
-                  size="small"
-                >
-                  Delete
-                </Button>
-              </Box>
+              {collection && (
+                <Box sx={{ display: "flex", gap: 2 }}>
+                  <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={() => setIsCreateSubCollectionOpen(true)}
+                    size="small"
+                  >
+                    Create Sub-Collection
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    startIcon={<EditIcon />}
+                    onClick={handleEditClick}
+                    size="small"
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    startIcon={<DeleteIcon />}
+                    onClick={handleCollectionDeleteClick}
+                    size="small"
+                  >
+                    Delete
+                  </Button>
+                </Box>
+              )}
             </Box>
 
             {isLoading || isFetching ? (

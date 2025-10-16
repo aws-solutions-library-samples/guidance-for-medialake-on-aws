@@ -1,6 +1,4 @@
 # import json
-import uuid
-
 import aws_cdk as cdk
 from aws_cdk import CfnOutput, Duration, RemovalPolicy, Stack
 from aws_cdk import aws_dynamodb as dynamodb
@@ -178,13 +176,13 @@ class BaseInfrastructureStack(Stack):
                 security_group_id=config.vpc.security_groups.existing_groups.media_lake_sg,
             )
         else:
-            unique_id = str(uuid.uuid4())[:8]
-            sg_base_name = config.vpc.security_groups.new_groups["media_lake_sg"].name
             self._security_group = ec2.SecurityGroup(
                 self,
                 "MediaLakeSecurityGroup",
                 vpc=self._vpc.vpc,
-                security_group_name=f"{sg_base_name}-{unique_id}",
+                security_group_name=config.vpc.security_groups.new_groups[
+                    "media_lake_sg"
+                ].name,
                 description=config.vpc.security_groups.new_groups[
                     "media_lake_sg"
                 ].description,
@@ -462,9 +460,9 @@ class BaseInfrastructureStack(Stack):
             )
 
             # Create asset table stream construct
-            # AGGRESSIVE throttling to prevent OpenSearch 429 errors
-            # - Concurrency: 1 (sequential processing only)
-            # - Batch sizes: Very small to minimize OpenSearch load
+            # Reduced concurrency and batch sizes to prevent OpenSearch 429 errors
+            # - Concurrency: 3 (down from 10) to reduce load on OpenSearch
+            # - Batch sizes: Smaller to process faster and reduce memory
             self._asset_table_stream = AssetTableStream(
                 self,
                 "AssetTableStreamConstruct",
@@ -476,9 +474,9 @@ class BaseInfrastructureStack(Stack):
                     opensearch_index_name=opensearch_index_name,
                     vpc=self._vpc.vpc,
                     security_group=self._security_group,
-                    batch_size=50,  # Bulk API batch size (reduced from 250)
-                    max_batch_size=100,  # DynamoDB stream batch size (reduced from 500)
-                    reserved_concurrency=1,  # Sequential processing only (reduced from 3)
+                    batch_size=250,  # Bulk API batch size (reduced from 500)
+                    max_batch_size=500,  # DynamoDB stream batch size (reduced from 1000)
+                    reserved_concurrency=3,  # Limit concurrent executions (reduced from 10)
                 ),
             )
 
