@@ -400,6 +400,7 @@ sync-to-github:
     - rm -rf github-repo/
     - rm -rf .traycer/
     - rm -rf INTERNAL-ai-documentation/
+    - rm -rf AUTHORIZATION_FIX.md
     - rm -rf memory-bank/
     - rm -rf cdk-test-output/
     - rm -rf design/
@@ -420,7 +421,7 @@ sync-to-github:
     - rm -rf medialake_user_interface/playwright-report/
     # Stage all changes and commit
     - git add -A
-    - git commit --allow-empty -m "release - Initial collections feature and updates to moving to a single lambda per root API resource for users, collections, and settings"
+    - git commit --allow-empty -m "fix - Update to remove the UUID from the SG in OpenSearch and fix for user creation"
     - echo "New commit created:" && git log --oneline -1
     # Push to GitHub main branch
     - git push origin main
