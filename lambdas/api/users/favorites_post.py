@@ -104,7 +104,9 @@ def _create_error_response(status_code: int, message: str) -> Dict[str, Any]:
     }
 
 
-def handle_post_favorite(app, dynamodb, user_table_name: str, logger, metrics, tracer) -> Dict[str, Any]:
+def handle_post_favorite(
+    app, dynamodb, user_table_name: str, logger, metrics, tracer
+) -> Dict[str, Any]:
     """
     Lambda handler to add a favorite item for a user in DynamoDB
     """

@@ -33,7 +33,13 @@ class AddMembersResponse(BaseModel):
 
 
 def _add_group_members(
-    dynamodb, table_name: str, group_id: str, user_ids: List[str], added_by: str, logger, metrics
+    dynamodb,
+    table_name: str,
+    group_id: str,
+    user_ids: List[str],
+    added_by: str,
+    logger,
+    metrics,
 ) -> Dict[str, List[str]]:
     """
     Add members to a group in DynamoDB
@@ -193,7 +199,13 @@ def handle_post_group_members(
 
         # Add members to the group
         result = _add_group_members(
-            dynamodb, table_name, group_id, add_members_request.userIds, user_id, logger, metrics
+            dynamodb,
+            table_name,
+            group_id,
+            add_members_request.userIds,
+            user_id,
+            logger,
+            metrics,
         )
 
         # Create success response
@@ -225,4 +237,3 @@ def handle_post_group_members(
         logger.exception("Error processing request")
         metrics.add_metric(name="UnhandledError", unit=MetricUnit.Count, value=1)
         return _create_error_response(500, f"Internal server error: {str(e)}")
-

@@ -300,7 +300,15 @@ def handle_post_groups(
 
         # Create the group with rollback handling
         group = _create_group_with_rollback(
-            table_name, user_pool_id, group_request, user_id, cognito, dynamodb, logger, metrics, tracer
+            table_name,
+            user_pool_id,
+            group_request,
+            user_id,
+            cognito,
+            dynamodb,
+            logger,
+            metrics,
+            tracer,
         )
 
         # Create success response
@@ -330,4 +338,3 @@ def handle_post_groups(
         logger.exception(f"Error processing request: {str(e)}")
         metrics.add_metric(name="UnhandledError", unit=MetricUnit.Count, value=1)
         return _create_error_response(500, f"Internal server error: {str(e)}")
-

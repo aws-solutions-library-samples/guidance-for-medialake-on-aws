@@ -19,9 +19,7 @@ class GroupResponse(BaseModel):
     data: Dict[str, Any] = Field(..., description="Group data")
 
 
-def _get_group_members(
-    table, group_id: str, logger, metrics
-) -> List[Dict[str, Any]]:
+def _get_group_members(table, group_id: str, logger, metrics) -> List[Dict[str, Any]]:
     """
     Get all members of a group
     """
@@ -66,7 +64,9 @@ def _get_group_members(
         raise
 
 
-def _get_group(dynamodb, table_name: str, group_id: str, logger, metrics) -> Optional[Dict[str, Any]]:
+def _get_group(
+    dynamodb, table_name: str, group_id: str, logger, metrics
+) -> Optional[Dict[str, Any]]:
     """
     Get a specific group from DynamoDB
     """
@@ -167,4 +167,3 @@ def handle_get_group(
         logger.exception("Error processing request")
         metrics.add_metric(name="UnhandledError", unit=MetricUnit.Count, value=1)
         return _create_error_response(500, f"Internal server error: {str(e)}")
-

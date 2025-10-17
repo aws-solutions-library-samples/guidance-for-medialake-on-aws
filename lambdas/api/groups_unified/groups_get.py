@@ -20,7 +20,9 @@ class GroupsResponse(BaseModel):
     data: Dict[str, Any] = Field(..., description="Groups data")
 
 
-def _list_groups(dynamodb, table_name: str, query_params: Dict[str, str], logger, metrics) -> List[Dict[str, Any]]:
+def _list_groups(
+    dynamodb, table_name: str, query_params: Dict[str, str], logger, metrics
+) -> List[Dict[str, Any]]:
     """
     List all groups from DynamoDB using a scan operation with a filter expression
     to find all items where PK begins with "GROUP#" and SK equals "METADATA"
@@ -87,7 +89,9 @@ def _create_error_response(status_code: int, message: str) -> Dict[str, Any]:
     }
 
 
-def handle_get_groups(app, dynamodb, table_name: str, logger, metrics, tracer) -> Dict[str, Any]:
+def handle_get_groups(
+    app, dynamodb, table_name: str, logger, metrics, tracer
+) -> Dict[str, Any]:
     """
     Lambda handler to list all groups from DynamoDB
     """
@@ -122,7 +126,9 @@ def handle_get_groups(app, dynamodb, table_name: str, logger, metrics, tracer) -
         query_string_parameters = app.current_event.query_string_parameters or {}
 
         # Fetch groups from DynamoDB
-        groups = _list_groups(dynamodb, table_name, query_string_parameters, logger, metrics)
+        groups = _list_groups(
+            dynamodb, table_name, query_string_parameters, logger, metrics
+        )
 
         # Create success response
         response = GroupsResponse(
@@ -146,4 +152,3 @@ def handle_get_groups(app, dynamodb, table_name: str, logger, metrics, tracer) -
         logger.exception("Error processing request")
         metrics.add_metric(name="UnhandledError", unit=MetricUnit.Count, value=1)
         return _create_error_response(500, f"Internal server error: {str(e)}")
-
