@@ -42,8 +42,9 @@ DEFAULT_MEMORY_SIZE = 128
 DEFAULT_TIMEOUT_MINUTES = 5
 DEFAULT_RUNTIME = lambda_.Runtime.PYTHON_3_12
 DEFAULT_ARCHITECTURE = lambda_.Architecture.X86_64
-# Enable SnapStart by default for Python 3.12+ to reduce cold starts (free performance boost)
-DEFAULT_SNAP_START = True
+# SnapStart disabled by default due to initialization issues with some Lambda functions
+# Use provisioned concurrency instead for critical APIs
+DEFAULT_SNAP_START = False
 MAX_LAMBDA_NAME_LENGTH = 64
 MAX_ROLE_NAME_LENGTH = 64
 MAX_LOG_GROUP_NAME_LENGTH = 512

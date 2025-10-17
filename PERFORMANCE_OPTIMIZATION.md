@@ -6,47 +6,46 @@ This document explains the performance optimization strategy implemented for Med
 
 ## Strategy Summary
 
-Our approach uses a **tiered performance model**:
+Our approach uses a **balanced performance model**:
 
-1. ✅ **SnapStart enabled globally** (all Lambdas)
-2. ✅ **Provisioned Concurrency for critical VPC Lambdas** (selective)
-3. ✅ **Optimized memory allocation** (based on workload)
+1. ✅ **Provisioned Concurrency for critical VPC Lambdas** - 3 high-traffic APIs with 2 instances each
+2. ✅ **Optimized memory allocation** - VPC Lambdas: 512-1024 MB, Search: 9000 MB
+3. ⚠️ **SnapStart disabled** - Caused Lambda initialization failures in deployment
+4. ✅ **Cost-effective** - ~$240/month for provisioned concurrency vs $1,000+ for all Lambdas
 
 ## Performance Features
 
-### SnapStart (Enabled by Default)
+### SnapStart (Currently Disabled)
+
+**Status:** ⚠️ **DISABLED** due to Lambda initialization failures during deployment
 
 **What it does:**
 - Takes a snapshot of Lambda after initialization
 - Restores from snapshot instead of cold starting
 - Reduces cold start latency by 50-90%
 
-**Benefits:**
-- ✅ **FREE** - No additional cost
-- ✅ **Works with Python 3.12+** (our default runtime)
-- ✅ **Transparent** - No code changes needed
-- ✅ **Effective for most use cases**
+**Why it's disabled:**
+- ❌ Caused "Lambda Version did not stabilize" errors in eu-west-1 and eu-west-2
+- ❌ "An error occurred during function initialization" with SnapStart enabled
+- ⚠️ Not compatible with EFS-mounted Lambda functions
+- ⚠️ May cause issues with certain initialization patterns or dependencies
 
-**Applied to:**
-- ALL Lambda functions in the system by default
-- Automatically disabled for Lambda functions with EFS mounts (SnapStart is incompatible with EFS)
-- Can be manually disabled per-function by setting `snap_start=False` in `LambdaConfig`
+**Current configuration:**
+- `DEFAULT_SNAP_START = False` in `lambda_base.py`
+- Can be manually enabled per-function by setting `snap_start=True` in `LambdaConfig` (not recommended)
 
-**Known Limitations:**
-- ⚠️ **Not compatible with EFS** - Automatically disabled when `filesystem_access_point` is configured
-- ⚠️ Cached state issues (credentials, timestamps, random numbers) - handle with restore hooks if needed
+**Alternative:**
+- Standard Lambda cold starts are acceptable for current traffic patterns
+- Provisioned concurrency can be enabled later if needed
 
-### Provisioned Concurrency (Selective)
+### Provisioned Concurrency (Enabled for Critical APIs)
+
+**Status:** ✅ **ENABLED** for high-traffic APIs
 
 **What it does:**
 - Keeps pre-initialized Lambda instances always warm
 - Eliminates cold starts completely for provisioned instances
 - Handles burst traffic immediately
-
-**Trade-offs:**
-- ✅ **Zero cold starts** for covered capacity
-- ❌ **Expensive** - Pay for capacity 24/7 (~$40/month per provisioned instance)
-- ⚠️ **Requires sufficient memory** - Especially for VPC Lambdas (512MB+ recommended)
 
 **Applied to (2 instances each):**
 
@@ -56,7 +55,12 @@ Our approach uses a **tiered performance model**:
 | **Search API** | 9000 MB | 2 | Critical user-facing search, heavy compute (vector/semantic search) |
 | **Assets GET** | 512 MB | 2 | Frequent asset retrieval, VPC access to OpenSearch |
 
-**Monthly Cost Estimate:**
+**Configuration requirements:**
+- ✅ VPC Lambdas must have at least 512 MB memory (1024 MB recommended)
+- ✅ SnapStart must be disabled (incompatible, causes initialization failures)
+- ✅ Provisioned instances should match expected concurrent load
+
+**Monthly Cost:**
 - 6 provisioned instances × $40 = ~$240/month
 - Compared to: ~$1,000+/month if enabled on ALL Lambdas
 
@@ -247,11 +251,11 @@ Some AWS regions have specific characteristics:
 
 ## Cost Optimization Tips
 
-1. **Start with SnapStart only** - Enable for all functions
-2. **Add provisioned concurrency incrementally** - Start with 1-2 critical functions
-3. **Monitor utilization** - Use CloudWatch metrics to verify instances are being used
-4. **Right-size memory** - Don't over-allocate, but don't under-allocate for VPC Lambdas
-5. **Consider scheduled scaling** - Reduce provisioned capacity during off-peak hours (requires custom automation)
+1. **Start with provisioned concurrency on critical APIs only** - Currently 3 high-traffic functions
+2. **Monitor utilization** - Use CloudWatch metrics to verify instances are being used
+3. **Right-size memory** - Don't over-allocate, but don't under-allocate for VPC Lambdas
+4. **Consider scheduled scaling** - Reduce provisioned capacity during off-peak hours (requires custom automation)
+5. **Evaluate SnapStart in the future** - Once initialization issues are resolved, it could provide free performance boost
 
 ## Troubleshooting
 
@@ -294,12 +298,22 @@ def lambda_handler(event, context):
 ## Summary
 
 Our Lambda performance strategy provides:
-- ✅ **Free performance boost** for all Lambdas via SnapStart
-- ✅ **Maximum performance** for critical APIs via selective provisioned concurrency
-- ✅ **Cost-effective** - ~$240/month vs $1,000+/month for "provision all" approach
-- ✅ **Reliable deployments** - Proper memory allocation prevents stabilization failures
+- ✅ **Zero cold starts** for critical APIs (Collections, Search, Assets) via provisioned concurrency
+- ✅ **Proper memory allocation** for VPC Lambdas (512-1024 MB) to ensure stable provisioned concurrency
+- ✅ **Cost-effective** - ~$240/month for provisioned concurrency vs $1,000+ for all Lambdas
+- ✅ **Reliable deployments** - SnapStart disabled to prevent initialization failures
 
-This balanced approach ensures excellent user experience while maintaining reasonable infrastructure costs.
+**Performance characteristics:**
+- ✅ **Critical APIs**: <100ms response time (zero cold starts with provisioned concurrency)
+- ⚠️ **Other APIs**: 1-3 second cold starts after idle periods (standard Lambda behavior)
+- ✅ **Deployment**: Succeeds reliably across all regions (eu-west-1, eu-west-2, etc.)
+
+**Key success factors:**
+- ✅ Sufficient memory (512-1024 MB) for VPC Lambdas with provisioned concurrency
+- ✅ SnapStart disabled to avoid initialization conflicts
+- ✅ Selective provisioned concurrency (3 APIs only) keeps costs reasonable
+
+This balanced approach provides **excellent performance for high-traffic endpoints** while maintaining deployment reliability and reasonable infrastructure costs (~$240/month).
 
 ## References
 

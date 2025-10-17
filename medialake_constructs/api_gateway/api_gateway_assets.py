@@ -167,7 +167,6 @@ class AssetsConstruct(Construct):
                 layers=[search_layer.layer],
                 memory_size=512,  # VPC Lambda needs sufficient memory for ENI setup
                 provisioned_concurrent_executions=2,  # Keep 2 instances warm for fast asset retrieval
-                snap_start=True,  # SnapStart + Provisioned Concurrency for maximum performance
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
