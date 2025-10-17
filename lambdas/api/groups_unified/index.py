@@ -70,7 +70,14 @@ COGNITO_USER_POOL_ID = os.environ["COGNITO_USER_POOL_ID"]
 def create_group():
     """POST /groups - Create a new group"""
     return handle_post_groups(
-        app, cognito, dynamodb, AUTH_TABLE_NAME, COGNITO_USER_POOL_ID, logger, metrics, tracer
+        app,
+        cognito,
+        dynamodb,
+        AUTH_TABLE_NAME,
+        COGNITO_USER_POOL_ID,
+        logger,
+        metrics,
+        tracer,
     )
 
 
@@ -85,7 +92,9 @@ def list_groups():
 @tracer.capture_method
 def get_group(group_id: str):
     """GET /groups/{groupId} - Get group details"""
-    return handle_get_group(group_id, dynamodb, AUTH_TABLE_NAME, logger, metrics, tracer)
+    return handle_get_group(
+        group_id, dynamodb, AUTH_TABLE_NAME, logger, metrics, tracer
+    )
 
 
 @app.put("/groups/<group_id>")
@@ -102,7 +111,13 @@ def put_group(group_id: str):
 def delete_group(group_id: str):
     """DELETE /groups/{groupId} - Delete a group"""
     return handle_delete_group(
-        group_id, dynamodb, COGNITO_USER_POOL_ID, AUTH_TABLE_NAME, logger, metrics, tracer
+        group_id,
+        dynamodb,
+        COGNITO_USER_POOL_ID,
+        AUTH_TABLE_NAME,
+        logger,
+        metrics,
+        tracer,
     )
 
 
@@ -138,4 +153,3 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         }
     )
     return app.resolve(event, context)
-

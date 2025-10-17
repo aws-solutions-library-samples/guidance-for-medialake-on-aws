@@ -19,7 +19,9 @@ class UserResponse(BaseModel):
     data: Dict[str, Any] = Field(..., description="User data from Cognito")
 
 
-def _get_cognito_user(cognito, user_pool_id: str, user_id: str, logger, metrics, tracer) -> Dict[str, Any]:
+def _get_cognito_user(
+    cognito, user_pool_id: str, user_id: str, logger, metrics, tracer
+) -> Dict[str, Any]:
     """
     Fetch user details from Cognito User Pool
     """
@@ -64,7 +66,9 @@ def _create_error_response(status_code: int, message: str) -> Dict[str, Any]:
     }
 
 
-def handle_get_user(user_id: str, cognito, user_pool_id: str, logger, metrics, tracer) -> Dict[str, Any]:
+def handle_get_user(
+    user_id: str, cognito, user_pool_id: str, logger, metrics, tracer
+) -> Dict[str, Any]:
     """
     Lambda handler to fetch user details from Cognito User Pool
     """
@@ -77,7 +81,9 @@ def handle_get_user(user_id: str, cognito, user_pool_id: str, logger, metrics, t
             return _create_error_response(400, "Missing user_id parameter")
 
         # Fetch user details from Cognito
-        user_details = _get_cognito_user(cognito, user_pool_id, user_id, logger, metrics, tracer)
+        user_details = _get_cognito_user(
+            cognito, user_pool_id, user_id, logger, metrics, tracer
+        )
 
         # Create success response
         response = UserResponse(

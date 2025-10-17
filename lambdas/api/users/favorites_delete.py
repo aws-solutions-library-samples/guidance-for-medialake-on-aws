@@ -21,7 +21,13 @@ class DeleteResponse(BaseModel):
 
 
 def _remove_favorite(
-    dynamodb, table_name: str, user_id: str, item_type: str, item_id: str, logger, metrics
+    dynamodb,
+    table_name: str,
+    user_id: str,
+    item_type: str,
+    item_id: str,
+    logger,
+    metrics,
 ) -> Dict[str, Any]:
     """
     Remove a favorite item for a user from DynamoDB
@@ -99,7 +105,14 @@ def _create_error_response(status_code: int, message: str) -> Dict[str, Any]:
 
 
 def handle_delete_favorite(
-    item_type: str, item_id: str, app, dynamodb, user_table_name: str, logger, metrics, tracer
+    item_type: str,
+    item_id: str,
+    app,
+    dynamodb,
+    user_table_name: str,
+    logger,
+    metrics,
+    tracer,
 ) -> Dict[str, Any]:
     """
     Lambda handler to remove an item from user favorites
@@ -146,7 +159,9 @@ def handle_delete_favorite(
             )
 
         # Remove the favorite from DynamoDB
-        result = _remove_favorite(dynamodb, user_table_name, user_id, item_type, item_id, logger, metrics)
+        result = _remove_favorite(
+            dynamodb, user_table_name, user_id, item_type, item_id, logger, metrics
+        )
 
         # Create success response
         response = DeleteResponse(

@@ -21,7 +21,9 @@ class SuccessResponse(BaseModel):
     )
 
 
-def _remove_group_member(dynamodb, table_name: str, group_id: str, user_id: str, logger, metrics) -> None:
+def _remove_group_member(
+    dynamodb, table_name: str, group_id: str, user_id: str, logger, metrics
+) -> None:
     """
     Remove a member from a group in DynamoDB
     """
@@ -158,4 +160,3 @@ def handle_delete_group_member(
         logger.exception("Error processing request")
         metrics.add_metric(name="UnhandledError", unit=MetricUnit.Count, value=1)
         return _create_error_response(500, f"Internal server error: {str(e)}")
-

@@ -103,7 +103,9 @@ def _create_error_response(status_code: int, message: str) -> Dict[str, Any]:
     }
 
 
-def handle_get_favorites(app, dynamodb, user_table_name: str, logger, metrics, tracer) -> Dict[str, Any]:
+def handle_get_favorites(
+    app, dynamodb, user_table_name: str, logger, metrics, tracer
+) -> Dict[str, Any]:
     """
     Lambda handler to fetch user favorites from DynamoDB
     """
@@ -134,7 +136,9 @@ def handle_get_favorites(app, dynamodb, user_table_name: str, logger, metrics, t
         item_type = query_params.get("itemType")
 
         # Fetch user favorites from DynamoDB
-        user_favorites = _get_user_favorites(dynamodb, user_table_name, user_id, item_type, logger, metrics)
+        user_favorites = _get_user_favorites(
+            dynamodb, user_table_name, user_id, item_type, logger, metrics
+        )
 
         # Create success response
         response = FavoritesResponse(

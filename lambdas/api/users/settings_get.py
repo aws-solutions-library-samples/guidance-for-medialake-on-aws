@@ -97,7 +97,9 @@ def _create_error_response(status_code: int, message: str) -> Dict[str, Any]:
     }
 
 
-def handle_get_settings(app, dynamodb, user_table_name: str, logger, metrics, tracer) -> Dict[str, Any]:
+def handle_get_settings(
+    app, dynamodb, user_table_name: str, logger, metrics, tracer
+) -> Dict[str, Any]:
     """
     Lambda handler to fetch user settings from DynamoDB
     """
@@ -129,7 +131,9 @@ def handle_get_settings(app, dynamodb, user_table_name: str, logger, metrics, tr
         namespace = query_params.get("namespace")
 
         # Fetch user settings from DynamoDB
-        user_settings = _get_user_settings(dynamodb, user_table_name, user_id, namespace, logger, metrics)
+        user_settings = _get_user_settings(
+            dynamodb, user_table_name, user_id, namespace, logger, metrics
+        )
 
         # Create success response
         response = SettingsResponse(

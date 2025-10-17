@@ -23,7 +23,13 @@ class SuccessResponse(BaseModel):
 
 
 def _delete_group_with_rollback(
-    dynamodb, table_name: str, cognito_user_pool_id: str, group_id: str, cognito, logger, metrics
+    dynamodb,
+    table_name: str,
+    cognito_user_pool_id: str,
+    group_id: str,
+    cognito,
+    logger,
+    metrics,
 ) -> None:
     """
     Delete a group from both DynamoDB and Cognito with rollback handling
@@ -68,9 +74,7 @@ def _delete_group_with_rollback(
         # Step 3: Delete from Cognito first
         logger.info(f"Deleting Cognito group: {group_id}")
         try:
-            cognito.delete_group(
-                GroupName=group_id, UserPoolId=cognito_user_pool_id
-            )
+            cognito.delete_group(GroupName=group_id, UserPoolId=cognito_user_pool_id)
             cognito_deleted = True
             logger.info(f"Successfully deleted Cognito group: {group_id}")
             metrics.add_metric(
@@ -215,10 +219,13 @@ def handle_delete_group(
 
         # Initialize cognito client (passed from main handler)
         import boto3
+
         cognito = boto3.client("cognito-idp")
 
         # Delete the group with rollback handling
-        _delete_group_with_rollback(dynamodb, table_name, user_pool_id, group_id, cognito, logger, metrics)
+        _delete_group_with_rollback(
+            dynamodb, table_name, user_pool_id, group_id, cognito, logger, metrics
+        )
 
         # Create success response
         response = SuccessResponse(
@@ -245,4 +252,3 @@ def handle_delete_group(
         logger.exception("Error processing request")
         metrics.add_metric(name="UnhandledError", unit=MetricUnit.Count, value=1)
         return _create_error_response(500, f"Internal server error: {str(e)}")
-
