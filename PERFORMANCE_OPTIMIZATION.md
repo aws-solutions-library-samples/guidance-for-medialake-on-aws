@@ -29,7 +29,12 @@ Our approach uses a **tiered performance model**:
 
 **Applied to:**
 - ALL Lambda functions in the system by default
-- Can be disabled per-function by setting `snap_start=False` in `LambdaConfig`
+- Automatically disabled for Lambda functions with EFS mounts (SnapStart is incompatible with EFS)
+- Can be manually disabled per-function by setting `snap_start=False` in `LambdaConfig`
+
+**Known Limitations:**
+- ⚠️ **Not compatible with EFS** - Automatically disabled when `filesystem_access_point` is configured
+- ⚠️ Cached state issues (credentials, timestamps, random numbers) - handle with restore hooks if needed
 
 ### Provisioned Concurrency (Selective)
 
@@ -158,6 +163,36 @@ Consider adding provisioned concurrency when:
 - ❌ Background processing functions (not user-facing)
 - ❌ Custom resource handlers (only run during deployments)
 - ❌ Functions that rarely execute
+
+## EFS Lambda Functions
+
+### Performance Considerations
+
+Lambda functions with EFS mounts (used for bulk download operations) have special considerations:
+
+**Limitations:**
+- ❌ **SnapStart not supported** - AWS does not support SnapStart with EFS-mounted Lambdas
+- ⚠️ **Provisioned Concurrency expensive** - Each instance maintains EFS connection
+- ⚠️ **Cold start overhead** - EFS mount adds ~500ms to cold start time
+
+**Current Configuration:**
+- Bulk download Lambdas (5 functions):
+  - `_init_zip_lambda` - 512 MB memory
+  - `_append_to_zip_lambda` - 1024 MB memory
+  - `_init_multipart_lambda` - 1024 MB memory
+  - `_upload_part_lambda` - 1024 MB memory
+  - `_complete_multipart_lambda` - 1024 MB memory
+
+**Optimization Strategy:**
+- ✅ Use higher memory (512-1024 MB) to offset cold start overhead
+- ✅ Accept longer cold starts (no SnapStart available)
+- ❌ Do NOT add provisioned concurrency (very expensive for EFS Lambdas)
+- ✅ Consider async processing patterns to hide latency from users
+
+**Alternative Approaches:**
+- Use S3 for temporary storage instead of EFS (enables SnapStart)
+- Use Step Functions to coordinate multi-Lambda workflows
+- Pre-warm functions using scheduled EventBridge rules if needed
 
 ## Provisioned Concurrency + VPC Best Practices
 
