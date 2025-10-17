@@ -589,8 +589,15 @@ components:
             type: string
           example:
             [
-              "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-              "b2c3d4e5-f6g7-8901-abcd-ef2345678901",
+              {
+                "assetId": "asset:uuid:f1d497d7-908b-40ed-868e-6a5c3568af77",
+                "clipBoundary": {},
+              },
+              {
+                "assetId": "asset:uuid:5df90b78-fa4e-410e-aebe-e631a3b94abd",
+                "clipBoundary":
+                  { "startTime": "00:01:30:00", "endTime": "00:01:35:00" },
+              },
             ]
         representation:
           type: string

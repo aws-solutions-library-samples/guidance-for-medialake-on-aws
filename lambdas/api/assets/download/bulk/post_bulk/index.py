@@ -15,6 +15,7 @@ The function implements AWS best practices including:
 
 import json
 import os
+import re
 import time
 import uuid
 from datetime import datetime, timedelta
@@ -60,8 +61,32 @@ class BulkDownloadError(Exception):
         self.message = message
 
 
+def timecode_to_frames(timecode: str) -> int:
+    """Convert timecode string to total frame count."""
+    normalized = timecode.replace(";", ":")
+    parts = normalized.split(":")
+    hours, minutes, seconds, frames = (
+        int(parts[0]),
+        int(parts[1]),
+        int(parts[2]),
+        int(parts[3]),
+    )
+    # This below math isn't strictly accurate from a frame-count perspective,
+    # since the length of time a frame represents changes depending on the framerate
+    # of the source (e.g. each frame in 30fps content contains twice the time of 60fps content).
+    # Doesn't matter for this though, we just need a rough absolute int value for comparison
+    # since the start/end times for a single piece of source content will resolve to the
+    # framerate of that source.
+    return (hours * 3600 + minutes * 60 + seconds) + frames
+
+
+def is_start_before_end(start_time: str, end_time: str) -> bool:
+    """Compare two timecodes to verify start is before end."""
+    return timecode_to_frames(start_time) < timecode_to_frames(end_time)
+
+
 @tracer.capture_method
-def validate_request(body: Dict[str, Any]) -> List[str]:
+def validate_request(body: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
     Validate the bulk download request.
 
@@ -76,11 +101,17 @@ def validate_request(body: Dict[str, Any]) -> List[str]:
     """
     # Check if assetIds is present and is a list
     if "assetIds" not in body or not isinstance(body["assetIds"], list):
-        raise BulkDownloadError("Missing or invalid assetIds. Must be a list.", 400)
+        raise BulkDownloadError(
+            "Missing or invalid assetIds. Must be a list of objects.", 400
+        )
 
     # Check if assetIds is empty
     if len(body["assetIds"]) == 0:
         raise BulkDownloadError("assetIds list cannot be empty.", 400)
+
+    # Check if assetIds is list of objects
+    if not all(isinstance(item, dict) for item in body["assetIds"]):
+        raise BulkDownloadError("Each item in assetIds list must be an object.", 400)
 
     # Check if assetIds exceeds maximum limit
     if len(body["assetIds"]) > MAX_ASSETS_PER_JOB:
@@ -89,23 +120,76 @@ def validate_request(body: Dict[str, Any]) -> List[str]:
         )
 
     # Validate each asset ID
-    asset_ids = []
-    for asset_id in body["assetIds"]:
-        if not isinstance(asset_id, str) or not asset_id.strip():
+    assets = []
+    for asset in body["assetIds"]:
+        if (
+            not isinstance(asset.get("assetId", None), str)
+            or not asset.get("assetId", "").strip()
+        ):
             raise BulkDownloadError("Each assetId must be a non-empty string.", 400)
-        asset_ids.append(asset_id.strip())
 
-    # Check for duplicates
-    if len(asset_ids) != len(set(asset_ids)):
-        logger.warning("Duplicate asset IDs found. Removing duplicates.")
-        asset_ids = list(set(asset_ids))
+        # Validate clipBoundary if present
+        if "clipBoundary" in asset:
+            clip = asset["clipBoundary"]
+            if not isinstance(clip, dict):
+                raise BulkDownloadError("clipBoundary must be an object.", 400)
 
-    return asset_ids
+            # Skip validation if clipBoundary is empty (indicates whole file operation)
+            if clip:
+                # Verify that both startTime and endTime keys are present for subclip operations
+                if "startTime" not in clip or "endTime" not in clip:
+                    raise BulkDownloadError(
+                        "clipBoundary must contain both 'startTime' and 'endTime' keys.",
+                        400,
+                    )
+
+                start_time = clip["startTime"]
+                end_time = clip["endTime"]
+
+                # Verify timecode format matches HH:MM:SS:FF or HH:MM:SS;FF
+                timecode_pattern = r"^\d{2}:\d{2}:\d{2}[:;]\d{2}$"
+                if not isinstance(start_time, str) or not re.match(
+                    timecode_pattern, start_time
+                ):
+                    raise BulkDownloadError(
+                        "startTime must be a string of numbers in format 'HH:MM:SS:FF' or 'HH:MM:SS;FF'.",
+                        400,
+                    )
+                if not isinstance(end_time, str) or not re.match(
+                    timecode_pattern, end_time
+                ):
+                    raise BulkDownloadError(
+                        "endTime must be a string of numbers in format 'HH:MM:SS:FF' or 'HH:MM:SS;FF'.",
+                        400,
+                    )
+
+                # Verify that startTime and endTime are not identical
+                if start_time == end_time:
+                    raise BulkDownloadError(
+                        "startTime and endTime cannot be the same.", 400
+                    )
+
+                # Verify that endTime is not earlier than startTime
+                if not is_start_before_end(start_time, end_time):
+                    raise BulkDownloadError(
+                        "endTime must be later than startTime.", 400
+                    )
+        else:
+            raise BulkDownloadError("clipBoundary must be an object.", 400)
+        assets.append(asset)
+
+    # Removed to support multiple sub-clips from the same source asset
+    # # Check for duplicates
+    # if len(asset_ids) != len(set(asset_ids)):
+    #     logger.warning("Duplicate asset IDs found. Removing duplicates.")
+    #     asset_ids = list(set(asset_ids))
+
+    return assets
 
 
 @tracer.capture_method
 def create_job_record(
-    user_id: str, asset_ids: List[str], options: Dict[str, Any]
+    user_id: str, assets: List[Dict[str, Any]], options: Dict[str, Any]
 ) -> str:
     """
     Create a new bulk download job record in the user table.
@@ -149,10 +233,10 @@ def create_job_record(
                 "itemType": "BULK_DOWNLOAD",
                 "jobId": job_id,
                 "status": "INITIATED",
-                "assetIds": asset_ids,
+                "assetIds": assets,
                 "options": options,
                 "progress": 0,
-                "totalFiles": len(asset_ids),
+                "totalFiles": len(assets),
                 "createdAt": current_time.isoformat(),
                 "updatedAt": current_time.isoformat(),
                 "expiresAt": int(expiration_time.timestamp()),
@@ -170,7 +254,7 @@ def create_job_record(
             extra={
                 "jobId": job_id,
                 "userId": user_id,
-                "assetCount": len(asset_ids),
+                "assetCount": len(assets),
                 "itemKey": item_key,
             },
         )
@@ -185,7 +269,7 @@ def create_job_record(
             extra={
                 "error": str(e),
                 "userId": user_id,
-                "assetCount": len(asset_ids),
+                "assetCount": len(assets),
             },
         )
         metrics.add_metric(name="JobCreationErrors", unit=MetricUnit.Count, value=1)
@@ -194,7 +278,7 @@ def create_job_record(
 
 @tracer.capture_method
 def start_step_function(
-    job_id: str, user_id: str, asset_ids: List[str], options: Dict[str, Any]
+    job_id: str, user_id: str, assets: List[Dict[str, Any]], options: Dict[str, Any]
 ) -> str:
     """
     Start a Step Functions execution to process the bulk download.
@@ -216,7 +300,7 @@ def start_step_function(
         step_function_input = {
             "jobId": job_id,
             "userId": user_id,
-            "assetIds": asset_ids,
+            "assetIds": assets,
             "options": options,
             "timestamp": int(time.time()),
             # Add empty arrays for Map states
@@ -343,16 +427,16 @@ def lambda_handler(
             raise BulkDownloadError("User ID not found in request", 401)
 
         # Validate request
-        asset_ids = validate_request(body)
+        assets = validate_request(body)
 
         # Get download options
         options = body.get("options", {})
 
         # Create job record
-        job_id = create_job_record(user_id, asset_ids, options)
+        job_id = create_job_record(user_id, assets, options)
 
         # Start Step Functions execution
-        execution_arn = start_step_function(job_id, user_id, asset_ids, options)
+        execution_arn = start_step_function(job_id, user_id, assets, options)
 
         # Return success response
         return create_response(
@@ -363,7 +447,7 @@ def lambda_handler(
                 "data": {
                     "jobId": job_id,
                     "status": "INITIATED",
-                    "totalFiles": len(asset_ids),
+                    "totalFiles": len(assets),
                     "executionArn": execution_arn,
                 },
             },

@@ -1,14 +1,8 @@
 import os
-import sys
 import time
 from functools import lru_cache
 
-# Import boto3 and Key inside handler
 import boto3
-
-# Add common_libraries to path
-sys.path.insert(0, "/opt/python")
-# Add AWS PowerTools for better tracing and performance measurement
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from boto3.dynamodb.conditions import Key
 from common_libraries.cors_utils import create_response

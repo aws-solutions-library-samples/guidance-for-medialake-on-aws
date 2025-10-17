@@ -17,7 +17,8 @@ import os
 import time
 import zipfile
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
+from urllib.parse import urlparse
 
 import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
@@ -53,6 +54,23 @@ asset_table = dynamodb.Table(ASSET_TABLE)
 MAX_RETRIES = 3  # Maximum number of retries for S3 operations
 CHUNK_SIZE_MB = int(os.environ.get("CHUNK_SIZE_MB", "100"))
 CHUNK_SIZE = CHUNK_SIZE_MB * 1024 * 1024  # Convert MB to bytes for streaming
+
+
+@tracer.capture_method
+def split_s3_uri(s3_uri: str) -> Tuple[str, str]:
+    """
+    Split an S3 URI into its constituent parts
+
+    Args:
+        s3_uri: the S3 uri to parse
+
+    Returns:
+        A Tuple containing the Bucket and Key Name
+    """
+    parsed = urlparse(s3_uri)
+    bucket = parsed.netloc
+    key = parsed.path.lstrip("/")
+    return bucket, key
 
 
 @tracer.capture_method
@@ -395,7 +413,9 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
     """
     job_id = event.get("jobId")
     user_id = event.get("userId")
-    asset_id = event.get("assetId")
+    asset_id = event.get("assetId", "")
+    output_location = event.get("outputLocation", "")
+    type = event.get("type", "")
 
     if not job_id:
         raise ValueError("Missing jobId in event")
@@ -403,8 +423,10 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
     if not user_id:
         raise ValueError("Missing userId in event")
 
-    if not asset_id:
-        raise ValueError("Missing assetId in event")
+    if not asset_id and not output_location:
+        raise ValueError(
+            "Missing required field. Must have one of assetId or outputLocation in event"
+        )
 
     try:
         logger.info(
@@ -413,6 +435,8 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                 "jobId": job_id,
                 "userId": user_id,
                 "assetId": asset_id,
+                "outputLocation": output_location,
+                "type": type,
                 "event": event,
             },
         )
@@ -440,35 +464,68 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                 "jobId": job_id,
                 "userId": user_id,
                 "assetId": asset_id,
+                "outputLocation": output_location,
+                "type": type,
             },
         )
 
-        # Get asset details
-        asset = get_asset_details(asset_id)
+        # Determine whether we need to get the asset location from DynamoDB or
+        # have a direct S3 URI
+        file_path = None
+        bucket = None
 
-        # Get download options
-        options = job.get("options", {})
-        quality = options.get("quality", "original")  # original or proxy
+        if event.get("type") == "S3_URI":
+            # Get asset location from S3 URI
+            asset_id = "S3_URI_ASSET_LOCATION"
+            uri: str = output_location
+            if not uri and uri.startswith("s3://") and len(uri) > 5:
+                logger.error(
+                    "Valid S3 URI not found",
+                    extra={
+                        "jobId": job_id,
+                        "assetId": asset_id,
+                        "outputLocation": output_location,
+                        "type": type,
+                    },
+                )
+            bucket, file_path = split_s3_uri(uri)
 
-        # Determine file path based on quality option
-        if quality == "proxy":
-            # Look for proxy representation
-            file_path = None
-            bucket = None
+        else:  # Get the asset details from DynamoDB
+            asset = get_asset_details(asset_id)
 
-            for rep in asset.get("DerivedRepresentations", []):
-                if rep.get("Purpose") == "proxy":
-                    storage_info = rep.get("StorageInfo", {}).get("PrimaryLocation", {})
+            # Get download options
+            options = job.get("options", {})
+            quality = options.get("quality", "original")  # original or proxy
+
+            # Determine file path based on quality option
+            if quality == "proxy":
+                # Look for proxy representation
+
+                for rep in asset.get("DerivedRepresentations", []):
+                    if rep.get("Purpose") == "proxy":
+                        storage_info = rep.get("StorageInfo", {}).get(
+                            "PrimaryLocation", {}
+                        )
+                        bucket = storage_info.get("Bucket", MEDIA_ASSETS_BUCKET)
+                        file_path = storage_info.get("ObjectKey", {}).get("FullPath")
+                        break
+
+                # If no proxy found, use original
+                if not file_path:
+                    logger.warning(
+                        "No proxy representation found, using original",
+                        extra={"assetId": asset_id},
+                    )
+                    main_rep = asset.get("DigitalSourceAsset", {}).get(
+                        "MainRepresentation", {}
+                    )
+                    storage_info = main_rep.get("StorageInfo", {}).get(
+                        "PrimaryLocation", {}
+                    )
                     bucket = storage_info.get("Bucket", MEDIA_ASSETS_BUCKET)
                     file_path = storage_info.get("ObjectKey", {}).get("FullPath")
-                    break
-
-            # If no proxy found, use original
-            if not file_path:
-                logger.warning(
-                    "No proxy representation found, using original",
-                    extra={"assetId": asset_id},
-                )
+            else:
+                # Use original representation
                 main_rep = asset.get("DigitalSourceAsset", {}).get(
                     "MainRepresentation", {}
                 )
@@ -477,15 +534,9 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                 )
                 bucket = storage_info.get("Bucket", MEDIA_ASSETS_BUCKET)
                 file_path = storage_info.get("ObjectKey", {}).get("FullPath")
-        else:
-            # Use original representation
-            main_rep = asset.get("DigitalSourceAsset", {}).get("MainRepresentation", {})
-            storage_info = main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
-            bucket = storage_info.get("Bucket", MEDIA_ASSETS_BUCKET)
-            file_path = storage_info.get("ObjectKey", {}).get("FullPath")
 
-        if not file_path:
-            raise ValueError(f"Could not determine file path for asset {asset_id}")
+            if not file_path:
+                raise ValueError(f"Could not determine file path for asset {asset_id}")
 
         # Get file name from path
         file_name = os.path.basename(file_path)
@@ -503,6 +554,8 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                     "jobId": job_id,
                     "userId": user_id,
                     "assetId": asset_id,
+                    "outputLocation": output_location,
+                    "type": type,
                     "fileName": file_name,
                 },
             )
@@ -523,6 +576,8 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                     "jobId": job_id,
                     "userId": user_id,
                     "assetId": asset_id,
+                    "outputLocation": output_location,
+                    "type": type,
                     "fileName": file_name,
                     "processedCount": processed_count,
                     "totalCount": total_count,
@@ -533,6 +588,8 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                 "jobId": job_id,
                 "userId": user_id,
                 "assetId": asset_id,
+                "outputLocation": output_location,
+                "type": type,
                 "status": "APPENDED",
                 "zipPath": zip_path,
                 "processedCount": processed_count,
@@ -549,6 +606,8 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                 "jobId": job_id,
                 "userId": user_id,
                 "assetId": asset_id,
+                "outputLocation": output_location,
+                "type": type,
             },
         )
 

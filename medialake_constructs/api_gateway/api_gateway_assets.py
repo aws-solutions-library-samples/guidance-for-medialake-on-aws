@@ -32,6 +32,10 @@ from medialake_constructs.shared_constructs.lambda_layers import (
     SearchLayer,
     ZipmergeLayer,
 )
+from medialake_constructs.shared_constructs.mediaconvert import (
+    MediaConvert,
+    MediaConvertProps,
+)
 
 
 def apply_custom_authorization(
@@ -74,7 +78,7 @@ class AssetsProps:
     s3_vector_index_name: str = "media-vectors"
 
     # Bulk download parameters
-    small_file_threshold_mb: int = 1024  # Max size for a file to be considered "small"
+    small_file_threshold_mb: int = 512  # Max size for a file to be considered "small"
     chunk_size_mb: int = 100  # Size of each chunk for large file processing
     max_small_file_concurrency: int = 1000  # Max Lambdas for processing small files
     max_large_chunk_concurrency: int = 100  # Max Lambdas processing large file chunks
@@ -151,6 +155,7 @@ class AssetsConstruct(Construct):
         )
         apply_custom_authorization(assets_get, props.authorizer)
         # /{id} Lambda
+        # High-traffic asset retrieval API with VPC access
         get_asset_lambda = Lambda(
             self,
             "GetAssetLambda",
@@ -160,6 +165,8 @@ class AssetsConstruct(Construct):
                 vpc=props.vpc,
                 security_groups=[props.security_group],
                 layers=[search_layer.layer],
+                memory_size=512,  # VPC Lambda needs sufficient memory for ENI setup
+                provisioned_concurrent_executions=2,  # Keep 2 instances warm for fast asset retrieval
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
@@ -855,6 +862,9 @@ class AssetsConstruct(Construct):
             ),
         )
 
+        # Create MediaConvert Resources
+        self._create_bulk_download_mediaconvert_resources()
+
         # Create Lambda functions
         self._create_bulk_download_lambda_functions(props)
 
@@ -1036,8 +1046,7 @@ class AssetsConstruct(Construct):
                 environment_variables={
                     **common_env_vars,
                     "ASSET_TABLE": props.asset_table.table_name,
-                    "SMALL_FILE_THRESHOLD": "100",  # MB
-                    "LARGE_JOB_THRESHOLD": "1000",  # MB
+                    "SMALL_FILE_THRESHOLD_MB": str(props.small_file_threshold_mb),  # MB
                     "SINGLE_FILE_CHECK": "true",  # Enable single file check
                 },
                 timeout_minutes=1,
@@ -1105,31 +1114,60 @@ class AssetsConstruct(Construct):
             ),
         )
 
+        # Get SubClips Paths Lambda
+        self._subclips_get_paths_lambda = Lambda(
+            self,
+            "AssetsBulkDownloadSubclipsGetPathsLambda",
+            config=LambdaConfig(
+                name="assets_bulk_download_subclips_get_paths",
+                entry="lambdas/api/assets/download/bulk/post_bulk/subclips_get_paths",
+                environment_variables={
+                    **common_env_vars,
+                    "ASSET_TABLE": props.asset_table.table_name,
+                },
+                timeout_minutes=1,
+                memory_size=512,
+            ),
+        )
+
+        # Sort SubClips by Size Lambda
+        self._subclips_size_sort_lambda = Lambda(
+            self,
+            "AssetsBulkDownloadSubclipsSizeSortLambda",
+            config=LambdaConfig(
+                name="assets_bulk_download_subclips_size_sort",
+                entry="lambdas/api/assets/download/bulk/post_bulk/subclips_size_sort",
+                environment_variables={
+                    **common_env_vars,
+                    "ASSET_TABLE": props.asset_table.table_name,
+                    "SMALL_FILE_THRESHOLD_MB": str(props.small_file_threshold_mb),  # MB
+                },
+                timeout_minutes=1,
+            ),
+        )
+
         # Add permissions to Lambda functions
         self._add_bulk_download_lambda_permissions(props)
 
     def _add_bulk_download_lambda_permissions(self, props: AssetsProps):
         """Add necessary permissions to Lambda functions."""
+
         # DynamoDB permissions
         for lambda_function in [
             self._kickoff_lambda,
             self._assess_scale_lambda,
-            # self._handle_small_lambda,  # UNUSED
-            # self._handle_large_lambda,  # UNUSED
-            # self._merge_batch_lambda,  # UNUSED
-            # self._final_merge_lambda,  # UNUSED
             self._status_lambda,
             self._mark_downloaded_lambda,
             self._init_zip_lambda,
             self._append_to_zip_lambda,
-            # self._finalize_zip_lambda,  # UNUSED
             self._init_multipart_lambda,
             self._upload_part_lambda,
             self._complete_multipart_lambda,
             self._get_parts_manifest_lambda,
             self._handle_large_individual_lambda,
-            # self._complete_mixed_job_lambda,  # UNUSED
             self._delete_bulk_download_lambda,
+            self._subclips_get_paths_lambda,
+            self._subclips_size_sort_lambda,
         ]:
             lambda_function.function.add_to_role_policy(
                 iam.PolicyStatement(
@@ -1152,6 +1190,7 @@ class AssetsConstruct(Construct):
             self._assess_scale_lambda,
             self._append_to_zip_lambda,
             self._handle_large_individual_lambda,
+            self._subclips_get_paths_lambda,
         ]:
             lambda_function.function.add_to_role_policy(
                 iam.PolicyStatement(
@@ -1184,6 +1223,7 @@ class AssetsConstruct(Construct):
         for lambda_function in [
             self._append_to_zip_lambda,
             self._handle_large_individual_lambda,
+            self._subclips_size_sort_lambda,
         ]:
             lambda_function.function.add_to_role_policy(
                 iam.PolicyStatement(
@@ -1228,6 +1268,7 @@ class AssetsConstruct(Construct):
             self._complete_multipart_lambda,
             self._get_parts_manifest_lambda,
             self._handle_large_individual_lambda,
+            self._subclips_size_sort_lambda,
         ]:
             lambda_function.function.add_to_role_policy(
                 iam.PolicyStatement(
@@ -1343,6 +1384,8 @@ class AssetsConstruct(Construct):
                         "jobId.$": "$.jobId",
                         "userId.$": "$.userId",
                         "assetId.$": "$.mapItem.assetId",
+                        "outputLocation.$": "$.mapItem.outputLocation",
+                        "type.$": "$.mapItem.type",
                         "options.$": "$.mapItem.options",
                         "zipPath.$": "$.zipPath",
                     }
@@ -1514,8 +1557,12 @@ class AssetsConstruct(Construct):
                 actions=[
                     "dynamodb:GetItem",
                     "dynamodb:UpdateItem",
+                    "dynamodb:Query",
                 ],
-                resources=[self._users_table.table_arn],
+                resources=[
+                    self._users_table.table_arn,
+                    f"{self._users_table.table_arn}/index/*",  # Allow access to all GSIs
+                ],
             )
         )
 
@@ -1809,6 +1856,128 @@ class AssetsConstruct(Construct):
         # Connect complete multipart task to success state
         complete_multipart_task.next(success_state)
 
+        ## Sub-Clipping Workflow Components ##
+        # Get sub-clips source file locations / output paths
+        get_subclip_paths_task = tasks.LambdaInvoke(
+            self,
+            "AssetsGetSubClipPaths",
+            lambda_function=self._subclips_get_paths_lambda.function,
+            output_path="$.Payload",
+        )
+
+        # Sort sub-clips into large/small
+        sort_subclips_by_size = tasks.LambdaInvoke(
+            self,
+            "AssetsSortSubClips",
+            lambda_function=self._subclips_size_sort_lambda.function,
+            output_path="$.Payload",
+        )
+
+        # Define Map state for creating sub-clips with MediaConvert
+        sub_clips_map = sfn.Map(
+            self,
+            "ProcessSubClipsMap",
+            items_path="$.subClips",
+            result_path="$.processedSubClips",
+            item_selector={
+                "jobId.$": "$.jobId",
+                "userId.$": "$.userId",
+                "mapItem.$": "$$.Map.Item.Value",
+            },
+        ).item_processor(
+            tasks.MediaConvertCreateJob(
+                self,
+                "CreateSubClipsWithMediaConvert",
+                result_selector={
+                    "outputLocation.$": "$.Job.Settings.OutputGroups[0].OutputGroupSettings.FileGroupSettings.Destination"
+                },
+                create_job_request={
+                    "Queue": self.subclip_mediaconvert_queue.queue_arn,
+                    "Role": self.subclip_mediaconvert_role.role_arn,
+                    "Settings": {
+                        "TimecodeConfig": {"Source": "ZEROBASED"},
+                        "OutputGroups": [
+                            {
+                                "Name": "File Group",
+                                "Outputs": [
+                                    {
+                                        "ContainerSettings": {
+                                            "Container": "MP4",
+                                            "Mp4Settings": {},
+                                        },
+                                        "VideoDescription": {
+                                            "CodecSettings": {
+                                                "Codec": "H_264",
+                                                "H264Settings": {
+                                                    "MaxBitrate.$": "States.StringToJson($.mapItem.video.MaxBitrate)",
+                                                    "Bitrate.$": "States.StringToJson($.mapItem.video.Bitrate)",
+                                                    "RateControlMode.$": "$.mapItem.video.RateControlMode",
+                                                },
+                                            }
+                                        },
+                                        "AudioDescriptions": [
+                                            {
+                                                "AudioSourceName": "Dynamic Audio Selector 1",
+                                                "CodecSettings": {
+                                                    "Codec": "AAC",
+                                                    "AacSettings": {
+                                                        "Bitrate.$": "States.StringToJson($.mapItem.audio.Bitrate)",
+                                                        "CodingMode": "CODING_MODE_2_0",
+                                                        "SampleRate.$": "States.StringToJson($.mapItem.audio.SampleRate)",
+                                                        "RateControlMode.$": "$.mapItem.audio.RateControlMode",
+                                                        "CodecProfile": "LC",
+                                                    },
+                                                },
+                                            }
+                                        ],
+                                    }
+                                ],
+                                "OutputGroupSettings": {
+                                    "Type": "FILE_GROUP_SETTINGS",
+                                    "FileGroupSettings": {
+                                        "Destination.$": "$.mapItem.outputLocationNoExt"
+                                    },
+                                },
+                            }
+                        ],
+                        "FollowSource": 1,
+                        "Inputs": [
+                            {
+                                "InputClippings": [
+                                    {
+                                        "EndTimecode.$": "$.mapItem.clipBoundary.endTime",
+                                        "StartTimecode.$": "$.mapItem.clipBoundary.startTime",
+                                    }
+                                ],
+                                "DynamicAudioSelectors": {
+                                    "Dynamic Audio Selector 1": {}
+                                },
+                                "VideoSelector": {},
+                                "TimecodeSource": "ZEROBASED",
+                                "FileInput.$": "$.mapItem.sourceLocation",
+                            }
+                        ],
+                    },
+                },
+                integration_pattern=sfn.IntegrationPattern.RUN_JOB,
+            )
+        )
+
+        # Define choice state for if there are sub-clips
+        sub_clips_workflow = (
+            sfn.Choice(
+                self,
+                "CheckForSubClips",
+            )
+            .when(
+                sfn.Condition.is_present("$.subClips[0]"),
+                get_subclip_paths_task.next(sub_clips_map)
+                .next(sort_subclips_by_size)
+                .next(multipart_workflow),
+            )
+            .otherwise(sfn.Pass(self, "NoSubClips").next(multipart_workflow))
+        )
+
         workflow = assess_scale_task.next(
             job_size_choice.when(
                 sfn.Condition.string_equals("$.jobType", "SINGLE_FILE"),
@@ -1819,7 +1988,7 @@ class AssetsConstruct(Construct):
                 handle_large_individual_task.next(success_state),
             )
             .otherwise(
-                multipart_workflow
+                sub_clips_workflow
             )  # Used for SMALL, MIXED, and legacy job types
         )
 
@@ -1929,6 +2098,71 @@ class AssetsConstruct(Construct):
         add_cors_options_method(job_resource)
         add_cors_options_method(user_resource)
 
+    def _create_bulk_download_mediaconvert_resources(self):
+        """Resources required to run MediaConvert for Bulk Download operations.
+
+        Includes tasks like sub-clipping. These are being created separate from the
+        MediaConvert resources related to pipeline operations to separate permissions and
+        keep queue operations distinct between bulk download sub-clipping jobs
+        and pipeline processing.
+        """
+        self.subclip_mediaconvert_queue = MediaConvert.create_queue(
+            self,
+            "MediaLakeSubClipQueue",
+            props=MediaConvertProps(
+                description="A MediaLake queue for creating Sub-Clips of source assets",
+                name="MediaLakeSubClipQueue",  # If omitted, one is auto-generated
+                pricing_plan="ON_DEMAND",  # Must be ON_DEMAND for CF-based queue creation
+                status="ACTIVE",  # Could also be "PAUSED"
+                tags=[
+                    {"Environment": config.environment},
+                    {"Owner": config.resource_prefix},
+                ],
+            ),
+        )
+
+        self.subclip_mediaconvert_role = iam.Role(
+            self,
+            "SubClipMediaConvertRole",
+            assumed_by=iam.ServicePrincipal("mediaconvert.amazonaws.com"),
+            role_name=f"{config.resource_prefix}_SubClip_MediaConvert_Role",
+            description="IAM role for MediaConvert SubClip Operations",
+        )
+
+        self.subclip_mediaconvert_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                    "s3:PutObject",
+                ],
+                resources=["arn:aws:s3:::*"],
+            )
+        )
+
+        self.subclip_mediaconvert_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "kms:Encrypt",
+                    "kms:Decrypt",
+                    "kms:ReEncrypt*",
+                    "kms:GenerateDataKey*",
+                    "kms:DescribeKey",
+                ],
+                resources=["*"],
+            )
+        )
+
+        self.subclip_mediaconvert_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                ],
+                resources=["arn:aws:logs:*:*:*"],
+            )
+        )
+
     @property
     def bulk_download_table(self) -> dynamodb.TableV2:
         return (
@@ -1942,3 +2176,19 @@ class AssetsConstruct(Construct):
     @property
     def state_machine(self) -> sfn.StateMachine:
         return self._state_machine if hasattr(self, "_state_machine") else None
+
+    @property
+    def subclip_mediaconvert_role_arn(self) -> str:
+        return (
+            self.subclip_mediaconvert_role.role_arn
+            if hasattr(self, "subclip_mediaconvert_role")
+            else None
+        )
+
+    @property
+    def subclip_mediaconvert_queue_arn(self) -> str:
+        return (
+            self.subclip_mediaconvert_queue.queue_arn
+            if hasattr(self, "proxy_queue")
+            else None
+        )

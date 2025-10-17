@@ -42,6 +42,9 @@ DEFAULT_MEMORY_SIZE = 128
 DEFAULT_TIMEOUT_MINUTES = 5
 DEFAULT_RUNTIME = lambda_.Runtime.PYTHON_3_12
 DEFAULT_ARCHITECTURE = lambda_.Architecture.X86_64
+# SnapStart disabled by default due to initialization issues with some Lambda functions
+# Use provisioned concurrency instead for critical APIs
+DEFAULT_SNAP_START = False
 MAX_LAMBDA_NAME_LENGTH = 64
 MAX_ROLE_NAME_LENGTH = 64
 MAX_LOG_GROUP_NAME_LENGTH = 512
@@ -176,8 +179,10 @@ class LambdaConfig:
             Use this to reduce cold starts. Creates a Lambda alias with provisioned concurrency.
         filesystem_access_point (Optional[efs.IAccessPoint]): EFS access point for Lambda filesystem
         filesystem_mount_path (Optional[str]): Mount path for EFS filesystem
-        snap_start (Optional[bool]): Enable SnapStart for faster cold starts (default: False).
-        Note: SnapStart is supported for Java 11+, Python 3.12+, and .NET 8+ runtimes.
+        snap_start (Optional[bool]): Enable SnapStart for faster cold starts (default: True).
+            Note: SnapStart is supported for Java 11+, Python 3.12+, and .NET 8+ runtimes.
+            WARNING: SnapStart is NOT compatible with EFS. If filesystem_access_point is configured,
+            SnapStart will be automatically disabled regardless of this setting.
     """
 
     name: Optional[str] = None
@@ -200,7 +205,7 @@ class LambdaConfig:
     provisioned_concurrent_executions: Optional[int] = None
     filesystem_access_point: Optional[efs.IAccessPoint] = None
     filesystem_mount_path: Optional[str] = None
-    snap_start: Optional[bool] = False
+    snap_start: Optional[bool] = DEFAULT_SNAP_START
 
 
 class Lambda(Construct):
@@ -447,7 +452,9 @@ class Lambda(Construct):
             common_lambda_props["security_groups"] = config.security_groups
 
         # Add filesystem if provided
+        has_efs = False
         if config.filesystem_access_point and config.filesystem_mount_path:
+            has_efs = True
             logger.debug(
                 f"Adding filesystem with access point and mount path {config.filesystem_mount_path}"
             )
@@ -457,8 +464,8 @@ class Lambda(Construct):
                 )
             )
 
-        # Add SnapStart if enabled
-        if config.snap_start:
+        # Add SnapStart if enabled (but not compatible with EFS)
+        if config.snap_start and not has_efs:
             logger.debug("SnapStart enabled for Lambda function")
             # SnapStart is supported for Java 11+, Python 3.12+, and .NET 8+ runtimes
             # SnapStart requires SnapStartConf object, not a simple boolean
@@ -491,6 +498,11 @@ class Lambda(Construct):
                     )
                 else:
                     logger.info(f"SnapStart is supported for {config.runtime.name}")
+        elif config.snap_start and has_efs:
+            logger.warning(
+                f"SnapStart was requested but is disabled because EFS filesystem is attached. "
+                f"SnapStart is not compatible with EFS-mounted Lambda functions."
+            )
 
         # Create the Lambda function based on runtime
         logger.info(f"Creating {config.runtime.family} Lambda function with properties")
