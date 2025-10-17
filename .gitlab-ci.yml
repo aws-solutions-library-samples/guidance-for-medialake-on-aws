@@ -101,6 +101,7 @@ medialake_deploy_us_west_2:
     - 'echo "Using DEPLOY_REGION: $DEPLOY_REGION"'
     - echo "Verifying AWS identity:"
     - aws sts get-caller-identity --profile default
+    - aws s3 ls --profile default
     - |
       # Generate unique S3 bucket name using UUID
       echo "Generating unique S3 bucket name..."
