@@ -1,5 +1,4 @@
 import os
-import sys
 from typing import Any, List
 
 import boto3
@@ -7,9 +6,6 @@ from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.event_handler.api_gateway import APIGatewayProxyEvent
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
-
-# Add common_libraries to path
-sys.path.insert(0, "/opt/python")
 from common_libraries.cors_utils import create_error_response, create_response
 
 # Initialize AWS Lambda Powertools
