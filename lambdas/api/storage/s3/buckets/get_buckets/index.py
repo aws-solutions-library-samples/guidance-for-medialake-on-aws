@@ -1,10 +1,6 @@
 import os
-import sys
 
 import boto3
-
-# Add common_libraries to path
-sys.path.insert(0, "/opt/python")
 from common_libraries.cors_utils import create_response
 
 
