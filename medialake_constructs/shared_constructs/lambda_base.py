@@ -42,6 +42,8 @@ DEFAULT_MEMORY_SIZE = 128
 DEFAULT_TIMEOUT_MINUTES = 5
 DEFAULT_RUNTIME = lambda_.Runtime.PYTHON_3_12
 DEFAULT_ARCHITECTURE = lambda_.Architecture.X86_64
+# Enable SnapStart by default for Python 3.12+ to reduce cold starts (free performance boost)
+DEFAULT_SNAP_START = True
 MAX_LAMBDA_NAME_LENGTH = 64
 MAX_ROLE_NAME_LENGTH = 64
 MAX_LOG_GROUP_NAME_LENGTH = 512
@@ -200,7 +202,7 @@ class LambdaConfig:
     provisioned_concurrent_executions: Optional[int] = None
     filesystem_access_point: Optional[efs.IAccessPoint] = None
     filesystem_mount_path: Optional[str] = None
-    snap_start: Optional[bool] = False
+    snap_start: Optional[bool] = DEFAULT_SNAP_START
 
 
 class Lambda(Construct):
