@@ -86,10 +86,8 @@ medialake_deploy_us_west_2:
     unzip awscliv2.zip
     ./aws/install
     # Configure AWS credentials
-    aws configure set aws_access_key_id $ACCESS_KEY_ID
-    aws configure set aws_secret_access_key $SECRET_ACCESS_KEY
-    aws configure set default.region $DEPLOY_REGION
-    echo "AWS credentials configured for region: $DEPLOY_REGION"
+    aws configure set default.region $E2E_TEST_AWS_REGION
+    echo "AWS credentials configured for region: $E2E_TEST_AWS_REGION"
     # Basic tool versions
     echo "login = $GITLAB_USER_LOGIN - using CICD credentials"
     npm --version
