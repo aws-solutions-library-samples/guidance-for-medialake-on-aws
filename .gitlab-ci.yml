@@ -696,8 +696,8 @@ playwright_e2e_test:
     - |
       # Clean up: Delete the temporary S3 bucket after deployment
       echo "Cleaning up temporary S3 bucket..."
-      aws s3 rm s3://$S3_BUCKET_NAME --recursive --region $DEPLOY_REGION --profile default
-      aws s3 rb s3://$S3_BUCKET_NAME --region $DEPLOY_REGION --profile default
+      aws s3 rm s3://$S3_BUCKET_NAME --recursive --profile default
+      aws s3 rb s3://$S3_BUCKET_NAME --profile default
       echo "Temporary S3 bucket deleted: $S3_BUCKET_NAME"
   after_script:
     - echo "E2E test execution completed"
