@@ -426,9 +426,6 @@ playwright_e2e_test:
     - size:large
   rules:
     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
-      when: on_success
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "lg_cicd"
-      when: on_success
     - when: never
   # Commented out for faster testing iteration
   # needs:
