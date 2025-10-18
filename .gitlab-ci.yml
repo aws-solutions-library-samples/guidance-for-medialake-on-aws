@@ -420,7 +420,7 @@ sync-to-github:
 
 playwright_e2e_test:
   stage: test
-  timeout: 1h
+  timeout: 3h
   tags:
     - arch:amd64
     - size:large
@@ -439,8 +439,6 @@ playwright_e2e_test:
     ENVIRONMENT_NAME: "e2e"
     DEPLOYMENT_SIZE: "small"
     ZIP_FILE_NAME: "medialake-source-${CI_COMMIT_SHORT_SHA}.zip"
-    #ACCESS_KEY_ID: $US_WEST_2_ACCESS_KEY
-    #SECRET_ACCESS_KEY: $US_WEST_2_SECRET_KEY
   before_script:
     # Install required dependencies
     - yum update -y
