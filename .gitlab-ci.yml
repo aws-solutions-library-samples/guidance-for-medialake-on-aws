@@ -18,11 +18,11 @@ variables:
 workflow:
   rules:
     # Allow merge requests to run
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    # Allow specific branches to run
-    - if: $CI_COMMIT_REF_NAME == "dev4"
-    - if: $CI_COMMIT_REF_NAME == "dev5"
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
+    # - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    # # Allow specific branches to run
+    # - if: $CI_COMMIT_REF_NAME == "dev4"
+    # - if: $CI_COMMIT_REF_NAME == "dev5"
+    # - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
     - when: never
 
 # Cache modules in between jobs
@@ -414,8 +414,8 @@ sync-to-github:
     - git push origin main
 
 playwright_e2e_test:
-  stage: test
-  timeout: 3h
+  stage: playwright_e2e_test
+  timeout: 4h
   tags:
     - arch:amd64
     - size:large
