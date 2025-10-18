@@ -414,7 +414,7 @@ sync-to-github:
     - git push origin main
 
 playwright_e2e_test:
-  stage: playwright_e2e_test
+  stage: test
   timeout: 4h
   tags:
     - arch:amd64
