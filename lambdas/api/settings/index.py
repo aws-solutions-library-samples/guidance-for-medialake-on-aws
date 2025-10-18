@@ -50,8 +50,9 @@ app = APIGatewayRestResolver(
     cors=cors_config,
 )
 
-# Register all routes from handlers
-from handlers import register_all_routes  # noqa: E402
+# Register all routes from handler modules (now in same directory)
+# Import handler modules to make register_all_routes work
+from __init__ import register_all_routes  # noqa: E402
 
 register_all_routes(app)
 
