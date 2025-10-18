@@ -503,57 +503,56 @@ playwright_e2e_test:
         if [ -z "$deleting_stacks" ]; then
           return 1
         else
-          echo "Stacks currently being deleted in $DEPLOY_REGION: $deleting_stacks"
+          echo "Stacks currently being deleted in $region: $deleting_stacks"
           return 0
         fi
       }
-      list_stacks $DEPLOY_REGION
-      any_deleting $DEPLOY_REGION
+
       # Function to delete stacks in a specific region
       delete_stacks_in_region() {
         local region=$1
-        echo "Starting comprehensive stack cleanup in region $DEPLOY_REGION"
+        echo "Starting comprehensive stack cleanup in region $region"
         echo "Will delete all stacks containing (case-insensitive): '$STACK_PREFIX'"
         # Main loop to delete stacks
         while true; do
-          stacks=$(list_stacks "$DEPLOY_REGION")
+          stacks=$(list_stacks "$region")
           if [ -z "$stacks" ]; then
             echo "No more medialake stacks found in region $region. Cleanup complete!"
             break
           fi
-          echo "Found stacks in $DEPLOY_REGION: $stacks"
+          echo "Found stacks in $region: $stacks"
           # Check if any stack is already being deleted
-          if any_deleting "$DEPLOY_REGION"; then
-            echo "Waiting for in-progress deletions to complete in $DEPLOY_REGION..."
+          if any_deleting "$region"; then
+            echo "Waiting for in-progress deletions to complete in $region..."
           else
             # Attempt to delete each stack
             for stack in $stacks; do
-              echo "Attempting to delete stack: $stack in region $DEPLOY_REGION"
+              echo "Attempting to delete stack: $stack in region $region"
               # Check if stack is in DELETE_FAILED state and try with retain resources
-              stack_status=$(aws cloudformation describe-stacks --stack-name "$stack" --region "$DEPLOY_REGION" --profile default --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "STACK_NOT_FOUND")
+              stack_status=$(aws cloudformation describe-stacks --stack-name "$stack" --region "$region" --profile default --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "STACK_NOT_FOUND")
               if [ "$stack_status" == "DELETE_FAILED" ]; then
                 echo "Stack $stack is in DELETE_FAILED state. Attempting to get resources that failed to delete..."
                 # Get resources that might have failed to delete
-                resources=$(aws cloudformation list-stack-resources --stack-name "$stack" --region "$DEPLOY_REGION" --profile default --query "StackResourceSummaries[?ResourceStatus=='DELETE_FAILED'].LogicalResourceId" --output text || true)
+                resources=$(aws cloudformation list-stack-resources --stack-name "$stack" --region "$region" --profile default --query "StackResourceSummaries[?ResourceStatus=='DELETE_FAILED'].LogicalResourceId" --output text || true)
                 if [ -n "$resources" ]; then
                   echo "Found resources that failed to delete: $resources"
                   echo "Attempting to delete stack with --retain-resources option"
                   aws cloudformation delete-stack \
-                    --region $DEPLOY_REGION \
+                    --region $region \
                     --profile default \
                     --stack-name $stack \
                     --retain-resources $resources || true
                 else
                   # Standard delete attempt
                   aws cloudformation delete-stack \
-                    --region $DEPLOY_REGION \
+                    --region $region \
                     --profile default \
                     --stack-name $stack || true
                 fi
               else
                 # Standard delete attempt
                 aws cloudformation delete-stack \
-                  --region $DEPLOY_REGION \
+                  --region $region \
                   --profile default \
                   --stack-name $stack || true
               fi
@@ -561,14 +560,14 @@ playwright_e2e_test:
               break
             done
           fi
-          echo "Waiting 60 seconds before checking again in $DEPLOY_REGION..."
+          echo "Waiting 60 seconds before checking again in $region..."
           sleep 60
         done
       }
       # Check for existing CodePipelines that might conflict
-      echo "Checking for existing CodePipelines..."
+      echo "Checking for existing CodePipelines in $DEPLOY_REGION..."
       for pipeline_candidate in "MediaLakeCDKPipeline" "CDKDeploymentPipeline"; do
-        if aws codepipeline get-pipeline --name "$pipeline_candidate" --profile default >/dev/null 2>&1; then
+        if aws codepipeline get-pipeline --name "$pipeline_candidate" --region $DEPLOY_REGION --profile default >/dev/null 2>&1; then
           echo "Found existing pipeline: $pipeline_candidate - will be cleaned up with stack deletion"
         fi
       done
