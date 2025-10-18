@@ -471,6 +471,40 @@ playwright_e2e_test:
     - export BUCKET_UUID=$(python3 -c "import uuid; print(str(uuid.uuid4())[:8])")
     - export S3_BUCKET_NAME="medialake-deploy-${BUCKET_UUID}-${CI_COMMIT_SHORT_SHA}"
     - aws s3 mb s3://$S3_BUCKET_NAME --profile default
+    - aws s3 ls s3://$S3_BUCKET_NAME/ --profile default
+    - aws s3 cp medialake.template s3://$S3_BUCKET_NAME/medialake.template --profile default
+    - |
+      list_stacks() {
+        local region=$1
+        local stack_prefix="$STACK_PREFIX"
+        # Get all stacks excluding DELETE_COMPLETE and filter case-insensitively for the prefix
+        aws cloudformation list-stacks \
+          --region $region \
+          --profile default \
+          --stack-status-filter CREATE_COMPLETE CREATE_FAILED CREATE_IN_PROGRESS REVIEW_IN_PROGRESS ROLLBACK_COMPLETE ROLLBACK_FAILED ROLLBACK_IN_PROGRESS UPDATE_COMPLETE UPDATE_COMPLETE_CLEANUP_IN_PROGRESS UPDATE_IN_PROGRESS UPDATE_ROLLBACK_COMPLETE UPDATE_ROLLBACK_COMPLETE_CLEANUP_IN_PROGRESS UPDATE_ROLLBACK_FAILED UPDATE_ROLLBACK_IN_PROGRESS DELETE_FAILED \
+          --query "StackSummaries[].StackName" \
+          --output text | tr '\t' '\n' | grep -i "$stack_prefix" || true
+      }
+
+      any_deleting() {
+        local region=$1
+        local stack_prefix="$STACK_PREFIX"
+        local deleting_stacks=$(aws cloudformation list-stacks \
+          --region $region \
+          --profile default \
+          --stack-status-filter DELETE_IN_PROGRESS \
+          --query "StackSummaries[].StackName" \
+          --output text | tr '\t' '\n' | grep -i "$stack_prefix" || true)
+        if [ -z "$deleting_stacks" ]; then
+          return 1
+        else
+          echo "Stacks currently being deleted in $DEPLOY_REGION: $deleting_stacks"
+          return 0
+        fi
+      }
+
+      list_stacks $DEPLOY_REGION
+      any_deleting $DEPLOY_REGION
   after_script:
     - echo "E2E test execution completed"
     - echo "Test artifacts available in test-results/ and playwright-report/ directories"
