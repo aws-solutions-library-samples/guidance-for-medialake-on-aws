@@ -434,8 +434,6 @@ playwright_e2e_test:
     CDK_DEPLOY_ACCOUNT: $US_WEST_2_AWS_ACCOUNT_ID
     CDK_DEFAULT_ACCOUNT: $US_WEST_2_AWS_ACCOUNT_ID
     CDK_DEPLOY_REGION: $US_WEST_2_AWS_REGION
-    AWS_REGION: $US_WEST_2_AWS_REGION
-    AMAZON_REGION: $US_WEST_2_AWS_REGION
     #ACCESS_KEY_ID: $US_WEST_2_ACCESS_KEY
     #SECRET_ACCESS_KEY: $US_WEST_2_SECRET_KEY
   before_script:
@@ -459,12 +457,6 @@ playwright_e2e_test:
     - echo $CDK_DEPLOY_ACCOUNT
     - echo $CDK_DEFAULT_ACCOUNT
     - echo $CDK_DEPLOY_REGION
-    - echo $AWS_REGION
-    - echo $AMAZON_REGION
-    # Export AWS credentials as environment variables (matching deployment job pattern)
-    # - export AWS_ACCESS_KEY_ID="$ACCESS_KEY_ID"
-    # - export AWS_SECRET_ACCESS_KEY="$SECRET_ACCESS_KEY"
-    # - unset AWS_SESSION_TOKEN
     - echo "Environment credentials overridden for testing"
     # Verify AWS access
     - cat /root/.aws/credentials
@@ -476,6 +468,9 @@ playwright_e2e_test:
   script:
     - echo "Running comprehensive Playwright E2E test against deployed MediaLake infrastructure"
     - aws s3 ls --profile default
+    - export BUCKET_UUID=$(python3 -c "import uuid; print(str(uuid.uuid4())[:8])")
+    - export S3_BUCKET_NAME="medialake-deploy-${BUCKET_UUID}-${CI_COMMIT_SHORT_SHA}"
+    - aws s3 mb s3://$S3_BUCKET_NAME --profile default
   after_script:
     - echo "E2E test execution completed"
     - echo "Test artifacts available in test-results/ and playwright-report/ directories"
