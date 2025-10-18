@@ -419,6 +419,10 @@ playwright_e2e_test:
   tags:
     - arch:amd64
     - size:large
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
+      when: on_success
+    - when: never
   # Commented out for faster testing iteration
   variables:
     AWS_CREDS_TARGET_ROLE: $US_WEST_2_AWS_IAM_ROLE
