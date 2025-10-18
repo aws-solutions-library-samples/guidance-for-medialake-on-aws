@@ -635,7 +635,6 @@ playwright_e2e_test:
           # Get pipeline execution status
           EXECUTION_STATUS=$(aws codepipeline list-pipeline-executions \
             --pipeline-name "$PIPELINE_NAME" \
-            --region $DEPLOY_REGION \
             --profile default \
             --max-items 1 \
             --query "pipelineExecutionSummaries[0].status" \
