@@ -18,11 +18,15 @@ variables:
 workflow:
   rules:
     # Allow merge requests to run
-    # - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    # # Allow specific branches to run
-    # - if: $CI_COMMIT_REF_NAME == "dev4"
-    # - if: $CI_COMMIT_REF_NAME == "dev5"
-    # - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    # Allow specific branches to run
+    - if: $CI_COMMIT_REF_NAME == "dev4"
+    - if: $CI_COMMIT_REF_NAME == "dev5"
+    - if: $CI_COMMIT_REF_NAME == "demo"
+    - if: $CI_COMMIT_REF_NAME == "stable"
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
+    - if: $CI_COMMIT_REF_NAME == "release"
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
     - when: never
 
 # Cache modules in between jobs
