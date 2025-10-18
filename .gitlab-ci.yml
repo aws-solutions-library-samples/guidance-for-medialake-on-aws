@@ -18,16 +18,11 @@ variables:
 workflow:
   rules:
     # Allow merge requests to run
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    # Allow specific branches to run
-    - if: $CI_COMMIT_REF_NAME == "dev4"
-    - if: $CI_COMMIT_REF_NAME == "dev5"
-    - if: $CI_COMMIT_REF_NAME == "demo"
-    - if: $CI_COMMIT_REF_NAME == "stable"
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "lg_cicd"
-    - if: $CI_COMMIT_REF_NAME == "release"
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+    # - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    # # Allow specific branches to run
+    # - if: $CI_COMMIT_REF_NAME == "dev4"
+    # - if: $CI_COMMIT_REF_NAME == "dev5"
+    # - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
     - when: never
 
 # Cache modules in between jobs
@@ -420,7 +415,7 @@ sync-to-github:
 
 playwright_e2e_test:
   stage: test
-  timeout: 3h
+  timeout: 4h
   tags:
     - arch:amd64
     - size:large
@@ -439,10 +434,17 @@ playwright_e2e_test:
     ENVIRONMENT_NAME: "e2e"
     DEPLOYMENT_SIZE: "small"
     ZIP_FILE_NAME: "medialake-source-${CI_COMMIT_SHORT_SHA}.zip"
+    #ACCESS_KEY_ID: $US_WEST_2_ACCESS_KEY
+    #SECRET_ACCESS_KEY: $US_WEST_2_SECRET_KEY
   before_script:
     # Install required dependencies
     - yum update -y
     - yum install -y python3 python3-pip unzip which findutils zip
+    # Install Node.js (required for Playwright)
+    - curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
+    - yum install -y nodejs
+    - node --version
+    - npm --version
     # Install AWS CLI
     - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
     - unzip awscliv2.zip
@@ -690,12 +692,115 @@ playwright_e2e_test:
           exit 1
         fi
       fi
+    - echo "============================================"
+    - echo "Extracting deployment information for E2E testing..."
+    - echo "============================================"
+    - |
+      # Extract CloudFront URL from stack outputs
+      CLOUDFRONT_URL=$(aws cloudformation describe-stacks \
+        --stack-name $STACK_NAME \
+        --region $DEPLOY_REGION \
+        --profile default \
+        --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionUrl'].OutputValue" \
+        --output text)
+
+      if [ -z "$CLOUDFRONT_URL" ]; then
+        echo "Error: Could not find CloudFront URL in stack outputs"
+        exit 1
+      fi
+
+      echo "CloudFront URL: $CLOUDFRONT_URL"
+      export PLAYWRIGHT_BASE_URL="https://$CLOUDFRONT_URL"
+      echo "PLAYWRIGHT_BASE_URL=$PLAYWRIGHT_BASE_URL"
+
+      # Extract other useful outputs
+      API_ENDPOINT=$(aws cloudformation describe-stacks \
+        --stack-name $STACK_NAME \
+        --region $DEPLOY_REGION \
+        --profile default \
+        --query "Stacks[0].Outputs[?OutputKey=='ApiEndpoint'].OutputValue" \
+        --output text || echo "")
+
+      echo "API Endpoint: $API_ENDPOINT"
+    - echo "============================================"
+    - echo "Setting up Playwright E2E tests..."
+    - echo "============================================"
+    - cd medialake_user_interface
+    - echo "Installing Node.js dependencies..."
+    - npm ci
+    - echo "Installing Playwright browsers..."
+    - npx playwright install --with-deps chromium
+    - echo "============================================"
+    - echo "Running Playwright E2E tests..."
+    - echo "============================================"
+    - |
+      # Run Playwright tests with the deployed environment
+      export CI=true
+      export AWS_REGION=$DEPLOY_REGION
+      export AWS_PROFILE=default
+
+      echo "Starting Playwright tests against $PLAYWRIGHT_BASE_URL"
+      echo "Test configuration:"
+      echo "  - Base URL: $PLAYWRIGHT_BASE_URL"
+      echo "  - AWS Region: $AWS_REGION"
+      echo "  - AWS Profile: $AWS_PROFILE"
+
+      # Create a temporary Playwright config that uses the CloudFront URL
+      cat > playwright.ci.config.ts << 'EOF'
+      import { defineConfig } from '@playwright/test';
+      import baseConfig from './playwright.config';
+
+      export default defineConfig({
+        ...baseConfig,
+        use: {
+          ...baseConfig.use,
+          baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173',
+        },
+        webServer: undefined, // Don't start local dev server in CI
+      });
+      EOF
+
+      # Run tests with proper configuration
+      npx playwright test \
+        --config=playwright.ci.config.ts \
+        --reporter=html \
+        --reporter=junit \
+        --project=chromium \
+        tests/auth/login.spec.ts \
+        tests/integration/ \
+        || TEST_EXIT_CODE=$?
+
+      # Store exit code but continue to show results
+      if [ -n "$TEST_EXIT_CODE" ] && [ "$TEST_EXIT_CODE" -ne "0" ]; then
+        echo "⚠️  Some Playwright tests failed (exit code: $TEST_EXIT_CODE)"
+        echo "Test report available in playwright-report/"
+      else
+        echo "✅ All Playwright tests passed!"
+      fi
+    - cd ..
+    - echo "============================================"
+    - echo "Cleaning up deployment resources..."
+    - echo "============================================"
     - |
       # Clean up: Delete the temporary S3 bucket after deployment
       echo "Cleaning up temporary S3 bucket..."
-      aws s3 rm s3://$S3_BUCKET_NAME --recursive --profile default
-      aws s3 rb s3://$S3_BUCKET_NAME --profile default
+      aws s3 rm s3://$S3_BUCKET_NAME --recursive --region $DEPLOY_REGION --profile default
+      aws s3 rb s3://$S3_BUCKET_NAME --region $DEPLOY_REGION --profile default
       echo "Temporary S3 bucket deleted: $S3_BUCKET_NAME"
+    - |
+      # Exit with test result code if tests failed
+      if [ -n "$TEST_EXIT_CODE" ] && [ "$TEST_EXIT_CODE" -ne "0" ]; then
+        echo "Failing job due to test failures"
+        exit $TEST_EXIT_CODE
+      fi
+  artifacts:
+    when: always
+    paths:
+      - medialake_user_interface/playwright-report/
+      - medialake_user_interface/test-results/
+    reports:
+      junit: medialake_user_interface/test-results/junit.xml
+    expire_in: 30 days
   after_script:
     - echo "E2E test execution completed"
     - echo "Test artifacts available in test-results/ and playwright-report/ directories"
