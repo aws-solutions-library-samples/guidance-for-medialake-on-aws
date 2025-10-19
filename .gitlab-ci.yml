@@ -700,9 +700,9 @@ playwright_e2e_test:
           exit 1
         fi
       fi
-    - echo "============================================"
+    - echo "============================================="
     - echo "Extracting deployment information for E2E testing..."
-    - echo "============================================"
+    - echo "============================================="
     - |
       # Extract CloudFront URL from stack outputs
       CLOUDFRONT_URL=$(aws cloudformation describe-stacks \
