@@ -7,7 +7,9 @@ from aws_lambda_powertools.metrics import MetricUnit
 from botocore.exceptions import ClientError
 
 
-def validate_groups_exist(cognito, user_pool_id: str, group_ids: list, logger, tracer) -> tuple[list, list]:
+def validate_groups_exist(
+    cognito, user_pool_id: str, group_ids: list, logger, tracer
+) -> tuple[list, list]:
     """
     Validate that the specified groups exist in Cognito
 
@@ -70,7 +72,9 @@ def validate_groups_exist(cognito, user_pool_id: str, group_ids: list, logger, t
     return valid_groups, invalid_groups
 
 
-def handle_create_user(app, cognito, user_pool_id: str, logger, metrics, tracer) -> Dict[str, Any]:
+def handle_create_user(
+    app, cognito, user_pool_id: str, logger, metrics, tracer
+) -> Dict[str, Any]:
     """Create a new user in Cognito user pool"""
     try:
         # Get request body from the event

@@ -22,6 +22,16 @@ node:
                 - "*"
             - effect: Allow
               actions:
+                - aws-marketplace:Subscribe
+                - aws-marketplace:ViewSubscriptions
+                - aws-marketplace:Unsubscribe
+              resources:
+                - "*"
+              condition:
+                StringEquals:
+                  aws:CalledViaLast: lambda.amazonaws.com
+            - effect: Allow
+              actions:
                 - s3:GetObject
                 - s3:PutObject
                 - s3:ListBucket

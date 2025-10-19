@@ -8,12 +8,12 @@ from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler.exceptions import BadRequestError
 from aws_lambda_powertools.metrics import MetricUnit
 from db_models import CollectionTypeModel
-from utils.permission_utils import check_admin_permission, extract_user_context
-from utils.response_utils import (
+from permission_utils import check_admin_permission, extract_user_context
+from response_utils import (
     create_error_response,
     now_iso,
 )
-from utils.validation_utils import validate_collection_type_data
+from validation_utils import validate_collection_type_data
 
 logger = Logger(
     service="settings-collection-types-post", level=os.environ.get("LOG_LEVEL", "INFO")

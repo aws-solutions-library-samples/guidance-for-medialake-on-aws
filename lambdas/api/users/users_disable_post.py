@@ -18,7 +18,9 @@ class CognitoError(Exception):
         super().__init__(self.message)
 
 
-def handle_disable_user(user_id: str, cognito, user_pool_id: str, logger, metrics, tracer) -> Dict[str, Any]:
+def handle_disable_user(
+    user_id: str, cognito, user_pool_id: str, logger, metrics, tracer
+) -> Dict[str, Any]:
     """
     Lambda handler to disable a user in Cognito User Pool
     """

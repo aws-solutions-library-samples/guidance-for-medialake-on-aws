@@ -7,7 +7,7 @@ from aws_lambda_powertools.event_handler.exceptions import BadRequestError
 from aws_lambda_powertools.metrics import MetricUnit
 from db_models import CollectionTypeModel
 from pynamodb.exceptions import QueryError
-from utils.response_utils import (
+from response_utils import (
     create_error_response,
     create_pagination_response,
     create_success_response,

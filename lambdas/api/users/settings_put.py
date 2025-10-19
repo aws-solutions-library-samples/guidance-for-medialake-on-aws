@@ -21,7 +21,14 @@ class SettingResponse(BaseModel):
 
 
 def _update_user_setting(
-    dynamodb, table_name: str, user_id: str, namespace: str, key: str, value: Any, logger, metrics
+    dynamodb,
+    table_name: str,
+    user_id: str,
+    namespace: str,
+    key: str,
+    value: Any,
+    logger,
+    metrics,
 ) -> Dict[str, Any]:
     """
     Update a specific user setting in DynamoDB
@@ -76,7 +83,14 @@ def _create_error_response(status_code: int, message: str) -> Dict[str, Any]:
 
 
 def handle_put_setting(
-    namespace: str, key: str, app, dynamodb, user_table_name: str, logger, metrics, tracer
+    namespace: str,
+    key: str,
+    app,
+    dynamodb,
+    user_table_name: str,
+    logger,
+    metrics,
+    tracer,
 ) -> Dict[str, Any]:
     """
     Lambda handler to update a specific user setting in DynamoDB
@@ -133,7 +147,14 @@ def handle_put_setting(
 
         # Update the user setting in DynamoDB
         updated_setting = _update_user_setting(
-            dynamodb, user_table_name, user_id, namespace, key, setting_data["value"], logger, metrics
+            dynamodb,
+            user_table_name,
+            user_id,
+            namespace,
+            key,
+            setting_data["value"],
+            logger,
+            metrics,
         )
 
         # Create success response

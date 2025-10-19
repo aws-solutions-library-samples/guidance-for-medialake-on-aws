@@ -32,7 +32,12 @@ def _sanitize_profile_data(profile_data: Dict[str, Any]) -> None:
 
 
 def _update_user_profile(
-    dynamodb, table_name: str, user_id: str, profile_data: Dict[str, Any], logger, metrics
+    dynamodb,
+    table_name: str,
+    user_id: str,
+    profile_data: Dict[str, Any],
+    logger,
+    metrics,
 ) -> Dict[str, Any]:
     """
     Update user profile in DynamoDB
@@ -123,7 +128,9 @@ def _create_error_response(status_code: int, message: str) -> Dict[str, Any]:
     }
 
 
-def handle_put_profile(app, dynamodb, user_table_name: str, logger, metrics, tracer) -> Dict[str, Any]:
+def handle_put_profile(
+    app, dynamodb, user_table_name: str, logger, metrics, tracer
+) -> Dict[str, Any]:
     """
     Lambda handler to update user profile in DynamoDB
     """
@@ -172,7 +179,9 @@ def handle_put_profile(app, dynamodb, user_table_name: str, logger, metrics, tra
         _sanitize_profile_data(profile_data)
 
         # Update the user profile in DynamoDB
-        updated_profile = _update_user_profile(dynamodb, user_table_name, user_id, profile_data, logger, metrics)
+        updated_profile = _update_user_profile(
+            dynamodb, user_table_name, user_id, profile_data, logger, metrics
+        )
 
         # Create success response
         response = ProfileResponse(

@@ -19,7 +19,9 @@ class ProfileResponse(BaseModel):
     data: Dict[str, Any] = Field(..., description="User profile data")
 
 
-def _get_user_profile(dynamodb, table_name: str, user_id: str, logger, metrics) -> Dict[str, Any]:
+def _get_user_profile(
+    dynamodb, table_name: str, user_id: str, logger, metrics
+) -> Dict[str, Any]:
     """
     Fetch user profile from DynamoDB
     """
@@ -81,7 +83,9 @@ def _create_error_response(status_code: int, message: str) -> Dict[str, Any]:
     }
 
 
-def handle_get_profile(app, dynamodb, user_table_name: str, logger, metrics, tracer) -> Dict[str, Any]:
+def handle_get_profile(
+    app, dynamodb, user_table_name: str, logger, metrics, tracer
+) -> Dict[str, Any]:
     """
     Lambda handler to fetch user profile from DynamoDB
     """
@@ -109,7 +113,9 @@ def handle_get_profile(app, dynamodb, user_table_name: str, logger, metrics, tra
             return _create_error_response(500, "Internal configuration error")
 
         # Fetch user profile from DynamoDB
-        user_profile = _get_user_profile(dynamodb, user_table_name, user_id, logger, metrics)
+        user_profile = _get_user_profile(
+            dynamodb, user_table_name, user_id, logger, metrics
+        )
 
         # Create success response
         response = ProfileResponse(

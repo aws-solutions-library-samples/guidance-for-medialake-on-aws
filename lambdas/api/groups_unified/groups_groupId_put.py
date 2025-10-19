@@ -182,7 +182,13 @@ def handle_put_group(
 
         # Update the group in DynamoDB
         updated_group = _update_group(
-            dynamodb, table_name, group_id, group_update_request, user_id, logger, metrics
+            dynamodb,
+            table_name,
+            group_id,
+            group_update_request,
+            user_id,
+            logger,
+            metrics,
         )
 
         # Create success response
@@ -205,4 +211,3 @@ def handle_put_group(
         logger.exception("Error processing request")
         metrics.add_metric(name="UnhandledError", unit=MetricUnit.Count, value=1)
         return _create_error_response(500, f"Internal server error: {str(e)}")
-

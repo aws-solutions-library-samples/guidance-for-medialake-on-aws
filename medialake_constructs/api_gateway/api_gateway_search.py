@@ -69,8 +69,7 @@ class SearchConstruct(Construct):
                 security_groups=[props.security_group],
                 entry="lambdas/api/search/get_search",
                 layers=[search_layer.layer],
-                memory_size=9000,  # High memory for vector/semantic search operations
-                provisioned_concurrent_executions=2,  # Keep 2 instances warm for search performance
+                memory_size=9000,
                 timeout_minutes=10,
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": (
@@ -221,6 +220,36 @@ class SearchConstruct(Construct):
                     "bedrock:GetInferenceProfile",
                 ],
                 resources=["*"],
+            )
+        )
+
+        # Add permissions access marketplace bedrock models under new simplified model access policy
+        # https://docs.aws.amazon.com/bedrock/latest/userguide/model-access.html
+        search_get_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "aws-marketplace:Subscribe",
+                ],
+                resources=[
+                    "arn:aws:bedrock:*::foundation-model/twelvelabs.marengo-embed-2-7-v1:0"
+                ],
+                conditions={
+                    "StringEquals": {"aws:CalledViaLast": "lambda.amazonaws.com"}
+                },
+            )
+        )
+
+        search_get_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "aws-marketplace:ViewSubscriptions",
+                ],
+                resources=["*"],
+                conditions={
+                    "StringEquals": {"aws:CalledViaLast": "lambda.amazonaws.com"}
+                },
             )
         )
 
