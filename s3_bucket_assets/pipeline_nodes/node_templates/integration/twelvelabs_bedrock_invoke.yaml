@@ -29,6 +29,22 @@ node:
                 - "*"
             - effect: Allow
               actions:
+                - aws-marketplace:Subscribe
+              resources:
+                - "arn:aws:bedrock:*::foundation-model/twelvelabs.marengo-embed-2-7-v1:0"
+              condition:
+                StringEquals:
+                  aws:CalledViaLast: lambda.amazonaws.com
+            - effect: Allow
+              actions:
+                - aws-marketplace:ViewSubscriptions
+              resources:
+                - "*"
+              condition:
+                StringEquals:
+                  aws:CalledViaLast: lambda.amazonaws.com
+            - effect: Allow
+              actions:
                 - s3:GetObject
                 - s3:PutObject
                 - s3:ListBucket
