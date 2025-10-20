@@ -622,7 +622,7 @@ playwright_e2e_test:
 
       # Wait for pipeline to be created with retry logic
       PIPELINE_NAME=""
-      MAX_PIPELINE_WAIT=600
+      MAX_PIPELINE_WAIT=6000
       PIPELINE_WAIT_ELAPSED=0
 
       while [ $PIPELINE_WAIT_ELAPSED -lt $MAX_PIPELINE_WAIT ]; do
