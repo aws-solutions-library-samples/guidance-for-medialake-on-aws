@@ -611,11 +611,8 @@ playwright_e2e_test:
         --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
         --region $DEPLOY_REGION \
         --profile default
-    - echo "Waiting for stack creation to complete..."
-    - aws cloudformation wait stack-create-complete --stack-name $STACK_NAME --region $DEPLOY_REGION --profile default
-    - echo "CloudFormation deployment completed successfully"
-    - 'echo "Stack outputs:"'
-    - aws cloudformation describe-stacks --stack-name $STACK_NAME --region $DEPLOY_REGION --profile default --query 'Stacks[0].Outputs'
+    - echo "CloudFormation stack deployment initiated successfully"
+    - echo "Stack name:$STACK_NAME"
     - |
       # Monitor CodePipeline execution similar to deploy-medialake.sh
       echo "Waiting for CodePipeline to be created by CloudFormation..."
@@ -623,7 +620,7 @@ playwright_e2e_test:
       # Check for pipeline existence (try multiple possible names)
       PIPELINE_NAME=""
       for pipeline_candidate in "MediaLakeCDKPipeline" "CDKDeploymentPipeline"; do
-        if aws codepipeline get-pipeline --name "$pipeline_candidate" --region $DEPLOY_REGION --profile default >/dev/null 2>&1; then
+        if aws codepipeline get-pipeline --name "$pipeline_candidate" --profile default >/dev/null 2>&1; then
           PIPELINE_NAME="$pipeline_candidate"
           echo "Found pipeline: $PIPELINE_NAME"
           break
