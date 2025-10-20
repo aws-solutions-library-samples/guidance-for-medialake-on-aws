@@ -660,8 +660,8 @@ playwright_e2e_test:
         LAST_STATUS_LOG=0
 
         while [ $ELAPSED_TIME -lt $MAX_WAIT_TIME ]; do
-          # Get pipeline execution status
-          EXECUTION_STATUS=$(aws codepipeline list-pipeline-executions \
+          # Get pipeline execution status with credential refresh support
+          EXECUTION_STATUS=$(aws_with_retry aws codepipeline list-pipeline-executions \
             --pipeline-name "$PIPELINE_NAME" \
             --profile default \
             --region $DEPLOY_REGION \
@@ -674,7 +674,7 @@ playwright_e2e_test:
 
           if [ $? -ne 0 ] || [ "$EXECUTION_STATUS" == "None" ] || [ -z "$EXECUTION_STATUS" ] || [ "$EXECUTION_STATUS" == "null" ]; then
             # Keepalive output every check interval
-            echo "[${ELAPSED_MINUTES}m] Waiting for pipeline execution to start..."
+            echo "[${ELAPSED_MINUTES}m] Waiting for pipeline execution to start... (credentials valid)"
           else
             # Log full status every STATUS_LOG_INTERVAL seconds
             if [ $((ELAPSED_TIME - LAST_STATUS_LOG)) -ge $STATUS_LOG_INTERVAL ]; then
