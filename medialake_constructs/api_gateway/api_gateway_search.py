@@ -222,6 +222,36 @@ class SearchConstruct(Construct):
             )
         )
 
+        # Add permissions access marketplace bedrock models under new simplified model access policy
+        # https://docs.aws.amazon.com/bedrock/latest/userguide/model-access.html
+        search_get_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "aws-marketplace:Subscribe",
+                ],
+                resources=[
+                    "arn:aws:bedrock:*::foundation-model/twelvelabs.marengo-embed-2-7-v1:0"
+                ],
+                conditions={
+                    "StringEquals": {"aws:CalledViaLast": "lambda.amazonaws.com"}
+                },
+            )
+        )
+
+        search_get_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "aws-marketplace:ViewSubscriptions",
+                ],
+                resources=["*"],
+                conditions={
+                    "StringEquals": {"aws:CalledViaLast": "lambda.amazonaws.com"}
+                },
+            )
+        )
+
         search_get = search_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(search_get_lambda.function),

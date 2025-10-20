@@ -12,7 +12,7 @@ Handles:
 - Search providers: GET/POST/PUT/DELETE /settings/system/search
 - Users: GET /settings/users
 
-All handlers are defined in the handlers/ directory following resource-path naming.
+All handlers are defined in this directory following resource-path naming.
 """
 
 import json
@@ -50,10 +50,45 @@ app = APIGatewayRestResolver(
     cors=cors_config,
 )
 
-# Register all routes from handlers
-from handlers import register_all_routes  # noqa: E402
+# Register all routes from handler modules (now in same directory)
+# Import all handlers directly since we have a flat structure
+import api_keys_get  # noqa: E402
+import api_keys_ID_delete  # noqa: E402
+import api_keys_ID_get  # noqa: E402
+import api_keys_ID_put  # noqa: E402
+import api_keys_post  # noqa: E402
+import collection_types_get  # noqa: E402
+import collection_types_ID_delete  # noqa: E402
+import collection_types_ID_migrate_post  # noqa: E402
+import collection_types_ID_put  # noqa: E402
+import collection_types_post  # noqa: E402
+import settings_users_get  # noqa: E402
+import system_get  # noqa: E402
+import system_search_delete  # noqa: E402
+import system_search_get  # noqa: E402
+import system_search_post  # noqa: E402
+import system_search_put  # noqa: E402
 
-register_all_routes(app)
+# Register all routes
+collection_types_get.register_route(app)
+collection_types_post.register_route(app)
+collection_types_ID_put.register_route(app)
+collection_types_ID_delete.register_route(app)
+collection_types_ID_migrate_post.register_route(app)
+
+system_get.register_route(app)
+system_search_get.register_route(app)
+system_search_post.register_route(app)
+system_search_put.register_route(app)
+system_search_delete.register_route(app)
+
+api_keys_get.register_route(app)
+api_keys_post.register_route(app)
+api_keys_ID_get.register_route(app)
+api_keys_ID_put.register_route(app)
+api_keys_ID_delete.register_route(app)
+
+settings_users_get.register_route(app)
 
 
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)

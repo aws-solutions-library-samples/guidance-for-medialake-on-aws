@@ -11,13 +11,13 @@ from aws_lambda_powertools.event_handler.exceptions import (
 from aws_lambda_powertools.metrics import MetricUnit
 from db_models import CollectionTypeModel
 from pynamodb.exceptions import DoesNotExist
-from utils.permission_utils import check_admin_permission, extract_user_context
-from utils.response_utils import (
+from permission_utils import check_admin_permission, extract_user_context
+from response_utils import (
     create_error_response,
     create_success_response,
     now_iso,
 )
-from utils.validation_utils import validate_collection_type_data
+from validation_utils import validate_collection_type_data
 
 logger = Logger(
     service="settings-collection-types-put", level=os.environ.get("LOG_LEVEL", "INFO")
