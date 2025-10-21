@@ -609,7 +609,6 @@ playwright_e2e_test:
           ParameterKey=MediaLakeEnvironmentName,ParameterValue="$ENVIRONMENT_NAME" \
           ParameterKey=OpenSearchDeploymentSize,ParameterValue="$DEPLOYMENT_SIZE" \
         --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
-        --region $DEPLOY_REGION \
         --profile default
     - echo "CloudFormation stack deployment initiated successfully"
     - echo "Stack name:$STACK_NAME"
@@ -635,7 +634,7 @@ playwright_e2e_test:
         echo "Pipeline monitoring will check status every 15 seconds with keepalive output"
 
         # Monitor pipeline with timeout (3 hours max to accommodate long deployments)
-        MAX_WAIT_TIME=10800
+        MAX_WAIT_TIME=10800000
         ELAPSED_TIME=0
         CHECK_INTERVAL=15
         STATUS_LOG_INTERVAL=60
