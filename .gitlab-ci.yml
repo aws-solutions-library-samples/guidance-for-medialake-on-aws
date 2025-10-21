@@ -634,13 +634,40 @@ playwright_e2e_test:
         echo "Pipeline monitoring will check status every 15 seconds with keepalive output"
 
         # Monitor pipeline with timeout (3 hours max to accommodate long deployments)
-        MAX_WAIT_TIME=10800000
+        MAX_WAIT_TIME=10800  # 3 hours in seconds
         ELAPSED_TIME=0
         CHECK_INTERVAL=15
         STATUS_LOG_INTERVAL=60
         LAST_STATUS_LOG=0
+        CREDENTIAL_REFRESH_INTERVAL=3000  # Refresh every 50 minutes (before 1-hour expiry)
+        LAST_CREDENTIAL_REFRESH=0
 
         while [ $ELAPSED_TIME -lt $MAX_WAIT_TIME ]; do
+          # Calculate elapsed time in minutes for display
+          ELAPSED_MINUTES=$((ELAPSED_TIME / 60))
+
+          # Refresh AWS credentials every 50 minutes to prevent expiration
+          if [ $((ELAPSED_TIME - LAST_CREDENTIAL_REFRESH)) -ge $CREDENTIAL_REFRESH_INTERVAL ] && [ $ELAPSED_TIME -gt 0 ]; then
+            echo ""
+            echo "[${ELAPSED_MINUTES}m] Refreshing AWS credentials to prevent expiration..."
+            # Check current credentials status
+            if aws sts get-caller-identity --profile default >/dev/null 2>&1; then
+              echo "Credentials still valid, refreshing from credential vendor..."
+              # Re-read credentials from the credential vendor location
+              if [ -f "$AWS_SHARED_CREDENTIALS_FILE" ]; then
+                export AWS_ACCESS_KEY_ID=$(grep -A2 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_access_key_id | cut -d'=' -f2 | tr -d ' ')
+                export AWS_SECRET_ACCESS_KEY=$(grep -A2 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_secret_access_key | cut -d'=' -f2 | tr -d ' ')
+                export AWS_SESSION_TOKEN=$(grep -A2 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_session_token | cut -d'=' -f2 | tr -d ' ')
+                echo "Credentials refreshed successfully"
+              else
+                echo "Warning: Credential file not found, continuing with existing credentials"
+              fi
+            else
+              echo "Warning: Unable to verify credentials, attempting to continue..."
+            fi
+            LAST_CREDENTIAL_REFRESH=$ELAPSED_TIME
+          fi
+
           # Get pipeline execution status
           EXECUTION_STATUS=$(aws codepipeline list-pipeline-executions \
             --pipeline-name "$PIPELINE_NAME" \
@@ -649,9 +676,6 @@ playwright_e2e_test:
             --max-items 1 \
             --query "pipelineExecutionSummaries[0].status" \
             --output text 2>/dev/null | tr -d '\n\r' | sed 's/None//g' | xargs)
-
-          # Calculate elapsed time in minutes for display
-          ELAPSED_MINUTES=$((ELAPSED_TIME / 60))
 
           if [ $? -ne 0 ] || [ "$EXECUTION_STATUS" == "None" ] || [ -z "$EXECUTION_STATUS" ] || [ "$EXECUTION_STATUS" == "null" ]; then
             # Keepalive output every check interval
