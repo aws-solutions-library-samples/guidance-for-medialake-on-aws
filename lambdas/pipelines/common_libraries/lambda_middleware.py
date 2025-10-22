@@ -467,13 +467,50 @@ class LambdaMiddleware:
 
     # ---------------------------------------------------------------- publish
     def _publish(self, out: Dict[str, Any]):
+        # EventBridge has a 256KB limit per event
+        MAX_EVENTBRIDGE_SIZE = 256 * 1024
+
         try:
+            # Serialize the full output to check size
+            detail_json = json.dumps(out, default=_json_default)
+            detail_size = len(detail_json.encode("utf-8"))
+
+            # If the event is too large, offload entire payload to S3
+            if detail_size > MAX_EVENTBRIDGE_SIZE:
+                self.logger.warning(
+                    f"EventBridge payload too large ({detail_size} bytes), offloading to S3"
+                )
+
+                # Generate S3 key for the full payload
+                event_key = f"eventbridge/{out['metadata']['pipelineExecutionId']}/{self.step_name}/{uuid.uuid4()}.json"
+
+                # Upload full payload to S3
+                payload_json = json.dumps(out["payload"], default=_json_default)
+                self.s3.put_object(
+                    Bucket=self.external_payload_bucket,
+                    Key=event_key,
+                    Body=payload_json.encode("utf-8"),
+                )
+
+                # Update metadata to indicate external payload
+                out["metadata"]["stepExternalPayload"] = "True"
+                out["metadata"]["stepExternalPayloadLocation"] = {
+                    "bucket": self.external_payload_bucket,
+                    "key": event_key,
+                }
+
+                # Clear the payload data and assets to reduce size
+                out["payload"] = {"data": {}, "assets": []}
+
+                # Re-serialize with offloaded payload
+                detail_json = json.dumps(out, default=_json_default)
+
             self.eb.put_events(
                 Entries=[
                     {
                         "Source": self.service,
                         "DetailType": f"{self.step_name}Output",
-                        "Detail": json.dumps(out),
+                        "Detail": detail_json,
                         "EventBusName": self.event_bus_name,
                     }
                 ]
