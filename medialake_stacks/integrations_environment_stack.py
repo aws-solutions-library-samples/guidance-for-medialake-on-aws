@@ -67,7 +67,20 @@ class IntegrationsEnvironmentStack(cdk.NestedStack):
         #     self, "IntegrationsCustomApiAuthorizer", api_gateway_id=api_id
         # )
 
-        # Create Integrations API Gateway construct
+        # Create Environments API Gateway construct first (needed by integrations)
+        self._environments_api = ApiGatewayEnvironmentsConstruct(
+            self,
+            "EnvironmentsApiGateway",
+            props=ApiGatewayEnvironmentsProps(
+                api_resource=props.api_resource,
+                authorizer=props.authorizer,
+                x_origin_verify_secret=props.x_origin_verify_secret,
+                integrations_table=None,  # Will be set later
+                post_integrations_handler=None,  # Will be set later
+            ),
+        )
+
+        # Create Integrations API Gateway construct with environments table
         self._integrations_stack = ApiGatewayIntegrationsConstruct(
             self,
             "Integrations",
@@ -76,20 +89,17 @@ class IntegrationsEnvironmentStack(cdk.NestedStack):
                 authorizer=props.authorizer,
                 x_origin_verify_secret=props.x_origin_verify_secret,
                 pipelines_nodes_table=props.pipelines_nodes_table,
+                environments_table=self._environments_api.environments_table.table,
             ),
         )
 
-        # Create Environments API Gateway construct
-        self._environments_api = ApiGatewayEnvironmentsConstruct(
-            self,
-            "EnvironmentsApiGateway",
-            props=ApiGatewayEnvironmentsProps(
-                api_resource=props.api_resource,
-                authorizer=props.authorizer,
-                x_origin_verify_secret=props.x_origin_verify_secret,
-                integrations_table=self._integrations_stack.integrations_table,
-                post_integrations_handler=self._integrations_stack.post_integrations_handler,
-            ),
+        # Update environments API with integrations table reference
+        # Note: This is a post-creation configuration
+        self._environments_api.set_integrations_table(
+            self._integrations_stack.integrations_table
+        )
+        self._environments_api.set_post_integrations_handler(
+            self._integrations_stack.integrations_lambda.function
         )
 
         # Create default environment custom resource
@@ -131,7 +141,13 @@ class IntegrationsEnvironmentStack(cdk.NestedStack):
 
     @property
     def post_integrations_handler(self) -> lambda_.Function:
-        return self._integrations_stack.post_integrations_handler
+        """Get the integrations Lambda function for backwards compatibility."""
+        return self._integrations_stack.integrations_lambda.function
+
+    @property
+    def integrations_lambda(self) -> Lambda:
+        """Get the integrations Lambda construct."""
+        return self._integrations_stack.integrations_lambda
 
     @property
     def environments_table(self) -> dynamodb.TableV2:
