@@ -49,10 +49,17 @@ app = APIGatewayRestResolver(
     cors=cors_config,
 )
 
-# Register all routes - import is done after PowerTools initialization
-from handlers import register_all_routes  # noqa: E402
+# Register all routes - import handlers after PowerTools initialization
+import integrations_get  # noqa: E402
+import integrations_ID_delete  # noqa: E402
+import integrations_ID_put  # noqa: E402
+import integrations_post  # noqa: E402
 
-register_all_routes(app)
+# Register all routes
+integrations_get.register_route(app)
+integrations_post.register_route(app)
+integrations_ID_put.register_route(app)
+integrations_ID_delete.register_route(app)
 
 
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)

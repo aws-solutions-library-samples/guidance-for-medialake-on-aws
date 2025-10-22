@@ -5,8 +5,9 @@ import os
 import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.metrics import MetricUnit
-from utils.formatting_utils import format_integration
-from utils.response_utils import create_error_response, create_success_response
+
+from formatting_utils import format_integration
+from response_utils import create_error_response, create_success_response
 
 logger = Logger(service="integrations-get", level=os.environ.get("LOG_LEVEL", "INFO"))
 tracer = Tracer(service="integrations-get")
