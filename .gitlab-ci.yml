@@ -475,31 +475,62 @@ playwright_e2e_test:
     - cat /root/.aws/credentials
     - cat /root/.aws/config
     - whoami
-    - aws s3 ls --profile default
-    - aws sts get-caller-identity --profile default
+    - aws s3 ls
+    - aws sts get-caller-identity
     - echo "AWS identity verified for testing"
   script:
     - echo "Running comprehensive Playwright E2E test against deployed MediaLake infrastructure"
     - |
       # Function to refresh AWS credentials from credential vendor
       refresh_credentials() {
-        echo "Refreshing AWS credentials..."
+        local timestamp=$(date '+%H:%M:%S')
+        echo "Refreshing AWS credentials at $timestamp..."
+
         if [ -f "$AWS_SHARED_CREDENTIALS_FILE" ]; then
-          export AWS_ACCESS_KEY_ID=$(grep -A2 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_access_key_id | cut -d'=' -f2 | tr -d ' ')
-          export AWS_SECRET_ACCESS_KEY=$(grep -A2 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_secret_access_key | cut -d'=' -f2 | tr -d ' ')
-          export AWS_SESSION_TOKEN=$(grep -A2 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_session_token | cut -d'=' -f2 | tr -d ' ')
-          echo "Credentials refreshed successfully at $(date '+%H:%M:%S')"
+          # Show file modification time for debugging
+          echo "Credential file last modified: $(stat -c %y "$AWS_SHARED_CREDENTIALS_FILE" 2>/dev/null || stat -f %Sm "$AWS_SHARED_CREDENTIALS_FILE" 2>/dev/null || echo 'unknown')"
+
+          # Read credentials from file
+          export AWS_ACCESS_KEY_ID=$(grep -A5 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_access_key_id | cut -d'=' -f2 | tr -d ' ' | tr -d '\t')
+          export AWS_SECRET_ACCESS_KEY=$(grep -A5 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_secret_access_key | cut -d'=' -f2 | tr -d ' ' | tr -d '\t')
+          export AWS_SESSION_TOKEN=$(grep -A5 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_session_token | cut -d'=' -f2 | tr -d ' ' | tr -d '\t')
+
+          # Debug: Show credential key prefix (first 10 chars)
+          echo "Access Key ID prefix: ${AWS_ACCESS_KEY_ID:0:10}..."
+
+          # Verify credentials are valid by testing them (don't use --profile, use env vars)
+          echo "Validating refreshed credentials..."
+          if aws sts get-caller-identity >/dev/null 2>&1; then
+            echo "✓ Credentials refreshed and validated successfully at $timestamp"
+            return 0
+          else
+            echo "⚠ Warning: Credentials read but validation failed - they may be expired"
+            echo "Attempting retry after 3 seconds..."
+            sleep 3
+            # Try reading the file again in case it's being updated by credential vendor
+            export AWS_ACCESS_KEY_ID=$(grep -A5 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_access_key_id | cut -d'=' -f2 | tr -d ' ' | tr -d '\t')
+            export AWS_SECRET_ACCESS_KEY=$(grep -A5 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_secret_access_key | cut -d'=' -f2 | tr -d ' ' | tr -d '\t')
+            export AWS_SESSION_TOKEN=$(grep -A5 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_session_token | cut -d'=' -f2 | tr -d ' ' | tr -d '\t')
+            if aws sts get-caller-identity >/dev/null 2>&1; then
+              echo "✓ Credentials validated on retry"
+              return 0
+            else
+              echo "✗ Credentials still invalid after retry - this may cause AWS operations to fail"
+              return 1
+            fi
+          fi
         else
-          echo "Warning: Credential file not found at $AWS_SHARED_CREDENTIALS_FILE"
+          echo "⚠ Warning: Credential file not found at $AWS_SHARED_CREDENTIALS_FILE"
+          return 1
         fi
       }
     - refresh_credentials
-    - aws s3 ls --profile default
+    - aws s3 ls
     - export BUCKET_UUID=$(python3 -c "import uuid; print(str(uuid.uuid4())[:8])")
     - export S3_BUCKET_NAME="medialake-deploy-${BUCKET_UUID}-${CI_COMMIT_SHORT_SHA}"
-    - aws s3 mb s3://$S3_BUCKET_NAME --profile default
-    - aws s3 ls s3://$S3_BUCKET_NAME/ --profile default
-    - aws s3 cp medialake.template s3://$S3_BUCKET_NAME/medialake.template --profile default
+    - aws s3 mb s3://$S3_BUCKET_NAME
+    - aws s3 ls s3://$S3_BUCKET_NAME/
+    - aws s3 cp medialake.template s3://$S3_BUCKET_NAME/medialake.template
     - |
       list_stacks() {
         local region=$1
@@ -507,7 +538,6 @@ playwright_e2e_test:
         # Get all stacks excluding DELETE_COMPLETE and filter case-insensitively for the prefix
         aws cloudformation list-stacks \
           --region $region \
-          --profile default \
           --stack-status-filter CREATE_COMPLETE CREATE_FAILED CREATE_IN_PROGRESS REVIEW_IN_PROGRESS ROLLBACK_COMPLETE ROLLBACK_FAILED ROLLBACK_IN_PROGRESS UPDATE_COMPLETE UPDATE_COMPLETE_CLEANUP_IN_PROGRESS UPDATE_IN_PROGRESS UPDATE_ROLLBACK_COMPLETE UPDATE_ROLLBACK_COMPLETE_CLEANUP_IN_PROGRESS UPDATE_ROLLBACK_FAILED UPDATE_ROLLBACK_IN_PROGRESS DELETE_FAILED \
           --query "StackSummaries[].StackName" \
           --output text | tr '\t' '\n' | grep -i "$stack_prefix" || true
@@ -518,7 +548,6 @@ playwright_e2e_test:
         local stack_prefix="$STACK_PREFIX"
         local deleting_stacks=$(aws cloudformation list-stacks \
           --region $region \
-          --profile default \
           --stack-status-filter DELETE_IN_PROGRESS \
           --query "StackSummaries[].StackName" \
           --output text | tr '\t' '\n' | grep -i "$stack_prefix" || true)
@@ -559,31 +588,28 @@ playwright_e2e_test:
             for stack in $stacks; do
               echo "Attempting to delete stack: $stack in region $region"
               # Check if stack is in DELETE_FAILED state and try with retain resources
-              stack_status=$(aws cloudformation describe-stacks --stack-name "$stack" --region "$region" --profile default --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "STACK_NOT_FOUND")
+              stack_status=$(aws cloudformation describe-stacks --stack-name "$stack" --region "$region" --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "STACK_NOT_FOUND")
               if [ "$stack_status" == "DELETE_FAILED" ]; then
                 echo "Stack $stack is in DELETE_FAILED state. Attempting to get resources that failed to delete..."
                 # Get resources that might have failed to delete
-                resources=$(aws cloudformation list-stack-resources --stack-name "$stack" --region "$region" --profile default --query "StackResourceSummaries[?ResourceStatus=='DELETE_FAILED'].LogicalResourceId" --output text || true)
+                resources=$(aws cloudformation list-stack-resources --stack-name "$stack" --region "$region" --query "StackResourceSummaries[?ResourceStatus=='DELETE_FAILED'].LogicalResourceId" --output text || true)
                 if [ -n "$resources" ]; then
                   echo "Found resources that failed to delete: $resources"
                   echo "Attempting to delete stack with --retain-resources option"
                   aws cloudformation delete-stack \
                     --region $region \
-                    --profile default \
                     --stack-name $stack \
                     --retain-resources $resources || true
                 else
                   # Standard delete attempt
                   aws cloudformation delete-stack \
                     --region $region \
-                    --profile default \
                     --stack-name $stack || true
                 fi
               else
                 # Standard delete attempt
                 aws cloudformation delete-stack \
                   --region $region \
-                  --profile default \
                   --stack-name $stack || true
               fi
               # Break after initiating one deletion to handle dependencies
@@ -597,7 +623,7 @@ playwright_e2e_test:
       # Check for existing CodePipelines that might conflict
       echo "Checking for existing CodePipelines in $DEPLOY_REGION..."
       for pipeline_candidate in "MediaLakeCDKPipeline" "CDKDeploymentPipeline"; do
-        if aws codepipeline get-pipeline --name "$pipeline_candidate" --region $DEPLOY_REGION --profile default >/dev/null 2>&1; then
+        if aws codepipeline get-pipeline --name "$pipeline_candidate" --region $DEPLOY_REGION >/dev/null 2>&1; then
           echo "Found existing pipeline: $pipeline_candidate - will be cleaned up with stack deletion"
         fi
       done
@@ -614,9 +640,9 @@ playwright_e2e_test:
     - ls -la $ZIP_FILE_NAME
     - refresh_credentials
     - 'echo "Uploading zip file to S3 bucket: $S3_BUCKET_NAME"'
-    - aws s3 cp $ZIP_FILE_NAME s3://$S3_BUCKET_NAME/$ZIP_FILE_NAME --profile default
+    - aws s3 cp $ZIP_FILE_NAME s3://$S3_BUCKET_NAME/$ZIP_FILE_NAME
     - echo "Generating pre-signed URL for zip file..."
-    - PRESIGNED_URL=$(aws s3 presign s3://$S3_BUCKET_NAME/$ZIP_FILE_NAME --expires-in 3600 --profile default)
+    - PRESIGNED_URL=$(aws s3 presign s3://$S3_BUCKET_NAME/$ZIP_FILE_NAME --expires-in 3600)
     - echo "Pre-signed URL generated successfully"
     - refresh_credentials
     - 'echo "Deploying CloudFormation stack: $STACK_NAME"'
@@ -632,8 +658,7 @@ playwright_e2e_test:
           ParameterKey=InitialUserEmail,ParameterValue="medialake+deploy@amazon.com" \
           ParameterKey=MediaLakeEnvironmentName,ParameterValue="$ENVIRONMENT_NAME" \
           ParameterKey=OpenSearchDeploymentSize,ParameterValue="$DEPLOYMENT_SIZE" \
-        --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
-        --profile default
+        --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM
     - echo "CloudFormation stack deployment initiated successfully"
     - echo "Stack name:$STACK_NAME"
     - |
@@ -643,7 +668,7 @@ playwright_e2e_test:
       # Check for pipeline existence (try multiple possible names)
       PIPELINE_NAME=""
       for pipeline_candidate in "MediaLakeCDKPipeline" "CDKDeploymentPipeline"; do
-        if aws codepipeline get-pipeline --name "$pipeline_candidate" --profile default >/dev/null 2>&1; then
+        if aws codepipeline get-pipeline --name "$pipeline_candidate" >/dev/null 2>&1; then
           PIPELINE_NAME="$pipeline_candidate"
           echo "Found pipeline: $PIPELINE_NAME"
           break
@@ -681,7 +706,6 @@ playwright_e2e_test:
           # Get pipeline execution status
           EXECUTION_STATUS=$(aws codepipeline list-pipeline-executions \
             --pipeline-name "$PIPELINE_NAME" \
-            --profile default \
             --region $DEPLOY_REGION \
             --max-items 1 \
             --query "pipelineExecutionSummaries[0].status" \
@@ -758,12 +782,12 @@ playwright_e2e_test:
     - echo "============================================="
     - echo "Extracting deployment information for E2E testing..."
     - echo "============================================="
+    - refresh_credentials
     - |
       # Extract CloudFront URL from stack outputs
       CLOUDFRONT_URL=$(aws cloudformation describe-stacks \
         --stack-name $STACK_NAME \
         --region $DEPLOY_REGION \
-        --profile default \
         --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionUrl'].OutputValue" \
         --output text)
 
@@ -780,7 +804,6 @@ playwright_e2e_test:
       API_ENDPOINT=$(aws cloudformation describe-stacks \
         --stack-name $STACK_NAME \
         --region $DEPLOY_REGION \
-        --profile default \
         --query "Stacks[0].Outputs[?OutputKey=='ApiEndpoint'].OutputValue" \
         --output text || echo "")
 
@@ -848,8 +871,8 @@ playwright_e2e_test:
     - |
       # Clean up: Delete the temporary S3 bucket after deployment
       echo "Cleaning up temporary S3 bucket..."
-      aws s3 rm s3://$S3_BUCKET_NAME --recursive --region $DEPLOY_REGION --profile default
-      aws s3 rb s3://$S3_BUCKET_NAME --region $DEPLOY_REGION --profile default
+      aws s3 rm s3://$S3_BUCKET_NAME --recursive --region $DEPLOY_REGION
+      aws s3 rb s3://$S3_BUCKET_NAME --region $DEPLOY_REGION
       echo "Temporary S3 bucket deleted: $S3_BUCKET_NAME"
     - |
       # Exit with test result code if tests failed
