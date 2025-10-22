@@ -480,6 +480,20 @@ playwright_e2e_test:
     - echo "AWS identity verified for testing"
   script:
     - echo "Running comprehensive Playwright E2E test against deployed MediaLake infrastructure"
+    - |
+      # Function to refresh AWS credentials from credential vendor
+      refresh_credentials() {
+        echo "Refreshing AWS credentials..."
+        if [ -f "$AWS_SHARED_CREDENTIALS_FILE" ]; then
+          export AWS_ACCESS_KEY_ID=$(grep -A2 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_access_key_id | cut -d'=' -f2 | tr -d ' ')
+          export AWS_SECRET_ACCESS_KEY=$(grep -A2 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_secret_access_key | cut -d'=' -f2 | tr -d ' ')
+          export AWS_SESSION_TOKEN=$(grep -A2 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_session_token | cut -d'=' -f2 | tr -d ' ')
+          echo "Credentials refreshed successfully at $(date '+%H:%M:%S')"
+        else
+          echo "Warning: Credential file not found at $AWS_SHARED_CREDENTIALS_FILE"
+        fi
+      }
+    - refresh_credentials
     - aws s3 ls --profile default
     - export BUCKET_UUID=$(python3 -c "import uuid; print(str(uuid.uuid4())[:8])")
     - export S3_BUCKET_NAME="medialake-deploy-${BUCKET_UUID}-${CI_COMMIT_SHORT_SHA}"
@@ -521,8 +535,16 @@ playwright_e2e_test:
         local region=$1
         echo "Starting comprehensive stack cleanup in region $region"
         echo "Will delete all stacks containing (case-insensitive): '$STACK_PREFIX'"
+        local iteration=0
         # Main loop to delete stacks
         while true; do
+          # Refresh credentials every 5 iterations (approximately every 5 minutes)
+          if [ $((iteration % 5)) -eq 0 ] && [ $iteration -gt 0 ]; then
+            echo "Refreshing credentials during stack cleanup (iteration $iteration)..."
+            refresh_credentials
+          fi
+          iteration=$((iteration + 1))
+
           stacks=$(list_stacks "$region")
           if [ -z "$stacks" ]; then
             echo "No more medialake stacks found in region $region. Cleanup complete!"
@@ -590,11 +612,13 @@ playwright_e2e_test:
     - echo "Creating zip file of repository..."
     - zip -r $ZIP_FILE_NAME . -x "*.git*" "*.venv*" "*__pycache__*" "*.pyc" "*node_modules*" "*.DS_Store*"
     - ls -la $ZIP_FILE_NAME
+    - refresh_credentials
     - 'echo "Uploading zip file to S3 bucket: $S3_BUCKET_NAME"'
     - aws s3 cp $ZIP_FILE_NAME s3://$S3_BUCKET_NAME/$ZIP_FILE_NAME --profile default
     - echo "Generating pre-signed URL for zip file..."
     - PRESIGNED_URL=$(aws s3 presign s3://$S3_BUCKET_NAME/$ZIP_FILE_NAME --expires-in 3600 --profile default)
     - echo "Pre-signed URL generated successfully"
+    - refresh_credentials
     - 'echo "Deploying CloudFormation stack: $STACK_NAME"'
     - |
       aws cloudformation create-stack \
@@ -650,21 +674,7 @@ playwright_e2e_test:
           if [ $((ELAPSED_TIME - LAST_CREDENTIAL_REFRESH)) -ge $CREDENTIAL_REFRESH_INTERVAL ] && [ $ELAPSED_TIME -gt 0 ]; then
             echo ""
             echo "[${ELAPSED_MINUTES}m] Refreshing AWS credentials to prevent expiration..."
-            # Check current credentials status
-            if aws sts get-caller-identity --profile default >/dev/null 2>&1; then
-              echo "Credentials still valid, refreshing from credential vendor..."
-              # Re-read credentials from the credential vendor location
-              if [ -f "$AWS_SHARED_CREDENTIALS_FILE" ]; then
-                export AWS_ACCESS_KEY_ID=$(grep -A2 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_access_key_id | cut -d'=' -f2 | tr -d ' ')
-                export AWS_SECRET_ACCESS_KEY=$(grep -A2 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_secret_access_key | cut -d'=' -f2 | tr -d ' ')
-                export AWS_SESSION_TOKEN=$(grep -A2 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_session_token | cut -d'=' -f2 | tr -d ' ')
-                echo "Credentials refreshed successfully"
-              else
-                echo "Warning: Credential file not found, continuing with existing credentials"
-              fi
-            else
-              echo "Warning: Unable to verify credentials, attempting to continue..."
-            fi
+            refresh_credentials
             LAST_CREDENTIAL_REFRESH=$ELAPSED_TIME
           fi
 
@@ -834,6 +844,7 @@ playwright_e2e_test:
     - echo "============================================"
     - echo "Cleaning up deployment resources..."
     - echo "============================================"
+    - refresh_credentials
     - |
       # Clean up: Delete the temporary S3 bucket after deployment
       echo "Cleaning up temporary S3 bucket..."
