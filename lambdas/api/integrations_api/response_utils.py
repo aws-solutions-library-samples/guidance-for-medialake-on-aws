@@ -17,31 +17,31 @@ def create_success_response(
     """
     Create a standardized success response.
 
+    Note: Lambda Powertools APIGatewayRestResolver automatically wraps
+    the response with statusCode, so we only return the body content.
+
     Args:
         data: Response data
         message: Success message
-        status_code: HTTP status code
+        status_code: HTTP status code (currently unused, kept for API compatibility)
         request_id: Optional request ID for tracking
 
     Returns:
-        Standardized success response dictionary
+        Standardized success response dictionary (body only)
     """
     response = {
-        "statusCode": status_code,
-        "body": {
-            "success": True,
-            "status": "success",
-            "message": message,
-            "data": data,
-            "meta": {
-                "timestamp": datetime.utcnow().isoformat() + "Z",
-                "version": "v1",
-            },
+        "success": True,
+        "status": "success",
+        "message": message,
+        "data": data,
+        "meta": {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "version": "v1",
         },
     }
 
     if request_id:
-        response["body"]["meta"]["request_id"] = request_id
+        response["meta"]["request_id"] = request_id
 
     return response
 
@@ -56,34 +56,34 @@ def create_error_response(
     """
     Create a standardized error response.
 
+    Note: Lambda Powertools APIGatewayRestResolver automatically wraps
+    the response with statusCode, so we only return the body content.
+
     Args:
         error_code: Error code identifier
         error_message: Human-readable error message
-        status_code: HTTP status code
+        status_code: HTTP status code (currently unused, kept for API compatibility)
         request_id: Optional request ID for tracking
         details: Optional additional error details
 
     Returns:
-        Standardized error response dictionary
+        Standardized error response dictionary (body only)
     """
     response = {
-        "statusCode": status_code,
-        "body": {
-            "success": False,
-            "status": "error",
-            "message": error_message,
-            "error": {"code": error_code, "message": error_message},
-            "meta": {
-                "timestamp": datetime.utcnow().isoformat() + "Z",
-                "version": "v1",
-            },
+        "success": False,
+        "status": "error",
+        "message": error_message,
+        "error": {"code": error_code, "message": error_message},
+        "meta": {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "version": "v1",
         },
     }
 
     if details:
-        response["body"]["error"]["details"] = details
+        response["error"]["details"] = details
 
     if request_id:
-        response["body"]["meta"]["request_id"] = request_id
+        response["meta"]["request_id"] = request_id
 
     return response
