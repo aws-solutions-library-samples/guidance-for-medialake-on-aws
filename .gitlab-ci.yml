@@ -385,6 +385,7 @@ sync-to-github:
     - rsync -av --delete --exclude=.git ../ ./
     # Remove files that shouldn't be in the public GitHub repository
     - rm -f secrets.txt
+    - rm -f .roomodes
     - rm -rf docs/
     - rm -rf .roo/
     - rm -rf .kiro/
@@ -447,6 +448,9 @@ playwright_e2e_test:
     ENVIRONMENT_NAME: "e2e"
     DEPLOYMENT_SIZE: "small"
     ZIP_FILE_NAME: "medialake-source-${CI_COMMIT_SHORT_SHA}.zip"
+    # Request maximum allowed AWS session duration (1 hour = 3600 seconds)
+    AWS_ROLE_SESSION_DURATION: "3600"
+    AWS_SESSION_DURATION: "3600"
     #ACCESS_KEY_ID: $US_WEST_2_ACCESS_KEY
     #SECRET_ACCESS_KEY: $US_WEST_2_SECRET_KEY
   before_script:
@@ -454,6 +458,7 @@ playwright_e2e_test:
     - echo "Job Start Time:$(date '+%Y-%m-%d %H:%M:%S %Z')"
     - echo "Job Timeout Configuration:4 hours"
     - echo "CI_JOB_TIMEOUT:$CI_JOB_TIMEOUT"
+    - echo "AWS_ROLE_SESSION_DURATION:$AWS_ROLE_SESSION_DURATION seconds"
     - echo "Checking for potential timeout issues..."
     - echo "============================================"
     # Install required dependencies
@@ -489,6 +494,73 @@ playwright_e2e_test:
     - aws s3 ls --profile default
     - aws sts get-caller-identity --profile default
     - echo "AWS identity verified for testing"
+    - |
+      # Check current session expiration and attempt to get longer session if needed
+      echo "============================================"
+      echo "Checking AWS session duration..."
+
+      # Try to get session token expiration (if available in credential vendor)
+      if [ -f "$AWS_SHARED_CREDENTIALS_FILE" ]; then
+        echo "Credential vendor file exists"
+
+        # Check if we can get session info
+        SESSION_INFO=$(aws sts get-session-token --duration-seconds 3600 --profile default 2>&1 || echo "FAILED")
+
+        if [[ "$SESSION_INFO" == *"FAILED"* ]] || [[ "$SESSION_INFO" == *"error"* ]]; then
+          echo "⚠ Could not request extended session token"
+          echo "Relying on credential vendor provided session"
+        else
+          echo "✓ Extended session token capability confirmed"
+        fi
+
+        # Attempt to manually assume role with maximum allowed duration as fallback
+        if [ -n "$AWS_CREDS_TARGET_ROLE" ]; then
+          echo "Attempting to assume role with 1-hour duration..."
+          echo "Role ARN: $AWS_CREDS_TARGET_ROLE"
+
+          ASSUME_OUTPUT=$(aws sts assume-role \
+            --role-arn "$AWS_CREDS_TARGET_ROLE" \
+            --role-session-name "gitlab-cicd-e2e-test-$(date +%s)" \
+            --duration-seconds 3600 \
+            --profile default 2>&1)
+          ASSUME_EXIT_CODE=$?
+
+          if [ $ASSUME_EXIT_CODE -eq 0 ]; then
+            echo "✓ Successfully assumed role with 1-hour duration"
+
+            # Extract credentials using jq (proper JSON parsing)
+            export AWS_ACCESS_KEY_ID=$(echo "$ASSUME_OUTPUT" | jq -r '.Credentials.AccessKeyId')
+            export AWS_SECRET_ACCESS_KEY=$(echo "$ASSUME_OUTPUT" | jq -r '.Credentials.SecretAccessKey')
+            export AWS_SESSION_TOKEN=$(echo "$ASSUME_OUTPUT" | jq -r '.Credentials.SessionToken')
+            EXPIRATION=$(echo "$ASSUME_OUTPUT" | jq -r '.Credentials.Expiration')
+
+            echo "Session expires at: $EXPIRATION"
+
+            # Update credentials file
+            mkdir -p ~/.aws
+            echo "[default]" > ~/.aws/credentials
+            echo "aws_access_key_id = $AWS_ACCESS_KEY_ID" >> ~/.aws/credentials
+            echo "aws_secret_access_key = $AWS_SECRET_ACCESS_KEY" >> ~/.aws/credentials
+            echo "aws_session_token = $AWS_SESSION_TOKEN" >> ~/.aws/credentials
+
+            # Verify new credentials work
+            if aws sts get-caller-identity --profile default >/dev/null 2>&1; then
+              echo "✓ Fresh 1-hour session credentials validated successfully"
+              echo "Credentials will be refreshed every 30 minutes during monitoring"
+            else
+              echo "⚠ Warning: Could not validate assumed role credentials"
+            fi
+          else
+            echo "⚠ Could not assume role"
+            echo "Error: $ASSUME_OUTPUT"
+            echo "Note: The IAM role must be configured with MaxSessionDuration of at least 1 hour"
+            echo "Proceeding with credential vendor provided session"
+          fi
+        else
+          echo "⚠ AWS_CREDS_TARGET_ROLE not set, cannot assume role"
+        fi
+      fi
+      echo "============================================"
   script:
     - echo "Running comprehensive Playwright E2E test against deployed MediaLake infrastructure"
     - |

@@ -106,19 +106,51 @@ cleanup_resources:
 
 ## Current Mitigations in Place
 
-1. **Credential refresh every 30 minutes** during monitoring
-2. **Retry logic** (3 attempts with 5-second delays)
-3. **Validation** before using credentials
-4. **S3 bucket cleanup in after_script** (runs even on failure)
-5. **Error detection** for expired token errors
+1. **Automatic fresh 1-hour session assumption** in `before_script`:
+   - Attempts to assume the IAM role with `--duration-seconds 3600`
+   - Gets a fresh 1-hour session at job start
+   - Falls back to credential vendor session if role assumption fails
+   - Validates credentials before proceeding
+2. **Environment variables** requesting session:
+   - `AWS_ROLE_SESSION_DURATION: "3600"`
+   - `AWS_SESSION_DURATION: "3600"`
+3. **Credential refresh every 30 minutes** during monitoring (critical for multi-hour jobs)
+4. **Retry logic** (3 attempts with 5-second delays)
+5. **Validation** before using credentials
+6. **S3 bucket cleanup in after_script** (runs even on failure)
+7. **Error detection** for expired token errors
+8. **Diagnostic logging** showing:
+   - Job start time
+   - Total elapsed time vs monitoring time
+   - Session expiration warnings
+
+**Note:** With 1-hour sessions and 30-minute refresh intervals, the job can run indefinitely as long as:
+
+- The project-level timeout allows it (must be set to 4+ hours)
+- The credential vendor continues providing fresh credentials
+- Each refresh cycle gets a new 1-hour session before the previous one expires
+
+## IAM Role Configuration
+
+The current configuration uses **1-hour sessions** (3600 seconds), which is the default for most IAM roles.
+
+**Note:** If you need longer sessions in the future:
+
+- IAM roles can support up to **12 hours** for IAM user assumptions
+- Federated users default to **1 hour** (can be extended if role is configured)
+- Update `AWS_ROLE_SESSION_DURATION` variable and `--duration-seconds` in the assume-role command
+- Ensure the IAM role's `MaxSessionDuration` is set appropriately
 
 ## Recommended Actions
 
 ### Immediate
 
-1. Check GitLab Runner `config.toml` for timeout settings
-2. Check Project CI/CD settings for job timeout limits
-3. Verify AWS credential vendor session duration configuration
+1. **Check and update Project CI/CD timeout**: Settings → CI/CD → General Pipelines → Timeout to **14400 seconds (4 hours)**
+2. Check GitLab Runner `config.toml` for timeout settings (if accessible)
+3. Monitor next job run for:
+   - Successful 1-hour session assumption at start
+   - Credential refresh every 30 minutes
+   - Job completing without timeout errors
 
 ### Long-term
 
