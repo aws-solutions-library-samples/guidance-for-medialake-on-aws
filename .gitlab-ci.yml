@@ -495,7 +495,7 @@ playwright_e2e_test:
     - aws sts get-caller-identity --profile default
     - echo "AWS identity verified for testing"
     - |
-      # Check current session expiration and attempt to get longer session if needed
+      # Check current session and attempt to get fresh 1-hour session
       echo "============================================"
       echo "Checking AWS session duration..."
 
@@ -507,15 +507,15 @@ playwright_e2e_test:
         SESSION_INFO=$(aws sts get-session-token --duration-seconds 3600 --profile default 2>&1 || echo "FAILED")
 
         if [[ "$SESSION_INFO" == *"FAILED"* ]] || [[ "$SESSION_INFO" == *"error"* ]]; then
-          echo "⚠ Could not request extended session token"
+          echo "⚠ Could not request fresh session token"
           echo "Relying on credential vendor provided session"
         else
-          echo "✓ Extended session token capability confirmed"
+          echo "✓ Session token capability confirmed"
         fi
 
-        # Attempt to manually assume role with maximum allowed duration as fallback
+        # Attempt to manually assume role for fresh 1-hour session
         if [ -n "$AWS_CREDS_TARGET_ROLE" ]; then
-          echo "Attempting to assume role with 1-hour duration..."
+          echo "Attempting to assume role for fresh 1-hour session..."
           echo "Role ARN: $AWS_CREDS_TARGET_ROLE"
 
           ASSUME_OUTPUT=$(aws sts assume-role \
