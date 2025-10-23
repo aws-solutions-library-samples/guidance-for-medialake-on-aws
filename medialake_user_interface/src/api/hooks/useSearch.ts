@@ -152,7 +152,10 @@ export const useSearch = (query: string, params?: SearchParams) => {
     },
     placeholderData: keepPreviousData,
     enabled: !!query, // Only enable and refetch if there is a query
-    staleTime: 1000 * 60, // Cache for 1 minute
-    gcTime: 1000 * 60 * 5, // Keep unused data for 5 minutes
+    staleTime: 1000 * 60 * 10, // Cache for 10 minutes - search results are relatively stable
+    gcTime: 1000 * 60 * 30, // Keep unused search results for 30 minutes - allows fast back navigation
+    refetchOnMount: false, // Don't refetch when component remounts
+    refetchOnWindowFocus: false, // Don't refetch on window focus
+    refetchOnReconnect: false, // Don't refetch on network reconnect
   });
 };

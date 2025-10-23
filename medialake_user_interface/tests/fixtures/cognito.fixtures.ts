@@ -39,6 +39,8 @@ function executeAwsCommand(command: string): string {
 function generateSecurePassword(passwordPolicy?: any): string {
   // Default to conservative requirements if policy is not available
   const minLength = passwordPolicy?.MinimumLength || 20; // Use 20 as a safe default
+  // Generate passwords 1.5x the minimum length
+  const targetLength = Math.ceil(minLength * 1.5);
   const requireUppercase = passwordPolicy?.RequireUppercase !== false;
   const requireLowercase = passwordPolicy?.RequireLowercase !== false;
   const requireNumbers = passwordPolicy?.RequireNumbers !== false;
@@ -52,42 +54,35 @@ function generateSecurePassword(passwordPolicy?: any): string {
   let password = "";
   let availableChars = "";
 
-  // Add required character types
-  if (requireUppercase) {
-    password += uppercase.charAt(Math.floor(Math.random() * uppercase.length));
-    password += uppercase.charAt(Math.floor(Math.random() * uppercase.length));
-    availableChars += uppercase;
-  }
+  // Always add at least 3 uppercase letters (guaranteed)
+  password += uppercase.charAt(Math.floor(Math.random() * uppercase.length));
+  password += uppercase.charAt(Math.floor(Math.random() * uppercase.length));
+  password += uppercase.charAt(Math.floor(Math.random() * uppercase.length));
+  availableChars += uppercase;
 
+  // Always add at least 2 numbers (guaranteed)
+  password += numbers.charAt(Math.floor(Math.random() * numbers.length));
+  password += numbers.charAt(Math.floor(Math.random() * numbers.length));
+  availableChars += numbers;
+
+  // Always add at least one '!' character (guaranteed)
+  password += "!";
+  availableChars += symbols;
+
+  // Add required character types
   if (requireLowercase) {
     password += lowercase.charAt(Math.floor(Math.random() * lowercase.length));
     password += lowercase.charAt(Math.floor(Math.random() * lowercase.length));
     availableChars += lowercase;
   }
 
-  if (requireNumbers) {
-    password += numbers.charAt(Math.floor(Math.random() * numbers.length));
-    password += numbers.charAt(Math.floor(Math.random() * numbers.length));
-    availableChars += numbers;
-  }
-
-  if (requireSymbols) {
-    password += symbols.charAt(Math.floor(Math.random() * symbols.length));
-    password += symbols.charAt(Math.floor(Math.random() * symbols.length));
-    availableChars += symbols;
-  }
-
   // If no specific requirements, use all character types
-  if (!availableChars) {
-    availableChars = uppercase + lowercase + numbers + symbols;
-    password += uppercase.charAt(Math.floor(Math.random() * uppercase.length));
-    password += lowercase.charAt(Math.floor(Math.random() * lowercase.length));
-    password += numbers.charAt(Math.floor(Math.random() * numbers.length));
-    password += symbols.charAt(Math.floor(Math.random() * symbols.length));
+  if (!availableChars.includes(lowercase)) {
+    availableChars += lowercase;
   }
 
-  // Fill to minimum length
-  while (password.length < minLength) {
+  // Fill to target length (1.5x minimum length)
+  while (password.length < targetLength) {
     password += availableChars.charAt(
       Math.floor(Math.random() * availableChars.length),
     );
@@ -176,6 +171,40 @@ function getUserPoolPasswordPolicy(userPoolId: string): any {
   }
 }
 
+// Helper function to verify superAdministrators group exists
+function verifySuperAdminGroupExists(userPoolId: string): boolean {
+  try {
+    console.log(
+      `[Cognito Fixture] Verifying superAdministrators group exists in user pool: ${userPoolId}`,
+    );
+    const groupsOutput = executeAwsCommand(
+      `cognito-idp list-groups --user-pool-id ${userPoolId}`,
+    );
+    const groupsData = JSON.parse(groupsOutput);
+    const groups = groupsData.Groups || [];
+
+    const superAdminGroup = groups.find(
+      (group: any) => group.GroupName === "superAdministrators",
+    );
+
+    if (superAdminGroup) {
+      console.log(`[Cognito Fixture] Found superAdministrators group`);
+      return true;
+    } else {
+      console.warn(
+        `[Cognito Fixture] superAdministrators group not found in user pool`,
+      );
+      return false;
+    }
+  } catch (error) {
+    console.error(
+      "[Cognito Fixture] Error verifying superAdministrators group:",
+      error,
+    );
+    return false;
+  }
+}
+
 // Helper function to create a test user
 function createTestUser(
   userPoolId: string,
@@ -199,6 +228,19 @@ function createTestUser(
     const setPasswordCommand = `cognito-idp admin-set-user-password --user-pool-id ${userPoolId} --username "${username}" --password "${password}" --permanent`;
     executeAwsCommand(setPasswordCommand);
 
+    // Verify superAdministrators group exists and add user to it
+    if (verifySuperAdminGroupExists(userPoolId)) {
+      const addToGroupCommand = `cognito-idp admin-add-user-to-group --user-pool-id ${userPoolId} --username "${username}" --group-name superAdministrators`;
+      executeAwsCommand(addToGroupCommand);
+      console.log(
+        `[Cognito Fixture] Test user added to superAdministrators group: ${username}`,
+      );
+    } else {
+      console.warn(
+        `[Cognito Fixture] Could not add user to superAdministrators group - group not found`,
+      );
+    }
+
     console.log(
       `[Cognito Fixture] Test user created successfully: ${username}`,
     );
@@ -211,6 +253,29 @@ function createTestUser(
         // Update the existing user's password
         const setPasswordCommand = `cognito-idp admin-set-user-password --user-pool-id ${userPoolId} --username "${username}" --password "${password}" --permanent`;
         executeAwsCommand(setPasswordCommand);
+
+        // Verify superAdministrators group exists and add user to it (in case they weren't already in it)
+        if (verifySuperAdminGroupExists(userPoolId)) {
+          try {
+            const addToGroupCommand = `cognito-idp admin-add-user-to-group --user-pool-id ${userPoolId} --username "${username}" --group-name superAdministrators`;
+            executeAwsCommand(addToGroupCommand);
+            console.log(
+              `[Cognito Fixture] Test user added to superAdministrators group: ${username}`,
+            );
+          } catch (groupError: any) {
+            // Ignore if user is already in the group
+            if (
+              !groupError.message.includes("UserNotFoundException") &&
+              !groupError.message.includes("already exists")
+            ) {
+              console.warn(
+                `[Cognito Fixture] Warning: Could not add user to group:`,
+                groupError.message,
+              );
+            }
+          }
+        }
+
         console.log(
           `[Cognito Fixture] Updated password for existing user: ${username}`,
         );
