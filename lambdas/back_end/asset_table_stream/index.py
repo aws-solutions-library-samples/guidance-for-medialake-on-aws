@@ -332,17 +332,73 @@ def execute_bulk_operation(actions: List[dict]) -> Tuple[int, List[dict]]:
             failed_actions.append(item)
             error_info = item.get("index", item.get("update", item.get("delete", {})))
             status = error_info.get("status", 0)
+            operation_type = (
+                "index"
+                if "index" in item
+                else ("update" if "update" in item else "delete")
+            )
+            item_id = error_info.get("_id", "unknown")
+            error_detail = error_info.get("error", {})
 
             if status == 429:
                 has_429_errors = True
                 logger.warning(
                     "Bulk operation item failed with 429 - Too Many Requests",
-                    extra={"item_id": error_info.get("_id"), "status": status},
+                    extra={
+                        "item_id": item_id,
+                        "status": status,
+                        "operation": operation_type,
+                    },
                 )
+            elif status == 404:
+                if operation_type == "delete":
+                    logger.info(
+                        "Delete operation - document not found (expected behavior)",
+                        extra={
+                            "item_id": item_id,
+                            "status": status,
+                            "operation": operation_type,
+                        },
+                    )
+                else:
+                    logger.error(
+                        "Bulk operation item failed",
+                        extra={
+                            "item_id": item_id,
+                            "status": status,
+                            "operation": operation_type,
+                            "error_type": (
+                                error_detail.get("type")
+                                if isinstance(error_detail, dict)
+                                else None
+                            ),
+                            "error_reason": (
+                                error_detail.get("reason")
+                                if isinstance(error_detail, dict)
+                                else str(error_detail)
+                            ),
+                            "index": error_info.get("_index"),
+                        },
+                    )
             else:
                 logger.error(
                     "Bulk operation item failed",
-                    extra={"error": error_info.get("error"), "status": status},
+                    extra={
+                        "item_id": item_id,
+                        "status": status,
+                        "operation": operation_type,
+                        "error_type": (
+                            error_detail.get("type")
+                            if isinstance(error_detail, dict)
+                            else None
+                        ),
+                        "error_reason": (
+                            error_detail.get("reason")
+                            if isinstance(error_detail, dict)
+                            else str(error_detail)
+                        ),
+                        "index": error_info.get("_index"),
+                    },
                 )
 
     # If we got 429 errors, raise exception to trigger retry with backoff
