@@ -427,7 +427,12 @@ playwright_e2e_test:
     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
       when: on_success
     - when: never
-  # Commented out for faster testing iteration
+  # KNOWN ISSUE: Job may be killed at ~60 minutes despite 4h timeout configuration
+  # This indicates one of:
+  #   1. GitLab Runner timeout override (check /etc/gitlab-runner/config.toml)
+  #   2. Project-level CI/CD timeout limit (check Settings → CI/CD → Timeout)
+  #   3. AWS Credential Vendor session duration limit (max 1 hour)
+  # See: INTERNAL-ai-documentation/gitlab-cicd-60-minute-timeout-issue.md
   variables:
     AWS_CREDS_TARGET_ROLE: $US_WEST_2_AWS_IAM_ROLE
     TARGET_ROLE: $US_WEST_2_AWS_IAM_ROLE
@@ -445,6 +450,12 @@ playwright_e2e_test:
     #ACCESS_KEY_ID: $US_WEST_2_ACCESS_KEY
     #SECRET_ACCESS_KEY: $US_WEST_2_SECRET_KEY
   before_script:
+    - echo "============================================"
+    - echo "Job Start Time:$(date '+%Y-%m-%d %H:%M:%S %Z')"
+    - echo "Job Timeout Configuration:4 hours"
+    - echo "CI_JOB_TIMEOUT:$CI_JOB_TIMEOUT"
+    - echo "Checking for potential timeout issues..."
+    - echo "============================================"
     # Install required dependencies
     - yum update -y
     - yum install -y python3 python3-pip unzip which findutils zip
@@ -729,6 +740,10 @@ playwright_e2e_test:
         echo "Pipeline monitoring will check status every 15 seconds with keepalive output"
         echo "Credentials will be refreshed every 30 minutes during monitoring"
 
+        # Record job start time for total elapsed time tracking
+        JOB_START_TIME=$(date +%s)
+        echo "Job start timestamp: $JOB_START_TIME"
+
         # Monitor pipeline with timeout (3 hours max to accommodate long deployments)
         MAX_WAIT_TIME=10800  # 3 hours in seconds
         ELAPSED_TIME=0
@@ -783,7 +798,16 @@ playwright_e2e_test:
           else
             # Log full status every STATUS_LOG_INTERVAL seconds
             if [ $((ELAPSED_TIME - LAST_STATUS_LOG)) -ge $STATUS_LOG_INTERVAL ]; then
-              echo "[${ELAPSED_MINUTES}m] Pipeline Status: $EXECUTION_STATUS ($(date '+%H:%M:%S'))"
+              CURRENT_TIME=$(date +%s)
+              TOTAL_JOB_ELAPSED=$((CURRENT_TIME - JOB_START_TIME))
+              TOTAL_JOB_MINUTES=$((TOTAL_JOB_ELAPSED / 60))
+              echo "[${ELAPSED_MINUTES}m monitoring / ${TOTAL_JOB_MINUTES}m total] Pipeline Status: $EXECUTION_STATUS ($(date '+%H:%M:%S'))"
+
+              # Warn if approaching 55 minutes (close to potential timeout)
+              if [ $TOTAL_JOB_MINUTES -ge 55 ] && [ $TOTAL_JOB_MINUTES -lt 58 ]; then
+                echo "⚠ WARNING: Job has been running for ${TOTAL_JOB_MINUTES} minutes. If timeout occurs, check GitLab Runner and project timeout settings."
+              fi
+
               LAST_STATUS_LOG=$ELAPSED_TIME
             else
               # Keepalive dot every CHECK_INTERVAL seconds
