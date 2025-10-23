@@ -660,10 +660,15 @@ playwright_e2e_test:
         --profile default
     - echo "CloudFormation stack deployment initiated successfully"
     - echo "Stack name:$STACK_NAME"
+    - refresh_credentials
     - |
       # Monitor CodePipeline execution similar to deploy-medialake.sh
       echo "Waiting for CodePipeline to be created by CloudFormation..."
       sleep 120  # Wait for pipeline creation
+
+      # Refresh credentials again after the sleep
+      refresh_credentials
+
       # Check for pipeline existence (try multiple possible names)
       PIPELINE_NAME=""
       for pipeline_candidate in "MediaLakeCDKPipeline" "CDKDeploymentPipeline"; do
@@ -680,6 +685,7 @@ playwright_e2e_test:
         echo "Monitoring CodePipeline execution: $PIPELINE_NAME"
         echo "This may take several minutes to complete..."
         echo "Pipeline monitoring will check status every 15 seconds with keepalive output"
+        echo "Credentials will be refreshed every 30 minutes during monitoring"
 
         # Monitor pipeline with timeout (3 hours max to accommodate long deployments)
         MAX_WAIT_TIME=10800  # 3 hours in seconds
@@ -687,29 +693,47 @@ playwright_e2e_test:
         CHECK_INTERVAL=15
         STATUS_LOG_INTERVAL=60
         LAST_STATUS_LOG=0
-        CREDENTIAL_REFRESH_INTERVAL=3000  # Refresh every 50 minutes (before 1-hour expiry)
+        CREDENTIAL_REFRESH_INTERVAL=1800  # Refresh every 30 minutes (well before 1-hour expiry)
         LAST_CREDENTIAL_REFRESH=0
 
         while [ $ELAPSED_TIME -lt $MAX_WAIT_TIME ]; do
           # Calculate elapsed time in minutes for display
           ELAPSED_MINUTES=$((ELAPSED_TIME / 60))
 
-          # Refresh AWS credentials every 50 minutes to prevent expiration
-          if [ $((ELAPSED_TIME - LAST_CREDENTIAL_REFRESH)) -ge $CREDENTIAL_REFRESH_INTERVAL ] && [ $ELAPSED_TIME -gt 0 ]; then
+          # Refresh AWS credentials every 30 minutes to prevent expiration
+          if [ $((ELAPSED_TIME - LAST_CREDENTIAL_REFRESH)) -ge $CREDENTIAL_REFRESH_INTERVAL ]; then
             echo ""
             echo "[${ELAPSED_MINUTES}m] Refreshing AWS credentials to prevent expiration..."
             refresh_credentials
             LAST_CREDENTIAL_REFRESH=$ELAPSED_TIME
           fi
 
-          # Get pipeline execution status
-          EXECUTION_STATUS=$(aws codepipeline list-pipeline-executions \
+          # Get pipeline execution status with error capture
+          EXECUTION_STATUS_OUTPUT=$(aws codepipeline list-pipeline-executions \
             --pipeline-name "$PIPELINE_NAME" \
             --profile default \
             --region $DEPLOY_REGION \
             --max-items 1 \
             --query "pipelineExecutionSummaries[0].status" \
-            --output text 2>/dev/null | tr -d '\n\r' | sed 's/None//g' | xargs)
+            --output text 2>&1)
+
+          # Check for credential expiration errors
+          if echo "$EXECUTION_STATUS_OUTPUT" | grep -qi "ExpiredToken\|InvalidToken\|expired"; then
+            echo ""
+            echo "[${ELAPSED_MINUTES}m] ⚠ Detected expired credentials, forcing refresh..."
+            refresh_credentials
+            LAST_CREDENTIAL_REFRESH=$ELAPSED_TIME
+            # Retry the command after refresh
+            EXECUTION_STATUS_OUTPUT=$(aws codepipeline list-pipeline-executions \
+              --pipeline-name "$PIPELINE_NAME" \
+              --profile default \
+              --region $DEPLOY_REGION \
+              --max-items 1 \
+              --query "pipelineExecutionSummaries[0].status" \
+              --output text 2>&1)
+          fi
+
+          EXECUTION_STATUS=$(echo "$EXECUTION_STATUS_OUTPUT" | tr -d '\n\r' | sed 's/None//g' | xargs)
 
           if [ $? -ne 0 ] || [ "$EXECUTION_STATUS" == "None" ] || [ -z "$EXECUTION_STATUS" ] || [ "$EXECUTION_STATUS" == "null" ]; then
             # Keepalive output every check interval
@@ -868,16 +892,6 @@ playwright_e2e_test:
         echo "✅ All Playwright tests passed!"
       fi
     - cd ..
-    - echo "============================================"
-    - echo "Cleaning up deployment resources..."
-    - echo "============================================"
-    - refresh_credentials
-    - |
-      # Clean up: Delete the temporary S3 bucket after deployment
-      echo "Cleaning up temporary S3 bucket..."
-      aws s3 rm s3://$S3_BUCKET_NAME --recursive --region $DEPLOY_REGION --profile default
-      aws s3 rb s3://$S3_BUCKET_NAME --region $DEPLOY_REGION --profile default
-      echo "Temporary S3 bucket deleted: $S3_BUCKET_NAME"
     - |
       # Exit with test result code if tests failed
       if [ -n "$TEST_EXIT_CODE" ] && [ "$TEST_EXIT_CODE" -ne "0" ]; then
@@ -893,5 +907,77 @@ playwright_e2e_test:
       junit: medialake_user_interface/test-results/junit.xml
     expire_in: 30 days
   after_script:
-    - echo "E2E test execution completed"
+    - echo "============================================"
+    - echo "Starting cleanup (runs regardless of job success/failure)"
+    - echo "============================================"
+    - |
+      # Function to refresh AWS credentials (redefined for after_script context)
+      refresh_credentials() {
+        local timestamp=$(date '+%H:%M:%S')
+        echo "Refreshing AWS credentials at $timestamp..."
+
+        if [ -f "$AWS_SHARED_CREDENTIALS_FILE" ]; then
+          # Read credentials from credential vendor file
+          local access_key=$(grep -A5 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_access_key_id | cut -d'=' -f2 | tr -d ' ' | tr -d '\t')
+          local secret_key=$(grep -A5 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_secret_access_key | cut -d'=' -f2 | tr -d ' ' | tr -d '\t')
+          local session_token=$(grep -A5 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_session_token | cut -d'=' -f2 | tr -d ' ' | tr -d '\t')
+
+          # Export as environment variables
+          export AWS_ACCESS_KEY_ID="$access_key"
+          export AWS_SECRET_ACCESS_KEY="$secret_key"
+          export AWS_SESSION_TOKEN="$session_token"
+
+          # Update credentials file for --profile default
+          mkdir -p ~/.aws
+          echo "[default]" > ~/.aws/credentials
+          echo "aws_access_key_id = $access_key" >> ~/.aws/credentials
+          echo "aws_secret_access_key = $secret_key" >> ~/.aws/credentials
+          echo "aws_session_token = $session_token" >> ~/.aws/credentials
+
+          echo "✓ Credentials refreshed for cleanup at $timestamp"
+        else
+          echo "⚠ Warning: Credential file not found, cleanup may fail"
+        fi
+      }
+    - refresh_credentials
+    - |
+      # Clean up S3 bucket (runs even if job failed)
+      if [ -n "$S3_BUCKET_NAME" ]; then
+        echo "============================================"
+        echo "Cleaning up S3 bucket: $S3_BUCKET_NAME"
+        echo "============================================"
+
+        # Check if bucket exists before trying to delete
+        if aws s3 ls "s3://$S3_BUCKET_NAME" --profile default --region $DEPLOY_REGION >/dev/null 2>&1; then
+          echo "Bucket found. Deleting all objects..."
+
+          # Delete all objects (including versions if versioning is enabled)
+          aws s3 rm "s3://$S3_BUCKET_NAME" --recursive --profile default --region $DEPLOY_REGION 2>&1 || {
+            echo "⚠ Warning: Failed to delete some objects, retrying..."
+            sleep 2
+            aws s3 rm "s3://$S3_BUCKET_NAME" --recursive --profile default --region $DEPLOY_REGION 2>&1 || echo "⚠ Some objects may remain"
+          }
+
+          echo "Deleting bucket..."
+          aws s3 rb "s3://$S3_BUCKET_NAME" --profile default --region $DEPLOY_REGION 2>&1 || {
+            echo "⚠ Warning: Failed to delete bucket on first attempt, retrying..."
+            sleep 2
+            aws s3 rb "s3://$S3_BUCKET_NAME" --force --profile default --region $DEPLOY_REGION 2>&1 || echo "⚠ Bucket deletion failed"
+          }
+
+          # Verify bucket is gone
+          if aws s3 ls "s3://$S3_BUCKET_NAME" --profile default --region $DEPLOY_REGION >/dev/null 2>&1; then
+            echo "⚠ WARNING: Bucket still exists after cleanup attempt!"
+          else
+            echo "✓ S3 bucket successfully deleted: $S3_BUCKET_NAME"
+          fi
+        else
+          echo "Bucket not found or already deleted: $S3_BUCKET_NAME"
+        fi
+      else
+        echo "No S3_BUCKET_NAME set - bucket may not have been created or job failed early"
+      fi
+    - echo "============================================"
+    - echo "E2E test execution and cleanup completed"
     - echo "Test artifacts available in test-results/ and playwright-report/ directories"
+    - echo "============================================"
