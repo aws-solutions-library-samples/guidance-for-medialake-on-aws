@@ -31,7 +31,7 @@ ERROR_THRESHOLD = float(os.environ.get("ERROR_THRESHOLD", "0.3"))
 CIRCUIT_TIMEOUT = int(os.environ.get("CIRCUIT_TIMEOUT", "60"))
 
 # Verbose logging configuration
-VERBOSE_LOGGING = "true"
+VERBOSE_LOGGING = True
 
 deserializer = TypeDeserializer()
 

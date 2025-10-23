@@ -1,9 +1,23 @@
+"""
+Integrations API Gateway module for MediaLake.
+
+This module defines the ApiGatewayIntegrationsConstruct class which sets up API Gateway endpoints
+and a consolidated Lambda function for managing integrations using Lambda Powertools routing.
+
+The module handles:
+- Integration CRUD operations
+- Secrets Manager integration for API keys
+- DynamoDB single-table integration
+- IAM roles and permissions
+- API Gateway integration with proxy integration
+- Lambda function configuration
+"""
+
 from dataclasses import dataclass
 
 from aws_cdk import aws_apigateway as apigateway
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_iam as iam
-from aws_cdk import aws_lambda as lambda_
 from aws_cdk import aws_secretsmanager as secretsmanager
 from constructs import Construct
 
@@ -11,21 +25,6 @@ from config import config
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
-
-
-def apply_custom_authorization(
-    method: apigateway.Method, authorizer: apigateway.IAuthorizer
-) -> None:
-    """
-    Apply custom authorization to an API Gateway method.
-
-    Args:
-        method: The API Gateway method to apply authorization to
-        authorizer: The custom authorizer to use
-    """
-    cfn_method = method.node.default_child
-    cfn_method.authorization_type = "CUSTOM"
-    cfn_method.authorizer_id = authorizer.authorizer_id
 
 
 @dataclass
@@ -36,9 +35,14 @@ class ApiGatewayIntegrationsProps:
     x_origin_verify_secret: secretsmanager.Secret
     authorizer: apigateway.IAuthorizer
     pipelines_nodes_table: dynamodb.TableV2
+    environments_table: dynamodb.TableV2
 
 
 class ApiGatewayIntegrationsConstruct(Construct):
+    """
+    Integrations API Gateway deployment with single Lambda and routing.
+    """
+
     def __init__(
         self,
         scope: Construct,
@@ -83,187 +87,127 @@ class ApiGatewayIntegrationsConstruct(Construct):
             ),
         )
 
-        # Create integrations resource
-        integrations_resource = props.api_resource.root.add_resource("integrations")
-
-        # GET /integrations
-        self._get_integrations_handler = Lambda(
+        # Create single consolidated Integrations Lambda with routing
+        integrations_lambda = Lambda(
             self,
-            "GetintegrationsHandler",
+            "IntegrationsLambda",
             config=LambdaConfig(
-                name=f"{config.resource_prefix}_get_integrations_{config.environment}",
-                entry="lambdas/api/integrations/get_integrations",
+                name="integrations_api",
+                entry="lambdas/api/integrations_api",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "INTEGRATIONS_TABLE": self._integrations_table.table_name,
                     "PIPELINES_NODES_TABLE": props.pipelines_nodes_table.table_name,
-                },
-            ),
-        )
-        self._integrations_table.table.grant_read_data(
-            self._get_integrations_handler.function
-        )
-
-        integrations_get = integrations_resource.add_method(
-            "GET",
-            apigateway.LambdaIntegration(self._get_integrations_handler.function),
-        )
-        apply_custom_authorization(integrations_get, props.authorizer)
-
-        # POST /integrations
-        self._post_integrations_handler = Lambda(
-            self,
-            "PostintegrationsHandler",
-            config=LambdaConfig(
-                name=f"{config.resource_prefix}_post_integrations_{config.environment}",
-                entry="lambdas/api/integrations/post_integrations",
-                environment_variables={
-                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
-                    "INTEGRATIONS_TABLE": self._integrations_table.table_name,
+                    "ENVIRONMENTS_TABLE": props.environments_table.table_name,
+                    "ENVIRONMENT": config.environment,
                 },
             ),
         )
 
-        self._post_integrations_handler.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["dynamodb:PutItem"],
-                resources=[self._integrations_table.table_arn],
-            )
+        # Grant DynamoDB permissions
+        self._integrations_table.table.grant_read_write_data(
+            integrations_lambda.function
         )
+        props.pipelines_nodes_table.grant_read_data(integrations_lambda.function)
+        props.environments_table.grant_read_data(integrations_lambda.function)
 
-        # Add Secrets Manager permissions
-        self._post_integrations_handler.function.add_to_role_policy(
+        # Add comprehensive DynamoDB permissions
+        integrations_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
-                    "secretsmanager:CreateSecret",
-                    "secretsmanager:PutSecretValue",
-                    "secretsmanager:TagResource",
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:DeleteItem",
+                    "dynamodb:Query",
+                    "dynamodb:Scan",
+                    "dynamodb:BatchWriteItem",
                 ],
-                resources=["arn:aws:secretsmanager:*"],
+                resources=[
+                    self._integrations_table.table_arn,
+                    f"{self._integrations_table.table_arn}/index/*",
+                ],
             )
         )
 
-        integrations_post = integrations_resource.add_method(
-            "POST",
-            apigateway.LambdaIntegration(self._post_integrations_handler.function),
-        )
-        apply_custom_authorization(integrations_post, props.authorizer)
-
-        # integration ID specific endpoints
-        integration_id_resource = integrations_resource.add_resource("{id}")
-
-        # PUT /integrations/{id}
-        self._put_integration_handler = Lambda(
-            self,
-            "PutintegrationHandler",
-            config=LambdaConfig(
-                name=f"{config.resource_prefix}_put_integrationsId_{config.environment}",
-                entry="lambdas/api/integrations/rp_integrationsId/put_integrationsId",
-                environment_variables={
-                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
-                    "INTEGRATIONS_TABLE": self._integrations_table.table_name,
-                },
-            ),
-        )
-
-        self._integrations_table.table.grant_write_data(
-            self._put_integration_handler.function
-        )
-
-        # Add specific DynamoDB permissions for query and update operations
-        self._put_integration_handler.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:Query"],
-                resources=[self._integrations_table.table_arn],
-            )
-        )
-
-        # Add Secrets Manager permissions for updating API key secrets
-        self._put_integration_handler.function.add_to_role_policy(
+        # Add Secrets Manager permissions for API key management
+        integrations_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "secretsmanager:CreateSecret",
                     "secretsmanager:PutSecretValue",
                     "secretsmanager:UpdateSecret",
+                    "secretsmanager:DeleteSecret",
+                    "secretsmanager:TagResource",
                 ],
                 resources=["arn:aws:secretsmanager:*:*:secret:integration/*"],
             )
         )
 
-        integration_put = integration_id_resource.add_method(
-            "PUT",
-            apigateway.LambdaIntegration(self._put_integration_handler.function),
-        )
-        apply_custom_authorization(integration_put, props.authorizer)
-
-        # DELETE /integrations/{id}
-        self._delete_integration_handler = Lambda(
-            self,
-            "DeleteIntegrationsHandler",
-            config=LambdaConfig(
-                name=f"{config.resource_prefix}_del_integrationsId_{config.environment}",
-                entry="lambdas/api/integrations/rp_integrationsId/del_integrationsId",
-                environment_variables={
-                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
-                    "INTEGRATIONS_TABLE": self._integrations_table.table_name,
-                },
-            ),
+        # Create Lambda integration
+        integrations_integration = apigateway.LambdaIntegration(
+            integrations_lambda.function,
+            proxy=True,
+            allow_test_invoke=True,
         )
 
-        self._integrations_table.table.grant_write_data(
-            self._delete_integration_handler.function
-        )
+        # /integrations resource
+        integrations_resource = props.api_resource.root.add_resource("integrations")
 
-        # Add specific DynamoDB permissions for batch operations
-        self._delete_integration_handler.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "dynamodb:DeleteItem",
-                    "dynamodb:BatchWriteItem",
-                    "dynamodb:Query",
-                ],
-                resources=[self._integrations_table.table_arn],
-            )
+        # Add ANY method to /integrations for list and create operations
+        integrations_method = integrations_resource.add_method(
+            "ANY",
+            integrations_integration,
         )
+        cfn_method = integrations_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
 
-        # Add Secrets Manager permissions for deleting API key secrets
-        self._delete_integration_handler.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["secretsmanager:DeleteSecret"],
-                resources=["arn:aws:secretsmanager:*:*:secret:integration/*"],
-            )
-        )
+        # /integrations/{integration_id} - Variable path for specific integrations
+        integration_id_resource = integrations_resource.add_resource("{integration_id}")
 
-        integration_delete = integration_id_resource.add_method(
-            "DELETE",
-            apigateway.LambdaIntegration(self._delete_integration_handler.function),
+        # Add ANY method to /integrations/{integration_id}
+        integration_id_method = integration_id_resource.add_method(
+            "ANY",
+            integrations_integration,
         )
-        apply_custom_authorization(integration_delete, props.authorizer)
+        cfn_method = integration_id_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
 
         # Add CORS support
         add_cors_options_method(integrations_resource)
         add_cors_options_method(integration_id_resource)
 
+        # Store the Lambda for external access
+        self._integrations_lambda = integrations_lambda
+
     @property
     def integrations_table(self) -> dynamodb.TableV2:
+        """
+        Get the Integrations DynamoDB table.
+
+        Returns:
+            dynamodb.TableV2: The Integrations table
+        """
         return self._integrations_table.table
 
     @property
     def integrations_table_arn(self) -> str:
+        """
+        Get the Integrations DynamoDB table ARN.
+
+        Returns:
+            str: The table ARN
+        """
         return self._integrations_table.table_arn
 
     @property
-    def get_integrations_handler(self) -> Lambda:
-        return self._get_integrations_handler
+    def integrations_lambda(self) -> Lambda:
+        """
+        Get the consolidated Integrations Lambda function.
 
-    @property
-    def post_integrations_handler(self) -> lambda_.Function:
-        return self._post_integrations_handler.function
-
-    @property
-    def put_integration_handler(self) -> Lambda:
-        return self._put_integration_handler.function
-
-    @property
-    def delete_integration_handler(self) -> Lambda:
-        return self._delete_integration_handler.function
+        Returns:
+            Lambda: The Integrations Lambda construct
+        """
+        return self._integrations_lambda

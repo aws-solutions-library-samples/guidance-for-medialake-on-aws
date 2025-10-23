@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional
 
 from aws_cdk import aws_apigateway as apigateway
 from aws_cdk import aws_dynamodb as dynamodb
@@ -34,8 +35,8 @@ class ApiGatewayEnvironmentsProps:
     api_resource: apigateway.IResource
     x_origin_verify_secret: secretsmanager.Secret
     authorizer: apigateway.IAuthorizer
-    integrations_table: dynamodb.TableV2
-    post_integrations_handler: lambda_.Function
+    integrations_table: Optional[dynamodb.TableV2] = None
+    post_integrations_handler: Optional[lambda_.Function] = None
 
 
 class ApiGatewayEnvironmentsConstruct(Construct):
@@ -46,6 +47,9 @@ class ApiGatewayEnvironmentsConstruct(Construct):
         props: ApiGatewayEnvironmentsProps,
     ) -> None:
         super().__init__(scope, id)
+
+        # Store props for later reference
+        self._props = props
 
         # Create DynamoDB table for environments
         self._environments_table = DynamoDB(
@@ -62,11 +66,14 @@ class ApiGatewayEnvironmentsConstruct(Construct):
             ),
         )
 
-        self._environments_table.table.grant_read_data(props.post_integrations_handler)
-
-        props.post_integrations_handler.add_environment(
-            "ENVIRONMENTS_TABLE", self._environments_table.table_name
-        )
+        # Configure post_integrations_handler if provided
+        if props.post_integrations_handler:
+            self._environments_table.table.grant_read_data(
+                props.post_integrations_handler
+            )
+            props.post_integrations_handler.add_environment(
+                "ENVIRONMENTS_TABLE", self._environments_table.table_name
+            )
 
         # Create environments resource
         environments_resource = props.api_resource.root.add_resource("environments")
@@ -158,7 +165,11 @@ class ApiGatewayEnvironmentsConstruct(Construct):
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "ENVIRONMENTS_TABLE": self._environments_table.table_name,
-                    "INTEGRATIONS_TABLE": props.integrations_table.table_name,
+                    "INTEGRATIONS_TABLE": (
+                        props.integrations_table.table_name
+                        if props.integrations_table
+                        else ""
+                    ),
                 },
             ),
         )
@@ -166,8 +177,12 @@ class ApiGatewayEnvironmentsConstruct(Construct):
         self._environments_table.table.grant_write_data(
             self._del_environment_handler.function
         )
-        props.integrations_table.grant_read_data(self._del_environment_handler.function)
-        props.integrations_table.grant_read_data(self._del_environment_handler.function)
+
+        # Grant integrations table permissions if provided
+        if props.integrations_table:
+            props.integrations_table.grant_read_data(
+                self._del_environment_handler.function
+            )
 
         environment_delete = environment_id_resource.add_method(
             "DELETE",
@@ -178,6 +193,40 @@ class ApiGatewayEnvironmentsConstruct(Construct):
         # Add CORS support to all API resources
         add_cors_options_method(environments_resource)
         add_cors_options_method(environment_id_resource)
+
+    def set_integrations_table(self, integrations_table: dynamodb.TableV2) -> None:
+        """
+        Set the integrations table after construction.
+
+        This is needed to resolve circular dependencies between
+        environments and integrations constructs.
+        """
+        self._props.integrations_table = integrations_table
+
+        # Update delete handler environment variable
+        self._del_environment_handler.function.add_environment(
+            "INTEGRATIONS_TABLE", integrations_table.table_name
+        )
+
+        # Grant read permissions
+        integrations_table.grant_read_data(self._del_environment_handler.function)
+
+    def set_post_integrations_handler(
+        self, post_integrations_handler: lambda_.Function
+    ) -> None:
+        """
+        Set the post integrations handler after construction.
+
+        This is needed to resolve circular dependencies between
+        environments and integrations constructs.
+        """
+        self._props.post_integrations_handler = post_integrations_handler
+
+        # Grant read permissions and set environment variable
+        self._environments_table.table.grant_read_data(post_integrations_handler)
+        post_integrations_handler.add_environment(
+            "ENVIRONMENTS_TABLE", self._environments_table.table_name
+        )
 
     @property
     def environments_table_name(self) -> str:
