@@ -11,7 +11,6 @@ from aws_lambda_powertools.event_handler.exceptions import (
 )
 from aws_lambda_powertools.metrics import MetricUnit
 from botocore.exceptions import ClientError
-
 from response_utils import create_error_response, create_success_response
 from secrets_utils import delete_api_key_secret
 

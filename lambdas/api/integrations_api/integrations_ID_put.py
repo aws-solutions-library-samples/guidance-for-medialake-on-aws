@@ -14,7 +14,6 @@ from aws_lambda_powertools.event_handler.exceptions import (
 from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.parser import ValidationError, parse
 from botocore.exceptions import ClientError
-
 from integration_models import UpdateIntegrationRequest
 from response_utils import create_error_response, create_success_response
 from secrets_utils import update_api_key_secret

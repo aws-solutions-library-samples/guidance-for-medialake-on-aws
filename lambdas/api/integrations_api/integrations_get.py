@@ -5,7 +5,6 @@ import os
 import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.metrics import MetricUnit
-
 from formatting_utils import format_integration
 from response_utils import create_error_response, create_success_response
 
