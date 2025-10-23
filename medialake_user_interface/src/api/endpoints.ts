@@ -22,7 +22,7 @@ export const API_ENDPOINTS = {
     BULK_DOWNLOAD_DELETE: (jobId: string) => `/assets/download/bulk/${jobId}`,
   },
   USERS: "/settings/users",
-  USER: "/users/user",
+  USER: "/users",
   ROLES: "/settings/roles",
   PERMISSION_SETS: {
     BASE: "/permissions",
@@ -57,8 +57,8 @@ export const API_ENDPOINTS = {
         `/assignments/groups/${groupId}/permission-sets/${permissionSetId}`,
     },
   },
-  DISABLE_USER: (userId: string) => `/users/user/${userId}/disableuser`,
-  ENABLE_USER: (userId: string) => `/users/user/${userId}/enableuser`,
+  DISABLE_USER: (userId: string) => `/users/${userId}/disable`,
+  ENABLE_USER: (userId: string) => `/users/${userId}/enable`,
   SYSTEM_SETTINGS: {
     GET: "/settings/system",
     SEARCH: "/settings/system/search",
@@ -67,5 +67,26 @@ export const API_ENDPOINTS = {
     BASE: "/users/favorites",
     DELETE: (itemType: string, itemId: string) =>
       `/users/favorites/${itemType}/${itemId}`,
+  },
+  COLLECTIONS: {
+    BASE: "/collections",
+    GET: (id: string) => `/collections/${id}`,
+    UPDATE: (id: string) => `/collections/${id}`,
+    DELETE: (id: string) => `/collections/${id}`,
+    ANCESTORS: (id: string) => `/collections/${id}/ancestors`,
+    SHARE: (id: string) => `/collections/${id}/share`,
+    UNSHARE: (id: string, userId: string) =>
+      `/collections/${id}/share/${userId}`,
+    SHARES: (id: string) => `/collections/${id}/shares`,
+    SHARED: "/collections/shared",
+    ITEMS: (id: string) => `/collections/${id}/items`,
+    ASSETS: (id: string) => `/collections/${id}/assets`,
+  },
+  COLLECTION_TYPES: {
+    BASE: "/settings/collection-types",
+    GET: (id: string) => `/settings/collection-types/${id}`,
+    UPDATE: (id: string) => `/settings/collection-types/${id}`,
+    DELETE: (id: string) => `/settings/collection-types/${id}`,
+    MIGRATE: (id: string) => `/settings/collection-types/${id}/migrate`,
   },
 };

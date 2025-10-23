@@ -39,6 +39,7 @@ import {
   Extension as IntegrationIcon,
   Cloud as EnvironmentIcon,
   Terrain as LogoIcon,
+  Folder as FolderIcon,
 } from "@mui/icons-material";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTheme as useCustomTheme } from "./hooks/useTheme";
@@ -188,6 +189,12 @@ function Sidebar() {
       visible: true, // Assets should always be shown
     },
     {
+      text: t("sidebar.menu.collections"),
+      icon: <FolderIcon />,
+      path: "/collections",
+      visible: true, // Collections should always be shown to authenticated users
+    },
+    {
       text: t("sidebar.menu.pipelines"),
       icon: <PipelineIcon />,
       path: "/pipelines",
@@ -218,7 +225,7 @@ function Sidebar() {
         {
           text: t("sidebar.submenu.usersAndGroups", "Users and Groups"),
           icon: <GroupIcon />,
-          path: "/settings/users-groups",
+          path: "/settings/users",
           visible:
             safePermissionCheck("view", "user") ||
             safePermissionCheck("view", "group") ||
@@ -732,7 +739,7 @@ function Sidebar() {
                         // Check if this is a system settings item that requires permission
                         const isSystemSettings =
                           subItem.path === "/settings/system" ||
-                          subItem.path === "/settings/users-groups" ||
+                          subItem.path === "/settings/users" ||
                           subItem.path === "/settings/permission-sets";
 
                         // Wrap system settings items with Can component

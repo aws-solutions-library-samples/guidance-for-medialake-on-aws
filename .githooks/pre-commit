@@ -14,10 +14,9 @@ if [ -f "/usr/local/amazon/var/git-defender/hooks/pre-commit" ]; then
     echo "git-defender checks passed"
 fi
 
-# Run pre-commit framework directly (without needing pre-commit install)
+# Run pre-commit framework
 if command -v pre-commit &> /dev/null && [ -f ".pre-commit-config.yaml" ]; then
     echo "Running pre-commit checks..."
-    # Use --all-files for initial setup, otherwise run on staged files
     if [ "${1:-}" = "--all-files" ]; then
         pre-commit run --all-files
     else

@@ -24,6 +24,7 @@ import { ResizableTable } from "../common/table";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import DownloadIcon from "@mui/icons-material/Download";
+import AddIcon from "@mui/icons-material/Add";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import { type AssetTableColumn } from "@/types/shared/assetComponents";
@@ -36,6 +37,11 @@ export interface AssetTableProps<T> {
   onSortingChange: (sorting: SortingState) => void;
   onDeleteClick: (item: T, event: React.MouseEvent<HTMLElement>) => void;
   onDownloadClick: (item: T, event: React.MouseEvent<HTMLElement>) => void;
+  onAddToCollectionClick?: (
+    item: T,
+    event: React.MouseEvent<HTMLElement>,
+  ) => void;
+  showRemoveButton?: boolean;
   onEditClick?: (item: T, event: React.MouseEvent<HTMLElement>) => void;
   onAssetClick: (item: T) => void;
   getThumbnailUrl: (item: T) => string;
@@ -68,6 +74,7 @@ export function AssetTable<T>({
   onSortingChange,
   onDeleteClick,
   onDownloadClick,
+  onAddToCollectionClick,
   onEditClick,
   onAssetClick,
   getThumbnailUrl,
@@ -534,6 +541,18 @@ export function AssetTable<T>({
             >
               <DownloadIcon fontSize="small" />
             </IconButton>
+            {onAddToCollectionClick && (
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddToCollectionClick(info.row.original, e);
+                }}
+                title="Add to Collection"
+              >
+                <AddIcon fontSize="small" />
+              </IconButton>
+            )}
           </Box>
         ),
       }),

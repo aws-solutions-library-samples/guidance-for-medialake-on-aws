@@ -33,7 +33,6 @@ export const useAuthenticate = () => {
         });
         return { type: "SAML_REDIRECT" };
       } catch (error) {
-        console.error("SAML redirect failed:", error);
         throw error;
       }
     }
@@ -65,7 +64,6 @@ export const useAuthenticate = () => {
 
       user.authenticateUser(authDetails, {
         onSuccess: (result) => {
-          console.log(result);
           StorageHelper.setToken(result.getIdToken().getJwtToken());
           StorageHelper.setUsername(result.getIdToken().payload.email);
           StorageHelper.setRefreshToken(result.getRefreshToken().getToken());
@@ -75,7 +73,6 @@ export const useAuthenticate = () => {
           resolve({ type: "NEW_PASSWORD_REQUIRED", user, userAttributes });
         },
         onFailure: (err) => {
-          console.log("login failed", err);
           StorageHelper.clearToken();
           StorageHelper.clearUsername();
           reject({ error: err, user }); // Include the user object in the rejection
@@ -92,14 +89,12 @@ export const useAuthenticate = () => {
     return new Promise((resolve, reject) => {
       user.completeNewPasswordChallenge(newPassword, userAttributes, {
         onSuccess: (result) => {
-          console.log(result);
           StorageHelper.setToken(result.getIdToken().getJwtToken());
           StorageHelper.setUsername(result.getIdToken().payload.email);
           StorageHelper.setRefreshToken(result.getRefreshToken().getToken());
           resolve(result);
         },
         onFailure: (err) => {
-          console.log("Change password failed", err);
           reject(err);
         },
       });
@@ -128,10 +123,8 @@ export const useAuthenticate = () => {
 
       user.refreshSession(token, (err, session) => {
         if (err) {
-          console.log("Failed to refresh session:", err);
           reject(err);
         } else {
-          console.log("Session refreshed successfully");
           StorageHelper.setToken(session.getIdToken().getJwtToken());
           StorageHelper.setRefreshToken(session.getRefreshToken().getToken());
           resolve(session);

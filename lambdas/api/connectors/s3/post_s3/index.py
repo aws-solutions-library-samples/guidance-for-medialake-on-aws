@@ -16,6 +16,7 @@ from aws_lambda_powertools.event_handler import (
     Response,
     content_types,
 )
+from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
 from aws_lambda_powertools.event_handler.openapi.exceptions import (
     RequestValidationError,
 )
@@ -27,7 +28,25 @@ from pydantic import BaseModel
 
 tracer = Tracer()
 logger = Logger()
-app = APIGatewayRestResolver(enable_validation=True)
+
+# Configure CORS to match Collections and Pipelines
+cors_config = CORSConfig(
+    allow_origin="*",
+    allow_headers=[
+        "Content-Type",
+        "X-Amz-Date",
+        "Authorization",
+        "X-Api-Key",
+        "X-Amz-Security-Token",
+        "X-Origin-Verify",
+    ],
+)
+app = APIGatewayRestResolver(
+    enable_validation=True,
+    cors=cors_config,
+    strip_prefixes=["/api"],
+    serializer=lambda x: json.dumps(x, default=str),
+)
 
 # AGGRESSIVE Performance Optimizations for API Gateway 29s Timeout:
 # 1. Optimized boto3 configuration with connection pooling and adaptive retries

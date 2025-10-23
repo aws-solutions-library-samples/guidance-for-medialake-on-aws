@@ -1,3 +1,11 @@
+"""
+Settings Stack for MediaLake.
+
+This stack aggregates bucket names and other settings configurations
+for reference across the application. It also manages DynamoDB tables
+for system settings and API keys.
+"""
+
 from dataclasses import dataclass
 
 import aws_cdk as cdk
@@ -16,22 +24,42 @@ from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaCon
 class SettingsStackProps:
     """Configuration for Settings Stack."""
 
-    # Add bucket references to pass to the custom resource
-    access_logs_bucket_name: str = None
-    media_assets_bucket_name: str = None
-    iac_assets_bucket_name: str = None
-    external_payload_bucket_name: str = None
-    ddb_export_bucket_name: str = None
-    pipelines_nodes_templates_bucket_name: str = None
-    asset_sync_results_bucket_name: str = None
-    user_interface_bucket_name: str = None
+    access_logs_bucket_name: str
+    media_assets_bucket_name: str
+    iac_assets_bucket_name: str
+    external_payload_bucket_name: str
+    ddb_export_bucket_name: str
+    pipelines_nodes_templates_bucket_name: str
+    asset_sync_results_bucket_name: str
+    user_interface_bucket_name: str
 
 
 class SettingsStack(cdk.NestedStack):
+    """
+    Stack for aggregating settings and configurations.
+
+    This stack collects bucket names and other configuration values
+    for easy reference across the application. It also creates DynamoDB
+    tables for system settings and API keys management.
+    """
+
     def __init__(self, scope: Construct, id: str, props: SettingsStackProps, **kwargs):
         super().__init__(scope, id, **kwargs)
 
-        self.system_settings_table = DynamoDB(
+        # Store bucket names for reference
+        self._access_logs_bucket_name = props.access_logs_bucket_name
+        self._media_assets_bucket_name = props.media_assets_bucket_name
+        self._iac_assets_bucket_name = props.iac_assets_bucket_name
+        self._external_payload_bucket_name = props.external_payload_bucket_name
+        self._ddb_export_bucket_name = props.ddb_export_bucket_name
+        self._pipelines_nodes_templates_bucket_name = (
+            props.pipelines_nodes_templates_bucket_name
+        )
+        self._asset_sync_results_bucket_name = props.asset_sync_results_bucket_name
+        self._user_interface_bucket_name = props.user_interface_bucket_name
+
+        # Create System Settings Table
+        self._system_settings_table = DynamoDB(
             self,
             "SystemSettingsTable",
             props=DynamoDBProps(
@@ -53,7 +81,7 @@ class SettingsStack(cdk.NestedStack):
                 name=f"{config.resource_prefix}-populate-system-settings-{config.environment}",
                 entry="lambdas/back_end/populate_system_settings",
                 environment_variables={
-                    "SYSTEM_SETTINGS_TABLE_NAME": self.system_settings_table.table_name,
+                    "SYSTEM_SETTINGS_TABLE_NAME": self._system_settings_table.table_name,
                     "ACCESS_LOGS_BUCKET_NAME": props.access_logs_bucket_name or "",
                     "MEDIA_ASSETS_BUCKET_NAME": props.media_assets_bucket_name or "",
                     "IAC_ASSETS_BUCKET_NAME": props.iac_assets_bucket_name or "",
@@ -66,12 +94,13 @@ class SettingsStack(cdk.NestedStack):
                     or "",
                     "USER_INTERFACE_BUCKET_NAME": props.user_interface_bucket_name
                     or "",
+                    "CURRENT_VERSION": "main",  # Initialize with main branch
                 },
             ),
         )
 
         # Grant DynamoDB permissions to the Lambda function
-        self.system_settings_table.table.grant_read_write_data(
+        self._system_settings_table.table.grant_read_write_data(
             self.populate_settings_lambda.function
         )
 
@@ -104,11 +133,11 @@ class SettingsStack(cdk.NestedStack):
 
         # Ensure the custom resource runs after the table is created
         self.populate_settings_custom_resource.node.add_dependency(
-            self.system_settings_table.table
+            self._system_settings_table.table
         )
 
         # Create API Keys table
-        self.api_keys_table = DynamoDB(
+        self._api_keys_table = DynamoDB(
             self,
             "ApiKeysTable",
             props=DynamoDBProps(
@@ -121,16 +150,24 @@ class SettingsStack(cdk.NestedStack):
 
     @property
     def system_settings_table_name(self) -> str:
-        return self.system_settings_table.table_name
+        return self._system_settings_table.table_name
 
     @property
     def system_settings_table_arn(self) -> str:
-        return self.system_settings_table.table_arn
+        return self._system_settings_table.table_arn
 
     @property
     def api_keys_table_name(self) -> str:
-        return self.api_keys_table.table_name
+        return self._api_keys_table.table_name
 
     @property
     def api_keys_table_arn(self) -> str:
-        return self.api_keys_table.table_arn
+        return self._api_keys_table.table_arn
+
+    @property
+    def system_settings_table(self) -> DynamoDB:
+        return self._system_settings_table
+
+    @property
+    def api_keys_table(self) -> DynamoDB:
+        return self._api_keys_table

@@ -40,7 +40,6 @@ USER_TABLE_NAME = os.environ[
 ASSET_TABLE = os.environ["ASSET_TABLE"]
 SMALL_FILE_THRESHOLD_MB = int(os.environ.get("SMALL_FILE_THRESHOLD_MB", "1024"))  # MB
 SMALL_FILE_THRESHOLD = SMALL_FILE_THRESHOLD_MB  # For backward compatibility
-LARGE_JOB_THRESHOLD = int(os.environ.get("LARGE_JOB_THRESHOLD", "1000"))  # MB
 SINGLE_FILE_CHECK = os.environ.get("SINGLE_FILE_CHECK", "false").lower() == "true"
 
 # Initialize DynamoDB tables
@@ -50,6 +49,24 @@ asset_table = dynamodb.Table(ASSET_TABLE)
 # Constants
 MB = 1024 * 1024  # 1 MB in bytes
 MAX_BATCH_SIZE = 25  # Maximum batch size for DynamoDB BatchGetItem
+
+
+@tracer.capture_method
+def is_sub_clip_request(asset: Dict[str, Any]) -> bool:
+    """
+    Determine if the asset is a subclip request.
+
+    Args:
+        asset: Asset metadata
+
+    Returns:
+        True if the asset is a subclip request, False otherwise
+    """
+    clip_boundary = asset.get("clipBoundary", {})
+    if clip_boundary.get("startTime", {}) and clip_boundary.get("endTime", {}):
+        return True
+    else:
+        return False
 
 
 @tracer.capture_method
@@ -134,7 +151,7 @@ def get_job_details(user_id: str, job_id: str) -> Dict[str, Any]:
 
 
 @tracer.capture_method
-def get_assets_metadata(asset_ids: List[str]) -> List[Dict[str, Any]]:
+def get_assets_metadata(asset_ids: List[str]) -> Dict[str, Any]:
     """
     Retrieve metadata for multiple assets using BatchGetItem.
 
@@ -142,9 +159,65 @@ def get_assets_metadata(asset_ids: List[str]) -> List[Dict[str, Any]]:
         asset_ids: List of asset IDs to retrieve
 
     Returns:
-        List of asset metadata
+        Dict of asset metadata with the InventoryID aka assetId as key
     """
-    assets = []
+    assets = {}
+
+    def _extract_required_metadata_from_response(response: Dict[str, Any]) -> None:
+        """Add required asset metadata fields to the internal assets dict
+
+        Args:
+            response (Dict[str, Any]): DynamoDB batch_get_item() Response
+        """
+        if ASSET_TABLE in response.get("Responses", {}):
+            for asset in response["Responses"][ASSET_TABLE]:
+                # General File Info
+                main_rep = asset.get("DigitalSourceAsset", {}).get(
+                    "MainRepresentation", {}
+                )
+                storage_info = main_rep.get("StorageInfo", {}).get(
+                    "PrimaryLocation", {}
+                )
+                file_info = storage_info.get("FileInfo", {})
+
+                # Metadata Fields
+                metadata = asset.get("Metadata", {}).get("EmbeddedMetadata", {})
+
+                selected_video_fields = {}
+                selected_audio_fields = {}
+
+                video_metadata: Dict = metadata.get("video", [{}])[0]
+                audio_metadata: Dict = metadata.get("audio", [{}])[0]
+
+                try:
+                    selected_video_fields["Bitrate"] = video_metadata["BitRate"]
+                    selected_video_fields["MaxBitrate"] = video_metadata[
+                        "BitRate_Maximum"
+                    ]
+                    selected_video_fields["RateControlMode"] = video_metadata[
+                        "BitRate_Mode"
+                    ]
+
+                    selected_audio_fields["Bitrate"] = audio_metadata["BitRate"]
+                    selected_audio_fields["SampleRate"] = audio_metadata["sample_rate"]
+                    selected_audio_fields["RateControlMode"] = audio_metadata[
+                        "BitRate_Mode"
+                    ]
+                except KeyError as e:
+                    logger.error(
+                        "Error: Missing required asset metadata",
+                        extra={
+                            "error": str(e),
+                        },
+                    )
+                    raise  # break and exit
+
+                # Create the asset metadata entry with assetId as Key
+                assets[asset["InventoryID"]] = {
+                    "size": file_info.get("Size", 0),
+                    "video": selected_video_fields,
+                    "audio": selected_audio_fields,
+                }
 
     # Process in batches of MAX_BATCH_SIZE
     for i in range(0, len(asset_ids), MAX_BATCH_SIZE):
@@ -159,9 +232,7 @@ def get_assets_metadata(asset_ids: List[str]) -> List[Dict[str, Any]]:
                 }
             )
 
-            # Add retrieved items to the assets list
-            if ASSET_TABLE in response.get("Responses", {}):
-                assets.extend(response["Responses"][ASSET_TABLE])
+            _extract_required_metadata_from_response(response)
 
             # Handle unprocessed keys with exponential backoff
             unprocessed_keys = response.get("UnprocessedKeys", {})
@@ -184,8 +255,7 @@ def get_assets_metadata(asset_ids: List[str]) -> List[Dict[str, Any]]:
 
                 response = dynamodb.batch_get_item(RequestItems=unprocessed_keys)
 
-                if ASSET_TABLE in response.get("Responses", {}):
-                    assets.extend(response["Responses"][ASSET_TABLE])
+                _extract_required_metadata_from_response(response)
 
                 unprocessed_keys = response.get("UnprocessedKeys", {})
 
@@ -196,7 +266,6 @@ def get_assets_metadata(asset_ids: List[str]) -> List[Dict[str, Any]]:
                     f"Failed to retrieve {unprocessed_count} assets after {max_retries} retries",
                     extra={"unprocessedCount": unprocessed_count},
                 )
-
         except ClientError as e:
             logger.error(
                 "Error retrieving asset metadata batch",
@@ -211,7 +280,7 @@ def get_assets_metadata(asset_ids: List[str]) -> List[Dict[str, Any]]:
 
 
 @tracer.capture_method
-def calculate_job_size(assets: List[Dict[str, Any]]) -> Tuple[int, int, int, str]:
+def calculate_job_size(assets: List[Dict[str, Any]]) -> Tuple[int, int, int, int, str]:
     """
     Calculate the total size and determine job type.
 
@@ -219,24 +288,22 @@ def calculate_job_size(assets: List[Dict[str, Any]]) -> Tuple[int, int, int, str
         assets: List of asset metadata
 
     Returns:
-        Tuple of (total_size, small_files_count, large_files_count, job_type)
+        Tuple of (total_size, sub_clips_count, small_files_count, large_files_count, job_type)
     """
     total_size = 0
+    sub_clips_count = 0
     small_files_count = 0
     large_files_count = 0
 
-    # Check if this is a single file job
-    if SINGLE_FILE_CHECK and len(assets) == 1:
+    # Check if this is a full-asset single file job (no sub-clipping)
+    if SINGLE_FILE_CHECK and len(assets) == 1 and not is_sub_clip_request(assets[0]):
         job_type = "SINGLE_FILE"
 
         # Still calculate the size for logging purposes
         asset = assets[0]
-        main_rep = asset.get("DigitalSourceAsset", {}).get("MainRepresentation", {})
-        storage_info = main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
-        file_info = storage_info.get("FileInfo", {})
 
-        # Get file size in bytes
-        file_size = file_info.get("Size", 0)
+        # # Get file size in bytes
+        file_size = asset.get("sourceAssetMetadata", {}).get("size", 0)
         total_size = file_size
 
         # Determine if this is a small or large file for metrics
@@ -251,30 +318,29 @@ def calculate_job_size(assets: List[Dict[str, Any]]) -> Tuple[int, int, int, str
                 "totalSize": total_size,
                 "totalSizeMB": total_size / MB,
                 "jobType": job_type,
-                "assetId": asset.get("InventoryID", "unknown"),
+                "assetId": asset.get("assetId", "unknown"),
             },
         )
     else:
         # Multiple files - process normally
         for asset in assets:
-            # Get the main representation size
-            main_rep = asset.get("DigitalSourceAsset", {}).get("MainRepresentation", {})
-            storage_info = main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
-            file_info = storage_info.get("FileInfo", {})
-
             # Get file size in bytes
-            file_size = file_info.get("Size", 0)
+            file_size = asset.get("sourceAssetMetadata", {}).get("size", 0)
             total_size += file_size
 
-            # Determine if this is a small or large file
-            if file_size <= SMALL_FILE_THRESHOLD * MB:
+            # Determine if this is a sub-clip request or small or large whole-file request
+            if is_sub_clip_request(asset):
+                sub_clips_count += 1
+            elif file_size <= SMALL_FILE_THRESHOLD * MB:
                 small_files_count += 1
             else:
                 large_files_count += 1
 
         # Determine job type based on file composition
-        if large_files_count > 0 and small_files_count > 0:
-            # Mixed files: small files get zipped, large files get individual presigned URLs
+        if sub_clips_count > 0 or (large_files_count > 0 and small_files_count > 0):
+            # Anything with sub-clips will require processing before packaging up.
+            # Mixed files: small files get zipped, large files get individual presigned URLs,
+            # whether they are whole-files or sub-clips
             job_type = "MIXED"
         elif large_files_count > 0:
             # Only large files: each gets individual presigned URLs
@@ -288,6 +354,7 @@ def calculate_job_size(assets: List[Dict[str, Any]]) -> Tuple[int, int, int, str
         extra={
             "totalSize": total_size,
             "totalSizeMB": total_size / MB,
+            "subClipCount": sub_clips_count,
             "smallFilesCount": small_files_count,
             "largeFilesCount": large_files_count,
             "jobType": job_type,
@@ -295,7 +362,7 @@ def calculate_job_size(assets: List[Dict[str, Any]]) -> Tuple[int, int, int, str
         },
     )
 
-    return total_size, small_files_count, large_files_count, job_type
+    return total_size, sub_clips_count, small_files_count, large_files_count, job_type
 
 
 @tracer.capture_method
@@ -415,16 +482,22 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         # Get job details
         job = get_job_details(user_id, job_id)
 
-        # Get asset IDs from job
-        asset_ids = job.get("assetIds", [])
-        if not asset_ids:
+        # Get assets from job
+        assets = job.get("assetIds", [])
+
+        if not assets:
             raise ValueError("No asset IDs found in job")
 
+        # Assets is a list of dicts (so we can have multiple sub-clips from a single source file), so we need to get the keys
+        asset_ids = [asset.get("assetId") for asset in assets]
+        # And remove duplicates for the metadata call
+        asset_ids = list(set(asset_ids))
+
         # Get asset metadata
-        assets = get_assets_metadata(asset_ids)
+        source_assets_metadata = get_assets_metadata(asset_ids)
 
         # Identify missing assets
-        found_asset_ids = [asset.get("InventoryID") for asset in assets]
+        found_asset_ids = list(source_assets_metadata.keys())
         missing_asset_ids = [
             asset_id for asset_id in asset_ids if asset_id not in found_asset_ids
         ]
@@ -439,9 +512,15 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                 },
             )
 
+        # Add source asset metadata to the asset records
+        for asset in assets:
+            asset["sourceAssetMetadata"] = source_assets_metadata.get(
+                asset.get("assetId", ""), {}
+            )
+
         # Calculate job size
-        total_size, small_files_count, large_files_count, job_type = calculate_job_size(
-            assets
+        total_size, sub_clips_count, small_files_count, large_files_count, job_type = (
+            calculate_job_size(assets)
         )
 
         # Update job record
@@ -463,34 +542,48 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         )
 
         # Prepare data for Map states
+        sub_clips = []
         small_files = []
         large_files = []
 
         # For SINGLE_FILE job type, we don't need to prepare arrays as it's handled separately
         if job_type != "SINGLE_FILE":
             for asset in assets:
-                asset_id = asset.get("InventoryID")
+                asset_id = asset.get("assetId")
                 if asset_id in found_asset_ids:
-                    main_rep = asset.get("DigitalSourceAsset", {}).get(
-                        "MainRepresentation", {}
-                    )
-                    storage_info = main_rep.get("StorageInfo", {}).get(
-                        "PrimaryLocation", {}
-                    )
-                    file_info = storage_info.get("FileInfo", {})
-                    file_size = file_info.get("Size", 0)
+                    file_size = asset.get("sourceAssetMetadata", {}).get("size", 0)
 
-                    # If it's a small file, add to small_files for zipping
-                    if file_size <= SMALL_FILE_THRESHOLD_MB * 1024 * 1024:
+                    # Determine if this is a sub-clip request or small or large whole-file request
+                    if is_sub_clip_request(asset):
+                        # Add to sub-clips for processing
+                        sub_clips.append(
+                            {
+                                "jobId": job_id,
+                                "userId": job.get("userId"),
+                                "assetId": asset_id,
+                                "options": job.get("options", {}),
+                                "clipBoundary": asset.get("clipBoundary", {}),
+                                "video": asset.get("sourceAssetMetadata", {}).get(
+                                    "video", {}
+                                ),
+                                "audio": asset.get("sourceAssetMetadata", {}).get(
+                                    "audio", {}
+                                ),
+                            }
+                        )
+                    # If it's a small whole-file, add to small_files for zipping
+                    elif file_size <= SMALL_FILE_THRESHOLD_MB * 1024 * 1024:
                         small_files.append(
                             {
                                 "jobId": job_id,
                                 "userId": job.get("userId"),
                                 "assetId": asset_id,
                                 "options": job.get("options", {}),
+                                "outputLocation": "",
+                                "type": "ASSET_ID",
                             }
                         )
-                    # If it's a large file, add to large_files for individual presigned URLs
+                    # If it's a large whole-file, add to large_files for individual presigned URLs
                     else:
                         large_files.append(
                             {
@@ -498,6 +591,8 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                                 "userId": job.get("userId"),
                                 "assetId": asset_id,
                                 "options": job.get("options", {}),
+                                "outputLocation": "",
+                                "type": "ASSET_ID",
                             }
                         )
 
@@ -507,11 +602,13 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
             "userId": job.get("userId"),
             "jobType": job_type,
             "totalSize": total_size,
+            "subClipsCount": sub_clips_count,
             "smallFilesCount": small_files_count,
             "largeFilesCount": large_files_count,
             "foundAssets": found_asset_ids,
             "missingAssets": missing_asset_ids,
             "options": job.get("options", {}),
+            "subClips": sub_clips,
             "smallFiles": small_files,
             "largeFiles": large_files,
         }

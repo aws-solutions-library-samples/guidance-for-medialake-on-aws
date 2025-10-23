@@ -16,6 +16,8 @@ import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import InfoIcon from "@mui/icons-material/Info";
+import AddIcon from "@mui/icons-material/Add";
+import RemoveIcon from "@mui/icons-material/Remove";
 import {
   PLACEHOLDER_IMAGE,
   VIDEO_PLACEHOLDER_IMAGE,
@@ -53,6 +55,8 @@ export interface AssetCardProps {
   onAssetClick: () => void;
   onDeleteClick: (event: React.MouseEvent<HTMLElement>) => void;
   onDownloadClick: (event: React.MouseEvent<HTMLElement>) => void;
+  onAddToCollectionClick?: (event: React.MouseEvent<HTMLElement>) => void;
+  showRemoveButton?: boolean;
   onEditClick?: (event: React.MouseEvent<HTMLElement>) => void;
   placeholderImage?: string;
   onImageError?: (event: React.SyntheticEvent<HTMLImageElement, Event>) => void;
@@ -88,6 +92,8 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
     onAssetClick,
     onDeleteClick,
     onDownloadClick,
+    onAddToCollectionClick,
+    showRemoveButton = false,
     onEditClick,
     placeholderImage = PLACEHOLDER_IMAGE,
     onImageError,
@@ -112,10 +118,14 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
   }) => {
     const [isHovering, setIsHovering] = useState(false);
     const [isMenuClicked, setIsMenuClicked] = useState(false);
-    const cardRef = useRef<HTMLDivElement>(null);
     const preventCommitRef = useRef<boolean>(false);
     const commitRef = useRef<(() => void) | null>(null);
     const omakasePlayerRef = useRef<OmakasePlayer | null>(null);
+
+    // Lazy loading state for video assets
+    const [isVisible, setIsVisible] = useState(false);
+    const [isPlayerReady, setIsPlayerReady] = useState(false);
+    const cardContainerRef = useRef<HTMLDivElement>(null);
 
     // Check if features are enabled
     const multiSelectFeature = useFeatureFlag(
@@ -141,10 +151,43 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
     const markerIdsRef = useRef<string[]>([]);
     const [videoLoadError, setVideoLoadError] = useState(false);
 
+    // IntersectionObserver for lazy loading videos
+    useEffect(() => {
+      // Only observe if this is a video asset
+      if (assetType !== "Video" || !cardContainerRef.current) return;
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              // Small delay to stagger initialization
+              setTimeout(() => {
+                setIsVisible(true);
+              }, Math.random() * 100); // 0-100ms random delay per video
+              observer.unobserve(entry.target);
+            }
+          });
+        },
+        {
+          rootMargin: "200px", // Start loading 200px before entering viewport
+          threshold: 0.01,
+        },
+      );
+
+      observer.observe(cardContainerRef.current);
+
+      return () => observer.disconnect();
+    }, [assetType]);
+
     // Initialize Omakase player for video assets
     useEffect(() => {
-      // Only initialize if it's a video, has a proxy URL, and hasn't been initialized yet
-      if (assetType === "Video" && proxyUrl && !playerInitializedRef.current) {
+      // Only initialize if it's a video, has a proxy URL, is visible, and hasn't been initialized yet
+      if (
+        assetType === "Video" &&
+        proxyUrl &&
+        isVisible &&
+        !playerInitializedRef.current
+      ) {
         const playerId = `omakase-player-${id}`;
 
         // Check if player container already exists
@@ -202,8 +245,9 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                   };
 
                   // For clip mode, we should only show the marker for this specific clip
-                  // Check if this is a clip asset (has clipData property)
-                  const isClipAsset = id.includes("_clip_");
+                  // Check if this is a clip asset (ID contains #CLIP# or _clip_)
+                  const isClipAsset =
+                    id.includes("#CLIP#") || id.includes("_clip_");
 
                   console.log(`🎬 INITIAL Asset ${id}:`);
                   console.log(`  - isClipAsset: ${isClipAsset}`);
@@ -339,12 +383,16 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                           `  ✅ Added marker: ${start}s - ${end}s (color: ${markerColor})`,
                         );
 
-                        // For clip assets, seek to the beginning of the clip
-                        if (isClipAsset) {
+                        // For clip assets or single-clip items, seek to the beginning of the clip
+                        // This includes collection items with a specific clip boundary
+                        if (
+                          isClipAsset ||
+                          (filteredClips.length === 1 && index === 0)
+                        ) {
                           try {
                             omakasePlayer.video.seekToTime(start);
                             console.log(
-                              `  🎯 Seeked to clip start time: ${start}s for clip asset ${id}`,
+                              `  🎯 Seeked to clip start time: ${start}s for ${isClipAsset ? "clip asset" : "single-clip item"} ${id}`,
                             );
                           } catch (seekError) {
                             console.warn(
@@ -417,7 +465,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
           }
         }
       };
-    }, [assetType, proxyUrl, id, thumbnailScale]); // Added thumbnailScale to reinitialize player when scale changes
+    }, [assetType, proxyUrl, id, thumbnailScale, isVisible]); // Added isVisible for lazy loading
 
     // Separate effect to handle clip marker updates when confidence threshold changes
     useEffect(() => {
@@ -647,8 +695,8 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
       const handleClickOutside = (event: MouseEvent) => {
         // If we click outside the card and the menu is open, consider it closed
         if (
-          cardRef.current &&
-          !cardRef.current.contains(event.target as Node)
+          cardContainerRef.current &&
+          !cardContainerRef.current.contains(event.target as Node)
         ) {
           // This is a click outside the card
           // We'll keep the menu clicked state for a short time to allow the menu to close gracefully
@@ -769,7 +817,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
 
     return (
       <Box
-        ref={cardRef}
+        ref={cardContainerRef}
         sx={{
           position: "relative",
           transition: "all 0.2s ease-in-out",
@@ -858,6 +906,45 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                   title="Download"
                 >
                   <DownloadIcon fontSize="small" />
+                </IconButton>
+
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    console.log("AssetCard: Add to Collection clicked!", e);
+                    console.log(
+                      "AssetCard: onAddToCollectionClick prop is:",
+                      typeof onAddToCollectionClick,
+                      onAddToCollectionClick,
+                    );
+                    e.stopPropagation();
+                    if (onAddToCollectionClick) {
+                      console.log("AssetCard: Calling onAddToCollectionClick");
+                      onAddToCollectionClick(e);
+                    } else {
+                      console.log(
+                        "AssetCard: onAddToCollectionClick is undefined!",
+                      );
+                    }
+                  }}
+                  sx={{
+                    color: "primary.main",
+                    "&:hover": {
+                      bgcolor: "primary.main",
+                      color: "primary.contrastText",
+                    },
+                  }}
+                  title={
+                    showRemoveButton
+                      ? "Remove from Collection"
+                      : "Add to Collection"
+                  }
+                >
+                  {showRemoveButton ? (
+                    <RemoveIcon fontSize="small" />
+                  ) : (
+                    <AddIcon fontSize="small" />
+                  )}
                 </IconButton>
 
                 <Button
@@ -953,6 +1040,33 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                   title="Download"
                 >
                   <DownloadIcon fontSize="small" />
+                </IconButton>
+
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    console.log("AssetCard: Add to Collection clicked!", e);
+                    e.stopPropagation();
+                    onAddToCollectionClick?.(e);
+                  }}
+                  sx={{
+                    color: "primary.main",
+                    "&:hover": {
+                      bgcolor: "primary.main",
+                      color: "primary.contrastText",
+                    },
+                  }}
+                  title={
+                    showRemoveButton
+                      ? "Remove from Collection"
+                      : "Add to Collection"
+                  }
+                >
+                  {showRemoveButton ? (
+                    <RemoveIcon fontSize="small" />
+                  ) : (
+                    <AddIcon fontSize="small" />
+                  )}
                 </IconButton>
 
                 {(() => {
@@ -1155,6 +1269,33 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                     <DownloadIcon fontSize="small" />
                   </IconButton>
                 )}
+
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    console.log("AssetCard: Add to Collection clicked!", e);
+                    e.stopPropagation();
+                    onAddToCollectionClick?.(e);
+                  }}
+                  sx={{
+                    color: "primary.main",
+                    "&:hover": {
+                      bgcolor: "primary.main",
+                      color: "primary.contrastText",
+                    },
+                  }}
+                  title={
+                    showRemoveButton
+                      ? "Remove from Collection"
+                      : "Add to Collection"
+                  }
+                >
+                  {showRemoveButton ? (
+                    <RemoveIcon fontSize="small" />
+                  ) : (
+                    <AddIcon fontSize="small" />
+                  )}
+                </IconButton>
 
                 <Button
                   size="small"

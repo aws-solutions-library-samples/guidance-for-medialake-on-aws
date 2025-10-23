@@ -42,6 +42,9 @@ DEFAULT_MEMORY_SIZE = 128
 DEFAULT_TIMEOUT_MINUTES = 5
 DEFAULT_RUNTIME = lambda_.Runtime.PYTHON_3_12
 DEFAULT_ARCHITECTURE = lambda_.Architecture.X86_64
+# SnapStart disabled by default due to initialization issues with some Lambda functions
+# Use provisioned concurrency instead for critical APIs
+DEFAULT_SNAP_START = False
 MAX_LAMBDA_NAME_LENGTH = 64
 MAX_ROLE_NAME_LENGTH = 64
 MAX_LOG_GROUP_NAME_LENGTH = 512
@@ -171,10 +174,15 @@ class LambdaConfig:
         log_removal_policy (Optional[RemovalPolicy]): Removal policy for the CloudWatch log group (default: DESTROY)
         python_bundling (Optional[BundlingOptions]): Bundling options for Python functions
         nodejs_bundling (Optional[NodeJSBundlingOptions]): Bundling options for Node.js functions
+        reserved_concurrent_executions (Optional[int]): Maximum concurrent executions allowed (limits concurrency)
+        provisioned_concurrent_executions (Optional[int]): Number of pre-initialized instances to keep warm.
+            Use this to reduce cold starts. Creates a Lambda alias with provisioned concurrency.
         filesystem_access_point (Optional[efs.IAccessPoint]): EFS access point for Lambda filesystem
         filesystem_mount_path (Optional[str]): Mount path for EFS filesystem
-        snap_start (Optional[bool]): Enable SnapStart for faster cold starts (default: False).
-        Note: SnapStart is supported for Java 11+, Python 3.12+, and .NET 8+ runtimes.
+        snap_start (Optional[bool]): Enable SnapStart for faster cold starts (default: True).
+            Note: SnapStart is supported for Java 11+, Python 3.12+, and .NET 8+ runtimes.
+            WARNING: SnapStart is NOT compatible with EFS. If filesystem_access_point is configured,
+            SnapStart will be automatically disabled regardless of this setting.
     """
 
     name: Optional[str] = None
@@ -194,9 +202,10 @@ class LambdaConfig:
     python_bundling: Optional[BundlingOptions] = None
     nodejs_bundling: Optional[NodeJSBundlingOptions] = None
     reserved_concurrent_executions: Optional[int] = None
+    provisioned_concurrent_executions: Optional[int] = None
     filesystem_access_point: Optional[efs.IAccessPoint] = None
     filesystem_mount_path: Optional[str] = None
-    snap_start: Optional[bool] = False
+    snap_start: Optional[bool] = DEFAULT_SNAP_START
 
 
 class Lambda(Construct):
@@ -443,7 +452,9 @@ class Lambda(Construct):
             common_lambda_props["security_groups"] = config.security_groups
 
         # Add filesystem if provided
+        has_efs = False
         if config.filesystem_access_point and config.filesystem_mount_path:
+            has_efs = True
             logger.debug(
                 f"Adding filesystem with access point and mount path {config.filesystem_mount_path}"
             )
@@ -453,8 +464,8 @@ class Lambda(Construct):
                 )
             )
 
-        # Add SnapStart if enabled
-        if config.snap_start:
+        # Add SnapStart if enabled (but not compatible with EFS)
+        if config.snap_start and not has_efs:
             logger.debug("SnapStart enabled for Lambda function")
             # SnapStart is supported for Java 11+, Python 3.12+, and .NET 8+ runtimes
             # SnapStart requires SnapStartConf object, not a simple boolean
@@ -487,6 +498,11 @@ class Lambda(Construct):
                     )
                 else:
                     logger.info(f"SnapStart is supported for {config.runtime.name}")
+        elif config.snap_start and has_efs:
+            logger.warning(
+                f"SnapStart was requested but is disabled because EFS filesystem is attached. "
+                f"SnapStart is not compatible with EFS-mounted Lambda functions."
+            )
 
         # Create the Lambda function based on runtime
         logger.info(f"Creating {config.runtime.family} Lambda function with properties")
@@ -512,6 +528,31 @@ class Lambda(Construct):
             else:
                 self._function_version = None
             # --- End SnapStart versioning ---
+
+            # --- Provisioned Concurrency: Create version and alias with provisioned concurrency ---
+            if config.provisioned_concurrent_executions is not None:
+                logger.debug(
+                    f"Setting up provisioned concurrent executions: {config.provisioned_concurrent_executions}"
+                )
+
+                # Create a version for provisioned concurrency
+                self._function_version = self._function.current_version
+
+                # Create an alias pointing to the current version
+                self._function_alias = lambda_.Alias(
+                    self,
+                    "ProvisionedAlias",
+                    alias_name="provisioned",
+                    version=self._function_version,
+                    provisioned_concurrent_executions=config.provisioned_concurrent_executions,
+                )
+
+                logger.info(
+                    f"Provisioned concurrency configured with {config.provisioned_concurrent_executions} instances"
+                )
+            else:
+                self._function_alias = None
+            # --- End Provisioned Concurrency ---
 
         except Exception as e:
             logger.error(f"Failed to create Lambda function: {str(e)}", exc_info=True)
@@ -730,9 +771,23 @@ class Lambda(Construct):
     @property
     def function_version(self) -> Optional[lambda_.Version]:
         """
-        Get the versioned Lambda function (if SnapStart is enabled).
+        Get the versioned Lambda function (if SnapStart or provisioned concurrency is enabled).
 
         Returns:
             lambda_.Version | None: The versioned Lambda function, or None if not versioned
         """
         return getattr(self, "_function_version", None)
+
+    @property
+    def function_alias(self) -> Optional[lambda_.Alias]:
+        """
+        Get the Lambda function alias (if provisioned concurrency is enabled).
+
+        When provisioned concurrency is configured, you should use this alias instead
+        of the base function for integrations (API Gateway, event sources, etc.) to
+        ensure requests are routed to the warmed instances.
+
+        Returns:
+            lambda_.Alias | None: The Lambda alias with provisioned concurrency, or None if not configured
+        """
+        return getattr(self, "_function_alias", None)

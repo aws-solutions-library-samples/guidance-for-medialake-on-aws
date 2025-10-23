@@ -54,7 +54,6 @@ cache:
     - cdk --version
     - jq --version
 
-# Commented out for faster testing iteration
 # medialake_deploy_us_west_2:
 #   stage: deploy
 #   timeout: 3h
@@ -70,10 +69,10 @@ cache:
 #   variables:
 #     STACK_NAME: "medialake-us-west-2"
 #     ZIP_FILE_NAME: "medialake-source-${CI_COMMIT_SHORT_SHA}.zip"
-#     AWS_CREDS_TARGET_ROLE: $DEPLOY_AWS_IAM_ROLE
-#     AWS_DEFAULT_ACCOUNT: $DEPLOY_AWS_ACCOUNT_ID
-#     AWS_DEFAULT_REGION: $DEPLOY_AWS_REGION
-#     DEPLOY_REGION: $DEPLOY_AWS_REGION
+#     AWS_CREDS_TARGET_ROLE: $E2E_TEST_AWS_IAM_ROLE
+#     AWS_DEFAULT_ACCOUNT: $E2E_TEST_AWS_ACCOUNT_ID
+#     AWS_DEFAULT_REGION: $E2E_TEST_AWS_REGION
+#     DEPLOY_REGION: $E2E_TEST_AWS_REGION
 #     STACK_PREFIX: "medialake"
 #     ENVIRONMENT_NAME: "dev"
 #     DEPLOYMENT_SIZE: "small"
@@ -85,6 +84,9 @@ cache:
 #     curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 #     unzip awscliv2.zip
 #     ./aws/install
+#     # Configure AWS credentials
+#     aws configure set default.region $E2E_TEST_AWS_REGION
+#     echo "AWS credentials configured for region: $E2E_TEST_AWS_REGION"
 #     # Basic tool versions
 #     echo "login = $GITLAB_USER_LOGIN - using CICD credentials"
 #     npm --version
@@ -98,6 +100,7 @@ cache:
 #     - 'echo "Using DEPLOY_REGION: $DEPLOY_REGION"'
 #     - echo "Verifying AWS identity:"
 #     - aws sts get-caller-identity --profile default
+#     - aws s3 ls --profile default
 #     - |
 #       # Generate unique S3 bucket name using UUID
 #       echo "Generating unique S3 bucket name..."
@@ -110,7 +113,7 @@ cache:
 #       echo "S3 bucket created successfully: $S3_BUCKET_NAME"
 #       # Test S3 access
 #       echo "Testing S3 bucket access..."
-#       aws s3 ls s3://$S3_BUCKET_NAME/ --region $DEPLOY_REGION --profile default
+#       aws s3 ls s3://$S3_BUCKET_NAME/ --region $DEPLOY_REGION
 #       echo "S3 bucket access confirmed"
 #     - echo "Infrastructure cleanup - checking for existing resources..."
 #     - |
@@ -120,7 +123,6 @@ cache:
 #         local stack_prefix="$STACK_PREFIX"
 #         # Get all stacks excluding DELETE_COMPLETE and filter case-insensitively for the prefix
 #         aws cloudformation list-stacks \
-#           --profile default \
 #           --region $region \
 #           --stack-status-filter CREATE_COMPLETE CREATE_FAILED CREATE_IN_PROGRESS REVIEW_IN_PROGRESS ROLLBACK_COMPLETE ROLLBACK_FAILED ROLLBACK_IN_PROGRESS UPDATE_COMPLETE UPDATE_COMPLETE_CLEANUP_IN_PROGRESS UPDATE_IN_PROGRESS UPDATE_ROLLBACK_COMPLETE UPDATE_ROLLBACK_COMPLETE_CLEANUP_IN_PROGRESS UPDATE_ROLLBACK_FAILED UPDATE_ROLLBACK_IN_PROGRESS DELETE_FAILED \
 #           --query "StackSummaries[].StackName" \
@@ -131,7 +133,6 @@ cache:
 #         local region=$1
 #         local stack_prefix="$STACK_PREFIX"
 #         local deleting_stacks=$(aws cloudformation list-stacks \
-#           --profile default \
 #           --region $region \
 #           --stack-status-filter DELETE_IN_PROGRESS \
 #           --query "StackSummaries[].StackName" \
@@ -164,30 +165,27 @@ cache:
 #             for stack in $stacks; do
 #               echo "Attempting to delete stack: $stack in region $DEPLOY_REGION"
 #               # Check if stack is in DELETE_FAILED state and try with retain resources
-#               stack_status=$(aws cloudformation describe-stacks --stack-name "$stack" --region "$DEPLOY_REGION" --profile default --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "STACK_NOT_FOUND")
+#               stack_status=$(aws cloudformation describe-stacks --stack-name "$stack" --region "$DEPLOY_REGION" --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "STACK_NOT_FOUND")
 #               if [ "$stack_status" == "DELETE_FAILED" ]; then
 #                 echo "Stack $stack is in DELETE_FAILED state. Attempting to get resources that failed to delete..."
 #                 # Get resources that might have failed to delete
-#                 resources=$(aws cloudformation list-stack-resources --stack-name "$stack" --region "$DEPLOY_REGION" --profile default --query "StackResourceSummaries[?ResourceStatus=='DELETE_FAILED'].LogicalResourceId" --output text || true)
+#                 resources=$(aws cloudformation list-stack-resources --stack-name "$stack" --region "$DEPLOY_REGION" --query "StackResourceSummaries[?ResourceStatus=='DELETE_FAILED'].LogicalResourceId" --output text || true)
 #                 if [ -n "$resources" ]; then
 #                   echo "Found resources that failed to delete: $resources"
 #                   echo "Attempting to delete stack with --retain-resources option"
 #                   aws cloudformation delete-stack \
-#                     --profile default \
 #                     --region $DEPLOY_REGION \
 #                     --stack-name $stack \
 #                     --retain-resources $resources || true
 #                 else
 #                   # Standard delete attempt
 #                   aws cloudformation delete-stack \
-#                     --profile default \
 #                     --region $DEPLOY_REGION \
 #                     --stack-name $stack || true
 #                 fi
 #               else
 #                 # Standard delete attempt
 #                 aws cloudformation delete-stack \
-#                   --profile default \
 #                   --region $DEPLOY_REGION \
 #                   --stack-name $stack || true
 #               fi
@@ -202,7 +200,7 @@ cache:
 #       # Check for existing CodePipelines that might conflict
 #       echo "Checking for existing CodePipelines..."
 #       for pipeline_candidate in "MediaLakeCDKPipeline" "CDKDeploymentPipeline"; do
-#         if aws codepipeline get-pipeline --name "$pipeline_candidate" --region $DEPLOY_REGION --profile default >/dev/null 2>&1; then
+#         if aws codepipeline get-pipeline --name "$pipeline_candidate" --region $DEPLOY_REGION >/dev/null 2>&1; then
 #           echo "Found existing pipeline: $pipeline_candidate - will be cleaned up with stack deletion"
 #         fi
 #       done
@@ -218,9 +216,9 @@ cache:
 #     - zip -r $ZIP_FILE_NAME . -x "*.git*" "*.venv*" "*__pycache__*" "*.pyc" "*node_modules*" "*.DS_Store*"
 #     - ls -la $ZIP_FILE_NAME
 #     - 'echo "Uploading zip file to S3 bucket: $S3_BUCKET_NAME"'
-#     - aws s3 cp $ZIP_FILE_NAME s3://$S3_BUCKET_NAME/$ZIP_FILE_NAME --region $DEPLOY_REGION --profile default
+#     - aws s3 cp $ZIP_FILE_NAME s3://$S3_BUCKET_NAME/$ZIP_FILE_NAME --region $DEPLOY_REGION
 #     - echo "Generating pre-signed URL for zip file..."
-#     - PRESIGNED_URL=$(aws s3 presign s3://$S3_BUCKET_NAME/$ZIP_FILE_NAME --expires-in 3600 --region $DEPLOY_REGION --profile default)
+#     - PRESIGNED_URL=$(aws s3 presign s3://$S3_BUCKET_NAME/$ZIP_FILE_NAME --expires-in 3600 --region $DEPLOY_REGION)
 #     - echo "Pre-signed URL generated successfully"
 #     - 'echo "Deploying CloudFormation stack: $STACK_NAME"'
 #     - |
@@ -236,13 +234,12 @@ cache:
 #           ParameterKey=MediaLakeEnvironmentName,ParameterValue="$ENVIRONMENT_NAME" \
 #           ParameterKey=OpenSearchDeploymentSize,ParameterValue="$DEPLOYMENT_SIZE" \
 #         --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
-#         --region $DEPLOY_REGION \
-#         --profile default
+#         --region $DEPLOY_REGION
 #     - echo "Waiting for stack creation to complete..."
-#     - aws cloudformation wait stack-create-complete --stack-name $STACK_NAME --region $DEPLOY_REGION --profile default
+#     - aws cloudformation wait stack-create-complete --stack-name $STACK_NAME --region $DEPLOY_REGION
 #     - echo "CloudFormation deployment completed successfully"
 #     - 'echo "Stack outputs:"'
-#     - aws cloudformation describe-stacks --stack-name $STACK_NAME --region $DEPLOY_REGION --profile default --query 'Stacks[0].Outputs'
+#     - aws cloudformation describe-stacks --stack-name $STACK_NAME --region $DEPLOY_REGION --query 'Stacks[0].Outputs'
 #     - |
 #       # Monitor CodePipeline execution similar to deploy-medialake.sh
 #       echo "Waiting for CodePipeline to be created by CloudFormation..."
@@ -250,7 +247,7 @@ cache:
 #       # Check for pipeline existence (try multiple possible names)
 #       PIPELINE_NAME=""
 #       for pipeline_candidate in "MediaLakeCDKPipeline" "CDKDeploymentPipeline"; do
-#         if aws codepipeline get-pipeline --name "$pipeline_candidate" --region $DEPLOY_REGION --profile default >/dev/null 2>&1; then
+#         if aws codepipeline get-pipeline --name "$pipeline_candidate" --region $DEPLOY_REGION >/dev/null 2>&1; then
 #           PIPELINE_NAME="$pipeline_candidate"
 #           echo "Found pipeline: $PIPELINE_NAME"
 #           break
@@ -270,7 +267,6 @@ cache:
 #           EXECUTION_STATUS=$(aws codepipeline list-pipeline-executions \
 #             --pipeline-name "$PIPELINE_NAME" \
 #             --region $DEPLOY_REGION \
-#             --profile default \
 #             --max-items 1 \
 #             --query "pipelineExecutionSummaries[0].status" \
 #             --output text 2>/dev/null | tr -d '\n\r' | sed 's/None//g' | xargs)
@@ -331,8 +327,8 @@ cache:
 #     - |
 #       # Clean up: Delete the temporary S3 bucket after deployment
 #       echo "Cleaning up temporary S3 bucket..."
-#       aws s3 rm s3://$S3_BUCKET_NAME --recursive --region $DEPLOY_REGION --profile default
-#       aws s3 rb s3://$S3_BUCKET_NAME --region $DEPLOY_REGION --profile default
+#       aws s3 rm s3://$S3_BUCKET_NAME --recursive --region $DEPLOY_REGION
+#       aws s3 rb s3://$S3_BUCKET_NAME --region $DEPLOY_REGION
 #       echo "Temporary S3 bucket deleted: $S3_BUCKET_NAME"
 
 # Pre-commit hooks job for merge requests to main (excluding ESLint)
@@ -378,16 +374,9 @@ sync-to-github:
     - ssh-keyscan github.com >> ~/.ssh/known_hosts
     - git config --global user.email "medialake@amazon.com"
     - git config --global user.name "Media Lake CI"
-    # Extract the merge request title from the most recent merge commit
-    # GitLab merge commits have format: "Merge branch 'X' into 'Y'\n\n<MR Title>\n\n..."
-    - export RELEASE_COMMIT_MESSAGE=$(git log -1 --merges --pretty=format:%B | sed -n '3p' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-    # Fallback to the merge commit subject if the title extraction fails
-    - |
-      if [ -z "$RELEASE_COMMIT_MESSAGE" ]; then
-        echo "Could not extract MR title, using merge commit subject as fallback"
-        export RELEASE_COMMIT_MESSAGE=$(git log -1 --pretty=format:%s)
-      fi
-    - echo "Using commit message: ${RELEASE_COMMIT_MESSAGE}"
+    # Capture subject of the latest non-merge commit on the release branch
+    - export RELEASE_COMMIT_MESSAGE=$(git log -1 --no-merges --pretty=format:%s)
+    - echo "Using commit message:${RELEASE_COMMIT_MESSAGE}"
     # Clone GitHub repository to maintain its git history
     - git clone git@github.com:aws-solutions-library-samples/guidance-for-medialake-on-aws.git github-repo
     - cd github-repo
@@ -396,10 +385,14 @@ sync-to-github:
     - rsync -av --delete --exclude=.git ../ ./
     # Remove files that shouldn't be in the public GitHub repository
     - rm -f secrets.txt
+    - rm -f .roomodes
     - rm -rf docs/
     - rm -rf .roo/
+    - rm -rf .kiro/
     - rm -rf github-repo/
     - rm -rf .traycer/
+    - rm -rf INTERNAL-ai-documentation/
+    - rm -rf AUTHORIZATION_FIX.md
     - rm -rf memory-bank/
     - rm -rf cdk-test-output/
     - rm -rf design/
@@ -407,6 +400,8 @@ sync-to-github:
     - rm -f manage-hooks.sh
     - rm -f .gitleaksignore
     - rm -f fix.sh
+    - rm -rf tests/
+    - rm -rf scripts/
     - rm -f .roomodes
     - rm -f .pre-commit-config.yaml
     - rm -f .secrets.baseline
@@ -418,86 +413,747 @@ sync-to-github:
     - rm -rf medialake_user_interface/playwright-report/
     # Stage all changes and commit
     - git add -A
-    - git commit --allow-empty -m "${RELEASE_COMMIT_MESSAGE}"
+    - git commit --allow-empty -m "fix - Removed Lambda concurrency due to intermittent deployment stabilization issues"
     - echo "New commit created:" && git log --oneline -1
     # Push to GitHub main branch
     - git push origin main
-# playwright_e2e_test:
-#   stage: test
-#   timeout: 1h
-#   tags:
-#     - arch:amd64
-#     - size:large
-#   rules:
-#     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
-#       when: on_success
-#     - when: never
-#   # Commented out for faster testing iteration
-#   # needs:
-#   #   - job: medialake_deploy_us_west_2
-#   #     artifacts: false
-#   variables:
-#     AWS_CREDS_TARGET_ROLE: $E2E_TEST_AWS_IAM_ROLE
-#     AWS_DEFAULT_ACCOUNT: $E2E_TEST_AWS_ACCOUNT_ID
-#     AWS_DEFAULT_REGION: $E2E_TEST_AWS_REGION
-#     DEPLOY_REGION: $E2E_TEST_AWS_REGION
-#     CDK_DEPLOY_ACCOUNT: $E2E_TEST_AWS_ACCOUNT_ID
-#     CDK_DEFAULT_ACCOUNT: $E2E_TEST_AWS_ACCOUNT_ID
-#     CDK_DEPLOY_REGION: $E2E_TEST_AWS_REGION
-#     AWS_REGION: $E2E_TEST_AWS_REGION
-#     AMAZON_REGION: $E2E_TEST_AWS_REGION
-#   before_script:
-#     # Install required dependencies including system packages for Playwright
-#     - yum update -y
-#     - yum install -y python3 python3-pip nodejs npm git jq unzip which findutils
-#     # Install minimal system dependencies for headless Chromium
-#     - yum install -y alsa-lib atk cups-libs gtk3 libXcomposite libXdamage libXext libXrandr libXScrnSaver libXtst pango at-spi2-atk xorg-x11-server-Xvfb fontconfig
-#     # Install AWS CLI
-#     - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-#     - unzip awscliv2.zip
-#     - ./aws/install
-#     # Verify AWS access
-#     - aws sts get-caller-identity --profile default
-#     - echo "AWS identity verified for testing"
-#     # Navigate to UI directory and install dependencies
-#     - cd medialake_user_interface
-#     - npm install
-#     # Install Playwright browsers without system dependencies (we installed them manually)
-#     - npx playwright install chromium
-#     - echo "Playwright setup completed"
-#   script:
-#     - echo "Running comprehensive Playwright E2E test against deployed MediaLake infrastructure"
-#     - echo "Starting Playwright test execution..."
 
-#     # Set minimal environment variables for CI
-#     - export NODE_ENV=test
-#     - export PLAYWRIGHT_JUNIT_OUTPUT_NAME=results.xml
+playwright_e2e_test:
+  stage: test
+  timeout: 4h
+  tags:
+    - arch:amd64
+    - size:large
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
+      when: on_success
+    - when: never
+  # KNOWN ISSUE: Job may be killed at ~60 minutes despite 4h timeout configuration
+  # This indicates one of:
+  #   1. GitLab Runner timeout override (check /etc/gitlab-runner/config.toml)
+  #   2. Project-level CI/CD timeout limit (check Settings → CI/CD → Timeout)
+  #   3. AWS Credential Vendor session duration limit (max 1 hour)
+  # See: INTERNAL-ai-documentation/gitlab-cicd-60-minute-timeout-issue.md
+  variables:
+    AWS_CREDS_TARGET_ROLE: $US_WEST_2_AWS_IAM_ROLE
+    TARGET_ROLE: $US_WEST_2_AWS_IAM_ROLE
+    AWS_DEFAULT_ACCOUNT: $US_WEST_2_AWS_ACCOUNT_ID
+    AWS_DEFAULT_REGION: $US_WEST_2_AWS_REGION
+    DEPLOY_REGION: $US_WEST_2_AWS_REGION
+    CDK_DEPLOY_ACCOUNT: $US_WEST_2_AWS_ACCOUNT_ID
+    CDK_DEFAULT_ACCOUNT: $US_WEST_2_AWS_ACCOUNT_ID
+    CDK_DEPLOY_REGION: $US_WEST_2_AWS_REGION
+    STACK_PREFIX: "medialake"
+    STACK_NAME: "medialake-e2e-test"
+    ENVIRONMENT_NAME: "e2e"
+    DEPLOYMENT_SIZE: "small"
+    ZIP_FILE_NAME: "medialake-source-${CI_COMMIT_SHORT_SHA}.zip"
+    # Request maximum allowed AWS session duration (1 hour = 3600 seconds)
+    AWS_ROLE_SESSION_DURATION: "3600"
+    AWS_SESSION_DURATION: "3600"
+    #ACCESS_KEY_ID: $US_WEST_2_ACCESS_KEY
+    #SECRET_ACCESS_KEY: $US_WEST_2_SECRET_KEY
+  before_script:
+    - echo "============================================"
+    - echo "Job Start Time:$(date '+%Y-%m-%d %H:%M:%S %Z')"
+    - echo "Job Timeout Configuration:4 hours"
+    - echo "CI_JOB_TIMEOUT:$CI_JOB_TIMEOUT"
+    - echo "AWS_ROLE_SESSION_DURATION:$AWS_ROLE_SESSION_DURATION seconds"
+    - echo "Checking for potential timeout issues..."
+    - echo "============================================"
+    # Install required dependencies
+    - yum update -y
+    - yum install -y python3 python3-pip unzip which findutils zip
+    # Install Node.js (required for Playwright)
+    - curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
+    - yum install -y nodejs
+    - node --version
+    - npm --version
+    # Install AWS CLI
+    - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+    - unzip awscliv2.zip
+    - ./aws/install
+    # Configure AWS credentials for test execution
+    # - aws configure set aws_access_key_id $ACCESS_KEY_ID
+    # - aws configure set aws_secret_access_key $SECRET_ACCESS_KEY
+    # - aws configure set default.region $DEPLOY_REGION
+    - echo "AWS credentials configured for testing in region $DEPLOY_REGION"
+    - cat $AWS_SHARED_CREDENTIALS_FILE
+    - echo $AWS_CREDS_TARGET_ROLE
+    - echo $AWS_DEFAULT_ACCOUNT
+    - echo $AWS_DEFAULT_REGION
+    - echo $DEPLOY_REGION
+    - echo $CDK_DEPLOY_ACCOUNT
+    - echo $CDK_DEFAULT_ACCOUNT
+    - echo $CDK_DEPLOY_REGION
+    - echo "Environment credentials overridden for testing"
+    # Verify AWS access
+    - cat /root/.aws/credentials
+    - cat /root/.aws/config
+    - whoami
+    - aws s3 ls --profile default
+    - aws sts get-caller-identity --profile default
+    - echo "AWS identity verified for testing"
+    - |
+      # Check current session expiration and attempt to get longer session if needed
+      echo "============================================"
+      echo "Checking AWS session duration..."
 
-#     # Quick AWS connectivity verification
-#     - echo "Verifying AWS connectivity..."
-#     - aws sts get-caller-identity --region $DEPLOY_REGION --profile default
+      # Try to get session token expiration (if available in credential vendor)
+      if [ -f "$AWS_SHARED_CREDENTIALS_FILE" ]; then
+        echo "Credential vendor file exists"
 
-#     # Run with optimized settings for CI - Chromium only
-#     - echo "Executing Playwright test with optimized CI settings..."
-#     - mkdir -p test-results
-#     - timeout 1200 npx playwright test tests/integration/comprehensive-user-lifecycle-e2e.spec.ts --project=chromium --reporter=junit --reporter=html --timeout=180000 --max-failures=1 --workers=1
-#     - echo "Playwright E2E test completed successfully"
+        # Check if we can get session info
+        SESSION_INFO=$(aws sts get-session-token --duration-seconds 3600 --profile default 2>&1 || echo "FAILED")
 
-#     # Ensure test results are in the expected location
-#     - echo "Verifying test artifacts..."
-#     - ls -la test-results/ || echo "No test-results directory found"
-#     - ls -la playwright-report/ || echo "No playwright-report directory found"
-#     - find . -name "*.xml" -type f || echo "No XML files found"
-#     - echo "Contents of test-results directory:"
-#     - ls -la test-results/ 2>/dev/null || echo "test-results directory not accessible"
-#   artifacts:
-#     when: always
-#     paths:
-#       - medialake_user_interface/test-results/
-#       - medialake_user_interface/playwright-report/
-#     expire_in: 1 week
-#     reports:
-#       junit: medialake_user_interface/test-results/*.xml
-#   after_script:
-#     - echo "E2E test execution completed"
-#     - echo "Test artifacts available in test-results/ and playwright-report/ directories"
+        if [[ "$SESSION_INFO" == *"FAILED"* ]] || [[ "$SESSION_INFO" == *"error"* ]]; then
+          echo "⚠ Could not request extended session token"
+          echo "Relying on credential vendor provided session"
+        else
+          echo "✓ Extended session token capability confirmed"
+        fi
+
+        # Attempt to manually assume role with maximum allowed duration as fallback
+        if [ -n "$AWS_CREDS_TARGET_ROLE" ]; then
+          echo "Attempting to assume role with 1-hour duration..."
+          echo "Role ARN: $AWS_CREDS_TARGET_ROLE"
+
+          ASSUME_OUTPUT=$(aws sts assume-role \
+            --role-arn "$AWS_CREDS_TARGET_ROLE" \
+            --role-session-name "gitlab-cicd-e2e-test-$(date +%s)" \
+            --duration-seconds 3600 \
+            --profile default 2>&1)
+          ASSUME_EXIT_CODE=$?
+
+          if [ $ASSUME_EXIT_CODE -eq 0 ]; then
+            echo "✓ Successfully assumed role with 1-hour duration"
+
+            # Extract credentials using jq (proper JSON parsing)
+            export AWS_ACCESS_KEY_ID=$(echo "$ASSUME_OUTPUT" | jq -r '.Credentials.AccessKeyId')
+            export AWS_SECRET_ACCESS_KEY=$(echo "$ASSUME_OUTPUT" | jq -r '.Credentials.SecretAccessKey')
+            export AWS_SESSION_TOKEN=$(echo "$ASSUME_OUTPUT" | jq -r '.Credentials.SessionToken')
+            EXPIRATION=$(echo "$ASSUME_OUTPUT" | jq -r '.Credentials.Expiration')
+
+            echo "Session expires at: $EXPIRATION"
+
+            # Update credentials file
+            mkdir -p ~/.aws
+            echo "[default]" > ~/.aws/credentials
+            echo "aws_access_key_id = $AWS_ACCESS_KEY_ID" >> ~/.aws/credentials
+            echo "aws_secret_access_key = $AWS_SECRET_ACCESS_KEY" >> ~/.aws/credentials
+            echo "aws_session_token = $AWS_SESSION_TOKEN" >> ~/.aws/credentials
+
+            # Verify new credentials work
+            if aws sts get-caller-identity --profile default >/dev/null 2>&1; then
+              echo "✓ Fresh 1-hour session credentials validated successfully"
+              echo "Credentials will be refreshed every 30 minutes during monitoring"
+            else
+              echo "⚠ Warning: Could not validate assumed role credentials"
+            fi
+          else
+            echo "⚠ Could not assume role"
+            echo "Error: $ASSUME_OUTPUT"
+            echo "Note: The IAM role must be configured with MaxSessionDuration of at least 1 hour"
+            echo "Proceeding with credential vendor provided session"
+          fi
+        else
+          echo "⚠ AWS_CREDS_TARGET_ROLE not set, cannot assume role"
+        fi
+      fi
+      echo "============================================"
+  script:
+    - echo "Running comprehensive Playwright E2E test against deployed MediaLake infrastructure"
+    - |
+      # Function to refresh AWS credentials from credential vendor
+      refresh_credentials() {
+        local timestamp=$(date '+%H:%M:%S')
+        echo "Refreshing AWS credentials at $timestamp..."
+
+        if [ ! -f "$AWS_SHARED_CREDENTIALS_FILE" ]; then
+          echo "✗ Error: Credential file not found at $AWS_SHARED_CREDENTIALS_FILE"
+          return 1
+        fi
+
+        # Record the current file modification time
+        local file_mtime_before=$(stat -c %Y "$AWS_SHARED_CREDENTIALS_FILE" 2>/dev/null || stat -f %m "$AWS_SHARED_CREDENTIALS_FILE" 2>/dev/null || echo "0")
+
+        # Wait a moment for credential vendor to potentially update the file
+        sleep 2
+
+        # Check if file was updated
+        local file_mtime_after=$(stat -c %Y "$AWS_SHARED_CREDENTIALS_FILE" 2>/dev/null || stat -f %m "$AWS_SHARED_CREDENTIALS_FILE" 2>/dev/null || echo "0")
+        if [ "$file_mtime_after" -gt "$file_mtime_before" ]; then
+          echo "Credential vendor file was updated, using fresh credentials"
+        fi
+
+        # Read credentials from credential vendor file with retry
+        local max_attempts=3
+        local attempt=1
+        local validation_success=0
+
+        while [ $attempt -le $max_attempts ]; do
+          echo "Attempt $attempt of $max_attempts to refresh credentials..."
+
+          # Read credentials
+          local access_key=$(grep -A5 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_access_key_id | cut -d'=' -f2 | tr -d ' ' | tr -d '\t')
+          local secret_key=$(grep -A5 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_secret_access_key | cut -d'=' -f2 | tr -d ' ' | tr -d '\t')
+          local session_token=$(grep -A5 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_session_token | cut -d'=' -f2 | tr -d ' ' | tr -d '\t')
+
+          if [ -z "$access_key" ] || [ -z "$secret_key" ] || [ -z "$session_token" ]; then
+            echo "⚠ Warning: Could not parse credentials from file (attempt $attempt)"
+            attempt=$((attempt + 1))
+            sleep 3
+            continue
+          fi
+
+          # Export as environment variables
+          export AWS_ACCESS_KEY_ID="$access_key"
+          export AWS_SECRET_ACCESS_KEY="$secret_key"
+          export AWS_SESSION_TOKEN="$session_token"
+
+          # Update ~/.aws/credentials for --profile default
+          mkdir -p ~/.aws
+          echo "[default]" > ~/.aws/credentials
+          echo "aws_access_key_id = $access_key" >> ~/.aws/credentials
+          echo "aws_secret_access_key = $secret_key" >> ~/.aws/credentials
+          echo "aws_session_token = $session_token" >> ~/.aws/credentials
+
+          # Verify credentials work
+          if aws sts get-caller-identity --profile default >/dev/null 2>&1; then
+            echo "✓ Credentials refreshed and validated at $timestamp (attempt $attempt)"
+            validation_success=1
+            break
+          else
+            echo "⚠ Credentials validation failed (attempt $attempt), waiting before retry..."
+            attempt=$((attempt + 1))
+            sleep 5
+          fi
+        done
+
+        if [ $validation_success -eq 0 ]; then
+          echo "✗ ERROR: Failed to refresh and validate credentials after $max_attempts attempts"
+          echo "This will likely cause subsequent AWS operations to fail"
+          return 1
+        fi
+
+        return 0
+      }
+    - refresh_credentials
+    - aws s3 ls --profile default
+    - export BUCKET_UUID=$(python3 -c "import uuid; print(str(uuid.uuid4())[:8])")
+    - export S3_BUCKET_NAME="medialake-deploy-${BUCKET_UUID}-${CI_COMMIT_SHORT_SHA}"
+    - echo "$S3_BUCKET_NAME" > /tmp/s3_bucket_name.txt
+    - echo "S3 Bucket Name saved for cleanup:$S3_BUCKET_NAME"
+    - aws s3 mb s3://$S3_BUCKET_NAME --profile default
+    - aws s3 ls s3://$S3_BUCKET_NAME/ --profile default
+    - aws s3 cp medialake.template s3://$S3_BUCKET_NAME/medialake.template --profile default
+    - |
+      list_stacks() {
+        local region=$1
+        local stack_prefix="$STACK_PREFIX"
+
+        # Get all stacks excluding DELETE_COMPLETE and filter case-insensitively for the prefix
+
+        aws cloudformation list-stacks \
+          --region $region \
+          --profile default \
+          --stack-status-filter CREATE_COMPLETE CREATE_FAILED CREATE_IN_PROGRESS REVIEW_IN_PROGRESS ROLLBACK_COMPLETE ROLLBACK_FAILED ROLLBACK_IN_PROGRESS UPDATE_COMPLETE UPDATE_COMPLETE_CLEANUP_IN_PROGRESS UPDATE_IN_PROGRESS UPDATE_ROLLBACK_COMPLETE UPDATE_ROLLBACK_COMPLETE_CLEANUP_IN_PROGRESS UPDATE_ROLLBACK_FAILED UPDATE_ROLLBACK_IN_PROGRESS DELETE_FAILED \
+          --query "StackSummaries[].StackName" \
+          --output text | tr '\t' '\n' | grep -i "$stack_prefix" || true
+      }
+
+      any_deleting() {
+        local region=$1
+        local stack_prefix="$STACK_PREFIX"
+        local deleting_stacks=$(aws cloudformation list-stacks \
+          --region $region \
+          --profile default \
+          --stack-status-filter DELETE_IN_PROGRESS \
+          --query "StackSummaries[].StackName" \
+          --output text | tr '\t' '\n' | grep -i "$stack_prefix" || true)
+        if [ -z "$deleting_stacks" ]; then
+          return 1
+        else
+          echo "Stacks currently being deleted in $region: $deleting_stacks"
+          return 0
+        fi
+      }
+
+      # Function to delete stacks in a specific region
+      delete_stacks_in_region() {
+        local region=$1
+        echo "Starting comprehensive stack cleanup in region $region"
+        echo "Will delete all stacks containing (case-insensitive): '$STACK_PREFIX'"
+        local iteration=0
+        # Main loop to delete stacks
+        while true; do
+          # Refresh credentials every 5 iterations (approximately every 5 minutes)
+          if [ $((iteration % 5)) -eq 0 ] && [ $iteration -gt 0 ]; then
+            echo "Refreshing credentials during stack cleanup (iteration $iteration)..."
+            refresh_credentials
+          fi
+          iteration=$((iteration + 1))
+
+          stacks=$(list_stacks "$region")
+          if [ -z "$stacks" ]; then
+            echo "No more medialake stacks found in region $region. Cleanup complete!"
+            break
+          fi
+          echo "Found stacks in $region: $stacks"
+          # Check if any stack is already being deleted
+          if any_deleting "$region"; then
+            echo "Waiting for in-progress deletions to complete in $region..."
+          else
+            # Attempt to delete each stack
+            for stack in $stacks; do
+              echo "Attempting to delete stack: $stack in region $region"
+              # Check if stack is in DELETE_FAILED state and try with retain resources
+              stack_status=$(aws cloudformation describe-stacks --stack-name "$stack" --region "$region" --profile default --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "STACK_NOT_FOUND")
+              if [ "$stack_status" == "DELETE_FAILED" ]; then
+                echo "Stack $stack is in DELETE_FAILED state. Attempting to get resources that failed to delete..."
+                # Get resources that might have failed to delete
+                resources=$(aws cloudformation list-stack-resources --stack-name "$stack" --region "$region" --profile default --query "StackResourceSummaries[?ResourceStatus=='DELETE_FAILED'].LogicalResourceId" --output text || true)
+                if [ -n "$resources" ]; then
+                  echo "Found resources that failed to delete: $resources"
+                  echo "Attempting to delete stack with --retain-resources option"
+                  aws cloudformation delete-stack \
+                    --region $region \
+                    --profile default \
+                    --stack-name $stack \
+                    --retain-resources $resources || true
+                else
+                  # Standard delete attempt
+                  aws cloudformation delete-stack \
+                    --region $region \
+                    --profile default \
+                    --stack-name $stack || true
+                fi
+              else
+                # Standard delete attempt
+                aws cloudformation delete-stack \
+                  --region $region \
+                  --profile default \
+                  --stack-name $stack || true
+              fi
+              # Break after initiating one deletion to handle dependencies
+              break
+            done
+          fi
+          echo "Waiting 60 seconds before checking again in $region..."
+          sleep 60
+        done
+      }
+      # Check for existing CodePipelines that might conflict
+      echo "Checking for existing CodePipelines in $DEPLOY_REGION..."
+      for pipeline_candidate in "MediaLakeCDKPipeline" "CDKDeploymentPipeline"; do
+        if aws codepipeline get-pipeline --name "$pipeline_candidate" --region $DEPLOY_REGION --profile default >/dev/null 2>&1; then
+          echo "Found existing pipeline: $pipeline_candidate - will be cleaned up with stack deletion"
+        fi
+      done
+      # First, destroy stacks in us-east-1
+      delete_stacks_in_region "us-east-1"
+      # Then destroy stacks in us-west-2 if different (for any regional resources)
+      if [ "$DEPLOY_REGION" != "us-east-1" ]; then
+        echo "Checking for regional resources in $DEPLOY_REGION..."
+        delete_stacks_in_region "$DEPLOY_REGION"
+      fi
+      echo "Infrastructure cleanup completed. Proceeding with fresh deployment."
+    - echo "Creating zip file of repository..."
+    - zip -r $ZIP_FILE_NAME . -x "*.git*" "*.venv*" "*__pycache__*" "*.pyc" "*node_modules*" "*.DS_Store*"
+    - ls -la $ZIP_FILE_NAME
+    - refresh_credentials
+    - 'echo "Uploading zip file to S3 bucket: $S3_BUCKET_NAME"'
+    - aws s3 cp $ZIP_FILE_NAME s3://$S3_BUCKET_NAME/$ZIP_FILE_NAME --profile default
+    - echo "Generating pre-signed URL for zip file..."
+    - PRESIGNED_URL=$(aws s3 presign s3://$S3_BUCKET_NAME/$ZIP_FILE_NAME --expires-in 3600 --profile default)
+    - echo "Pre-signed URL generated successfully"
+    - refresh_credentials
+    - 'echo "Deploying CloudFormation stack: $STACK_NAME"'
+    - |
+      aws cloudformation create-stack \
+        --stack-name $STACK_NAME \
+        --template-body file://medialake.template \
+        --parameters \
+          ParameterKey=SourceType,ParameterValue="S3PresignedURL" \
+          ParameterKey=S3PresignedURL,ParameterValue="$PRESIGNED_URL" \
+          ParameterKey=InitialUserFirstName,ParameterValue="Media" \
+          ParameterKey=InitialUserLastName,ParameterValue="Lake" \
+          ParameterKey=InitialUserEmail,ParameterValue="medialake+deploy@amazon.com" \
+          ParameterKey=MediaLakeEnvironmentName,ParameterValue="$ENVIRONMENT_NAME" \
+          ParameterKey=OpenSearchDeploymentSize,ParameterValue="$DEPLOYMENT_SIZE" \
+        --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+        --profile default
+    - echo "CloudFormation stack deployment initiated successfully"
+    - echo "Stack name:$STACK_NAME"
+    - refresh_credentials
+    - |
+      # Monitor CodePipeline execution similar to deploy-medialake.sh
+      echo "Waiting for CodePipeline to be created by CloudFormation..."
+      sleep 120  # Wait for pipeline creation
+
+      # Refresh credentials again after the sleep
+      refresh_credentials
+
+      # Check for pipeline existence (try multiple possible names)
+      PIPELINE_NAME=""
+      for pipeline_candidate in "MediaLakeCDKPipeline" "CDKDeploymentPipeline"; do
+        if aws codepipeline get-pipeline --name "$pipeline_candidate" --profile default >/dev/null 2>&1; then
+          PIPELINE_NAME="$pipeline_candidate"
+          echo "Found pipeline: $PIPELINE_NAME"
+          break
+        fi
+      done
+      if [ -z "$PIPELINE_NAME" ]; then
+        echo "Warning: No CodePipeline found after CloudFormation deployment"
+        echo "Pipeline may still be creating. Deployment infrastructure is ready."
+      else
+        echo "Monitoring CodePipeline execution: $PIPELINE_NAME"
+        echo "This may take several minutes to complete..."
+        echo "Pipeline monitoring will check status every 15 seconds with keepalive output"
+        echo "Credentials will be refreshed every 30 minutes during monitoring"
+
+        # Record job start time for total elapsed time tracking
+        JOB_START_TIME=$(date +%s)
+        echo "Job start timestamp: $JOB_START_TIME"
+
+        # Monitor pipeline with timeout (3 hours max to accommodate long deployments)
+        MAX_WAIT_TIME=10800  # 3 hours in seconds
+        ELAPSED_TIME=0
+        CHECK_INTERVAL=15
+        STATUS_LOG_INTERVAL=60
+        LAST_STATUS_LOG=0
+        CREDENTIAL_REFRESH_INTERVAL=1800  # Refresh every 30 minutes (well before 1-hour expiry)
+        LAST_CREDENTIAL_REFRESH=0
+
+        while [ $ELAPSED_TIME -lt $MAX_WAIT_TIME ]; do
+          # Calculate elapsed time in minutes for display
+          ELAPSED_MINUTES=$((ELAPSED_TIME / 60))
+
+          # Refresh AWS credentials every 30 minutes to prevent expiration
+          if [ $((ELAPSED_TIME - LAST_CREDENTIAL_REFRESH)) -ge $CREDENTIAL_REFRESH_INTERVAL ]; then
+            echo ""
+            echo "[${ELAPSED_MINUTES}m] Refreshing AWS credentials to prevent expiration..."
+            refresh_credentials
+            LAST_CREDENTIAL_REFRESH=$ELAPSED_TIME
+          fi
+
+          # Get pipeline execution status with error capture
+          EXECUTION_STATUS_OUTPUT=$(aws codepipeline list-pipeline-executions \
+            --pipeline-name "$PIPELINE_NAME" \
+            --profile default \
+            --region $DEPLOY_REGION \
+            --max-items 1 \
+            --query "pipelineExecutionSummaries[0].status" \
+            --output text 2>&1)
+
+          # Check for credential expiration errors
+          if echo "$EXECUTION_STATUS_OUTPUT" | grep -qi "ExpiredToken\|InvalidToken\|expired"; then
+            echo ""
+            echo "[${ELAPSED_MINUTES}m] ⚠ Detected expired credentials, forcing refresh..."
+            refresh_credentials
+            LAST_CREDENTIAL_REFRESH=$ELAPSED_TIME
+            # Retry the command after refresh
+            EXECUTION_STATUS_OUTPUT=$(aws codepipeline list-pipeline-executions \
+              --pipeline-name "$PIPELINE_NAME" \
+              --profile default \
+              --region $DEPLOY_REGION \
+              --max-items 1 \
+              --query "pipelineExecutionSummaries[0].status" \
+              --output text 2>&1)
+          fi
+
+          EXECUTION_STATUS=$(echo "$EXECUTION_STATUS_OUTPUT" | tr -d '\n\r' | sed 's/None//g' | xargs)
+
+          if [ $? -ne 0 ] || [ "$EXECUTION_STATUS" == "None" ] || [ -z "$EXECUTION_STATUS" ] || [ "$EXECUTION_STATUS" == "null" ]; then
+            # Keepalive output every check interval
+            echo "[${ELAPSED_MINUTES}m] Waiting for pipeline execution to start..."
+          else
+            # Log full status every STATUS_LOG_INTERVAL seconds
+            if [ $((ELAPSED_TIME - LAST_STATUS_LOG)) -ge $STATUS_LOG_INTERVAL ]; then
+              CURRENT_TIME=$(date +%s)
+              TOTAL_JOB_ELAPSED=$((CURRENT_TIME - JOB_START_TIME))
+              TOTAL_JOB_MINUTES=$((TOTAL_JOB_ELAPSED / 60))
+              echo "[${ELAPSED_MINUTES}m monitoring / ${TOTAL_JOB_MINUTES}m total] Pipeline Status: $EXECUTION_STATUS ($(date '+%H:%M:%S'))"
+
+              # Warn if approaching 55 minutes (close to potential timeout)
+              if [ $TOTAL_JOB_MINUTES -ge 55 ] && [ $TOTAL_JOB_MINUTES -lt 58 ]; then
+                echo "⚠ WARNING: Job has been running for ${TOTAL_JOB_MINUTES} minutes. If timeout occurs, check GitLab Runner and project timeout settings."
+              fi
+
+              LAST_STATUS_LOG=$ELAPSED_TIME
+            else
+              # Keepalive dot every CHECK_INTERVAL seconds
+              echo -n "."
+            fi
+
+            case "$EXECUTION_STATUS" in
+              "Succeeded")
+                echo ""
+                echo "Pipeline completed successfully!"
+                echo "MediaLake deployment completed successfully!"
+                break
+                ;;
+              "Failed")
+                echo ""
+                echo "Pipeline failed!"
+                echo "Pipeline execution failed. Check CodePipeline console for details."
+                exit 1
+                ;;
+              "Stopped")
+                echo ""
+                echo "Pipeline was stopped!"
+                echo "Pipeline execution was stopped."
+                exit 1
+                ;;
+              "Stopping")
+                # Continue monitoring
+                :
+                ;;
+              "InProgress"|"IN_PROGRESS"|"In_Progress")
+                # Continue monitoring
+                :
+                ;;
+              "Superseded")
+                echo ""
+                echo "Pipeline was superseded by a newer execution..."
+                echo "Pipeline execution was superseded."
+                exit 1
+                ;;
+              *)
+                # Check for failure patterns
+                if [[ "$EXECUTION_STATUS" == *"FAILED"* ]] || [[ "$EXECUTION_STATUS" == *"Failed"* ]] || [[ "$EXECUTION_STATUS" == *"failed"* ]]; then
+                  echo ""
+                  echo "Pipeline appears to have failed (status: $EXECUTION_STATUS)"
+                  exit 1
+                fi
+                ;;
+            esac
+          fi
+
+          sleep $CHECK_INTERVAL
+          ELAPSED_TIME=$((ELAPSED_TIME + CHECK_INTERVAL))
+        done
+
+        if [ $ELAPSED_TIME -ge $MAX_WAIT_TIME ]; then
+          echo ""
+          echo "Pipeline monitoring timed out after 3 hours"
+          echo "Pipeline may still be running. Check CodePipeline console for current status."
+          exit 1
+        fi
+      fi
+    - echo "============================================="
+    - echo "Extracting deployment information for E2E testing..."
+    - echo "============================================="
+    - refresh_credentials
+    - |
+      # Extract CloudFront URL from stack outputs
+      CLOUDFRONT_URL=$(aws cloudformation describe-stacks \
+        --stack-name $STACK_NAME \
+        --region $DEPLOY_REGION \
+        --profile default \
+        --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionUrl'].OutputValue" \
+        --output text)
+
+      if [ -z "$CLOUDFRONT_URL" ]; then
+        echo "Error: Could not find CloudFront URL in stack outputs"
+        exit 1
+      fi
+
+      echo "CloudFront URL: $CLOUDFRONT_URL"
+      export PLAYWRIGHT_BASE_URL="https://$CLOUDFRONT_URL"
+      echo "PLAYWRIGHT_BASE_URL=$PLAYWRIGHT_BASE_URL"
+
+      # Extract other useful outputs
+      API_ENDPOINT=$(aws cloudformation describe-stacks \
+        --stack-name $STACK_NAME \
+        --region $DEPLOY_REGION \
+        --profile default \
+        --query "Stacks[0].Outputs[?OutputKey=='ApiEndpoint'].OutputValue" \
+        --output text || echo "")
+
+      echo "API Endpoint: $API_ENDPOINT"
+    - echo "============================================"
+    - echo "Setting up Playwright E2E tests..."
+    - echo "============================================"
+    - refresh_credentials
+    - cd medialake_user_interface
+    - echo "Installing Node.js dependencies..."
+    - npm ci
+    - echo "Installing Playwright browsers..."
+    - npx playwright install --with-deps chromium
+    - echo "============================================"
+    - echo "Running Playwright E2E tests..."
+    - echo "============================================"
+    - refresh_credentials
+    - |
+      # Run Playwright tests with the deployed environment
+      export CI=true
+      export AWS_REGION=$DEPLOY_REGION
+      export AWS_PROFILE=default
+
+      echo "Starting Playwright tests against $PLAYWRIGHT_BASE_URL"
+      echo "Test configuration:"
+      echo "  - Base URL: $PLAYWRIGHT_BASE_URL"
+      echo "  - AWS Region: $AWS_REGION"
+      echo "  - AWS Profile: $AWS_PROFILE"
+
+      # Create a temporary Playwright config that uses the CloudFront URL
+      cat > playwright.ci.config.ts << 'EOF'
+      import { defineConfig } from '@playwright/test';
+      import baseConfig from './playwright.config';
+
+      export default defineConfig({
+        ...baseConfig,
+        use: {
+          ...baseConfig.use,
+          baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173',
+        },
+        webServer: undefined, // Don't start local dev server in CI
+      });
+      EOF
+
+      # Run tests with proper configuration
+      npx playwright test \
+        --config=playwright.ci.config.ts \
+        --reporter=html \
+        --reporter=junit \
+        --project=chromium \
+        tests/auth/login.spec.ts \
+        tests/integration/ \
+        || TEST_EXIT_CODE=$?
+
+      # Store exit code but continue to show results
+      if [ -n "$TEST_EXIT_CODE" ] && [ "$TEST_EXIT_CODE" -ne "0" ]; then
+        echo "⚠️  Some Playwright tests failed (exit code: $TEST_EXIT_CODE)"
+        echo "Test report available in playwright-report/"
+      else
+        echo "✅ All Playwright tests passed!"
+      fi
+    - cd ..
+    - |
+      # Exit with test result code if tests failed
+      if [ -n "$TEST_EXIT_CODE" ] && [ "$TEST_EXIT_CODE" -ne "0" ]; then
+        echo "Failing job due to test failures"
+        exit $TEST_EXIT_CODE
+      fi
+  artifacts:
+    when: always
+    paths:
+      - medialake_user_interface/playwright-report/
+      - medialake_user_interface/test-results/
+    reports:
+      junit: medialake_user_interface/test-results/junit.xml
+    expire_in: 30 days
+  after_script:
+    - echo "============================================"
+    - echo "Starting cleanup (runs regardless of job success/failure)"
+    - echo "============================================"
+    - |
+      # Function to refresh AWS credentials (redefined for after_script context)
+      refresh_credentials() {
+        local timestamp=$(date '+%H:%M:%S')
+        echo "Refreshing AWS credentials at $timestamp..."
+
+        if [ ! -f "$AWS_SHARED_CREDENTIALS_FILE" ]; then
+          echo "✗ Error: Credential file not found at $AWS_SHARED_CREDENTIALS_FILE"
+          return 1
+        fi
+
+        # Wait for credential vendor to update
+        sleep 2
+
+        # Read credentials with retry
+        local max_attempts=3
+        local attempt=1
+        local validation_success=0
+
+        while [ $attempt -le $max_attempts ]; do
+          echo "Attempt $attempt of $max_attempts to refresh credentials..."
+
+          local access_key=$(grep -A5 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_access_key_id | cut -d'=' -f2 | tr -d ' ' | tr -d '\t')
+          local secret_key=$(grep -A5 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_secret_access_key | cut -d'=' -f2 | tr -d ' ' | tr -d '\t')
+          local session_token=$(grep -A5 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_session_token | cut -d'=' -f2 | tr -d ' ' | tr -d '\t')
+
+          if [ -z "$access_key" ] || [ -z "$secret_key" ] || [ -z "$session_token" ]; then
+            echo "⚠ Warning: Could not parse credentials (attempt $attempt)"
+            attempt=$((attempt + 1))
+            sleep 3
+            continue
+          fi
+
+          export AWS_ACCESS_KEY_ID="$access_key"
+          export AWS_SECRET_ACCESS_KEY="$secret_key"
+          export AWS_SESSION_TOKEN="$session_token"
+
+          mkdir -p ~/.aws
+          echo "[default]" > ~/.aws/credentials
+          echo "aws_access_key_id = $access_key" >> ~/.aws/credentials
+          echo "aws_secret_access_key = $secret_key" >> ~/.aws/credentials
+          echo "aws_session_token = $session_token" >> ~/.aws/credentials
+
+          if aws sts get-caller-identity --profile default >/dev/null 2>&1; then
+            echo "✓ Credentials refreshed and validated for cleanup at $timestamp (attempt $attempt)"
+            validation_success=1
+            break
+          else
+            echo "⚠ Credentials validation failed (attempt $attempt), waiting..."
+            attempt=$((attempt + 1))
+            sleep 5
+          fi
+        done
+
+        if [ $validation_success -eq 0 ]; then
+          echo "✗ ERROR: Failed to refresh credentials for cleanup"
+          return 1
+        fi
+
+        return 0
+      }
+    - refresh_credentials
+    - |
+      # Read S3 bucket name from file (saved during script execution)
+      if [ -f "/tmp/s3_bucket_name.txt" ]; then
+        S3_BUCKET_NAME=$(cat /tmp/s3_bucket_name.txt)
+        echo "Found S3 bucket name from previous execution: $S3_BUCKET_NAME"
+      fi
+
+      # Clean up S3 bucket (runs even if job failed)
+      if [ -n "$S3_BUCKET_NAME" ]; then
+        echo "============================================"
+        echo "Cleaning up S3 bucket: $S3_BUCKET_NAME"
+        echo "============================================"
+
+        # Check if bucket exists before trying to delete
+        if aws s3 ls "s3://$S3_BUCKET_NAME" --profile default --region $DEPLOY_REGION >/dev/null 2>&1; then
+          echo "Bucket found. Deleting all objects..."
+
+          # Delete all objects (including versions if versioning is enabled)
+          aws s3 rm "s3://$S3_BUCKET_NAME" --recursive --profile default --region $DEPLOY_REGION 2>&1 || {
+            echo "⚠ Warning: Failed to delete some objects, retrying..."
+            sleep 2
+            aws s3 rm "s3://$S3_BUCKET_NAME" --recursive --profile default --region $DEPLOY_REGION 2>&1 || echo "⚠ Some objects may remain"
+          }
+
+          echo "Deleting bucket..."
+          aws s3 rb "s3://$S3_BUCKET_NAME" --profile default --region $DEPLOY_REGION 2>&1 || {
+            echo "⚠ Warning: Failed to delete bucket on first attempt, retrying..."
+            sleep 2
+            aws s3 rb "s3://$S3_BUCKET_NAME" --force --profile default --region $DEPLOY_REGION 2>&1 || echo "⚠ Bucket deletion failed"
+          }
+
+          # Verify bucket is gone
+          if aws s3 ls "s3://$S3_BUCKET_NAME" --profile default --region $DEPLOY_REGION >/dev/null 2>&1; then
+            echo "⚠ WARNING: Bucket still exists after cleanup attempt!"
+          else
+            echo "✓ S3 bucket successfully deleted: $S3_BUCKET_NAME"
+          fi
+        else
+          echo "Bucket not found or already deleted: $S3_BUCKET_NAME"
+        fi
+      else
+        echo "No S3_BUCKET_NAME set - bucket may not have been created or job failed early"
+      fi
+    - echo "============================================"
+    - echo "E2E test execution and cleanup completed"
+    - echo "Test artifacts available in test-results/ and playwright-report/ directories"
+    - echo "============================================"

@@ -167,4 +167,32 @@ export const QUERY_KEYS = {
     all: ["system-settings"] as const,
     search: () => [...QUERY_KEYS.SYSTEM_SETTINGS.all, "search"] as const,
   },
+  COLLECTIONS: {
+    all: ["collections"] as const,
+    lists: () => [...QUERY_KEYS.COLLECTIONS.all, "list"] as const,
+    list: (filters?: Record<string, any>) =>
+      [...QUERY_KEYS.COLLECTIONS.lists(), { filters }] as const,
+    details: () => [...QUERY_KEYS.COLLECTIONS.all, "detail"] as const,
+    detail: (id: string) => [...QUERY_KEYS.COLLECTIONS.details(), id] as const,
+    shared: () => [...QUERY_KEYS.COLLECTIONS.all, "shared"] as const,
+    shares: (id: string) =>
+      [...QUERY_KEYS.COLLECTIONS.detail(id), "shares"] as const,
+    items: (id: string) =>
+      [...QUERY_KEYS.COLLECTIONS.detail(id), "items"] as const,
+    assets: (id: string, filters?: Record<string, any>) =>
+      [...QUERY_KEYS.COLLECTIONS.detail(id), "assets", { filters }] as const,
+    children: (parentId: string) =>
+      [...QUERY_KEYS.COLLECTIONS.detail(parentId), "children"] as const,
+    ancestors: (id: string) =>
+      [...QUERY_KEYS.COLLECTIONS.detail(id), "ancestors"] as const,
+  },
+  COLLECTION_TYPES: {
+    all: ["collection-types"] as const,
+    lists: () => [...QUERY_KEYS.COLLECTION_TYPES.all, "list"] as const,
+    list: (filters?: Record<string, any>) =>
+      [...QUERY_KEYS.COLLECTION_TYPES.lists(), filters] as const,
+    details: () => [...QUERY_KEYS.COLLECTION_TYPES.all, "detail"] as const,
+    detail: (id: string) =>
+      [...QUERY_KEYS.COLLECTION_TYPES.details(), id] as const,
+  },
 } as const;
