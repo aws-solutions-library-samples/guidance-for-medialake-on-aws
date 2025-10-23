@@ -486,18 +486,49 @@ playwright_e2e_test:
         local timestamp=$(date '+%H:%M:%S')
         echo "Refreshing AWS credentials at $timestamp..."
 
-        if [ -f "$AWS_SHARED_CREDENTIALS_FILE" ]; then
-          # Read credentials from credential vendor file
+        if [ ! -f "$AWS_SHARED_CREDENTIALS_FILE" ]; then
+          echo "✗ Error: Credential file not found at $AWS_SHARED_CREDENTIALS_FILE"
+          return 1
+        fi
+
+        # Record the current file modification time
+        local file_mtime_before=$(stat -c %Y "$AWS_SHARED_CREDENTIALS_FILE" 2>/dev/null || stat -f %m "$AWS_SHARED_CREDENTIALS_FILE" 2>/dev/null || echo "0")
+
+        # Wait a moment for credential vendor to potentially update the file
+        sleep 2
+
+        # Check if file was updated
+        local file_mtime_after=$(stat -c %Y "$AWS_SHARED_CREDENTIALS_FILE" 2>/dev/null || stat -f %m "$AWS_SHARED_CREDENTIALS_FILE" 2>/dev/null || echo "0")
+        if [ "$file_mtime_after" -gt "$file_mtime_before" ]; then
+          echo "Credential vendor file was updated, using fresh credentials"
+        fi
+
+        # Read credentials from credential vendor file with retry
+        local max_attempts=3
+        local attempt=1
+        local validation_success=0
+
+        while [ $attempt -le $max_attempts ]; do
+          echo "Attempt $attempt of $max_attempts to refresh credentials..."
+
+          # Read credentials
           local access_key=$(grep -A5 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_access_key_id | cut -d'=' -f2 | tr -d ' ' | tr -d '\t')
           local secret_key=$(grep -A5 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_secret_access_key | cut -d'=' -f2 | tr -d ' ' | tr -d '\t')
           local session_token=$(grep -A5 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_session_token | cut -d'=' -f2 | tr -d ' ' | tr -d '\t')
 
-          # Export as environment variables (for non-profile AWS CLI calls)
+          if [ -z "$access_key" ] || [ -z "$secret_key" ] || [ -z "$session_token" ]; then
+            echo "⚠ Warning: Could not parse credentials from file (attempt $attempt)"
+            attempt=$((attempt + 1))
+            sleep 3
+            continue
+          fi
+
+          # Export as environment variables
           export AWS_ACCESS_KEY_ID="$access_key"
           export AWS_SECRET_ACCESS_KEY="$secret_key"
           export AWS_SESSION_TOKEN="$session_token"
 
-          # Also update the credentials in ~/.aws/credentials so --profile default works
+          # Update ~/.aws/credentials for --profile default
           mkdir -p ~/.aws
           echo "[default]" > ~/.aws/credentials
           echo "aws_access_key_id = $access_key" >> ~/.aws/credentials
@@ -506,19 +537,30 @@ playwright_e2e_test:
 
           # Verify credentials work
           if aws sts get-caller-identity --profile default >/dev/null 2>&1; then
-            echo "✓ Credentials refreshed and validated at $timestamp"
+            echo "✓ Credentials refreshed and validated at $timestamp (attempt $attempt)"
+            validation_success=1
+            break
           else
-            echo "⚠ Warning: Credentials read but validation failed"
+            echo "⚠ Credentials validation failed (attempt $attempt), waiting before retry..."
+            attempt=$((attempt + 1))
+            sleep 5
           fi
-        else
-          echo "✗ Error: Credential file not found at $AWS_SHARED_CREDENTIALS_FILE"
+        done
+
+        if [ $validation_success -eq 0 ]; then
+          echo "✗ ERROR: Failed to refresh and validate credentials after $max_attempts attempts"
+          echo "This will likely cause subsequent AWS operations to fail"
           return 1
         fi
+
+        return 0
       }
     - refresh_credentials
     - aws s3 ls --profile default
     - export BUCKET_UUID=$(python3 -c "import uuid; print(str(uuid.uuid4())[:8])")
     - export S3_BUCKET_NAME="medialake-deploy-${BUCKET_UUID}-${CI_COMMIT_SHORT_SHA}"
+    - echo "$S3_BUCKET_NAME" > /tmp/s3_bucket_name.txt
+    - echo "S3 Bucket Name saved for cleanup:$S3_BUCKET_NAME"
     - aws s3 mb s3://$S3_BUCKET_NAME --profile default
     - aws s3 ls s3://$S3_BUCKET_NAME/ --profile default
     - aws s3 cp medialake.template s3://$S3_BUCKET_NAME/medialake.template --profile default
@@ -916,31 +958,69 @@ playwright_e2e_test:
         local timestamp=$(date '+%H:%M:%S')
         echo "Refreshing AWS credentials at $timestamp..."
 
-        if [ -f "$AWS_SHARED_CREDENTIALS_FILE" ]; then
-          # Read credentials from credential vendor file
+        if [ ! -f "$AWS_SHARED_CREDENTIALS_FILE" ]; then
+          echo "✗ Error: Credential file not found at $AWS_SHARED_CREDENTIALS_FILE"
+          return 1
+        fi
+
+        # Wait for credential vendor to update
+        sleep 2
+
+        # Read credentials with retry
+        local max_attempts=3
+        local attempt=1
+        local validation_success=0
+
+        while [ $attempt -le $max_attempts ]; do
+          echo "Attempt $attempt of $max_attempts to refresh credentials..."
+
           local access_key=$(grep -A5 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_access_key_id | cut -d'=' -f2 | tr -d ' ' | tr -d '\t')
           local secret_key=$(grep -A5 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_secret_access_key | cut -d'=' -f2 | tr -d ' ' | tr -d '\t')
           local session_token=$(grep -A5 "\[default\]" $AWS_SHARED_CREDENTIALS_FILE | grep aws_session_token | cut -d'=' -f2 | tr -d ' ' | tr -d '\t')
 
-          # Export as environment variables
+          if [ -z "$access_key" ] || [ -z "$secret_key" ] || [ -z "$session_token" ]; then
+            echo "⚠ Warning: Could not parse credentials (attempt $attempt)"
+            attempt=$((attempt + 1))
+            sleep 3
+            continue
+          fi
+
           export AWS_ACCESS_KEY_ID="$access_key"
           export AWS_SECRET_ACCESS_KEY="$secret_key"
           export AWS_SESSION_TOKEN="$session_token"
 
-          # Update credentials file for --profile default
           mkdir -p ~/.aws
           echo "[default]" > ~/.aws/credentials
           echo "aws_access_key_id = $access_key" >> ~/.aws/credentials
           echo "aws_secret_access_key = $secret_key" >> ~/.aws/credentials
           echo "aws_session_token = $session_token" >> ~/.aws/credentials
 
-          echo "✓ Credentials refreshed for cleanup at $timestamp"
-        else
-          echo "⚠ Warning: Credential file not found, cleanup may fail"
+          if aws sts get-caller-identity --profile default >/dev/null 2>&1; then
+            echo "✓ Credentials refreshed and validated for cleanup at $timestamp (attempt $attempt)"
+            validation_success=1
+            break
+          else
+            echo "⚠ Credentials validation failed (attempt $attempt), waiting..."
+            attempt=$((attempt + 1))
+            sleep 5
+          fi
+        done
+
+        if [ $validation_success -eq 0 ]; then
+          echo "✗ ERROR: Failed to refresh credentials for cleanup"
+          return 1
         fi
+
+        return 0
       }
     - refresh_credentials
     - |
+      # Read S3 bucket name from file (saved during script execution)
+      if [ -f "/tmp/s3_bucket_name.txt" ]; then
+        S3_BUCKET_NAME=$(cat /tmp/s3_bucket_name.txt)
+        echo "Found S3 bucket name from previous execution: $S3_BUCKET_NAME"
+      fi
+
       # Clean up S3 bucket (runs even if job failed)
       if [ -n "$S3_BUCKET_NAME" ]; then
         echo "============================================"
