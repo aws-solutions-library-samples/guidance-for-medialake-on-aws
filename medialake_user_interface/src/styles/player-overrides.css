@@ -12,5 +12,18 @@
   background-image: none !important;
 }
 
+/* Make video fill full container height and width */
+.omakase-player .omakase-player-wrapper {
+  width: 100% !important;
+  height: 100% !important;
+  aspect-ratio: unset !important;
+  background-color: black;
+}
+
+/* Ensure media-theme doesn't cause overflow issues */
+media-theme {
+  overflow: hidden;
+}
+
 /* Additional Omakase player customizations can be added here */
 /* Example: Hide specific UI elements, adjust colors, etc. */

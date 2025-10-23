@@ -454,7 +454,7 @@ const e2eIntegrationTest = base.extend<E2EIntegrationFixtures>({
    * Comprehensive E2E integration context
    */
   e2eIntegrationContext: [
-    async (fixtures, use, testInfo) => {
+    async ({}, use, testInfo) => {
       const setupStartTime = Date.now();
       console.log(
         `[E2E Worker ${testInfo.workerIndex}] Setting up comprehensive integration context`,

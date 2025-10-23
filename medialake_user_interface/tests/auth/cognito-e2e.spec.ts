@@ -26,7 +26,12 @@ test.describe("Cognito E2E Authentication Tests", () => {
   }) => {
     // This test demonstrates manual login using the test user credentials
     const loginUrl = baseURL ? `${baseURL}/sign-in` : "/sign-in";
-    await page.goto(loginUrl);
+    await page.goto(loginUrl, { waitUntil: "domcontentloaded" });
+
+    // Wait for login form to be visible before interacting
+    await page
+      .getByRole("textbox", { name: "Email" })
+      .waitFor({ state: "visible", timeout: 10000 });
 
     // Fill in the login form with the dynamically created test user
     await page
@@ -41,7 +46,7 @@ test.describe("Cognito E2E Authentication Tests", () => {
 
     // Wait for successful login - SPA redirects to root
     const rootUrl = baseURL || "http://localhost:5173";
-    await page.waitForURL(rootUrl, { timeout: 15000 });
+    await page.waitForURL(rootUrl, { timeout: 30000 });
 
     // Verify successful authentication
     await expect(page).toHaveURL(rootUrl);
