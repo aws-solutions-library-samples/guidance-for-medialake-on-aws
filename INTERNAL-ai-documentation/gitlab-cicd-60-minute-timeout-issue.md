@@ -129,17 +129,6 @@ cleanup_resources:
 - The project-level timeout allows it (must be set to 4+ hours)
 - The credential vendor continues providing fresh credentials at each refresh
 
-## IAM Role Configuration
-
-The current configuration uses **1-hour sessions** (3600 seconds), which is the default for most IAM roles.
-
-**Note:** If you need longer sessions in the future:
-
-- IAM roles can support up to **12 hours** for IAM user assumptions
-- Federated users default to **1 hour** (can be extended if role is configured)
-- Update `AWS_ROLE_SESSION_DURATION` variable and `--duration-seconds` in the assume-role command
-- Ensure the IAM role's `MaxSessionDuration` is set appropriately
-
 ## Recommended Actions
 
 ### Immediate
