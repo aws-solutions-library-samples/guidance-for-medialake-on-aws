@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from aws_cdk import CfnOutput, RemovalPolicy, Stack
 from aws_cdk import aws_cognito as cognito
 from aws_cdk import aws_dynamodb as dynamodb
-from aws_cdk import aws_iam as iam
 from aws_cdk import custom_resources as cr
 from aws_cdk.aws_cognito_identitypool_alpha import (
     IdentityPool,
@@ -15,7 +14,6 @@ from constructs import Construct
 
 from config import config
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
-from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 
 @dataclass
@@ -82,14 +80,14 @@ class CognitoConstruct(Construct):
         self._auth_table = DynamoDB(self, "AuthorizationTable", self._auth_table_props)
 
         # Create Lambda functions
-        self._cognito_trigger_lambda = Lambda(
-            self,
-            "CognitoTrigger",
-            LambdaConfig(
-                name="cognito-trigger",
-                entry="lambdas/auth/cognito_trigger",
-            ),
-        )
+        # self._cognito_trigger_lambda = Lambda(
+        #     self,
+        #     "CognitoTrigger",
+        #     LambdaConfig(
+        #         name="cognito-trigger",
+        #         entry="lambdas/auth/cognito_trigger",
+        #     ),
+        # )
 
         # Pre-Token Generation Lambda is now created in CognitoUpdateStack
         # This avoids circular dependencies and timing issues
@@ -154,11 +152,11 @@ class CognitoConstruct(Construct):
                     temporary_password_validity_days=7,
                 )
             ),
-            "lambda_config": cognito.CfnUserPool.LambdaConfigProperty(
-                pre_sign_up=self._cognito_trigger_lambda.function.function_arn,
-                post_confirmation=self._cognito_trigger_lambda.function.function_arn,
-                # Pre-token generation config is now set via CognitoUpdateStack
-            ),
+            # "lambda_config": cognito.CfnUserPool.LambdaConfigProperty(
+            #     pre_sign_up=self._cognito_trigger_lambda.function.function_arn,
+            #     post_confirmation=self._cognito_trigger_lambda.function.function_arn,
+            #     # Pre-token generation config is now set via CognitoUpdateStack
+            # ),
             "user_pool_add_ons": cognito.CfnUserPool.UserPoolAddOnsProperty(
                 advanced_security_mode="ENFORCED"
             ),
@@ -226,18 +224,18 @@ class CognitoConstruct(Construct):
 
         # Grant permissions AFTER the user pool is created
         # Grant permission for pre-signup lambda (same as post confirmation)
-        self._cognito_trigger_lambda.function.add_permission(
-            "CognitoInvokePreSignUp",
-            principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
-            source_arn=cfn_user_pool.attr_arn,
-        )
+        # self._cognito_trigger_lambda.function.add_permission(
+        #     "CognitoInvokePreSignUp",
+        #     principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
+        #     source_arn=cfn_user_pool.attr_arn,
+        # )
 
-        # Grant permission for post confirmation lambda
-        self._cognito_trigger_lambda.function.add_permission(
-            "CognitoInvokePostConfirmation",
-            principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
-            source_arn=cfn_user_pool.attr_arn,
-        )
+        # # Grant permission for post confirmation lambda
+        # self._cognito_trigger_lambda.function.add_permission(
+        #     "CognitoInvokePostConfirmation",
+        #     principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
+        #     source_arn=cfn_user_pool.attr_arn,
+        # )
 
         # Pre-token generation lambda permissions are now granted in CognitoUpdateStack
 
