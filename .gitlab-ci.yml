@@ -413,7 +413,7 @@ sync-to-github:
     - rm -rf medialake_user_interface/playwright-report/
     # Stage all changes and commit
     - git add -A
-    - git commit --allow-empty -m "fix - Removed Lambda concurrency due to intermittent deployment stabilization issues"
+    - git commit --allow-empty -m "refactor - Quality of life improvement refactor- Collapsed integration Lambda into a single lambda, introduced lazy loading for video player results"
     - echo "New commit created:" && git log --oneline -1
     # Push to GitHub main branch
     - git push origin main
