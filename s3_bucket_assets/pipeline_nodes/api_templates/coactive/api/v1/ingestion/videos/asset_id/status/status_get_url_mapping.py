@@ -60,8 +60,14 @@ def translate_event_to_request(event):
         if not asset_id:
             asset_id = payload.get("asset_id") or payload.get("coactive_asset_id")
 
-    # Ensure we have a valid asset_id
+    # Ensure we have a valid asset_id - fail fast if missing
     if not asset_id or not asset_id.strip():
-        asset_id = "unknown"
+        raise RuntimeError(
+            "Cannot determine Coactive asset_id for status check. "
+            "Expected to find coactive_asset_id in metadata.externalJobResult.asset_results[0].coactive_asset_id "
+            "from the previous ingestion POST step. "
+            "This usually indicates that the ingestion step did not complete successfully or "
+            "the externalJobResult data was not properly passed through the pipeline."
+        )
 
     return {"asset_id": asset_id, "subdomain": subdomain}

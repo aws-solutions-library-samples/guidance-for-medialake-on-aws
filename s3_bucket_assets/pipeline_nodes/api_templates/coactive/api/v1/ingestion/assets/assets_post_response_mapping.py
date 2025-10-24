@@ -1,6 +1,11 @@
 # assets_post_response_mapping.py
 import json
+import logging
 from typing import Any, Dict
+
+# Set up logging
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 
 def translate_event_to_request(
@@ -99,9 +104,27 @@ def translate_event_to_request(
     else:
         message = f"Partial success: {total_assets - errored_assets} submitted, {errored_assets} failed"
 
+    # For single asset ingestion, use the asset ID as externalJobId for status tracking
+    # For batch ingestion, use the job ID
+    logger.info("=== EXTERNAL JOB ID SELECTION DEBUG ===")
+    logger.info(f"Job ID from response: {job_id}")
+    logger.info(f"Number of asset results: {len(asset_results)}")
+    logger.info(f"Asset results: {json.dumps(asset_results, indent=2)}")
+
+    external_job_id = job_id
+    if len(asset_results) == 1 and asset_results[0].get("coactive_asset_id"):
+        asset_id = asset_results[0]["coactive_asset_id"]
+        logger.info(f"Single asset detected - using asset ID: {asset_id}")
+        external_job_id = asset_id
+    else:
+        logger.info(f"Multiple assets or no asset ID - using job ID: {job_id}")
+
+    logger.info(f"Final externalJobId: {external_job_id}")
+    logger.info("=== END DEBUG ===")
+
     return {
         # External job tracking for pipeline middleware
-        "externalJobId": job_id,
+        "externalJobId": external_job_id,
         "externalJobStatus": "Started",
         "externalJobResult": {
             "message": message,
