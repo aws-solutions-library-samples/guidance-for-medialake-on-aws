@@ -827,70 +827,108 @@ e2e_03_deploy_stack:
       if [ -n "$existing_stacks" ]; then
         echo "WARNING: Found existing MediaLake stacks! Cleaning up before deployment..."
         echo "Stacks to delete: $existing_stacks"
-
-        # Initiate deletion of all stacks in parallel (CloudFormation will handle dependencies)
-        for stack in $existing_stacks; do
-          echo "Checking status of stack: $stack"
-          stack_status=$(aws cloudformation describe-stacks --stack-name "$stack" --region "$DEPLOY_REGION" --profile default --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "STACK_NOT_FOUND")
-
-          if [ "$stack_status" == "STACK_NOT_FOUND" ]; then
-            echo "Stack $stack not found, skipping..."
-            continue
-          fi
-
-          echo "Stack $stack status: $stack_status"
-
-          # Handle different states
-          if [ "$stack_status" == "DELETE_FAILED" ]; then
-            echo "Stack $stack is in DELETE_FAILED state. Attempting to get failed resources..."
-            resources=$(aws cloudformation list-stack-resources --stack-name "$stack" --region "$DEPLOY_REGION" --profile default --query "StackResourceSummaries[?ResourceStatus=='DELETE_FAILED'].LogicalResourceId" --output text || true)
-            if [ -n "$resources" ]; then
-              echo "Retaining failed resources: $resources"
-              aws cloudformation delete-stack --stack-name "$stack" --region "$DEPLOY_REGION" --profile default --retain-resources $resources || echo "Failed to delete $stack"
-            else
-              aws cloudformation delete-stack --stack-name "$stack" --region "$DEPLOY_REGION" --profile default || echo "Failed to delete $stack"
-            fi
-          elif [[ "$stack_status" != *"DELETE_IN_PROGRESS"* ]]; then
-            echo "Initiating deletion of stack: $stack"
-            aws cloudformation delete-stack --stack-name "$stack" --region "$DEPLOY_REGION" --profile default || echo "Failed to initiate deletion of $stack"
-          else
-            echo "Stack $stack already being deleted, will monitor..."
-          fi
-        done
-
         echo ""
-        echo "Waiting for all stacks to be deleted (max 15 minutes)..."
+        echo "Starting iterative deletion process (handles dependencies automatically)..."
         echo ""
 
-        # Wait for all stacks to be deleted
-        for i in {1..60}; do
-          sleep 15
+        # Iterative deletion loop - tries to delete all stacks, retrying those blocked by dependencies
+        MAX_ITERATIONS=60
+        iteration=0
+
+        while [ $iteration -lt $MAX_ITERATIONS ]; do
+          iteration=$((iteration + 1))
           remaining_stacks=$(list_stacks "$DEPLOY_REGION")
 
           if [ -z "$remaining_stacks" ]; then
+            echo ""
             echo "✓ All stacks successfully deleted!"
             break
           fi
 
+          echo "=== Iteration $iteration/$MAX_ITERATIONS ==="
+          echo "Remaining stacks: $remaining_stacks"
+          echo ""
+
+          # Check if any deletions are in progress
           if any_deleting "$DEPLOY_REGION"; then
-            echo "[$i/60] Deletions still in progress..."
-          else
-            echo "[$i/60] Some stacks remain but not deleting. Checking statuses..."
-            for stack in $remaining_stacks; do
-              status=$(aws cloudformation describe-stacks --stack-name "$stack" --region "$DEPLOY_REGION" --profile default --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "GONE")
-              if [ "$status" != "GONE" ]; then
-                echo "  - $stack: $status"
-              fi
-            done
+            echo "Deletions in progress, waiting..."
+            sleep 15
+            continue
           fi
 
-          if [ "$i" -eq 60 ]; then
+          # Try to delete all remaining stacks
+          # CloudFormation will reject deletes for stacks with dependencies
+          # Those will be retried in the next iteration after dependencies are gone
+          deleted_any=false
+
+          for stack in $remaining_stacks; do
+            stack_status=$(aws cloudformation describe-stacks --stack-name "$stack" --region "$DEPLOY_REGION" --profile default --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "STACK_NOT_FOUND")
+
+            if [ "$stack_status" == "STACK_NOT_FOUND" ]; then
+              continue
+            fi
+
+            # Only try to delete stacks that aren't already deleting
+            if [[ "$stack_status" == *"DELETE_IN_PROGRESS"* ]]; then
+              echo "  $stack: Already deleting..."
+              continue
+            fi
+
+            # Handle DELETE_FAILED state
+            if [ "$stack_status" == "DELETE_FAILED" ]; then
+              echo "  $stack: DELETE_FAILED - attempting with retain-resources..."
+              resources=$(aws cloudformation list-stack-resources --stack-name "$stack" --region "$DEPLOY_REGION" --profile default --query "StackResourceSummaries[?ResourceStatus=='DELETE_FAILED'].LogicalResourceId" --output text || true)
+              if [ -n "$resources" ]; then
+                aws cloudformation delete-stack --stack-name "$stack" --region "$DEPLOY_REGION" --profile default --retain-resources $resources 2>&1 | grep -v "AlreadyExistsException" || true
+              else
+                aws cloudformation delete-stack --stack-name "$stack" --region "$DEPLOY_REGION" --profile default 2>&1 | grep -v "AlreadyExistsException" || true
+              fi
+              deleted_any=true
+            else
+              # Try to delete the stack
+              echo "  $stack: Attempting deletion..."
+              if aws cloudformation delete-stack --stack-name "$stack" --region "$DEPLOY_REGION" --profile default 2>&1 | tee /tmp/delete_output.txt; then
+                deleted_any=true
+              else
+                # Check if it failed due to dependencies
+                if grep -q "has dependent" /tmp/delete_output.txt || grep -q "cannot be deleted" /tmp/delete_output.txt; then
+                  echo "    ↳ Has dependencies, will retry later"
+                else
+                  echo "    ↳ Delete failed, will retry"
+                fi
+              fi
+            fi
+          done
+
+          if [ "$deleted_any" = true ]; then
             echo ""
-            echo "ERROR: Stack deletion timed out after 15 minutes"
-            echo "Remaining stacks: $remaining_stacks"
+            echo "Initiated deletions, waiting for progress..."
+            sleep 15
+          else
+            echo ""
+            echo "No deletions initiated this iteration. Checking if stacks are stuck..."
+            sleep 5
+          fi
+
+          # Safety check - if we've tried many times with no progress, fail
+          if [ $iteration -ge 40 ] && [ -n "$(list_stacks "$DEPLOY_REGION")" ]; then
+            echo ""
+            echo "ERROR: Stack deletion not progressing after $iteration iterations"
+            echo "Remaining stacks:"
+            for stack in $(list_stacks "$DEPLOY_REGION"); do
+              status=$(aws cloudformation describe-stacks --stack-name "$stack" --region "$DEPLOY_REGION" --profile default --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "GONE")
+              echo "  - $stack: $status"
+            done
             exit 1
           fi
         done
+
+        if [ $iteration -ge $MAX_ITERATIONS ]; then
+          echo ""
+          echo "ERROR: Stack deletion timed out after $MAX_ITERATIONS iterations"
+          echo "Remaining stacks: $(list_stacks "$DEPLOY_REGION")"
+          exit 1
+        fi
       else
         echo "✓ No existing MediaLake stacks found. Proceeding with fresh deployment."
       fi
