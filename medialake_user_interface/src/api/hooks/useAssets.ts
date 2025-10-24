@@ -274,6 +274,11 @@ export const useAsset = (inventoryId: string) => {
     },
     enabled: !!inventoryId,
     retry: 1,
+    staleTime: 1000 * 60 * 30, // Keep fresh for 30 minutes - videos don't change frequently
+    gcTime: 1000 * 60 * 60, // Keep in cache for 1 hour even when unused
+    refetchOnMount: false, // Don't refetch when component remounts
+    refetchOnWindowFocus: false, // Don't refetch on window focus
+    refetchOnReconnect: false, // Don't refetch on network reconnect
   });
 };
 
@@ -452,7 +457,11 @@ export const useRelatedVersions = (
       return response.data;
     },
     enabled: !!assetId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 1000 * 60 * 30, // Keep fresh for 30 minutes - related versions don't change frequently
+    gcTime: 1000 * 60 * 60, // Keep in cache for 1 hour
+    refetchOnMount: false, // Don't refetch when component remounts
+    refetchOnWindowFocus: false, // Don't refetch on window focus
+    refetchOnReconnect: false, // Don't refetch on network reconnect
   });
 };
 
@@ -477,6 +486,11 @@ export const useTranscription = (inventoryId: string) => {
     },
     enabled: !!inventoryId,
     retry: 1,
+    staleTime: 1000 * 60 * 30, // Keep fresh for 30 minutes - transcripts don't change
+    gcTime: 1000 * 60 * 60, // Keep in cache for 1 hour
+    refetchOnMount: false, // Don't refetch when component remounts
+    refetchOnWindowFocus: false, // Don't refetch on window focus
+    refetchOnReconnect: false, // Don't refetch on network reconnect
   });
 };
 

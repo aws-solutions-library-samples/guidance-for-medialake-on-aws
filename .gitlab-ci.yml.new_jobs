@@ -1,0 +1,516 @@
+# ==============================================================================
+# E2E TEST PIPELINE - SPLIT INTO MULTIPLE JOBS (EACH < 1 HOUR)
+# ==============================================================================
+# This replaces the single monolithic playwright_e2e_test job
+# Each job completes within 1 hour to avoid credential/timeout issues
+# ==============================================================================
+
+# Job 1: Clean up existing infrastructure
+e2e_01_cleanup_infrastructure:
+  stage: test
+  timeout: 1h
+  tags:
+    - arch:amd64
+    - size:large
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
+      when: on_success
+    - when: never
+  variables:
+    <<: *e2e_variables
+  <<: *e2e_aws_setup
+  script:
+    - echo "Step 1 Cleaning up any existing MediaLake E2E test infrastructure..."
+    - |
+      # Function to list all matching stacks
+      list_stacks() {
+        local region=$1
+        local stack_prefix="$STACK_PREFIX"
+        aws cloudformation list-stacks \
+          --region $region \
+          --profile default \
+          --stack-status-filter CREATE_COMPLETE CREATE_FAILED CREATE_IN_PROGRESS REVIEW_IN_PROGRESS ROLLBACK_COMPLETE ROLLBACK_FAILED ROLLBACK_IN_PROGRESS UPDATE_COMPLETE UPDATE_COMPLETE_CLEANUP_IN_PROGRESS UPDATE_IN_PROGRESS UPDATE_ROLLBACK_COMPLETE UPDATE_ROLLBACK_COMPLETE_CLEANUP_IN_PROGRESS UPDATE_ROLLBACK_FAILED UPDATE_ROLLBACK_IN_PROGRESS DELETE_FAILED \
+          --query "StackSummaries[].StackName" \
+          --output text | tr '\t' '\n' | grep -i "$stack_prefix" || true
+      }
+
+      # Function to check if any stacks are being deleted
+      any_deleting() {
+        local region=$1
+        local stack_prefix="$STACK_PREFIX"
+        local deleting_stacks=$(aws cloudformation list-stacks \
+          --region $region \
+          --profile default \
+          --stack-status-filter DELETE_IN_PROGRESS \
+          --query "StackSummaries[].StackName" \
+          --output text | tr '\t' '\n' | grep -i "$stack_prefix" || true)
+        if [ -z "$deleting_stacks" ]; then
+          return 1
+        else
+          echo "Stacks currently being deleted in $region: $deleting_stacks"
+          return 0
+        fi
+      }
+
+      # Function to delete stacks in a specific region
+      delete_stacks_in_region() {
+        local region=$1
+        echo "Starting comprehensive stack cleanup in region $region"
+        echo "Will delete all stacks containing (case-insensitive): '$STACK_PREFIX'"
+        local iteration=0
+        # Main loop to delete stacks
+        while true; do
+          iteration=$((iteration + 1))
+
+          stacks=$(list_stacks "$region")
+          if [ -z "$stacks" ]; then
+            echo "No more medialake stacks found in region $region. Cleanup complete!"
+            break
+          fi
+          echo "Found stacks in $region: $stacks"
+          # Check if any stack is already being deleted
+          if any_deleting "$region"; then
+            echo "Waiting for in-progress deletions to complete in $region..."
+          else
+            # Attempt to delete each stack
+            for stack in $stacks; do
+              echo "Attempting to delete stack: $stack in region $region"
+              stack_status=$(aws cloudformation describe-stacks --stack-name "$stack" --region "$region" --profile default --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "STACK_NOT_FOUND")
+              if [ "$stack_status" == "DELETE_FAILED" ]; then
+                echo "Stack $stack is in DELETE_FAILED state. Attempting to get resources that failed to delete..."
+                resources=$(aws cloudformation list-stack-resources --stack-name "$stack" --region "$region" --profile default --query "StackResourceSummaries[?ResourceStatus=='DELETE_FAILED'].LogicalResourceId" --output text || true)
+                if [ -n "$resources" ]; then
+                  echo "Found resources that failed to delete: $resources"
+                  echo "Attempting to delete stack with --retain-resources option"
+                  aws cloudformation delete-stack \
+                    --region $region \
+                    --profile default \
+                    --stack-name $stack \
+                    --retain-resources $resources || true
+                else
+                  aws cloudformation delete-stack \
+                    --region $region \
+                    --profile default \
+                    --stack-name $stack || true
+                fi
+              else
+                aws cloudformation delete-stack \
+                  --region $region \
+                  --profile default \
+                  --stack-name $stack || true
+              fi
+              break
+            done
+          fi
+          echo "Waiting 60 seconds before checking again in $region..."
+          sleep 60
+        done
+      }
+
+      # Delete stacks in us-east-1 first
+      delete_stacks_in_region "us-east-1"
+
+      # Then delete stacks in deployment region if different
+      if [ "$DEPLOY_REGION" != "us-east-1" ]; then
+        echo "Checking for regional resources in $DEPLOY_REGION..."
+        delete_stacks_in_region "$DEPLOY_REGION"
+      fi
+
+      echo "Infrastructure cleanup completed!"
+    - echo "cleanup_complete=true" > cleanup_status.txt
+  artifacts:
+    paths:
+      - cleanup_status.txt
+    expire_in: 1 day
+
+# Job 2: Deploy CloudFormation stack
+e2e_02_deploy_stack:
+  stage: test
+  timeout: 1h
+  tags:
+    - arch:amd64
+    - size:large
+  needs:
+    - job: e2e_01_cleanup_infrastructure
+      artifacts: true
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
+      when: on_success
+    - when: never
+  variables:
+    <<: *e2e_variables
+  <<: *e2e_aws_setup
+  script:
+    - echo "Step 2 Deploying MediaLake CloudFormation stack..."
+    - cat cleanup_status.txt
+    - export BUCKET_UUID=$(python3 -c "import uuid; print(str(uuid.uuid4())[:8])")
+    - export S3_BUCKET_NAME="medialake-deploy-${BUCKET_UUID}-${CI_COMMIT_SHORT_SHA}"
+    - echo "Creating S3 bucket $S3_BUCKET_NAME..."
+    - aws s3 mb s3://$S3_BUCKET_NAME --profile default --region $DEPLOY_REGION
+    - aws s3 ls s3://$S3_BUCKET_NAME/ --profile default --region $DEPLOY_REGION
+    - aws s3 cp medialake.template s3://$S3_BUCKET_NAME/medialake.template --profile default --region $DEPLOY_REGION
+    - echo "Creating zip file of repository..."
+    - zip -r $ZIP_FILE_NAME . -x "*.git*" "*.venv*" "*__pycache__*" "*.pyc" "*node_modules*" "*.DS_Store*"
+    - ls -la $ZIP_FILE_NAME
+    - echo "Uploading zip file to S3 bucket..."
+    - aws s3 cp $ZIP_FILE_NAME s3://$S3_BUCKET_NAME/$ZIP_FILE_NAME --profile default --region $DEPLOY_REGION
+    - echo "Generating pre-signed URL for zip file..."
+    - PRESIGNED_URL=$(aws s3 presign s3://$S3_BUCKET_NAME/$ZIP_FILE_NAME --expires-in 3600 --profile default --region $DEPLOY_REGION)
+    - echo "Pre-signed URL generated successfully"
+    - echo "Deploying CloudFormation stack $STACK_NAME..."
+    - |
+      aws cloudformation create-stack \
+        --stack-name $STACK_NAME \
+        --template-body file://medialake.template \
+        --parameters \
+          ParameterKey=SourceType,ParameterValue="S3PresignedURL" \
+          ParameterKey=S3PresignedURL,ParameterValue="$PRESIGNED_URL" \
+          ParameterKey=InitialUserFirstName,ParameterValue="Media" \
+          ParameterKey=InitialUserLastName,ParameterValue="Lake" \
+          ParameterKey=InitialUserEmail,ParameterValue="medialake+deploy@amazon.com" \
+          ParameterKey=MediaLakeEnvironmentName,ParameterValue="$ENVIRONMENT_NAME" \
+          ParameterKey=OpenSearchDeploymentSize,ParameterValue="$DEPLOYMENT_SIZE" \
+        --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+        --region $DEPLOY_REGION \
+        --profile default
+    - echo "CloudFormation stack deployment initiated successfully"
+    - echo "Saving deployment information for next jobs..."
+    - echo "$STACK_NAME" > stack_name.txt
+    - echo "$S3_BUCKET_NAME" > s3_bucket_name.txt
+    - echo "$DEPLOY_REGION" > deploy_region.txt
+  artifacts:
+    paths:
+      - stack_name.txt
+      - s3_bucket_name.txt
+      - deploy_region.txt
+    expire_in: 1 day
+
+# Job 3: Monitor CodePipeline deployment
+e2e_03_monitor_deployment:
+  stage: test
+  timeout: 1h
+  tags:
+    - arch:amd64
+    - size:large
+  needs:
+    - job: e2e_02_deploy_stack
+      artifacts: true
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
+      when: on_success
+    - when: never
+  variables:
+    <<: *e2e_variables
+  <<: *e2e_aws_setup
+  script:
+    - echo "Step 3 Monitoring CodePipeline deployment..."
+    - export STACK_NAME=$(cat stack_name.txt)
+    - export S3_BUCKET_NAME=$(cat s3_bucket_name.txt)
+    - export DEPLOY_REGION=$(cat deploy_region.txt)
+    - echo "Stack $STACK_NAME"
+    - echo "Region $DEPLOY_REGION"
+    - |
+      echo "Waiting for CodePipeline to be created by CloudFormation..."
+      sleep 120
+
+      # Check for pipeline existence
+      PIPELINE_NAME=""
+      for pipeline_candidate in "MediaLakeCDKPipeline" "CDKDeploymentPipeline"; do
+        if aws codepipeline get-pipeline --name "$pipeline_candidate" --profile default --region $DEPLOY_REGION >/dev/null 2>&1; then
+          PIPELINE_NAME="$pipeline_candidate"
+          echo "Found pipeline $PIPELINE_NAME"
+          break
+        fi
+      done
+
+      if [ -z "$PIPELINE_NAME" ]; then
+        echo "Warning No CodePipeline found after CloudFormation deployment"
+        echo "Pipeline may still be creating. Will retry in next job."
+        echo "pipeline_not_found=true" > pipeline_status.txt
+      else
+        echo "Monitoring CodePipeline execution $PIPELINE_NAME"
+        echo "This job will monitor for up to 50 minutes..."
+
+        # Monitor pipeline with timeout (50 minutes max for this job)
+        MAX_WAIT_TIME=3000  # 50 minutes
+        ELAPSED_TIME=0
+        CHECK_INTERVAL=15
+
+        while [ $ELAPSED_TIME -lt $MAX_WAIT_TIME ]; do
+          ELAPSED_MINUTES=$((ELAPSED_TIME / 60))
+
+          EXECUTION_STATUS=$(aws codepipeline list-pipeline-executions \
+            --pipeline-name "$PIPELINE_NAME" \
+            --profile default \
+            --region $DEPLOY_REGION \
+            --max-items 1 \
+            --query "pipelineExecutionSummaries[0].status" \
+            --output text 2>/dev/null | tr -d '\n\r' | sed 's/None//g' | xargs)
+
+          if [ -z "$EXECUTION_STATUS" ] || [ "$EXECUTION_STATUS" == "null" ]; then
+            echo "[$ELAPSED_MINUTES m] Waiting for pipeline execution to start..."
+          else
+            echo "[$ELAPSED_MINUTES m] Pipeline Status $EXECUTION_STATUS"
+
+            case "$EXECUTION_STATUS" in
+              "Succeeded")
+                echo "Pipeline completed successfully!"
+                echo "pipeline_status=Succeeded" > pipeline_status.txt
+                break
+                ;;
+              "Failed"|"Stopped")
+                echo "Pipeline failed or was stopped!"
+                echo "pipeline_status=Failed" > pipeline_status.txt
+                exit 1
+                ;;
+              "InProgress"|"IN_PROGRESS"|"In_Progress")
+                # Continue monitoring
+                ;;
+              *)
+                if [[ "$EXECUTION_STATUS" == *"FAILED"* ]] || [[ "$EXECUTION_STATUS" == *"Failed"* ]]; then
+                  echo "Pipeline failed!"
+                  echo "pipeline_status=Failed" > pipeline_status.txt
+                  exit 1
+                fi
+                ;;
+            esac
+          fi
+
+          sleep $CHECK_INTERVAL
+          ELAPSED_TIME=$((ELAPSED_TIME + CHECK_INTERVAL))
+        done
+
+        if [ $ELAPSED_TIME -ge $MAX_WAIT_TIME ]; then
+          echo "Monitoring reached 50-minute limit for this job"
+          echo "Pipeline may still be running - will continue in next job"
+          echo "pipeline_status=InProgress" > pipeline_status.txt
+        fi
+      fi
+    - echo "$(cat pipeline_status.txt)"
+  artifacts:
+    paths:
+      - stack_name.txt
+      - s3_bucket_name.txt
+      - deploy_region.txt
+      - pipeline_status.txt
+    expire_in: 1 day
+
+# Job 4: Continue monitoring if needed (gets fresh credentials)
+e2e_04_continue_monitoring:
+  stage: test
+  timeout: 1h
+  tags:
+    - arch:amd64
+    - size:large
+  needs:
+    - job: e2e_03_monitor_deployment
+      artifacts: true
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
+      when: on_success
+    - when: never
+  variables:
+    <<: *e2e_variables
+  <<: *e2e_aws_setup
+  script:
+    - echo "Step 4 Continue monitoring if pipeline still in progress..."
+    - export STACK_NAME=$(cat stack_name.txt)
+    - export DEPLOY_REGION=$(cat deploy_region.txt)
+    - |
+      if [ -f pipeline_status.txt ]; then
+        STATUS=$(cat pipeline_status.txt | cut -d'=' -f2)
+        if [ "$STATUS" == "Succeeded" ]; then
+          echo "Pipeline already completed successfully!"
+          exit 0
+        elif [ "$STATUS" == "Failed" ]; then
+          echo "Pipeline failed in previous job"
+          exit 1
+        fi
+      fi
+
+      echo "Continuing pipeline monitoring with fresh credentials..."
+
+      # Find pipeline
+      PIPELINE_NAME=""
+      for pipeline_candidate in "MediaLakeCDKPipeline" "CDKDeploymentPipeline"; do
+        if aws codepipeline get-pipeline --name "$pipeline_candidate" --profile default --region $DEPLOY_REGION >/dev/null 2>&1; then
+          PIPELINE_NAME="$pipeline_candidate"
+          break
+        fi
+      done
+
+      if [ -z "$PIPELINE_NAME" ]; then
+        echo "Error Pipeline not found!"
+        exit 1
+      fi
+
+      # Monitor for another 50 minutes
+      MAX_WAIT_TIME=3000
+      ELAPSED_TIME=0
+      CHECK_INTERVAL=15
+
+      while [ $ELAPSED_TIME -lt $MAX_WAIT_TIME ]; do
+        ELAPSED_MINUTES=$((ELAPSED_TIME / 60))
+
+        EXECUTION_STATUS=$(aws codepipeline list-pipeline-executions \
+          --pipeline-name "$PIPELINE_NAME" \
+          --profile default \
+          --region $DEPLOY_REGION \
+          --max-items 1 \
+          --query "pipelineExecutionSummaries[0].status" \
+          --output text 2>/dev/null | tr -d '\n\r' | sed 's/None//g' | xargs)
+
+        echo "[$ELAPSED_MINUTES m] Pipeline Status $EXECUTION_STATUS"
+
+        case "$EXECUTION_STATUS" in
+          "Succeeded")
+            echo "Pipeline completed successfully!"
+            echo "pipeline_status=Succeeded" > pipeline_status.txt
+            break
+            ;;
+          "Failed"|"Stopped")
+            echo "Pipeline failed!"
+            exit 1
+            ;;
+        esac
+
+        sleep $CHECK_INTERVAL
+        ELAPSED_TIME=$((ELAPSED_TIME + CHECK_INTERVAL))
+      done
+  artifacts:
+    paths:
+      - stack_name.txt
+      - s3_bucket_name.txt
+      - deploy_region.txt
+      - pipeline_status.txt
+    expire_in: 1 day
+
+# Job 5: Run Playwright E2E tests
+e2e_05_run_tests:
+  stage: test
+  timeout: 1h
+  tags:
+    - arch:amd64
+    - size:large
+  needs:
+    - job: e2e_04_continue_monitoring
+      artifacts: true
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
+      when: on_success
+    - when: never
+  variables:
+    <<: *e2e_variables
+  before_script:
+    - echo "============================================"
+    - echo "Job Start Time $(date '+%Y-%m-%d %H:%M:%S %Z')"
+    - echo "============================================"
+    # Install Node.js for Playwright
+    - yum update -y
+    - curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
+    - yum install -y nodejs
+    - yum install -y python3 python3-pip
+    - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+    - unzip awscliv2.zip
+    - ./aws/install
+    - aws --version
+  script:
+    - echo "Step 5 Running Playwright E2E tests..."
+    - export STACK_NAME=$(cat stack_name.txt)
+    - export DEPLOY_REGION=$(cat deploy_region.txt)
+    - echo "Extracting deployment information..."
+    - |
+      CLOUDFRONT_URL=$(aws cloudformation describe-stacks \
+        --stack-name $STACK_NAME \
+        --region $DEPLOY_REGION \
+        --profile default \
+        --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionUrl'].OutputValue" \
+        --output text)
+
+      echo "CloudFront URL $CLOUDFRONT_URL"
+      export PLAYWRIGHT_BASE_URL="https://$CLOUDFRONT_URL"
+    - cd medialake_user_interface
+    - npm ci
+    - npx playwright install --with-deps chromium
+    - |
+      export CI=true
+      export AWS_REGION=$DEPLOY_REGION
+      export AWS_PROFILE=default
+
+      cat > playwright.ci.config.ts << 'EOF'
+      import { defineConfig } from '@playwright/test';
+      import baseConfig from './playwright.config';
+
+      export default defineConfig({
+        ...baseConfig,
+        use: {
+          ...baseConfig.use,
+          baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173',
+        },
+        webServer: undefined,
+      });
+      EOF
+
+      npx playwright test \
+        --config=playwright.ci.config.ts \
+        --reporter=html \
+        --reporter=junit \
+        --project=chromium \
+        tests/auth/login.spec.ts \
+        tests/integration/ \
+        || TEST_EXIT_CODE=$?
+
+      if [ -n "$TEST_EXIT_CODE" ] && [ "$TEST_EXIT_CODE" -ne "0" ]; then
+        echo "Some Playwright tests failed (exit code $TEST_EXIT_CODE)"
+        exit $TEST_EXIT_CODE
+      else
+        echo "All Playwright tests passed!"
+      fi
+  artifacts:
+    when: always
+    paths:
+      - medialake_user_interface/playwright-report/
+      - medialake_user_interface/test-results/
+      - stack_name.txt
+      - s3_bucket_name.txt
+      - deploy_region.txt
+    reports:
+      junit: medialake_user_interface/test-results/junit.xml
+    expire_in: 30 days
+
+# Job 6: Cleanup resources
+e2e_06_cleanup:
+  stage: test
+  timeout: 30m
+  tags:
+    - arch:amd64
+    - size:large
+  needs:
+    - job: e2e_05_run_tests
+      artifacts: true
+  when: always  # Always run cleanup, even if tests fail
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
+      when: always
+    - when: never
+  variables:
+    <<: *e2e_variables
+  <<: *e2e_aws_setup
+  script:
+    - echo "Step 6 Cleaning up deployment resources..."
+    - export S3_BUCKET_NAME=$(cat s3_bucket_name.txt 2>/dev/null || echo "")
+    - export DEPLOY_REGION=$(cat deploy_region.txt 2>/dev/null || echo "$US_WEST_2_AWS_REGION")
+    - |
+      if [ -n "$S3_BUCKET_NAME" ]; then
+        echo "Cleaning up S3 bucket $S3_BUCKET_NAME..."
+        if aws s3 ls "s3://$S3_BUCKET_NAME" --profile default --region $DEPLOY_REGION >/dev/null 2>&1; then
+          aws s3 rm "s3://$S3_BUCKET_NAME" --recursive --profile default --region $DEPLOY_REGION 2>&1 || echo "Warning Failed to delete some objects"
+          aws s3 rb "s3://$S3_BUCKET_NAME" --profile default --region $DEPLOY_REGION 2>&1 || echo "Warning Bucket deletion failed"
+          echo "S3 bucket cleanup completed"
+        else
+          echo "S3 bucket not found or already deleted"
+        fi
+      else
+        echo "No S3 bucket to clean up"
+      fi
+    - echo "Cleanup completed!"

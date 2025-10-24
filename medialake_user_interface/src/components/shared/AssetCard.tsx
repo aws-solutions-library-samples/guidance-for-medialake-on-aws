@@ -118,10 +118,14 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
   }) => {
     const [isHovering, setIsHovering] = useState(false);
     const [isMenuClicked, setIsMenuClicked] = useState(false);
-    const cardRef = useRef<HTMLDivElement>(null);
     const preventCommitRef = useRef<boolean>(false);
     const commitRef = useRef<(() => void) | null>(null);
     const omakasePlayerRef = useRef<OmakasePlayer | null>(null);
+
+    // Lazy loading state for video assets
+    const [isVisible, setIsVisible] = useState(false);
+    const [isPlayerReady, setIsPlayerReady] = useState(false);
+    const cardContainerRef = useRef<HTMLDivElement>(null);
 
     // Check if features are enabled
     const multiSelectFeature = useFeatureFlag(
@@ -147,10 +151,46 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
     const markerIdsRef = useRef<string[]>([]);
     const [videoLoadError, setVideoLoadError] = useState(false);
 
+    // IntersectionObserver for lazy loading videos
+    useEffect(() => {
+      // Only observe if this is a video asset
+      if (assetType !== "Video" || !cardContainerRef.current) return;
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              // Stagger initialization to spread load across frames
+              // Use requestAnimationFrame for smoother initialization
+              requestAnimationFrame(() => {
+                setTimeout(() => {
+                  setIsVisible(true);
+                }, Math.random() * 100); // 0-100ms random delay per video
+              });
+              observer.unobserve(entry.target);
+            }
+          });
+        },
+        {
+          rootMargin: "400px", // Start loading 400px before entering viewport (increased from 200px)
+          threshold: 0.01,
+        },
+      );
+
+      observer.observe(cardContainerRef.current);
+
+      return () => observer.disconnect();
+    }, [assetType]);
+
     // Initialize Omakase player for video assets
     useEffect(() => {
-      // Only initialize if it's a video, has a proxy URL, and hasn't been initialized yet
-      if (assetType === "Video" && proxyUrl && !playerInitializedRef.current) {
+      // Only initialize if it's a video, has a proxy URL, is visible, and hasn't been initialized yet
+      if (
+        assetType === "Video" &&
+        proxyUrl &&
+        isVisible &&
+        !playerInitializedRef.current
+      ) {
         const playerId = `omakase-player-${id}`;
 
         // Check if player container already exists
@@ -188,195 +228,214 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
           // Load the video then add markers if clips provided
           omakasePlayer.loadVideo(proxyUrl).subscribe({
             next: () => {
-              try {
-                // Clear any default markers that might have been created by the player
-                console.log(`🧹 Clearing any default markers for asset ${id}`);
-                try {
-                  omakasePlayer.progressMarkerTrack.removeAllMarkers();
-                  console.log(`🧹 ✅ Default markers cleared`);
-                } catch (e) {
-                  console.warn(`🧹 ❌ Could not clear default markers:`, e);
-                }
-
-                if (Array.isArray(clips) && clips.length > 0) {
-                  const timecodeToSeconds = (tc: string): number => {
-                    const [hh, mm, ss, ff] = tc.split(":").map(Number);
-                    const fps = 25; // default/fallback; adjust if actual fps available
-                    return (
-                      hh * 3600 + mm * 60 + ss + (isNaN(ff) ? 0 : ff / fps)
-                    );
-                  };
-
-                  // For clip mode, we should only show the marker for this specific clip
-                  // Check if this is a clip asset (ID contains #CLIP# or _clip_)
-                  const isClipAsset =
-                    id.includes("#CLIP#") || id.includes("_clip_");
-
-                  console.log(`🎬 INITIAL Asset ${id}:`);
-                  console.log(`  - isClipAsset: ${isClipAsset}`);
-                  console.log(
-                    `  - isSemantic: ${isSemantic} (type: ${typeof isSemantic})`,
-                  );
-                  console.log(
-                    `  - confidenceThreshold: ${confidenceThreshold} (type: ${typeof confidenceThreshold})`,
-                  );
-                  console.log(`  - clips count: ${clips?.length || 0}`);
-                  console.log(
-                    `  - clips:`,
-                    clips?.map((c, idx) => ({
-                      index: idx,
-                      score: c.score,
-                      start_timecode: c.start_timecode,
-                      end_timecode: c.end_timecode,
-                      start_seconds: c.start,
-                      end_seconds: c.end,
-                    })),
-                  );
-
-                  // For clip assets, we only want to show the single clip marker
-                  // For full assets, we show all clips that pass the confidence threshold
-                  let filteredClips;
-                  if (isClipAsset) {
-                    // This is a clip asset, so clips array should contain only one clip
-                    // But let's be extra careful and ensure we only process valid clips
-                    filteredClips = (clips || []).filter((clip) => {
-                      const hasValidTimes =
-                        (clip.start_timecode && clip.end_timecode) ||
-                        (typeof clip.start === "number" &&
-                          typeof clip.end === "number");
-                      console.log(`    Validating clip:`, {
-                        hasValidTimes,
-                        start_timecode: clip.start_timecode,
-                        end_timecode: clip.end_timecode,
-                        start: clip.start,
-                        end: clip.end,
-                      });
-                      return hasValidTimes;
-                    });
+              // Defer marker creation to idle time to avoid blocking video playback
+              const scheduleMarkerCreation = () => {
+                const callback = () => {
+                  try {
+                    // Clear any default markers that might have been created by the player
                     console.log(
-                      `  - Clip asset: showing ${filteredClips.length} of ${clips?.length || 0} marker(s)`,
+                      `🧹 Clearing any default markers for asset ${id}`,
                     );
-                  } else {
-                    // This is a full asset, apply confidence filtering
-                    const shouldFilter = isSemantic && confidenceThreshold > 0;
-                    console.log(
-                      `  - shouldFilter: ${shouldFilter} (isSemantic=${isSemantic} && confidenceThreshold=${confidenceThreshold} > 0)`,
-                    );
-
-                    filteredClips = shouldFilter
-                      ? clips.filter((clip) => {
-                          const score = clip.score ?? 1;
-                          const passes = score >= confidenceThreshold;
-                          console.log(
-                            `    Clip ${clip.start_timecode}-${clip.end_timecode}: score=${score}, threshold=${confidenceThreshold}, passes=${passes}`,
-                          );
-                          return passes;
-                        })
-                      : clips;
-
-                    console.log(
-                      `  - Full asset: showing ${filteredClips.length} of ${clips.length} markers (confidence >= ${confidenceThreshold})`,
-                    );
-                  }
-
-                  filteredClips.forEach((clip, index) => {
-                    const start =
-                      typeof clip.start === "number"
-                        ? clip.start
-                        : clip.start_timecode
-                          ? timecodeToSeconds(clip.start_timecode)
-                          : undefined;
-                    const end =
-                      typeof clip.end === "number"
-                        ? clip.end
-                        : clip.end_timecode
-                          ? timecodeToSeconds(clip.end_timecode)
-                          : undefined;
-
-                    console.log(`  🎯 Processing clip ${index}:`, {
-                      start_timecode: clip.start_timecode,
-                      end_timecode: clip.end_timecode,
-                      start_seconds: clip.start,
-                      end_seconds: clip.end,
-                      calculated_start: start,
-                      calculated_end: end,
-                      score: clip.score,
-                    });
-
-                    if (start !== undefined && end !== undefined) {
-                      // Skip markers that have very short duration (likely unwanted markers)
-                      // Only skip clips starting at 0 if they're very short (< 1 second)
-                      if (
-                        (start === 0 && end - start < 1) ||
-                        (start < 2 && end - start < 1)
-                      ) {
-                        console.log(
-                          `  ⚠️ Skipping unwanted short marker: ${start}s - ${end}s (duration: ${end - start}s)`,
-                        );
-                        return;
-                      }
-
-                      // Additional validation: ensure the marker has reasonable duration
-                      if (end - start < 1) {
-                        console.log(
-                          `  ⚠️ Skipping marker with too short duration: ${start}s - ${end}s (duration: ${end - start}s)`,
-                        );
-                        return;
-                      }
-
-                      // Use random colors for all markers
-                      const markerColor = randomHexColor();
-
-                      // Follow JSFiddle approach: let byomakase library generate its own IDs
-                      // This prevents querySelector errors with colon-containing custom IDs
-                      const marker = new PeriodMarker({
-                        timeObservation: { start, end },
-                        style: {
-                          color: markerColor,
-                        },
-                      });
-                      // Add marker to progress track when available
-                      try {
-                        omakasePlayer.progressMarkerTrack.addMarker(marker);
-                        // Store marker reference for later removal since we don't control the ID
-                        markerIdsRef.current.push(
-                          marker.id || `${start}-${end}`,
-                        );
-                        console.log(
-                          `  ✅ Added marker: ${start}s - ${end}s (color: ${markerColor})`,
-                        );
-
-                        // For clip assets or single-clip items, seek to the beginning of the clip
-                        // This includes collection items with a specific clip boundary
-                        if (
-                          isClipAsset ||
-                          (filteredClips.length === 1 && index === 0)
-                        ) {
-                          try {
-                            omakasePlayer.video.seekToTime(start);
-                            console.log(
-                              `  🎯 Seeked to clip start time: ${start}s for ${isClipAsset ? "clip asset" : "single-clip item"} ${id}`,
-                            );
-                          } catch (seekError) {
-                            console.warn(
-                              `  ⚠️ Failed to seek to clip start time ${start}s:`,
-                              seekError,
-                            );
-                          }
-                        }
-                      } catch (e) {
-                        console.warn("progressMarkerTrack not ready", e);
-                      }
-                    } else {
-                      console.log(
-                        `  ❌ Skipped clip ${index}: invalid start/end times`,
-                      );
+                    try {
+                      omakasePlayer.progressMarkerTrack.removeAllMarkers();
+                      console.log(`🧹 ✅ Default markers cleared`);
+                    } catch (e) {
+                      console.warn(`🧹 ❌ Could not clear default markers:`, e);
                     }
-                  });
+
+                    if (Array.isArray(clips) && clips.length > 0) {
+                      const timecodeToSeconds = (tc: string): number => {
+                        const [hh, mm, ss, ff] = tc.split(":").map(Number);
+                        const fps = 25; // default/fallback; adjust if actual fps available
+                        return (
+                          hh * 3600 + mm * 60 + ss + (isNaN(ff) ? 0 : ff / fps)
+                        );
+                      };
+
+                      // For clip mode, we should only show the marker for this specific clip
+                      // Check if this is a clip asset (ID contains #CLIP# or _clip_)
+                      const isClipAsset =
+                        id.includes("#CLIP#") || id.includes("_clip_");
+
+                      console.log(`🎬 INITIAL Asset ${id}:`);
+                      console.log(`  - isClipAsset: ${isClipAsset}`);
+                      console.log(
+                        `  - isSemantic: ${isSemantic} (type: ${typeof isSemantic})`,
+                      );
+                      console.log(
+                        `  - confidenceThreshold: ${confidenceThreshold} (type: ${typeof confidenceThreshold})`,
+                      );
+                      console.log(`  - clips count: ${clips?.length || 0}`);
+                      console.log(
+                        `  - clips:`,
+                        clips?.map((c, idx) => ({
+                          index: idx,
+                          score: c.score,
+                          start_timecode: c.start_timecode,
+                          end_timecode: c.end_timecode,
+                          start_seconds: c.start,
+                          end_seconds: c.end,
+                        })),
+                      );
+
+                      // For clip assets, we only want to show the single clip marker
+                      // For full assets, we show all clips that pass the confidence threshold
+                      let filteredClips;
+                      if (isClipAsset) {
+                        // This is a clip asset, so clips array should contain only one clip
+                        // But let's be extra careful and ensure we only process valid clips
+                        filteredClips = (clips || []).filter((clip) => {
+                          const hasValidTimes =
+                            (clip.start_timecode && clip.end_timecode) ||
+                            (typeof clip.start === "number" &&
+                              typeof clip.end === "number");
+                          console.log(`    Validating clip:`, {
+                            hasValidTimes,
+                            start_timecode: clip.start_timecode,
+                            end_timecode: clip.end_timecode,
+                            start: clip.start,
+                            end: clip.end,
+                          });
+                          return hasValidTimes;
+                        });
+                        console.log(
+                          `  - Clip asset: showing ${filteredClips.length} of ${clips?.length || 0} marker(s)`,
+                        );
+                      } else {
+                        // This is a full asset, apply confidence filtering
+                        const shouldFilter =
+                          isSemantic && confidenceThreshold > 0;
+                        console.log(
+                          `  - shouldFilter: ${shouldFilter} (isSemantic=${isSemantic} && confidenceThreshold=${confidenceThreshold} > 0)`,
+                        );
+
+                        filteredClips = shouldFilter
+                          ? clips.filter((clip) => {
+                              const score = clip.score ?? 1;
+                              const passes = score >= confidenceThreshold;
+                              console.log(
+                                `    Clip ${clip.start_timecode}-${clip.end_timecode}: score=${score}, threshold=${confidenceThreshold}, passes=${passes}`,
+                              );
+                              return passes;
+                            })
+                          : clips;
+
+                        console.log(
+                          `  - Full asset: showing ${filteredClips.length} of ${clips.length} markers (confidence >= ${confidenceThreshold})`,
+                        );
+                      }
+
+                      filteredClips.forEach((clip, index) => {
+                        const start =
+                          typeof clip.start === "number"
+                            ? clip.start
+                            : clip.start_timecode
+                              ? timecodeToSeconds(clip.start_timecode)
+                              : undefined;
+                        const end =
+                          typeof clip.end === "number"
+                            ? clip.end
+                            : clip.end_timecode
+                              ? timecodeToSeconds(clip.end_timecode)
+                              : undefined;
+
+                        console.log(`  🎯 Processing clip ${index}:`, {
+                          start_timecode: clip.start_timecode,
+                          end_timecode: clip.end_timecode,
+                          start_seconds: clip.start,
+                          end_seconds: clip.end,
+                          calculated_start: start,
+                          calculated_end: end,
+                          score: clip.score,
+                        });
+
+                        if (start !== undefined && end !== undefined) {
+                          // Skip markers that have very short duration (likely unwanted markers)
+                          // Only skip clips starting at 0 if they're very short (< 1 second)
+                          if (
+                            (start === 0 && end - start < 1) ||
+                            (start < 2 && end - start < 1)
+                          ) {
+                            console.log(
+                              `  ⚠️ Skipping unwanted short marker: ${start}s - ${end}s (duration: ${end - start}s)`,
+                            );
+                            return;
+                          }
+
+                          // Additional validation: ensure the marker has reasonable duration
+                          if (end - start < 1) {
+                            console.log(
+                              `  ⚠️ Skipping marker with too short duration: ${start}s - ${end}s (duration: ${end - start}s)`,
+                            );
+                            return;
+                          }
+
+                          // Use random colors for all markers
+                          const markerColor = randomHexColor();
+
+                          // Follow JSFiddle approach: let byomakase library generate its own IDs
+                          // This prevents querySelector errors with colon-containing custom IDs
+                          const marker = new PeriodMarker({
+                            timeObservation: { start, end },
+                            style: {
+                              color: markerColor,
+                            },
+                          });
+                          // Add marker to progress track when available
+                          try {
+                            omakasePlayer.progressMarkerTrack.addMarker(marker);
+                            // Store marker reference for later removal since we don't control the ID
+                            markerIdsRef.current.push(
+                              marker.id || `${start}-${end}`,
+                            );
+                            console.log(
+                              `  ✅ Added marker: ${start}s - ${end}s (color: ${markerColor})`,
+                            );
+
+                            // For clip assets or single-clip items, seek to the beginning of the clip
+                            // This includes collection items with a specific clip boundary
+                            if (
+                              isClipAsset ||
+                              (filteredClips.length === 1 && index === 0)
+                            ) {
+                              try {
+                                omakasePlayer.video.seekToTime(start);
+                                console.log(
+                                  `  🎯 Seeked to clip start time: ${start}s for ${isClipAsset ? "clip asset" : "single-clip item"} ${id}`,
+                                );
+                              } catch (seekError) {
+                                console.warn(
+                                  `  ⚠️ Failed to seek to clip start time ${start}s:`,
+                                  seekError,
+                                );
+                              }
+                            }
+                          } catch (e) {
+                            console.warn("progressMarkerTrack not ready", e);
+                          }
+                        } else {
+                          console.log(
+                            `  ❌ Skipped clip ${index}: invalid start/end times`,
+                          );
+                        }
+                      });
+                    }
+                  } catch (e) {
+                    console.error("Failed to add semantic markers:", e);
+                  }
+                };
+
+                // Use requestIdleCallback to defer marker creation, with fallback to setTimeout
+                if ("requestIdleCallback" in window) {
+                  requestIdleCallback(callback, { timeout: 2000 });
+                } else {
+                  // Fallback for browsers without requestIdleCallback
+                  setTimeout(callback, 100);
                 }
-              } catch (e) {
-                console.error("Failed to add semantic markers:", e);
-              }
+              };
+
+              // Call the schedule function to initiate deferred marker creation
+              scheduleMarkerCreation();
             },
             error: (error) => {
               console.error(`Failed to load video for asset ${id}:`, error);
@@ -428,7 +487,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
           }
         }
       };
-    }, [assetType, proxyUrl, id, thumbnailScale]); // Added thumbnailScale to reinitialize player when scale changes
+    }, [assetType, proxyUrl, id, thumbnailScale, isVisible]); // Added isVisible for lazy loading
 
     // Separate effect to handle clip marker updates when confidence threshold changes
     useEffect(() => {
@@ -438,177 +497,190 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
         Array.isArray(clips) &&
         clips.length > 0
       ) {
-        try {
-          // Clear ALL existing markers using removeAllMarkers method
-          console.log(
-            `🧹 CLEARING ALL existing markers for asset ${id} using removeAllMarkers()`,
-          );
+        // Defer marker updates to idle time to avoid blocking interactions
+        const updateMarkers = () => {
           try {
-            omakasePlayerRef.current?.progressMarkerTrack.removeAllMarkers();
-            markerIdsRef.current = []; // Reset our tracking array
-            console.log(`🧹 ✅ All markers cleared successfully`);
-          } catch (e) {
-            console.warn(`🧹 ❌ Could not clear all markers:`, e);
-            // Fallback to individual removal if removeAllMarkers fails
-            markerIdsRef.current.forEach((markerId) => {
-              try {
-                omakasePlayerRef.current?.progressMarkerTrack.removeMarker(
-                  markerId,
-                );
-                console.log(`  ✅ Fallback removed marker: ${markerId}`);
-              } catch (e) {
-                console.warn(`  ❌ Could not remove marker ${markerId}:`, e);
-              }
-            });
-            markerIdsRef.current = [];
-          }
-
-          const timecodeToSeconds = (tc: string): number => {
-            const [hh, mm, ss, ff] = tc.split(":").map(Number);
-            const fps = 25; // default/fallback; adjust if actual fps available
-            return hh * 3600 + mm * 60 + ss + (isNaN(ff) ? 0 : ff / fps);
-          };
-
-          // For clip mode, we should only show the marker for this specific clip
-          // Check if this is a clip asset (has clipData property)
-          const isClipAsset = id.includes("_clip_");
-
-          console.log(`🔄 UPDATE Asset ${id}:`);
-          console.log(`  - isClipAsset: ${isClipAsset}`);
-          console.log(
-            `  - isSemantic: ${isSemantic} (type: ${typeof isSemantic})`,
-          );
-          console.log(
-            `  - confidenceThreshold: ${confidenceThreshold} (type: ${typeof confidenceThreshold})`,
-          );
-          console.log(`  - clips count: ${clips?.length || 0}`);
-
-          // For clip assets, we only want to show the single clip marker
-          // For full assets, we show all clips that pass the confidence threshold
-          let filteredClips;
-          if (isClipAsset) {
-            // This is a clip asset, so clips array should contain only one clip
-            // But let's be extra careful and ensure we only process valid clips
-            filteredClips = (clips || []).filter((clip) => {
-              const hasValidTimes =
-                (clip.start_timecode && clip.end_timecode) ||
-                (typeof clip.start === "number" &&
-                  typeof clip.end === "number");
-              console.log(`    UPDATE: Validating clip:`, {
-                hasValidTimes,
-                start_timecode: clip.start_timecode,
-                end_timecode: clip.end_timecode,
-                start: clip.start,
-                end: clip.end,
-              });
-              return hasValidTimes;
-            });
+            // Clear ALL existing markers using removeAllMarkers method
             console.log(
-              `  - Clip asset: updating ${filteredClips.length} of ${clips?.length || 0} marker(s)`,
+              `🧹 CLEARING ALL existing markers for asset ${id} using removeAllMarkers()`,
             );
-          } else {
-            // This is a full asset, apply confidence filtering
-            const shouldFilter = isSemantic && confidenceThreshold > 0;
-            console.log(
-              `  - shouldFilter: ${shouldFilter} (isSemantic=${isSemantic} && confidenceThreshold=${confidenceThreshold} > 0)`,
-            );
-
-            filteredClips = shouldFilter
-              ? clips.filter((clip) => {
-                  const score = clip.score ?? 1;
-                  const passes = score >= confidenceThreshold;
-                  console.log(
-                    `    UPDATE Clip ${clip.start_timecode}-${clip.end_timecode}: score=${score}, threshold=${confidenceThreshold}, passes=${passes}`,
+            try {
+              omakasePlayerRef.current?.progressMarkerTrack.removeAllMarkers();
+              markerIdsRef.current = []; // Reset our tracking array
+              console.log(`🧹 ✅ All markers cleared successfully`);
+            } catch (e) {
+              console.warn(`🧹 ❌ Could not clear all markers:`, e);
+              // Fallback to individual removal if removeAllMarkers fails
+              markerIdsRef.current.forEach((markerId) => {
+                try {
+                  omakasePlayerRef.current?.progressMarkerTrack.removeMarker(
+                    markerId,
                   );
-                  return passes;
-                })
-              : clips;
+                  console.log(`  ✅ Fallback removed marker: ${markerId}`);
+                } catch (e) {
+                  console.warn(`  ❌ Could not remove marker ${markerId}:`, e);
+                }
+              });
+              markerIdsRef.current = [];
+            }
+
+            const timecodeToSeconds = (tc: string): number => {
+              const [hh, mm, ss, ff] = tc.split(":").map(Number);
+              const fps = 25; // default/fallback; adjust if actual fps available
+              return hh * 3600 + mm * 60 + ss + (isNaN(ff) ? 0 : ff / fps);
+            };
+
+            // For clip mode, we should only show the marker for this specific clip
+            // Check if this is a clip asset (has clipData property)
+            const isClipAsset = id.includes("_clip_");
+
+            console.log(`🔄 UPDATE Asset ${id}:`);
+            console.log(`  - isClipAsset: ${isClipAsset}`);
+            console.log(
+              `  - isSemantic: ${isSemantic} (type: ${typeof isSemantic})`,
+            );
+            console.log(
+              `  - confidenceThreshold: ${confidenceThreshold} (type: ${typeof confidenceThreshold})`,
+            );
+            console.log(`  - clips count: ${clips?.length || 0}`);
+
+            // For clip assets, we only want to show the single clip marker
+            // For full assets, we show all clips that pass the confidence threshold
+            let filteredClips;
+            if (isClipAsset) {
+              // This is a clip asset, so clips array should contain only one clip
+              // But let's be extra careful and ensure we only process valid clips
+              filteredClips = (clips || []).filter((clip) => {
+                const hasValidTimes =
+                  (clip.start_timecode && clip.end_timecode) ||
+                  (typeof clip.start === "number" &&
+                    typeof clip.end === "number");
+                console.log(`    UPDATE: Validating clip:`, {
+                  hasValidTimes,
+                  start_timecode: clip.start_timecode,
+                  end_timecode: clip.end_timecode,
+                  start: clip.start,
+                  end: clip.end,
+                });
+                return hasValidTimes;
+              });
+              console.log(
+                `  - Clip asset: updating ${filteredClips.length} of ${clips?.length || 0} marker(s)`,
+              );
+            } else {
+              // This is a full asset, apply confidence filtering
+              const shouldFilter = isSemantic && confidenceThreshold > 0;
+              console.log(
+                `  - shouldFilter: ${shouldFilter} (isSemantic=${isSemantic} && confidenceThreshold=${confidenceThreshold} > 0)`,
+              );
+
+              filteredClips = shouldFilter
+                ? clips.filter((clip) => {
+                    const score = clip.score ?? 1;
+                    const passes = score >= confidenceThreshold;
+                    console.log(
+                      `    UPDATE Clip ${clip.start_timecode}-${clip.end_timecode}: score=${score}, threshold=${confidenceThreshold}, passes=${passes}`,
+                    );
+                    return passes;
+                  })
+                : clips;
+
+              console.log(
+                `  - Full asset: updating ${filteredClips.length} of ${clips.length} markers (confidence >= ${confidenceThreshold})`,
+              );
+            }
+
+            filteredClips.forEach((clip) => {
+              const start =
+                typeof clip.start === "number"
+                  ? clip.start
+                  : clip.start_timecode
+                    ? timecodeToSeconds(clip.start_timecode)
+                    : undefined;
+              const end =
+                typeof clip.end === "number"
+                  ? clip.end
+                  : clip.end_timecode
+                    ? timecodeToSeconds(clip.end_timecode)
+                    : undefined;
+
+              if (start !== undefined && end !== undefined) {
+                // Skip markers that have very short duration (likely unwanted markers)
+                // Only skip clips starting at 0 if they're very short (< 1 second)
+                if (
+                  (start === 0 && end - start < 1) ||
+                  (start < 2 && end - start < 1)
+                ) {
+                  console.log(
+                    `  ⚠️ UPDATE: Skipping unwanted short marker: ${start}s - ${end}s (duration: ${end - start}s)`,
+                  );
+                  return;
+                }
+
+                // Additional validation: ensure the marker has reasonable duration
+                if (end - start < 1) {
+                  console.log(
+                    `  ⚠️ UPDATE: Skipping marker with too short duration: ${start}s - ${end}s (duration: ${end - start}s)`,
+                  );
+                  return;
+                }
+
+                // Use random colors for all markers
+                const markerColor = randomHexColor();
+
+                // Follow JSFiddle approach: let byomakase library generate its own IDs
+                // This prevents querySelector errors with colon-containing custom IDs
+                const marker = new PeriodMarker({
+                  timeObservation: { start, end },
+                  style: {
+                    color: markerColor,
+                  },
+                });
+                // Add marker to progress track when available
+                try {
+                  omakasePlayerRef.current.progressMarkerTrack.addMarker(
+                    marker,
+                  );
+                  // Store marker reference for later removal since we don't control the ID
+                  markerIdsRef.current.push(marker.id || `${start}-${end}`);
+                  console.log(
+                    `  ✅ Added marker: ${marker.id || "auto-generated"} (${start}s-${end}s)`,
+                  );
+
+                  // For clip assets, seek to the beginning of the clip
+                  if (isClipAsset) {
+                    try {
+                      omakasePlayerRef.current.video.seekToTime(start);
+                      console.log(
+                        `  🎯 UPDATE: Seeked to clip start time: ${start}s for clip asset ${id}`,
+                      );
+                    } catch (seekError) {
+                      console.warn(
+                        `  ⚠️ UPDATE: Failed to seek to clip start time ${start}s:`,
+                        seekError,
+                      );
+                    }
+                  }
+                } catch (e) {
+                  console.warn("progressMarkerTrack not ready", e);
+                }
+              }
+            });
 
             console.log(
-              `  - Full asset: updating ${filteredClips.length} of ${clips.length} markers (confidence >= ${confidenceThreshold})`,
+              `🎯 SUMMARY for Asset ${id}: Created ${markerIdsRef.current.length} markers from ${filteredClips.length} filtered clips (out of ${clips.length} total clips)`,
             );
+          } catch (e) {
+            console.error("Failed to update semantic markers:", e);
           }
+        };
 
-          filteredClips.forEach((clip) => {
-            const start =
-              typeof clip.start === "number"
-                ? clip.start
-                : clip.start_timecode
-                  ? timecodeToSeconds(clip.start_timecode)
-                  : undefined;
-            const end =
-              typeof clip.end === "number"
-                ? clip.end
-                : clip.end_timecode
-                  ? timecodeToSeconds(clip.end_timecode)
-                  : undefined;
-
-            if (start !== undefined && end !== undefined) {
-              // Skip markers that have very short duration (likely unwanted markers)
-              // Only skip clips starting at 0 if they're very short (< 1 second)
-              if (
-                (start === 0 && end - start < 1) ||
-                (start < 2 && end - start < 1)
-              ) {
-                console.log(
-                  `  ⚠️ UPDATE: Skipping unwanted short marker: ${start}s - ${end}s (duration: ${end - start}s)`,
-                );
-                return;
-              }
-
-              // Additional validation: ensure the marker has reasonable duration
-              if (end - start < 1) {
-                console.log(
-                  `  ⚠️ UPDATE: Skipping marker with too short duration: ${start}s - ${end}s (duration: ${end - start}s)`,
-                );
-                return;
-              }
-
-              // Use random colors for all markers
-              const markerColor = randomHexColor();
-
-              // Follow JSFiddle approach: let byomakase library generate its own IDs
-              // This prevents querySelector errors with colon-containing custom IDs
-              const marker = new PeriodMarker({
-                timeObservation: { start, end },
-                style: {
-                  color: markerColor,
-                },
-              });
-              // Add marker to progress track when available
-              try {
-                omakasePlayerRef.current.progressMarkerTrack.addMarker(marker);
-                // Store marker reference for later removal since we don't control the ID
-                markerIdsRef.current.push(marker.id || `${start}-${end}`);
-                console.log(
-                  `  ✅ Added marker: ${marker.id || "auto-generated"} (${start}s-${end}s)`,
-                );
-
-                // For clip assets, seek to the beginning of the clip
-                if (isClipAsset) {
-                  try {
-                    omakasePlayerRef.current.video.seekToTime(start);
-                    console.log(
-                      `  🎯 UPDATE: Seeked to clip start time: ${start}s for clip asset ${id}`,
-                    );
-                  } catch (seekError) {
-                    console.warn(
-                      `  ⚠️ UPDATE: Failed to seek to clip start time ${start}s:`,
-                      seekError,
-                    );
-                  }
-                }
-              } catch (e) {
-                console.warn("progressMarkerTrack not ready", e);
-              }
-            }
-          });
-
-          console.log(
-            `🎯 SUMMARY for Asset ${id}: Created ${markerIdsRef.current.length} markers from ${filteredClips.length} filtered clips (out of ${clips.length} total clips)`,
-          );
-        } catch (e) {
-          console.error("Failed to update semantic markers:", e);
+        // Use requestIdleCallback to defer marker updates, with fallback to setTimeout
+        if ("requestIdleCallback" in window) {
+          requestIdleCallback(updateMarkers, { timeout: 1000 });
+        } else {
+          // Fallback for browsers without requestIdleCallback
+          setTimeout(updateMarkers, 50);
         }
       }
     }, [clips, isSemantic, confidenceThreshold, assetType, id]); // Update markers when clips or confidence threshold changes
@@ -658,8 +730,8 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
       const handleClickOutside = (event: MouseEvent) => {
         // If we click outside the card and the menu is open, consider it closed
         if (
-          cardRef.current &&
-          !cardRef.current.contains(event.target as Node)
+          cardContainerRef.current &&
+          !cardContainerRef.current.contains(event.target as Node)
         ) {
           // This is a click outside the card
           // We'll keep the menu clicked state for a short time to allow the menu to close gracefully
@@ -780,7 +852,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
 
     return (
       <Box
-        ref={cardRef}
+        ref={cardContainerRef}
         sx={{
           position: "relative",
           transition: "all 0.2s ease-in-out",

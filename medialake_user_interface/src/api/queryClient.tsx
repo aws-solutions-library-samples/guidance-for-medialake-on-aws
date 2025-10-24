@@ -13,11 +13,11 @@ const queryClient = new QueryClient({
         // Otherwise retry up to 3 times
         return failureCount < 3;
       },
-      staleTime: 1000 * 60 * 5, // Consider data fresh for 5 minutes
-      gcTime: 1000 * 60 * 10, // Keep unused data in cache for 10 minutes
+      staleTime: 1000 * 60 * 10, // Consider data fresh for 10 minutes (increased from 5)
+      gcTime: 1000 * 60 * 30, // Keep unused data in cache for 30 minutes (increased from 10)
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
       refetchOnWindowFocus: false, // Don't refetch on window focus
-      refetchOnMount: true, // Only refetch if stale
+      refetchOnMount: false, // Don't refetch on mount - rely on staleTime
       refetchOnReconnect: false, // Don't refetch on reconnect
       throwOnError: false,
     },

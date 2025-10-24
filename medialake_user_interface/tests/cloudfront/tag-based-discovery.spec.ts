@@ -136,7 +136,7 @@ const tagDiscoveryTest = awsDiscoveryTest.extend<TagDiscoveryFixtures>({
   /**
    * Tag discovery engine fixture
    */
-  tagDiscoveryEngine: async (_fixtures, use, testInfo) => {
+  tagDiscoveryEngine: async ({}, use, testInfo) => {
     const config = createTagDiscoveryConfig();
     const engine = createResourceDiscoveryEngine(config, testInfo.workerIndex);
 

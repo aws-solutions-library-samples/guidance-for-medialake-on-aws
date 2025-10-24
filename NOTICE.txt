@@ -24,9 +24,7 @@ Amazon Cognito Identity SDK for JavaScript under the Apache License Version 2.0
 MediaInfo under the BSD-2-Clause License
 ReactFlow under the Massachusetts Institute of Technology (MIT) license
 Tanstack Query under the Massachusetts Institute of Technology (MIT) license
-<<<<<<< HEAD
 Omakase Player under the Apache License Version 2.0
-=======
 Uppy under the Massachusetts Institute of Technology (MIT) license
 @byomakase/omakase-player under the Massachusetts Institute of Technology (MIT) license
 @mui components under the Massachusetts Institute of Technology (MIT) license
@@ -50,4 +48,3 @@ opensearch-py under the Apache License Version 2.0
 requests_aws4auth under the Massachusetts Institute of Technology (MIT) license
 pynamodb under the Massachusetts Institute of Technology (MIT) license
 pyaml under the Massachusetts Institute of Technology (MIT) license
->>>>>>> fdf331aac393632ee74f65e04736b719d966405f

@@ -9,8 +9,8 @@ from aws_lambda_powertools.event_handler.exceptions import (
 )
 from aws_lambda_powertools.metrics import MetricUnit
 from db_models import CollectionModel, CollectionTypeModel
-from pynamodb.exceptions import DoesNotExist
 from permission_utils import check_admin_permission, extract_user_context
+from pynamodb.exceptions import DoesNotExist
 from response_utils import (
     create_error_response,
     create_success_response,

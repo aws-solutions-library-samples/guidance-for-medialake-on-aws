@@ -275,6 +275,14 @@ exports.lambda_handler = async (event) => {
           ReturnValues: "UPDATED_NEW",
         })
         .promise();
+
+      // ── 5) read back the full updated item (optional) ───────────────
+      const getResp = await dynamoDB
+        .getItem({
+          TableName: MEDIALAKE_ASSET_TABLE,
+          Key: { InventoryID: { S: inventoryId } },
+        })
+        .promise();
       const updatedAsset = AWS.DynamoDB.Converter.unmarshall(getResp.Item);
 
       console.log(`Updated metadata for ${inventoryId}`);

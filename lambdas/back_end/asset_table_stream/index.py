@@ -30,6 +30,9 @@ MAX_BULK_SIZE_MB = int(os.environ.get("MAX_BULK_SIZE_MB", "5"))
 ERROR_THRESHOLD = float(os.environ.get("ERROR_THRESHOLD", "0.3"))
 CIRCUIT_TIMEOUT = int(os.environ.get("CIRCUIT_TIMEOUT", "60"))
 
+# Verbose logging configuration
+VERBOSE_LOGGING = False
+
 deserializer = TypeDeserializer()
 
 
@@ -194,19 +197,27 @@ def dynamodb_item_to_dict(item):
     return {k: deserializer.deserialize(v) for k, v in item.items()}
 
 
-def prepare_bulk_actions(records: List[dict]) -> Tuple[List[dict], List[dict]]:
+def prepare_bulk_actions(records: List[dict]) -> Tuple[List[dict], dict, List[dict]]:
     """
     Prepare bulk actions from DynamoDB stream records.
 
     Returns:
-        Tuple of (bulk_actions, failed_records)
+        Tuple of (bulk_actions, action_to_record_map, failed_records)
+        action_to_record_map: dict mapping document_id to original record
     """
     bulk_actions = []
+    action_to_record_map = {}
     failed_records = []
 
-    for record in records:
+    for idx, record in enumerate(records):
         try:
             event_name = record.get("eventName")
+
+            if VERBOSE_LOGGING:
+                logger.info(
+                    f"Processing record {idx + 1}/{len(records)}",
+                    extra={"event_name": event_name, "record_index": idx},
+                )
 
             if event_name == "REMOVE":
                 document_id = record["dynamodb"]["OldImage"]["InventoryID"]["S"]
@@ -217,6 +228,13 @@ def prepare_bulk_actions(records: List[dict]) -> Tuple[List[dict], List[dict]]:
                         "_id": document_id,
                     }
                 )
+                action_to_record_map[document_id] = record
+
+                if VERBOSE_LOGGING:
+                    logger.info(
+                        f"Prepared DELETE action for document {document_id}",
+                        extra={"document_id": document_id, "operation": "delete"},
+                    )
 
             elif event_name == "INSERT":
                 new_image = record["dynamodb"].get("NewImage")
@@ -235,6 +253,13 @@ def prepare_bulk_actions(records: List[dict]) -> Tuple[List[dict], List[dict]]:
                         "_source": document,
                     }
                 )
+                action_to_record_map[document_id] = record
+
+                if VERBOSE_LOGGING:
+                    logger.info(
+                        f"Prepared INDEX action for document {document_id}",
+                        extra={"document_id": document_id, "operation": "index"},
+                    )
 
             elif event_name == "MODIFY":
                 new_image = record["dynamodb"].get("NewImage")
@@ -254,15 +279,33 @@ def prepare_bulk_actions(records: List[dict]) -> Tuple[List[dict], List[dict]]:
                         "doc_as_upsert": True,
                     }
                 )
+                action_to_record_map[document_id] = record
+
+                if VERBOSE_LOGGING:
+                    logger.info(
+                        f"Prepared UPDATE action for document {document_id}",
+                        extra={"document_id": document_id, "operation": "update"},
+                    )
 
         except Exception as e:
             logger.error(
                 f"Failed to prepare bulk action for record",
-                extra={"error": str(e), "event_name": event_name},
+                extra={"error": str(e), "event_name": event_name, "record_index": idx},
             )
             failed_records.append(record)
 
-    return bulk_actions, failed_records
+    if VERBOSE_LOGGING:
+        logger.info(
+            f"Bulk action preparation complete",
+            extra={
+                "total_records": len(records),
+                "actions_prepared": len(bulk_actions),
+                "failed_preparations": len(failed_records),
+                "mapping_size": len(action_to_record_map),
+            },
+        )
+
+    return bulk_actions, action_to_record_map, failed_records
 
 
 def estimate_bulk_size(actions: List[dict]) -> int:
@@ -304,17 +347,41 @@ def chunk_bulk_actions(actions: List[dict]) -> List[List[dict]]:
 
 
 @retry_with_backoff(max_retries=15, base_delay=3, max_delay=60)
-def execute_bulk_operation(actions: List[dict]) -> Tuple[int, List[dict]]:
+def execute_bulk_operation(
+    actions: List[dict], action_to_record_map: dict
+) -> Tuple[int, List[dict]]:
     """
     Execute bulk operation on OpenSearch with retry logic for 429 errors.
 
+    Args:
+        actions: List of bulk actions to execute
+        action_to_record_map: Mapping of document_id to original DynamoDB record
+
     Returns:
-        Tuple of (success_count, failed_actions)
+        Tuple of (success_count, failed_records)
     """
     if not actions:
         return 0, []
 
     logger.info(f"Executing bulk operation with {len(actions)} actions")
+
+    if VERBOSE_LOGGING:
+        logger.info(
+            "Bulk operation details",
+            extra={
+                "action_count": len(actions),
+                "mapping_size": len(action_to_record_map),
+                "action_types": {
+                    "index": len([a for a in actions if a.get("_op_type") == "index"]),
+                    "update": len(
+                        [a for a in actions if a.get("_op_type") == "update"]
+                    ),
+                    "delete": len(
+                        [a for a in actions if a.get("_op_type") == "delete"]
+                    ),
+                },
+            },
+        )
 
     success, failed = bulk(
         opensearch_client,
@@ -324,26 +391,61 @@ def execute_bulk_operation(actions: List[dict]) -> Tuple[int, List[dict]]:
         raise_on_exception=False,
     )
 
-    failed_actions = []
+    failed_records = []
     has_429_errors = False
 
     if failed:
-        for item in failed:
-            failed_actions.append(item)
+        if VERBOSE_LOGGING:
+            logger.info(f"Processing {len(failed)} failed items from bulk operation")
+
+        for idx, item in enumerate(failed):
             error_info = item.get("index", item.get("update", item.get("delete", {})))
             status = error_info.get("status", 0)
+            item_id = error_info.get("_id", "unknown")
 
             if status == 429:
                 has_429_errors = True
                 logger.warning(
                     "Bulk operation item failed with 429 - Too Many Requests",
-                    extra={"item_id": error_info.get("_id"), "status": status},
+                    extra={"item_id": item_id, "status": status},
                 )
             else:
                 logger.error(
                     "Bulk operation item failed",
-                    extra={"error": error_info.get("error"), "status": status},
+                    extra={
+                        "error": error_info.get("error"),
+                        "status": status,
+                        "item_id": item_id,
+                    },
                 )
+
+            # Map failed action back to original record
+            if item_id in action_to_record_map:
+                failed_records.append(action_to_record_map[item_id])
+                if VERBOSE_LOGGING:
+                    logger.info(
+                        f"Mapped failed action to original record",
+                        extra={
+                            "item_id": item_id,
+                            "status": status,
+                            "failed_item_index": idx,
+                        },
+                    )
+            else:
+                logger.warning(
+                    f"Failed to map document_id {item_id} back to original record"
+                )
+
+    if VERBOSE_LOGGING:
+        logger.info(
+            "Bulk operation results",
+            extra={
+                "success_count": success,
+                "failed_count": len(failed),
+                "failed_records_mapped": len(failed_records),
+                "has_429_errors": has_429_errors,
+            },
+        )
 
     # If we got 429 errors, raise exception to trigger retry with backoff
     if has_429_errors:
@@ -354,7 +456,7 @@ def execute_bulk_operation(actions: List[dict]) -> Tuple[int, List[dict]]:
     metrics.add_metric(name="BulkOperationSuccess", unit="Count", value=success)
     metrics.add_metric(name="BulkOperationFailed", unit="Count", value=len(failed))
 
-    return success, failed_actions
+    return success, failed_records
 
 
 def send_to_dlq(records: List[dict], reason: str):
@@ -405,11 +507,22 @@ def lambda_handler(event, context):
     metrics.add_metric(name="RecordsReceived", unit="Count", value=total_records)
 
     try:
-        # Prepare bulk actions
-        bulk_actions, failed_prep = prepare_bulk_actions(records)
+        if VERBOSE_LOGGING:
+            logger.info(
+                "Starting bulk action preparation",
+                extra={"total_records": total_records},
+            )
+
+        # Prepare bulk actions with mapping
+        bulk_actions, action_to_record_map, failed_prep = prepare_bulk_actions(records)
 
         if failed_prep:
             logger.warning(f"Failed to prepare {len(failed_prep)} records")
+            if VERBOSE_LOGGING:
+                logger.info(
+                    "Sending failed preparation records to DLQ",
+                    extra={"failed_prep_count": len(failed_prep)},
+                )
             send_to_dlq(failed_prep, "Failed to prepare bulk action")
 
         if not bulk_actions:
@@ -422,6 +535,16 @@ def lambda_handler(event, context):
             f"Split {len(bulk_actions)} actions into {len(action_chunks)} chunks"
         )
 
+        if VERBOSE_LOGGING:
+            logger.info(
+                "Chunk details",
+                extra={
+                    "total_actions": len(bulk_actions),
+                    "chunk_count": len(action_chunks),
+                    "chunk_sizes": [len(chunk) for chunk in action_chunks],
+                },
+            )
+
         total_success = 0
         total_failed = 0
 
@@ -432,24 +555,59 @@ def lambda_handler(event, context):
                     f"Processing chunk {i+1}/{len(action_chunks)} with {len(chunk)} actions"
                 )
 
-                success_count, failed_actions = execute_bulk_operation(chunk)
+                success_count, failed_records = execute_bulk_operation(
+                    chunk, action_to_record_map
+                )
                 total_success += success_count
-                total_failed += len(failed_actions)
+                total_failed += len(failed_records)
 
-                if failed_actions:
-                    logger.warning(f"Chunk {i+1} had {len(failed_actions)} failures")
-                    # Extract original records for failed actions and send to DLQ
-                    # This is a simplified approach - in production you'd want to map back to original records
-                    send_to_dlq(records[: len(failed_actions)], "Bulk operation failed")
+                if failed_records:
+                    logger.warning(f"Chunk {i+1} had {len(failed_records)} failures")
+                    if VERBOSE_LOGGING:
+                        logger.info(
+                            f"Sending {len(failed_records)} failed records from chunk {i+1} to DLQ",
+                            extra={
+                                "chunk_number": i + 1,
+                                "failed_count": len(failed_records),
+                            },
+                        )
+                    send_to_dlq(failed_records, "Bulk operation failed")
+                elif VERBOSE_LOGGING:
+                    logger.info(f"Chunk {i+1} completed successfully with no failures")
 
             except Exception as e:
                 logger.error(
                     f"Failed to process chunk {i+1}",
                     extra={"error": str(e), "chunk_size": len(chunk)},
                 )
-                # Send entire chunk to DLQ
-                chunk_records = records[i * BULK_BATCH_SIZE : (i + 1) * BULK_BATCH_SIZE]
-                send_to_dlq(chunk_records, f"Chunk processing failed: {str(e)}")
+                # Map chunk actions back to original records
+                chunk_failed_records = []
+                for action in chunk:
+                    doc_id = action.get("_id")
+                    if doc_id and doc_id in action_to_record_map:
+                        chunk_failed_records.append(action_to_record_map[doc_id])
+                        if VERBOSE_LOGGING:
+                            logger.info(
+                                f"Mapped failed chunk action to record",
+                                extra={"document_id": doc_id, "chunk": i + 1},
+                            )
+                    else:
+                        logger.warning(
+                            f"Could not map action with id {doc_id} to original record"
+                        )
+
+                if chunk_failed_records:
+                    if VERBOSE_LOGGING:
+                        logger.info(
+                            f"Sending {len(chunk_failed_records)} chunk failure records to DLQ",
+                            extra={
+                                "chunk": i + 1,
+                                "failed_count": len(chunk_failed_records),
+                            },
+                        )
+                    send_to_dlq(
+                        chunk_failed_records, f"Chunk processing failed: {str(e)}"
+                    )
                 total_failed += len(chunk)
 
         logger.info(
