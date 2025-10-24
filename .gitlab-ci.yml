@@ -883,21 +883,30 @@ e2e_05_run_tests:
     - echo "============================================"
     - echo "Job Start Time $(date '+%Y-%m-%d %H:%M:%S %Z')"
     - echo "============================================"
-    # Install Node.js for Playwright
+    # Install required dependencies
     - yum update -y
+    - yum install -y python3 python3-pip unzip which findutils
+    # Install Node.js for Playwright
     - curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
     - yum install -y nodejs
-    - yum install -y python3 python3-pip
+    - node --version
+    - npm --version
+    # Install AWS CLI
     - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
     - unzip awscliv2.zip
     - ./aws/install
     - aws --version
+    # Configure AWS credentials for test execution
+    - cat $AWS_SHARED_CREDENTIALS_FILE
+    - aws sts get-caller-identity --profile default
+    - echo "AWS identity verified for testing"
   script:
     - echo "Step 5 Running Playwright E2E tests..."
     - export STACK_NAME=$(cat stack_name.txt)
     - export DEPLOY_REGION=$(cat deploy_region.txt)
-    - echo "Extracting deployment information..."
+    - echo "Extracting deployment information from CloudFormation stack..."
     - |
+      # Extract all relevant stack outputs
       CLOUDFRONT_URL=$(aws cloudformation describe-stacks \
         --stack-name $STACK_NAME \
         --region $DEPLOY_REGION \
@@ -905,8 +914,50 @@ e2e_05_run_tests:
         --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionUrl'].OutputValue" \
         --output text)
 
-      echo "CloudFront URL $CLOUDFRONT_URL"
+      API_ENDPOINT=$(aws cloudformation describe-stacks \
+        --stack-name $STACK_NAME \
+        --region $DEPLOY_REGION \
+        --profile default \
+        --query "Stacks[0].Outputs[?OutputKey=='ApiEndpoint'].OutputValue" \
+        --output text || echo "")
+
+      COGNITO_USER_POOL_ID=$(aws cloudformation describe-stacks \
+        --stack-name $STACK_NAME \
+        --region $DEPLOY_REGION \
+        --profile default \
+        --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue" \
+        --output text || echo "")
+
+      COGNITO_IDENTITY_POOL_ID=$(aws cloudformation describe-stacks \
+        --stack-name $STACK_NAME \
+        --region $DEPLOY_REGION \
+        --profile default \
+        --query "Stacks[0].Outputs[?OutputKey=='IdentityPoolId'].OutputValue" \
+        --output text || echo "")
+
+      COGNITO_APP_CLIENT_ID=$(aws cloudformation describe-stacks \
+        --stack-name $STACK_NAME \
+        --region $DEPLOY_REGION \
+        --profile default \
+        --query "Stacks[0].Outputs[?OutputKey=='AppClientId'].OutputValue" \
+        --output text || echo "")
+
+      echo "================================================"
+      echo "Deployment Information:"
+      echo "  CloudFront URL: $CLOUDFRONT_URL"
+      echo "  API Endpoint: $API_ENDPOINT"
+      echo "  Cognito User Pool ID: $COGNITO_USER_POOL_ID"
+      echo "  Cognito Identity Pool ID: $COGNITO_IDENTITY_POOL_ID"
+      echo "  Cognito App Client ID: $COGNITO_APP_CLIENT_ID"
+      echo "================================================"
+
+      # Export for Playwright tests
       export PLAYWRIGHT_BASE_URL="https://$CLOUDFRONT_URL"
+      export API_ENDPOINT="$API_ENDPOINT"
+      export COGNITO_USER_POOL_ID="$COGNITO_USER_POOL_ID"
+      export COGNITO_IDENTITY_POOL_ID="$COGNITO_IDENTITY_POOL_ID"
+      export COGNITO_APP_CLIENT_ID="$COGNITO_APP_CLIENT_ID"
+      export STACK_NAME="$STACK_NAME"
     - cd medialake_user_interface
     - npm ci
     - npx playwright install --with-deps chromium
