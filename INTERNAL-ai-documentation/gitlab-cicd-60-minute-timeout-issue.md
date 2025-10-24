@@ -106,40 +106,28 @@ cleanup_resources:
 
 ## Current Mitigations in Place
 
-1. **Automatic fresh 1-hour session assumption** in `before_script`:
-   - Attempts to assume the IAM role with `--duration-seconds 3600`
-   - Gets a fresh 1-hour session at job start
-   - Falls back to credential vendor session if role assumption fails
-   - Validates credentials before proceeding
-2. **Environment variables** requesting session:
-   - `AWS_ROLE_SESSION_DURATION: "3600"`
-   - `AWS_SESSION_DURATION: "3600"`
-3. **Credential refresh every 30 minutes** during monitoring (critical for multi-hour jobs)
-4. **Retry logic** (3 attempts with 5-second delays)
-5. **Validation** before using credentials
-6. **S3 bucket cleanup in after_script** (runs even on failure)
-7. **Error detection** for expired token errors
-8. **Diagnostic logging** showing:
+1. **Uses credential vendor provided session**:
+   - Relies on GitLab's AWS credential vendor for authentication
+   - No manual role assumption (keeps it simple and working)
+   - Validates credentials in before_script
+2. **Credential refresh every 30 minutes** during monitoring (critical for multi-hour jobs):
+   - Reads fresh credentials from credential vendor file
+   - Updates both environment variables and ~/.aws/credentials file
+   - Validates credentials work before using them
+3. **Retry logic** (3 attempts with 5-second delays)
+4. **Validation** before using credentials
+5. **S3 bucket cleanup in after_script** (runs even on failure)
+   - Bucket name saved to /tmp/s3_bucket_name.txt for after_script access
+6. **Error detection** for expired token errors
+7. **Diagnostic logging** showing:
    - Job start time
    - Total elapsed time vs monitoring time
    - Session expiration warnings
 
-**Note:** With 1-hour sessions and 30-minute refresh intervals, the job can run indefinitely as long as:
+**Note:** With 30-minute refresh intervals, the job can run for multiple hours as long as:
 
 - The project-level timeout allows it (must be set to 4+ hours)
-- The credential vendor continues providing fresh credentials
-- Each refresh cycle gets a new 1-hour session before the previous one expires
-
-## IAM Role Configuration
-
-The current configuration uses **1-hour sessions** (3600 seconds), which is the default for most IAM roles.
-
-**Note:** If you need longer sessions in the future:
-
-- IAM roles can support up to **12 hours** for IAM user assumptions
-- Federated users default to **1 hour** (can be extended if role is configured)
-- Update `AWS_ROLE_SESSION_DURATION` variable and `--duration-seconds` in the assume-role command
-- Ensure the IAM role's `MaxSessionDuration` is set appropriately
+- The credential vendor continues providing fresh credentials at each refresh
 
 ## Recommended Actions
 

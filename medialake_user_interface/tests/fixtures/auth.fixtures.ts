@@ -82,7 +82,13 @@ export const test = cognitoBase.extend<AuthFixtures>({
     async ({ page, cognitoTestUser, baseURL }, use) => {
       // Login process using the dynamically created test user
       const loginUrl = baseURL ? `${baseURL}/sign-in` : "/sign-in";
-      await page.goto(loginUrl);
+      await page.goto(loginUrl, { waitUntil: "domcontentloaded" });
+
+      // Wait for login form to be visible before interacting
+      await page
+        .getByRole("textbox", { name: "Email" })
+        .waitFor({ state: "visible", timeout: 10000 });
+
       await page
         .getByRole("textbox", { name: "Email" })
         .fill(cognitoTestUser.username);
@@ -93,10 +99,14 @@ export const test = cognitoBase.extend<AuthFixtures>({
 
       // Wait for successful login - SPA redirects to root
       const rootUrl = baseURL ? baseURL : "http://localhost:5173";
-      await page.waitForURL(rootUrl, { timeout: 15000 });
+      await page.waitForURL(rootUrl, { timeout: 30000 });
 
-      // Additional wait to ensure the page is fully loaded and authenticated
-      await page.waitForLoadState("networkidle");
+      // Wait for page to be loaded - using domcontentloaded instead of networkidle
+      // networkidle is too strict and may never resolve if app has polling/websockets
+      await page.waitForLoadState("domcontentloaded");
+
+      // Give a small buffer for any immediate post-load operations
+      await page.waitForTimeout(1000);
 
       // Use the authenticated page
       await use(page);
@@ -226,7 +236,13 @@ export const test = cognitoBase.extend<AuthFixtures>({
 
       // Login process using the dynamically created test user
       const loginUrl = baseURL ? `${baseURL}/sign-in` : "/sign-in";
-      await page.goto(loginUrl);
+      await page.goto(loginUrl, { waitUntil: "domcontentloaded" });
+
+      // Wait for login form to be visible before interacting
+      await page
+        .getByRole("textbox", { name: "Email" })
+        .waitFor({ state: "visible", timeout: 10000 });
+
       await page
         .getByRole("textbox", { name: "Email" })
         .fill(cognitoTestUser.username);
@@ -237,10 +253,14 @@ export const test = cognitoBase.extend<AuthFixtures>({
 
       // Wait for navigation to root - SPA redirects to root
       const rootUrl = baseURL ? baseURL : "http://localhost:5173";
-      await page.waitForURL(rootUrl, { timeout: 15000 });
+      await page.waitForURL(rootUrl, { timeout: 30000 });
 
-      // Additional wait to ensure the page is fully loaded and authenticated
-      await page.waitForLoadState("networkidle");
+      // Wait for page to be loaded - using domcontentloaded instead of networkidle
+      // networkidle is too strict and may never resolve if app has polling/websockets
+      await page.waitForLoadState("domcontentloaded");
+
+      // Give a small buffer for any immediate post-load operations
+      await page.waitForTimeout(1000);
 
       await use(context);
 
