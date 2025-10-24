@@ -64,6 +64,7 @@ class AssetsProps:
     open_search_endpoint: str
     opensearch_index: str
     open_search_arn: str
+    system_settings_table: str
     # user_table: (
     #     dynamodb.Table
     # )
@@ -205,6 +206,7 @@ class AssetsConstruct(Construct):
                     "INDEX_NAME": props.opensearch_index,
                     "VECTOR_BUCKET_NAME": props.s3_vector_bucket_name,
                     "VECTOR_INDEX_NAME": props.s3_vector_index_name,
+                    "SYSTEM_SETTINGS_TABLE": props.system_settings_table,
                 },
             ),
         )
@@ -298,10 +300,14 @@ class AssetsConstruct(Construct):
         )
 
         # Add DynamoDB permissions for DELETE Lambda
+        system_settings_table_arn = f"arn:aws:dynamodb:{Stack.of(self).region}:{Stack.of(self).account}:table/{props.system_settings_table}"
         delete_asset_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["dynamodb:DeleteItem", "dynamodb:GetItem"],
-                resources=[props.asset_table.table_arn],
+                resources=[
+                    props.asset_table.table_arn,
+                    system_settings_table_arn,
+                ],
             )
         )
 
@@ -322,13 +328,17 @@ class AssetsConstruct(Construct):
         )
 
         # Add Secrets Manager permissions for DELETE Lambda
+        # Need access to both X-Origin secret and search provider API key secrets
         delete_asset_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "secretsmanager:GetSecretValue",
                     "secretsmanager:DescribeSecret",
                 ],
-                resources=[props.x_origin_verify_secret.secret_arn],
+                resources=[
+                    props.x_origin_verify_secret.secret_arn,
+                    f"arn:aws:secretsmanager:{Stack.of(self).region}:{Stack.of(self).account}:secret:medialake/search/provider/*",
+                ],
             )
         )
 

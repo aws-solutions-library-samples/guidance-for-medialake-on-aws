@@ -4,6 +4,7 @@ Coactive AI External Service Plugin
 Plugin for handling Coactive AI asset deletion operations.
 """
 
+import http.client
 import json
 from typing import Any, Dict, Optional
 
@@ -59,7 +60,7 @@ class CoactivePlugin(ExternalServicePlugin):
     def delete_asset(
         self, asset_record: Dict[str, Any], inventory_id: str
     ) -> AssetDeletionResult:
-        """Delete asset from Coactive AI dataset"""
+        """Delete asset from Coactive AI dataset by querying with medialake_uuid"""
         try:
             # Get asset type to determine which endpoint to use
             asset_type = (
@@ -73,14 +74,18 @@ class CoactivePlugin(ExternalServicePlugin):
                     deleted_count=0,
                 )
 
-            # Look for Coactive IDs in the asset metadata
-            coactive_ids = self._extract_coactive_ids(asset_record, asset_type)
+            # Query Coactive to find the asset by medialake_uuid and get its Coactive ID
+            coactive_ids = self._find_coactive_ids_by_medialake_uuid(
+                inventory_id, asset_type
+            )
 
             if not coactive_ids:
-                self.logger.info(f"No Coactive IDs found for asset {inventory_id}")
+                self.logger.info(
+                    f"No Coactive IDs found for MediaLake asset {inventory_id}"
+                )
                 return AssetDeletionResult(
                     success=True,
-                    message="No Coactive IDs found for this asset",
+                    message=f"Asset not found in Coactive (medialake_uuid: {inventory_id})",
                     deleted_count=0,
                 )
 
@@ -94,7 +99,7 @@ class CoactivePlugin(ExternalServicePlugin):
                     if success:
                         deleted_count += 1
                         self.logger.info(
-                            f"Deleted Coactive {asset_type} ID: {coactive_id}"
+                            f"Deleted Coactive {asset_type} ID: {coactive_id} (medialake_uuid: {inventory_id})"
                         )
                     else:
                         errors.append(
@@ -119,7 +124,7 @@ class CoactivePlugin(ExternalServicePlugin):
                 )
 
             success = deleted_count > 0 or len(errors) == 0
-            message = f"Deleted {deleted_count} Coactive {asset_type}(s)"
+            message = f"Deleted {deleted_count} Coactive {asset_type}(s) for medialake_uuid: {inventory_id}"
             if errors:
                 message += f" with {len(errors)} errors"
 
@@ -170,39 +175,138 @@ class CoactivePlugin(ExternalServicePlugin):
         self._dataset_id = self.config.get("dataset_id")
         return self._dataset_id
 
-    def _extract_coactive_ids(
-        self, asset_record: Dict[str, Any], asset_type: str
+    def _get_auth_token(self) -> Optional[str]:
+        """Get JWT access token by exchanging personal token with Coactive API"""
+        try:
+            # Get API key (personal token) from config
+            api_key = self._get_api_key()
+            if not api_key:
+                self.logger.warning("No API key available for Coactive authentication")
+                return None
+
+            # Exchange personal token for JWT access token
+            conn = http.client.HTTPSConnection("api.coactive.ai")
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}",
+            }
+            payload = {"grant_type": "refresh_token"}
+            body = json.dumps(payload)
+
+            self.logger.info("Exchanging personal token for JWT access token")
+            conn.request("POST", "/api/v0/login", body=body, headers=headers)
+            auth_response = conn.getresponse()
+            response_data = auth_response.read().decode("utf-8")
+            conn.close()
+
+            if auth_response.status != 200:
+                self.logger.error(
+                    f"Coactive authentication failed: {auth_response.status} - {response_data}"
+                )
+                return None
+
+            auth_data = json.loads(response_data)
+            access_token = auth_data.get("access_token")
+
+            if not access_token:
+                self.logger.error(f"No access_token in response: {auth_data}")
+                return None
+
+            self.logger.info("Successfully obtained JWT access token from Coactive API")
+            return access_token
+
+        except Exception as e:
+            self.logger.error(f"Failed to get Coactive auth token: {str(e)}")
+            return None
+
+    def _find_coactive_ids_by_medialake_uuid(
+        self, medialake_uuid: str, asset_type: str
     ) -> list:
-        """Extract Coactive IDs from asset record metadata"""
-        coactive_ids = []
+        """
+        Query Coactive API to find Coactive IDs by medialake_uuid.
+        Uses metadata filtering to find assets indexed with this MediaLake UUID.
+        """
+        try:
+            auth_token = self._get_auth_token()
+            if not auth_token:
+                self.logger.error("No auth token available for Coactive query")
+                return []
 
-        # Look in various places where Coactive IDs might be stored
-        # Check main metadata
-        metadata = asset_record.get("Metadata", {})
-        if isinstance(metadata, dict):
-            # Look for coactive_video_id or coactive_image_id
+            # Build search payload with metadata filter for medialake_uuid
+            # Using text-to-image endpoint with empty query and metadata filter
+            payload = {
+                "dataset_id": self.config.get("dataset_id"),
+                "text_query": "",  # Empty query to match all
+                "offset": 0,
+                "limit": 100,  # Should be enough for one asset
+                "metadata_filters": [
+                    {
+                        "key": "medialake_uuid",
+                        "operator": "==",
+                        "value": medialake_uuid,
+                    }
+                ],
+            }
+
+            # Add asset_type filter if it's a video
             if asset_type == "video":
-                if coactive_id := metadata.get("coactive_video_id"):
-                    coactive_ids.append(coactive_id)
-            elif asset_type == "image":
-                if coactive_id := metadata.get("coactive_image_id"):
-                    coactive_ids.append(coactive_id)
+                payload["asset_type"] = "video"
 
-        # Check embedded metadata
-        embedded = asset_record.get("Metadata", {}).get("Embedded", {})
-        if isinstance(embedded, dict):
-            # Look for Coactive metadata in S3 metadata
-            s3_metadata = embedded.get("S3", {}).get("Metadata", {})
-            if isinstance(s3_metadata, dict):
-                if asset_type == "video":
-                    if coactive_id := s3_metadata.get("coactive_video_id"):
-                        coactive_ids.append(coactive_id)
-                elif asset_type == "image":
-                    if coactive_id := s3_metadata.get("coactive_image_id"):
-                        coactive_ids.append(coactive_id)
+            self.logger.info(
+                f"Querying Coactive for medialake_uuid: {medialake_uuid} (type: {asset_type})"
+            )
 
-        # Remove duplicates while preserving order
-        return list(dict.fromkeys(coactive_ids))
+            # Make request to Coactive search API
+            endpoint = "https://api.coactive.ai/api/v1/search/text-to-image"
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {auth_token}",
+            }
+
+            conn = http.client.HTTPSConnection("api.coactive.ai")
+            body = json.dumps(payload)
+            conn.request(
+                "POST", "/api/v1/search/text-to-image", body=body, headers=headers
+            )
+            response = conn.getresponse()
+            response_data = response.read().decode("utf-8")
+            conn.close()
+
+            if response.status != 200:
+                self.logger.error(
+                    f"Coactive query failed: {response.status} - {response_data}"
+                )
+                return []
+
+            # Parse response and extract Coactive IDs
+            result = json.loads(response_data)
+            coactive_ids = []
+
+            for item in result.get("data", []):
+                if asset_type == "image":
+                    # For images, the ID is in the coactiveImageId field
+                    if coactive_id := item.get("coactiveImageId"):
+                        coactive_ids.append(coactive_id)
+                elif asset_type == "video":
+                    # For videos, the ID is in video.coactiveVideoId
+                    if video_data := item.get("video"):
+                        if coactive_id := video_data.get("coactiveVideoId"):
+                            coactive_ids.append(coactive_id)
+
+            # Remove duplicates
+            coactive_ids = list(dict.fromkeys(coactive_ids))
+
+            self.logger.info(
+                f"Found {len(coactive_ids)} Coactive ID(s) for medialake_uuid {medialake_uuid}: {coactive_ids}"
+            )
+
+            return coactive_ids
+
+        except Exception as e:
+            self.logger.error(
+                f"Failed to query Coactive for medialake_uuid {medialake_uuid}: {str(e)}"
+            )
+            return []
 
     def _delete_from_coactive(self, coactive_id: str, asset_type: str) -> bool:
         """Delete asset from Coactive AI using their API"""
