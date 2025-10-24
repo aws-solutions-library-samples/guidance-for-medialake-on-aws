@@ -160,37 +160,3 @@ class ExternalServicePluginManager:
                 )
 
         return available_plugins
-
-    def delete_asset_from_all_services(
-        self, asset_record: Dict[str, Any], inventory_id: str
-    ) -> Dict[str, AssetDeletionResult]:
-        """Delete asset from all available external services"""
-        results = {}
-        asset_type = asset_record.get("DigitalSourceAsset", {}).get("Type", "")
-
-        available_plugins = self.get_available_plugins(asset_type)
-
-        for plugin in available_plugins:
-            service_name = plugin.get_service_name()
-            try:
-                result = plugin.delete_asset(asset_record, inventory_id)
-                results[service_name] = result
-
-                if result.success:
-                    self.logger.info(
-                        f"Successfully deleted asset from {service_name}: {result.message}"
-                    )
-                else:
-                    self.logger.warning(
-                        f"Failed to delete asset from {service_name}: {result.message}"
-                    )
-
-            except Exception as e:
-                self.logger.error(f"Error deleting asset from {service_name}: {str(e)}")
-                results[service_name] = AssetDeletionResult(
-                    success=False,
-                    message=f"Exception occurred: {str(e)}",
-                    errors=[str(e)],
-                )
-
-        return results

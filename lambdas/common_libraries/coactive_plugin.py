@@ -214,11 +214,11 @@ class CoactivePlugin(ExternalServicePlugin):
                 self.logger.error("Missing Coactive API key or dataset ID")
                 return False
 
-            # Determine the correct endpoint based on asset type
+            # Determine the correct endpoint based on asset type (using singular form per API docs)
             if asset_type == "video":
-                endpoint = f"https://app.coactive.ai/api/v1/datasets/{dataset_id}/videos/{coactive_id}"
+                endpoint = f"https://app.coactive.ai/api/v1/datasets/{dataset_id}/video/{coactive_id}"
             elif asset_type == "image":
-                endpoint = f"https://app.coactive.ai/api/v1/datasets/{dataset_id}/images/{coactive_id}"
+                endpoint = f"https://app.coactive.ai/api/v1/datasets/{dataset_id}/image/{coactive_id}"
             else:
                 self.logger.error(
                     f"Unsupported asset type for Coactive deletion: {asset_type}"
