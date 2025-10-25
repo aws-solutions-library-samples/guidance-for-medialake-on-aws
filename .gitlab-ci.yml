@@ -1201,6 +1201,9 @@ e2e_06_run_tests:
     # Install required dependencies
     - yum update -y
     - yum install -y python3 python3-pip unzip which findutils
+    # Install Playwright browser dependencies for Amazon Linux
+    - echo "Installing Playwright browser dependencies..."
+    - yum install -y atk at-spi2-atk cups-libs libdrm libxcb libxkbcommon at-spi2-core libX11 libXcomposite libXdamage libXext libXfixes libXrandr mesa-libgbm pango cairo alsa-lib libXScrnSaver gtk3 nss nspr
     # Install Node.js for Playwright
     - curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
     - yum install -y nodejs
@@ -1221,10 +1224,16 @@ e2e_06_run_tests:
     - export DEPLOY_REGION=$(cat deploy_region.txt)
     - echo "Extracting CloudFront URL for E2E tests..."
     - |
-      # Get environment from config (default to 'dev' if not specified)
-      MEDIALAKE_ENV=${MEDIALAKE_ENV:-dev}
+      # Use the environment name from the deployment
+      MEDIALAKE_ENV=${ENVIRONMENT_NAME:-e2e}
 
-      # Extract CloudFront domain from SSM Parameter
+      echo "Looking for CloudFront URL for environment: $MEDIALAKE_ENV"
+      echo "Stack name: $STACK_NAME"
+      echo "Region: $DEPLOY_REGION"
+      echo ""
+
+      # Try 1: Extract CloudFront domain from SSM Parameter
+      echo "Attempt 1: Checking SSM parameter /medialake/${MEDIALAKE_ENV}/cloudfront-distribution-domain..."
       CLOUDFRONT_DOMAIN=$(aws ssm get-parameter \
         --name "/medialake/${MEDIALAKE_ENV}/cloudfront-distribution-domain" \
         --region $DEPLOY_REGION \
@@ -1232,16 +1241,47 @@ e2e_06_run_tests:
         --query "Parameter.Value" \
         --output text 2>/dev/null || echo "")
 
-      # If SSM parameter doesn't exist, try CloudFormation exports
-      if [ -z "$CLOUDFRONT_DOMAIN" ] || [ "$CLOUDFRONT_DOMAIN" == "None" ]; then
-        echo "CloudFront domain not found in SSM, trying CloudFormation exports..."
-        CLOUDFRONT_DOMAIN=$(aws cloudformation list-exports \
+      if [ -n "$CLOUDFRONT_DOMAIN" ] && [ "$CLOUDFRONT_DOMAIN" != "None" ]; then
+        echo "✓ Found CloudFront domain in SSM: $CLOUDFRONT_DOMAIN"
+      else
+        echo "✗ SSM parameter not found or empty"
+
+        # Try 2: Look for CloudFront distribution from stack outputs
+        echo ""
+        echo "Attempt 2: Checking CloudFormation stack outputs..."
+        CLOUDFRONT_DOMAIN=$(aws cloudformation describe-stacks \
+          --stack-name $STACK_NAME \
           --region $DEPLOY_REGION \
           --profile default \
-          --query "Exports[?contains(Name, 'CloudFront')].Value | [0]" \
+          --query "Stacks[0].Outputs[?contains(OutputKey,'CloudFront')||contains(OutputKey,'Distribution')].OutputValue|[0]" \
           --output text 2>/dev/null || echo "")
+
+        if [ -n "$CLOUDFRONT_DOMAIN" ] && [ "$CLOUDFRONT_DOMAIN" != "None" ]; then
+          echo "✓ Found CloudFront domain in stack outputs: $CLOUDFRONT_DOMAIN"
+        else
+          echo "✗ Stack outputs did not contain CloudFront domain"
+
+          # Try 3: Look through CloudFormation exports
+          echo ""
+          echo "Attempt 3: Checking CloudFormation exports..."
+          echo "All exports in region:"
+          aws cloudformation list-exports --region $DEPLOY_REGION --profile default --query "Exports[].{Name:Name,Value:Value}" --output table
+
+          CLOUDFRONT_DOMAIN=$(aws cloudformation list-exports \
+            --region $DEPLOY_REGION \
+            --profile default \
+            --query "Exports[?contains(Name,'CloudFront')&&contains(Name,'Domain')].Value|[0]" \
+            --output text 2>/dev/null || echo "")
+
+          if [ -n "$CLOUDFRONT_DOMAIN" ] && [ "$CLOUDFRONT_DOMAIN" != "None" ]; then
+            echo "✓ Found CloudFront domain in exports: $CLOUDFRONT_DOMAIN"
+          else
+            echo "✗ No CloudFront domain found in exports"
+          fi
+        fi
       fi
 
+      echo ""
       echo "================================================"
       echo "E2E Test Configuration:"
       echo "  CloudFront Domain: $CLOUDFRONT_DOMAIN"
@@ -1255,9 +1295,9 @@ e2e_06_run_tests:
 
       # Validate CloudFront URL
       if [ -z "$CLOUDFRONT_DOMAIN" ] || [ "$CLOUDFRONT_DOMAIN" == "None" ]; then
-        echo "ERROR: CloudFront domain not found!"
-        echo "Listing all CloudFormation exports for debugging:"
-        aws cloudformation list-exports --region $DEPLOY_REGION --profile default
+        echo ""
+        echo "ERROR: CloudFront domain not found after all attempts!"
+        echo "Please check that the deployment completed successfully."
         exit 1
       fi
 
@@ -1271,8 +1311,10 @@ e2e_06_run_tests:
     - cd medialake_user_interface
     - echo "Installing Node.js dependencies..."
     - npm install
-    - echo "Installing Playwright browsers..."
-    - npx playwright install --with-deps chromium
+    - echo "Installing Playwright browsers (skipping system dependency check - already installed manually)..."
+    - export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true
+    - npx playwright install chromium
+    - echo "Playwright browser installation complete"
     - |
       # Set environment variables for Playwright tests
       export CI=true
