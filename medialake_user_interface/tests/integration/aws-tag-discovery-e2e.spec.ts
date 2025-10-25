@@ -319,10 +319,23 @@ function generateSecurePassword(passwordPolicy?: any): string {
   }
 
   // Shuffle the password to randomize character positions
-  return password
+  const shuffled = password
     .split("")
     .sort(() => Math.random() - 0.5)
     .join("");
+
+  // CRITICAL: Ensure password starts with alphanumeric character
+  // AWS CLI interprets leading dashes/symbols as flags, causing command failures
+  const alphanumeric = uppercase + lowercase + numbers;
+  if (!/^[a-zA-Z0-9]/.test(shuffled)) {
+    // Replace first character with random alphanumeric
+    const safeStart = alphanumeric.charAt(
+      Math.floor(Math.random() * alphanumeric.length),
+    );
+    return safeStart + shuffled.slice(1);
+  }
+
+  return shuffled;
 }
 
 /**

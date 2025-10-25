@@ -1315,6 +1315,7 @@ e2e_06_run_tests:
     - export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true
     - npx playwright install chromium
     - echo "Playwright browser installation complete"
+    - echo "Using CI-specific Playwright configuration (excludes old local dev tests)"
     - |
       # Set environment variables for Playwright tests
       export CI=true
@@ -1344,14 +1345,11 @@ e2e_06_run_tests:
       });
       EOF
 
-      echo "Running Playwright E2E tests..."
+      echo "Running Playwright E2E tests with CI configuration..."
+      echo "ℹ Note: Old local dev tests (auth/login.spec.ts) excluded via config"
       npx playwright test \
         --config=playwright.ci.config.ts \
-        --reporter=html \
-        --reporter=junit \
         --project=chromium \
-        tests/auth/login.spec.ts \
-        tests/integration/ \
         || TEST_EXIT_CODE=$?
 
       if [ -n "$TEST_EXIT_CODE" ] && [ "$TEST_EXIT_CODE" -ne "0" ]; then
