@@ -15,17 +15,26 @@ This document summarizes the comprehensive fixes implemented to resolve critical
 
 **Problem:** Tests in `auth/login.spec.ts` were trying to connect to `localhost:5173` instead of the deployed CloudFront distribution, causing `ERR_CONNECTION_REFUSED` errors.
 
+**Additional Issue:** ESLint error in `cloudfront/tag-based-discovery.spec.ts` was preventing all tests from running:
+
+```
+First argument must use the object destructuring pattern: _fixtures
+```
+
 **Solution:**
 
 - Created `playwright.ci.config.ts` with CI-specific configuration
 - Excluded old local dev tests via `testIgnore: ["**/auth/login.spec.ts"]`
+- Excluded cloudfront-specific tests via `testIgnore: ["**/cloudfront/**/*.spec.ts"]`
 - Only run integration tests via `testMatch: ["**/integration/**/*.spec.ts"]`
+- Fixed ESLint error by renaming unused fixture parameter from `{}` to `_fixtures`
 - Updated GitLab CI to use the new config with `--config=playwright.ci.config.ts`
 
 **Files Modified:**
 
 - Created: `medialake_user_interface/playwright.ci.config.ts`
 - Updated: `.gitlab-ci.yml` (removed explicit test file paths, added config note)
+- Fixed: `medialake_user_interface/tests/cloudfront/tag-based-discovery.spec.ts` (linting error)
 
 ---
 
@@ -253,6 +262,7 @@ When the pipeline runs next:
 ### Modified:
 
 - `.gitlab-ci.yml`
+- `medialake_user_interface/tests/cloudfront/tag-based-discovery.spec.ts` (ESLint fix)
 - `medialake_user_interface/tests/fixtures/enhanced-cognito.fixtures.ts`
 - `medialake_user_interface/tests/fixtures/cognito.fixtures.ts`
 - `medialake_user_interface/tests/fixtures/aws-discovery.fixtures.ts`

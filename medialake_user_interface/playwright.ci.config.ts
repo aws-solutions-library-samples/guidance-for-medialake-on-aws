@@ -10,6 +10,7 @@ export default defineConfig({
   // Exclude old local dev tests that aren't compatible with CloudFront deployments
   testIgnore: [
     "**/auth/login.spec.ts", // Old local dev test (uses localhost:5173)
+    "**/cloudfront/**/*.spec.ts", // CloudFront-specific tests (not full integration)
   ],
 
   // Only run integration tests in CI
