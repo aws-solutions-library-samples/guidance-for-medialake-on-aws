@@ -483,8 +483,8 @@ sync-to-github:
 # Each job completes within 1 hour to avoid credential/timeout issues
 # ==============================================================================
 
-# Job 1: Clean up existing infrastructure
-e2e_01_cleanup_infrastructure:
+# Job 1: Start infrastructure cleanup and monitor (first 50 minutes)
+e2e_01_start_cleanup:
   stage: test
   timeout: 1h
   tags:
@@ -498,8 +498,11 @@ e2e_01_cleanup_infrastructure:
     <<: *e2e_variables
   <<: *e2e_aws_setup
   script:
-    - echo "Step 1 Cleaning up any existing MediaLake E2E test infrastructure..."
+    - echo "Step 1 Starting cleanup of existing MediaLake E2E test infrastructure..."
     - |
+      # Save regions for next job
+      echo "$DEPLOY_REGION" > cleanup_region.txt
+
       # Function to list all matching stacks
       list_stacks() {
         local region=$1
@@ -530,22 +533,50 @@ e2e_01_cleanup_infrastructure:
         fi
       }
 
-      # Function to delete stacks in a specific region
-      delete_stacks_in_region() {
+      # Function to delete stacks in a specific region (with time limit)
+      delete_stacks_with_monitoring() {
         local region=$1
+        local max_minutes=50
+        local start_time=$(date +%s)
+
         echo "Starting comprehensive stack cleanup in region $region"
+        echo "Will monitor for up to $max_minutes minutes"
         echo "Will delete all stacks containing (case-insensitive): '$STACK_PREFIX'"
+
         local iteration=0
-        # Main loop to delete stacks
         while true; do
           iteration=$((iteration + 1))
+          local current_time=$(date +%s)
+          local elapsed_minutes=$(( (current_time - start_time) / 60 ))
+
+          echo "Cleanup iteration $iteration (elapsed: ${elapsed_minutes} minutes)"
+
+          # Check if we're approaching time limit
+          if [ $elapsed_minutes -ge $max_minutes ]; then
+            echo "Reached ${max_minutes}-minute monitoring limit"
+            echo "Checking if cleanup is complete or needs continuation..."
+
+            stacks=$(list_stacks "$region")
+            if [ -z "$stacks" ]; then
+              echo "cleanup_status=complete" > cleanup_status.txt
+              echo "All stacks cleaned up successfully!"
+              return 0
+            else
+              echo "cleanup_status=in_progress" > cleanup_status.txt
+              echo "Cleanup still in progress. Will continue in next job."
+              return 0
+            fi
+          fi
 
           stacks=$(list_stacks "$region")
           if [ -z "$stacks" ]; then
+            echo "cleanup_status=complete" > cleanup_status.txt
             echo "No more medialake stacks found in region $region. Cleanup complete!"
-            break
+            return 0
           fi
+
           echo "Found stacks in $region: $stacks"
+
           # Check if any stack is already being deleted
           if any_deleting "$region"; then
             echo "Waiting for in-progress deletions to complete in $region..."
@@ -580,36 +611,42 @@ e2e_01_cleanup_infrastructure:
               break
             done
           fi
+
           echo "Waiting 60 seconds before checking again in $region..."
           sleep 60
         done
       }
 
       # Delete stacks in us-east-1 first
-      delete_stacks_in_region "us-east-1"
+      delete_stacks_with_monitoring "us-east-1"
 
-      # Then delete stacks in deployment region if different
+      # Check if we need to continue with deploy region
       if [ "$DEPLOY_REGION" != "us-east-1" ]; then
-        echo "Checking for regional resources in $DEPLOY_REGION..."
-        delete_stacks_in_region "$DEPLOY_REGION"
+        cleanup_status=$(cat cleanup_status.txt | cut -d'=' -f2)
+        if [ "$cleanup_status" == "complete" ]; then
+          echo "Checking for regional resources in $DEPLOY_REGION..."
+          delete_stacks_with_monitoring "$DEPLOY_REGION"
+        else
+          echo "Time limit reached. Regional cleanup will continue in next job."
+        fi
       fi
 
-      echo "Infrastructure cleanup completed!"
-    - echo "cleanup_complete=true" > cleanup_status.txt
+      echo "First cleanup phase completed!"
   artifacts:
     paths:
       - cleanup_status.txt
+      - cleanup_region.txt
     expire_in: 1 day
 
-# Job 2: Deploy CloudFormation stack
-e2e_02_deploy_stack:
+# Job 2: Continue cleanup monitoring if needed (second 50 minutes)
+e2e_02_continue_cleanup:
   stage: test
   timeout: 1h
   tags:
     - arch:amd64
     - size:large
   needs:
-    - job: e2e_01_cleanup_infrastructure
+    - job: e2e_01_start_cleanup
       artifacts: true
   rules:
     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
@@ -619,8 +656,286 @@ e2e_02_deploy_stack:
     <<: *e2e_variables
   <<: *e2e_aws_setup
   script:
-    - echo "Step 2 Deploying MediaLake CloudFormation stack..."
+    - echo "Step 2 Continuing cleanup monitoring if needed..."
+    - export DEPLOY_REGION=$(cat cleanup_region.txt)
+    - export CLEANUP_STATUS=$(cat cleanup_status.txt | cut -d'=' -f2)
+    - |
+      if [ "$CLEANUP_STATUS" == "complete" ]; then
+        echo "Cleanup already completed in previous job. Skipping."
+        echo "cleanup_status=complete" > cleanup_status.txt
+        exit 0
+      fi
+
+      echo "Cleanup still in progress. Continuing monitoring..."
+
+      # Function to list all matching stacks
+      list_stacks() {
+        local region=$1
+        local stack_prefix="$STACK_PREFIX"
+        aws cloudformation list-stacks \
+          --region $region \
+          --profile default \
+          --stack-status-filter CREATE_COMPLETE CREATE_FAILED CREATE_IN_PROGRESS REVIEW_IN_PROGRESS ROLLBACK_COMPLETE ROLLBACK_FAILED ROLLBACK_IN_PROGRESS UPDATE_COMPLETE UPDATE_COMPLETE_CLEANUP_IN_PROGRESS UPDATE_IN_PROGRESS UPDATE_ROLLBACK_COMPLETE UPDATE_ROLLBACK_COMPLETE_CLEANUP_IN_PROGRESS UPDATE_ROLLBACK_FAILED UPDATE_ROLLBACK_IN_PROGRESS DELETE_FAILED \
+          --query "StackSummaries[].StackName" \
+          --output text | tr '\t' '\n' | grep -i "$stack_prefix" || true
+      }
+
+      # Function to check if any stacks are being deleted
+      any_deleting() {
+        local region=$1
+        local stack_prefix="$STACK_PREFIX"
+        local deleting_stacks=$(aws cloudformation list-stacks \
+          --region $region \
+          --profile default \
+          --stack-status-filter DELETE_IN_PROGRESS \
+          --query "StackSummaries[].StackName" \
+          --output text | tr '\t' '\n' | grep -i "$stack_prefix" || true)
+        if [ -z "$deleting_stacks" ]; then
+          return 1
+        else
+          echo "Stacks currently being deleted in $region: $deleting_stacks"
+          return 0
+        fi
+      }
+
+      # Continue monitoring for up to 50 more minutes
+      max_minutes=50
+      start_time=$(date +%s)
+
+      for region in "us-east-1" "$DEPLOY_REGION"; do
+        # Skip duplicate if both regions are the same
+        if [ "$region" == "us-east-1" ] && [ "$DEPLOY_REGION" == "us-east-1" ]; then
+          if [ "$region" == "$DEPLOY_REGION" ]; then
+            continue
+          fi
+        fi
+
+        echo "Monitoring cleanup in region: $region"
+
+        while true; do
+          current_time=$(date +%s)
+          elapsed_minutes=$(( (current_time - start_time) / 60 ))
+
+          if [ $elapsed_minutes -ge $max_minutes ]; then
+            echo "Reached ${max_minutes}-minute monitoring limit"
+            stacks=$(list_stacks "$region")
+            if [ -z "$stacks" ]; then
+              echo "cleanup_status=complete" > cleanup_status.txt
+              echo "All cleanup complete!"
+              break 2
+            else
+              echo "cleanup_status=failed" > cleanup_status.txt
+              echo "ERROR: Cleanup did not complete within allocated time"
+              echo "Remaining stacks: $stacks"
+              exit 1
+            fi
+          fi
+
+          stacks=$(list_stacks "$region")
+          if [ -z "$stacks" ]; then
+            echo "No more stacks in $region. Moving to next region."
+            break
+          fi
+
+          echo "Found stacks in $region: $stacks"
+
+          if any_deleting "$region"; then
+            echo "Deletions in progress. Waiting..."
+          else
+            # Try to delete remaining stacks
+            for stack in $stacks; do
+              echo "Attempting to delete stack: $stack"
+              stack_status=$(aws cloudformation describe-stacks --stack-name "$stack" --region "$region" --profile default --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "STACK_NOT_FOUND")
+              if [ "$stack_status" == "DELETE_FAILED" ]; then
+                resources=$(aws cloudformation list-stack-resources --stack-name "$stack" --region "$region" --profile default --query "StackResourceSummaries[?ResourceStatus=='DELETE_FAILED'].LogicalResourceId" --output text || true)
+                if [ -n "$resources" ]; then
+                  aws cloudformation delete-stack \
+                    --region $region \
+                    --profile default \
+                    --stack-name $stack \
+                    --retain-resources $resources || true
+                else
+                  aws cloudformation delete-stack --region $region --profile default --stack-name $stack || true
+                fi
+              else
+                aws cloudformation delete-stack --region $region --profile default --stack-name $stack || true
+              fi
+              break
+            done
+          fi
+
+          sleep 60
+        done
+      done
+
+      echo "cleanup_status=complete" > cleanup_status.txt
+      echo "Cleanup monitoring completed!"
+  artifacts:
+    paths:
+      - cleanup_status.txt
+      - cleanup_region.txt
+    expire_in: 1 day
+
+# Job 3: Deploy CloudFormation stack
+e2e_03_deploy_stack:
+  stage: test
+  timeout: 1h
+  tags:
+    - arch:amd64
+    - size:large
+  needs:
+    - job: e2e_02_continue_cleanup
+      artifacts: true
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
+      when: on_success
+    - when: never
+  variables:
+    <<: *e2e_variables
+  <<: *e2e_aws_setup
+  script:
+    - echo "Step 3 Deploying MediaLake CloudFormation stack..."
     - cat cleanup_status.txt
+    - echo "Checking for any existing MediaLake stacks..."
+    - |
+      # Function to list all matching stacks
+      list_stacks() {
+        local region=$1
+        aws cloudformation list-stacks \
+          --region $region \
+          --profile default \
+          --stack-status-filter CREATE_COMPLETE CREATE_FAILED CREATE_IN_PROGRESS REVIEW_IN_PROGRESS ROLLBACK_COMPLETE ROLLBACK_FAILED ROLLBACK_IN_PROGRESS UPDATE_COMPLETE UPDATE_COMPLETE_CLEANUP_IN_PROGRESS UPDATE_IN_PROGRESS UPDATE_ROLLBACK_COMPLETE UPDATE_ROLLBACK_COMPLETE_CLEANUP_IN_PROGRESS UPDATE_ROLLBACK_FAILED UPDATE_ROLLBACK_IN_PROGRESS DELETE_FAILED \
+          --query "StackSummaries[].StackName" \
+          --output text | tr '\t' '\n' | grep -i "$STACK_PREFIX" || true
+      }
+
+      # Function to check if any stacks are being deleted
+      any_deleting() {
+        local region=$1
+        local deleting_stacks=$(aws cloudformation list-stacks \
+          --region $region \
+          --profile default \
+          --stack-status-filter DELETE_IN_PROGRESS \
+          --query "StackSummaries[].StackName" \
+          --output text | tr '\t' '\n' | grep -i "$STACK_PREFIX" || true)
+        [ -n "$deleting_stacks" ]
+      }
+
+      # Check if any stacks exist
+      existing_stacks=$(list_stacks "$DEPLOY_REGION")
+
+      if [ -n "$existing_stacks" ]; then
+        echo "WARNING: Found existing MediaLake stacks! Cleaning up before deployment..."
+        echo "Stacks to delete: $existing_stacks"
+        echo ""
+        echo "Starting iterative deletion process (handles dependencies automatically)..."
+        echo ""
+
+        # Iterative deletion loop - tries to delete all stacks, retrying those blocked by dependencies
+        MAX_ITERATIONS=60
+        iteration=0
+
+        while [ $iteration -lt $MAX_ITERATIONS ]; do
+          iteration=$((iteration + 1))
+          remaining_stacks=$(list_stacks "$DEPLOY_REGION")
+
+          if [ -z "$remaining_stacks" ]; then
+            echo ""
+            echo "✓ All stacks successfully deleted!"
+            break
+          fi
+
+          echo "=== Iteration $iteration/$MAX_ITERATIONS ==="
+          echo "Remaining stacks: $remaining_stacks"
+          echo ""
+
+          # Check if any deletions are in progress
+          if any_deleting "$DEPLOY_REGION"; then
+            echo "Deletions in progress, waiting..."
+            sleep 15
+            continue
+          fi
+
+          # Try to delete all remaining stacks
+          # CloudFormation will reject deletes for stacks with dependencies
+          # Those will be retried in the next iteration after dependencies are gone
+          deleted_any=false
+
+          for stack in $remaining_stacks; do
+            stack_status=$(aws cloudformation describe-stacks --stack-name "$stack" --region "$DEPLOY_REGION" --profile default --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "STACK_NOT_FOUND")
+
+            if [ "$stack_status" == "STACK_NOT_FOUND" ]; then
+              continue
+            fi
+
+            # Only try to delete stacks that aren't already deleting
+            if [[ "$stack_status" == *"DELETE_IN_PROGRESS"* ]]; then
+              echo "  $stack: Already deleting..."
+              continue
+            fi
+
+            # Handle DELETE_FAILED state
+            if [ "$stack_status" == "DELETE_FAILED" ]; then
+              echo "  $stack: DELETE_FAILED - attempting with retain-resources..."
+              resources=$(aws cloudformation list-stack-resources --stack-name "$stack" --region "$DEPLOY_REGION" --profile default --query "StackResourceSummaries[?ResourceStatus=='DELETE_FAILED'].LogicalResourceId" --output text || true)
+              if [ -n "$resources" ]; then
+                aws cloudformation delete-stack --stack-name "$stack" --region "$DEPLOY_REGION" --profile default --retain-resources $resources 2>&1 | grep -v "AlreadyExistsException" || true
+              else
+                aws cloudformation delete-stack --stack-name "$stack" --region "$DEPLOY_REGION" --profile default 2>&1 | grep -v "AlreadyExistsException" || true
+              fi
+              deleted_any=true
+            else
+              # Try to delete the stack
+              echo "  $stack: Attempting deletion..."
+              if aws cloudformation delete-stack --stack-name "$stack" --region "$DEPLOY_REGION" --profile default 2>&1 | tee /tmp/delete_output.txt; then
+                deleted_any=true
+              else
+                # Check if it failed due to dependencies
+                if grep -q "has dependent" /tmp/delete_output.txt || grep -q "cannot be deleted" /tmp/delete_output.txt; then
+                  echo "    ↳ Has dependencies, will retry later"
+                else
+                  echo "    ↳ Delete failed, will retry"
+                fi
+              fi
+            fi
+          done
+
+          if [ "$deleted_any" = true ]; then
+            echo ""
+            echo "Initiated deletions, waiting for progress..."
+            sleep 15
+          else
+            echo ""
+            echo "No deletions initiated this iteration. Checking if stacks are stuck..."
+            sleep 5
+          fi
+
+          # Safety check - if we've tried many times with no progress, fail
+          if [ $iteration -ge 40 ] && [ -n "$(list_stacks "$DEPLOY_REGION")" ]; then
+            echo ""
+            echo "ERROR: Stack deletion not progressing after $iteration iterations"
+            echo "Remaining stacks:"
+            for stack in $(list_stacks "$DEPLOY_REGION"); do
+              status=$(aws cloudformation describe-stacks --stack-name "$stack" --region "$DEPLOY_REGION" --profile default --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "GONE")
+              echo "  - $stack: $status"
+            done
+            exit 1
+          fi
+        done
+
+        if [ $iteration -ge $MAX_ITERATIONS ]; then
+          echo ""
+          echo "ERROR: Stack deletion timed out after $MAX_ITERATIONS iterations"
+          echo "Remaining stacks: $(list_stacks "$DEPLOY_REGION")"
+          exit 1
+        fi
+      else
+        echo "✓ No existing MediaLake stacks found. Proceeding with fresh deployment."
+      fi
+
+      echo ""
+      echo "Pre-deployment cleanup complete!"
+      echo ""
     - export BUCKET_UUID=$(python3 -c "import uuid; print(str(uuid.uuid4())[:8])")
     - export S3_BUCKET_NAME="medialake-deploy-${BUCKET_UUID}-${CI_COMMIT_SHORT_SHA}"
     - echo "Creating S3 bucket $S3_BUCKET_NAME..."
@@ -663,15 +978,15 @@ e2e_02_deploy_stack:
       - deploy_region.txt
     expire_in: 1 day
 
-# Job 3: Monitor CodePipeline deployment
-e2e_03_monitor_deployment:
+# Job 4: Monitor CodePipeline deployment (first 50 minutes)
+e2e_04_monitor_deployment:
   stage: test
   timeout: 1h
   tags:
     - arch:amd64
     - size:large
   needs:
-    - job: e2e_02_deploy_stack
+    - job: e2e_03_deploy_stack
       artifacts: true
   rules:
     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
@@ -773,15 +1088,15 @@ e2e_03_monitor_deployment:
       - pipeline_status.txt
     expire_in: 1 day
 
-# Job 4: Continue monitoring if needed (gets fresh credentials)
-e2e_04_continue_monitoring:
+# Job 5: Continue monitoring if needed (second 50 minutes, gets fresh credentials)
+e2e_05_continue_monitoring:
   stage: test
   timeout: 1h
   tags:
     - arch:amd64
     - size:large
   needs:
-    - job: e2e_03_monitor_deployment
+    - job: e2e_04_monitor_deployment
       artifacts: true
   rules:
     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
@@ -863,15 +1178,15 @@ e2e_04_continue_monitoring:
       - pipeline_status.txt
     expire_in: 1 day
 
-# Job 5: Run Playwright E2E tests
-e2e_05_run_tests:
+# Job 6: Run Playwright E2E tests
+e2e_06_run_tests:
   stage: test
   timeout: 1h
   tags:
     - arch:amd64
     - size:large
   needs:
-    - job: e2e_04_continue_monitoring
+    - job: e2e_05_continue_monitoring
       artifacts: true
   rules:
     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
@@ -886,6 +1201,9 @@ e2e_05_run_tests:
     # Install required dependencies
     - yum update -y
     - yum install -y python3 python3-pip unzip which findutils
+    # Install Playwright browser dependencies for Amazon Linux
+    - echo "Installing Playwright browser dependencies..."
+    - yum install -y atk at-spi2-atk cups-libs libdrm libxcb libxkbcommon at-spi2-core libX11 libXcomposite libXdamage libXext libXfixes libXrandr mesa-libgbm pango cairo alsa-lib libXScrnSaver gtk3 nss nspr
     # Install Node.js for Playwright
     - curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
     - yum install -y nodejs
@@ -904,67 +1222,111 @@ e2e_05_run_tests:
     - echo "Step 5 Running Playwright E2E tests..."
     - export STACK_NAME=$(cat stack_name.txt)
     - export DEPLOY_REGION=$(cat deploy_region.txt)
-    - echo "Extracting deployment information from CloudFormation stack..."
+    - echo "Extracting CloudFront URL for E2E tests..."
     - |
-      # Extract all relevant stack outputs
-      CLOUDFRONT_URL=$(aws cloudformation describe-stacks \
-        --stack-name $STACK_NAME \
+      # Use the environment name from the deployment
+      MEDIALAKE_ENV=${ENVIRONMENT_NAME:-e2e}
+
+      echo "Looking for CloudFront URL for environment: $MEDIALAKE_ENV"
+      echo "Stack name: $STACK_NAME"
+      echo "Region: $DEPLOY_REGION"
+      echo ""
+
+      # Try 1: Extract CloudFront domain from SSM Parameter
+      echo "Attempt 1: Checking SSM parameter /medialake/${MEDIALAKE_ENV}/cloudfront-distribution-domain..."
+      CLOUDFRONT_DOMAIN=$(aws ssm get-parameter \
+        --name "/medialake/${MEDIALAKE_ENV}/cloudfront-distribution-domain" \
         --region $DEPLOY_REGION \
         --profile default \
-        --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionUrl'].OutputValue" \
-        --output text)
+        --query "Parameter.Value" \
+        --output text 2>/dev/null || echo "")
 
-      API_ENDPOINT=$(aws cloudformation describe-stacks \
-        --stack-name $STACK_NAME \
-        --region $DEPLOY_REGION \
-        --profile default \
-        --query "Stacks[0].Outputs[?OutputKey=='ApiEndpoint'].OutputValue" \
-        --output text || echo "")
+      if [ -n "$CLOUDFRONT_DOMAIN" ] && [ "$CLOUDFRONT_DOMAIN" != "None" ]; then
+        echo "✓ Found CloudFront domain in SSM: $CLOUDFRONT_DOMAIN"
+      else
+        echo "✗ SSM parameter not found or empty"
 
-      COGNITO_USER_POOL_ID=$(aws cloudformation describe-stacks \
-        --stack-name $STACK_NAME \
-        --region $DEPLOY_REGION \
-        --profile default \
-        --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue" \
-        --output text || echo "")
+        # Try 2: Look for CloudFront distribution from stack outputs
+        echo ""
+        echo "Attempt 2: Checking CloudFormation stack outputs..."
+        CLOUDFRONT_DOMAIN=$(aws cloudformation describe-stacks \
+          --stack-name $STACK_NAME \
+          --region $DEPLOY_REGION \
+          --profile default \
+          --query "Stacks[0].Outputs[?contains(OutputKey,'CloudFront')||contains(OutputKey,'Distribution')].OutputValue|[0]" \
+          --output text 2>/dev/null || echo "")
 
-      COGNITO_IDENTITY_POOL_ID=$(aws cloudformation describe-stacks \
-        --stack-name $STACK_NAME \
-        --region $DEPLOY_REGION \
-        --profile default \
-        --query "Stacks[0].Outputs[?OutputKey=='IdentityPoolId'].OutputValue" \
-        --output text || echo "")
+        if [ -n "$CLOUDFRONT_DOMAIN" ] && [ "$CLOUDFRONT_DOMAIN" != "None" ]; then
+          echo "✓ Found CloudFront domain in stack outputs: $CLOUDFRONT_DOMAIN"
+        else
+          echo "✗ Stack outputs did not contain CloudFront domain"
 
-      COGNITO_APP_CLIENT_ID=$(aws cloudformation describe-stacks \
-        --stack-name $STACK_NAME \
-        --region $DEPLOY_REGION \
-        --profile default \
-        --query "Stacks[0].Outputs[?OutputKey=='AppClientId'].OutputValue" \
-        --output text || echo "")
+          # Try 3: Look through CloudFormation exports
+          echo ""
+          echo "Attempt 3: Checking CloudFormation exports..."
+          echo "All exports in region:"
+          aws cloudformation list-exports --region $DEPLOY_REGION --profile default --query "Exports[].{Name:Name,Value:Value}" --output table
 
+          CLOUDFRONT_DOMAIN=$(aws cloudformation list-exports \
+            --region $DEPLOY_REGION \
+            --profile default \
+            --query "Exports[?contains(Name,'CloudFront')&&contains(Name,'Domain')].Value|[0]" \
+            --output text 2>/dev/null || echo "")
+
+          if [ -n "$CLOUDFRONT_DOMAIN" ] && [ "$CLOUDFRONT_DOMAIN" != "None" ]; then
+            echo "✓ Found CloudFront domain in exports: $CLOUDFRONT_DOMAIN"
+          else
+            echo "✗ No CloudFront domain found in exports"
+          fi
+        fi
+      fi
+
+      echo ""
       echo "================================================"
-      echo "Deployment Information:"
-      echo "  CloudFront URL: $CLOUDFRONT_URL"
-      echo "  API Endpoint: $API_ENDPOINT"
-      echo "  Cognito User Pool ID: $COGNITO_USER_POOL_ID"
-      echo "  Cognito Identity Pool ID: $COGNITO_IDENTITY_POOL_ID"
-      echo "  Cognito App Client ID: $COGNITO_APP_CLIENT_ID"
+      echo "E2E Test Configuration:"
+      echo "  CloudFront Domain: $CLOUDFRONT_DOMAIN"
+      echo "  AWS Region: $DEPLOY_REGION"
+      echo "  Stack Name: $STACK_NAME"
+      echo "  Environment: $MEDIALAKE_ENV"
+      echo "================================================"
+      echo "Note: Playwright will dynamically discover Cognito"
+      echo "      pools and other AWS resources using AWS SDK"
       echo "================================================"
 
-      # Export for Playwright tests
-      export PLAYWRIGHT_BASE_URL="https://$CLOUDFRONT_URL"
-      export API_ENDPOINT="$API_ENDPOINT"
-      export COGNITO_USER_POOL_ID="$COGNITO_USER_POOL_ID"
-      export COGNITO_IDENTITY_POOL_ID="$COGNITO_IDENTITY_POOL_ID"
-      export COGNITO_APP_CLIENT_ID="$COGNITO_APP_CLIENT_ID"
+      # Validate CloudFront URL
+      if [ -z "$CLOUDFRONT_DOMAIN" ] || [ "$CLOUDFRONT_DOMAIN" == "None" ]; then
+        echo ""
+        echo "ERROR: CloudFront domain not found after all attempts!"
+        echo "Please check that the deployment completed successfully."
+        exit 1
+      fi
+
+      # Export minimal configuration for Playwright
+      # Playwright tests will use AWS SDK to discover Cognito and other resources
+      export PLAYWRIGHT_BASE_URL="https://$CLOUDFRONT_DOMAIN"
+      export AWS_REGION="$DEPLOY_REGION"
+      export AWS_DEFAULT_REGION="$DEPLOY_REGION"
       export STACK_NAME="$STACK_NAME"
+      export MEDIALAKE_ENV="$MEDIALAKE_ENV"
     - cd medialake_user_interface
-    - npm ci
-    - npx playwright install --with-deps chromium
+    - echo "Installing Node.js dependencies..."
+    - npm install
+    - echo "Installing Playwright browsers (skipping system dependency check - already installed manually)..."
+    - export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true
+    - npx playwright install chromium
+    - echo "Playwright browser installation complete"
     - |
+      # Set environment variables for Playwright tests
       export CI=true
       export AWS_REGION=$DEPLOY_REGION
-      export AWS_PROFILE=default
+      export AWS_DEFAULT_REGION=$DEPLOY_REGION
+
+      # Make AWS credentials available to Playwright (for dynamic resource discovery)
+      export AWS_ACCESS_KEY_ID=$(grep aws_access_key_id $AWS_SHARED_CREDENTIALS_FILE | cut -d'=' -f2 | tr -d ' ')
+      export AWS_SECRET_ACCESS_KEY=$(grep aws_secret_access_key $AWS_SHARED_CREDENTIALS_FILE | cut -d'=' -f2 | tr -d ' ')
+      export AWS_SESSION_TOKEN=$(grep aws_session_token $AWS_SHARED_CREDENTIALS_FILE | cut -d'=' -f2 | tr -d ' ')
+
+      echo "Environment prepared for Playwright tests with AWS SDK access"
 
       cat > playwright.ci.config.ts << 'EOF'
       import { defineConfig } from '@playwright/test';
@@ -977,9 +1339,12 @@ e2e_05_run_tests:
           baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173',
         },
         webServer: undefined,
+        // Increase timeout for tests that need to discover AWS resources
+        timeout: 60000,
       });
       EOF
 
+      echo "Running Playwright E2E tests..."
       npx playwright test \
         --config=playwright.ci.config.ts \
         --reporter=html \
@@ -1007,15 +1372,15 @@ e2e_05_run_tests:
       junit: medialake_user_interface/test-results/junit.xml
     expire_in: 30 days
 
-# Job 6: Cleanup resources
-e2e_06_cleanup:
+# Job 7: Cleanup resources
+e2e_07_cleanup:
   stage: test
   timeout: 30m
   tags:
     - arch:amd64
     - size:large
   needs:
-    - job: e2e_05_run_tests
+    - job: e2e_06_run_tests
       artifacts: true
   when: always # Always run cleanup, even if tests fail
   rules:
