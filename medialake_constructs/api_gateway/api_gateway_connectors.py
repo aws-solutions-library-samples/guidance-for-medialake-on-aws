@@ -35,6 +35,7 @@ from medialake_constructs.shared_constructs.dynamodb import (
 from medialake_constructs.shared_constructs.lam_deployment import LambdaDeployment
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 from medialake_constructs.shared_constructs.lambda_layers import (
+    CommonLibrariesLayer,
     IngestMediaProcessorLayer,
 )
 
@@ -420,6 +421,10 @@ class ConnectorsConstruct(Construct):
             self,
             "IngestMediaProcessorLayer",
         )
+        common_libraries_layer = CommonLibrariesLayer(
+            self,
+            "CommonLibrariesLayer",
+        )
 
         # Prepare environment variables
         env_vars = {
@@ -429,6 +434,7 @@ class ConnectorsConstruct(Construct):
             "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
             "MEDIA_ASSETS_BUCKET": props.media_assets_bucket.bucket.bucket_name,  # Added for cross-bucket deletion
             "INGEST_MEDIA_PROCESSOR_LAYER": ingest_media_processor_layer.layer.layer_version_arn,
+            "COMMON_LIBRARIES_LAYER_ARN": common_libraries_layer.layer.layer_version_arn,
             "PIPELINES_EVENT_BUS": props.pipelines_event_bus,
             "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
             "MEDIALAKE_ASSET_TABLE_FILE_HASH_INDEX": props.asset_table_file_hash_index_arn,
@@ -442,6 +448,7 @@ class ConnectorsConstruct(Construct):
             "INDEX_NAME": props.opensearch_index,
             "OPENSEARCH_VPC_SUBNET_IDS": props.vpc_subnet_ids,
             "OPENSEARCH_SECURITY_GROUP_ID": props.security_group_id,
+            "SYSTEM_SETTINGS_TABLE": props.system_settings_table_name or "",
             # S3 Vector Store configuration
             "VECTOR_BUCKET_NAME": props.s3_vector_bucket_name,
             "VECTOR_INDEX_NAME": props.s3_vector_index_name,

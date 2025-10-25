@@ -13,11 +13,11 @@ def translate_event_to_request(response_body_and_event):
     # Extract status information from Coactive response
     data = response_body.get("data", {})
     status = data.get("status", "unknown")
-    job_id = data.get("asset_id")
+    coactive_asset_id = data.get("asset_id")
 
     # Preserve previous externalJobId if missing from response
-    if not job_id:
-        job_id = event.get("metadata", {}).get("externalJobId")
+    if not coactive_asset_id:
+        coactive_asset_id = event.get("metadata", {}).get("externalJobId")
 
     # Extract additional fields from the response
     dataset_id = data.get("dataset_id")
@@ -127,11 +127,11 @@ def translate_event_to_request(response_body_and_event):
 
     return {
         # External job tracking for pipeline middleware
-        "externalJobId": job_id,
+        "externalJobId": coactive_asset_id,
         "externalJobStatus": ext_status,
         "externalJobResult": ext_result,  # Simple string, not complex object
         # Template variables
-        "job_id": job_id,
+        "job_id": coactive_asset_id,
         "status": status,
         "coactive_status": status,
         "coactive_response": response_body,  # Keep full response for debugging

@@ -1,5 +1,5 @@
 {
-  "name": "Coactive API Image Ingestion Pipelinev2 (1)",
+  "name": "Coactive API Image Ingestion Pipeline",
   "description": "",
   "active": true,
   "configuration": {
@@ -23,7 +23,9 @@
             },
             "_owner": null
           },
-          "inputTypes": ["any"],
+          "inputTypes": [
+            "any"
+          ],
           "outputTypes": [
             {
               "name": "image",
@@ -42,10 +44,12 @@
             "requestMapping": null,
             "responseMapping": null
           },
-          "rotation": 0
+          "rotation": 270
         },
         "width": 204,
-        "height": 119
+        "height": 119,
+        "selected": false,
+        "dragging": false
       },
       {
         "id": "dndnode_3",
@@ -74,7 +78,7 @@
             "method": "post",
             "requestMapping": "api_templates/coactive/api/v1/datasets",
             "responseMapping": "api_templates/coactive/api/v1/datasets",
-            "integrationId": "10c5a379-ad98-4cfb-8420-dc8c50ad3fce",
+            "integrationId": "794fe641-c391-4da3-81d8-74b3233c00e9",
             "operationId": "createDataset",
             "parameters": {
               "nodeId": ""
@@ -90,7 +94,7 @@
         "type": "custom",
         "position": {
           "x": 720,
-          "y": 544
+          "y": 576
         },
         "data": {
           "nodeId": "pre_signed_url",
@@ -104,7 +108,9 @@
             },
             "_owner": null
           },
-          "inputTypes": ["any"],
+          "inputTypes": [
+            "any"
+          ],
           "outputTypes": [
             {
               "name": "presigned_url",
@@ -122,10 +128,12 @@
             "requestMapping": "utility/pre_signed_url/generate/",
             "responseMapping": "utility/pre_signed_url/generate/"
           },
-          "rotation": 0
+          "rotation": 90
         },
         "width": 204,
-        "height": 95
+        "height": 95,
+        "selected": false,
+        "dragging": false
       },
       {
         "id": "dndnode_5",
@@ -154,23 +162,25 @@
             "method": "post",
             "requestMapping": "api_templates/coactive/api/v1/ingestion/assets",
             "responseMapping": "api_templates/coactive/api/v1/ingestion/assets",
-            "integrationId": "10c5a379-ad98-4cfb-8420-dc8c50ad3fce",
+            "integrationId": "794fe641-c391-4da3-81d8-74b3233c00e9",
             "operationId": "ingestAssets",
             "parameters": {
               "nodeId": ""
             }
           },
-          "rotation": 0
+          "rotation": 90
         },
         "width": 204,
-        "height": 95
+        "height": 95,
+        "selected": false,
+        "dragging": false
       },
       {
         "id": "dndnode_6",
         "type": "custom",
         "position": {
-          "x": 1200,
-          "y": 0
+          "x": 1232,
+          "y": 304
         },
         "data": {
           "nodeId": "wait",
@@ -184,7 +194,9 @@
             },
             "_owner": null
           },
-          "inputTypes": ["any"],
+          "inputTypes": [
+            "any"
+          ],
           "outputTypes": [
             {
               "name": "any",
@@ -200,17 +212,19 @@
               "Duration": "15"
             }
           },
-          "rotation": 0
+          "rotation": 270
         },
         "width": 204,
-        "height": 95
+        "height": 95,
+        "selected": false,
+        "dragging": false
       },
       {
         "id": "dndnode_7",
         "type": "custom",
         "position": {
-          "x": 720,
-          "y": 96
+          "x": 704,
+          "y": 160
         },
         "data": {
           "nodeId": "coactive",
@@ -232,23 +246,25 @@
             "method": "get",
             "requestMapping": "api_templates/coactive/api/v1/ingestion/images/status",
             "responseMapping": "api_templates/coactive/api/v1/ingestion/images/status",
-            "integrationId": "10c5a379-ad98-4cfb-8420-dc8c50ad3fce",
+            "integrationId": "794fe641-c391-4da3-81d8-74b3233c00e9",
             "operationId": "getImageAssetStatus",
             "parameters": {
               "asset_id": ""
             }
           },
-          "rotation": 0
+          "rotation": 90
         },
         "width": 204,
-        "height": 95
+        "height": 95,
+        "selected": false,
+        "dragging": false
       },
       {
         "id": "dndnode_9",
         "type": "custom",
         "position": {
-          "x": 896,
-          "y": 704
+          "x": 1392,
+          "y": -16
         },
         "data": {
           "nodeId": "success",
@@ -262,7 +278,9 @@
             },
             "_owner": null
           },
-          "inputTypes": ["any"],
+          "inputTypes": [
+            "any"
+          ],
           "outputTypes": [],
           "type": "FLOW",
           "configuration": {
@@ -272,14 +290,16 @@
           "rotation": 0
         },
         "width": 204,
-        "height": 95
+        "height": 95,
+        "selected": false,
+        "dragging": false
       },
       {
         "id": "dndnode_10",
         "type": "custom",
         "position": {
-          "x": 1152,
-          "y": 704
+          "x": 1408,
+          "y": 144
         },
         "data": {
           "nodeId": "fail",
@@ -293,7 +313,9 @@
             },
             "_owner": null
           },
-          "inputTypes": ["any"],
+          "inputTypes": [
+            "any"
+          ],
           "outputTypes": [],
           "type": "FLOW",
           "configuration": {
@@ -308,14 +330,16 @@
           "rotation": 0
         },
         "width": 204,
-        "height": 94
+        "height": 94,
+        "selected": true,
+        "dragging": false
       },
       {
         "id": "dndnode_12",
         "type": "custom",
         "position": {
           "x": 304,
-          "y": 544
+          "y": 496
         },
         "data": {
           "nodeId": "conditional",
@@ -329,7 +353,9 @@
             },
             "_owner": null
           },
-          "inputTypes": ["any"],
+          "inputTypes": [
+            "any"
+          ],
           "outputTypes": [
             {
               "name": "True",
@@ -350,10 +376,12 @@
               "Variable": "$.payload.data.dataset_exists"
             }
           },
-          "rotation": 0
+          "rotation": 270
         },
         "width": 204,
-        "height": 119
+        "height": 119,
+        "selected": false,
+        "dragging": false
       },
       {
         "id": "dndnode_15",
@@ -382,21 +410,23 @@
             "method": "get",
             "requestMapping": "api/v1/ingestion/videos/status",
             "responseMapping": "api/v1/ingestion/videos/status",
-            "integrationId": "10c5a379-ad98-4cfb-8420-dc8c50ad3fce",
+            "integrationId": "794fe641-c391-4da3-81d8-74b3233c00e9",
             "operationId": "listDatasets",
             "parameters": {}
           },
-          "rotation": 0
+          "rotation": 270
         },
         "width": 204,
-        "height": 94
+        "height": 94,
+        "selected": false,
+        "dragging": false
       },
       {
         "id": "dndnode_16",
         "type": "custom",
         "position": {
-          "x": 992,
-          "y": 256
+          "x": 976,
+          "y": 0
         },
         "data": {
           "nodeId": "choice",
@@ -410,7 +440,9 @@
             },
             "_owner": null
           },
-          "inputTypes": ["any"],
+          "inputTypes": [
+            "any"
+          ],
           "outputTypes": [
             {
               "name": "Completed",
@@ -433,7 +465,9 @@
           "rotation": 0
         },
         "width": 204,
-        "height": 119
+        "height": 119,
+        "selected": false,
+        "dragging": false
       }
     ],
     "edges": [
