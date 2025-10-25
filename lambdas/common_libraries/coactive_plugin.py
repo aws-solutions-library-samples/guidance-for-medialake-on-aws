@@ -60,7 +60,7 @@ class CoactivePlugin(ExternalServicePlugin):
     def delete_asset(
         self, asset_record: Dict[str, Any], inventory_id: str
     ) -> AssetDeletionResult:
-        """Delete asset from Coactive AI dataset by querying with medialake_uuid"""
+        """Delete asset from Coactive using stored external ID or fallback to metadata query"""
         try:
             # Get asset type to determine which endpoint to use
             asset_type = (
@@ -69,11 +69,155 @@ class CoactivePlugin(ExternalServicePlugin):
 
             if not self.supports_asset_type(asset_type):
                 return AssetDeletionResult(
-                    success=True,  # Not an error, just not supported
+                    success=True,
                     message=f"Asset type '{asset_type}' not supported by Coactive",
                     deleted_count=0,
                 )
 
+            # Try to get stored external ID first (new approach)
+            external_ids = asset_record.get("Metadata", {}).get("ExternalIDs", [])
+            coactive_id = None
+
+            # Look for simple format: {"coactive": "asset_id"}
+            for eid in external_ids:
+                if "coactive" in eid:
+                    coactive_id = eid.get("coactive")
+                    break
+
+            if coactive_id:
+                # Use stored ID (new approach)
+                self.logger.info(
+                    f"Using stored Coactive ID for deletion: {coactive_id}"
+                )
+                return self._delete_by_stored_id(coactive_id, inventory_id, asset_type)
+            else:
+                # Fall back to metadata query (legacy approach)
+                self.logger.warning(
+                    f"No stored Coactive ID for {inventory_id}, falling back to metadata query"
+                )
+                return self._delete_by_metadata_query(inventory_id, asset_type)
+
+        except Exception as e:
+            self.logger.error(
+                f"Coactive asset deletion failed for {inventory_id}: {str(e)}"
+            )
+            self.metrics.add_metric(
+                name="CoactiveDeletionErrors", unit="Count", value=1
+            )
+            return AssetDeletionResult(
+                success=False,
+                message=f"Coactive deletion failed: {str(e)}",
+                errors=[str(e)],
+            )
+
+    def _delete_by_stored_id(
+        self, coactive_asset_id: str, inventory_id: str, asset_type: str
+    ) -> AssetDeletionResult:
+        """Delete asset using stored Coactive ID"""
+        try:
+            if not coactive_asset_id:
+                return AssetDeletionResult(
+                    success=False,
+                    message="Coactive asset ID is empty",
+                    errors=["Missing coactive ID in ExternalIDs entry"],
+                )
+
+            self.config.get("dataset_id")
+
+            # Delete from Coactive
+            success = self._delete_from_coactive(coactive_asset_id, asset_type)
+
+            if success:
+                self.logger.info(
+                    f"Successfully deleted {asset_type} asset {coactive_asset_id} from Coactive"
+                )
+                self.metrics.add_metric(
+                    name="CoactiveAssetsDeleted", unit="Count", value=1
+                )
+                return AssetDeletionResult(
+                    success=True,
+                    message=f"Deleted {asset_type} asset from Coactive",
+                    deleted_count=1,
+                )
+            else:
+                error_msg = f"Failed to delete {asset_type} ID: {coactive_asset_id}"
+                self.logger.error(error_msg)
+                self.metrics.add_metric(
+                    name="CoactiveDeletionErrors", unit="Count", value=1
+                )
+                return AssetDeletionResult(
+                    success=False,
+                    message=error_msg,
+                    errors=[error_msg],
+                )
+
+        except Exception as e:
+            error_msg = f"Error deleting by stored ID: {str(e)}"
+            self.logger.error(error_msg)
+            self.metrics.add_metric(
+                name="CoactiveDeletionErrors", unit="Count", value=1
+            )
+            return AssetDeletionResult(
+                success=False, message=error_msg, errors=[str(e)]
+            )
+
+    def _get_access_token(self) -> Optional[str]:
+        """
+        Exchange personal token for access token using Coactive's authentication flow.
+        This follows the same pattern as system_search_post.py
+        """
+        try:
+            personal_token = self._get_api_key()
+            if not personal_token:
+                self.logger.error("No personal token available")
+                return None
+
+            # Step 1: Authenticate to get access token
+            conn = http.client.HTTPSConnection("api.coactive.ai", timeout=30)
+
+            login_payload = {"grant_type": "refresh_token"}
+            login_data = json.dumps(login_payload)
+
+            conn.request(
+                "POST",
+                "/api/v0/login",
+                body=login_data,
+                headers={
+                    "Authorization": f"Bearer {personal_token}",
+                    "Content-Type": "application/json",
+                    "User-Agent": "MediaLake/1.0",
+                },
+            )
+
+            response = conn.getresponse()
+            response_data = response.read().decode("utf-8")
+            conn.close()
+
+            if response.status != 200:
+                self.logger.error(
+                    f"Coactive authentication failed: {response.status} - {response_data}"
+                )
+                return None
+
+            response_json = json.loads(response_data)
+            access_token = response_json.get("access_token")
+
+            if not access_token:
+                self.logger.error("No access token received from Coactive")
+                return None
+
+            self.logger.info("Successfully obtained Coactive access token")
+            return access_token
+
+        except Exception as e:
+            self.logger.error(f"Failed to get Coactive access token: {str(e)}")
+            return None
+
+    def _delete_by_metadata_query(
+        self, inventory_id: str, asset_type: str
+    ) -> AssetDeletionResult:
+        """Legacy method: Delete asset by querying Coactive with metadata"""
+        try:
             # Query Coactive to find the asset by medialake_uuid and get its Coactive ID
             coactive_ids = self._find_coactive_ids_by_medialake_uuid(
                 inventory_id, asset_type
@@ -136,16 +280,13 @@ class CoactivePlugin(ExternalServicePlugin):
             )
 
         except Exception as e:
-            self.logger.error(
-                f"Coactive asset deletion failed for {inventory_id}: {str(e)}"
-            )
+            error_msg = f"Error in metadata query deletion: {str(e)}"
+            self.logger.error(error_msg)
             self.metrics.add_metric(
                 name="CoactiveDeletionErrors", unit="Count", value=1
             )
             return AssetDeletionResult(
-                success=False,
-                message=f"Coactive deletion failed: {str(e)}",
-                errors=[str(e)],
+                success=False, message=error_msg, errors=[str(e)]
             )
 
     def _get_api_key(self) -> Optional[str]:
@@ -311,11 +452,12 @@ class CoactivePlugin(ExternalServicePlugin):
     def _delete_from_coactive(self, coactive_id: str, asset_type: str) -> bool:
         """Delete asset from Coactive AI using their API"""
         try:
-            api_key = self._get_api_key()
+            # Get access token (not personal token)
+            access_token = self._get_access_token()
             dataset_id = self._get_dataset_id()
 
-            if not api_key or not dataset_id:
-                self.logger.error("Missing Coactive API key or dataset ID")
+            if not access_token or not dataset_id:
+                self.logger.error("Missing Coactive access token or dataset ID")
                 return False
 
             # Determine the correct endpoint based on asset type (using singular form per API docs)
@@ -330,8 +472,9 @@ class CoactivePlugin(ExternalServicePlugin):
                 return False
 
             headers = {
-                "Authorization": f"Bearer {api_key}",
+                "Authorization": f"Bearer {access_token}",
                 "Content-Type": "application/json",
+                "User-Agent": "MediaLake/1.0",
             }
 
             self.logger.info(

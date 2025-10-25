@@ -1,4 +1,5 @@
 # dataset_id_get_response_mapping.py
+import os
 from typing import Any, Dict
 
 
@@ -6,13 +7,13 @@ def translate_event_to_request(
     response_body_and_event: Dict[str, Any],
 ) -> Dict[str, Any]:
     """
-    Process Coactive dataset listing response and check if MediaLake_Dataset exists.
+    Process Coactive dataset listing response and check if MediaLake_Dataset_{ENVIRONMENT} exists.
 
     Args:
         response_body_and_event: Dictionary containing 'response_body' and 'event'
 
     Returns:
-        Dictionary with processed response data indicating if MediaLake_Dataset exists
+        Dictionary with processed response data indicating if MediaLake_Dataset_{ENVIRONMENT} exists
 
     Raises:
         RuntimeError: If the API call failed or returned an error status
@@ -51,8 +52,9 @@ def translate_event_to_request(
         f"First few datasets: {datasets[:3] if isinstance(datasets, list) and len(datasets) > 0 else 'No datasets'}"
     )
 
-    # Look for exact match of "MediaLake_Dataset" (not timestamped versions)
-    target_dataset_name = "MediaLake_Dataset"
+    # Look for exact match of "MediaLake_Dataset_{ENVIRONMENT}"
+    environment = os.environ.get("ENVIRONMENT", "dev")
+    target_dataset_name = f"MediaLake_Dataset_{environment}"
     medialake_dataset = None
     dataset_exists = False
 

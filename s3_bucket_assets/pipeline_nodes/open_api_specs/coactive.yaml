@@ -37,7 +37,7 @@ paths:
   /datasets:
     get:
       summary: List all datasets
-      description: Lists all available datasets to check if MediaLake_Dataset exists
+      description: Lists all available datasets to check if MediaLake_Dataset_{ENVIRONMENT} exists
       operationId: listDatasets
       tags:
         - Dataset Management

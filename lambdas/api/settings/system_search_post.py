@@ -20,7 +20,7 @@ secretsmanager = boto3.client("secretsmanager")
 
 def create_coactive_dataset(api_key: str, endpoint: str = None) -> dict:
     """
-    Create or find existing MediaLake_Dataset in Coactive.
+    Create or find existing MediaLake_Dataset_{ENVIRONMENT} in Coactive.
 
     Args:
         api_key: Coactive personal token
@@ -32,6 +32,8 @@ def create_coactive_dataset(api_key: str, endpoint: str = None) -> dict:
     Raises:
         Exception: If dataset creation/lookup fails
     """
+    environment = os.environ.get("ENVIRONMENT", "dev")
+    dataset_name = f"MediaLake_Dataset_{environment}"
     try:
         # Step 1: Authenticate to get access token (following working script pattern)
         auth_conn = http.client.HTTPSConnection("api.coactive.ai", timeout=30)
@@ -67,11 +69,11 @@ def create_coactive_dataset(api_key: str, endpoint: str = None) -> dict:
 
         logger.info("Successfully obtained Coactive access token")
 
-        # Step 2: Check if MediaLake_Dataset already exists (following working script pattern)
-        logger.info("Checking for existing MediaLake_Dataset")
+        # Step 2: Check if MediaLake_Dataset_{ENVIRONMENT} already exists (following working script pattern)
+        logger.info(f"Checking for existing {dataset_name}")
         dataset_conn = http.client.HTTPSConnection("app.coactive.ai", timeout=30)
 
-        # List datasets to find existing MediaLake_Dataset
+        # List datasets to find existing dataset
         dataset_conn.request(
             "GET",
             "/api/v1/datasets?limit=100",
@@ -89,25 +91,23 @@ def create_coactive_dataset(api_key: str, endpoint: str = None) -> dict:
             list_json = json.loads(list_response_data)
             datasets = list_json.get("data", [])
 
-            # Look for existing MediaLake_Dataset (case insensitive)
+            # Look for existing dataset (case insensitive)
             for dataset in datasets:
-                if dataset.get("name", "").lower() == "medialake_dataset":
+                if dataset.get("name", "").lower() == dataset_name.lower():
                     dataset_id = dataset.get("datasetId")
-                    logger.info(
-                        f"Found existing MediaLake_Dataset with ID: {dataset_id}"
-                    )
+                    logger.info(f"Found existing {dataset_name} with ID: {dataset_id}")
                     dataset_conn.close()
                     return dataset
 
         # Step 3: Create dataset if it doesn't exist
         dataset_payload = {
-            "name": "MediaLake_Dataset",
-            "description": "MediaLake unified search dataset for semantic search operations",
+            "name": dataset_name,
+            "description": f"MediaLake unified search dataset for semantic search operations ({environment} environment)",
             "encoder": "multimodal-tx-large3",
         }
         dataset_data = json.dumps(dataset_payload)
 
-        logger.info("Creating new MediaLake_Dataset in Coactive")
+        logger.info(f"Creating new {dataset_name} in Coactive")
         dataset_conn.request(
             "POST",
             "/api/v1/datasets",
@@ -236,9 +236,9 @@ def register_route(app):
             coactive_dataset_id = None
             if body.get("type") == "coactive" and "apiKey" in body:
                 try:
-                    logger.info(
-                        "Coactive provider detected - creating MediaLake_Dataset"
-                    )
+                    environment = os.environ.get("ENVIRONMENT", "dev")
+                    dataset_name = f"MediaLake_Dataset_{environment}"
+                    logger.info(f"Coactive provider detected - creating {dataset_name}")
                     dataset_info = create_coactive_dataset(
                         api_key=body["apiKey"],
                         endpoint=body.get(

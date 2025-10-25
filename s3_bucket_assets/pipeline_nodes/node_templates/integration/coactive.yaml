@@ -49,6 +49,7 @@ node:
               resources:
                 - ${NODE_TABLE}
                 - ${PIPELINES_TABLE}
+                - ${MEDIALAKE_ASSET_TABLE}
             - effect: Allow
               actions:
                 - secretsmanager:GetSecretValue

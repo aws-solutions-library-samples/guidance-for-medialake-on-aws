@@ -638,6 +638,7 @@ def create_lambda_function(
                     "MEDIALAKE_ASSET_TABLE": MEDIALAKE_ASSET_TABLE,
                     "API_TEMPLATE_BUCKET": os.environ.get("NODE_TEMPLATES_BUCKET"),
                     "OPENSEARCH_ENDPOINT": os.environ.get("OPENSEARCH_ENDPOINT"),
+                    "ENVIRONMENT": os.environ.get("ENVIRONMENT", "dev"),
                     # Add required environment variables
                     "SERVICE": node.data.id,  # node Title
                     "STEP_NAME": node.data.label,  # friendly name of the node
