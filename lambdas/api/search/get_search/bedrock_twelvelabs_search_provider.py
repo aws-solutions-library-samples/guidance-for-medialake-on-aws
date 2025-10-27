@@ -101,18 +101,93 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
 
     def generate_embeddings(self, query_text: str) -> List[float]:
         """
-        Generate embeddings using Bedrock TwelveLabs model.
-        This method delegates to the base embedding store's generate_text_embedding method.
+        Generate embeddings using Bedrock TwelveLabs model directly.
         """
-        # Import here to avoid circular imports
-        from base_embedding_store import BaseEmbeddingStore
+        return self._generate_embedding_via_bedrock(query_text)
 
-        # Create a temporary embedding store instance to use the centralized embedding generation
-        temp_store = BaseEmbeddingStore.__new__(BaseEmbeddingStore)
-        temp_store.logger = self.logger
-        temp_store.metrics = self.metrics
+    def _get_regional_inference_profile(self) -> str:
+        """
+        Get the appropriate TwelveLabs Marengo Embed v2.7 inference profile based on AWS region.
+        """
+        if "BEDROCK_INFERENCE_PROFILE_ARN" in os.environ:
+            return os.environ["BEDROCK_INFERENCE_PROFILE_ARN"]
 
-        return temp_store.generate_text_embedding(query_text)
+        aws_region = os.environ.get("AWS_REGION", "us-east-1")
+        model_suffix = ".twelvelabs.marengo-embed-2-7-v1:0"
+
+        if aws_region.startswith("us-"):
+            regional_prefix = "us"
+        elif aws_region.startswith("eu-"):
+            regional_prefix = "eu"
+        elif aws_region.startswith("ap-"):
+            regional_prefix = "apac"
+        else:
+            self.logger.warning(
+                f"Unknown AWS region: {aws_region}, defaulting to US inference profile"
+            )
+            regional_prefix = "us"
+
+        inference_profile_id = f"{regional_prefix}{model_suffix}"
+        self.logger.info(
+            f"Selected inference profile {inference_profile_id} for region {aws_region}"
+        )
+        return inference_profile_id
+
+    def _generate_embedding_via_bedrock(self, query_text: str) -> List[float]:
+        """
+        Generate text embedding using TwelveLabs model via AWS Bedrock InvokeModel.
+        """
+        import json
+
+        try:
+            bedrock_client = boto3.client("bedrock-runtime")
+            inference_profile_id = self._get_regional_inference_profile()
+
+            self.logger.info(f"Using Bedrock inference profile: {inference_profile_id}")
+
+            payload = {"inputType": "text", "inputText": query_text}
+
+            self.logger.info(
+                f"Starting Bedrock embedding creation for query: {query_text}"
+            )
+
+            response = bedrock_client.invoke_model(
+                modelId=inference_profile_id,
+                contentType="application/json",
+                accept="application/json",
+                body=json.dumps(payload),
+            )
+
+            response_body = json.loads(response["body"].read())
+
+            # Extract embedding from response
+            if "data" in response_body and response_body["data"]:
+                if (
+                    isinstance(response_body["data"], list)
+                    and len(response_body["data"]) > 0
+                    and "embedding" in response_body["data"][0]
+                ):
+                    embedding = response_body["data"][0]["embedding"]
+                    self.logger.info(
+                        f"Successfully generated Bedrock embedding with {len(embedding)} dimensions"
+                    )
+                    return embedding
+
+            # Format 2: Direct embedding array
+            if "embedding" in response_body:
+                embedding = response_body["embedding"]
+                self.logger.info(
+                    f"Successfully generated Bedrock embedding with {len(embedding)} dimensions"
+                )
+                return embedding
+
+            raise Exception(
+                f"Unexpected Bedrock response format: {list(response_body.keys())}"
+            )
+
+        except Exception as e:
+            self.logger.error(f"Bedrock embedding generation failed: {str(e)}")
+            raise
 
     def execute_store_search(
         self, embeddings: List[float], query: SearchQuery

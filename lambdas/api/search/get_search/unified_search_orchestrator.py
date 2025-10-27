@@ -157,7 +157,7 @@ class UnifiedSearchOrchestrator:
                         "name": item.get("name", "Coactive AI"),
                         "id": item.get("id"),
                     }
-                elif provider_type == "bedrock twelvelabs":
+                elif provider_type in ["bedrock twelvelabs", "twelvelabs-bedrock"]:
                     provider_config = {
                         "provider": "bedrock_twelvelabs",
                         "provider_location": "internal",
@@ -176,7 +176,7 @@ class UnifiedSearchOrchestrator:
                         "name": item.get("name", "Bedrock TwelveLabs"),
                         "id": item.get("id"),
                     }
-                elif provider_type == "twelvelabs":
+                elif provider_type in ["twelvelabs", "twelvelabs-api"]:
                     provider_config = {
                         "provider": "twelvelabs_api",
                         "provider_location": "external",
