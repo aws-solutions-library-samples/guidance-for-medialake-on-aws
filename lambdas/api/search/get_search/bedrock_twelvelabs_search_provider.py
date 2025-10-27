@@ -236,30 +236,41 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
             total_results = response["hits"]["total"]["value"]
 
             self.logger.info(
-                f"Bedrock TwelveLabs search returned {len(hits)} hits from {total_results} total"
+                f"Bedrock TwelveLabs search returned {len(hits)} raw hits from {total_results} total"
             )
 
-            # Convert hits to SearchHit format
+            # Process semantic results to group clips with parent assets
+            from index import process_semantic_results_parallel
+
+            processing_start = time.time()
+            processed_results = process_semantic_results_parallel(hits)
+            self.logger.info(
+                f"[PERF] Clip processing took: {time.time() - processing_start:.3f}s"
+            )
+            self.logger.info(
+                f"Processed {len(hits)} hits into {len(processed_results)} parent assets with clips"
+            )
+
+            # Convert processed results to SearchHit format
             search_hits = []
             max_score = 0.0
 
-            for hit in hits:
-                score = hit.get("_score", 0.0)
+            for result in processed_results:
+                score = result.get("score", 0.0)
                 if score > max_score:
                     max_score = score
 
                 # Determine media type from source data
-                source = hit.get("_source", {})
-                asset_type = source.get("DigitalSourceAsset", {}).get("Type", "video")
+                asset_type = result.get("DigitalSourceAsset", {}).get("Type", "video")
                 try:
                     media_type = MediaType(asset_type.lower())
                 except ValueError:
-                    media_type = MediaType.VIDEO  # default fallback
+                    media_type = MediaType.VIDEO
 
                 search_hit = SearchHit(
-                    asset_id=source.get("InventoryID", ""),
+                    asset_id=result.get("InventoryID", ""),
                     score=score,
-                    source=source,
+                    source=result,
                     media_type=media_type,
                     provider_metadata={
                         "provider": "bedrock_twelvelabs",
@@ -270,7 +281,7 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
 
             return SearchResult(
                 hits=search_hits,
-                total_results=total_results,
+                total_results=len(search_hits),
                 max_score=max_score,
                 took_ms=int(opensearch_time * 1000),
                 provider="bedrock_twelvelabs",
