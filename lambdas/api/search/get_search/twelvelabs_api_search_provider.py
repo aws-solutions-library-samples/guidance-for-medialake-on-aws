@@ -124,7 +124,25 @@ class TwelveLabsAPISearchProvider(ProviderPlusStoreSearchProvider):
             ):
                 raise Exception("Invalid response from TwelveLabs API")
 
-            embedding = embedding_response.text_embedding.float
+            # Extract the embedding from the response
+            # The text_embedding can be a BaseSegment object with float_ attribute
+            # or it can have segments with BaseSegment objects
+            text_embedding = embedding_response.text_embedding
+
+            # Handle different response formats
+            if hasattr(text_embedding, "segments") and text_embedding.segments:
+                # Response has segments array with BaseSegment objects
+                embedding = text_embedding.segments[0].float_
+            elif hasattr(text_embedding, "float_"):
+                # Response is a BaseSegment object directly
+                embedding = text_embedding.float_
+            elif isinstance(text_embedding, list):
+                # Response is already a list
+                embedding = text_embedding
+            else:
+                # Try to convert to list
+                embedding = list(text_embedding)
+
             self.logger.info(
                 f"Successfully generated TwelveLabs API embedding with {len(embedding)} dimensions"
             )

@@ -550,6 +550,14 @@ def create_lambda_function(
                     f"Detected variables in API service URL: {api_service_url}, enabling custom URL processing"
                 )
 
+            # Check if the resource path contains path parameters (like {task_id}, {asset_id})
+            resource_path = node.data.configuration.get("path", "")
+            if resource_path and "{" in resource_path and "}" in resource_path:
+                needs_custom_url = True
+                logger.info(
+                    f"Detected path parameters in resource path: {resource_path}, enabling custom URL processing"
+                )
+
     except Exception as e:
         logger.warning(
             f"Failed to extract API service URL and path from node info: {e}"

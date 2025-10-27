@@ -179,7 +179,7 @@ class UnifiedSearchOrchestrator:
                 elif provider_type in ["twelvelabs", "twelvelabs-api"]:
                     provider_config = {
                         "provider": "twelvelabs_api",
-                        "provider_location": "external",
+                        "provider_location": "internal",
                         "architecture": "provider_plus_store",
                         "capabilities": {
                             "media": ["video", "audio", "image"],
