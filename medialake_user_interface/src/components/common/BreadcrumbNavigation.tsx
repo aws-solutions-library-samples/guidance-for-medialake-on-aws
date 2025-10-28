@@ -7,8 +7,8 @@ import {
   MenuItem,
   Divider,
 } from "@mui/material";
-import { ChevronLeft, ChevronRight, History, Trash2 } from "lucide-react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { ChevronLeft, History, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useRecentlyViewed } from "../../contexts/RecentlyViewedContext";
 import { formatDistanceToNow } from "date-fns";
 
@@ -26,11 +26,6 @@ interface BreadcrumbNavigationProps {
 
 const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
   searchTerm,
-  currentResult,
-  totalResults,
-  onBack,
-  onPrevious,
-  onNext,
   assetName,
   assetId,
   assetType,
@@ -39,7 +34,6 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
   const open = Boolean(anchorEl);
   const { items, clearAll } = useRecentlyViewed();
   const navigate = useNavigate();
-  const location = useLocation();
 
   const handleHistoryClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
