@@ -17,6 +17,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import SearchIcon from "@mui/icons-material/Search";
 import MetadataContent from "./MetadataContent";
+import TabContentContainer from "./common/TabContentContainer";
 
 // Category mapping for display names
 const categoryMapping = {
@@ -151,131 +152,136 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
   /* ---------------------------------------------------------------------- */
 
   return (
-    <Box sx={{ borderRadius: 1, width: "100%" }}>
-      {/* --------------------------------------------------  Filter bar  --- */}
-      <Box sx={{ mb: 2, display: "flex", alignItems: "center", gap: 2 }}>
-        <TextField
-          placeholder="Filter metadata…"
-          size="small"
-          value={textFilter}
-          onChange={(e) => setTextFilter(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" />
-              </InputAdornment>
-            ),
-          }}
-          sx={{ flex: 1, px: 2 }}
-        />
+    <TabContentContainer>
+      <Box sx={{ width: "100%" }}>
+        {/* --------------------------------------------------  Filter bar  --- */}
+        <Box sx={{ mb: 2, display: "flex", alignItems: "center", gap: 2 }}>
+          <TextField
+            placeholder="Filter metadata…"
+            size="small"
+            value={textFilter}
+            onChange={(e) => setTextFilter(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
+            sx={{ flex: 1, px: 2 }}
+          />
 
-        <FormControl size="small" sx={{ minWidth: 140, px: 2 }}>
-          <Select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value as string)}
-            displayEmpty
-          >
-            <MenuItem value="all">All Categories</MenuItem>
-            {availableCategories.map((key) => (
-              <MenuItem key={key} value={key}>
-                {categoryMapping[key] ||
-                  key.charAt(0).toUpperCase() + key.slice(1)}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      </Box>
+          <FormControl size="small" sx={{ minWidth: 140, px: 2 }}>
+            <Select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value as string)}
+              displayEmpty
+            >
+              <MenuItem value="all">All Categories</MenuItem>
+              {availableCategories.map((key) => (
+                <MenuItem key={key} value={key}>
+                  {categoryMapping[key] ||
+                    key.charAt(0).toUpperCase() + key.slice(1)}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Box>
 
-      {/* ----------------------------------------------  Metadata tree  --- */}
-      <SimpleTreeView
-        defaultExpandedItems={expandedItems}
-        sx={{
-          "& .MuiTreeItem-content": {
-            padding: "4px 8px",
-            borderRadius: "4px",
-            "&:hover": {
-              backgroundColor: alpha(theme.palette.primary.main, 0.05),
+        {/* ----------------------------------------------  Metadata tree  --- */}
+        <SimpleTreeView
+          defaultExpandedItems={expandedItems}
+          sx={{
+            "& .MuiTreeItem-content": {
+              padding: "4px 8px",
+              borderRadius: "4px",
+              "&:hover": {
+                backgroundColor: alpha(theme.palette.primary.main, 0.05),
+              },
             },
-          },
-          "& .MuiTreeItem-group": {
-            marginLeft: "24px",
-            borderLeft: `1px dashed ${alpha(theme.palette.text.primary, 0.2)}`,
-            paddingLeft: "8px",
-          },
-        }}
-        slots={{ collapseIcon: ExpandMoreIcon, expandIcon: ChevronRightIcon }}
-      >
-        {filteredAccordions.map((parent, pIdx) => (
-          <TreeItem
-            key={pIdx}
-            itemId={`parent-${pIdx}`}
-            label={
-              <Box sx={{ display: "flex", alignItems: "center" }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                  {parent.category === "EmbeddedMetadata"
-                    ? "Embedded Metadata"
-                    : categoryMapping[
-                        parent.category as keyof typeof categoryMapping
-                      ] || parent.category}
-                </Typography>
-                <Chip
-                  size="small"
-                  label={parent.count}
-                  sx={{
-                    ml: 1,
-                    height: 20,
-                    fontSize: "0.70rem",
-                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                    color: theme.palette.primary.main,
-                  }}
-                />
-              </Box>
-            }
-          >
-            {parent.subCategories.map((sub: any, sIdx: number) => (
-              <TreeItem
-                key={sIdx}
-                itemId={`${pIdx}-${sIdx}`}
-                label={
-                  <Box sx={{ display: "flex", alignItems: "center" }}>
-                    <Typography variant="body2">
-                      {categoryMapping[
-                        sub.category as keyof typeof categoryMapping
-                      ] || sub.category}
-                    </Typography>
-                    <Chip
-                      size="small"
-                      label={sub.count}
-                      sx={{
-                        ml: 1,
-                        height: 18,
-                        fontSize: "0.65rem",
-                        backgroundColor: alpha(
-                          theme.palette.secondary.main,
-                          0.1,
-                        ),
-                        color: theme.palette.secondary.main,
-                      }}
-                    />
-                  </Box>
-                }
-              >
-                <Box
-                  sx={{
-                    p: 2,
-                    mt: 1,
-                    backgroundColor: alpha(theme.palette.background.paper, 0.5),
-                    borderRadius: 1,
-                  }}
-                >
-                  {getContentComponent(sub)}
+            "& .MuiTreeItem-group": {
+              marginLeft: "24px",
+              borderLeft: `1px dashed ${alpha(theme.palette.text.primary, 0.2)}`,
+              paddingLeft: "8px",
+            },
+          }}
+          slots={{ collapseIcon: ExpandMoreIcon, expandIcon: ChevronRightIcon }}
+        >
+          {filteredAccordions.map((parent, pIdx) => (
+            <TreeItem
+              key={pIdx}
+              itemId={`parent-${pIdx}`}
+              label={
+                <Box sx={{ display: "flex", alignItems: "center" }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                    {parent.category === "EmbeddedMetadata"
+                      ? "Embedded Metadata"
+                      : categoryMapping[
+                          parent.category as keyof typeof categoryMapping
+                        ] || parent.category}
+                  </Typography>
+                  <Chip
+                    size="small"
+                    label={parent.count}
+                    sx={{
+                      ml: 1,
+                      height: 20,
+                      fontSize: "0.70rem",
+                      backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                      color: theme.palette.primary.main,
+                    }}
+                  />
                 </Box>
-              </TreeItem>
-            ))}
-          </TreeItem>
-        ))}
-      </SimpleTreeView>
-    </Box>
+              }
+            >
+              {parent.subCategories.map((sub: any, sIdx: number) => (
+                <TreeItem
+                  key={sIdx}
+                  itemId={`${pIdx}-${sIdx}`}
+                  label={
+                    <Box sx={{ display: "flex", alignItems: "center" }}>
+                      <Typography variant="body2">
+                        {categoryMapping[
+                          sub.category as keyof typeof categoryMapping
+                        ] || sub.category}
+                      </Typography>
+                      <Chip
+                        size="small"
+                        label={sub.count}
+                        sx={{
+                          ml: 1,
+                          height: 18,
+                          fontSize: "0.65rem",
+                          backgroundColor: alpha(
+                            theme.palette.secondary.main,
+                            0.1,
+                          ),
+                          color: theme.palette.secondary.main,
+                        }}
+                      />
+                    </Box>
+                  }
+                >
+                  <Box
+                    sx={{
+                      p: 2,
+                      mt: 1,
+                      backgroundColor: alpha(
+                        theme.palette.background.paper,
+                        0.5,
+                      ),
+                      borderRadius: 1,
+                    }}
+                  >
+                    {getContentComponent(sub)}
+                  </Box>
+                </TreeItem>
+              ))}
+            </TreeItem>
+          ))}
+        </SimpleTreeView>
+      </Box>
+    </TabContentContainer>
   );
 };
 

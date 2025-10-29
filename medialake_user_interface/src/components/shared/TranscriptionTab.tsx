@@ -27,10 +27,9 @@ import {
 } from "@mui/material";
 import { TranscriptionResponse } from "../../api/hooks/useAssets";
 import MarkdownRenderer from "../common/MarkdownRenderer";
+import TabContentContainer from "../common/TabContentContainer";
 
 // MUI Icons
-import SubtitlesOutlinedIcon from "@mui/icons-material/SubtitlesOutlined";
-import CodeOutlinedIcon from "@mui/icons-material/CodeOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import ClearIcon from "@mui/icons-material/Clear";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
@@ -690,17 +689,18 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
   // Handle loading state
   if (isLoading) {
     return (
-      <Box
-        sx={{
-          p: 2,
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "300px",
-        }}
-      >
-        <CircularProgress />
-      </Box>
+      <TabContentContainer>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            minHeight: "300px",
+          }}
+        >
+          <CircularProgress />
+        </Box>
+      </TabContentContainer>
     );
   }
 
@@ -711,25 +711,13 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
     !transcriptionData.data.results
   ) {
     return (
-      <Box sx={{ p: 2, textAlign: "center" }}>
-        <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
-          {mediaType === "audio" ? "Audio" : "Video"} Transcription
-        </Typography>
-        <Paper
-          elevation={0}
-          sx={{
-            mb: 3,
-            p: 4,
-            backgroundColor: alpha(theme.palette.background.paper, 0.7),
-            borderRadius: 1,
-            border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-          }}
-        >
+      <TabContentContainer>
+        <Box sx={{ textAlign: "center" }}>
           <Typography variant="body1" color="text.secondary">
             No transcription data available for this {mediaType} file.
           </Typography>
-        </Paper>
-      </Box>
+        </Box>
+      </TabContentContainer>
     );
   }
 
@@ -776,309 +764,316 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
   const summary = assetData?.data?.asset?.Summary100Result;
 
   return (
-    <Box sx={{ p: 2 }} ref={transcriptRef}>
-      {/* Collapsible Header */}
-      {/* Custom Collapsible Header */}
-      <Paper
-        elevation={0}
-        sx={{
-          mb: 2,
-          border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
-        }}
-      >
-        <Box
+    <TabContentContainer>
+      <Box ref={transcriptRef}>
+        {/* Collapsible Header */}
+        {/* Custom Collapsible Header */}
+        <Paper
+          elevation={0}
           sx={{
-            backgroundColor: alpha(theme.palette.background.paper, 0.7),
-            "&:hover": {
-              backgroundColor: alpha(theme.palette.background.paper, 0.9),
-            },
-            display: "flex",
-            alignItems: "center",
-            padding: "8px 16px",
-            minHeight: "48px",
+            mb: 2,
+            border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
           }}
         >
-          {/* Custom Header Content */}
           <Box
             sx={{
+              backgroundColor: alpha(theme.palette.background.paper, 0.7),
+              "&:hover": {
+                backgroundColor: alpha(theme.palette.background.paper, 0.9),
+              },
               display: "flex",
               alignItems: "center",
-              justifyContent: "space-between",
-              width: "100%",
+              padding: "8px 16px",
+              minHeight: "48px",
             }}
           >
-            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-              {mediaType === "audio" ? "Audio" : "Video"} Transcription
-            </Typography>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-              {/* Quick Search */}
-              {segments.length > 0 && (
-                <TextField
+            {/* Custom Header Content */}
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                width: "100%",
+              }}
+            >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                {/* Quick Search */}
+                {segments.length > 0 && (
+                  <TextField
+                    size="small"
+                    placeholder="Quick search..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon sx={{ fontSize: 16 }} />
+                        </InputAdornment>
+                      ),
+                      sx: { fontSize: "0.875rem" },
+                    }}
+                    sx={{ width: 200 }}
+                  />
+                )}
+
+                {/* Language Detection Chip */}
+                {languageData && languageData.detectedLanguages.length > 0 && (
+                  <Chip
+                    icon={<LanguageIcon />}
+                    label={`${languageData.detectedLanguages[0].code} (${Math.round(
+                      languageData.detectedLanguages[0].score * 100,
+                    )}%)`}
+                    size="small"
+                    sx={{
+                      backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                      color: theme.palette.primary.main,
+                      fontSize: "0.7rem",
+                    }}
+                  />
+                )}
+
+                {/* Export Button */}
+                <IconButton
                   size="small"
-                  placeholder="Quick search..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchIcon sx={{ fontSize: 16 }} />
-                      </InputAdornment>
-                    ),
-                    sx: { fontSize: "0.875rem" },
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleExportTranscript();
                   }}
-                  sx={{ width: 200 }}
-                />
-              )}
+                  title="Export transcript"
+                  sx={{
+                    backgroundColor: alpha(theme.palette.secondary.main, 0.1),
+                    "&:hover": {
+                      backgroundColor: alpha(theme.palette.secondary.main, 0.2),
+                    },
+                  }}
+                >
+                  <FileDownloadIcon sx={{ fontSize: 16 }} />
+                </IconButton>
 
-              {/* Language Detection Chip */}
-              {languageData && languageData.detectedLanguages.length > 0 && (
-                <Chip
-                  icon={<LanguageIcon />}
-                  label={`${languageData.detectedLanguages[0].code} (${Math.round(
-                    languageData.detectedLanguages[0].score * 100,
-                  )}%)`}
+                {/* Custom Expand Button */}
+                <IconButton
                   size="small"
+                  onClick={() => setAccordionExpanded(!accordionExpanded)}
+                  title={
+                    accordionExpanded ? "Collapse details" : "Expand details"
+                  }
                   sx={{
-                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                    color: theme.palette.primary.main,
-                    fontSize: "0.7rem",
+                    "&:hover": {
+                      backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                    },
                   }}
-                />
-              )}
-
-              {/* Export Button */}
-              <IconButton
-                size="small"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleExportTranscript();
-                }}
-                title="Export transcript"
-                sx={{
-                  backgroundColor: alpha(theme.palette.secondary.main, 0.1),
-                  "&:hover": {
-                    backgroundColor: alpha(theme.palette.secondary.main, 0.2),
-                  },
-                }}
-              >
-                <FileDownloadIcon sx={{ fontSize: 16 }} />
-              </IconButton>
-
-              {/* Custom Expand Button */}
-              <IconButton
-                size="small"
-                onClick={() => setAccordionExpanded(!accordionExpanded)}
-                title={
-                  accordionExpanded ? "Collapse details" : "Expand details"
-                }
-                sx={{
-                  "&:hover": {
-                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                  },
-                }}
-              >
-                <ExpandMoreIcon
-                  sx={{
-                    transform: accordionExpanded
-                      ? "rotate(180deg)"
-                      : "rotate(0deg)",
-                    transition: "transform 0.2s ease-in-out",
-                  }}
-                />
-              </IconButton>
+                >
+                  <ExpandMoreIcon
+                    sx={{
+                      transform: accordionExpanded
+                        ? "rotate(180deg)"
+                        : "rotate(0deg)",
+                      transition: "transform 0.2s ease-in-out",
+                    }}
+                  />
+                </IconButton>
+              </Box>
             </Box>
           </Box>
-        </Box>
 
-        {/* Collapsible Details */}
-        <Collapse in={accordionExpanded}>
-          <Box sx={{ p: 2, pt: 0 }}>
-            {/* Summary Section */}
-            {summary && (
-              <Paper
-                elevation={0}
-                sx={{
-                  mb: 2,
-                  p: 2,
-                  backgroundColor: alpha(theme.palette.background.paper, 0.5),
-                  borderRadius: 1,
-                  border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                }}
-              >
-                <Typography
-                  variant="body2"
+          {/* Collapsible Details */}
+          <Collapse in={accordionExpanded}>
+            <Box sx={{ p: 2, pt: 0 }}>
+              {/* Summary Section */}
+              {summary && (
+                <Paper
+                  elevation={0}
                   sx={{
                     mb: 2,
-                    fontStyle: "italic",
-                    color: theme.palette.text.secondary,
+                    p: 2,
+                    backgroundColor: alpha(theme.palette.background.paper, 0.5),
+                    borderRadius: 1,
+                    border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
                   }}
                 >
-                  Summary:
-                </Typography>
-                <MarkdownRenderer content={summary} />
-              </Paper>
-            )}
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      mb: 2,
+                      fontStyle: "italic",
+                      color: theme.palette.text.secondary,
+                    }}
+                  >
+                    Summary:
+                  </Typography>
+                  <MarkdownRenderer content={summary} />
+                </Paper>
+              )}
 
-            {/* Advanced Search */}
-            {segments.length > 0 && searchResults.length > 0 && (
-              <Paper
-                elevation={0}
-                sx={{
-                  mb: 2,
-                  p: 1.5,
-                  backgroundColor: alpha(theme.palette.background.paper, 0.5),
-                  borderRadius: 1,
-                  border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                }}
-              >
-                <Typography
-                  variant="caption"
-                  sx={{ mb: 1, display: "block", fontWeight: 600 }}
+              {/* Advanced Search */}
+              {segments.length > 0 && searchResults.length > 0 && (
+                <Paper
+                  elevation={0}
+                  sx={{
+                    mb: 2,
+                    p: 1.5,
+                    backgroundColor: alpha(theme.palette.background.paper, 0.5),
+                    borderRadius: 1,
+                    border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                  }}
                 >
-                  Search Results ({searchResults.length}):
-                </Typography>
-                <Box sx={{ maxHeight: 250, overflowY: "auto" }}>
-                  {searchResults.map((result, index) => (
+                  <Typography
+                    variant="caption"
+                    sx={{ mb: 1, display: "block", fontWeight: 600 }}
+                  >
+                    Search Results ({searchResults.length}):
+                  </Typography>
+                  <Box sx={{ maxHeight: 250, overflowY: "auto" }}>
+                    {searchResults.map((result, index) => (
+                      <Box
+                        key={index}
+                        onClick={() => handleJumpToResult(result)}
+                        sx={{
+                          p: 1,
+                          cursor: "pointer",
+                          borderRadius: 1,
+                          "&:hover": {
+                            backgroundColor: alpha(
+                              theme.palette.primary.main,
+                              0.1,
+                            ),
+                          },
+                        }}
+                      >
+                        <Typography variant="caption" color="text.secondary">
+                          {result.segment.speaker} •{" "}
+                          {result.timestamp.toFixed(1)}s
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontSize: "0.8rem" }}>
+                          ...{result.word.content}...
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </Paper>
+              )}
+
+              {/* Language Detection Details */}
+              {languageData && languageData.detectedLanguages.length > 1 && (
+                <Paper
+                  elevation={0}
+                  sx={{
+                    mb: 2,
+                    p: 1.5,
+                    backgroundColor: alpha(theme.palette.background.paper, 0.5),
+                    borderRadius: 1,
+                    border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    sx={{ mb: 1, display: "block", fontWeight: 600 }}
+                  >
+                    Language Detection Details:
+                  </Typography>
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                    {languageData.detectedLanguages
+                      .filter((lang) => lang.score >= 0.7) // Only show languages with 70%+ confidence
+                      .slice(0, 5)
+                      .map((lang, index) => (
+                        <Chip
+                          key={index}
+                          label={`${lang.code}: ${Math.round(lang.score * 100)}%`}
+                          size="small"
+                          variant={index === 0 ? "filled" : "outlined"}
+                          sx={{ fontSize: "0.7rem" }}
+                        />
+                      ))}
+                  </Box>
+                </Paper>
+              )}
+
+              {/* Confidence Legend */}
+              {segments.length > 0 && (
+                <Paper
+                  elevation={0}
+                  sx={{
+                    mb: 2,
+                    p: 1.5,
+                    backgroundColor: alpha(theme.palette.background.paper, 0.5),
+                    borderRadius: 1,
+                    border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    sx={{ mb: 1, display: "block", fontWeight: 600 }}
+                  >
+                    Confidence Indicators:
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      gap: 2,
+                      flexWrap: "wrap",
+                      alignItems: "center",
+                    }}
+                  >
                     <Box
-                      key={index}
-                      onClick={() => handleJumpToResult(result)}
-                      sx={{
-                        p: 1,
-                        cursor: "pointer",
-                        borderRadius: 1,
-                        "&:hover": {
-                          backgroundColor: alpha(
-                            theme.palette.primary.main,
-                            0.1,
-                          ),
-                        },
-                      }}
+                      sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
                     >
+                      <span
+                        style={{
+                          padding: "2px 6px",
+                          borderRadius: "4px",
+                          fontSize: "0.75rem",
+                          backgroundColor: "transparent",
+                        }}
+                      >
+                        Normal
+                      </span>
                       <Typography variant="caption" color="text.secondary">
-                        {result.segment.speaker} • {result.timestamp.toFixed(1)}
-                        s
-                      </Typography>
-                      <Typography variant="body2" sx={{ fontSize: "0.8rem" }}>
-                        ...{result.word.content}...
+                        ≥80% confidence
                       </Typography>
                     </Box>
-                  ))}
-                </Box>
-              </Paper>
-            )}
-
-            {/* Language Detection Details */}
-            {languageData && languageData.detectedLanguages.length > 1 && (
-              <Paper
-                elevation={0}
-                sx={{
-                  mb: 2,
-                  p: 1.5,
-                  backgroundColor: alpha(theme.palette.background.paper, 0.5),
-                  borderRadius: 1,
-                  border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                }}
-              >
-                <Typography
-                  variant="caption"
-                  sx={{ mb: 1, display: "block", fontWeight: 600 }}
-                >
-                  Language Detection Details:
-                </Typography>
-                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-                  {languageData.detectedLanguages
-                    .filter((lang) => lang.score >= 0.7) // Only show languages with 70%+ confidence
-                    .slice(0, 5)
-                    .map((lang, index) => (
-                      <Chip
-                        key={index}
-                        label={`${lang.code}: ${Math.round(lang.score * 100)}%`}
-                        size="small"
-                        variant={index === 0 ? "filled" : "outlined"}
-                        sx={{ fontSize: "0.7rem" }}
-                      />
-                    ))}
-                </Box>
-              </Paper>
-            )}
-
-            {/* Confidence Legend */}
-            {segments.length > 0 && (
-              <Paper
-                elevation={0}
-                sx={{
-                  mb: 2,
-                  p: 1.5,
-                  backgroundColor: alpha(theme.palette.background.paper, 0.5),
-                  borderRadius: 1,
-                  border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                }}
-              >
-                <Typography
-                  variant="caption"
-                  sx={{ mb: 1, display: "block", fontWeight: 600 }}
-                >
-                  Confidence Indicators:
-                </Typography>
-                <Box
-                  sx={{
-                    display: "flex",
-                    gap: 2,
-                    flexWrap: "wrap",
-                    alignItems: "center",
-                  }}
-                >
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                    <span
-                      style={{
-                        padding: "2px 6px",
-                        borderRadius: "4px",
-                        fontSize: "0.75rem",
-                        backgroundColor: "transparent",
-                      }}
+                    <Box
+                      sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
                     >
-                      Normal
-                    </span>
-                    <Typography variant="caption" color="text.secondary">
-                      ≥80% confidence
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                    <span
-                      style={{
-                        padding: "2px 6px",
-                        borderRadius: "4px",
-                        fontSize: "0.75rem",
-                        fontStyle: "italic",
-                        backgroundColor: alpha(theme.palette.warning.main, 0.1),
-                        color: theme.palette.warning.main,
-                      }}
+                      <span
+                        style={{
+                          padding: "2px 6px",
+                          borderRadius: "4px",
+                          fontSize: "0.75rem",
+                          fontStyle: "italic",
+                          backgroundColor: alpha(
+                            theme.palette.warning.main,
+                            0.1,
+                          ),
+                          color: theme.palette.warning.main,
+                        }}
+                      >
+                        Low
+                      </span>
+                      <Typography variant="caption" color="text.secondary">
+                        60-79% confidence
+                      </Typography>
+                    </Box>
+                    <Box
+                      sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
                     >
-                      Low
-                    </span>
-                    <Typography variant="caption" color="text.secondary">
-                      60-79% confidence
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                    <span
-                      style={{
-                        padding: "2px 6px",
-                        borderRadius: "4px",
-                        fontSize: "0.75rem",
-                        fontStyle: "italic",
-                        textDecoration: "underline dotted",
-                        backgroundColor: alpha(theme.palette.error.main, 0.1),
-                        color: theme.palette.error.main,
-                      }}
-                    >
-                      Very Low
-                    </span>
-                    <Typography variant="caption" color="text.secondary">
-                      &lt;60% confidence
-                    </Typography>
-                  </Box>
-                  {/* <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <span
+                        style={{
+                          padding: "2px 6px",
+                          borderRadius: "4px",
+                          fontSize: "0.75rem",
+                          fontStyle: "italic",
+                          textDecoration: "underline dotted",
+                          backgroundColor: alpha(theme.palette.error.main, 0.1),
+                          color: theme.palette.error.main,
+                        }}
+                      >
+                        Very Low
+                      </span>
+                      <Typography variant="caption" color="text.secondary">
+                        &lt;60% confidence
+                      </Typography>
+                    </Box>
+                    {/* <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                                         <span style={{
                                             padding: '2px 6px',
@@ -1107,102 +1102,103 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
                                         Click icon for alternatives
                                     </Typography>
                                 </Box> */}
-                </Box>
-              </Paper>
-            )}
+                  </Box>
+                </Paper>
+              )}
 
-            {/* Speakers Info */}
-            {speakers.length > 0 && (
-              <Paper
-                elevation={0}
-                sx={{
-                  mb: 0,
-                  p: 1.5,
-                  backgroundColor: alpha(theme.palette.background.paper, 0.5),
-                  borderRadius: 1,
-                  border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                }}
-              >
-                <Typography
-                  variant="caption"
-                  sx={{ mb: 1, display: "block", fontWeight: 600 }}
+              {/* Speakers Info */}
+              {speakers.length > 0 && (
+                <Paper
+                  elevation={0}
+                  sx={{
+                    mb: 0,
+                    p: 1.5,
+                    backgroundColor: alpha(theme.palette.background.paper, 0.5),
+                    borderRadius: 1,
+                    border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                  }}
                 >
-                  Speakers:
-                </Typography>
-                <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                  {speakers.map((speaker) => (
-                    <Chip
-                      key={speaker}
-                      icon={<PersonIcon />}
-                      label={speaker}
-                      size="small"
-                      variant="outlined"
-                      sx={{ fontSize: "0.7rem" }}
-                    />
-                  ))}
-                </Box>
-              </Paper>
-            )}
+                  <Typography
+                    variant="caption"
+                    sx={{ mb: 1, display: "block", fontWeight: 600 }}
+                  >
+                    Speakers:
+                  </Typography>
+                  <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                    {speakers.map((speaker) => (
+                      <Chip
+                        key={speaker}
+                        icon={<PersonIcon />}
+                        label={speaker}
+                        size="small"
+                        variant="outlined"
+                        sx={{ fontSize: "0.7rem" }}
+                      />
+                    ))}
+                  </Box>
+                </Paper>
+              )}
+            </Box>
+          </Collapse>
+        </Paper>
+
+        {/*  Transcript */}
+        {segments.length > 0 ? (
+          <Box>
+            <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
+              Transcript
+              {currentTime > 0 && (
+                <Chip
+                  label={`${currentTime.toFixed(1)}s`}
+                  size="small"
+                  sx={{ ml: 2 }}
+                  color="primary"
+                />
+              )}
+            </Typography>
+
+            {segments.map((segment) => (
+              <div key={segment.id} id={`segment-${segment.id}`}>
+                <TranscriptSegment
+                  segment={segment}
+                  currentHighlight={currentHighlight}
+                  searchResults={searchResults}
+                  onSeek={handleSeek}
+                />
+              </div>
+            ))}
           </Box>
-        </Collapse>
-      </Paper>
-
-      {/*  Transcript */}
-      {segments.length > 0 ? (
-        <Box>
-          <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
-            Transcript
-            {currentTime > 0 && (
-              <Chip
-                label={`${currentTime.toFixed(1)}s`}
-                size="small"
-                sx={{ ml: 2 }}
-                color="primary"
-              />
-            )}
-          </Typography>
-
-          {segments.map((segment) => (
-            <div key={segment.id} id={`segment-${segment.id}`}>
-              <TranscriptSegment
-                segment={segment}
-                currentHighlight={currentHighlight}
-                searchResults={searchResults}
-                onSeek={handleSeek}
-              />
-            </div>
-          ))}
-        </Box>
-      ) : (
-        /* Fallback to original display */
-        <Paper
-          elevation={0}
-          sx={{
-            mb: 3,
-            p: 2,
-            backgroundColor: alpha(theme.palette.background.paper, 0.7),
-            borderRadius: 1,
-            border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-          }}
-        >
-          <Typography
-            variant="body2"
+        ) : (
+          /* Fallback to original display */
+          <Paper
+            elevation={0}
             sx={{
-              mb: 2,
-              fontStyle: "italic",
-              color: theme.palette.text.secondary,
+              mb: 3,
+              p: 2,
+              backgroundColor: alpha(theme.palette.background.paper, 0.7),
+              borderRadius: 1,
+              border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
             }}
           >
-            Full Transcript:
-          </Typography>
-          <Typography variant="body1" paragraph>
-            {hasTranscripts
-              ? transcriptionData.data.results.transcripts[0].transcript
-              : "Full transcript not available"}
-          </Typography>
-        </Paper>
-      )}
-    </Box>
+            <Typography
+              variant="body2"
+              sx={{
+                mb: 2,
+                fontStyle: "italic",
+                color: theme.palette.text.secondary,
+              }}
+            >
+              Full Transcript:
+            </Typography>
+            <Typography variant="body1" paragraph>
+              {hasTranscripts
+                ? transcriptionData.data.results.transcripts[0].transcript
+                : "Full transcript not available"}
+            </Typography>
+          </Paper>
+        )}
+      </Box>
+    </TabContentContainer>
   );
 };
 
