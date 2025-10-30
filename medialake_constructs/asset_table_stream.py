@@ -9,7 +9,6 @@ from aws_cdk import aws_lambda as lambda_
 from aws_cdk import aws_lambda_event_sources as lambda_event_sources
 from constructs import Construct
 
-from config import config
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 from medialake_constructs.shared_constructs.lambda_layers import SearchLayer
 from medialake_constructs.sqs import SQSConstruct, SQSProps
@@ -64,11 +63,7 @@ class AssetTableStream(Construct):
                 encryption=False,  # Use SSE-SQS (AWS managed) for consistency with other queues
                 enforce_ssl=True,
                 max_receive_count=0,  # No DLQ for this queue as it's already a DLQ
-                removal_policy=(
-                    RemovalPolicy.RETAIN
-                    if config.environment == "prod" and config.should_retain_tables
-                    else RemovalPolicy.DESTROY
-                ),
+                removal_policy=RemovalPolicy.DESTROY,
             ),
         )
 

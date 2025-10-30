@@ -128,9 +128,6 @@ class OpenSearchCluster(Construct):
                 allow_all_outbound=True,
             )
 
-            if config.environment == "prod":
-                os_security_group.apply_removal_policy(RemovalPolicy.RETAIN)
-
         os_security_group.add_ingress_rule(
             peer=props.security_group,
             connection=ec2.Port.tcp(443),
@@ -325,10 +322,6 @@ class OpenSearchCluster(Construct):
 
             # THIS is the magic: ensure the policy exists first
             self.domain.node.add_dependency(log_policy)
-
-            # Retain domain on stack destroy if in prod
-            if config.environment == "prod":
-                self.domain.apply_removal_policy(RemovalPolicy.RETAIN)
 
             # For new domains, the endpoint is not available until deployment.
             collection_endpoint = f"https://{self.domain.attr_domain_endpoint}"

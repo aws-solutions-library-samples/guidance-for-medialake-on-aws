@@ -59,26 +59,18 @@ class PipelinesExecutionsStack(Stack):
             targets=[targets.EventBus(self._pipelines_executions_event_bus.event_bus)],
         )
 
-        if config.db.use_existing_tables:
-            self._pipelnes_executions_table = dynamodb.Table.from_table_arn(
-                self,
-                "ImportedPipelinesExecutionsTable",
-                config.db.pipelines_executions_arn,
-            )
-        else:
-
-            dynamodb_table = DynamoDB(
-                self,
-                "PipelinesExecutionsTable",
-                props=DynamoDBProps(
-                    name=f"{config.resource_prefix}-pipelines-executions-{config.environment}",
-                    partition_key_name="execution_id",
-                    partition_key_type=dynamodb.AttributeType.STRING,
-                    sort_key_name="start_time",
-                    sort_key_type=dynamodb.AttributeType.NUMBER,
-                ),
-            )
-            self._pipelnes_executions_table = dynamodb_table.table
+        dynamodb_table = DynamoDB(
+            self,
+            "PipelinesExecutionsTable",
+            props=DynamoDBProps(
+                name=f"{config.resource_prefix}-pipelines-executions-{config.environment}",
+                partition_key_name="execution_id",
+                partition_key_type=dynamodb.AttributeType.STRING,
+                sort_key_name="start_time",
+                sort_key_type=dynamodb.AttributeType.NUMBER,
+            ),
+        )
+        self._pipelnes_executions_table = dynamodb_table.table
 
         self._pipeline_executions_event_processor = Lambda(
             self,

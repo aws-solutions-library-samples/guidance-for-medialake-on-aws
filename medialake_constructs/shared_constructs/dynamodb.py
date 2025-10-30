@@ -6,8 +6,6 @@ from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_kms as kms
 from constructs import Construct
 
-from config import config
-
 
 @dataclass
 class DynamoDBProps:
@@ -37,60 +35,43 @@ class DynamoDB(Construct):
         self.region = stack.region
         self.account_id = stack.account
 
-        if config.db.use_existing_tables:
-            # Import existing table
-            self._table = dynamodb.Table.from_table_attributes(
-                self,
-                f"{id}Existing",
-                table_name=props.name,
-                table_stream_arn=(
-                    f"arn:aws:dynamodb:{self.region}:{self.account_id}:table/{props.name}/stream/{props.stream}"
-                    if props.stream
-                    else None
-                ),
+        # Create a custom KMS key for encryption
+        self._kms_key = kms.Key(
+            self,
+            "DynamoDBKMSKey",
+            removal_policy=props.removal_policy,
+            enable_key_rotation=True,
+            description="KMS key for DynamoDB table encryption",
+        )
+
+        # Create new table with all configurations
+        table_props = {
+            "table_name": props.name,
+            "partition_key": dynamodb.Attribute(
+                name=props.partition_key_name, type=props.partition_key_type
+            ),
+            "point_in_time_recovery": props.point_in_time_recovery,
+            "removal_policy": RemovalPolicy.DESTROY,
+            "dynamo_stream": props.stream,
+            "encryption": dynamodb.TableEncryptionV2.dynamo_owned_key(),
+            "billing": props.billing_mode or dynamodb.Billing.on_demand(),
+        }
+
+        # Add TTL attribute if provided
+        if props.ttl_attribute:
+            table_props["time_to_live_attribute"] = props.ttl_attribute
+
+        # Add sort key if provided
+        if props.sort_key_name and props.sort_key_type:
+            table_props["sort_key"] = dynamodb.Attribute(
+                name=props.sort_key_name, type=props.sort_key_type
             )
-        else:
-            # Create a custom KMS key for encryption
-            self._kms_key = kms.Key(
-                self,
-                "DynamoDBKMSKey",
-                removal_policy=props.removal_policy,
-                enable_key_rotation=True,
-                description="KMS key for DynamoDB table encryption",
-            )
 
-            # Create new table with all configurations
-            table_props = {
-                "table_name": props.name,
-                "partition_key": dynamodb.Attribute(
-                    name=props.partition_key_name, type=props.partition_key_type
-                ),
-                "point_in_time_recovery": props.point_in_time_recovery,
-                "removal_policy": (
-                    RemovalPolicy.RETAIN
-                    if config.should_retain_tables
-                    else RemovalPolicy.DESTROY
-                ),
-                "dynamo_stream": props.stream,
-                "encryption": dynamodb.TableEncryptionV2.dynamo_owned_key(),
-                "billing": props.billing_mode or dynamodb.Billing.on_demand(),
-            }
+        # Add global secondary indexes if provided
+        if props.global_secondary_indexes:
+            table_props["global_secondary_indexes"] = props.global_secondary_indexes
 
-            # Add TTL attribute if provided
-            if props.ttl_attribute:
-                table_props["time_to_live_attribute"] = props.ttl_attribute
-
-            # Add sort key if provided
-            if props.sort_key_name and props.sort_key_type:
-                table_props["sort_key"] = dynamodb.Attribute(
-                    name=props.sort_key_name, type=props.sort_key_type
-                )
-
-            # Add global secondary indexes if provided
-            if props.global_secondary_indexes:
-                table_props["global_secondary_indexes"] = props.global_secondary_indexes
-
-            self._table = dynamodb.TableV2(self, "DynamoDBTable", **table_props)
+        self._table = dynamodb.TableV2(self, "DynamoDBTable", **table_props)
 
     @property
     def table(self) -> dynamodb.ITable:

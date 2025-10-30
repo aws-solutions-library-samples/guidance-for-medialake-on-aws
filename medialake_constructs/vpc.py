@@ -8,7 +8,6 @@ from constructs import Construct
 
 # Import the CDK logger instead of aws_lambda_powertools
 from cdk_logger import get_logger
-from config import config
 
 logger = get_logger("VPC")
 
@@ -92,15 +91,6 @@ class CustomVpc(Construct):
                 },
             )
             logger.info(f"Successfully created new VPC: {self.vpc.vpc_id}")
-
-            # If the environment is prod, apply a retention policy to the VPC.
-            if config.environment == "prod":
-                logger.info(
-                    "Production environment detected - applying RETAIN removal policy"
-                )
-                self.vpc.apply_removal_policy(RemovalPolicy.RETAIN)
-                for subnet in self.vpc.public_subnets + self.vpc.private_subnets:
-                    subnet.apply_removal_policy(RemovalPolicy.RETAIN)
 
         self.vpc_id = self.vpc.vpc_id
 
