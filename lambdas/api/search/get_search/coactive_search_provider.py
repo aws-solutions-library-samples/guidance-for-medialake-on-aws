@@ -228,9 +228,17 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
             "limit": query.page_size,
         }
 
-        # Add asset_type filter for video if include_clips is true
-        if query.include_clips:
-            payload["asset_type"] = "video"
+        # Only add asset_type filter if explicitly provided in query filters
+        # Don't automatically filter by asset_type based on include_clips
+        # as this would exclude images when in clip mode
+        if query.filters:
+            for filter_item in query.filters:
+                if (
+                    filter_item.field == "asset_type"
+                    or filter_item.field == "DigitalSourceAsset.Type"
+                ):
+                    payload["asset_type"] = filter_item.value
+                    break
 
         self.logger.info(f"Built Coactive payload: {payload}")
         return payload
