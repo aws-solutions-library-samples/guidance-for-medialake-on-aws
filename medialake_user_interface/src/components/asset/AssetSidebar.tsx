@@ -1572,12 +1572,16 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
 
       // Get all visual-text clips
       const allVisualTextClips = asset.clips
-        .filter(
-          (clip) =>
-            clip.embedding_option === "visual-text" &&
-            clip.score !== null &&
-            clip.score !== undefined,
-        )
+        .filter((clip) => {
+          // Support both embedding_option (TwelveLabs API/Coative) and embedding_scope (TwelveLabs Bedrock)
+          const isValidEmbedding =
+            clip.embedding_option === "visual-text" ||
+            clip.embedding_scope === "clip";
+
+          const hasValidScore = clip.score !== null && clip.score !== undefined;
+
+          return isValidEmbedding && hasValidScore;
+        })
         .sort((a, b) => (b.score || 0) - (a.score || 0));
 
       // Filter by new threshold
@@ -1772,26 +1776,40 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
         }
 
         // Get all visual-text clips first
+        // console.log("=== FILTERING CLIPS DEBUG ===");
+        // console.log("Total clips in asset:", asset.clips.length);
+        // console.log("Sample clip structure:", asset.clips[0]);
+
         const allVisualTextClips = asset.clips
-          .filter(
-            (clip) =>
-              clip.embedding_option === "visual-text" &&
-              clip.score !== null &&
-              clip.score !== undefined &&
+          .filter((clip) => {
+            // Support both embedding_option (TwelveLabs API/Coative) and embedding_scope (TwelveLabs Bedrock)
+            const isValidEmbedding =
+              clip.embedding_option === "visual-text" ||
+              clip.embedding_scope === "clip";
+
+            const hasValidScore =
+              clip.score !== null && clip.score !== undefined;
+            const hasValidTimes =
               (clip.start_timecode || clip.start_time) &&
-              (clip.end_timecode || clip.end_time),
-          )
+              (clip.end_timecode || clip.end_time);
+
+            return isValidEmbedding && hasValidScore && hasValidTimes;
+          })
           .sort((a, b) => (b.score || 0) - (a.score || 0));
 
-        console.log(
-          "All visual-text clips:",
-          allVisualTextClips.map((c) => ({
-            score: c.score,
-            start: c.start_timecode || c.start_time,
-            end: c.end_timecode || c.end_time,
-          })),
-        );
-        console.log("Current score threshold:", scoreThreshold);
+        // console.log("Filtered visual-text clips count:", allVisualTextClips.length);
+        // console.log(
+        //   "All visual-text clips:",
+        //   allVisualTextClips.map((c) => ({
+        //     score: c.score,
+        //     embedding_option: c.embedding_option,
+        //     embedding_scope: c.embedding_scope,
+        //     start: c.start_timecode || c.start_time,
+        //     end: c.end_timecode || c.end_time,
+        //   })),
+        // );
+        // console.log("Current score threshold:", scoreThreshold);
+        // console.log("=== END FILTERING CLIPS DEBUG ===");
 
         // Create markers for all clips (filtering will be done at render time)
         const selectedClips = allVisualTextClips;
@@ -1972,12 +1990,30 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
   );
 
   useEffect(() => {
+    // Debug logging for asset and clips
+    // console.log("=== CLIP MARKERS DEBUG - START ===");
+    // console.log("Asset object:", asset);
+    // console.log("Asset clips:", asset?.clips);
+    // console.log("Has clips?", !!asset?.clips);
+    // console.log("Is clips array?", Array.isArray(asset?.clips));
+    // console.log("Clips length:", asset?.clips?.length);
+    // console.log("First clip sample:", asset?.clips?.[0]);
+    // console.log("VideoViewerRef available?", !!videoViewerRef?.current);
+    // console.log("Clips markers already created?", clipsMarkersCreated);
+    // console.log("=== CLIP MARKERS DEBUG - END ===");
+
     if (
       !videoViewerRef?.current ||
       !asset?.clips ||
       !Array.isArray(asset.clips)
-    )
+    ) {
+      // console.warn("Skipping marker creation - missing requirements:", {
+      //   hasVideoViewerRef: !!videoViewerRef?.current,
+      //   hasClips: !!asset?.clips,
+      //   isClipsArray: Array.isArray(asset?.clips),
+      // });
       return;
+    }
 
     // Skip if markers have already been created from clips
     if (clipsMarkersCreated) {
