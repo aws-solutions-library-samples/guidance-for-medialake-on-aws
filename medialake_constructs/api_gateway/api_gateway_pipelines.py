@@ -547,17 +547,19 @@ class ApiGatewayPipelinesConstruct(Construct):
         apply_custom_authorization(pipelines_status_execution_get, props.authorizer)
 
         # Add get pipeline by ID endpoint - use a different name to avoid conflicts
-        pipelines_pipeline_get = (
-            pipelines_resource.add_resource("pipeline")
-            .add_resource("{pipelineId}")
-            .add_method(
-                "GET",
-                apigateway.LambdaIntegration(
-                    self._post_pipelines_async_handler.function
-                ),
-            )
-        )
-        apply_custom_authorization(pipelines_pipeline_get, props.authorizer)
+        # COMMENTED OUT: This creates a duplicate path /pipelines/pipeline/{pipelineId}
+        # which conflicts with /pipelines/{pipelineId} below (line 591)
+        # pipelines_pipeline_get = (
+        #     pipelines_resource.add_resource("pipeline")
+        #     .add_resource("{pipelineId}")
+        #     .add_method(
+        #         "GET",
+        #         apigateway.LambdaIntegration(
+        #             self._post_pipelines_async_handler.function
+        #         ),
+        #     )
+        # )
+        # apply_custom_authorization(pipelines_pipeline_get, props.authorizer)
 
         # DELETE /api/pipelines - now handled by the comprehensive del_pipelinesId handler
         # This endpoint is removed as we're consolidating to use only the {pipelineId} endpoint
