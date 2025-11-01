@@ -43,10 +43,10 @@ class S3VectorCluster(Construct):
             config=LambdaConfig(
                 entry="lambdas/back_end/create_s3_vector_index",
                 lambda_handler="handler",
-                # vpc=props.vpc,
-                # security_groups=(
-                #     [props.security_group] if props.security_group else None
-                # ),
+                vpc=props.vpc,
+                security_groups=(
+                    [props.security_group] if props.security_group else None
+                ),
                 timeout_minutes=5,
                 environment_variables={
                     "VECTOR_BUCKET_NAME": self._bucket_name,
