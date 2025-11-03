@@ -233,7 +233,7 @@ def lambda_handler(event: Dict[str, Any], context) -> Any:  # noqa: C901 (long f
             s3_client.download_file(source_bucket, source_key, input_path)
         else:
             logger.info("Downloading via presigned URL")
-            r = requests.get(presigned_url)
+            r = requests.get(presigned_url, timeout=600)
             r.raise_for_status()
             with open(input_path, "wb") as f:
                 f.write(r.content)
