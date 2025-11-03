@@ -666,7 +666,7 @@ def process_store_action(payload: Dict[str, Any]) -> Dict[str, Any]:
     if not inventory_id:
         raise ValueError("Unable to determine inventory_id from payload")
 
-    # batch processing
+    # Check if this is batch processing (array of embeddings)
     if isinstance(payload.get("data"), list):
         data_list = payload["data"]
         if not data_list:
@@ -774,46 +774,63 @@ def process_store_action(payload: Dict[str, Any]) -> Dict[str, Any]:
             ),
         }
 
-    # single embedding processing
-    embedding_vector = extract_embedding_vector(payload)
+    # Single embedding - extract from data.item structure or direct data
+    embedding_data = None
+
+    # Try new structure: data.item
+    if isinstance(payload.get("data"), dict):
+        item = payload["data"].get("item")
+        if isinstance(item, dict):
+            embedding_data = item
+
+    # Fallback to old structure: data directly contains embedding
+    if not embedding_data and isinstance(payload.get("data"), dict):
+        data = payload["data"]
+        if data.get("float"):  # Has embedding vector directly
+            embedding_data = data
+
+    if not embedding_data:
+        raise ValueError(
+            "No embedding data found in payload - expected data.item or data with float field"
+        )
+
+    embedding_vector = embedding_data.get("float")
     if not embedding_vector:
-        raise ValueError("No embedding vector found in payload")
+        raise ValueError("No embedding vector found in embedding data")
     if not isinstance(embedding_vector, list) or not embedding_vector:
         raise ValueError("Embedding vector must be a non-empty list")
 
-    scope = extract_scope(payload)
+    # Create temp payload for extraction functions
+    temp_payload = {
+        "data": embedding_data,
+        **{k: v for k, v in payload.items() if k != "data"},
+    }
+
+    scope = embedding_data.get("embedding_scope") or extract_scope(temp_payload)
     if not scope:
         raise ValueError("Cannot determine embedding scope from payload")
 
-    opt = extract_embedding_option(payload)
+    opt = embedding_data.get("embedding_option") or extract_embedding_option(
+        temp_payload
+    )
 
-    # Dynamically detect content type for single embedding
-    single_content_type = detect_content_type(payload)
-    is_audio_content = single_content_type == "audio"
+    # Dynamically detect content type
+    content_type = detect_content_type(payload, embedding_data)
+    is_audio_content = content_type == "audio"
 
     # clip, audio, or image
     if scope in {"clip", "audio", "image"} or is_audio_content:
-        # Check for embedding data in either 'data' or 'item' field
-        embedding_data = payload.get("data") or payload.get("item")
-        if not embedding_data:
-            raise ValueError(
-                "Missing 'data' or 'item' field in payload for single embedding processing"
-            )
-
         result = process_single_embedding(payload, embedding_data, client, inventory_id)
         return {"statusCode": 200, "body": json.dumps(result)}
 
     # master/video - extract framerate from input data (only for video content)
-    master_content_type = detect_content_type(payload)
-    if master_content_type == "video":
-        framerate = extract_framerate(payload)
+    if content_type == "video":
+        framerate = embedding_data.get("framerate") or extract_framerate(temp_payload)
         int(round(framerate)) if framerate else 30
-    else:
-        pass
 
     metadata = {
         "inventory_id": inventory_id,
-        "content_type": master_content_type,
+        "content_type": content_type,
         "embedding_scope": scope,
         "timestamp": datetime.utcnow().isoformat(),
     }
@@ -822,7 +839,6 @@ def process_store_action(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     vectors_data = [{"vector": embedding_vector, "metadata": metadata}]
 
-    # These now raise exceptions instead of returning booleans
     ensure_vector_bucket_exists(client, VECTOR_BUCKET_NAME)
     dim = len(embedding_vector)
     ensure_index_exists(client, VECTOR_BUCKET_NAME, INDEX_NAME, dim)
