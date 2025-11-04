@@ -18,6 +18,7 @@ from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_efs as efs
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_lambda_event_sources as lambda_event_sources
+from aws_cdk import aws_logs as logs
 from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_secretsmanager as secretsmanager
 from aws_cdk import aws_sqs as sqs
@@ -1994,13 +1995,26 @@ class AssetsConstruct(Construct):
 
         # Final merge task is already connected to success_state in the workflow definition
 
-        # Create the state machine using the non-deprecated API
+        # Create CloudWatch Log Group for state machine logging
+        bulk_download_log_group = logs.LogGroup(
+            self,
+            "AssetsBulkDownloadLogGroup",
+            log_group_name=f"/aws/vendedlogs/states/{config.resource_prefix}_Asset-Bulk-Download",
+            retention=logs.RetentionDays.ONE_MONTH,
+        )
+
+        # Create the state machine using the non-deprecated API with logging enabled
         self._state_machine = sfn.StateMachine(
             self,
             "AssetsBulkDownloadStateMachine",
             state_machine_name=f"{config.resource_prefix}_Asset-Bulk-Download",
             definition_body=sfn.DefinitionBody.from_chainable(workflow),
             timeout=Duration.hours(6),  # Increase timeout for large file processing
+            logs=sfn.LogOptions(
+                destination=bulk_download_log_group,
+                level=sfn.LogLevel.ALL,
+                include_execution_data=True,
+            ),
         )
 
         # Update the Kickoff Lambda with the state machine ARN
