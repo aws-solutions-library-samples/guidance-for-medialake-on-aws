@@ -60,6 +60,7 @@ CLAUDE.md
 *.claude-ignore
 *.roomodes
 .kiro/
+.sonar/
 
 # Playwrght testing
 playwright-report/
