@@ -210,8 +210,8 @@ interface BulkDownloadRequest {
   assetIds: Array<{
     assetId: string;
     clipBoundary?: {
-      startTime: number;
-      endTime: number;
+      startTime?: number;
+      endTime?: number;
     };
   }>;
   options?: {
