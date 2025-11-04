@@ -375,9 +375,9 @@ sync-to-github:
     - git config --global user.email "medialake@amazon.com"
     - git config --global user.name "Media Lake CI"
     # Extract MR title from the merge commit body (it's on line 3 of the merge commit)
-    - echo "Debug - Full commit message:"
+    - 'echo "Debug - Full commit message:"'
     - git log -1 --pretty=%B
-    - echo "Debug - Extracting line 3..."
+    - 'echo "Debug - Extracting line 3..."'
     - 'export COMMIT_MESSAGE=$(git log -1 --pretty=%B | sed -n "3p" | xargs)'
     - 'echo "Debug - Extracted message: [${COMMIT_MESSAGE}]"'
     # Fallback to commit title if extraction fails or is empty
