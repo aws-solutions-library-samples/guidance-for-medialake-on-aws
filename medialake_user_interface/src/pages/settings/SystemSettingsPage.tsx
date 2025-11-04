@@ -468,9 +468,13 @@ const SystemSettingsPage: React.FC = () => {
                                 .TWELVE_LABS_BEDROCK.name
                             }
                           </MenuItem>
+                          <MenuItem value="coactive">
+                            {SYSTEM_SETTINGS_CONFIG.PROVIDERS.COACTIVE.name}
+                          </MenuItem>
                         </Select>
                       </FormControl>
-                      {settings.provider.type === "twelvelabs-api" &&
+                      {(settings.provider.type === "twelvelabs-api" ||
+                        settings.provider.type === "coactive") &&
                         settings.provider.config?.isConfigured && (
                           <Button
                             variant="outlined"
@@ -505,7 +509,11 @@ const SystemSettingsPage: React.FC = () => {
                   sx={{
                     border: `1px solid ${theme.palette.divider}`,
                     borderRadius: 2,
-                    opacity: settings.isEnabled ? 1 : 0.5,
+                    opacity:
+                      settings.isEnabled &&
+                      settings.provider.type !== "coactive"
+                        ? 1
+                        : 0.5,
                   }}
                 >
                   <CardContent>
@@ -520,64 +528,86 @@ const SystemSettingsPage: React.FC = () => {
                       color="text.secondary"
                       sx={{ mb: 3 }}
                     >
-                      {t(
-                        "settings.systemSettings.search.embeddingStoreDesc",
-                        "Choose where to store and search vector embeddings",
-                      )}
+                      {settings.provider.type === "coactive"
+                        ? t(
+                            "settings.systemSettings.search.embeddingStoreCoactiveDesc",
+                            "Coactive AI uses its own external search service and does not require an embedding store configuration.",
+                          )
+                        : t(
+                            "settings.systemSettings.search.embeddingStoreDesc",
+                            "Choose where to store and search vector embeddings",
+                          )}
                     </Typography>
 
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                      <FormControl
-                        sx={{ minWidth: 200 }}
-                        disabled={!settings.isEnabled}
+                    {settings.provider.type !== "coactive" ? (
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 2 }}
                       >
-                        <InputLabel>
-                          {t(
-                            "settings.systemSettings.search.selectStore",
-                            "Select Store",
-                          )}
-                        </InputLabel>
-                        <Select
-                          value={settings.embeddingStore.type}
-                          label="Select Store"
-                          onChange={(e) =>
-                            handleEmbeddingStoreChange(
-                              e.target.value as "opensearch" | "s3-vector",
+                        <FormControl
+                          sx={{ minWidth: 200 }}
+                          disabled={!settings.isEnabled}
+                        >
+                          <InputLabel>
+                            {t(
+                              "settings.systemSettings.search.selectStore",
+                              "Select Store",
+                            )}
+                          </InputLabel>
+                          <Select
+                            value={settings.embeddingStore.type}
+                            label="Select Store"
+                            onChange={(e) =>
+                              handleEmbeddingStoreChange(
+                                e.target.value as "opensearch" | "s3-vector",
+                              )
+                            }
+                          >
+                            <MenuItem value="opensearch">
+                              {
+                                SYSTEM_SETTINGS_CONFIG.EMBEDDING_STORES
+                                  .OPENSEARCH.name
+                              }
+                            </MenuItem>
+                            <MenuItem value="s3-vector">
+                              {
+                                SYSTEM_SETTINGS_CONFIG.EMBEDDING_STORES
+                                  .S3_VECTOR.name
+                              }
+                            </MenuItem>
+                          </Select>
+                        </FormControl>
+
+                        <Button
+                          variant="contained"
+                          onClick={handleSaveEmbeddingStoreSettings}
+                          disabled={!settings.isEnabled || isSaving}
+                          startIcon={
+                            isSaving ? (
+                              <CircularProgress size={16} />
+                            ) : (
+                              <CheckCircleIcon />
                             )
                           }
                         >
-                          <MenuItem value="opensearch">
-                            {
-                              SYSTEM_SETTINGS_CONFIG.EMBEDDING_STORES.OPENSEARCH
-                                .name
-                            }
-                          </MenuItem>
-                          <MenuItem value="s3-vector">
-                            {
-                              SYSTEM_SETTINGS_CONFIG.EMBEDDING_STORES.S3_VECTOR
-                                .name
-                            }
-                          </MenuItem>
-                        </Select>
-                      </FormControl>
-
-                      <Button
-                        variant="contained"
-                        onClick={handleSaveEmbeddingStoreSettings}
-                        disabled={!settings.isEnabled || isSaving}
-                        startIcon={
-                          isSaving ? (
-                            <CircularProgress size={16} />
-                          ) : (
-                            <CheckCircleIcon />
-                          )
-                        }
+                          {isSaving
+                            ? t("common.saving", "Saving...")
+                            : t("common.save", "Save")}
+                        </Button>
+                      </Box>
+                    ) : (
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 2 }}
                       >
-                        {isSaving
-                          ? t("common.saving", "Saving...")
-                          : t("common.save", "Save")}
-                      </Button>
-                    </Box>
+                        <Chip
+                          label={t(
+                            "settings.systemSettings.search.externalService",
+                            "External Service",
+                          )}
+                          color="info"
+                          variant="outlined"
+                        />
+                      </Box>
+                    )}
                   </CardContent>
                 </Card>
 

@@ -268,6 +268,7 @@ class ApiGatewayStack(cdk.NestedStack):
                 vpc=props.vpc,
                 security_group=props.security_group,
                 open_search_arn=props.collection_arn,
+                system_settings_table=props.system_settings_table,
                 media_assets_bucket=props.media_assets_bucket.bucket,
                 s3_vector_bucket_name=props.s3_vector_bucket_name,
             ),

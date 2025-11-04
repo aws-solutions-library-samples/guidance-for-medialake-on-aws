@@ -1,0 +1,8 @@
+{
+    "job_id": "{{ variables.job_id }}",
+    "status": "{{ variables.ingestion_status }}",
+    "assets_processed": {{ variables.processed_assets | default(0) }},
+    "externalJobId": "{{ variables.externalJobId }}",
+    "externalJobStatus": "Started",
+    "externalJobResult": {{ variables.externalJobResult | jsonify }}
+}
