@@ -302,7 +302,7 @@ cdk deploy --all --profile <profile> --region <region>
 
 ### 1. **Login**
 
-Use the emailed credentials to log in to the media lake UI.
+Use the emailed credentials and link to log in to the media lake UI.
 
 ### 2. **Connect Storage**
 
