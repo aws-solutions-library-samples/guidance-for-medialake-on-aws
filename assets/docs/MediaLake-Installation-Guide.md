@@ -7,7 +7,7 @@
 1. **Open AWS Console** and switch to your desired region.
 2. Go to **CloudFormation** > click **Create Stack** > **With new resources (standard)**.
    ![Create Stack](../images/installation-guide/CF-Install-1.png)
-3. Choose **Upload a template file**, select [`medialake.template`](../../medialake.template), and click Next.
+3. Choose **Upload a template file**, select `medialake.template`, and click Next.
    ![Upload Template](../images/installation-guide/CF-Install-2.png)
    ![Upload Template2](../images/installation-guide/CF-Install-3.png)
 4. **Configure Stack and Media Lake Settings**:
@@ -135,24 +135,24 @@ After deployment, you'll need to configure storage connectors to connect media l
     **Twelve Labs AI Enhancement Pipelines:**
 
     _API-based Pipelines (Direct TwelveLabs API):_
-    - `TwelveLabs API Audio Embedding to OpenSearch.json` - Generate audio embeddings for semantic search using TwelveLabs API
-    - `TwelveLabs API Video Embedding to OpenSearch.json` - Generate video embeddings for semantic search using TwelveLabs API
-    - `TwelveLabs API Image Embedding to OpenSearch.json` - Generate image embeddings for semantic search using TwelveLabs API
-    - `TwelveLabs API Audio Embedding to S3 Vectors.json` - Generate audio embeddings for S3 Vectors using TwelveLabs API
-    - `TwelveLabs API Video Embedding to S3 Vectors.json` - Generate video embeddings for S3 Vectors using TwelveLabs API
-    - `TwelveLabs API Image Embedding to S3 Vectors.json` - Generate image embeddings for S3 Vectors using TwelveLabs API
+    - [`TwelveLabs API Audio Embedding to OpenSearch.json`](../../pipeline_library/TwelveLabs%20API%20Audio%20Embedding%20to%20OpenSearch.json) - Generate audio embeddings for semantic search using TwelveLabs API
+    - [`TwelveLabs API Video Embedding to OpenSearch.json`](../../pipeline_library/TwelveLabs%20API%20Video%20Embedding%20to%20OpenSearch.json) - Generate video embeddings for semantic search using TwelveLabs API
+    - [`TwelveLabs API Image Embedding to OpenSearch.json`](../../pipeline_library/TwelveLabs%20API%20Image%20Embedding%20to%20OpenSearch.json) - Generate image embeddings for semantic search using TwelveLabs API
+    - [`TwelveLabs API Audio Embedding to S3 Vectors.json`](../../pipeline_library/TwelveLabs%20API%20Audio%20Embedding%20to%20S3%20Vectors.json) - Generate audio embeddings for S3 Vectors using TwelveLabs API
+    - [`TwelveLabs API Video Embedding to S3 Vectors.json`](../../pipeline_library/TwelveLabs%20API%20Video%20Embedding%20to%20S3%20Vectors.json) - Generate video embeddings for S3 Vectors using TwelveLabs API
+    - [`TwelveLabs API Image Embedding to S3 Vectors.json`](../../pipeline_library/TwelveLabs%20API%20Image%20Embedding%20to%20S3%20Vectors.json) - Generate image embeddings for S3 Vectors using TwelveLabs API
 
     _Bedrock-based Pipelines (TwelveLabs via AWS Bedrock):_
-    - `TwelveLabs Bedrock Audio Embedding to OpenSearch.json` - Generate audio embeddings for semantic search using TwelveLabs Marengo 2.7 on Bedrock
-    - `TwelveLabs Bedrock Video Embedding to OpenSearch.json` - Generate video embeddings for semantic search using TwelveLabs Marengo 2.7 on Bedrock
-    - `TwelveLabs Bedrock Image Embedding to OpenSearch.json` - Generate image embeddings for semantic search using TwelveLabs Marengo 2.7 on Bedrock
-    - `TwelveLabs Bedrock Audio Embedding to S3 Vectors.json` - Generate audio embeddings for S3 Vectors using TwelveLabs Marengo 2.7 on Bedrock
-    - `TwelveLabs Bedrock Video Embedding to S3 Vectors.json` - Generate video embeddings for S3 Vectors using TwelveLabs Marengo 2.7 on Bedrock
-    - `TwelveLabs Bedrock Image Embedding to S3 Vectors.json` - Generate image embeddings for S3 Vectors using TwelveLabs Marengo 2.7 on Bedrock
+    - [`TwelveLabs Bedrock Audio Embedding to OpenSearch.json`](../../pipeline_library/TwelveLabs%20Bedrock%20Audio%20Embedding%20to%20OpenSearch.json) - Generate audio embeddings for semantic search using TwelveLabs Marengo 2.7 on Bedrock
+    - [`TwelveLabs Bedrock Video Embedding to OpenSearch.json`](../../pipeline_library/TwelveLabs%20Bedrock%20Video%20Embedding%20to%20OpenSearch.json) - Generate video embeddings for semantic search using TwelveLabs Marengo 2.7 on Bedrock
+    - [`TwelveLabs Bedrock Image Embedding to OpenSearch.json`](../../pipeline_library/TwelveLabs%20Bedrock%20Image%20Embedding%20to%20OpenSearch.json) - Generate image embeddings for semantic search using TwelveLabs Marengo 2.7 on Bedrock
+    - [`TwelveLabs Bedrock Audio Embedding to S3 Vectors.json`](../../pipeline_library/TwelveLabs%20Bedrock%20Audio%20Embedding%20to%20S3%20Vectors.json) - Generate audio embeddings for S3 Vectors using TwelveLabs Marengo 2.7 on Bedrock
+    - [`TwelveLabs Bedrock Video Embedding to S3 Vectors.json`](../../pipeline_library/TwelveLabs%20Bedrock%20Video%20Embedding%20to%20S3%20Vectors.json) - Generate video embeddings for S3 Vectors using TwelveLabs Marengo 2.7 on Bedrock
+    - [`TwelveLabs Bedrock Image Embedding to S3 Vectors.json`](../../pipeline_library/TwelveLabs%20Bedrock%20Image%20Embedding%20to%20S3%20Vectors.json) - Generate image embeddings for S3 Vectors using TwelveLabs Marengo 2.7 on Bedrock
 
     **Transcription Pipelines:**
-    - [`Audio Transcription.json`](../../pipeline_library/Transcription/Audio%20Transcription.json) - Audio transcription using Amazon Transcribe with Bedrock summarization
-    - [`Video Transcription.json`](../../pipeline_library/Transcription/Video%20Transcription.json) - Video transcription using Amazon Transcribe with Bedrock summarization
+    - [`Audio Transcription.json`](../../pipeline_library/Audio%20Transcription.json) - Audio transcription using Amazon Transcribe with Bedrock summarization
+    - [`Video Transcription.json`](../../pipeline_library/Video%20Transcription.json) - Video transcription using Amazon Transcribe with Bedrock summarization
 
   - You can import individual pipelines based on your media types (audio, video, image) or import all pipelines for comprehensive processing capabilities.
   - You can also import other pipelines from the library as needed for your specific use case.
