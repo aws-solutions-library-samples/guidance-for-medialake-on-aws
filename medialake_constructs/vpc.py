@@ -95,9 +95,6 @@ class CustomVpc(Construct):
             # Configure Network ACLs to restrict SSH and RDP access from Internet
             self._configure_network_acls()
 
-            # Configure Network ACLs to restrict SSH and RDP access from Internet
-            self._configure_network_acls()
-
         self.vpc_id = self.vpc.vpc_id
 
         # Create a CloudWatch Log Group for Flow Logs
