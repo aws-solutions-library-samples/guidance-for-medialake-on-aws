@@ -7,7 +7,7 @@
 1. **Open AWS Console** and switch to your desired region.
 2. Go to **CloudFormation** > click **Create Stack** > **With new resources (standard)**.
    ![Create Stack](../images/installation-guide/CF-Install-1.png)
-3. Choose **Upload a template file**, select [`medialake.template`](../../medialake.template), and click Next.
+3. Choose **Upload a template file**, select `medialake.template`, and click Next.
    ![Upload Template](../images/installation-guide/CF-Install-2.png)
    ![Upload Template2](../images/installation-guide/CF-Install-3.png)
 4. **Configure Stack and Media Lake Settings**:
@@ -171,8 +171,8 @@ After deployment, you'll need to configure storage connectors to connect media l
     - [`TwelveLabs Pegasus Bedrock Video Enrichment.json`](../../pipeline_library/Enrichment/TwelveLabs%20Pegasus%20Bedrock%20Video%20Enrichment.json) - Enrich video content with AI-generated metadata using TwelveLabs Pegasus on Bedrock
 
     **Transcription Pipelines:**
-    - [`Audio Transcription.json`](../../pipeline_library/Transcription/Audio%20Transcription.json) - Audio transcription using Amazon Transcribe with Bedrock summarization
-    - [`Video Transcription.json`](../../pipeline_library/Transcription/Video%20Transcription.json) - Video transcription using Amazon Transcribe with Bedrock summarization
+    - [`Audio Transcription.json`](../../pipeline_library/Audio%20Transcription.json) - Audio transcription using Amazon Transcribe with Bedrock summarization
+    - [`Video Transcription.json`](../../pipeline_library/Video%20Transcription.json) - Video transcription using Amazon Transcribe with Bedrock summarization
 
   - You can import individual pipelines based on your media types (audio, video, image) or import all pipelines for comprehensive processing capabilities.
   - You can also import other pipelines from the library as needed for your specific use case.

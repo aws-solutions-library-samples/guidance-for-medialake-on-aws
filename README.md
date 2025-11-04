@@ -136,7 +136,7 @@ We recommend creating a **Budget through AWS Cost Explorer** to help manage cost
 ### Deployment Steps
 
 1. **Download the CloudFormation template**
-   - Download [`medialake.template`](medialake.template) from the GitHub repository
+   - Download `medialake.template` from the GitHub repository
 
 2. **Deploy using AWS Console**
    - Go to the AWS Console > CloudFormation > "Create Stack" > "With new resources (standard)"
@@ -235,7 +235,7 @@ pip install -r requirements-dev.txt
 
 ### 3. **Configuration Setup**
 
-Create a `config.json` file in the project root with your deployment settings:
+Create a [`config.json`](config.json) file in the project root with your deployment settings:
 
 ```bash
 touch config.json
@@ -351,9 +351,9 @@ guidance-for-medialake-on-aws/
 │   ├── auth/                        # Authentication constructs
 │   └── shared_constructs/           # Shared AWS constructs
 ├── medialake_stacks/                # CDK stack definitions
-│   ├── [`api_gateway_core_stack.py`](medialake_stacks/api_gateway_core_stack.py)    # Core API Gateway stack
-│   ├── [`api_gateway_deployment_stack.py`](medialake_stacks/api_gateway_deployment_stack.py) # API deployment stack
-│   ├── [`api_gateway_stack.py`](medialake_stacks/shared_api_stack.py)         # Main API Gateway stack
+│   ├── api_gateway_core_stack.py    # Core API Gateway stack
+│   ├── api_gateway_deployment_stack.py # API deployment stack
+│   ├── api_gateway_stack.py         # Main API Gateway stack
 │   └── [additional stack files]     # Infrastructure and service stacks
 ├── medialake_user_interface/        # React TypeScript frontend
 │   ├── src/                         # Source code
@@ -363,8 +363,8 @@ guidance-for-medialake-on-aws/
 │   │   ├── shared/                  # Common utilities and types
 │   │   └── [additional folders]     # Components, hooks, contexts
 │   ├── tests/                       # End-to-end tests
-│   ├── [`package.json`](medialake_user_interface/package.json)                 # Node.js dependencies
-│   └── [`playwright.config.ts`](medialake_user_interface/playwright.config.ts)         # Testing configuration
+│   ├── package.json                 # Node.js dependencies
+│   └── playwright.config.ts         # Testing configuration
 ├── lambdas/                         # Lambda function source code
 │   ├── api/                         # API endpoint handlers
 │   ├── auth/                        # Authentication functions
@@ -372,18 +372,18 @@ guidance-for-medialake-on-aws/
 │   ├── nodes/                       # Pipeline processing nodes
 │   ├── pipelines/                   # Pipeline orchestration
 │   └── common_libraries/            # Shared Lambda utilities
-├── [`pipeline_library/`](pipeline_library/)               # Default pipeline templates
-├── [`s3_bucket_assets/`](s3_bucket_assets/)               # S3 deployment assets
-│   ├── [`pipeline_library/`](s3_bucket_assets/pipeline_library/)           # Pipeline definitions
-│   └── [`pipeline_nodes/`](s3_bucket_assets/pipeline_nodes/)             # Node templates and specs
-├── [`app.py`](app.py)                          # Main CDK application entry point
-├── [`cdk.json`](cdk.json)                        # CDK configuration and settings
-├── [`config_utils.py`](config_utils.py)                 # Configuration utilities
-├── [`config-example.json`](config-example.json)                 # Development configuration example
-├── [`requirements.txt`](requirements.txt)                # Python dependencies
-├── [`requirements-dev.txt`](requirements-dev.txt)            # Development Python dependencies
-├── [`package.json`](package.json)                    # Node.js dependencies for CDK
-└── [`README.md`](README.md)                       # This documentation file
+├── pipeline_library/               # Default pipeline templates
+├── s3_bucket_assets/               # S3 deployment assets
+│   ├── pipeline_library/           # Pipeline definitions
+│   └── pipeline_nodes/             # Node templates and specs
+├── app.py                          # Main CDK application entry point
+├── cdk.json                        # CDK configuration and settings
+├── config_utils.py                 # Configuration utilities
+├── config-dev.json                 # Development configuration example
+├── requirements.txt                # Python dependencies
+├── requirements-dev.txt            # Development Python dependencies
+├── package.json                    # Node.js dependencies for CDK
+└── README.md                       # This documentation file
 ```
 
 ---
@@ -491,7 +491,7 @@ To remove all media lake resources:
 - For feedback, questions, or suggestions, please use the [GitHub Issues page](https://github.com/aws-solutions-library-samples/guidance-for-medialake/issues).
 - Known issues and deployment tips will be tracked in the Issues section.
 - Service quotas: media lake relies on OpenSearch, DynamoDB, Lambda, and S3 limits; monitor and request increases if needed for large-scale deployments.
-- For SAML integration and advanced identity provider setup, refer to the SAML instructions in [`MediaLake-Installation-Guide.md`](assets/docs/MediaLake-Installation-Guide.md).
+- For SAML integration and advanced identity provider setup, refer to the SAML instructions in [MediaLake-Installation-Guide.md](assets/docs/MediaLake-Installation-Guide.md).
 
 ---
 
