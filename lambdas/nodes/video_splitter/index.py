@@ -197,6 +197,12 @@ def lambda_handler(event: Dict[str, Any], context) -> Any:
             logger.warning("Invalid CHUNK_DURATION – defaulting to 7200 s")
 
         # Download source
+        # Two download paths:
+        # 1. Direct S3 download: Used when accessing proxy representations stored
+        #    in S3. More efficient as it uses boto3's native S3 transfer capabilities.
+        # 2. Presigned URL download: Used when the source is provided via a
+        #    time-limited presigned URL (e.g., from external sources or cross-account
+        #    access). Uses requests with 600s timeout to handle large files.
         input_path = os.path.join(tempfile.gettempdir(), os.path.basename(source_key))
         if use_s3_direct:
             logger.info(
