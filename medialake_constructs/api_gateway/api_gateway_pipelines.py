@@ -8,6 +8,7 @@ from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_events as events
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_lambda as lambda_
+from aws_cdk import aws_logs as logs
 from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_secretsmanager as secretsmanager
 from aws_cdk import aws_stepfunctions as sfn
@@ -389,6 +390,19 @@ class ApiGatewayPipelinesConstruct(Construct):
 
         self._post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
+                actions=[
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                    "logs:DescribeLogGroups",
+                    "logs:PutRetentionPolicy",
+                ],
+                resources=["*"],
+            )
+        )
+
+        self._post_pipelines_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
                 actions=["dynamodb:GetItem"],
                 resources=[props.node_table.table_arn],
             )
@@ -473,17 +487,29 @@ class ApiGatewayPipelinesConstruct(Construct):
 
         # Define the success state
         success_state = sfn.Succeed(self, "SuccessState")
-
         # Create a simple state machine definition
         definition = pipeline_worker_task.next(success_state)
 
-        # Create the state machine
+        # Create CloudWatch Log Group for state machine logging
+        pipeline_creation_log_group = logs.LogGroup(
+            self,
+            "PipelineCreationStateMachineLogGroup",
+            log_group_name=f"/aws/vendedlogs/states/{config.resource_prefix}_Pipeline_Creator",
+            retention=logs.RetentionDays.ONE_MONTH,
+        )
+
+        # Create the state machine with logging enabled
         self._pipeline_creation_state_machine = sfn.StateMachine(
             self,
             "PipelineCreationStateMachine",
             state_machine_name=f"{config.resource_prefix}_Pipeline_Creator",
             definition=definition,
             timeout=Duration.minutes(300),
+            logs=sfn.LogOptions(
+                destination=pipeline_creation_log_group,
+                level=sfn.LogLevel.ALL,
+                include_execution_data=True,
+            ),
         )
 
         # Create the front-end Lambda
@@ -547,17 +573,19 @@ class ApiGatewayPipelinesConstruct(Construct):
         apply_custom_authorization(pipelines_status_execution_get, props.authorizer)
 
         # Add get pipeline by ID endpoint - use a different name to avoid conflicts
-        pipelines_pipeline_get = (
-            pipelines_resource.add_resource("pipeline")
-            .add_resource("{pipelineId}")
-            .add_method(
-                "GET",
-                apigateway.LambdaIntegration(
-                    self._post_pipelines_async_handler.function
-                ),
-            )
-        )
-        apply_custom_authorization(pipelines_pipeline_get, props.authorizer)
+        # COMMENTED OUT: This creates a duplicate path /pipelines/pipeline/{pipelineId}
+        # which conflicts with /pipelines/{pipelineId} below (line 591)
+        # pipelines_pipeline_get = (
+        #     pipelines_resource.add_resource("pipeline")
+        #     .add_resource("{pipelineId}")
+        #     .add_method(
+        #         "GET",
+        #         apigateway.LambdaIntegration(
+        #             self._post_pipelines_async_handler.function
+        #         ),
+        #     )
+        # )
+        # apply_custom_authorization(pipelines_pipeline_get, props.authorizer)
 
         # DELETE /api/pipelines - now handled by the comprehensive del_pipelinesId handler
         # This endpoint is removed as we're consolidating to use only the {pipelineId} endpoint

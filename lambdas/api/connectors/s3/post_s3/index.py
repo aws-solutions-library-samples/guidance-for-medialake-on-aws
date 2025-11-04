@@ -1408,6 +1408,19 @@ def create_connector(createconnector: S3Connector) -> dict:
             policies_to_attach.append((eventbridge_policy_name, eventbridge_policy))
 
             # DynamoDB policy
+            system_settings_table = os.environ.get("SYSTEM_SETTINGS_TABLE", "")
+            dynamodb_resources = [
+                medialake_asset_table,
+                asset_table_file_hash_index_arn,
+                asset_table_asset_id_index_arn,
+                asset_table_s3_path_index_arn,
+            ]
+
+            # Add system settings table if configured
+            if system_settings_table:
+                system_settings_table_arn = f"arn:aws:dynamodb:{bucket_region}:{account_id}:table/{system_settings_table}"
+                dynamodb_resources.append(system_settings_table_arn)
+
             dynamodb_policy = {
                 "Version": "2012-10-17",
                 "Statement": [
@@ -1424,12 +1437,7 @@ def create_connector(createconnector: S3Connector) -> dict:
                             "dynamodb:BatchGetItem",
                             "dynamodb:DescribeTable",
                         ],
-                        "Resource": [
-                            medialake_asset_table,
-                            asset_table_file_hash_index_arn,
-                            asset_table_asset_id_index_arn,
-                            asset_table_s3_path_index_arn,
-                        ],
+                        "Resource": dynamodb_resources,
                     }
                 ],
             }
@@ -1438,6 +1446,26 @@ def create_connector(createconnector: S3Connector) -> dict:
                 "iam_policy", dynamodb_policy_name_base
             )
             policies_to_attach.append((dynamodb_policy_name, dynamodb_policy))
+
+            # Secrets Manager policy for external service API keys
+            # Allow access to search provider secrets for external service deletion
+            secrets_policy = {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": [
+                            "secretsmanager:GetSecretValue",
+                            "secretsmanager:DescribeSecret",
+                        ],
+                        "Resource": f"arn:aws:secretsmanager:{bucket_region}:{account_id}:secret:medialake/search/provider/*",
+                    }
+                ],
+            }
+            secrets_policy_name = truncate_resource_name(
+                "iam_policy", f"{role_name}-secrets-policy"
+            )
+            policies_to_attach.append((secrets_policy_name, secrets_policy))
 
             opensearch_policy = {
                 "Version": "2012-10-17",
@@ -1601,6 +1629,10 @@ def create_connector(createconnector: S3Connector) -> dict:
                         "VECTOR_BUCKET_NAME": os.environ.get("VECTOR_BUCKET_NAME", ""),
                         "VECTOR_INDEX_NAME": os.environ.get(
                             "VECTOR_INDEX_NAME", "media-vectors"
+                        ),
+                        # System settings table for external service manager
+                        "SYSTEM_SETTINGS_TABLE": os.environ.get(
+                            "SYSTEM_SETTINGS_TABLE", ""
                         ),
                     }
                 },

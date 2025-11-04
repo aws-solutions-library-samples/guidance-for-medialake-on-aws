@@ -171,13 +171,15 @@ class StateConnector:
             if true_target_state and false_target_state:
                 # Set the Choices array to point to the true target
                 if "Choices" in source_state and source_state["Choices"]:
-                    # First choice is for "Completed" status
+                    # Find the first choice and set it to the true target
+                    # This handles both "Completed" and "True" conditions
                     for choice in source_state["Choices"]:
-                        if choice.get("StringEquals") == "Completed":
+                        if choice.get("StringEquals") in ["Completed", "True", "true"]:
                             choice["Next"] = true_target_state
                             logger.info(
-                                f"Set Choice true path: {source_state_name} -> {true_target_state}"
+                                f"Set Choice true path: {source_state_name} -> {true_target_state} (condition: {choice.get('StringEquals')})"
                             )
+                            break
 
                 # Set the Default to point to the false target
                 source_state["Default"] = false_target_state
@@ -220,7 +222,12 @@ class StateConnector:
 
         # Fall back to the original logic if we don't have identified true/false targets
         # Check if this is a conditional edge (has a sourceHandle)
-        if source_handle in ["condition_true", "condition_true_output", "Completed"]:
+        if source_handle in [
+            "condition_true",
+            "condition_true_output",
+            "Completed",
+            "True",
+        ]:
             # This is the "true" path from the Choice
             if "Choices" in source_state and source_state["Choices"]:
                 # Replace the placeholder with the actual target
@@ -240,6 +247,7 @@ class StateConnector:
             "condition_false",
             "condition_false_output",
             "In Progress",
+            "False",
         ]:
             # This is the "false" path from the Choice (Default)
             if "Default" in source_state and "__PLACEHOLDER__" in str(

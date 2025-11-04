@@ -1,0 +1,57 @@
+spec: v1.0.0
+node:
+  id: coactive
+  title: Coactive
+  description: Coactive AI platform for multimodal asset ingestion and semantic search
+  version: 1.0.0
+  type: integration
+  integration:
+    api:
+      open_api_spec_path: open_api_specs/coactive.yaml
+    pre_custom_code: coactive_auth.py
+    config:
+      lambda:
+        version: 1.0.0
+        handler: integration/ApiLambdaDeployment
+        runtime: python3.12
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - s3:GetObject
+                - s3:PutObject
+              resources:
+                - arn:aws:s3:::${NODE_TEMPLATES_BUCKET}/*
+                - arn:aws:s3:::${IAC_ASSETS_BUCKET}/*
+                - arn:aws:s3:::${EXTERNAL_PAYLOAD_BUCKET}/*
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}/*
+            - effect: Allow
+              actions:
+                - kms:Decrypt
+                - kms:GenerateDataKey
+              resources:
+                - "arn:aws:kms:${AWS_REGION}:${ACCOUNT_ID}:key/*"
+                - ${MEDIA_ASSETS_BUCKET_ARN_KMS_KEY}
+            - effect: Allow
+              actions:
+                - s3:ListBucket
+              resources:
+                - arn:aws:s3:::${NODE_TEMPLATES_BUCKET}
+                - arn:aws:s3:::${IAC_ASSETS_BUCKET}
+                - arn:aws:s3:::${EXTERNAL_PAYLOAD_BUCKET}
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}
+            - effect: Allow
+              actions:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:Scan
+              resources:
+                - ${NODE_TABLE}
+                - ${PIPELINES_TABLE}
+                - ${MEDIALAKE_ASSET_TABLE}
+            - effect: Allow
+              actions:
+                - secretsmanager:GetSecretValue
+              resources:
+                - arn:aws:secretsmanager:${AWS_REGION}:${ACCOUNT_ID}:secret:*

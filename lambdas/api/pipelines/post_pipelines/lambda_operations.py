@@ -511,6 +511,9 @@ def create_lambda_function(
     request_templates_path = node.data.configuration.get("requestMapping")
     response_templates_path = node.data.configuration.get("responseMapping")
 
+    # Initialize flag to detect if custom URL processing is needed
+    needs_custom_url = False
+
     try:
         if (
             node.data.type.lower() == "integration"
@@ -539,6 +542,21 @@ def create_lambda_function(
 
             logger.info(f"Using API service URL: {api_service_url}")
             logger.info(f"Using API path: {api_path}")
+
+            # Check if the API service URL contains variables (like {subdomain})
+            if api_service_url and "{" in api_service_url and "}" in api_service_url:
+                needs_custom_url = True
+                logger.info(
+                    f"Detected variables in API service URL: {api_service_url}, enabling custom URL processing"
+                )
+
+            # Check if the resource path contains path parameters (like {task_id}, {asset_id})
+            resource_path = node.data.configuration.get("path", "")
+            if resource_path and "{" in resource_path and "}" in resource_path:
+                needs_custom_url = True
+                logger.info(
+                    f"Detected path parameters in resource path: {resource_path}, enabling custom URL processing"
+                )
 
     except Exception as e:
         logger.warning(
@@ -628,6 +646,7 @@ def create_lambda_function(
                     "MEDIALAKE_ASSET_TABLE": MEDIALAKE_ASSET_TABLE,
                     "API_TEMPLATE_BUCKET": os.environ.get("NODE_TEMPLATES_BUCKET"),
                     "OPENSEARCH_ENDPOINT": os.environ.get("OPENSEARCH_ENDPOINT"),
+                    "ENVIRONMENT": os.environ.get("ENVIRONMENT", "dev"),
                     # Add required environment variables
                     "SERVICE": node.data.id,  # node Title
                     "STEP_NAME": node.data.label,  # friendly name of the node
@@ -715,6 +734,29 @@ def create_lambda_function(
 
                 # Only include additional Environment variables if the node type is "integration"
                 if node.data.type.lower() == "integration":
+                    # Check for custom_code configurations in YAML
+                    integration_config = yaml_data.get("node", {}).get(
+                        "integration", {}
+                    )
+
+                    # Support both old format (custom_code) and new format (pre_custom_code, post_custom_code)
+                    legacy_custom_code = integration_config.get("custom_code")
+                    pre_custom_code = integration_config.get("pre_custom_code")
+                    post_custom_code = integration_config.get("post_custom_code")
+
+                    # If legacy custom_code is specified, use it as post_custom_code for backward compatibility
+                    if legacy_custom_code and not post_custom_code:
+                        post_custom_code = legacy_custom_code
+                        logger.info(
+                            f"Using legacy custom_code as post_custom_code: {legacy_custom_code}"
+                        )
+
+                    custom_code_enabled = (
+                        "true"
+                        if (pre_custom_code or post_custom_code)
+                        else os.environ.get("API_CUSTOM_CODE", "false")
+                    )
+
                     env_vars = {
                         **common_env_vars,  # Include common env vars (now with node parameters)
                         "WORKFLOW_STEP_NAME": function_name,
@@ -739,24 +781,62 @@ def create_lambda_function(
                             else os.environ.get("API_AUTH_TYPE", "")
                         ),
                         "API_SERVICE_NAME": node.data.id,
-                        "API_CUSTOM_URL": os.environ.get("API_CUSTOM_URL", "false"),
-                        "API_CUSTOM_CODE": os.environ.get("API_CUSTOM_CODE", "false"),
-                        **(
-                            {
-                                "API_KEY_SECRET_ARN": get_integration_secret_arn(
-                                    node.data.configuration.get("integrationId", "")
-                                )
-                                or ""
-                            }
-                            if node.data.type.lower() == "integration"
-                            and node.data.configuration.get("integrationId")
-                            else {}
+                        "API_CUSTOM_URL": (
+                            "true"
+                            if needs_custom_url
+                            else os.environ.get("API_CUSTOM_URL", "false")
                         ),
-                        "EXTERNAL_PAYLOAD_BUCKET": os.environ.get(
-                            "EXTERNAL_PAYLOAD_BUCKET"
-                        ),
-                        "CUSTOM_HEADERS": os.environ.get("CUSTOM_HEADERS", "{}"),
+                        "API_CUSTOM_CODE": custom_code_enabled,
                     }
+
+                    # Set PRE_CUSTOM_CODE environment variable if pre_custom_code is specified in YAML
+                    if pre_custom_code:
+                        # Build the full path: api_templates/{node_id}/{pre_custom_code_file}
+                        pre_custom_code_path = (
+                            f"api_templates/{node.data.id}/{pre_custom_code}"
+                        )
+                        env_vars["PRE_CUSTOM_CODE"] = pre_custom_code_path
+                        logger.info(
+                            f"Set PRE_CUSTOM_CODE for {function_name}: {pre_custom_code_path}"
+                        )
+
+                    # Set POST_CUSTOM_CODE environment variable if post_custom_code is specified in YAML
+                    if post_custom_code:
+                        # Build the full path: api_templates/{node_id}/{post_custom_code_file}
+                        post_custom_code_path = (
+                            f"api_templates/{node.data.id}/{post_custom_code}"
+                        )
+                        env_vars["POST_CUSTOM_CODE"] = post_custom_code_path
+                        logger.info(
+                            f"Set POST_CUSTOM_CODE for {function_name}: {post_custom_code_path}"
+                        )
+
+                        # Also set legacy CUSTOM_CODE for backward compatibility
+                        env_vars["CUSTOM_CODE"] = post_custom_code_path
+                        logger.info(
+                            f"Set legacy CUSTOM_CODE for backward compatibility: {post_custom_code_path}"
+                        )
+
+                    # Add additional environment variables
+                    env_vars.update(
+                        {
+                            **(
+                                {
+                                    "API_KEY_SECRET_ARN": get_integration_secret_arn(
+                                        node.data.configuration.get("integrationId", "")
+                                    )
+                                    or ""
+                                }
+                                if node.data.type.lower() == "integration"
+                                and node.data.configuration.get("integrationId")
+                                else {}
+                            ),
+                            "EXTERNAL_PAYLOAD_BUCKET": os.environ.get(
+                                "EXTERNAL_PAYLOAD_BUCKET"
+                            ),
+                            "CUSTOM_HEADERS": os.environ.get("CUSTOM_HEADERS", "{}"),
+                        }
+                    )
                     create_function_params["Environment"] = {"Variables": env_vars}
 
                 # For all other node types, just add the common environment variables

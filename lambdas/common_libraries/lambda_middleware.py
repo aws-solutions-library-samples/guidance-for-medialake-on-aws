@@ -426,6 +426,16 @@ class LambdaMiddleware:
         if map_block:
             payload["map"] = map_block
 
+        # Preserve payload.data from previous step in payload_history for pipeline continuity
+        # This ensures that data from previous steps (like dataset_id) flows through the pipeline
+        if isinstance(orig.get("payload"), dict) and "data" in orig["payload"]:
+            original_data = orig["payload"]["data"]
+            if original_data:  # Only preserve if there's actual data
+                payload["payload_history"] = copy.deepcopy(original_data)
+                self.logger.info(
+                    "Preserved original payload.data in payload_history for pipeline continuity"
+                )
+
         # Serialize and offload if too large
         raw = json.dumps(payload["data"], default=_json_default).encode()
         if len(raw) > self.max_response_size:
