@@ -207,7 +207,13 @@ export interface RelatedVersionsResponse {
 
 // Bulk download types
 interface BulkDownloadRequest {
-  assetIds: string[];
+  assetIds: Array<{
+    assetId: string;
+    clipBoundary?: {
+      startTime?: number;
+      endTime?: number;
+    };
+  }>;
   options?: {
     includeMetadata?: boolean;
     format?: "zip";

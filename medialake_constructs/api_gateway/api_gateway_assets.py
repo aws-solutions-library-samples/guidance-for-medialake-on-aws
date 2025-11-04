@@ -837,6 +837,9 @@ class AssetsConstruct(Construct):
             self,
             "AssetsBulkDownloadEFS",
             vpc=props.vpc,
+            vpc_subnets=ec2.SubnetSelection(
+                subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
+            ),
             lifecycle_policy=efs.LifecyclePolicy.AFTER_7_DAYS,
             performance_mode=efs.PerformanceMode.GENERAL_PURPOSE,
             throughput_mode=efs.ThroughputMode.BURSTING,
