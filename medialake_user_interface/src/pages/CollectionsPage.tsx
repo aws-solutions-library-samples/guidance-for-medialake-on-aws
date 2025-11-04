@@ -269,7 +269,7 @@ const CollectionsPage: React.FC = () => {
               onRefresh={handleRefresh}
               isRefreshing={isRefreshing}
               disabled={isLoading}
-              variant="button"
+              variant="icon"
             />
             <Button
               variant="contained"

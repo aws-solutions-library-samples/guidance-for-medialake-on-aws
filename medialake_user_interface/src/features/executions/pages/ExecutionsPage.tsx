@@ -70,6 +70,7 @@ const ExecutionsPage: React.FC = () => {
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(false);
   const [selectedExecution, setSelectedExecution] =
     useState<PipelineExecution | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Retry mutations
   const retryFromCurrentMutation = useRetryFromCurrent();
@@ -212,7 +213,10 @@ const ExecutionsPage: React.FC = () => {
   }, [isSidePanelOpen, selectedExecution]);
 
   const handleRefresh = useCallback(() => {
-    refetch();
+    setIsRefreshing(true);
+    refetch().finally(() => {
+      setIsRefreshing(false);
+    });
   }, [refetch]);
 
   const columns = useMemo<ColumnDef<PipelineExecution>[]>(
@@ -445,7 +449,8 @@ const ExecutionsPage: React.FC = () => {
         action={
           <RefreshButton
             onRefresh={handleRefresh}
-            isRefreshing={isLoading}
+            isRefreshing={isRefreshing}
+            disabled={isLoading}
             variant="icon"
           />
         }
