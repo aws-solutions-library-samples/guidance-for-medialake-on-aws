@@ -392,6 +392,7 @@ sync-to-github:
     # Remove files that shouldn't be in the public GitHub repository
     - rm -f secrets.txt
     - rm -f .roomodes
+    - rm -rf .sonar/
     - rm -rf docs/
     - rm -rf .roo/
     - rm -rf .kiro/
