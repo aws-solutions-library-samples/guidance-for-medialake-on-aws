@@ -407,6 +407,7 @@ sync-to-github:
     - rm -f manage-hooks.sh
     - rm -f .gitleaksignore
     - rm -f fix.sh
+    - rm -f PERFORMANCE_OPTIMIZATION.md
     - rm -rf tests/
     - rm -rf scripts/
     - rm -f .roomodes
