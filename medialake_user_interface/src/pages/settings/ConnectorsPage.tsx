@@ -1,8 +1,9 @@
 import React, { useState } from "react";
-import { Typography, Button, Box, Snackbar, Alert } from "@mui/material";
+import { Button, Box, Snackbar, Alert } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
 import ConnectorCard from "@/features/settings/connectors/components/ConnectorCard";
 import ConnectorModal from "@/features/settings/connectors/components/ConnectorModal";
+import { PageHeader, PageContent } from "@/components/common/layout";
 import {
   useGetConnectors,
   useDeleteConnector,
@@ -148,62 +149,53 @@ const ConnectorsPage: React.FC = () => {
     setAlert(null);
   };
 
-  if (isLoading) {
-    return <div>Loading...</div>;
-  }
-
-  if (isError) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Typography color="error" variant="h6">
-          Error loading connectors: {String(error)}
-        </Typography>
-      </Box>
-    );
-  }
-
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}>
-        <Typography variant="h5">Connectors</Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={handleAddClick}
+    <Box
+      sx={{ p: 3, height: "100%", display: "flex", flexDirection: "column" }}
+    >
+      <PageHeader
+        title="Connectors"
+        description="Manage storage connectors for your media assets"
+        action={
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={handleAddClick}
+          >
+            Add Connector
+          </Button>
+        }
+      />
+
+      <PageContent isLoading={isLoading} error={error as Error}>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: {
+              xs: "1fr",
+              sm: "repeat(auto-fill, minmax(300px, 1fr))",
+              md: "repeat(auto-fill, minmax(350px, 1fr))",
+            },
+            gap: 3,
+          }}
         >
-          Add Connector
-        </Button>
-      </Box>
+          {connectors.map((connector, index) => {
+            if (!connector) return null;
 
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: {
-            xs: "1fr",
-            sm: "repeat(auto-fill, minmax(300px, 1fr))",
-            md: "repeat(auto-fill, minmax(350px, 1fr))",
-          },
-          gap: 3,
-        }}
-      >
-        {connectors.map((connector, index) => {
-          // If connector is null/undefined for some reason, skip it
-          if (!connector) return null;
-          // console.log('Connector data:', connector);
-
-          return (
-            <Box key={connector.id ?? index}>
-              <ConnectorCard
-                connector={connector}
-                onEdit={handleEditClick}
-                onDelete={handleDelete}
-                onToggleStatus={handleToggleStatus}
-                onSync={handleSync}
-              />
-            </Box>
-          );
-        })}
-      </Box>
+            return (
+              <Box key={connector.id ?? index}>
+                <ConnectorCard
+                  connector={connector}
+                  onEdit={handleEditClick}
+                  onDelete={handleDelete}
+                  onToggleStatus={handleToggleStatus}
+                  onSync={handleSync}
+                />
+              </Box>
+            );
+          })}
+        </Box>
+      </PageContent>
 
       <ConnectorModal
         open={isModalOpen}
