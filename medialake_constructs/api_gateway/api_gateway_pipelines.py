@@ -389,6 +389,19 @@ class ApiGatewayPipelinesConstruct(Construct):
 
         self._post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
+                actions=[
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                    "logs:DescribeLogGroups",
+                    "logs:PutRetentionPolicy",
+                ],
+                resources=["*"],
+            )
+        )
+
+        self._post_pipelines_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
                 actions=["dynamodb:GetItem"],
                 resources=[props.node_table.table_arn],
             )

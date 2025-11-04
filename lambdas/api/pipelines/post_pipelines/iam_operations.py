@@ -228,6 +228,10 @@ def create_sfn_role(role_name: str) -> str:
         )
         logger.info(f"Added CloudWatch Logs policy to role {role_name}")
 
+        # Wait for role and policies to propagate
+        logger.info(f"Waiting for role {role_name} to propagate...")
+        time.sleep(10)
+
         logger.info(f"Role {role_name} created successfully with ARN: {role_arn}")
         return role_arn
 
