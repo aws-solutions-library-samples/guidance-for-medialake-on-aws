@@ -11,11 +11,6 @@ from constructs import Construct
 from config import config
 from constants import KMS
 from constants import Lambda as LambdaConstants
-
-# from medialake_constructs.shared_constructs.opensearch_ingestion_pipeline import (
-#     OpenSearchIngestionPipeline,
-#     OpenSearchIngestionPipelineProps,
-# )
 from medialake_constructs.asset_table_stream import (
     AssetTableStream,
     AssetTableStreamProps,
@@ -85,49 +80,36 @@ class BaseInfrastructureStack(Stack):
         parent_stack = cdk.Stack.of(self)
         parent_stack.region
 
-        if config.s3.use_existing_buckets:
-            # Import existing buckets
-            self._access_logs_bucket = S3Bucket(
-                self,
-                "AccessLogsBucket",
-                props=S3BucketProps(
-                    bucket_name=config.s3.access_logs_bucket.bucket_name,
-                    destroy_on_delete=config.environment != "prod",
-                    existing_bucket_arn=config.s3.access_logs_bucket.bucket_arn,
-                ),
-            )
-
-        else:
-            self._access_logs_bucket = S3Bucket(
-                self,
-                "AccessLogsBucket",
-                props=S3BucketProps(
-                    # bucket_name=f"{config.resource_prefix}-access-logs-{config.account_id}-{region}-{config.environment}".lower(),
-                    destroy_on_delete=config.environment != "prod",
-                    intelligent_tiering_configurations=[
-                        s3.IntelligentTieringConfiguration(
-                            name="All",
-                            archive_access_tier_time=Duration.days(90),
-                            deep_archive_access_tier_time=Duration.days(180),
-                        )
-                    ],
-                    lifecycle_rules=[
-                        s3.LifecycleRule(
-                            enabled=True,
-                            abort_incomplete_multipart_upload_after=Duration.days(7),
-                        ),
-                        s3.LifecycleRule(
-                            enabled=True,
-                            transitions=[
-                                s3.Transition(
-                                    storage_class=s3.StorageClass.INTELLIGENT_TIERING,
-                                    transition_after=Duration.minutes(0),
-                                )
-                            ],
-                        ),
-                    ],
-                ),
-            )
+        self._access_logs_bucket = S3Bucket(
+            self,
+            "AccessLogsBucket",
+            props=S3BucketProps(
+                # bucket_name=f"{config.resource_prefix}-access-logs-{config.account_id}-{region}-{config.environment}".lower(),
+                destroy_on_delete=True,
+                intelligent_tiering_configurations=[
+                    s3.IntelligentTieringConfiguration(
+                        name="All",
+                        archive_access_tier_time=Duration.days(90),
+                        deep_archive_access_tier_time=Duration.days(180),
+                    )
+                ],
+                lifecycle_rules=[
+                    s3.LifecycleRule(
+                        enabled=True,
+                        abort_incomplete_multipart_upload_after=Duration.days(7),
+                    ),
+                    s3.LifecycleRule(
+                        enabled=True,
+                        transitions=[
+                            s3.Transition(
+                                storage_class=s3.StorageClass.INTELLIGENT_TIERING,
+                                transition_after=Duration.minutes(0),
+                            )
+                        ],
+                    ),
+                ],
+            ),
+        )
 
         ## CloudTrail Logs for DynamDB, commented out due to feature request
         # self.dynamodb_cloudtrail_logs = DynamoDBCloudTrailLogs(
@@ -187,9 +169,6 @@ class BaseInfrastructureStack(Stack):
                     "media_lake_sg"
                 ].description,
             )
-            # If the environment is prod, apply a retention policy to the security group
-            if config.environment == "prod":
-                self._security_group.apply_removal_policy(RemovalPolicy.RETAIN)
 
             # Allow HTTPS ingress from the VPC CIDR
             self._security_group.add_ingress_rule(
@@ -267,64 +246,38 @@ class BaseInfrastructureStack(Stack):
             ),
         )
 
-        # Handle media asset bucket
-        if config.s3.use_existing_buckets and config.s3.asset_bucket:
-            # Import existing asset bucket
-            self.media_assets_s3_bucket = S3Bucket(
-                self,
-                "MediaAssets",
-                props=S3BucketProps(
-                    # bucket_name=config.s3.asset_bucket.bucket_name,
-                    access_logs=True,
-                    access_logs_bucket=self.access_logs_bucket,
-                    existing_bucket_arn=config.s3.asset_bucket.bucket_arn,
-                    existing_kms_key_arn=(
-                        config.s3.asset_bucket.kms_key_arn
-                        if config.s3.asset_bucket.kms_key_arn
-                        else None
-                    ),
-                ),
-            )
-        else:
-            # Create new media asset bucket
-            self.media_assets_s3_bucket = S3Bucket(
-                self,
-                "MediaAssets",
-                props=S3BucketProps(
-                    # bucket_name=f"{config.resource_prefix}-asset-bucket-{config.account_id}-{self.region}-{config.environment}",
-                    access_logs=True,
-                    access_logs_bucket=self.access_logs_bucket,
-                    existing_kms_key_arn=(
-                        config.s3.asset_bucket.kms_key_arn
-                        if config.s3.use_existing_buckets
-                        and config.s3.asset_bucket
-                        and config.s3.asset_bucket.kms_key_arn
-                        else None
-                    ),
-                    alias=KMS.MEDIA_BUCKET_KEY_ALIAS,
-                    cors=[
-                        s3.CorsRule(
-                            allowed_methods=[
-                                s3.HttpMethods.GET,
-                                s3.HttpMethods.PUT,
-                                s3.HttpMethods.POST,
-                                s3.HttpMethods.DELETE,
-                                s3.HttpMethods.HEAD,
-                            ],
-                            allowed_origins=[
-                                "http://localhost:5173",
-                                "http://localhost:5174",
-                                "http://localhost:3000",
-                                "http://localhost:8080",
-                                "https://*.cloudfront.net",
-                            ],
-                            allowed_headers=["*"],
-                            exposed_headers=["ETag"],
-                            max_age=3000,
-                        )
-                    ],
-                ),
-            )
+        # Create new media asset bucket
+        self.media_assets_s3_bucket = S3Bucket(
+            self,
+            "MediaAssets",
+            props=S3BucketProps(
+                # bucket_name=f"{config.resource_prefix}-asset-bucket-{config.account_id}-{self.region}-{config.environment}",
+                access_logs=True,
+                access_logs_bucket=self.access_logs_bucket,
+                alias=KMS.MEDIA_BUCKET_KEY_ALIAS,
+                cors=[
+                    s3.CorsRule(
+                        allowed_methods=[
+                            s3.HttpMethods.GET,
+                            s3.HttpMethods.PUT,
+                            s3.HttpMethods.POST,
+                            s3.HttpMethods.DELETE,
+                            s3.HttpMethods.HEAD,
+                        ],
+                        allowed_origins=[
+                            "http://localhost:5173",
+                            "http://localhost:5174",
+                            "http://localhost:3000",
+                            "http://localhost:8080",
+                            "https://*.cloudfront.net",
+                        ],
+                        allowed_headers=["*"],
+                        exposed_headers=["ETag"],
+                        max_age=3000,
+                    )
+                ],
+            ),
+        )
 
         add_s3_access_logging_policy(
             self,
@@ -403,84 +356,73 @@ class BaseInfrastructureStack(Stack):
         self._pipeline_table = pipeline_table.table
 
         # Asset table
-        if config.db.use_existing_tables:
-            self._asset_table = dynamodb.Table.from_table_arn(
-                self,
-                "ImportedAssetTable",
-                config.db.asset_table_arn,
-            )
-        else:
-            asset_table = DynamoDB(
-                self,
-                "MediaLakeAssetTable",
-                props=DynamoDBProps(
-                    name=f"{config.resource_prefix}-asset-table-{config.environment}",
-                    partition_key_name="InventoryID",
-                    partition_key_type=dynamodb.AttributeType.STRING,
-                    stream=dynamodb.StreamViewType.NEW_AND_OLD_IMAGES,
-                    point_in_time_recovery=True,
-                    removal_policy=(
-                        RemovalPolicy.RETAIN
-                        if config.should_retain_tables
-                        else RemovalPolicy.DESTROY
-                    ),
-                ),
-            )
-            self._asset_table = asset_table.table
+        asset_table = DynamoDB(
+            self,
+            "MediaLakeAssetTable",
+            props=DynamoDBProps(
+                name=f"{config.resource_prefix}-asset-table-{config.environment}",
+                partition_key_name="InventoryID",
+                partition_key_type=dynamodb.AttributeType.STRING,
+                stream=dynamodb.StreamViewType.NEW_AND_OLD_IMAGES,
+                point_in_time_recovery=True,
+                removal_policy=RemovalPolicy.DESTROY,
+            ),
+        )
+        self._asset_table = asset_table.table
 
-            # Add GSIs only for new tables
-            self._asset_table.add_global_secondary_index(
-                index_name="AssetIDIndex",
-                partition_key=dynamodb.Attribute(
-                    name="DigitalSourceAsset.ID", type=dynamodb.AttributeType.STRING
-                ),
-                sort_key=dynamodb.Attribute(
-                    name="DigitalSourceAsset.IngestedAt",
-                    type=dynamodb.AttributeType.STRING,
-                ),
-                projection_type=dynamodb.ProjectionType.ALL,
-            )
+        # Add GSIs
+        self._asset_table.add_global_secondary_index(
+            index_name="AssetIDIndex",
+            partition_key=dynamodb.Attribute(
+                name="DigitalSourceAsset.ID", type=dynamodb.AttributeType.STRING
+            ),
+            sort_key=dynamodb.Attribute(
+                name="DigitalSourceAsset.IngestedAt",
+                type=dynamodb.AttributeType.STRING,
+            ),
+            projection_type=dynamodb.ProjectionType.ALL,
+        )
 
-            self._asset_table.add_global_secondary_index(
-                index_name="FileHashIndex",
-                partition_key=dynamodb.Attribute(
-                    name="FileHash", type=dynamodb.AttributeType.STRING
-                ),
-                projection_type=dynamodb.ProjectionType.ALL,
-            )
+        self._asset_table.add_global_secondary_index(
+            index_name="FileHashIndex",
+            partition_key=dynamodb.Attribute(
+                name="FileHash", type=dynamodb.AttributeType.STRING
+            ),
+            projection_type=dynamodb.ProjectionType.ALL,
+        )
 
-            self._asset_table.add_global_secondary_index(
-                index_name="S3PathIndex",
-                partition_key=dynamodb.Attribute(
-                    name="StoragePath", type=dynamodb.AttributeType.STRING
-                ),
-                projection_type=dynamodb.ProjectionType.ALL,
-            )
+        self._asset_table.add_global_secondary_index(
+            index_name="S3PathIndex",
+            partition_key=dynamodb.Attribute(
+                name="StoragePath", type=dynamodb.AttributeType.STRING
+            ),
+            projection_type=dynamodb.ProjectionType.ALL,
+        )
 
-            # Create asset table stream construct
-            # Reduced concurrency and batch sizes to prevent OpenSearch 429 errors
-            # - Concurrency: 3 (down from 10) to reduce load on OpenSearch
-            # - Batch sizes: Smaller to process faster and reduce memory
-            self._asset_table_stream = AssetTableStream(
-                self,
-                "AssetTableStreamConstruct",
-                props=AssetTableStreamProps(
-                    asset_table=self._asset_table,
-                    opensearch_cluster_domain_endpoint=self._opensearch_cluster.domain_endpoint,
-                    opensearch_cluster_domain_arn=self._opensearch_cluster.domain_arn,
-                    opensearch_cluster_region=self._opensearch_cluster.region,
-                    opensearch_index_name=opensearch_index_name,
-                    vpc=self._vpc.vpc,
-                    security_group=self._security_group,
-                    batch_size=250,  # Bulk API batch size (reduced from 500)
-                    max_batch_size=500,  # DynamoDB stream batch size (reduced from 1000)
-                    reserved_concurrency=3,  # Limit concurrent executions (reduced from 10)
-                ),
-            )
+        # Create asset table stream construct
+        # Reduced concurrency and batch sizes to prevent OpenSearch 429 errors
+        # - Concurrency: 3 (down from 10) to reduce load on OpenSearch
+        # - Batch sizes: Smaller to process faster and reduce memory
+        self._asset_table_stream = AssetTableStream(
+            self,
+            "AssetTableStreamConstruct",
+            props=AssetTableStreamProps(
+                asset_table=self._asset_table,
+                opensearch_cluster_domain_endpoint=self._opensearch_cluster.domain_endpoint,
+                opensearch_cluster_domain_arn=self._opensearch_cluster.domain_arn,
+                opensearch_cluster_region=self._opensearch_cluster.region,
+                opensearch_index_name=opensearch_index_name,
+                vpc=self._vpc.vpc,
+                security_group=self._security_group,
+                batch_size=250,  # Bulk API batch size (reduced from 500)
+                max_batch_size=500,  # DynamoDB stream batch size (reduced from 1000)
+                reserved_concurrency=3,  # Limit concurrent executions (reduced from 10)
+            ),
+        )
 
-            # Expose lambda and DLQ for backward compatibility
-            self._asset_sync_engine_lambda = self._asset_table_stream.lambda_function
-            self.storage_ingest_connector_dlq = self._asset_table_stream.dlq
+        # Expose lambda and DLQ for backward compatibility
+        self._asset_sync_engine_lambda = self._asset_table_stream.lambda_function
+        self.storage_ingest_connector_dlq = self._asset_table_stream.dlq
 
         ## Asset V2 table, commented out until implementation needed
         # if config.db.use_existing_tables:
@@ -500,11 +442,7 @@ class BaseInfrastructureStack(Stack):
         #             point_in_time_recovery=True,
         #             sort_key_name="SK",
         #             sort_key_type=dynamodb.AttributeType.STRING,
-        #             removal_policy=(
-        #                 RemovalPolicy.RETAIN
-        #                 if config.should_retain_tables
-        #                 else RemovalPolicy.DESTROY
-        #             ),
+        #             removal_policy=RemovalPolicy.DESTROY,
         #         ),
         #     )
         #     self._assetv2_table = assetv2_table.table
@@ -649,16 +587,12 @@ class BaseInfrastructureStack(Stack):
             export_name=f"{self.stack_name}-AccessLogsBucketArn",
         )
 
-        # Add outputs for retained resources in prod environment
-        self.add_retained_resources_outputs()
-
     def add_retained_resources_outputs(self):
         """
-        Adds CloudFormation outputs for retained resources in production environment.
-        Only executes when config.environment == "prod".
+        Adds CloudFormation outputs for retained resources.
+        This method is kept for backwards compatibility but no longer checks environment.
         """
-        if config.environment != "prod":
-            return
+        return
 
         # VPC Outputs
         CfnOutput(

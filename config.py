@@ -9,7 +9,6 @@ from aws_cdk import aws_logs as logs
 from pydantic import (
     BaseModel,
     Field,
-    ValidationInfo,
     field_validator,
     model_validator,
     root_validator,
@@ -359,53 +358,6 @@ class SecurityGroupsConfig(BaseModel):
         return self
 
 
-class ExistingS3Config(BaseModel):
-    bucket_name: str
-    bucket_arn: str
-    kms_key_arn: Optional[str] = None
-
-
-class S3Config(BaseModel):
-    use_existing_buckets: bool = False
-    asset_bucket: Optional[ExistingS3Config] = None
-    access_logs_bucket: Optional[ExistingS3Config] = None
-
-    @field_validator("asset_bucket", "access_logs_bucket")
-    @classmethod
-    def validate_bucket_config(
-        cls, v: Optional[ExistingS3Config], info: ValidationInfo
-    ) -> Optional[ExistingS3Config]:
-        if info.data.get("use_existing_buckets") and v is None:
-            raise ValueError(
-                f"{info.field_name} is required when use_existing_buckets is True"
-            )
-        return v
-
-
-class DatabaseConfig(BaseModel):
-    use_existing_tables: bool = False
-    pipelines_executions_arn: Optional[str] = None
-    asset_table_arn: Optional[str] = None
-    assetv2_table_arn: Optional[str] = None
-    pipeline_nodes_table_arn: Optional[str] = None
-
-    @field_validator(
-        "pipelines_executions_arn",
-        "asset_table_arn",
-        "assetv2_table_arn",
-        "pipeline_nodes_table_arn",
-    )
-    @classmethod
-    def validate_table_arns(
-        cls, v: Optional[str], info: ValidationInfo
-    ) -> Optional[str]:
-        if info.data.get("use_existing_tables") and v is None:
-            raise ValueError(
-                f"{info.field_name} is required when use_existing_tables is True"
-            )
-        return v
-
-
 class VpcConfig(BaseModel):
     use_existing_vpc: bool = False
     existing_vpc: Optional[ExistingVpcConfig] = None
@@ -451,8 +403,6 @@ class CDKConfig(BaseModel):
     )
     authZ: AuthConfig = AuthConfig()
     vpc: VpcConfig = Field(default_factory=VpcConfig)
-    db: DatabaseConfig = Field(default_factory=DatabaseConfig)
-    s3: S3Config = Field(default_factory=S3Config)
 
     @property
     def resolved_opensearch_cluster_settings(self) -> OpenSearchClusterSettings:
@@ -464,10 +414,6 @@ class CDKConfig(BaseModel):
         # Use preset based on deployment_size
         preset_config = OpenSearchPresets.get_preset(self.opensearch_deployment_size)
         return OpenSearchClusterSettings(**preset_config)
-
-    @property
-    def should_retain_tables(self) -> bool:
-        return self.environment == "prod"
 
     @model_validator(mode="after")
     def check_az_count_vpc(self):
@@ -499,10 +445,6 @@ class CDKConfig(BaseModel):
         if getattr(self, "enable_ha", False) and self.secondary_region:
             regions.append(self.secondary_region)
         return regions
-
-    @property
-    def should_use_existing_tables(self) -> bool:
-        return self.environment == "prod"
 
     @classmethod
     def load_from_file(cls, filename="config.json"):
