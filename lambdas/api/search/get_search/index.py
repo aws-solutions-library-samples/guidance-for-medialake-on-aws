@@ -21,6 +21,9 @@ from opensearchpy import (
 )
 from pydantic import BaseModel, ConfigDict, Field, conint
 from search_utils import parse_search_query
+
+# Import unified search components
+from unified_search_orchestrator import UnifiedSearchOrchestrator
 from url_utils import generate_cloudfront_url, generate_cloudfront_urls_batch
 
 # Global flag to enable/disable clip logic
@@ -29,6 +32,18 @@ CLIP_LOGIC_ENABLED = True
 # Initialize AWS clients and utilities
 logger = Logger()
 metrics = Metrics()
+
+# Initialize unified search orchestrator
+unified_search_orchestrator = None
+
+
+def get_unified_search_orchestrator():
+    """Get or create unified search orchestrator instance"""
+    global unified_search_orchestrator
+    if unified_search_orchestrator is None:
+        unified_search_orchestrator = UnifiedSearchOrchestrator(logger, metrics)
+    return unified_search_orchestrator
+
 
 # Configure CORS
 cors_config = CORSConfig(
@@ -1457,10 +1472,10 @@ def perform_search(params: SearchParams) -> Dict:
 
 @app.get("/search")
 def handle_search():
-    """Handle search requests with validated parameters."""
+    """Handle search requests with unified search orchestrator."""
     handler_start = time.time()
     try:
-        logger.info("[PERF] Starting search handler")
+        logger.info("[PERF] Starting unified search handler")
 
         param_start = time.time()
         query_params = app.current_event.get("queryStringParameters") or {}
@@ -1473,18 +1488,23 @@ def handle_search():
                 "data": None,
             }
 
-        params = SearchParams(**query_params)
         logger.info(
-            f"[PERF] Parameter validation took: {time.time() - param_start:.3f}s"
+            f"[PERF] Parameter extraction took: {time.time() - param_start:.3f}s"
         )
 
+        # Use unified search orchestrator
         search_start = time.time()
-        result = perform_search(params)
-        logger.info(f"[PERF] Search execution took: {time.time() - search_start:.3f}s")
+        orchestrator = get_unified_search_orchestrator()
+        result = orchestrator.search(query_params)
+        logger.info(
+            f"[PERF] Unified search execution took: {time.time() - search_start:.3f}s"
+        )
 
         total_handler_time = time.time() - handler_start
         logger.info(f"[PERF] Total handler time: {total_handler_time:.3f}s")
-        logger.info(f"Search completed successfully for query: {params.q}")
+        logger.info(
+            f"Unified search completed successfully for query: {query_params.get('q')}"
+        )
         return result
 
     except ValueError as e:
@@ -1493,6 +1513,30 @@ def handle_search():
     except SearchException as e:
         logger.error(f"Search error: {str(e)}")
         return {"status": "500", "message": str(e), "data": None}
+    except Exception as e:
+        logger.error(f"Unexpected error in unified search: {str(e)}")
+        return {
+            "status": "500",
+            "message": "Search service temporarily unavailable",
+            "data": None,
+        }
+
+
+@app.get("/search/providers/status")
+def handle_provider_status():
+    """Get status of all configured search providers."""
+    try:
+        orchestrator = get_unified_search_orchestrator()
+        status = orchestrator.get_provider_status()
+
+        return {"status": "200", "message": "ok", "data": status}
+    except Exception as e:
+        logger.error(f"Error getting provider status: {str(e)}")
+        return {
+            "status": "500",
+            "message": "Failed to get provider status",
+            "data": None,
+        }
 
 
 @metrics.log_metrics

@@ -52,7 +52,7 @@ export interface SearchProviderUpdate {
 export interface SemanticSearchSettings {
   isEnabled: boolean;
   provider: {
-    type: "none" | "twelvelabs-api" | "twelvelabs-bedrock";
+    type: "none" | "twelvelabs-api" | "twelvelabs-bedrock" | "coactive";
     config: SearchProvider | null;
   };
   embeddingStore: {

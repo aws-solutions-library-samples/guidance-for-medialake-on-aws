@@ -346,6 +346,21 @@ class StateDefinitionFactory:
             # Choice state
             choices = node.data.configuration.get("choices", [])
 
+            # Check if this is a conditional node with parameters instead of choices
+            parameters = node.data.configuration.get("parameters", {})
+            if not choices and parameters:
+                # Handle conditional nodes that use Variable and Condition parameters
+                variable = parameters.get("Variable", "$.metadata.externalJobStatus")
+                condition = parameters.get("Condition", "Completed")
+
+                # Use the condition value as-is to preserve exact case matching
+                condition_value = condition
+
+                choices = [{"variable": variable, "value": condition_value}]
+                logger.info(
+                    f"Created choice from conditional parameters: Variable={variable}, Condition={condition_value}"
+                )
+
             # Ensure we have at least one choice in the Choices array
             if not choices:
                 choices = [

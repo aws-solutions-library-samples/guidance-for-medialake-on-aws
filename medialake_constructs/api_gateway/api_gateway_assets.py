@@ -18,6 +18,7 @@ from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_efs as efs
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_lambda_event_sources as lambda_event_sources
+from aws_cdk import aws_logs as logs
 from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_secretsmanager as secretsmanager
 from aws_cdk import aws_sqs as sqs
@@ -64,6 +65,7 @@ class AssetsProps:
     open_search_endpoint: str
     opensearch_index: str
     open_search_arn: str
+    system_settings_table: str
     # user_table: (
     #     dynamodb.Table
     # )
@@ -208,6 +210,7 @@ class AssetsConstruct(Construct):
                     "INDEX_NAME": props.opensearch_index,
                     "VECTOR_BUCKET_NAME": props.s3_vector_bucket_name,
                     "VECTOR_INDEX_NAME": props.s3_vector_index_name,
+                    "SYSTEM_SETTINGS_TABLE": props.system_settings_table,
                 },
             ),
         )
@@ -301,10 +304,14 @@ class AssetsConstruct(Construct):
         )
 
         # Add DynamoDB permissions for DELETE Lambda
+        system_settings_table_arn = f"arn:aws:dynamodb:{Stack.of(self).region}:{Stack.of(self).account}:table/{props.system_settings_table}"
         delete_asset_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["dynamodb:DeleteItem", "dynamodb:GetItem"],
-                resources=[props.asset_table.table_arn],
+                resources=[
+                    props.asset_table.table_arn,
+                    system_settings_table_arn,
+                ],
             )
         )
 
@@ -325,13 +332,17 @@ class AssetsConstruct(Construct):
         )
 
         # Add Secrets Manager permissions for DELETE Lambda
+        # Need access to both X-Origin secret and search provider API key secrets
         delete_asset_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "secretsmanager:GetSecretValue",
                     "secretsmanager:DescribeSecret",
                 ],
-                resources=[props.x_origin_verify_secret.secret_arn],
+                resources=[
+                    props.x_origin_verify_secret.secret_arn,
+                    f"arn:aws:secretsmanager:{Stack.of(self).region}:{Stack.of(self).account}:secret:medialake/search/provider/*",
+                ],
             )
         )
 
@@ -840,6 +851,9 @@ class AssetsConstruct(Construct):
             self,
             "AssetsBulkDownloadEFS",
             vpc=props.vpc,
+            vpc_subnets=ec2.SubnetSelection(
+                subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
+            ),
             lifecycle_policy=efs.LifecyclePolicy.AFTER_7_DAYS,
             performance_mode=efs.PerformanceMode.GENERAL_PURPOSE,
             throughput_mode=efs.ThroughputMode.BURSTING,
@@ -1994,13 +2008,26 @@ class AssetsConstruct(Construct):
 
         # Final merge task is already connected to success_state in the workflow definition
 
-        # Create the state machine using the non-deprecated API
+        # Create CloudWatch Log Group for state machine logging
+        bulk_download_log_group = logs.LogGroup(
+            self,
+            "AssetsBulkDownloadLogGroup",
+            log_group_name=f"/aws/vendedlogs/states/{config.resource_prefix}_Asset-Bulk-Download",
+            retention=logs.RetentionDays.ONE_MONTH,
+        )
+
+        # Create the state machine using the non-deprecated API with logging enabled
         self._state_machine = sfn.StateMachine(
             self,
             "AssetsBulkDownloadStateMachine",
             state_machine_name=f"{config.resource_prefix}_Asset-Bulk-Download",
             definition_body=sfn.DefinitionBody.from_chainable(workflow),
             timeout=Duration.hours(6),  # Increase timeout for large file processing
+            logs=sfn.LogOptions(
+                destination=bulk_download_log_group,
+                level=sfn.LogLevel.ALL,
+                include_execution_data=True,
+            ),
         )
 
         # Update the Kickoff Lambda with the state machine ARN

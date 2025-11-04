@@ -21,6 +21,7 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.auth import SigV4Auth
 from botocore.awsrequest import AWSRequest
 from botocore.config import Config
+from external_service_manager import MediaLakeExternalServiceManager
 
 # OpenSearch configuration
 OPENSEARCH_ENDPOINT = os.environ.get("OPENSEARCH_ENDPOINT", "")
@@ -334,6 +335,9 @@ class AssetProcessor:
 
         _session = boto3.Session()
         self._credentials = _session.get_credentials()
+
+        # Initialize external service manager for handling Coactive and other external services
+        self.external_service_manager = MediaLakeExternalServiceManager(logger, metrics)
 
     def _signed_request(
         self, method: str, url: str, payload: dict | None = None, timeout: int = 60
@@ -1486,6 +1490,21 @@ class AssetProcessor:
                 # Delete S3 vectors
                 vector_count = self.delete_s3_vectors(inventory_id)
                 logger.info(f"Deleted {vector_count} vectors for asset {inventory_id}")
+
+                # Delete from external services (e.g., Coactive)
+                try:
+                    external_results = self.external_service_manager.delete_asset_from_external_services(
+                        asset_record, inventory_id
+                    )
+                    if external_results:
+                        logger.info(
+                            f"External service deletion results for {inventory_id}: {external_results}"
+                        )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to delete asset from external services: {str(e)}"
+                    )
+                    # Don't fail the entire deletion if external service deletion fails
 
                 # Publish deletion event
                 self.publish_deletion_event(inventory_id)

@@ -222,20 +222,20 @@ class GraphAnalyzer:
             if not source_node:
                 continue
 
-            # Handle Choice node edges
-            if (
-                source_node.data.type.lower() == "flow"
-                and source_node.data.id == "choice"
-            ):
-                if source_handle == "Completed":
+            # Handle Choice node edges (both choice and conditional nodes)
+            if source_node.data.type.lower() == "flow" and source_node.data.id in [
+                "choice",
+                "conditional",
+            ]:
+                if source_handle in ["Completed", "True"]:
                     choice_true_targets[source_id] = target_id
                     logger.info(
-                        f"Identified Choice true path: {source_id} -> {target_id}"
+                        f"Identified Choice/Conditional true path: {source_id} -> {target_id}"
                     )
-                elif source_handle == "In Progress":
+                elif source_handle in ["In Progress", "False"]:
                     choice_false_targets[source_id] = target_id
                     logger.info(
-                        f"Identified Choice false path: {source_id} -> {target_id}"
+                        f"Identified Choice/Conditional false path: {source_id} -> {target_id}"
                     )
                 elif source_handle == "Fail":
                     choice_fail_targets[source_id] = target_id

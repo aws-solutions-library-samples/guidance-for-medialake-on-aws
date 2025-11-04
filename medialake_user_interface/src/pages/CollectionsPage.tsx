@@ -27,7 +27,6 @@ import {
   Lock as PrivateIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-  Refresh as RefreshIcon,
   CalendarToday as CalendarIcon,
   AccountTree as TreeIcon,
   PhotoLibrary as PhotoLibraryIcon,
@@ -46,6 +45,7 @@ import {
   LocalOffer,
 } from "@mui/icons-material";
 import { PageHeader, PageContent } from "@/components/common/layout";
+import { RefreshButton } from "@/components/common";
 import {
   useGetCollections,
   useDeleteCollection,
@@ -265,36 +265,12 @@ const CollectionsPage: React.FC = () => {
         description="Organize and manage your media assets in collections"
         action={
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <Button
-              onClick={handleRefresh}
-              disabled={isLoading || isRefreshing}
-              sx={{
-                backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                color: theme.palette.primary.main,
-                "&:hover": {
-                  backgroundColor: alpha(theme.palette.primary.main, 0.2),
-                },
-              }}
-              startIcon={
-                <RefreshIcon
-                  sx={{
-                    animation: isRefreshing
-                      ? "spin 1s linear infinite"
-                      : "none",
-                    "@keyframes spin": {
-                      "0%": {
-                        transform: "rotate(0deg)",
-                      },
-                      "100%": {
-                        transform: "rotate(360deg)",
-                      },
-                    },
-                  }}
-                />
-              }
-            >
-              Refresh
-            </Button>
+            <RefreshButton
+              onRefresh={handleRefresh}
+              isRefreshing={isRefreshing}
+              disabled={isLoading}
+              variant="icon"
+            />
             <Button
               variant="contained"
               startIcon={<AddIcon />}

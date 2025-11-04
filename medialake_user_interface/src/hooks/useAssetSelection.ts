@@ -260,8 +260,12 @@ export function useAssetSelection<T>({
     try {
       console.log("Starting batch download for:", selectedAssets);
 
-      // Extract asset IDs from selected assets
-      const assetIds = selectedAssets.map((asset) => asset.id);
+      // Transform asset IDs into the required object format
+      // Empty clipBoundary {} indicates whole file download (not a subclip)
+      const assetIds = selectedAssets.map((asset) => ({
+        assetId: asset.id,
+        clipBoundary: {},
+      }));
 
       // Initiate bulk download
       const response = await bulkDownloadMutation.mutateAsync({

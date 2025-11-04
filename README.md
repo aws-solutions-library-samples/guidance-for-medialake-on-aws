@@ -312,9 +312,15 @@ Use the emailed credentials to log in to the media lake UI.
 
 ### 3. **Enable Semantic Search and Integrations**
 
-- Enable and configure semantic search providers (e.g., TwelveLabs) as described in the UI and [MediaLake-Instructions.md](assets/docs/MediaLake-Installation-Guide.md).
-- **Embedding Store Options**: Media lake supports both OpenSearch and S3 Vectors as embedding stores for semantic search. While S3 Vectors provides a cost-effective option and is currently in preview mode, **OpenSearch is recommended for production deployments** due to its enhanced reliability and performance.
-- Import pipelines for enrichment and transcription.
+- Enable and configure semantic search providers as described in the UI and [`MediaLake-Installation-Guide.md`](assets/docs/MediaLake-Installation-Guide.md).
+- **Semantic Search Architecture**: Media lake supports two architectural patterns:
+  - **Provider + Store Architecture** (TwelveLabs): AI provider generates embeddings stored in OpenSearch or S3 Vectors
+  - **External Semantic Service Architecture** (Coactive): External service manages both embedding generation and storage
+- **Embedding Store Options** (for Provider + Store Architecture): OpenSearch (recommended for production) or S3 Vectors (cost-effective, preview mode)
+- **Supported Providers**:
+  - **TwelveLabs**: Via direct API or AWS Bedrock integration
+  - **Coactive**: Direct API integration for multimodal search
+- Import pipelines for semantic search, enrichment, and transcription.
 
 ### 4. **Ingest Media**
 

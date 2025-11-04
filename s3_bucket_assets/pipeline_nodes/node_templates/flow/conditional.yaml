@@ -1,0 +1,40 @@
+spec: v1.0.0
+node:
+  id: conditional
+  title: Conditional
+  description: Branch workflow based on a true/false condition
+  version: 1.0.0
+  type: flow
+  integration:
+    config:
+      aws_stepfunction:
+        step_name: choice
+actions:
+  conditional:
+    summary: Branch workflow based on a true/false condition
+    description: This step will branch the workflow into two paths based on a boolean condition evaluation
+    operationId: conditional
+    parameters:
+      - in: body
+        name: Variable
+        required: false
+        default: "$.metadata.externalJobStatus"
+        schema:
+          type: string
+          description: JSONPath expression to evaluate for the condition
+      - in: body
+        name: Condition
+        required: false
+        default: "Completed"
+        schema:
+          type: string
+          description: Value to compare against for true condition
+    connections:
+      incoming:
+        type: [any]
+      outgoing:
+        type:
+          - name: "True"
+            description: Path taken when condition evaluates to true
+          - name: "False"
+            description: Path taken when condition evaluates to false

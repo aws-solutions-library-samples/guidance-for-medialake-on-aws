@@ -5,7 +5,6 @@ import {
   Box,
   Typography,
   LinearProgress,
-  Paper,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -30,6 +29,7 @@ import {
 } from "../components/common/RightSidebar";
 import SearchFilters from "../components/search/SearchFilters";
 import MasterResultsView from "../components/search/MasterResultsView";
+import NoResultsFound from "../components/search/NoResultsFound";
 import { useSearch } from "../api/hooks/useSearch";
 import { useSearchFields, type FieldInfo } from "../api/hooks/useSearchFields";
 import { useAssetOperations } from "@/hooks/useAssetOperations";
@@ -685,52 +685,7 @@ const SearchPage: React.FC = () => {
             }}
           >
             {searchMetadata?.totalResults === 0 && currentQuery && (
-              <Box
-                sx={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  minHeight: "50vh",
-                  textAlign: "center",
-                  gap: 2,
-                }}
-              >
-                <Paper
-                  elevation={0}
-                  sx={{
-                    p: 4,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: 2,
-                    bgcolor: "background.paper",
-                    borderRadius: 2,
-                  }}
-                >
-                  <SearchOffIcon
-                    sx={{
-                      fontSize: 64,
-                      color: "text.secondary",
-                      mb: 2,
-                    }}
-                  />
-                  <Typography variant="h5" color="text.primary" gutterBottom>
-                    No results found
-                  </Typography>
-                  <Typography variant="body1" color="text.secondary">
-                    We couldn't find any matches for "{currentQuery}"
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ mt: 1 }}
-                  >
-                    Try adjusting your search or filters to find what you're
-                    looking for
-                  </Typography>
-                </Paper>
-              </Box>
+              <NoResultsFound query={currentQuery} />
             )}
 
             {(filteredResults.length > 0 && searchMetadata && !error) ||

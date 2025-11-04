@@ -8,7 +8,6 @@ from constructs import Construct
 
 # Import the CDK logger instead of aws_lambda_powertools
 from cdk_logger import get_logger
-from config import config
 
 logger = get_logger("VPC")
 
@@ -93,14 +92,8 @@ class CustomVpc(Construct):
             )
             logger.info(f"Successfully created new VPC: {self.vpc.vpc_id}")
 
-            # If the environment is prod, apply a retention policy to the VPC.
-            if config.environment == "prod":
-                logger.info(
-                    "Production environment detected - applying RETAIN removal policy"
-                )
-                self.vpc.apply_removal_policy(RemovalPolicy.RETAIN)
-                for subnet in self.vpc.public_subnets + self.vpc.private_subnets:
-                    subnet.apply_removal_policy(RemovalPolicy.RETAIN)
+            # Configure Network ACLs to restrict SSH and RDP access from Internet
+            self._configure_network_acls()
 
         self.vpc_id = self.vpc.vpc_id
 
@@ -122,9 +115,166 @@ class CustomVpc(Construct):
             traffic_type=ec2.FlowLogTrafficType.ALL,
             destination=ec2.FlowLogDestination.to_cloud_watch_logs(flow_log_group),
         )
-        logger.info("VPC Flow Logs successfully configured")
 
-        logger.info(f"Available AZs: {scope.availability_zones}")
+    def _configure_network_acls(self) -> None:
+        """
+        Configure custom Network ACL rules to restrict SSH and RDP access from the Internet.
+        This addresses security findings from Prowler scan for ports 22 and 3389.
+        """
+        logger.info(
+            "Configuring custom Network ACL rules to restrict SSH and RDP access"
+        )
+
+        # Create Network ACL for Public Subnets
+        public_nacl = ec2.NetworkAcl(
+            self,
+            "PublicSubnetNACL",
+            vpc=self.vpc,
+            network_acl_name=f"{self.vpc.vpc_id}-public-nacl",
+        )
+
+        # Associate public subnets with the custom NACL
+        for idx, subnet in enumerate(self.vpc.public_subnets):
+            ec2.SubnetNetworkAclAssociation(
+                self,
+                f"PublicSubnetNACLAssoc{idx}",
+                subnet=subnet,
+                network_acl=public_nacl,
+            )
+
+        # Public NACL Ingress Rules
+        # Allow HTTP from anywhere
+        public_nacl.add_entry(
+            "AllowHTTPInbound",
+            cidr=ec2.AclCidr.any_ipv4(),
+            rule_number=100,
+            traffic=ec2.AclTraffic.tcp_port(80),
+            direction=ec2.TrafficDirection.INGRESS,
+            rule_action=ec2.Action.ALLOW,
+        )
+
+        # Allow HTTPS from anywhere
+        public_nacl.add_entry(
+            "AllowHTTPSInbound",
+            cidr=ec2.AclCidr.any_ipv4(),
+            rule_number=110,
+            traffic=ec2.AclTraffic.tcp_port(443),
+            direction=ec2.TrafficDirection.INGRESS,
+            rule_action=ec2.Action.ALLOW,
+        )
+
+        # Allow ephemeral ports for return traffic
+        public_nacl.add_entry(
+            "AllowEphemeralInbound",
+            cidr=ec2.AclCidr.any_ipv4(),
+            rule_number=120,
+            traffic=ec2.AclTraffic.tcp_port_range(1024, 65535),
+            direction=ec2.TrafficDirection.INGRESS,
+            rule_action=ec2.Action.ALLOW,
+        )
+
+        # Explicitly DENY SSH from Internet
+        public_nacl.add_entry(
+            "DenySSHFromInternet",
+            cidr=ec2.AclCidr.any_ipv4(),
+            rule_number=10,
+            traffic=ec2.AclTraffic.tcp_port(22),
+            direction=ec2.TrafficDirection.INGRESS,
+            rule_action=ec2.Action.DENY,
+        )
+
+        # Explicitly DENY RDP from Internet
+        public_nacl.add_entry(
+            "DenyRDPFromInternet",
+            cidr=ec2.AclCidr.any_ipv4(),
+            rule_number=20,
+            traffic=ec2.AclTraffic.tcp_port(3389),
+            direction=ec2.TrafficDirection.INGRESS,
+            rule_action=ec2.Action.DENY,
+        )
+
+        # Public NACL Egress Rules - Allow all outbound
+        public_nacl.add_entry(
+            "AllowAllOutbound",
+            cidr=ec2.AclCidr.any_ipv4(),
+            rule_number=100,
+            traffic=ec2.AclTraffic.all_traffic(),
+            direction=ec2.TrafficDirection.EGRESS,
+            rule_action=ec2.Action.ALLOW,
+        )
+
+        logger.info("Public subnet NACL configured with SSH and RDP restrictions")
+
+        # Create Network ACL for Private Subnets
+        private_nacl = ec2.NetworkAcl(
+            self,
+            "PrivateSubnetNACL",
+            vpc=self.vpc,
+            network_acl_name=f"{self.vpc.vpc_id}-private-nacl",
+        )
+
+        # Associate private subnets with the custom NACL
+        for idx, subnet in enumerate(self.vpc.private_subnets):
+            ec2.SubnetNetworkAclAssociation(
+                self,
+                f"PrivateSubnetNACLAssoc{idx}",
+                subnet=subnet,
+                network_acl=private_nacl,
+            )
+
+        # Private NACL Ingress Rules
+        # Allow all traffic from VPC CIDR
+        private_nacl.add_entry(
+            "AllowVPCInbound",
+            cidr=ec2.AclCidr.ipv4(self.vpc.vpc_cidr_block),
+            rule_number=100,
+            traffic=ec2.AclTraffic.all_traffic(),
+            direction=ec2.TrafficDirection.INGRESS,
+            rule_action=ec2.Action.ALLOW,
+        )
+
+        # Allow ephemeral ports from Internet for return traffic
+        private_nacl.add_entry(
+            "AllowEphemeralFromInternet",
+            cidr=ec2.AclCidr.any_ipv4(),
+            rule_number=110,
+            traffic=ec2.AclTraffic.tcp_port_range(1024, 65535),
+            direction=ec2.TrafficDirection.INGRESS,
+            rule_action=ec2.Action.ALLOW,
+        )
+
+        # Explicitly DENY SSH from Internet
+        private_nacl.add_entry(
+            "DenySSHFromInternet",
+            cidr=ec2.AclCidr.any_ipv4(),
+            rule_number=10,
+            traffic=ec2.AclTraffic.tcp_port(22),
+            direction=ec2.TrafficDirection.INGRESS,
+            rule_action=ec2.Action.DENY,
+        )
+
+        # Explicitly DENY RDP from Internet
+        private_nacl.add_entry(
+            "DenyRDPFromInternet",
+            cidr=ec2.AclCidr.any_ipv4(),
+            rule_number=20,
+            traffic=ec2.AclTraffic.tcp_port(3389),
+            direction=ec2.TrafficDirection.INGRESS,
+            rule_action=ec2.Action.DENY,
+        )
+
+        # Private NACL Egress Rules - Allow all outbound
+        private_nacl.add_entry(
+            "AllowAllOutbound",
+            cidr=ec2.AclCidr.any_ipv4(),
+            rule_number=100,
+            traffic=ec2.AclTraffic.all_traffic(),
+            direction=ec2.TrafficDirection.EGRESS,
+            rule_action=ec2.Action.ALLOW,
+        )
+
+        logger.info("Private subnet NACL configured with SSH and RDP restrictions")
+        logger.info("Network ACL configuration completed successfully")
 
     def get_subnet_ids(self, subnet_type: ec2.SubnetType) -> List[Dict[str, str]]:
         """Get subnet IDs and their availability zones for a specific subnet type"""

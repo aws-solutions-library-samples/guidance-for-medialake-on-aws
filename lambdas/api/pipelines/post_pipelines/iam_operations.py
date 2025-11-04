@@ -156,7 +156,7 @@ def delete_role(role_name: str) -> None:
 
 
 def create_sfn_role(role_name: str) -> str:
-    """Create a Step Functions execution role."""
+    """Create a Step Functions execution role with CloudWatch Logs permissions."""
     iam_client = boto3.client("iam")
 
     # Define the trust relationship policy
@@ -167,6 +167,27 @@ def create_sfn_role(role_name: str) -> str:
                 "Effect": "Allow",
                 "Principal": {"Service": "states.amazonaws.com"},
                 "Action": "sts:AssumeRole",
+            }
+        ],
+    }
+
+    # Define inline policy for CloudWatch Logs
+    logs_policy = {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "logs:CreateLogDelivery",
+                    "logs:GetLogDelivery",
+                    "logs:UpdateLogDelivery",
+                    "logs:DeleteLogDelivery",
+                    "logs:ListLogDeliveries",
+                    "logs:PutResourcePolicy",
+                    "logs:DescribeResourcePolicies",
+                    "logs:DescribeLogGroups",
+                ],
+                "Resource": "*",
             }
         ],
     }
@@ -198,6 +219,18 @@ def create_sfn_role(role_name: str) -> str:
             RoleName=role_name,
             PolicyArn="arn:aws:iam::aws:policy/service-role/AWSLambdaRole",
         )
+
+        # Add inline policy for CloudWatch Logs
+        iam_client.put_role_policy(
+            RoleName=role_name,
+            PolicyName="StepFunctionsLoggingPolicy",
+            PolicyDocument=json.dumps(logs_policy),
+        )
+        logger.info(f"Added CloudWatch Logs policy to role {role_name}")
+
+        # Wait for role and policies to propagate
+        logger.info(f"Waiting for role {role_name} to propagate...")
+        time.sleep(10)
 
         logger.info(f"Role {role_name} created successfully with ARN: {role_arn}")
         return role_arn

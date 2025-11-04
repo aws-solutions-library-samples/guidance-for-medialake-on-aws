@@ -13,6 +13,13 @@ export const SYSTEM_SETTINGS_CONFIG = {
       type: "twelvelabs-bedrock",
       requiresApiKey: false,
     },
+    COACTIVE: {
+      id: "coactive",
+      name: "Coactive AI",
+      type: "coactive",
+      defaultEndpoint: "https://app.coactive.ai/api/v1/search",
+      requiresApiKey: true,
+    },
   },
   EMBEDDING_STORES: {
     OPENSEARCH: {

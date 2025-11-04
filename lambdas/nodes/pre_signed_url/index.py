@@ -128,7 +128,7 @@ def _extract_location(payload: Dict[str, Any]) -> Tuple[str, str, str]:
 def lambda_handler(event: Dict[str, Any], context: LambdaContext):
     """
     Lambda entry – generate a pre-signed URL for the selected object.
-    The URL is signed in the bucket’s own region, preventing
+    The URL is signed in the bucket's own region, preventing
     SignatureDoesNotMatch errors outside us-east-1.
     """
     logger.info("Incoming event", extra={"event": event})

@@ -6,8 +6,6 @@ from aws_cdk import aws_kms as kms
 from aws_cdk import aws_s3 as s3
 from constructs import Construct
 
-from config import config
-
 
 @dataclass
 class S3BucketProps:
@@ -48,7 +46,7 @@ class S3Bucket(Construct):
                 "BucketEncryptionKey",
                 removal_policy=(
                     RemovalPolicy.DESTROY
-                    if props.destroy_on_delete and config.environment != "prod"
+                    if props.destroy_on_delete
                     else RemovalPolicy.RETAIN
                 ),
                 enable_key_rotation=True,
@@ -63,11 +61,10 @@ class S3Bucket(Construct):
             "enforce_ssl": True,
             "removal_policy": (
                 RemovalPolicy.DESTROY
-                if props.destroy_on_delete and config.environment != "prod"
+                if props.destroy_on_delete
                 else RemovalPolicy.RETAIN
             ),
-            "auto_delete_objects": props.destroy_on_delete
-            and config.environment != "prod",
+            "auto_delete_objects": props.destroy_on_delete,
         }
 
         # Add optional properties from props if they exist
