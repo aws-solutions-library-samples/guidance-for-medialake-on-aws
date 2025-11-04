@@ -386,7 +386,7 @@ sync-to-github:
     # Clone GitHub repository to maintain its git history
     - git clone git@github.com:aws-solutions-library-samples/guidance-for-medialake-on-aws.git github-repo
     - cd github-repo
-    - echo "Current GitHub main commit:" && git log --oneline -1
+    - 'echo "Current GitHub main commit:" && git log --oneline -1'
     # Copy all files from GitLab workspace (excluding .git) and delete files that do not exist in GitLab
     - rsync -av --delete --exclude=.git ../ ./
     # Remove files that shouldn't be in the public GitHub repository
@@ -420,7 +420,7 @@ sync-to-github:
     # Stage all changes and commit with the MR title
     - git add -A
     - 'git commit --allow-empty -m "${COMMIT_MESSAGE}"'
-    - echo "New commit created:" && git log --oneline -1
+    - 'echo "New commit created:" && git log --oneline -1'
     # Push to GitHub main branch
     - git push origin main
 
