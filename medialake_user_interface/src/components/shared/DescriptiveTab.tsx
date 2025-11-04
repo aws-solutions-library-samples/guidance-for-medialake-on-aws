@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, Typography, Paper } from "@mui/material";
 import MarkdownRenderer from "../common/MarkdownRenderer";
+import TabContentContainer from "../common/TabContentContainer";
 
 interface DescriptiveTabProps {
   assetData: any;
@@ -11,16 +12,16 @@ const DescriptiveTab: React.FC<DescriptiveTabProps> = ({ assetData }) => {
 
   if (!structuredRecapResult) {
     return (
-      <Box sx={{ p: 2, textAlign: "center" }}>
-        <Typography color="text.secondary">
+      <TabContentContainer>
+        <Typography color="text.secondary" sx={{ textAlign: "center" }}>
           No descriptive content available for this asset.
         </Typography>
-      </Box>
+      </TabContentContainer>
     );
   }
 
   return (
-    <Box sx={{ p: 2 }}>
+    <TabContentContainer noPaper>
       <Typography variant="h6" sx={{ mb: 2, color: "primary.main" }}>
         Structured Recap Result
       </Typography>
@@ -35,7 +36,7 @@ const DescriptiveTab: React.FC<DescriptiveTabProps> = ({ assetData }) => {
       >
         <MarkdownRenderer content={structuredRecapResult} />
       </Paper>
-    </Box>
+    </TabContentContainer>
   );
 };
 

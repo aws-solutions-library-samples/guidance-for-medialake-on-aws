@@ -275,7 +275,6 @@ class BaseInfrastructureStack(Stack):
                 "MediaAssets",
                 props=S3BucketProps(
                     # bucket_name=config.s3.asset_bucket.bucket_name,
-                    destroy_on_delete=config.environment != "prod",
                     access_logs=True,
                     access_logs_bucket=self.access_logs_bucket,
                     existing_bucket_arn=config.s3.asset_bucket.bucket_arn,
@@ -293,7 +292,6 @@ class BaseInfrastructureStack(Stack):
                 "MediaAssets",
                 props=S3BucketProps(
                     # bucket_name=f"{config.resource_prefix}-asset-bucket-{config.account_id}-{self.region}-{config.environment}",
-                    destroy_on_delete=config.environment != "prod",
                     access_logs=True,
                     access_logs_bucket=self.access_logs_bucket,
                     existing_kms_key_arn=(

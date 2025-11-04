@@ -4,27 +4,11 @@ import {
   Box,
   CircularProgress,
   Typography,
-  List,
-  ListItem,
   Paper,
   Button,
   Tabs,
   Tab,
-  Grid,
-  Card,
-  CardContent,
-  Chip,
-  useTheme,
   alpha,
-  TextField,
-  InputAdornment,
-  FormControl,
-  Select,
-  MenuItem,
-  IconButton,
-  CardHeader,
-  ListItemText,
-  LinearProgress,
 } from "@mui/material";
 import {
   useAsset,
@@ -39,150 +23,20 @@ import {
   RecentlyViewedProvider,
   useTrackRecentlyViewed,
 } from "../contexts/RecentlyViewedContext";
-import { formatCamelCase } from "../utils/stringUtils";
-import { TruncatedTextWithTooltip } from "../components/common/TruncatedTextWithTooltip";
 import { formatFileSize } from "../utils/imageUtils";
-import { formatLocalDateTime } from "@/shared/utils/dateUtils";
 import ImageViewer from "../components/common/ImageViewer";
 import BreadcrumbNavigation from "../components/common/BreadcrumbNavigation";
 import AssetSidebar from "../components/asset/AssetSidebar";
 import CommentPopper from "../components/common/CommentPopper";
-import MetadataSection from "../components/common/MetadataSection";
-import { SimpleTreeView } from "@mui/x-tree-view/SimpleTreeView";
-import { TreeItem } from "@mui/x-tree-view/TreeItem";
-import { Chip as MuiChip } from "@mui/material";
 import { RelatedItemsView } from "../components/shared/RelatedItemsView";
-import { RelatedVersionsResponse as NewRelatedVersionsResponse } from "../api/types/asset.types";
-import TechnicalMetadataTab, {
-  categoryMapping,
-} from "../components/TechnicalMetadataTab";
-import MetadataContent, { outputFilters } from "../components/MetadataContent";
-
-// MUI Icons
+import TechnicalMetadataTab from "../components/TechnicalMetadataTab";
+import TabContentContainer from "../components/common/TabContentContainer";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
-import CodeOutlinedIcon from "@mui/icons-material/CodeOutlined";
-import LinkOutlinedIcon from "@mui/icons-material/LinkOutlined";
-import ZoomOutMapIcon from "@mui/icons-material/ZoomOutMap";
-import SearchIcon from "@mui/icons-material/Search";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy";
-import EditIcon from "@mui/icons-material/Edit";
-import CheckIcon from "@mui/icons-material/Check";
-import CloseIcon from "@mui/icons-material/Close";
-
-interface MetadataContentProps {
-  data: any;
-  depth?: number;
-  showAll: boolean;
-  category?: string;
-}
-
-// Color coding for metadata categories
-const getMetadataCategoryColor = (category: string, theme: any) => {
-  const categoryColors: Record<string, string> = {
-    EXIF: theme.palette.primary.main,
-    GPS: theme.palette.success.main,
-    XMP: theme.palette.warning.main,
-    IPTC: theme.palette.info.main,
-    ICC: theme.palette.secondary.main,
-    general: theme.palette.grey[600],
-    technical: theme.palette.primary.light,
-    descriptive: theme.palette.secondary.light,
-  };
-
-  // Try to find an exact match
-  if (categoryColors[category]) return categoryColors[category];
-
-  // Try to find a partial match
-  const foundKey = Object.keys(categoryColors).find((key) =>
-    category.toLowerCase().includes(key.toLowerCase()),
-  );
-
-  return foundKey ? categoryColors[foundKey] : categoryColors.general;
-};
-
-// Add this component for tag input
-const TagInput: React.FC<{
-  tags: string[];
-  onChange: (newTags: string[]) => void;
-}> = ({ tags, onChange }) => {
-  const [inputValue, setInputValue] = useState("");
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputValue(e.target.value);
-  };
-
-  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if ((e.key === " " || e.key === "Enter") && inputValue.trim()) {
-      e.preventDefault();
-      const newTag = inputValue.trim();
-
-      // Only add if it's not a duplicate
-      if (!tags.includes(newTag)) {
-        onChange([...tags, newTag]);
-      }
-
-      setInputValue("");
-    } else if (e.key === "Backspace" && !inputValue && tags.length > 0) {
-      // Remove the last tag when backspace is pressed in an empty input
-      onChange(tags.slice(0, -1));
-    }
-  };
-
-  const handleDeleteTag = (tagToDelete: string) => {
-    onChange(tags.filter((tag) => tag !== tagToDelete));
-  };
-
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        flexWrap: "wrap",
-        gap: 0.5,
-        alignItems: "center",
-        p: 1,
-        border: "1px solid",
-        borderColor: "divider",
-        borderRadius: 1,
-        minHeight: 32,
-      }}
-    >
-      {tags.map((tag) => (
-        <MuiChip
-          key={tag}
-          label={tag}
-          size="small"
-          onDelete={() => handleDeleteTag(tag)}
-          sx={{ height: 24 }}
-        />
-      ))}
-      <input
-        value={inputValue}
-        onChange={handleInputChange}
-        onKeyDown={handleInputKeyDown}
-        placeholder={tags.length > 0 ? "" : "Type and press space to add tags"}
-        style={{
-          flex: "1 0 50px",
-          minWidth: 60,
-          border: "none",
-          outline: "none",
-          background: "transparent",
-          padding: "4px 0",
-          fontSize: "0.9rem",
-        }}
-      />
-    </Box>
-  );
-};
 
 const SummaryTab = ({ assetData }: { assetData: any }) => {
-  const theme = useTheme();
   const asset = assetData?.data?.asset;
-  const fileInfoColor = "#4299E1"; // Blue
-  const techDetailsColor = "#68D391"; // Green/teal
+  const fileInfoColor = "#4299E1";
+  const techDetailsColor = "#68D391";
 
   // Extract metadata from API response
   const metadata = asset?.Metadata?.EmbeddedMetadata || {};
@@ -246,7 +100,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
     : undefined;
 
   return (
-    <Box>
+    <TabContentContainer>
       {/* File Information Section */}
       <Box sx={{ mb: 3 }}>
         <Typography
@@ -303,7 +157,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
         {renderField("Compression", compression)}
         {renderField("Created Date", createdDate)}
       </Box>
-    </Box>
+    </TabContentContainer>
   );
 };
 
@@ -368,21 +222,16 @@ const ImageDetailContent: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const theme = useTheme();
   const [activeTab, setActiveTab] = useState("summary");
   const [relatedPage, setRelatedPage] = useState(1);
   const { data: assetData, isLoading: isLoadingAsset } = useAsset(id || "");
   const { data: relatedVersionsData, isLoading: isLoadingRelated } =
     useRelatedVersions(id || "", relatedPage);
   const { isExpanded, closeSidebar } = useRightSidebar();
-  const [expandedMetadata, setExpandedMetadata] = useState<{
-    [key: string]: boolean;
-  }>({});
   const [commentAnchorEl, setCommentAnchorEl] = useState<null | HTMLElement>(
     null,
   );
   const [selectedComment, setSelectedComment] = useState<number | null>(null);
-  const [newComment, setNewComment] = useState("");
   const [showHeader, setShowHeader] = useState(true);
   const [comments, setComments] = useState([
     {
@@ -508,28 +357,6 @@ const ImageDetailContent: React.FC = () => {
     },
     [commentAnchorEl, selectedComment],
   );
-
-  const handleCommentSubmit = useCallback(() => {
-    if (newComment.trim()) {
-      const now = new Date().toISOString();
-      const formattedTimestamp = formatLocalDateTime(now, {
-        showSeconds: true,
-      });
-
-      const newCommentObj = {
-        user: "Current User",
-        avatar: "https://mui.com/static/images/avatar/1.jpg",
-        content: newComment,
-        timestamp: formattedTimestamp,
-      };
-      setComments((prevComments) => [...prevComments, newCommentObj]);
-      setNewComment("");
-    }
-  }, [newComment]);
-
-  const toggleMetadataExpansion = useCallback((key: string) => {
-    setExpandedMetadata((prev) => ({ ...prev, [key]: !prev[key] }));
-  }, []);
 
   const transformMetadata = useCallback((metadata: any) => {
     if (!metadata) return [];
@@ -667,7 +494,6 @@ const ImageDetailContent: React.FC = () => {
       timestamp: new Date().toISOString(),
     };
     setComments((prev) => [...prev, newCommentObj]);
-    setNewComment("");
   }, []);
 
   console.log("ImageDetailContent - activeTab:", activeTab);
@@ -752,9 +578,7 @@ const ImageDetailContent: React.FC = () => {
         sx={{
           position: "sticky",
           top: 0,
-          zIndex: 1200,
-          background: (theme) => alpha(theme.palette.background.default, 0.8),
-          backdropFilter: "blur(8px)",
+          zIndex: 1000,
           transform: showHeader ? "translateY(0)" : "translateY(-100%)",
           transition: "transform 0.3s ease-in-out",
           visibility: showHeader ? "visible" : "hidden",

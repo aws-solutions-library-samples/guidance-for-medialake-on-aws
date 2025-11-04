@@ -6,10 +6,6 @@ import {
   Stack,
   Chip,
   IconButton,
-  FormControlLabel,
-  Switch,
-  Typography,
-  Paper,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { Button } from "@/components/common";
@@ -18,8 +14,6 @@ import {
   CloudUpload as CloudUploadIcon,
   FilterList as FilterListIcon,
   Chat as ChatIcon,
-  Notifications as NotificationsIcon,
-  Psychology as PsychologyIcon,
 } from "@mui/icons-material";
 import { useChat } from "./contexts/ChatContext";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -67,13 +61,11 @@ function TopBar() {
   // Get search state from store
   const storeQuery = useSearchQuery();
   const storeIsSemantic = useSemanticSearch();
-  const storeSemanticMode = useSemanticMode();
   const filters = useSearchFilters();
   const { setQuery, setIsSemantic, setSemanticMode, setFilters } =
     useDomainActions();
   const { openFilterModal } = useUIActions();
   const [searchResults, setSearchResults] = useState<any>(null);
-  const [searchBoxWidth, setSearchBoxWidth] = useState<number>(0);
   const searchBoxRef = useRef<HTMLDivElement>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const isFileUploadEnabled = useFeatureFlag("file-upload-enabled", true);
@@ -222,31 +214,6 @@ function TopBar() {
 
     navigate(`/search?${queryParams.toString()}`);
   };
-
-  // Measure search box width
-  useEffect(() => {
-    const updateWidth = () => {
-      if (searchBoxRef.current) {
-        const width = searchBoxRef.current.offsetWidth;
-        setSearchBoxWidth(width);
-        // console.log('Search box width measured:', width);
-      }
-    };
-
-    // Initial measurement after a short delay
-    setTimeout(updateWidth, 100);
-    window.addEventListener("resize", updateWidth);
-    const observer = new ResizeObserver(() => {
-      updateWidth();
-    });
-    if (searchBoxRef.current) {
-      observer.observe(searchBoxRef.current);
-    }
-    return () => {
-      window.removeEventListener("resize", updateWidth);
-      observer.disconnect();
-    };
-  }, []);
 
   // Handle search results from session storage
   useEffect(() => {

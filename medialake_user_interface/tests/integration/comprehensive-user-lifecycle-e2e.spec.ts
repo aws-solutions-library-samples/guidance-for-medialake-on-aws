@@ -494,32 +494,71 @@ test.describe("Comprehensive User Lifecycle E2E with AWS Discovery", () => {
       const loginUrl = `${cloudFrontContext.testUrls.root}/sign-in`;
       console.log(`[E2E Test] Navigating to login URL: ${loginUrl}`);
 
-      await page.goto(loginUrl, {
-        waitUntil: "networkidle",
-        timeout: 60000,
-      });
+      try {
+        // Navigate with detailed logging
+        console.log(`[E2E Test] Loading page: ${loginUrl}`);
+        const response = await page.goto(loginUrl, {
+          waitUntil: "networkidle",
+          timeout: 60000,
+        });
 
-      // Wait for login form to be fully loaded using working selectors
-      await page.waitForSelector('input[name="username"]', { timeout: 15000 });
-      await page.waitForLoadState("networkidle");
+        console.log(
+          `[E2E Test] Page loaded with status: ${response?.status()}`,
+        );
+        console.log(`[E2E Test] Final URL: ${page.url()}`);
 
-      // Use the working selectors from login.spec.ts
-      await page.fill('input[name="username"]', enhancedCognitoUser.username);
-      await page.fill('input[name="password"]', enhancedCognitoUser.password);
-      await page.click('.amplify-button[type="submit"]');
+        // Check page title
+        const title = await page.title();
+        console.log(`[E2E Test] Page title: ${title}`);
 
-      // Wait for successful login - check for redirect away from sign-in page
-      await page.waitForURL((url) => !url.toString().includes("/sign-in"), {
-        timeout: 60000,
-      });
-      await page.waitForLoadState("networkidle");
+        // Wait for login form to be fully loaded using working selectors
+        console.log(`[E2E Test] Waiting for username input field...`);
+        await page.waitForSelector('input[name="username"]', {
+          timeout: 15000,
+        });
+        console.log(`[E2E Test] ✓ Username field found`);
 
-      // Give the page a moment to fully render after login
-      await page.waitForTimeout(2000);
+        await page.waitForLoadState("networkidle");
 
-      console.log(
-        `[E2E Test] Successfully logged in as: ${enhancedCognitoUser.username}`,
-      );
+        // Use the working selectors from login.spec.ts
+        console.log(`[E2E Test] Filling in credentials...`);
+        await page.fill('input[name="username"]', enhancedCognitoUser.username);
+        await page.fill('input[name="password"]', enhancedCognitoUser.password);
+
+        console.log(`[E2E Test] Clicking login button...`);
+        await page.click('.amplify-button[type="submit"]');
+
+        // Wait for successful login - check for redirect away from sign-in page
+        console.log(`[E2E Test] Waiting for redirect after login...`);
+        await page.waitForURL((url) => !url.toString().includes("/sign-in"), {
+          timeout: 60000,
+        });
+        await page.waitForLoadState("networkidle");
+
+        // Give the page a moment to fully render after login
+        await page.waitForTimeout(2000);
+
+        console.log(`[E2E Test] Post-login URL: ${page.url()}`);
+        console.log(
+          `[E2E Test] Successfully logged in as: ${enhancedCognitoUser.username}`,
+        );
+      } catch (error) {
+        // Enhanced error reporting
+        console.error(`[E2E Test] Login failed at URL: ${page.url()}`);
+        console.error(`[E2E Test] Error details:`, error);
+
+        // Capture page content for debugging
+        const content = await page.content();
+        console.error(
+          `[E2E Test] Page HTML length: ${content.length} characters`,
+        );
+
+        // Take screenshot for debugging
+        await page.screenshot({ path: "login-failure.png", fullPage: true });
+        console.error(`[E2E Test] Screenshot saved: login-failure.png`);
+
+        throw error;
+      }
     }, "Login Process");
 
     // Step 3: Navigate to User Management

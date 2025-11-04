@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useFeatureFlag } from "@/utils/featureFlags";
+import { useSemanticSearch } from "@/stores/searchStore";
 import {
   Box,
   Typography,
@@ -135,8 +136,10 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
     const favoritesFeature = useFeatureFlag("user-favorites-enabled", true);
 
     // Get semantic mode to conditionally hide buttons
+    // Only hide buttons when semantic search is active AND in clip mode
     const semanticMode = useSemanticMode();
-    const isClipMode = semanticMode === "clip";
+    const isSemanticSearchActive = useSemanticSearch();
+    const isClipMode = isSemanticSearchActive && semanticMode === "clip";
 
     // Update when menuOpen prop changes
     useEffect(() => {

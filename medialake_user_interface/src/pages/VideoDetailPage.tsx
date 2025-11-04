@@ -12,17 +12,8 @@ import {
   CircularProgress,
   Typography,
   Paper,
-  List,
-  ListItem,
-  Divider,
-  Button,
   Tabs,
   Tab,
-  Grid,
-  Card,
-  CardContent,
-  Chip,
-  useTheme,
   alpha,
 } from "@mui/material";
 import {
@@ -30,7 +21,6 @@ import {
   useRelatedVersions,
   useTranscription,
   RelatedVersionsResponse,
-  TranscriptionResponse,
 } from "../api/hooks/useAssets";
 import {
   RightSidebarProvider,
@@ -42,47 +32,20 @@ import {
 } from "../contexts/RecentlyViewedContext";
 import AssetSidebar from "../components/asset/AssetSidebar";
 import BreadcrumbNavigation from "../components/common/BreadcrumbNavigation";
-import AssetHeader from "../components/asset/AssetHeader";
 import AssetVideo from "../components/asset/AssetVideo";
-import { formatCamelCase } from "../utils/stringUtils";
-import { TruncatedTextWithTooltip } from "../components/common/TruncatedTextWithTooltip";
 import { formatLocalDateTime } from "@/shared/utils/dateUtils";
-import { SimpleTreeView } from "@mui/x-tree-view/SimpleTreeView";
-import { TreeItem } from "@mui/x-tree-view/TreeItem";
-import { Chip as MuiChip } from "@mui/material";
 import { RelatedItemsView } from "../components/shared/RelatedItemsView";
 import { AssetResponse } from "../api/types/asset.types";
 import { formatFileSize } from "../utils/imageUtils";
-import TechnicalMetadataTab, {
-  categoryMapping,
-} from "../components/TechnicalMetadataTab";
-import MetadataContent, { outputFilters } from "../components/MetadataContent";
+import TechnicalMetadataTab from "../components/TechnicalMetadataTab";
+import TranscriptionTab from "../components/shared/TranscriptionTab";
+import DescriptiveTab from "../components/shared/DescriptiveTab";
+import TabContentContainer from "../components/common/TabContentContainer";
+import { VideoViewerRef } from "../components/common/VideoViewer";
 
-// MUI Icons
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
-import CodeOutlinedIcon from "@mui/icons-material/CodeOutlined";
-import LinkOutlinedIcon from "@mui/icons-material/LinkOutlined";
-import SubtitlesOutlinedIcon from "@mui/icons-material/SubtitlesOutlined";
-import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
-import MarkdownRenderer from "../components/common/MarkdownRenderer";
-
-import { VideoViewer, VideoViewerRef } from "../components/common/VideoViewer";
-
-// Tab content components
-const SummaryTab = ({
-  metadataFields,
-  assetData,
-}: {
-  metadataFields: any;
-  assetData: any;
-}) => {
-  const theme = useTheme();
-  const fileInfoColor = "#4299E1"; // Blue
-  const techDetailsColor = "#68D391"; // Green/teal
-  const descKeywordsColor = "#F6AD55"; // Orange
+const SummaryTab = ({ assetData }: { assetData: any }) => {
+  const fileInfoColor = "#4299E1";
+  const techDetailsColor = "#68D391";
 
   const s3Bucket =
     assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo
@@ -129,7 +92,7 @@ const SummaryTab = ({
     : "Unknown";
 
   return (
-    <Box>
+    <TabContentContainer>
       {/* File Information Section */}
       <Box sx={{ mb: 3 }}>
         <Typography
@@ -359,59 +322,9 @@ const SummaryTab = ({
           </Typography>
         </Box>
       </Box>
-
-      {/* Description & Keywords Section */}
-      {/* <Box sx={{ mb: 3 }}>
-                <Typography
-                    sx={{
-                        color: descKeywordsColor,
-                        fontSize: '0.875rem',
-                        fontWeight: 600,
-                        mb: 0.5
-                    }}
-                >
-                    Description & Keywords
-                </Typography>
-                <Box sx={{
-                    width: '100%',
-                    height: '1px',
-                    bgcolor: descKeywordsColor,
-                    mb: 2
-                }} />
-
-                <Typography sx={{ fontSize: '0.875rem', mb: 2 }}>
-                    {metadataFields.descriptive.find((item: any) => item.label === 'Description')?.value || 'No description available'}
-                </Typography>
-
-                <Box sx={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: 0.75
-                }}>
-                    {(metadataFields.descriptive.find((item: any) => item.label === 'Keywords')?.value || 'video,footage')
-                        .split(',')
-                        .map((keyword: string, index: number) => (
-                            <Chip
-                                key={index}
-                                label={keyword.trim()}
-                                size="small"
-                                sx={{
-                                    bgcolor: '#1E2732',
-                                    color: '#fff',
-                                    borderRadius: '16px',
-                                    fontSize: '0.75rem'
-                                }}
-                            />
-                        ))}
-                </Box>
-            </Box> */}
-    </Box>
+    </TabContentContainer>
   );
 };
-
-// Import the shared TranscriptionTab component
-import TranscriptionTab from "../components/shared/TranscriptionTab";
-import DescriptiveTab from "../components/shared/DescriptiveTab";
 
 const RelatedItemsTab: React.FC<{
   assetId: string;
@@ -476,7 +389,6 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
   searchTerm,
 }) => {
   const videoViewerRef = useRef<VideoViewerRef>(null);
-  console.log("Parent videoViewerRef:", videoViewerRef); // Debug log
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -508,9 +420,6 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
     }
   }, [mediaController]);
 
-  const [expandedMetadata, setExpandedMetadata] = useState<{
-    [key: string]: boolean;
-  }>({});
   const [comments, setComments] = useState([
     {
       user: "John Doe",
@@ -578,45 +487,6 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
     ];
   }, [assetData]);
 
-  const metadataFields = useMemo(() => {
-    if (!assetData?.data?.asset)
-      return {
-        summary: [],
-        descriptive: [],
-        technical: [],
-      };
-
-    return {
-      summary: [
-        { label: "Title", value: "Winter Expedition Base Camp" },
-        { label: "Type", value: "Video" },
-        { label: "Duration", value: "00:15" },
-      ],
-      descriptive: [
-        {
-          label: "Description",
-          value: "Base camp footage from winter expedition",
-        },
-        { label: "Keywords", value: "winter, expedition, base camp" },
-        { label: "Location", value: "Mount Everest" },
-      ],
-      technical: [
-        {
-          label: "Format",
-          value:
-            assetData.data.asset.DigitalSourceAsset.MainRepresentation.Format,
-        },
-        {
-          label: "File Size",
-          value:
-            assetData.data.asset.DigitalSourceAsset.MainRepresentation
-              .StorageInfo.PrimaryLocation.FileInfo.Size,
-        },
-        { label: "Date Created", value: "2024-01-07" },
-      ],
-    };
-  }, [assetData]);
-
   const transformMetadata = (metadata: any) => {
     if (!metadata) return [];
 
@@ -661,27 +531,6 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
     };
     setComments([...comments, newComment]);
   };
-
-  const toggleMetadataExpansion = (key: string) => {
-    setExpandedMetadata((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-  const activityLog = [
-    {
-      user: "John Doe",
-      action: "Uploaded video",
-      timestamp: "2024-01-07 09:30:22",
-    },
-    {
-      user: "AI Pipeline",
-      action: "Generated metadata",
-      timestamp: "2024-01-07 09:31:05",
-    },
-    {
-      user: "Jane Smith",
-      action: "Added tags",
-      timestamp: "2024-01-07 10:15:43",
-    },
-  ];
 
   // Track this asset in recently viewed
   useTrackRecentlyViewed(
@@ -840,9 +689,7 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
         sx={{
           position: "sticky",
           top: 0,
-          zIndex: 1200,
-          background: (theme) => alpha(theme.palette.background.default, 0.8),
-          backdropFilter: "blur(8px)",
+          zIndex: 1000,
           transform: showHeader ? "translateY(0)" : "translateY(-100%)",
           transition: "transform 0.3s ease-in-out",
           visibility: showHeader ? "visible" : "hidden",
@@ -994,12 +841,7 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
               aria-labelledby={`tab-${activeTab}`}
               tabIndex={0} // Make the panel focusable
             >
-              {activeTab === "summary" && (
-                <SummaryTab
-                  metadataFields={metadataFields}
-                  assetData={assetData}
-                />
-              )}
+              {activeTab === "summary" && <SummaryTab assetData={assetData} />}
               {activeTab === "technical" && (
                 <TechnicalMetadataTab
                   metadataAccordions={metadataAccordions}
@@ -1056,9 +898,6 @@ interface VideoDetailContentProps {
 const VideoDetailPage: React.FC = () => {
   const location = useLocation();
   const { assetType, searchTerm, asset } = location.state;
-  console.log("Asset type: ", assetType); // The DigitalSourceAsset.Type
-  console.log("SearchTerm: ", searchTerm); // The currentQuery value
-  console.log("Asset: ", asset); // The full asset object
   return (
     <RecentlyViewedProvider>
       <RightSidebarProvider>
