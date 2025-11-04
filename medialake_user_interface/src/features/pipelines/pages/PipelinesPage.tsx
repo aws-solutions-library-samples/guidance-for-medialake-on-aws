@@ -18,7 +18,6 @@ import {
 import {
   Add as AddIcon,
   FileUpload as FileUploadIcon,
-  Refresh as RefreshIcon,
 } from "@mui/icons-material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import { useNavigate } from "react-router-dom";
@@ -34,6 +33,7 @@ import {
 } from "@tanstack/react-table";
 
 import { PageHeader, PageContent } from "@/components/common/layout";
+import { RefreshButton } from "@/components/common";
 import { BaseTableToolbar } from "@/components/common/table/BaseTableToolbar";
 import { BaseFilterPopover } from "@/components/common/table/BaseFilterPopover";
 import { ColumnVisibilityMenu } from "@/components/common/table/ColumnVisibilityMenu";
@@ -392,33 +392,12 @@ const PipelinesPage: React.FC = () => {
         action={
           <>
             <Box sx={{ display: "flex", alignItems: "center", gap: 3.5 }}>
-              <IconButton
-                onClick={handleRefresh}
-                disabled={isLoading || isRefreshing}
-                sx={{
-                  backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                  "&:hover": {
-                    backgroundColor: alpha(theme.palette.primary.main, 0.2),
-                  },
-                }}
-                title={t("common.refresh")}
-              >
-                <RefreshIcon
-                  sx={{
-                    animation: isRefreshing
-                      ? "spin 1s linear infinite"
-                      : "none",
-                    "@keyframes spin": {
-                      "0%": {
-                        transform: "rotate(0deg)",
-                      },
-                      "100%": {
-                        transform: "rotate(360deg)",
-                      },
-                    },
-                  }}
-                />
-              </IconButton>
+              <RefreshButton
+                onRefresh={handleRefresh}
+                isRefreshing={isRefreshing}
+                disabled={isLoading}
+                variant="icon"
+              />
               <ButtonGroup
                 variant="contained"
                 ref={addPipelineButtonRef}

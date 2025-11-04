@@ -16,7 +16,6 @@ import {
   Visibility as VisibilityIcon,
   RestartAlt as RestartIcon,
   Replay as ReplayIcon,
-  Refresh as RefreshIcon,
 } from "@mui/icons-material";
 import {
   useReactTable,
@@ -31,6 +30,7 @@ import {
 } from "@tanstack/react-table";
 
 import { PageHeader, PageContent } from "@/components/common/layout";
+import { RefreshButton } from "@/components/common";
 import { BaseTableToolbar } from "@/components/common/table/BaseTableToolbar";
 import { ExecutionsTable } from "../components/ExecutionsTable";
 import { TableCellContent } from "@/components/common/table";
@@ -443,19 +443,11 @@ const ExecutionsPage: React.FC = () => {
         title={t("executions.title")}
         description={t("executions.description")}
         action={
-          <IconButton
-            onClick={handleRefresh}
-            disabled={isLoading}
-            sx={{
-              backgroundColor: alpha(theme.palette.primary.main, 0.1),
-              "&:hover": {
-                backgroundColor: alpha(theme.palette.primary.main, 0.2),
-              },
-            }}
-            title={t("common.refresh")}
-          >
-            <RefreshIcon />
-          </IconButton>
+          <RefreshButton
+            onRefresh={handleRefresh}
+            isRefreshing={isLoading}
+            variant="icon"
+          />
         }
       />
       <BaseTableToolbar
