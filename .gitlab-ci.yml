@@ -375,8 +375,8 @@ sync-to-github:
     - git config --global user.email "medialake@amazon.com"
     - git config --global user.name "Media Lake CI"
     # Use the commit title (which contains the MR title when merged)
-    - export COMMIT_MESSAGE="${CI_COMMIT_TITLE:-Sync from GitLab release branch}"
-    - echo "Using commit message: ${COMMIT_MESSAGE}"
+    - 'export COMMIT_MESSAGE="${CI_COMMIT_TITLE:-Sync from GitLab release branch}"'
+    - 'echo "Using commit message: ${COMMIT_MESSAGE}"'
     # Clone GitHub repository to maintain its git history
     - git clone git@github.com:aws-solutions-library-samples/guidance-for-medialake-on-aws.git github-repo
     - cd github-repo
@@ -413,7 +413,7 @@ sync-to-github:
     - rm -rf medialake_user_interface/playwright-report/
     # Stage all changes and commit with the MR title
     - git add -A
-    - git commit --allow-empty -m "${COMMIT_MESSAGE}"
+    - 'git commit --allow-empty -m "${COMMIT_MESSAGE}"'
     - echo "New commit created:" && git log --oneline -1
     # Push to GitHub main branch
     - git push origin main
