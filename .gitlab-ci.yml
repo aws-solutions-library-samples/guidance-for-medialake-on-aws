@@ -375,10 +375,14 @@ sync-to-github:
     - git config --global user.email "medialake@amazon.com"
     - git config --global user.name "Media Lake CI"
     # Extract MR title from the merge commit body (it's on line 3 of the merge commit)
+    - echo "Debug - Full commit message:"
+    - git log -1 --pretty=%B
+    - echo "Debug - Extracting line 3..."
     - 'export COMMIT_MESSAGE=$(git log -1 --pretty=%B | sed -n "3p" | xargs)'
+    - 'echo "Debug - Extracted message: [${COMMIT_MESSAGE}]"'
     # Fallback to commit title if extraction fails or is empty
     - 'if [ -z "$COMMIT_MESSAGE" ]; then export COMMIT_MESSAGE="${CI_COMMIT_TITLE}"; fi'
-    - 'echo "Using commit message: ${COMMIT_MESSAGE}"'
+    - 'echo "Final commit message for GitHub: ${COMMIT_MESSAGE}"'
     # Clone GitHub repository to maintain its git history
     - git clone git@github.com:aws-solutions-library-samples/guidance-for-medialake-on-aws.git github-repo
     - cd github-repo
