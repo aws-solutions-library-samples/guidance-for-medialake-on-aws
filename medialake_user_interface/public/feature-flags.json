@@ -9,10 +9,10 @@
     "value": false
   },
   "notification-enabled": {
-    "value": true
+    "value": false
   },
   "search-multi-select-enabled": {
-    "value": true
+    "value": false
   },
   "user-favorites-enabled": {
     "value": false
