@@ -1,4 +1,5 @@
 stages:
+  - .pre
   - lint
   - deploy
   - test
@@ -34,6 +35,51 @@ cache:
   key: $CI_COMMIT_REF_SLUG
   paths:
     - .cache/pip
+
+# Validate merge request titles follow Angular Conventional Commits
+mr-title-check:
+  stage: .pre
+  image: alpine:latest
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  script:
+    - apk add --no-cache jq
+    - |
+      # Angular Conventional Commits regex with "release" added for stable->release merges
+      REGEX='^(build|ci|docs|feat|fix|perf|refactor|release|style|test)(\([a-zA-Z0-9\-_.]+\))?(!)?: .+'
+      TITLE="$CI_MERGE_REQUEST_TITLE"
+
+      echo "Validating merge request title: $TITLE"
+
+      if ! echo "$TITLE" | grep -E "$REGEX" > /dev/null; then
+        echo ""
+        echo "❌ ERROR: Merge request title must follow Angular Conventional Commits format"
+        echo ""
+        echo "Format: <type>(<scope>): <description>"
+        echo ""
+        echo "Allowed types:"
+        echo "  - build:    Changes to build system or dependencies"
+        echo "  - ci:       Changes to CI/CD configuration"
+        echo "  - docs:     Documentation changes"
+        echo "  - feat:     New features"
+        echo "  - fix:      Bug fixes"
+        echo "  - perf:     Performance improvements"
+        echo "  - refactor: Code refactoring"
+        echo "  - release:  Release commits (for stable->release merges)"
+        echo "  - style:    Code style changes"
+        echo "  - test:     Test changes"
+        echo ""
+        echo "Examples:"
+        echo "  - feat(auth): add login functionality"
+        echo "  - fix(ci): retry image build on failure"
+        echo "  - docs: update README with new deployment steps"
+        echo "  - release: version 1.2.3"
+        echo ""
+        echo "Your title: $TITLE"
+        exit 1
+      fi
+
+      echo "✅ Merge request title is valid!"
 
 .echo_versions: &echo_versions
   before_script:
@@ -360,6 +406,226 @@ pre_commit_checks:
     - pre-commit run --all-files flake8
     - pre-commit run --all-files prettier
     - find . -name .DS_Store -type f -delete
+
+# Semantic versioning and changelog generation for stable branch
+semantic-version:
+  image: alpine:latest
+  stage: deploy
+  rules:
+    - if: $CI_COMMIT_REF_NAME == "stable"
+  script:
+    - apk add --no-cache git bash
+    - git config --global user.email "medialake@amazon.com"
+    - git config --global user.name "Media Lake CI"
+    # Configure Git to push using GitLab CI token
+    - git remote set-url origin "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+    - |
+      echo "=========================================="
+      echo "Semantic Versioning & Changelog Generation"
+      echo "=========================================="
+
+      # Get the last version tag (or default to 0.0.0 for initial calculation)
+      LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+      if [ -z "$LAST_TAG" ]; then
+        echo "No existing tags found. Starting from v1.0.0"
+        LAST_VERSION="0.0.0"
+        LAST_TAG="v0.0.0"
+      else
+        echo "Last version tag: $LAST_TAG"
+        LAST_VERSION="${LAST_TAG#v}"  # Remove 'v' prefix
+      fi
+
+      # Parse current version
+      IFS='.' read -r MAJOR MINOR PATCH <<< "$LAST_VERSION"
+
+      echo "Current version: $MAJOR.$MINOR.$PATCH"
+      echo ""
+
+      # Get all commits since last tag
+      if [ "$LAST_TAG" = "v0.0.0" ]; then
+        COMMITS=$(git log --pretty=format:"%H|%s|%b" --no-merges)
+      else
+        COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"%H|%s|%b" --no-merges)
+      fi
+
+      # Initialize bump type (none, patch, minor, major)
+      BUMP_TYPE="none"
+
+      # Arrays to store commits by type
+      BREAKING_CHANGES=""
+      FEATURES=""
+      FIXES=""
+      REFACTORS=""
+      PERFORMANCES=""
+      OTHERS=""
+
+      echo "Analyzing commits since $LAST_TAG..."
+      echo ""
+
+      # Process each commit
+      while IFS='|' read -r HASH SUBJECT BODY; do
+        FULL_MESSAGE="$SUBJECT"$'\n'"$BODY"
+
+        # Check for breaking changes (! or BREAKING CHANGE:)
+        if [[ "$SUBJECT" =~ ^[a-z]+(\([a-zA-Z0-9\-_.]+\))?!: ]] || [[ "$FULL_MESSAGE" =~ BREAKING[[:space:]]CHANGE: ]]; then
+          echo "  [MAJOR] Breaking change detected: $SUBJECT"
+          BUMP_TYPE="major"
+          BREAKING_CHANGES="${BREAKING_CHANGES}- ${SUBJECT} (${HASH:0:7})"$'\n'
+        # Check for features
+        elif [[ "$SUBJECT" =~ ^feat(\([a-zA-Z0-9\-_.]+\))?: ]]; then
+          echo "  [MINOR] Feature: $SUBJECT"
+          if [ "$BUMP_TYPE" != "major" ]; then
+            BUMP_TYPE="minor"
+          fi
+          FEATURES="${FEATURES}- ${SUBJECT} (${HASH:0:7})"$'\n'
+        # Check for fixes
+        elif [[ "$SUBJECT" =~ ^fix(\([a-zA-Z0-9\-_.]+\))?: ]]; then
+          echo "  [PATCH] Fix: $SUBJECT"
+          if [ "$BUMP_TYPE" = "none" ]; then
+            BUMP_TYPE="patch"
+          fi
+          FIXES="${FIXES}- ${SUBJECT} (${HASH:0:7})"$'\n'
+        # Check for refactor
+        elif [[ "$SUBJECT" =~ ^refactor(\([a-zA-Z0-9\-_.]+\))?: ]]; then
+          echo "  [PATCH] Refactor: $SUBJECT"
+          if [ "$BUMP_TYPE" = "none" ]; then
+            BUMP_TYPE="patch"
+          fi
+          REFACTORS="${REFACTORS}- ${SUBJECT} (${HASH:0:7})"$'\n'
+        # Check for performance
+        elif [[ "$SUBJECT" =~ ^perf(\([a-zA-Z0-9\-_.]+\))?: ]]; then
+          echo "  [PATCH] Performance: $SUBJECT"
+          if [ "$BUMP_TYPE" = "none" ]; then
+            BUMP_TYPE="patch"
+          fi
+          PERFORMANCES="${PERFORMANCES}- ${SUBJECT} (${HASH:0:7})"$'\n'
+        # Check for release
+        elif [[ "$SUBJECT" =~ ^release(\([a-zA-Z0-9\-_.]+\))?: ]]; then
+          echo "  [TRACKED] Release: $SUBJECT"
+          OTHERS="${OTHERS}- ${SUBJECT} (${HASH:0:7})"$'\n'
+        # Docs and CI don't bump version but are tracked
+        elif [[ "$SUBJECT" =~ ^(docs|ci)(\([a-zA-Z0-9\-_.]+\))?: ]]; then
+          echo "  [NO BUMP] ${SUBJECT}"
+          OTHERS="${OTHERS}- ${SUBJECT} (${HASH:0:7})"$'\n'
+        # Other types (style, test, build) are patches
+        elif [[ "$SUBJECT" =~ ^(style|test|build)(\([a-zA-Z0-9\-_.]+\))?: ]]; then
+          echo "  [PATCH] ${SUBJECT}"
+          if [ "$BUMP_TYPE" = "none" ]; then
+            BUMP_TYPE="patch"
+          fi
+          OTHERS="${OTHERS}- ${SUBJECT} (${HASH:0:7})"$'\n'
+        fi
+      done <<< "$COMMITS"
+
+      echo ""
+      echo "Version bump type: $BUMP_TYPE"
+
+      # Calculate new version
+      case $BUMP_TYPE in
+        major)
+          MAJOR=$((MAJOR + 1))
+          MINOR=0
+          PATCH=0
+          ;;
+        minor)
+          MINOR=$((MINOR + 1))
+          PATCH=0
+          ;;
+        patch)
+          PATCH=$((PATCH + 1))
+          ;;
+        none)
+          echo "No version-bumping changes detected. Keeping version at $MAJOR.$MINOR.$PATCH"
+          exit 0
+          ;;
+      esac
+
+      NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+      NEW_TAG="v$NEW_VERSION"
+
+      echo "New version: $NEW_VERSION"
+      echo "New tag: $NEW_TAG"
+      echo ""
+
+      # Generate CHANGELOG entry
+      CHANGELOG_ENTRY="## [$NEW_VERSION] - $(date +%Y-%m-%d)"$'\n\n'
+
+      if [ -n "$BREAKING_CHANGES" ]; then
+        CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### ⚠ BREAKING CHANGES"$'\n\n'"${BREAKING_CHANGES}"$'\n'
+      fi
+
+      if [ -n "$FEATURES" ]; then
+        CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### ✨ Features"$'\n\n'"${FEATURES}"$'\n'
+      fi
+
+      if [ -n "$FIXES" ]; then
+        CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### 🐛 Bug Fixes"$'\n\n'"${FIXES}"$'\n'
+      fi
+
+      if [ -n "$PERFORMANCES" ]; then
+        CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### ⚡ Performance Improvements"$'\n\n'"${PERFORMANCES}"$'\n'
+      fi
+
+      if [ -n "$REFACTORS" ]; then
+        CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### ♻️ Code Refactoring"$'\n\n'"${REFACTORS}"$'\n'
+      fi
+
+      if [ -n "$OTHERS" ]; then
+        CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### 📝 Other Changes"$'\n\n'"${OTHERS}"$'\n'
+      fi
+
+      # Create or update CHANGELOG.md
+      if [ -f CHANGELOG.md ]; then
+        # Insert new entry after the header
+        echo "Updating existing CHANGELOG.md"
+        TEMP_FILE=$(mktemp)
+
+        # Keep the header (first line) and insert new entry
+        head -n 1 CHANGELOG.md > "$TEMP_FILE"
+        echo "" >> "$TEMP_FILE"
+        echo "$CHANGELOG_ENTRY" >> "$TEMP_FILE"
+        tail -n +2 CHANGELOG.md >> "$TEMP_FILE"
+
+        mv "$TEMP_FILE" CHANGELOG.md
+      else
+        # Create new CHANGELOG.md
+        echo "Creating new CHANGELOG.md"
+        cat > CHANGELOG.md << EOF
+      # Changelog
+
+      $CHANGELOG_ENTRY
+      EOF
+      fi
+
+      echo "CHANGELOG.md updated successfully"
+      echo ""
+      echo "=========================================="
+      echo "Preview of new CHANGELOG entry:"
+      echo "=========================================="
+      head -n 30 CHANGELOG.md
+      echo "=========================================="
+      echo ""
+
+      # Commit the CHANGELOG
+      git add CHANGELOG.md
+      git commit -m "chore: update CHANGELOG for $NEW_TAG"
+
+      # Create the tag
+      git tag -a "$NEW_TAG" -m "Release $NEW_VERSION"$'\n\n'"$CHANGELOG_ENTRY"
+
+      echo "✅ Created tag: $NEW_TAG"
+      echo "✅ Updated CHANGELOG.md"
+      echo ""
+
+      # Push the changelog commit and tag back to GitLab
+      echo "Pushing changes to GitLab..."
+      git push origin stable
+      git push origin "$NEW_TAG"
+
+      echo "✅ Pushed commit and tag to GitLab"
+      echo ""
+      echo "Version $NEW_VERSION released successfully!"
 
 sync-to-github:
   image: alpine:latest
