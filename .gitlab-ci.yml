@@ -508,9 +508,25 @@ semantic-version:
             BUMP_TYPE="minor"
           fi
           FEATURES="${FEATURES}- ${SUBJECT} (${HASH:0:7})"$'\n'
+        # Debug: check if it starts with feat
+        elif [[ "$SUBJECT" == feat:* ]]; then
+          echo "  [DEBUG] Found feat: prefix but regex didn't match: '$SUBJECT'"
+          echo "  [DEBUG] Treating as MINOR anyway"
+          if [ "$BUMP_TYPE" != "major" ]; then
+            BUMP_TYPE="minor"
+          fi
+          FEATURES="${FEATURES}- ${SUBJECT} (${HASH:0:7})"$'\n'
         # Check for fixes
         elif [[ "$SUBJECT" =~ ^fix(\([a-zA-Z0-9\-_.]+\))?: ]]; then
           echo "  [PATCH] Fix: $SUBJECT"
+          if [ "$BUMP_TYPE" = "none" ]; then
+            BUMP_TYPE="patch"
+          fi
+          FIXES="${FIXES}- ${SUBJECT} (${HASH:0:7})"$'\n'
+        # Debug: check if it starts with fix
+        elif [[ "$SUBJECT" == fix:* ]]; then
+          echo "  [DEBUG] Found fix: prefix but regex didn't match: '$SUBJECT'"
+          echo "  [DEBUG] Treating as PATCH anyway"
           if [ "$BUMP_TYPE" = "none" ]; then
             BUMP_TYPE="patch"
           fi
