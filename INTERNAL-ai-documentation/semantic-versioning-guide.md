@@ -143,22 +143,18 @@ git push origin feature/add-login
 
 - MR title: `feat(auth): add login functionality`
 - Merge (squashes commits)
-- **semantic-version job runs automatically**:
-  - Analyzes commits since last tag on main
-  - Calculates new version (e.g., v1.1.0 for feat)
-  - Updates CHANGELOG.md with version [1.1.0]
-  - Creates git tag v1.1.0
-  - Pushes CHANGELOG and tag to main
+- **No semantic-version job runs yet**
 
 ### 3. Merge main → stable
 
-- MR title can be: `release: prepare for stable promotion`
-- Merge (regular merge, **not squashed** to preserve tags)
-- **No semantic-version job runs**:
-  - All tags from main are included
-  - CHANGELOG from main is included
-  - No new version tags created
-  - stable now has accumulated version history
+- MR title: `feat: Semantic Versioning release` (or any conventional commit)
+- Merge (regular merge to preserve history)
+- **semantic-version job runs automatically**:
+  - Analyzes commits since last tag on stable
+  - Calculates new version (e.g., v1.1.0 for feat)
+  - Updates CHANGELOG.md with version [1.1.0]
+  - Creates git tag v1.1.0
+  - Pushes CHANGELOG and tag to stable
 
 ### 4. Merge stable → release
 

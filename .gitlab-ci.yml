@@ -412,7 +412,9 @@ semantic-version:
   image: alpine:latest
   stage: deploy
   rules:
-    - if: $CI_COMMIT_REF_NAME == "stable"
+    - if: '$CI_COMMIT_REF_NAME == "stable"'
+      when: on_success
+    - when: never
   script:
     - apk add --no-cache git bash
     - git config --global user.email "medialake@amazon.com"
@@ -774,8 +776,6 @@ e2e_01_start_cleanup:
     - arch:amd64
     - size:large
   rules:
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
-      when: on_success
     - when: never
   variables:
     <<: *e2e_variables
@@ -932,8 +932,6 @@ e2e_02_continue_cleanup:
     - job: e2e_01_start_cleanup
       artifacts: true
   rules:
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
-      when: on_success
     - when: never
   variables:
     <<: *e2e_variables
@@ -1070,8 +1068,6 @@ e2e_03_deploy_stack:
     - job: e2e_02_continue_cleanup
       artifacts: true
   rules:
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
-      when: on_success
     - when: never
   variables:
     <<: *e2e_variables
@@ -1272,8 +1268,6 @@ e2e_04_monitor_deployment:
     - job: e2e_03_deploy_stack
       artifacts: true
   rules:
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
-      when: on_success
     - when: never
   variables:
     <<: *e2e_variables
@@ -1382,8 +1376,6 @@ e2e_05_continue_monitoring:
     - job: e2e_04_monitor_deployment
       artifacts: true
   rules:
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
-      when: on_success
     - when: never
   variables:
     <<: *e2e_variables
@@ -1472,8 +1464,6 @@ e2e_06_run_tests:
     - job: e2e_05_continue_monitoring
       artifacts: true
   rules:
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
-      when: on_success
     - when: never
   variables:
     <<: *e2e_variables
@@ -1663,10 +1653,7 @@ e2e_07_cleanup:
   needs:
     - job: e2e_06_run_tests
       artifacts: true
-  when: always # Always run cleanup, even if tests fail
   rules:
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
-      when: always
     - when: never
   variables:
     <<: *e2e_variables
