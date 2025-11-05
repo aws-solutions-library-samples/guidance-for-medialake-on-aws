@@ -655,6 +655,11 @@ semantic-version:
       echo "=========================================="
       echo ""
 
+      # Checkout stable branch before committing (CI runs in detached HEAD)
+      echo "Checking out stable branch..."
+      git checkout -B stable
+      echo "Current branch: $(git branch --show-current)"
+
       # Commit the CHANGELOG
       git add CHANGELOG.md
       git commit -m "chore: update CHANGELOG for $NEW_TAG"
