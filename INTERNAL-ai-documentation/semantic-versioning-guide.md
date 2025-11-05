@@ -13,29 +13,29 @@ Automated semantic versioning has been implemented using conventional commits. T
 ## Workflow
 
 ```
-Feature Branch → main (squashed) ← 🏷️ Creates version tag + updates CHANGELOG
+Feature Branch → main (squashed)
                   ↓
-              stable (merge)     ← Aggregates all tags + CHANGELOG from main
+              stable (merge)     ← 🏷️ Creates version tag + updates CHANGELOG
                   ↓
               release → sync to GitHub (includes CHANGELOG + all tags)
 ```
 
 ## When It Runs
 
-The `semantic-version` job runs automatically **only on the `main` branch**.
+The `semantic-version` job runs automatically **only on the `stable` branch**.
 
-When you merge to main:
+When you merge to stable:
 
 - Analyzes all commits since the last version tag
 - Determines version bump type based on commit messages
 - Updates CHANGELOG.md with new version number
 - Creates and pushes a git tag (e.g., v1.2.3)
 
-When you merge main → stable:
+When you merge stable → release:
 
 - **No new tags created**
-- CHANGELOG and all existing tags are merged forward
-- Tags accumulate for the release to GitHub
+- CHANGELOG and all existing tags are promoted to release
+- Everything syncs to GitHub
 
 ## Version Bumping Rules
 

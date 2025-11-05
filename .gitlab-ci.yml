@@ -407,12 +407,12 @@ pre_commit_checks:
     - pre-commit run --all-files prettier
     - find . -name .DS_Store -type f -delete
 
-# Semantic versioning and changelog generation (main branch only)
+# Semantic versioning and changelog generation (stable branch only)
 semantic-version:
   image: alpine:latest
   stage: deploy
   rules:
-    - if: $CI_COMMIT_REF_NAME == "main"
+    - if: $CI_COMMIT_REF_NAME == "stable"
   script:
     - apk add --no-cache git bash
     - git config --global user.email "medialake@amazon.com"
@@ -424,7 +424,7 @@ semantic-version:
       #!/bin/bash
       set -e
       echo "=========================================="
-      echo "Changelog Generation & Versioning (main)"
+      echo "Changelog Generation & Versioning (stable)"
       echo "=========================================="
 
       # Get the last version tag (or default to 0.0.0 for initial calculation)
@@ -624,14 +624,14 @@ semantic-version:
       echo "✅ Updated CHANGELOG.md"
       echo ""
 
-      # Push the changelog commit and tag back to main
-      echo "Pushing changes to main..."
-      git push origin main
+      # Push the changelog commit and tag back to stable
+      echo "Pushing changes to stable..."
+      git push origin stable
       git push origin "$NEW_TAG"
 
-      echo "✅ Pushed commit and tag to main"
+      echo "✅ Pushed commit and tag to stable"
       echo ""
-      echo "Version $NEW_VERSION released on main!"
+      echo "Version $NEW_VERSION released on stable!"
       SCRIPT_EOF
       chmod +x /tmp/semantic_version.sh
       bash /tmp/semantic_version.sh
