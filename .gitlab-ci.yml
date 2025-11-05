@@ -506,8 +506,9 @@ semantic-version:
         echo "DEBUG: Analyzing commit: $SUBJECT"
         FULL_MESSAGE="$SUBJECT"$'\n'"$BODY"
 
-        # Check for breaking changes (! or BREAKING CHANGE:)
-        if [[ "$SUBJECT" =~ ^[a-z]+(\([a-zA-Z0-9\-_.]+\))?!: ]] || [[ "$FULL_MESSAGE" =~ BREAKING[[:space:]]CHANGE: ]]; then
+        # Check for breaking changes (! after type/scope or BREAKING CHANGE: in message)
+        # Matches: feat!: or feat(scope)!: or BREAKING CHANGE: anywhere in commit message
+        if [[ "$SUBJECT" =~ ^[a-z]+(\([a-zA-Z0-9\-_.]+\))?!:[[:space:]] ]] || [[ "$FULL_MESSAGE" =~ BREAKING[[:space:]]CHANGE: ]]; then
           echo "  [MAJOR] Breaking change detected: $SUBJECT"
           BUMP_TYPE="major"
           BREAKING_CHANGES="${BREAKING_CHANGES}- ${SUBJECT} (${HASH:0:7})"$'\n'
