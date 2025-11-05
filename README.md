@@ -497,7 +497,7 @@ To remove all media lake resources:
 
 ## Revisions
 
-- Nov 4 2025: Initial Semantic Version release 1.0.0.
+- Nov 5 2025: Initial Semantic Version release 1.0.0.
 - July 2025: Initial release and commit of repository.
 - See repository commit history for further changes.
 
