@@ -1,7 +1,4 @@
-import base64
-import importlib.util
 import json
-import mimetypes
 import os
 import random
 import time
@@ -12,7 +9,6 @@ from urllib.parse import urlparse
 import boto3
 from aws_lambda_powertools import Logger, Tracer
 from botocore.exceptions import ClientError
-from jinja2 import Environment, FileSystemLoader
 from lambda_middleware import lambda_middleware
 
 # ────────────────────────────────────────────────────────────
@@ -170,6 +166,33 @@ def _generic_prompt_builder(instr: str, txt: str) -> Dict[str, Any]:
     }
 
 
+def _twelvelabs_pegasus_builder(
+    instr: str, content: Union[str, Dict[str, Any]]
+) -> Dict[str, Any]:
+    """
+    Builder for TwelveLabs Pegasus model.
+    Requires inputPrompt and mediaSource with S3 URI and bucketOwner.
+    """
+    if isinstance(content, dict) and "s3_uri" in content:
+        # Get AWS account ID from STS
+        import boto3
+
+        sts = boto3.client("sts")
+        account_id = sts.get_caller_identity()["Account"]
+
+        return {
+            "inputPrompt": instr,
+            "mediaSource": {
+                "s3Location": {"uri": content["s3_uri"], "bucketOwner": account_id}
+            },
+        }
+    else:
+        raise ValueError(
+            "TwelveLabs Pegasus requires content dict with 's3_uri' field, "
+            f"got: {type(content)}"
+        )
+
+
 # === 2) Map model IDs to builders ===
 
 MODEL_BODY_BUILDERS: Dict[str, Callable[..., Dict[str, Any]]] = {
@@ -184,6 +207,7 @@ MODEL_BODY_BUILDERS: Dict[str, Callable[..., Dict[str, Any]]] = {
     "meta.llama4": _generic_prompt_builder,
     "pixtral-large": _generic_prompt_builder,
     "mistral.pixtral-large": _generic_prompt_builder,
+    "twelvelabs.pegasus": _twelvelabs_pegasus_builder,
 }
 
 # === 3) Central body‐builder ===
@@ -580,32 +604,31 @@ def invoke_bedrock_with_retry(
 def lambda_handler(event, context):
     try:
         logger.info("Event received", extra={"event": event})
-        bucket = os.getenv("API_TEMPLATE_BUCKET", "medialake-assets")
-        tpl_paths = build_s3_templates_path("bedrock", "content_processor", "post")
 
-        params, mapping = create_request_body(tpl_paths, bucket, event)
-
-        asset_id = params.get("asset_id")
-        file_uri = params.get("file_s3_uri")
-        content_src = os.getenv("CONTENT_SOURCE")
+        # Extract parameters directly from event without S3 mapping files
+        content_src = os.getenv("CONTENT_SOURCE", "proxy")
         prompt_name = os.getenv("PROMPT_NAME")
-        custom_prompt = mapping.get("custom_prompt")
-
-        instr = (
-            custom_prompt
-            or DEFAULT_PROMPTS.get(prompt_name)
-            or os.getenv("PROMPT", DEFAULT_PROMPTS["summary_100"])
-        )
-
         model_id = os.getenv("MODEL_ID")
+
         if not model_id:
             raise KeyError("MODEL_ID environment variable is required")
 
+        # Get instruction/prompt
+        instr = DEFAULT_PROMPTS.get(prompt_name) or os.getenv(
+            "PROMPT", DEFAULT_PROMPTS["summary_100"]
+        )
+
         # ── Locate content ────────────────────────────────────────────────
-        assets = event.get("payload", {}).get("assets", [])
+        payload = event.get("payload", {})
+        assets = payload.get("assets", [])
         if not assets:
             raise ValueError("No assets found in event.payload.assets")
         asset_detail = assets[0]
+
+        # Extract asset_id from the asset
+        asset_id = asset_detail.get("InventoryID")
+        if not asset_id:
+            raise ValueError("No InventoryID found in asset")
 
         if content_src == "transcript":
             uri = (
@@ -638,15 +661,11 @@ def lambda_handler(event, context):
                 if r["Purpose"] == "proxy"
             )
             loc = rep["StorageInfo"]["PrimaryLocation"]
-            raw = get_s3_bytes(loc["Bucket"], loc["ObjectKey"]["FullPath"])
-            b64 = base64.b64encode(raw).decode("utf-8")
-            mime = (
-                mimetypes.guess_type(loc["ObjectKey"]["FullPath"])[0]
-                or "application/octet-stream"
-            )
             fetched_uri = f"s3://{loc['Bucket']}/{loc['ObjectKey']['FullPath']}"
+
+            # For TwelveLabs models, pass S3 URI directly instead of base64
             body_json = build_bedrock_body(
-                model_id, instr, {"b64": b64, "mime": mime}
+                model_id, instr, {"s3_uri": fetched_uri}
             ).encode("utf-8")
             use_chunking = False
 
@@ -720,8 +739,17 @@ def lambda_handler(event, context):
                 data = json.loads(resp["body"].read())
                 logger.info(f"Bedrock response structure: {list(data.keys())}")
 
+                # Extract result from Bedrock response
                 if "anthropic" in model_id.lower():
                     result = data["content"][0]["text"]
+                elif "twelvelabs" in model_id.lower() and "pegasus" in model_id.lower():
+                    # TwelveLabs Pegasus returns message as a direct string
+                    result = data.get("message", "")
+                    logger.info(
+                        f"TwelveLabs Pegasus result extraction: {result[:100]}..."
+                        if result
+                        else "TwelveLabs Pegasus result is empty"
+                    )
                 elif "nova" in model_id.lower():
                     result = (
                         data.get("output", {})
@@ -747,7 +775,7 @@ def lambda_handler(event, context):
         formatted_prompt_name = (
             _format_prompt_name_for_dynamo(prompt_name) if prompt_name else None
         )
-        dynamo_key = mapping.get("dynamo_key") or (
+        dynamo_key = (
             f"{formatted_prompt_name}Result"
             if formatted_prompt_name
             else "customPromptResult"
@@ -762,10 +790,21 @@ def lambda_handler(event, context):
             ExpressionAttributeValues={":v": result},
         )
 
-        final = create_response_output(tpl_paths, bucket, data, event, mapping)
+        # Return response directly without S3 template mapping
         updated = table.get_item(Key={"InventoryID": asset_id}).get("Item", {})
-        final["updatedAsset"] = _strip_decimals(updated)
-        return final
+        return {
+            "statusCode": 200,
+            "body": {
+                "result": result,
+                "model_id": model_id,
+                "prompt_name": prompt_name,
+                "content_source": content_src,
+                "asset_id": asset_id,
+            },
+            "updatedAsset": _strip_decimals(updated),
+            "metadata": event.get("metadata", {}),
+            "payload": event.get("payload", {}),
+        }
 
     except Exception:
         # Log *and* re-raise so the Lambda ends in an error state         ❶
