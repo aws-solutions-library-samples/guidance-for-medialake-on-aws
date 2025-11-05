@@ -611,8 +611,11 @@ semantic-version:
       git add CHANGELOG.md
       git commit -m "chore: update CHANGELOG for $NEW_TAG"
 
-      # Create the tag
-      git tag -a "$NEW_TAG" -m "Release $NEW_VERSION"$'\n\n'"$CHANGELOG_ENTRY"
+      # Create the tag with message from file to avoid shell escaping issues
+      echo "Release $NEW_VERSION" > /tmp/tag_message.txt
+      echo "" >> /tmp/tag_message.txt
+      echo "$CHANGELOG_ENTRY" >> /tmp/tag_message.txt
+      git tag -a "$NEW_TAG" -F /tmp/tag_message.txt
 
       echo "✅ Created tag: $NEW_TAG"
       echo "✅ Updated CHANGELOG.md"
