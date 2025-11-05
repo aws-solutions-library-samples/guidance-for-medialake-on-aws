@@ -428,12 +428,9 @@ semantic-version:
       LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
 
       if [ -z "$LAST_TAG" ]; then
-        echo "No existing tags found."
+        echo "No existing tags found. Will create initial version v1.0.0"
         LAST_VERSION="0.0.0"
         LAST_TAG="v0.0.0"
-        if [ "$CREATE_VERSION_TAG" = true ]; then
-          echo "Will create initial version v1.0.0"
-        fi
       else
         echo "Last version tag: $LAST_TAG"
         LAST_VERSION="${LAST_TAG#v}"  # Remove 'v' prefix
@@ -596,11 +593,9 @@ semantic-version:
       else
         # Create new CHANGELOG.md
         echo "Creating new CHANGELOG.md"
-        cat > CHANGELOG.md << EOF
-      # Changelog
-
-      $CHANGELOG_ENTRY
-      EOF
+        echo "# Changelog" > CHANGELOG.md
+        echo "" >> CHANGELOG.md
+        echo "$CHANGELOG_ENTRY" >> CHANGELOG.md
       fi
 
       echo "CHANGELOG.md updated successfully"
