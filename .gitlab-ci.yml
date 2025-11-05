@@ -407,12 +407,12 @@ pre_commit_checks:
     - pre-commit run --all-files prettier
     - find . -name .DS_Store -type f -delete
 
-# Semantic versioning and changelog generation for stable branch
+# Semantic versioning and changelog generation (main branch only)
 semantic-version:
   image: alpine:latest
   stage: deploy
   rules:
-    - if: $CI_COMMIT_REF_NAME == "stable"
+    - if: $CI_COMMIT_REF_NAME == "main"
   script:
     - apk add --no-cache git bash
     - git config --global user.email "medialake@amazon.com"
@@ -421,16 +421,19 @@ semantic-version:
     - git remote set-url origin "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
     - |
       echo "=========================================="
-      echo "Semantic Versioning & Changelog Generation"
+      echo "Changelog Generation & Versioning (main)"
       echo "=========================================="
 
       # Get the last version tag (or default to 0.0.0 for initial calculation)
       LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
 
       if [ -z "$LAST_TAG" ]; then
-        echo "No existing tags found. Starting from v1.0.0"
+        echo "No existing tags found."
         LAST_VERSION="0.0.0"
         LAST_TAG="v0.0.0"
+        if [ "$CREATE_VERSION_TAG" = true ]; then
+          echo "Will create initial version v1.0.0"
+        fi
       else
         echo "Last version tag: $LAST_TAG"
         LAST_VERSION="${LAST_TAG#v}"  # Remove 'v' prefix
@@ -442,10 +445,12 @@ semantic-version:
       echo "Current version: $MAJOR.$MINOR.$PATCH"
       echo ""
 
-      # Get all commits since last tag
+      # Get all commits since last version tag
       if [ "$LAST_TAG" = "v0.0.0" ]; then
+        echo "Getting all commits (no previous tag)"
         COMMITS=$(git log --pretty=format:"%H|%s|%b" --no-merges)
       else
+        echo "Getting commits since $LAST_TAG"
         COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"%H|%s|%b" --no-merges)
       fi
 
@@ -548,7 +553,7 @@ semantic-version:
       echo "New tag: $NEW_TAG"
       echo ""
 
-      # Generate CHANGELOG entry
+      # Generate CHANGELOG entry with version number
       CHANGELOG_ENTRY="## [$NEW_VERSION] - $(date +%Y-%m-%d)"$'\n\n'
 
       if [ -n "$BREAKING_CHANGES" ]; then
@@ -618,14 +623,14 @@ semantic-version:
       echo "✅ Updated CHANGELOG.md"
       echo ""
 
-      # Push the changelog commit and tag back to GitLab
-      echo "Pushing changes to GitLab..."
-      git push origin stable
+      # Push the changelog commit and tag back to main
+      echo "Pushing changes to main..."
+      git push origin main
       git push origin "$NEW_TAG"
 
-      echo "✅ Pushed commit and tag to GitLab"
+      echo "✅ Pushed commit and tag to main"
       echo ""
-      echo "Version $NEW_VERSION released successfully!"
+      echo "Version $NEW_VERSION released on main!"
 
 sync-to-github:
   image: alpine:latest

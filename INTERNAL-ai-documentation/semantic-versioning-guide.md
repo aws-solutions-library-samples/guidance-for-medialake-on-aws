@@ -13,16 +13,29 @@ Automated semantic versioning has been implemented using conventional commits. T
 ## Workflow
 
 ```
-Feature Branch → main (squashed)
+Feature Branch → main (squashed) ← 🏷️ Creates version tag + updates CHANGELOG
                   ↓
-              stable (squashed) ← semantic-version job runs here
+              stable (merge)     ← Aggregates all tags + CHANGELOG from main
                   ↓
-              release → sync to GitHub
+              release → sync to GitHub (includes CHANGELOG + all tags)
 ```
 
-## When Versioning Happens
+## When It Runs
 
-The `semantic-version` job runs automatically when code is merged to the **`stable`** branch.
+The `semantic-version` job runs automatically **only on the `main` branch**.
+
+When you merge to main:
+
+- Analyzes all commits since the last version tag
+- Determines version bump type based on commit messages
+- Updates CHANGELOG.md with new version number
+- Creates and pushes a git tag (e.g., v1.2.3)
+
+When you merge main → stable:
+
+- **No new tags created**
+- CHANGELOG and all existing tags are merged forward
+- Tags accumulate for the release to GitHub
 
 ## Version Bumping Rules
 
@@ -130,25 +143,31 @@ git push origin feature/add-login
 
 - MR title: `feat(auth): add login functionality`
 - Merge (squashes commits)
+- **semantic-version job runs automatically**:
+  - Analyzes commits since last tag on main
+  - Calculates new version (e.g., v1.1.0 for feat)
+  - Updates CHANGELOG.md with version [1.1.0]
+  - Creates git tag v1.1.0
+  - Pushes CHANGELOG and tag to main
 
 ### 3. Merge main → stable
 
-- MR title can be: `release: prepare for v1.3.0`
-- Merge (squashes commits)
-- **semantic-version job runs automatically**:
-  - Analyzes all commits since last tag
-  - Calculates new version (e.g., v1.3.0)
-  - Updates CHANGELOG.md
-  - Creates git tag v1.3.0
-  - Pushes to GitLab
+- MR title can be: `release: prepare for stable promotion`
+- Merge (regular merge, **not squashed** to preserve tags)
+- **No semantic-version job runs**:
+  - All tags from main are included
+  - CHANGELOG from main is included
+  - No new version tags created
+  - stable now has accumulated version history
 
 ### 4. Merge stable → release
 
-- MR title: `release: v1.3.0`
+- MR title: `release: promote to production`
 - Merge
 - **sync-to-github job runs**:
   - Syncs code to GitHub
-  - Includes CHANGELOG.md
+  - Includes CHANGELOG.md with all versions
+  - Includes all git tags from main
   - Uses MR title as GitHub commit message
 
 ## Checking Versions
