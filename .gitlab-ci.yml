@@ -44,7 +44,6 @@ mr-title-check:
   image: alpine:latest
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      when: on_success
   script:
     - apk add --no-cache jq
     - |
@@ -426,11 +425,15 @@ semantic-version:
     - git config --global user.name "Media Lake CI"
     # Configure Git to push using GitLab token (use project token if available, fallback to CI_JOB_TOKEN)
     - |
+      echo "DEBUG: Checking for GITLAB_PUSH_TOKEN..."
+      echo "DEBUG: GITLAB_PUSH_TOKEN is set: $(if [ -n "$GITLAB_PUSH_TOKEN" ]; then echo 'YES'; else echo 'NO'; fi)"
+      echo "DEBUG: GITLAB_PUSH_TOKEN length: ${#GITLAB_PUSH_TOKEN}"
       if [ -n "$GITLAB_PUSH_TOKEN" ]; then
-        echo "Using GITLAB_PUSH_TOKEN for authentication"
+        echo "✓ Using GITLAB_PUSH_TOKEN for authentication"
         git remote set-url origin "https://gitlab-ci-token:${GITLAB_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
       else
-        echo "Using CI_JOB_TOKEN for authentication"
+        echo "⚠ GITLAB_PUSH_TOKEN not found, using CI_JOB_TOKEN for authentication"
+        echo "⚠ Note: CI_JOB_TOKEN may not have push permissions!"
         git remote set-url origin "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
       fi
     - |
