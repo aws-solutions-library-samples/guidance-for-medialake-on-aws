@@ -424,13 +424,15 @@ semantic-version:
     - apk add --no-cache git bash
     - git config --global user.email "medialake@amazon.com"
     - git config --global user.name "Media Lake CI"
-    # Configure Git to push using GitLab CI token
-    - git remote set-url origin "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
-    # Checkout stable branch (CI runs in detached HEAD, need to be on branch to push)
-    - echo "Current HEAD:$(git rev-parse HEAD)"
-    - echo "Creating local stable branch at current HEAD..."
-    - git checkout -B stable
-    - echo "On branch:$(git branch --show-current)"
+    # Configure Git to push using GitLab token (use project token if available, fallback to CI_JOB_TOKEN)
+    - |
+      if [ -n "$GITLAB_PUSH_TOKEN" ]; then
+        echo "Using GITLAB_PUSH_TOKEN for authentication"
+        git remote set-url origin "https://gitlab-ci-token:${GITLAB_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+      else
+        echo "Using CI_JOB_TOKEN for authentication"
+        git remote set-url origin "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+      fi
     - |
       cat > /tmp/semantic_version.sh << 'SCRIPT_EOF'
       #!/bin/bash
