@@ -414,6 +414,8 @@ pre_commit_checks:
 semantic-version:
   image: alpine:latest
   stage: deploy
+  variables:
+    GIT_DEPTH: 0 # Fetch full git history to analyze all commits
   rules:
     - if: '$CI_COMMIT_REF_NAME == "stable"'
       when: on_success
@@ -450,13 +452,20 @@ semantic-version:
       echo "Current version: $MAJOR.$MINOR.$PATCH"
       echo ""
 
-      # Get all commits since last version tag
+      # Get all commits since last version tag (including merge commits to capture MR titles)
       if [ "$LAST_TAG" = "v0.0.0" ]; then
         echo "Getting all commits (no previous tag)"
-        COMMITS=$(git log --pretty=format:"%H|%s|%b" --no-merges)
+        COMMITS=$(git log --pretty=format:"%H|%s|%b")
       else
         echo "Getting commits since $LAST_TAG"
-        COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"%H|%s|%b" --no-merges)
+        COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"%H|%s|%b")
+      fi
+
+      echo "DEBUG: Number of commits found: $(echo "$COMMITS" | grep -c '.')"
+      if [ -z "$COMMITS" ]; then
+        echo "WARNING: No commits found to analyze!"
+        echo "No version-bumping changes detected."
+        exit 0
       fi
 
       # Initialize bump type (none, patch, minor, major)
@@ -472,9 +481,19 @@ semantic-version:
 
       echo "Analyzing commits since $LAST_TAG..."
       echo ""
+      echo "DEBUG: Total commits to analyze:"
+      echo "$COMMITS" | wc -l
+      echo ""
+      echo "DEBUG: First 5 commit subjects:"
+      echo "$COMMITS" | head -5 | cut -d'|' -f2
+      echo ""
 
       # Process each commit
       while IFS='|' read -r HASH SUBJECT BODY; do
+        # Skip empty lines
+        [ -z "$HASH" ] && continue
+
+        echo "DEBUG: Analyzing commit: $SUBJECT"
         FULL_MESSAGE="$SUBJECT"$'\n'"$BODY"
 
         # Check for breaking changes (! or BREAKING CHANGE:)
