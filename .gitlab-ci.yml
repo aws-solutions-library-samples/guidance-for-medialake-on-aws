@@ -21,6 +21,7 @@ workflow:
     # Allow merge requests to run
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     # Allow specific branches to run
+    - if: $CI_COMMIT_REF_NAME == "main"
     - if: $CI_COMMIT_REF_NAME == "dev4"
     - if: $CI_COMMIT_REF_NAME == "dev5"
     - if: $CI_COMMIT_REF_NAME == "demo"
@@ -42,6 +43,8 @@ mr-title-check:
   image: alpine:latest
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: on_success
+    - when: never
   script:
     - apk add --no-cache jq
     - |
