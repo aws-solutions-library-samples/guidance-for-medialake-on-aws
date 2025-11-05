@@ -653,7 +653,7 @@ const SearchPage: React.FC = () => {
           sx={{
             display: "flex",
             minHeight: "100%",
-            bgcolor: "background.default",
+            // bgcolor: "background.default",
             position: "relative",
             overflow: "auto",
           }}
