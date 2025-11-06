@@ -2011,6 +2011,7 @@ class AssetsConstruct(Construct):
             "AssetsBulkDownloadLogGroup",
             log_group_name=f"/aws/vendedlogs/states/{config.resource_prefix}_Asset-Bulk-Download",
             retention=logs.RetentionDays.ONE_MONTH,
+            removal_policy=RemovalPolicy.DESTROY,
         )
 
         # Create the state machine using the non-deprecated API with logging enabled

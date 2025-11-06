@@ -225,7 +225,11 @@ def create_step_function(
         logger.info(
             f"Created state machine for pipeline '{pipeline_name}' with name '{sanitized_state_machine_name}' and logging enabled: {response}"
         )
-        return {"response": response, "role_arn": role_arn}
+        return {
+            "response": response,
+            "role_arn": role_arn,
+            "log_group_name": log_group_name,
+        }
     except Exception as e:
         logger.exception(
             f"Failed to create/update state machine for pipeline '{pipeline_name}': {e}"

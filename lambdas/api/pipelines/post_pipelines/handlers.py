@@ -349,6 +349,7 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
             sfn_result = create_step_function(pipeline_name, state_machine_definition)
             state_machine_arn = sfn_result["response"].get("stateMachineArn")
             sfn_role_arn = sfn_result["role_arn"]
+            sfn_log_group_name = sfn_result.get("log_group_name")
             logger.info(f"State machine created with ARN: {state_machine_arn}")
 
             update_pipeline_status(pipeline_id, "STATE MACHINE CREATED")
@@ -442,6 +443,7 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                 sqs_queue_arns=sqs_queue_arns,
                 event_source_mapping_uuids=event_source_mapping_uuids,
                 service_role_arns=service_role_arns,
+                sfn_log_group_name=sfn_log_group_name,
             )
 
             update_pipeline_status(pipeline_id, "DEPLOYED")
