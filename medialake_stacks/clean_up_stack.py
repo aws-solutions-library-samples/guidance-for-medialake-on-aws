@@ -34,7 +34,7 @@ class CleanupStack(Stack):
                 environment_variables={
                     "CONNECTOR_TABLE": props.connector_table.table_name,
                     "PIPELINE_TABLE": props.pipeline_table.table_name,
-                    "VECTOR_BUCKET_NAME": f"medialake-vectors-{Stack.of(self).region}-{Stack.of(self).node.try_get_context('environment') or 'dev'}",
+                    "VECTOR_BUCKET_NAME": f"medialake-vectors-{Stack.of(self).account}-{Stack.of(self).region}-{Stack.of(self).node.try_get_context('environment') or 'dev'}",
                 },
             ),
         )
@@ -103,9 +103,14 @@ class CleanupStack(Stack):
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
-                actions=["lambda:DeleteFunction"],
+                actions=[
+                    "lambda:DeleteFunction",
+                    "lambda:DeleteEventSourceMapping",
+                    "lambda:GetEventSourceMapping",
+                ],
                 resources=[
-                    f"arn:aws:lambda:{Stack.of(self).region}:{Stack.of(self).account}:function:*"
+                    f"arn:aws:lambda:{Stack.of(self).region}:{Stack.of(self).account}:function:*",
+                    f"arn:aws:lambda:{Stack.of(self).region}:{Stack.of(self).account}:event-source-mapping:*",
                 ],  # TODO add resource prefix i.e. medialake
             )
         )
