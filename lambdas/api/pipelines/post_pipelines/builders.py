@@ -90,9 +90,13 @@ class StateMachineBuilder:
             self.node_id_to_state_name,
             map_processor_chains,
         )
+        logger.info(
+            f"After state creation, we have {len(self.states)} states: {list(self.states.keys())}"
+        )
 
         # Step 5: Determine the start state
         self.start_at = self._determine_start_state(root_node_id)
+        logger.info(f"Start state determined: {self.start_at}")
 
         # Step 6: Connect states based on edges
         state_connector = StateConnector(
@@ -107,6 +111,9 @@ class StateMachineBuilder:
             choice_false_targets,
             choice_fail_targets,
         )
+        logger.info(
+            f"After connecting states, we have {len(self.states)} states: {list(self.states.keys())}"
+        )
 
         # Step 7: Find execution path
         execution_path = self.graph_analyzer.find_execution_path(
@@ -117,10 +124,19 @@ class StateMachineBuilder:
         state_connector.ensure_terminal_states(
             execution_path, self.graph_analyzer.leaf_nodes
         )
+        logger.info(
+            f"After ensuring terminal states, we have {len(self.states)} states: {list(self.states.keys())}"
+        )
 
         # Step 9: Validate and fix the state machine
         self.validator.validate(self.states, self.start_at)
+        logger.info(
+            f"After validation, we have {len(self.states)} states: {list(self.states.keys())}"
+        )
         self.validator.fix_invalid_states(self.states, self.start_at)
+        logger.info(
+            f"After fixing invalid states, we have {len(self.states)} states: {list(self.states.keys())}"
+        )
 
         # Step 10: Build the final definition
         definition = {

@@ -135,7 +135,9 @@ class StateDefinitionFactory:
 
             # Skip nodes that are used exclusively as Map processors
             if node.id in map_processor_nodes:
-                logger.info(f"Skipping node {node.id} as it's used as a Map processor")
+                logger.info(
+                    f"Skipping node {node.id} ({node.data.label}) as it's used as a Map processor"
+                )
                 continue
 
             state_name = node_id_to_state_name.get(node.id)
@@ -143,7 +145,9 @@ class StateDefinitionFactory:
                 logger.warning(f"No state name found for node {node.id}, skipping")
                 continue
 
-            logger.info(f"Creating state definition for {state_name}")
+            logger.info(
+                f"Creating state definition for node {node.id} ({node.data.label}, type={node.data.type}): state_name={state_name}"
+            )
 
             if node.data.type.lower() == "flow":
                 # Handle flow-type nodes
@@ -171,6 +175,9 @@ class StateDefinitionFactory:
 
                     # Add the main state
                     states[state_name] = state_def
+                    logger.info(
+                        f"Added state {state_name} to states dict. Total states: {len(states)}, Keys: {list(states.keys())}"
+                    )
                     logger.info(f"Created flow state for {state_name}: {state_def}")
 
                     # Add any additional states
@@ -180,11 +187,17 @@ class StateDefinitionFactory:
                     ) in additional_states.items():
                         states[additional_state_name] = additional_state_def
                         logger.info(
-                            f"Added additional state {additional_state_name} for {state_name}"
+                            f"Added additional state {additional_state_name} for {state_name}. Total states: {len(states)}, Keys: {list(states.keys())}"
                         )
                 except Exception as e:
+                    import traceback
+
                     logger.error(
                         f"Failed to create flow state for node {state_name}: {e}"
+                    )
+                    logger.error(f"Stack trace: {traceback.format_exc()}")
+                    logger.error(
+                        f"CRITICAL: Skipping state {state_name} due to exception. This will cause connection failures."
                     )
                     continue
             else:
@@ -251,8 +264,14 @@ class StateDefinitionFactory:
                         )
 
                     states[state_name] = task_state
+                    logger.info(
+                        f"Added task state {state_name} to states dict. Total states: {len(states)}, Keys: {list(states.keys())}"
+                    )
                     logger.info(f"Created task state for {state_name}")
 
+        logger.info(
+            f"Returning {len(states)} states from create_state_definitions: {list(states.keys())}"
+        )
         return states
 
     def _build_lambda_key_mappings(self, nodes: list) -> None:

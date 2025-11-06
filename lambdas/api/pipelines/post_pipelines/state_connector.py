@@ -58,7 +58,8 @@ class StateConnector:
         # Initialize choice_fail_targets if not provided
         if choice_fail_targets is None:
             choice_fail_targets = {}
-        logger.info("Connecting states based on edges")
+        logger.info(f"Connecting states based on {len(edges)} edges")
+        logger.info(f"Available states at connection time: {list(self.states.keys())}")
 
         # Connect states based on edges
         for edge in edges:
@@ -80,7 +81,20 @@ class StateConnector:
                 f"Connecting: {source_id} ({source_state_name}) -> {target_id} ({target_state_name}), sourceHandle: {source_handle}"
             )
 
-            if source_state_name in self.states and target_state_name in self.states:
+            # Check if states exist
+            source_exists = source_state_name in self.states
+            target_exists = target_state_name in self.states
+
+            if not source_exists:
+                logger.warning(
+                    f"Source state {source_state_name} (node {source_id}) does not exist in states dict. Skipping edge."
+                )
+            if not target_exists:
+                logger.warning(
+                    f"Target state {target_state_name} (node {target_id}) does not exist in states dict. Skipping edge."
+                )
+
+            if source_exists and target_exists:
                 source_state = self.states[source_state_name]
                 self.node_id_to_node.get(source_id)
 
