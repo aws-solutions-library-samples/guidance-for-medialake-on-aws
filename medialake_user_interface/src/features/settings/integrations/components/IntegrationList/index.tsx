@@ -6,6 +6,7 @@ import {
   getSortedRowModel,
   getFilteredRowModel,
 } from "@tanstack/react-table";
+import { Extension as IntegrationIcon } from "@mui/icons-material";
 import { ResizableTable } from "@/components/common/table";
 import { BaseTableToolbar } from "@/components/common/table";
 import { useTableVirtualizer } from "@/features/settings/integrations/hooks/useTableVirtualizer";
@@ -106,6 +107,10 @@ const IntegrationList: React.FC<IntegrationListProps> = ({
           activeSorting={mappedActiveSorting}
           onRemoveFilter={onRemoveFilter}
           onRemoveSort={handleRemoveSort}
+          emptyState={{
+            message: "No integrations found",
+            icon: <IntegrationIcon sx={{ fontSize: 40 }} />,
+          }}
         />
       )}
     </Box>

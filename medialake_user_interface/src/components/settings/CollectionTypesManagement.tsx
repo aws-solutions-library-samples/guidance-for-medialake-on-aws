@@ -35,6 +35,7 @@ import {
 } from "@/api/hooks/useCollections";
 import CollectionTypeFormDialog from "@/components/settings/CollectionTypeFormDialog";
 import MigrateCollectionTypeDialog from "@/components/settings/MigrateCollectionTypeDialog";
+import { EmptyTableState } from "@/components/common/table";
 
 const ICON_MAP: Record<string, React.ReactElement> = {
   Folder: <FolderIcon />,
@@ -152,10 +153,20 @@ const CollectionTypesManagement: React.FC = () => {
           <TableBody>
             {collectionTypes.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} align="center">
-                  <Typography color="text.secondary" py={4}>
-                    No collection types found. Create one to get started.
-                  </Typography>
+                <TableCell colSpan={5} sx={{ p: 0, border: 0 }}>
+                  <EmptyTableState
+                    message="No collection types found. Create one to get started."
+                    icon={<FolderIcon sx={{ fontSize: 40 }} />}
+                    action={
+                      <Button
+                        variant="contained"
+                        startIcon={<AddIcon />}
+                        onClick={handleCreateClick}
+                      >
+                        Create Type
+                      </Button>
+                    }
+                  />
                 </TableCell>
               </TableRow>
             ) : (

@@ -1,6 +1,7 @@
 import React, { useRef, memo } from "react";
 import { Box } from "@mui/material";
 import { type Table as TanStackTable } from "@tanstack/react-table";
+import { AccountTree as PipelineIcon } from "@mui/icons-material";
 import { Pipeline } from "../../types/pipelines.types";
 import { ResizableTable } from "@/components/common/table";
 import { useTableVirtualizer } from "../../hooks/useTableVirtualizer";
@@ -53,6 +54,10 @@ const PipelineList: React.FC<PipelineListProps> = memo(
           onRemoveSort={onRemoveSort}
           togglingPipelines={togglingPipelines}
           onToggleActive={onToggleActive}
+          emptyState={{
+            message: "No pipelines found",
+            icon: <PipelineIcon sx={{ fontSize: 40 }} />,
+          }}
         />
       </Box>
     );
