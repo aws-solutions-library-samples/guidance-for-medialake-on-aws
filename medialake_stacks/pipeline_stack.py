@@ -226,6 +226,13 @@ class PipelineStack(cdk.NestedStack):
                 "loadFromS3": True,
             }
 
+            # Prepare delete payload - will use pipeline name from creation
+            delete_lambda_payload = {
+                "httpMethod": "DELETE",
+                "path": f"/pipelines/{pipeline_name}",
+                "pathParameters": {"pipelineId": pipeline_name},
+            }
+
             invoke_lambda = cr.AwsCustomResource(
                 self,
                 f"InvokeLambda{pipeline_name.replace(' ', '')}",
@@ -252,12 +259,21 @@ class PipelineStack(cdk.NestedStack):
                         f"UpdateLambda{pipeline_name.replace(' ', '')}-{timestamp}"
                     ),
                 ),
+                on_delete=cr.AwsSdkCall(
+                    service="Lambda",
+                    action="invoke",
+                    parameters={
+                        "FunctionName": self._pipelines_api.del_pipeline_id_handler.function_name,
+                        "Payload": json.dumps(delete_lambda_payload),
+                    },
+                ),
                 policy=cr.AwsCustomResourcePolicy.from_statements(
                     [
                         iam.PolicyStatement(
                             actions=["lambda:InvokeFunction"],
                             resources=[
-                                self._pipelines_api.post_pipelines_handler.function_arn
+                                self._pipelines_api.post_pipelines_handler.function_arn,
+                                self._pipelines_api.del_pipeline_id_handler.function_arn,
                             ],
                         )
                     ]
