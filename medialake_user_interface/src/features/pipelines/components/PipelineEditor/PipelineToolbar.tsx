@@ -31,7 +31,7 @@ import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { FaFileVideo } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
-import { ensureCorrectTypes } from "../../types";
+import { ensureCorrectTypes, normalizeNumericValues } from "../../types";
 import { IconSwitch } from "@/components/common";
 import { PipelineNameInput } from "./";
 import { useSidebar } from "@/contexts/SidebarContext";
@@ -1341,9 +1341,11 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
         nodes: fixedFlow.nodes.map((n: any) => {
           // Remove numeric keys in parameters
           if (n.data.configuration?.parameters) {
-            n.data.configuration.parameters = Object.fromEntries(
-              Object.entries(n.data.configuration.parameters).filter(([key]) =>
-                isNaN(Number(key)),
+            n.data.configuration.parameters = normalizeNumericValues(
+              Object.fromEntries(
+                Object.entries(n.data.configuration.parameters).filter(
+                  ([key]) => isNaN(Number(key)),
+                ),
               ),
             );
           }
@@ -1353,8 +1355,8 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
         }),
         // Edges are unchanged
         edges: fixedFlow.edges,
-        // Keep settings under configuration
-        settings: fixedFlow.settings,
+        // Normalize settings to ensure numeric values are numbers, not strings
+        settings: normalizeNumericValues(fixedFlow.settings),
       },
     };
 

@@ -1,10 +1,5 @@
-import React, {
-  useCallback,
-  useRef,
-  useState,
-  useMemo,
-  useEffect,
-} from "react";
+import React from "react";
+import { useCallback, useRef, useState, useMemo, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import ReactFlow, {
   Background,
@@ -78,7 +73,12 @@ import {
 } from "../components/PipelineEditor";
 import type { PipelineToolbarProps } from "../components/PipelineEditor/PipelineToolbar";
 import IntegrationValidationDialog from "../components/IntegrationValidationDialog";
-import { Node as NodeType, NodeConfiguration, NodeMethod } from "../types";
+import {
+  Node as NodeType,
+  NodeConfiguration,
+  NodeMethod,
+  normalizeNumericValues,
+} from "../types";
 import {
   RightSidebarProvider,
   useRightSidebar,
@@ -959,17 +959,40 @@ const PipelineEditorContent = () => {
     setApiStatusModalMessage("Please wait...");
     setApiStatusModalOpen(true);
 
+    // Normalize numeric values in node parameters and settings before submitting
+    const normalizedFormData = {
+      ...formData,
+      configuration: {
+        ...formData.configuration,
+        nodes: formData.configuration.nodes.map((node: any) => ({
+          ...node,
+          data: {
+            ...node.data,
+            configuration: node.data.configuration
+              ? {
+                  ...node.data.configuration,
+                  parameters: normalizeNumericValues(
+                    node.data.configuration.parameters || {},
+                  ),
+                }
+              : node.data.configuration,
+          },
+        })),
+        settings: normalizeNumericValues(formData.configuration.settings || {}),
+      },
+    };
+
     if (pipelineId && pipelineId !== "new") {
       // Add updateDeployed flag for deployed pipelines
       updatePipeline.mutate({
         id: pipelineId,
         data: {
-          ...formData,
+          ...normalizedFormData,
           updateDeployed: true, // Flag to indicate updating a deployed pipeline
         },
       });
     } else {
-      createPipeline.mutate(formData);
+      createPipeline.mutate(normalizedFormData);
     }
   };
 
