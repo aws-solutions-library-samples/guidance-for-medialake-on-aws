@@ -31,6 +31,7 @@ import {
   BarChart as BarChartIcon,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
+import { EmptyTableState } from "@/components/common/table";
 
 interface User {
   id: string;

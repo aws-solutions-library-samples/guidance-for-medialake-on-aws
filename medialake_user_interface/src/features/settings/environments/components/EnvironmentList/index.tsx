@@ -1,6 +1,7 @@
 import React, { useRef, memo } from "react";
 import { Box } from "@mui/material";
 import { type Table as TanStackTable } from "@tanstack/react-table";
+import { Cloud as EnvironmentIcon } from "@mui/icons-material";
 import { Environment } from "@/types/environment";
 import { ResizableTable } from "@/components/common/table";
 import { useTableVirtualizer } from "../../hooks/useTableVirtualizer";
@@ -49,6 +50,10 @@ const EnvironmentList: React.FC<EnvironmentListProps> = memo(
           activeSorting={activeSorting}
           onRemoveFilter={onRemoveFilter}
           onRemoveSort={onRemoveSort}
+          emptyState={{
+            message: "No environments found",
+            icon: <EnvironmentIcon sx={{ fontSize: 40 }} />,
+          }}
         />
       </Box>
     );
