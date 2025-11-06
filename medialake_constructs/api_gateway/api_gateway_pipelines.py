@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from aws_cdk import Duration, Stack
+from aws_cdk import Duration, RemovalPolicy, Stack
 from aws_cdk import aws_apigateway as apigateway
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_ec2 as ec2
@@ -496,6 +496,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             "PipelineCreationStateMachineLogGroup",
             log_group_name=f"/aws/vendedlogs/states/{config.resource_prefix}_Pipeline_Creator",
             retention=logs.RetentionDays.ONE_MONTH,
+            removal_policy=RemovalPolicy.DESTROY,
         )
 
         # Create the state machine with logging enabled
@@ -813,6 +814,16 @@ class ApiGatewayPipelinesConstruct(Construct):
             iam.PolicyStatement(
                 actions=["dynamodb:DeleteItem", "dynamodb:GetItem", "dynamodb:Scan"],
                 resources=[props.pipeline_table.table_arn],
+            )
+        )
+
+        # Add CloudWatch Logs deletion permissions for Step Functions log groups
+        self._del_pipeline_id_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["logs:DeleteLogGroup", "logs:DescribeLogGroups"],
+                resources=[
+                    f"arn:aws:logs:{self.region}:{self.account_id}:log-group:/aws/vendedlogs/states/{config.resource_prefix}*"
+                ],
             )
         )
 

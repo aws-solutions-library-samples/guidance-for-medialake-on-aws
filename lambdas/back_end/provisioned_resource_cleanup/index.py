@@ -355,6 +355,8 @@ def clean_up_pipeline(item, table):
                     delete_event_source_mapping(resource_identifier)
                 elif resource_type == "eventbridge_pipe" or resource_type == "pipe":
                     delete_eventbridge_pipe(resource_identifier)
+                elif resource_type == "cloudwatch_log_group":
+                    delete_cloudwatch_log_group(resource_identifier)
                 else:
                     logger.warning(f"Unknown resource type: {resource_type}")
             except Exception as e:
@@ -474,6 +476,18 @@ def delete_event_bus_and_rules(event_bus_name):
         if e.response["Error"]["Code"] != "ResourceNotFoundException":
             raise
         logger.warning(f"EventBridge event bus {event_bus_name} already deleted")
+
+
+def delete_cloudwatch_log_group(log_group_name: str):
+    """Delete a CloudWatch Log Group."""
+    try:
+        logger.info(f"Deleting CloudWatch Log Group: {log_group_name}")
+        cloudwatch_logs.delete_log_group(logGroupName=log_group_name)
+        logger.info(f"Successfully deleted log group: {log_group_name}")
+    except ClientError as e:
+        if e.response["Error"]["Code"] != "ResourceNotFoundException":
+            raise
+        logger.warning(f"Log group {log_group_name} not found or already deleted")
 
 
 def delete_step_function(state_machine_arn):
