@@ -320,6 +320,9 @@ Use the emailed credentials and link to log in to the media lake UI.
 - **Supported Providers**:
   - **TwelveLabs**: Via direct API or AWS Bedrock integration
   - **Coactive**: Direct API integration for multimodal search
+- **Integration Configuration**: Integrations provide secure credential storage for pipelines requiring external API access. Configure integrations in **Settings > Integrations** before importing dependent pipelines:
+  - **Required for**: TwelveLabs API pipelines, Coactive pipelines
+  - **Not required for**: TwelveLabs Bedrock pipelines (uses IAM role permissions) and others
 - Import pipelines for semantic search, enrichment, and transcription.
 
 ### 4. **Ingest Media**
