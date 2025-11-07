@@ -18,7 +18,6 @@ import {
   MenuItem,
   MenuList,
   useTheme,
-  useMediaQuery,
 } from "@mui/material";
 import SaveIcon from "@mui/icons-material/Save";
 import CloseIcon from "@mui/icons-material/Close";
@@ -49,7 +48,6 @@ import type {
 import type { Integration } from "@/features/settings/integrations/types/integrations.types";
 import { drawerWidth, collapsedDrawerWidth } from "@/constants";
 
-/* —— props unchanged —— */
 export interface PipelineToolbarProps {
   onSave: () => Promise<void>;
   isLoading: boolean;
@@ -64,10 +62,10 @@ export interface PipelineToolbarProps {
   onDelete?: () => void;
   status?: string;
   isEditMode?: boolean;
+  hasChanges?: boolean;
 }
 
 const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
-  /* —— destructuring unchanged props for brevity —— */
   const {
     onSave,
     isLoading,
@@ -82,6 +80,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
     onDelete,
     status,
     isEditMode = false,
+    hasChanges = true,
   } = props;
 
   /* —— routing & sidebar width logic —— */
@@ -1505,12 +1504,24 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
               </Box>
 
               {/* Save button - always icon in compact mode */}
-              <Tooltip title={isEditMode ? "Update Pipeline" : "Save Pipeline"}>
+              <Tooltip
+                title={
+                  isEditMode && !hasChanges
+                    ? "No changes to save"
+                    : isEditMode
+                      ? "Update Pipeline"
+                      : "Save Pipeline"
+                }
+              >
                 <span>
                   <IconButton
                     color="primary"
                     onClick={onSave}
-                    disabled={isLoading || !pipelineName.trim()}
+                    disabled={
+                      isLoading ||
+                      !pipelineName.trim() ||
+                      (isEditMode && !hasChanges)
+                    }
                     size="medium"
                   >
                     {isLoading ? <CircularProgress size={24} /> : <SaveIcon />}
@@ -1695,21 +1706,32 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                 />
               </Box>
 
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={onSave}
-                disabled={isLoading || !pipelineName || !pipelineName.trim()}
-                sx={{
-                  "&.Mui-disabled": {
-                    opacity: 1,
-                    color: "text.disabled",
-                    backgroundColor: "action.disabledBackground",
-                  },
-                }}
+              <Tooltip
+                title={isEditMode && !hasChanges ? "No changes to save" : ""}
               >
-                {isLoading ? "Saving…" : isEditMode ? "Update" : "Save"}
-              </Button>
+                <span>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={onSave}
+                    disabled={
+                      isLoading ||
+                      !pipelineName ||
+                      !pipelineName.trim() ||
+                      (isEditMode && !hasChanges)
+                    }
+                    sx={{
+                      "&.Mui-disabled": {
+                        opacity: 1,
+                        color: "text.disabled",
+                        backgroundColor: "action.disabledBackground",
+                      },
+                    }}
+                  >
+                    {isLoading ? "Saving…" : isEditMode ? "Update" : "Save"}
+                  </Button>
+                </span>
+              </Tooltip>
 
               <Button variant="outlined" color="inherit" onClick={handleCancel}>
                 Cancel
