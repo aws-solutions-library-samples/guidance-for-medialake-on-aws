@@ -10,7 +10,6 @@ import ReactFlow, {
   addEdge,
   ReactFlowProvider,
   useReactFlow,
-  ReactFlowInstance,
   BackgroundVariant,
   Connection,
   Node,
@@ -23,12 +22,9 @@ import {
   Box,
   Modal,
   Typography,
-  TextField,
-  Stack,
   Dialog,
   DialogTitle,
   DialogContent,
-  Button,
   CircularProgress,
   Backdrop,
 } from "@mui/material";
@@ -52,7 +48,6 @@ import {
 import queryClient from "@/api/queryClient";
 import { useGetNode } from "@/shared/nodes/api/nodesController";
 import type {
-  Pipeline,
   CreatePipelineDto,
   PipelineEdge,
   PipelineNode,
@@ -71,14 +66,8 @@ import {
   NodeConfigurationForm,
   PipelineToolbar,
 } from "../components/PipelineEditor";
-import type { PipelineToolbarProps } from "../components/PipelineEditor/PipelineToolbar";
 import IntegrationValidationDialog from "../components/IntegrationValidationDialog";
-import {
-  Node as NodeType,
-  NodeConfiguration,
-  NodeMethod,
-  normalizeNumericValues,
-} from "../types";
+import { Node as NodeType, normalizeNumericValues } from "../types";
 import {
   RightSidebarProvider,
   useRightSidebar,
@@ -725,6 +714,10 @@ const PipelineEditorContent = () => {
     },
   });
 
+  // Track the original pipeline data for change detection
+  const [originalPipelineData, setOriginalPipelineData] =
+    React.useState<CreatePipelineDto | null>(null);
+
   // Fetch all pipelines when the component mounts
 
   const { data: pipeline } = useGetPipeline(pipelineId || "", {
@@ -891,10 +884,10 @@ const PipelineEditorContent = () => {
         "[PipelineEditorPage] Setting form data from pipeline:",
         pipeline,
       );
-      setFormData({
+      const pipelineData = {
         name: pipeline.name || "",
         description: pipeline.description || "",
-        active: pipeline.active !== false, // Use pipeline active state or default to true
+        active: pipeline.active !== false,
         configuration: pipeline.configuration || {
           nodes: [],
           edges: [],
@@ -904,7 +897,9 @@ const PipelineEditorContent = () => {
             timeout: 3600,
           },
         },
-      });
+      };
+      setFormData(pipelineData);
+      setOriginalPipelineData(JSON.parse(JSON.stringify(pipelineData)));
     }
   }, [pipeline]);
 
@@ -915,6 +910,97 @@ const PipelineEditorContent = () => {
       active,
     }));
   };
+
+  // Detect if there are any changes in the pipeline
+  const hasChanges = React.useMemo(() => {
+    if (!originalPipelineData || !pipelineId || pipelineId === "new") {
+      return true;
+    }
+
+    try {
+      // Compare name, description, and active state
+      if (
+        formData.name !== originalPipelineData.name ||
+        formData.description !== originalPipelineData.description ||
+        formData.active !== originalPipelineData.active
+      ) {
+        return true;
+      }
+
+      // Compare nodes - check count first
+      if (
+        formData.configuration.nodes.length !==
+        originalPipelineData.configuration.nodes.length
+      ) {
+        return true;
+      }
+
+      // Deep compare each node
+      for (const node of formData.configuration.nodes) {
+        const originalNode = originalPipelineData.configuration.nodes.find(
+          (n) => n.id === node.id,
+        );
+        if (!originalNode) {
+          return true;
+        }
+
+        // Compare node properties
+        if (
+          node.position.x !== originalNode.position.x ||
+          node.position.y !== originalNode.position.y ||
+          JSON.stringify(node.data.configuration) !==
+            JSON.stringify(originalNode.data.configuration) ||
+          (node as any).rotation !== (originalNode as any).rotation
+        ) {
+          return true;
+        }
+      }
+
+      // Compare edges - check count first
+      if (
+        formData.configuration.edges.length !==
+        originalPipelineData.configuration.edges.length
+      ) {
+        return true;
+      }
+
+      // Deep compare each edge
+      for (const edge of formData.configuration.edges) {
+        const originalEdge = originalPipelineData.configuration.edges.find(
+          (e) => e.id === edge.id,
+        );
+        if (!originalEdge) {
+          return true;
+        }
+
+        // Compare edge properties
+        if (
+          edge.source !== originalEdge.source ||
+          edge.target !== originalEdge.target ||
+          edge.sourceHandle !== originalEdge.sourceHandle ||
+          edge.targetHandle !== originalEdge.targetHandle
+        ) {
+          return true;
+        }
+      }
+
+      // Compare settings
+      if (
+        JSON.stringify(formData.configuration.settings) !==
+        JSON.stringify(originalPipelineData.configuration.settings)
+      ) {
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error(
+        "[PipelineEditorPage] Error comparing pipeline data:",
+        error,
+      );
+      return true;
+    }
+  }, [formData, originalPipelineData, pipelineId]);
 
   const handleSave = async () => {
     console.log(
@@ -1969,6 +2055,7 @@ const PipelineEditorContent = () => {
         onActiveChange={handleActiveChange}
         status={pipeline?.deploymentStatus}
         isEditMode={!!pipelineId && pipelineId !== "new"}
+        hasChanges={hasChanges}
         updateFormData={(importedNodes, importedEdges) => {
           // Convert imported React Flow nodes to pipeline nodes
           const pipelineNodes = importedNodes.map((node) =>
