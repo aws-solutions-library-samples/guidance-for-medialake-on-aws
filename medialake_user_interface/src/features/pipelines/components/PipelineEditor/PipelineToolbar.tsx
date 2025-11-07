@@ -1790,16 +1790,6 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                 label={active ? "Active" : "Inactive"}
               />
 
-              {/* Hidden file input */}
-              <input
-                type="file"
-                accept="application/json"
-                ref={fileInputRef}
-                style={{ display: "none" }}
-                onChange={handleLoadFlow}
-                onClick={(e) => ((e.target as HTMLInputElement).value = "")}
-              />
-
               {/* Import/Export */}
               <ButtonGroup
                 ref={importExportRef}
@@ -1877,6 +1867,16 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
           </>
         )}
       </Box>
+
+      {/* Hidden file input - shared between compact and full mode */}
+      <input
+        type="file"
+        accept="application/json"
+        ref={fileInputRef}
+        style={{ display: "none" }}
+        onChange={handleLoadFlow}
+        onClick={(e) => ((e.target as HTMLInputElement).value = "")}
+      />
 
       {/* Integration validation dialog (unchanged) */}
       <IntegrationValidationDialog
