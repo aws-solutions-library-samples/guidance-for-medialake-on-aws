@@ -389,6 +389,8 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
   searchTerm,
 }) => {
   const videoViewerRef = useRef<VideoViewerRef>(null);
+  const seekAttemptsRef = useRef<number>(0);
+  const seekTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -419,6 +421,92 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
       mediaController.registerVideoElement(videoViewerRef);
     }
   }, [mediaController]);
+
+  // Seek to clip start time if this is a clip result from CLIP mode
+  useEffect(() => {
+    // Check if this is a clip result (has clips array with exactly one clip)
+    const clips = asset?.clips;
+    if (!clips || !Array.isArray(clips) || clips.length !== 1) {
+      return;
+    }
+
+    const clip = clips[0];
+    let startTime: number | undefined;
+
+    // Extract start time from either start (number) or start_timecode (string)
+    if (typeof clip.start === "number") {
+      startTime = clip.start;
+    } else if (clip.start_timecode) {
+      // Convert timecode (HH:MM:SS:FF) to seconds
+      const timecodeToSeconds = (tc: string): number => {
+        const [hh, mm, ss, ff] = tc.split(":").map(Number);
+        const fps = 25; // default/fallback; adjust if actual fps available
+        return hh * 3600 + mm * 60 + ss + (isNaN(ff) ? 0 : ff / fps);
+      };
+      startTime = timecodeToSeconds(clip.start_timecode);
+    }
+
+    // Seek to the clip start time when video is ready
+    if (startTime === undefined || startTime < 0) {
+      return;
+    }
+
+    // Poll to check if video is ready, then seek
+    const maxAttempts = 20; // Try for up to 2 seconds (20 * 100ms)
+    const pollInterval = 100; // Check every 100ms
+    seekAttemptsRef.current = 0;
+
+    // Clear any existing timeout
+    if (seekTimeoutRef.current) {
+      clearTimeout(seekTimeoutRef.current);
+      seekTimeoutRef.current = null;
+    }
+
+    const seekToClipStart = () => {
+      seekAttemptsRef.current++;
+
+      if (!videoViewerRef.current) {
+        if (seekAttemptsRef.current < maxAttempts) {
+          seekTimeoutRef.current = setTimeout(seekToClipStart, pollInterval);
+        }
+        return;
+      }
+
+      try {
+        // Try to get current time to verify video is ready
+        const currentTime = videoViewerRef.current.getCurrentTime();
+        // If we can get current time, video is ready
+        videoViewerRef.current.seek(startTime!);
+        console.log(`Seeked to clip start time: ${startTime}s for asset ${id}`);
+        // Success - clear any pending timeouts
+        if (seekTimeoutRef.current) {
+          clearTimeout(seekTimeoutRef.current);
+          seekTimeoutRef.current = null;
+        }
+      } catch (error) {
+        // Video might not be ready yet, retry
+        if (seekAttemptsRef.current < maxAttempts) {
+          seekTimeoutRef.current = setTimeout(seekToClipStart, pollInterval);
+        } else {
+          console.warn(
+            `Failed to seek to clip start time ${startTime}s after ${maxAttempts} attempts:`,
+            error,
+          );
+        }
+      }
+    };
+
+    // Start polling after a small initial delay
+    seekTimeoutRef.current = setTimeout(seekToClipStart, 200);
+
+    return () => {
+      if (seekTimeoutRef.current) {
+        clearTimeout(seekTimeoutRef.current);
+        seekTimeoutRef.current = null;
+      }
+      seekAttemptsRef.current = 0;
+    };
+  }, [asset, videoViewerRef, id]);
 
   const [comments, setComments] = useState([
     {

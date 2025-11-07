@@ -112,9 +112,9 @@ export function transformResultsToClipMode(
         }
       }
 
-      // For video assets, process individual clips if available
+      // For video and audio assets, process individual clips if available
       if (
-        assetType === "Video" &&
+        (assetType === "Video" || assetType === "Audio") &&
         clips &&
         Array.isArray(clips) &&
         clips.length > 0
@@ -172,8 +172,8 @@ export function transformResultsToClipMode(
           }
         });
       }
-      // For non-video assets (Audio, Image), treat the entire asset as a "clip"
-      else if (assetType === "Audio" || assetType === "Image") {
+      // For non-video/audio assets (Image), treat the entire asset as a "clip"
+      else if (assetType === "Image") {
         const { clips: originalClips, ...assetWithoutClips } = asset as any;
         const wholeAssetClip: ClipAssetItem = {
           ...assetWithoutClips,
@@ -193,8 +193,8 @@ export function transformResultsToClipMode(
 
         allClipAssets!.push(wholeAssetClip);
       }
-      // For video assets without clips, also treat as whole asset
-      else if (assetType === "Video") {
+      // For video/audio assets without clips, also treat as whole asset
+      else if (assetType === "Video" || assetType === "Audio") {
         const { clips: originalClips, ...assetWithoutClips } = asset as any;
         const wholeAssetClip: ClipAssetItem = {
           ...assetWithoutClips,
