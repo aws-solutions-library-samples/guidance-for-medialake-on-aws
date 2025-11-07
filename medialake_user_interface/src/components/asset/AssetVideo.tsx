@@ -12,10 +12,11 @@ interface AssetVideoProps {
   onVideoElementReady?: (
     videoViewerRef: React.RefObject<VideoViewerRef>,
   ) => void;
+  protocol?: "audio" | "video";
 }
 
 export const AssetVideo = forwardRef<VideoViewerRef, AssetVideoProps>(
-  ({ src, alt, onTimeUpdate, onVideoElementReady }, ref) => {
+  ({ src, alt, onTimeUpdate, onVideoElementReady, protocol }, ref) => {
     // Register the video element when the component mounts
     useEffect(() => {
       if (
@@ -45,7 +46,12 @@ export const AssetVideo = forwardRef<VideoViewerRef, AssetVideoProps>(
           },
         }}
       >
-        <VideoViewer ref={ref} videoSrc={src} onTimeUpdate={onTimeUpdate} />
+        <VideoViewer
+          ref={ref}
+          videoSrc={src}
+          onTimeUpdate={onTimeUpdate}
+          protocol={protocol}
+        />
       </Box>
     );
   },

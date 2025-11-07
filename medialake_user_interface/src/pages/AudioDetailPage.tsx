@@ -1,4 +1,10 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, {
+  useState,
+  useMemo,
+  useCallback,
+  useEffect,
+  useRef,
+} from "react";
 import { useMediaController } from "../hooks/useMediaController";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
@@ -25,14 +31,16 @@ import {
 } from "../contexts/RecentlyViewedContext";
 import AssetSidebar from "../components/asset/AssetSidebar";
 import BreadcrumbNavigation from "../components/common/BreadcrumbNavigation";
-import { AssetAudio } from "../components/asset";
+import AssetVideo from "../components/asset/AssetVideo";
 import { formatLocalDateTime } from "@/shared/utils/dateUtils";
+import { VideoViewerRef } from "../components/common/VideoViewer";
 import { RelatedItemsView } from "../components/shared/RelatedItemsView";
 import { AssetResponse } from "../api/types/asset.types";
 import type { RelatedVersionsResponse } from "../api/hooks/useAssets";
 import { formatFileSize } from "../utils/imageUtils";
 import TechnicalMetadataTab from "../components/TechnicalMetadataTab";
 import TranscriptionTab from "../components/shared/TranscriptionTab";
+import DescriptiveTab from "../components/shared/DescriptiveTab";
 import TabContentContainer from "../components/common/TabContentContainer";
 
 const SummaryTab = ({ assetData }: { assetData: any }) => {
@@ -396,7 +404,20 @@ const RelatedItemsTab: React.FC<{
   );
 };
 
-const AudioDetailContent: React.FC = () => {
+interface AudioDetailContentProps {
+  asset: any;
+  assetType: string;
+  searchTerm?: string;
+}
+
+const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
+  asset,
+  assetType,
+  searchTerm,
+}) => {
+  const audioViewerRef = useRef<VideoViewerRef>(null);
+  const seekAttemptsRef = useRef<number>(0);
+  const seekTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -420,6 +441,101 @@ const AudioDetailContent: React.FC = () => {
 
   // Media controller for transcript synchronization
   const mediaController = useMediaController();
+
+  // Register audio element with media controller
+  useEffect(() => {
+    if (audioViewerRef.current) {
+      mediaController.registerVideoElement(audioViewerRef);
+    }
+  }, [mediaController]);
+
+  // Seek to clip start time if this is a clip result from CLIP mode
+  useEffect(() => {
+    // Check if this is a clip result (has clips array with exactly one clip)
+    const clips = asset?.clips;
+    if (!clips || !Array.isArray(clips) || clips.length !== 1) {
+      return;
+    }
+
+    const clip = clips[0];
+    let startTime: number | undefined;
+
+    // Extract start time from either start (number) or start_timecode (string)
+    if (typeof clip.start === "number") {
+      startTime = clip.start;
+    } else if (clip.start_timecode) {
+      // Convert timecode (HH:MM:SS:FF) to seconds
+      const timecodeToSeconds = (tc: string): number => {
+        const [hh, mm, ss, ff] = tc.split(":").map(Number);
+        const fps = 25; // default/fallback; adjust if actual fps available
+        return hh * 3600 + mm * 60 + ss + (isNaN(ff) ? 0 : ff / fps);
+      };
+      startTime = timecodeToSeconds(clip.start_timecode);
+    }
+
+    // Seek to the clip start time when audio is ready
+    if (startTime === undefined || startTime < 0) {
+      return;
+    }
+
+    // Poll to check if audio is ready, then seek
+    const maxAttempts = 20; // Try for up to 2 seconds (20 * 100ms)
+    const pollInterval = 100; // Check every 100ms
+    seekAttemptsRef.current = 0;
+
+    // Clear any existing timeout
+    if (seekTimeoutRef.current) {
+      clearTimeout(seekTimeoutRef.current);
+      seekTimeoutRef.current = null;
+    }
+
+    const seekToClipStart = () => {
+      seekAttemptsRef.current++;
+
+      if (!audioViewerRef.current) {
+        if (seekAttemptsRef.current < maxAttempts) {
+          seekTimeoutRef.current = setTimeout(seekToClipStart, pollInterval);
+        }
+        return;
+      }
+
+      try {
+        // Try to get current time to verify audio is ready
+        const currentTime = audioViewerRef.current.getCurrentTime();
+        // If we can get current time, audio is ready
+        audioViewerRef.current.seek(startTime!);
+        console.log(
+          `Seeked to clip start time: ${startTime}s for audio asset ${id}`,
+        );
+        // Success - clear any pending timeouts
+        if (seekTimeoutRef.current) {
+          clearTimeout(seekTimeoutRef.current);
+          seekTimeoutRef.current = null;
+        }
+      } catch (error) {
+        // Audio might not be ready yet, retry
+        if (seekAttemptsRef.current < maxAttempts) {
+          seekTimeoutRef.current = setTimeout(seekToClipStart, pollInterval);
+        } else {
+          console.warn(
+            `Failed to seek to clip start time ${startTime}s after ${maxAttempts} attempts:`,
+            error,
+          );
+        }
+      }
+    };
+
+    // Start polling after a small initial delay
+    seekTimeoutRef.current = setTimeout(seekToClipStart, 200);
+
+    return () => {
+      if (seekTimeoutRef.current) {
+        clearTimeout(seekTimeoutRef.current);
+        seekTimeoutRef.current = null;
+      }
+      seekAttemptsRef.current = 0;
+    };
+  }, [asset, audioViewerRef, id]);
 
   const [comments, setComments] = useState([
     {
@@ -492,9 +608,12 @@ const AudioDetailContent: React.FC = () => {
     };
   }, []);
 
+  // Use the searchTerm prop or fallback to URL parameters
   const searchParams = new URLSearchParams(location.search);
-  const searchTerm =
+  const urlSearchTerm =
     searchParams.get("q") || searchParams.get("searchTerm") || "";
+  // Use the prop value if available, otherwise use the URL value
+  const effectiveSearchTerm = searchTerm || urlSearchTerm;
 
   const versions = useMemo(() => {
     if (!assetData?.data?.asset) return [];
@@ -570,7 +689,7 @@ const AudioDetailContent: React.FC = () => {
               .StorageInfo.PrimaryLocation.ObjectKey.Name,
           type: assetData.data.asset.DigitalSourceAsset.Type.toLowerCase() as "audio",
           path: `/audio/${assetData.data.asset.InventoryID}`,
-          searchTerm: searchTerm,
+          searchTerm: effectiveSearchTerm,
           metadata: {
             duration: "42:18",
             fileSize: `${assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size} bytes`,
@@ -583,7 +702,13 @@ const AudioDetailContent: React.FC = () => {
   // Handle keyboard navigation for tabs
   const handleTabKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
-      const tabs = ["summary", "technical", "transcription", "related"];
+      const tabs = [
+        "summary",
+        "technical",
+        "descriptive",
+        "transcription",
+        "related",
+      ];
       const currentIndex = tabs.indexOf(activeTab);
 
       if (event.key === "ArrowRight") {
@@ -607,7 +732,7 @@ const AudioDetailContent: React.FC = () => {
     } else {
       // Fallback to search page with search term if available
       navigate(
-        `/search${searchTerm ? `?q=${encodeURIComponent(searchTerm)}` : ""}`,
+        `/search${effectiveSearchTerm ? `?q=${encodeURIComponent(effectiveSearchTerm)}` : ""}`,
       );
     }
   }, [navigate, location.state, searchTerm]);
@@ -659,6 +784,7 @@ const AudioDetailContent: React.FC = () => {
         display: "flex",
         flexDirection: "column",
         maxWidth: isExpanded ? "calc(100% - 300px)" : "100%",
+        width: "100%",
         transition: (theme) =>
           theme.transitions.create(["max-width"], {
             easing: theme.transitions.easing.sharp,
@@ -680,7 +806,7 @@ const AudioDetailContent: React.FC = () => {
       >
         <Box sx={{ py: 0, mb: 0 }}>
           <BreadcrumbNavigation
-            searchTerm={searchTerm}
+            searchTerm={effectiveSearchTerm}
             currentResult={48}
             totalResults={156}
             onBack={handleBack}
@@ -696,8 +822,19 @@ const AudioDetailContent: React.FC = () => {
         </Box>
       </Box>
 
-      {/* Audio player section */}
-      <Box sx={{ px: 3, pt: 0, pb: 3, height: "50vh", minHeight: "400px" }}>
+      <Box
+        sx={{
+          px: 3,
+          pt: 0,
+          pb: 0,
+          mt: 0,
+          height: "75vh",
+          minHeight: "600px",
+          flexShrink: 0,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
         <Paper
           elevation={0}
           sx={{
@@ -706,12 +843,26 @@ const AudioDetailContent: React.FC = () => {
             background: "transparent",
             position: "relative",
             height: "100%",
+            width: "100%",
+            maxWidth: isExpanded ? "calc(100% - 10px)" : "100%",
+            transition: (theme) =>
+              theme.transitions.create(["width", "max-width"], {
+                easing: theme.transitions.easing.sharp,
+                duration: theme.transitions.duration.enteringScreen,
+              }),
           }}
         >
-          <AssetAudio
+          <AssetVideo
+            ref={audioViewerRef}
             src={proxyUrl}
             alt={assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID}
-            onAudioElementReady={mediaController.registerAudioElement}
+            protocol="audio"
+            onTimeUpdate={(time) => {
+              mediaController.updateCurrentTime(time);
+            }}
+            onVideoElementReady={(ref) => {
+              mediaController.registerVideoElement(ref);
+            }}
           />
         </Paper>
       </Box>
@@ -764,6 +915,12 @@ const AudioDetailContent: React.FC = () => {
                 aria-controls="tabpanel-technical"
               />
               <Tab
+                value="descriptive"
+                label="Descriptive"
+                id="tab-descriptive"
+                aria-controls="tabpanel-descriptive"
+              />
+              <Tab
                 value="transcription"
                 label="Transcription"
                 id="tab-transcription"
@@ -804,6 +961,9 @@ const AudioDetailContent: React.FC = () => {
                   mediaType="audio"
                 />
               )}
+              {activeTab === "descriptive" && (
+                <DescriptiveTab assetData={assetData} />
+              )}
               {activeTab === "transcription" && (
                 <TranscriptionTab
                   assetId={id || ""}
@@ -831,17 +991,27 @@ const AudioDetailContent: React.FC = () => {
         versions={versions}
         comments={comments}
         onAddComment={handleAddComment}
+        videoViewerRef={audioViewerRef}
         assetId={assetData?.data?.asset?.InventoryID}
+        asset={asset}
+        assetType={assetType}
+        searchTerm={effectiveSearchTerm}
       />
     </Box>
   );
 };
 
 const AudioDetailPage: React.FC = () => {
+  const location = useLocation();
+  const { assetType, searchTerm, asset } = location.state || {};
   return (
     <RecentlyViewedProvider>
       <RightSidebarProvider>
-        <AudioDetailContent />
+        <AudioDetailContent
+          asset={asset}
+          assetType={assetType}
+          searchTerm={searchTerm}
+        />
       </RightSidebarProvider>
     </RecentlyViewedProvider>
   );

@@ -52,7 +52,7 @@ import SmartToyIcon from "@mui/icons-material/SmartToy";
 import RestoreIcon from "@mui/icons-material/Restore";
 import { RefObject } from "react";
 import { VideoViewer, VideoViewerRef, Marker } from "../common/VideoViewer";
-import { randomHexColor } from "../common/utils";
+import { randomHexColor, getMarkerColorByConfidence } from "../common/utils";
 import {
   SCRUBBER_LANE_STYLE_DARK,
   TIMELINE_STYLE_DARK,
@@ -1660,6 +1660,9 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
           if (videoViewerRef?.current) {
             const lane = videoViewerRef.current.getMarkerLane();
             if (lane) {
+              // Use confidence-based color for semantic markers
+              const markerColor = getMarkerColorByConfidence(clip.score);
+
               const periodMarker = new PeriodMarker({
                 timeObservation: {
                   start: startSeconds,
@@ -1669,7 +1672,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                 id: markerId,
                 style: {
                   ...PERIOD_MARKER_STYLE,
-                  color: randomHexColor(),
+                  color: markerColor,
                 },
               });
 
@@ -1692,7 +1695,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                   end: endSeconds,
                 },
                 style: {
-                  color: periodMarker.style.color,
+                  color: markerColor,
                 },
                 score: clip.score !== null ? clip.score : undefined,
                 type: "semantic" as const,
@@ -1859,6 +1862,11 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
           // Generate a consistent ID based on timecode and index to ensure uniqueness
           const newId = `clip_${startTime}_${endTime}_${index}`;
 
+          // Use confidence-based color for semantic markers
+          const markerColor = getMarkerColorByConfidence(
+            clipScore ?? undefined,
+          );
+
           const periodMarker = new PeriodMarker({
             timeObservation: {
               start: startSeconds,
@@ -1868,7 +1876,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
             id: newId,
             style: {
               ...PERIOD_MARKER_STYLE,
-              color: randomHexColor(),
+              color: markerColor,
             },
           });
 
@@ -1898,7 +1906,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                 end: endSeconds,
               },
               style: {
-                color: periodMarker.style.color,
+                color: markerColor,
               },
               score: clipScore !== null ? clipScore : undefined, // Add score only if it exists
               type: "semantic" as const,
@@ -2072,14 +2080,14 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
         if (!markerRef) {
           console.log(`Creating new markerRef for ${marker.id}`);
 
-          // Determine the color - use stored color if available, otherwise generate appropriate color
+          // Determine the color - always use score from payload for semantic markers
           let markerColor;
-          if (marker.style?.color) {
-            markerColor = marker.style.color;
-          } else if (marker.type === "user") {
-            markerColor = theme.palette.primary.main;
+          if (marker.type === "user") {
+            markerColor = marker.style?.color || theme.palette.primary.main;
           } else {
-            markerColor = randomHexColor();
+            // For semantic markers, always use confidence-based color from the clip's score
+            // This ensures colors are based on the actual score from the payload, not the filter threshold
+            markerColor = getMarkerColorByConfidence(marker.score);
           }
 
           markerRef = new PeriodMarker({
