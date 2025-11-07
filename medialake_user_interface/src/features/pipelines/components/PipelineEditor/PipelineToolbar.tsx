@@ -19,6 +19,7 @@ import {
   MenuList,
   useTheme,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import SaveIcon from "@mui/icons-material/Save";
 import CloseIcon from "@mui/icons-material/Close";
 import FileUploadIcon from "@mui/icons-material/FileUpload";
@@ -1461,6 +1462,22 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
           py: 1,
           px: 2,
           minHeight: 56,
+          background: (t) => `
+            radial-gradient(ellipse at top, ${alpha(
+              t.palette.primary.main,
+              0.08,
+            )} 0%, transparent 50%),
+            linear-gradient(135deg, ${t.palette.background.default} 0%, ${alpha(
+              t.palette.primary.main,
+              0.02,
+            )} 100%)
+          `,
+          backdropFilter: "blur(10px)",
+          borderRadius: 2,
+          boxShadow: (t) =>
+            t.palette.mode === "dark"
+              ? "0 4px 12px rgba(0, 0, 0, 0.3)"
+              : "0 2px 8px rgba(0, 0, 0, 0.1)",
         }}
       >
         {isCompactMode ? (

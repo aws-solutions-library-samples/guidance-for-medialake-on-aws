@@ -796,6 +796,10 @@ const PipelineEditorContent = () => {
 
   const updatePipeline = useUpdatePipeline({
     onSuccess: () => {
+      // Invalidate the pipelines list query to force a refresh
+      queryClient.invalidateQueries({
+        queryKey: ["pipelines", "list"],
+      });
       navigate("/pipelines");
     },
   });
@@ -872,6 +876,11 @@ const PipelineEditorContent = () => {
     if (executionArn && apiStatusModalState === "success") {
       setShouldPollStatus(true);
     }
+
+    // Invalidate the pipelines list query to force a refresh
+    queryClient.invalidateQueries({
+      queryKey: ["pipelines", "list"],
+    });
 
     // Always navigate back to pipelines page when modal closes
     navigate("/pipelines");
@@ -2321,6 +2330,11 @@ const PipelineEditorContent = () => {
                 setApiStatusModalMessage(
                   "The pipeline has been deleted successfully.",
                 );
+
+                // Invalidate the pipelines list query to force a refresh
+                queryClient.invalidateQueries({
+                  queryKey: ["pipelines", "list"],
+                });
 
                 // Navigate back to pipelines page after a short delay
                 setTimeout(() => {
