@@ -402,6 +402,12 @@ const PipelinesPage: React.FC = () => {
                 variant="contained"
                 ref={addPipelineButtonRef}
                 aria-label="Pipeline actions"
+                sx={{
+                  boxShadow: "none",
+                  "&:hover": {
+                    boxShadow: "none",
+                  },
+                }}
               >
                 <Button
                   startIcon={<AddIcon />}
