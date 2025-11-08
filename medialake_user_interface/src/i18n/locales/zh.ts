@@ -81,7 +81,18 @@ export default {
     },
   },
   search: {
-    semantic: "语义搜索",
+    semantic: {
+      label: "语义",
+      enable: "启用语义搜索",
+      disable: "禁用语义搜索",
+      configure: "点击配置语义搜索",
+      configDialog: {
+        title: "语义搜索未配置",
+        description:
+          "语义搜索当前未配置或已禁用。要启用此功能，请转到系统设置 > 搜索以配置搜索提供商，或按下面的按钮。",
+        goToSettings: "前往搜索设置",
+      },
+    },
     filters: {
       dateRange: "日期范围",
       contentType: "内容类型",

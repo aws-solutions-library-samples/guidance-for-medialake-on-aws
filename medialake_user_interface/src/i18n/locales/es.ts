@@ -146,6 +146,13 @@ export default {
       label: "Semántico",
       enable: "Habilitar búsqueda semántica",
       disable: "Deshabilitar búsqueda semántica",
+      configure: "Haz clic para configurar la búsqueda semántica",
+      configDialog: {
+        title: "Búsqueda semántica no configurada",
+        description:
+          "La búsqueda semántica no está configurada o está deshabilitada. Para habilitar esta función, ve a Configuración del sistema > Búsqueda para configurar un proveedor de búsqueda, o presiona el botón a continuación.",
+        goToSettings: "Ir a configuración de búsqueda",
+      },
     },
     filters: {
       dateRange: "Rango de fechas",

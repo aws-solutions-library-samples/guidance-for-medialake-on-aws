@@ -83,7 +83,18 @@ export default {
     },
   },
   search: {
-    semantic: "Pesquisa Semântica",
+    semantic: {
+      label: "Semântica",
+      enable: "Ativar pesquisa semântica",
+      disable: "Desativar pesquisa semântica",
+      configure: "Clique para configurar a pesquisa semântica",
+      configDialog: {
+        title: "Pesquisa semântica não configurada",
+        description:
+          "A pesquisa semântica não está configurada ou está desativada. Para ativar este recurso, vá para Configurações do sistema > Pesquisa para configurar um provedor de pesquisa, ou pressione o botão abaixo.",
+        goToSettings: "Ir para configurações de pesquisa",
+      },
+    },
     filters: {
       dateRange: "Intervalo de Data",
       contentType: "Tipo de Conteúdo",
