@@ -215,6 +215,13 @@ export default {
       label: "Semantic",
       enable: "Enable semantic search",
       disable: "Disable semantic search",
+      configure: "Click to configure semantic search",
+      configDialog: {
+        title: "Semantic Search Not Configured",
+        description:
+          "Semantic search is currently not configured or disabled. To enable this feature, go to System Settings > Search to configure a search provider, or press the button below.",
+        goToSettings: "Go to Search Settings",
+      },
     },
     filters: {
       dateRange: "Date Range",

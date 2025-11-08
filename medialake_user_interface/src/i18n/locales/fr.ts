@@ -84,7 +84,18 @@ export default {
     },
   },
   search: {
-    semantic: "Recherche sémantique",
+    semantic: {
+      label: "Sémantique",
+      enable: "Activer la recherche sémantique",
+      disable: "Désactiver la recherche sémantique",
+      configure: "Cliquez pour configurer la recherche sémantique",
+      configDialog: {
+        title: "Recherche sémantique non configurée",
+        description:
+          "La recherche sémantique n'est actuellement pas configurée ou est désactivée. Pour activer cette fonctionnalité, allez dans Paramètres système > Recherche pour configurer un fournisseur de recherche, ou appuyez sur le bouton ci-dessous.",
+        goToSettings: "Aller aux paramètres de recherche",
+      },
+    },
     filters: {
       dateRange: "Plage de dates",
       contentType: "Type de contenu",

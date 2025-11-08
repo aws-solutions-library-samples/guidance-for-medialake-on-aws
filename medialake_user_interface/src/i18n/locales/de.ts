@@ -146,6 +146,13 @@ export default {
       label: "Semantisch",
       enable: "Semantische Suche aktivieren",
       disable: "Semantische Suche deaktivieren",
+      configure: "Klicken Sie hier, um die semantische Suche zu konfigurieren",
+      configDialog: {
+        title: "Semantische Suche nicht konfiguriert",
+        description:
+          "Die semantische Suche ist derzeit nicht konfiguriert oder deaktiviert. Um diese Funktion zu aktivieren, gehen Sie zu Systemeinstellungen > Suche, um einen Suchanbieter zu konfigurieren, oder drücken Sie die Schaltfläche unten.",
+        goToSettings: "Zu Sucheinstellungen gehen",
+      },
     },
     filters: {
       dateRange: "Datumsbereich",

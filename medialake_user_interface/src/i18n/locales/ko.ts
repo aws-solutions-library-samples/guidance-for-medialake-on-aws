@@ -145,6 +145,13 @@ export default {
       label: "시맨틱",
       enable: "시맨틱 검색 활성화",
       disable: "시맨틱 검색 비활성화",
+      configure: "클릭하여 시맨틱 검색 구성",
+      configDialog: {
+        title: "시맨틱 검색이 구성되지 않음",
+        description:
+          "시맨틱 검색이 현재 구성되지 않았거나 비활성화되어 있습니다. 이 기능을 활성화하려면 시스템 설정 > 검색으로 이동하여 검색 제공업체를 구성하거나 아래 버튼을 누르세요.",
+        goToSettings: "검색 설정으로 이동",
+      },
     },
     filters: {
       dateRange: "날짜 범위",
