@@ -123,12 +123,26 @@ export const parseApiKey = (axiosResponseData: any): ApiKey => {
 
 /**
  * Parse generic response with string body (for mutations)
+ * Handles both string body format and direct JSON format
  */
-export const parseStringBodyResponse = <T>(axiosResponseData: {
-  body: string;
-}): T => {
+export const parseStringBodyResponse = <T>(axiosResponseData: any): T => {
   try {
-    return JSON.parse(axiosResponseData.body);
+    // Handle string body format (older API Gateway format)
+    if (axiosResponseData?.body && typeof axiosResponseData.body === "string") {
+      return JSON.parse(axiosResponseData.body);
+    }
+
+    // Handle direct JSON response format
+    if (axiosResponseData?.status && axiosResponseData?.data !== undefined) {
+      return axiosResponseData as T;
+    }
+
+    // If it's already the expected format, return it
+    if (axiosResponseData) {
+      return axiosResponseData as T;
+    }
+
+    throw new Error("Invalid response format");
   } catch (error) {
     console.error("Failed to parse string body response:", error);
     throw new Error("Failed to parse response body");

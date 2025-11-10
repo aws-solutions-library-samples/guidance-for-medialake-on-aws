@@ -51,7 +51,7 @@ const PageContent: React.FC<PageContentProps> = ({
         flex: 1,
         display: "flex",
         flexDirection: "column",
-        overflow: "hidden",
+        overflow: "visible",
         minHeight: 0,
         textAlign: isRTL ? "right" : "left",
         direction: isRTL ? "rtl" : "ltr",

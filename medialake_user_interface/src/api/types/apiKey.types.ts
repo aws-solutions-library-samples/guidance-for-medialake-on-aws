@@ -40,17 +40,15 @@ export interface ApiKeyResponse {
 export interface CreateApiKeyResponse {
   status: string;
   message: string;
-  data: {
-    apiKey: ApiKey;
-    secret: string;
+  data: ApiKey & {
+    apiKey: string; // The full API key string (id_secret)
   };
 }
 
 export interface RotateApiKeyResponse {
   status: string;
   message: string;
-  data: {
-    apiKey: ApiKey;
-    secret: string;
+  data: ApiKey & {
+    apiKey: string; // The full API key string (id_secret)
   };
 }
