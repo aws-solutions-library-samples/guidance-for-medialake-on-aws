@@ -513,14 +513,14 @@ semantic-version:
         if [[ "$SUBJECT" =~ ^[a-z]+(\([a-zA-Z0-9\-_.]+\))?!:[[:space:]] ]] || [[ "$FULL_MESSAGE" =~ BREAKING[[:space:]]CHANGE: ]]; then
           echo "  [MAJOR] Breaking change detected: $SUBJECT"
           BUMP_TYPE="major"
-          BREAKING_CHANGES="${BREAKING_CHANGES}- ${SUBJECT} (${HASH:0:7})"$'\n'
+          BREAKING_CHANGES="${BREAKING_CHANGES}- ${SUBJECT}"$'\n'
         # Check for features
         elif [[ "$SUBJECT" =~ ^feat(\([a-zA-Z0-9\-_.]+\))?: ]]; then
           echo "  [MINOR] Feature: $SUBJECT"
           if [ "$BUMP_TYPE" != "major" ]; then
             BUMP_TYPE="minor"
           fi
-          FEATURES="${FEATURES}- ${SUBJECT} (${HASH:0:7})"$'\n'
+          FEATURES="${FEATURES}- ${SUBJECT}"$'\n'
         # Debug: check if it starts with feat
         elif [[ "$SUBJECT" == feat:* ]]; then
           echo "  [DEBUG] Found feat: prefix but regex didn't match: '$SUBJECT'"
@@ -528,14 +528,14 @@ semantic-version:
           if [ "$BUMP_TYPE" != "major" ]; then
             BUMP_TYPE="minor"
           fi
-          FEATURES="${FEATURES}- ${SUBJECT} (${HASH:0:7})"$'\n'
+          FEATURES="${FEATURES}- ${SUBJECT}"$'\n'
         # Check for fixes
         elif [[ "$SUBJECT" =~ ^fix(\([a-zA-Z0-9\-_.]+\))?: ]]; then
           echo "  [PATCH] Fix: $SUBJECT"
           if [ "$BUMP_TYPE" = "none" ]; then
             BUMP_TYPE="patch"
           fi
-          FIXES="${FIXES}- ${SUBJECT} (${HASH:0:7})"$'\n'
+          FIXES="${FIXES}- ${SUBJECT}"$'\n'
         # Debug: check if it starts with fix
         elif [[ "$SUBJECT" == fix:* ]]; then
           echo "  [DEBUG] Found fix: prefix but regex didn't match: '$SUBJECT'"
@@ -543,36 +543,36 @@ semantic-version:
           if [ "$BUMP_TYPE" = "none" ]; then
             BUMP_TYPE="patch"
           fi
-          FIXES="${FIXES}- ${SUBJECT} (${HASH:0:7})"$'\n'
+          FIXES="${FIXES}- ${SUBJECT}"$'\n'
         # Check for refactor
         elif [[ "$SUBJECT" =~ ^refactor(\([a-zA-Z0-9\-_.]+\))?: ]]; then
           echo "  [PATCH] Refactor: $SUBJECT"
           if [ "$BUMP_TYPE" = "none" ]; then
             BUMP_TYPE="patch"
           fi
-          REFACTORS="${REFACTORS}- ${SUBJECT} (${HASH:0:7})"$'\n'
+          REFACTORS="${REFACTORS}- ${SUBJECT}"$'\n'
         # Check for performance
         elif [[ "$SUBJECT" =~ ^perf(\([a-zA-Z0-9\-_.]+\))?: ]]; then
           echo "  [PATCH] Performance: $SUBJECT"
           if [ "$BUMP_TYPE" = "none" ]; then
             BUMP_TYPE="patch"
           fi
-          PERFORMANCES="${PERFORMANCES}- ${SUBJECT} (${HASH:0:7})"$'\n'
+          PERFORMANCES="${PERFORMANCES}- ${SUBJECT}"$'\n'
         # Check for release
         elif [[ "$SUBJECT" =~ ^release(\([a-zA-Z0-9\-_.]+\))?: ]]; then
           echo "  [TRACKED] Release: $SUBJECT"
-          OTHERS="${OTHERS}- ${SUBJECT} (${HASH:0:7})"$'\n'
+          OTHERS="${OTHERS}- ${SUBJECT}"$'\n'
         # Docs and CI don't bump version but are tracked
         elif [[ "$SUBJECT" =~ ^(docs|ci)(\([a-zA-Z0-9\-_.]+\))?: ]]; then
           echo "  [NO BUMP] ${SUBJECT}"
-          OTHERS="${OTHERS}- ${SUBJECT} (${HASH:0:7})"$'\n'
+          OTHERS="${OTHERS}- ${SUBJECT}"$'\n'
         # Other types (style, test, build) are patches
         elif [[ "$SUBJECT" =~ ^(style|test|build)(\([a-zA-Z0-9\-_.]+\))?: ]]; then
           echo "  [PATCH] ${SUBJECT}"
           if [ "$BUMP_TYPE" = "none" ]; then
             BUMP_TYPE="patch"
           fi
-          OTHERS="${OTHERS}- ${SUBJECT} (${HASH:0:7})"$'\n'
+          OTHERS="${OTHERS}- ${SUBJECT}"$'\n'
         fi
       done <<< "$COMMITS"
 
