@@ -37,7 +37,7 @@ def register_route(app):
             body = app.current_event.json_body
 
             # Get existing API key
-            response = api_keys_table.get_item(Key={"keyId": id})
+            response = api_keys_table.get_item(Key={"id": id})
 
             if "Item" not in response:
                 return {
@@ -51,6 +51,7 @@ def register_route(app):
             # Prepare update expression
             update_expression_parts = ["SET updatedAt = :updatedAt"]
             expression_attribute_values = {":updatedAt": datetime.utcnow().isoformat()}
+            expression_attribute_names = {}
 
             # Add fields to update
             if "name" in body:
@@ -66,7 +67,8 @@ def register_route(app):
                         "message": "Name cannot exceed 100 characters",
                         "data": {},
                     }
-                update_expression_parts.append("name = :name")
+                update_expression_parts.append("#name = :name")
+                expression_attribute_names["#name"] = "name"
                 expression_attribute_values[":name"] = body["name"].strip()
 
             if "description" in body:
@@ -82,7 +84,8 @@ def register_route(app):
                         "message": "Description cannot exceed 500 characters",
                         "data": {},
                     }
-                update_expression_parts.append("description = :description")
+                update_expression_parts.append("#description = :description")
+                expression_attribute_names["#description"] = "description"
                 expression_attribute_values[":description"] = body[
                     "description"
                 ].strip()
@@ -137,18 +140,25 @@ def register_route(app):
             # Update the API key
             update_expression = " , ".join(update_expression_parts)
 
-            update_response = api_keys_table.update_item(
-                Key={"keyId": id},
-                UpdateExpression=update_expression,
-                ExpressionAttributeValues=expression_attribute_values,
-                ReturnValues="ALL_NEW",
-            )
+            # Build update_item parameters
+            update_params = {
+                "Key": {"id": id},
+                "UpdateExpression": update_expression,
+                "ExpressionAttributeValues": expression_attribute_values,
+                "ReturnValues": "ALL_NEW",
+            }
+
+            # Only add ExpressionAttributeNames if we have reserved keywords
+            if expression_attribute_names:
+                update_params["ExpressionAttributeNames"] = expression_attribute_names
+
+            update_response = api_keys_table.update_item(**update_params)
 
             updated_item = update_response.get("Attributes", {})
 
             # Prepare response
             response_item = {
-                "id": updated_item.get("keyId"),
+                "id": updated_item.get("id"),
                 "name": updated_item.get("name"),
                 "description": updated_item.get("description"),
                 "isEnabled": updated_item.get("isEnabled", True),

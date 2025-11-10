@@ -38,30 +38,38 @@ def register_route(app):
             body = app.current_event.json_body
 
             # Validate required fields
-            required_fields = ["name", "description"]
-            for field in required_fields:
-                if field not in body:
-                    return {
-                        "status": "error",
-                        "message": f"Missing required field: {field}",
-                        "data": {},
-                    }
-                # Validate field content
-                if not isinstance(body[field], str) or not body[field].strip():
-                    return {
-                        "status": "error",
-                        "message": f"Field {field} must be a non-empty string",
-                        "data": {},
-                    }
+            if "name" not in body:
+                return {
+                    "status": "error",
+                    "message": "Missing required field: name",
+                    "data": {},
+                }
 
-            # Validate field lengths
+            # Validate name
+            if not isinstance(body["name"], str) or not body["name"].strip():
+                return {
+                    "status": "error",
+                    "message": "Name must be a non-empty string",
+                    "data": {},
+                }
+
             if len(body["name"]) > 100:
                 return {
                     "status": "error",
                     "message": "Name cannot exceed 100 characters",
                     "data": {},
                 }
-            if len(body["description"]) > 500:
+
+            # Validate description (optional field)
+            description = body.get("description", "")
+            if not isinstance(description, str):
+                return {
+                    "status": "error",
+                    "message": "Description must be a string",
+                    "data": {},
+                }
+
+            if len(description) > 500:
                 return {
                     "status": "error",
                     "message": "Description cannot exceed 500 characters",
@@ -102,9 +110,9 @@ def register_route(app):
             permissions = body.get("permissions", default_permissions)
 
             api_key_item = {
-                "keyId": api_key_id,
+                "id": api_key_id,
                 "name": body["name"],
-                "description": body["description"],
+                "description": description,
                 "secretArn": secret_arn,
                 "isEnabled": body.get("isEnabled", True),
                 "permissions": json.dumps(permissions),
@@ -117,7 +125,7 @@ def register_route(app):
 
             # Prepare response (exclude secret ARN)
             response_item = {
-                "id": api_key_item["keyId"],
+                "id": api_key_item["id"],
                 "name": api_key_item["name"],
                 "description": api_key_item["description"],
                 "isEnabled": api_key_item["isEnabled"],
