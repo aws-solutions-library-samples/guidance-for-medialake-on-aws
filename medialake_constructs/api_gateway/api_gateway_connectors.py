@@ -344,6 +344,24 @@ class ConnectorsConstruct(Construct):
         )
 
         # Separate IAM policy with account-specific ARNs
+        # First, explicitly deny permission mutation on the role itself to prevent self-mutation (Scenario 1.1)
+        connectors_del_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.DENY,
+                actions=[
+                    "iam:DeleteRole",
+                    "iam:DeleteRolePolicy",
+                    "iam:DetachRolePolicy",
+                    "iam:AttachRolePolicy",
+                    "iam:PutRolePolicy",
+                    "iam:UpdateRole",
+                    "iam:TagRole",
+                    "iam:UntagRole",
+                ],
+                resources=[connectors_del_lambda.function.role.role_arn],
+            )
+        )
+        # Then allow IAM operations on other roles
         connectors_del_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
@@ -567,6 +585,24 @@ class ConnectorsConstruct(Construct):
         )
 
         # Separate IAM policy with account-specific ARNs
+        # First, explicitly deny permission mutation on the role itself to prevent self-mutation (Scenario 1.1)
+        connector_s3_post_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.DENY,
+                actions=[
+                    "iam:DeleteRole",
+                    "iam:UpdateRole",
+                    "iam:PutRolePolicy",
+                    "iam:AttachRolePolicy",
+                    "iam:DeleteRolePolicy",
+                    "iam:DetachRolePolicy",
+                    "iam:TagRole",
+                    "iam:UntagRole",
+                ],
+                resources=[connector_s3_post_lambda.function.role.role_arn],
+            )
+        )
+        # Then allow IAM operations on other roles
         connector_s3_post_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[

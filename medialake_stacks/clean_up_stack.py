@@ -70,6 +70,24 @@ class CleanupStack(Stack):
             )
         )
 
+        # Prevent self-mutation (Scenario 1.1 privilege escalation)
+        self._clean_up_lambda.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.DENY,
+                actions=[
+                    "iam:DeleteRole",
+                    "iam:UpdateRole",
+                    "iam:PutRolePolicy",
+                    "iam:AttachRolePolicy",
+                    "iam:DetachRolePolicy",
+                    "iam:DeleteRolePolicy",
+                    "iam:TagRole",
+                    "iam:UntagRole",
+                ],
+                resources=[self._clean_up_lambda.lambda_role.role_arn],
+            )
+        )
+
         # Ensure IAM permissions for role deletion are complete
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
