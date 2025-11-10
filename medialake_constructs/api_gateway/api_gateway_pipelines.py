@@ -302,6 +302,25 @@ class ApiGatewayPipelinesConstruct(Construct):
             config=post_pipelines_lambda_config,
         )
 
+        # Prevent self-mutation (Scenario 1.1 privilege escalation)
+        self._post_pipelines_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.DENY,
+                actions=[
+                    "iam:CreateRole",
+                    "iam:DeleteRole",
+                    "iam:UpdateRole",
+                    "iam:PutRolePolicy",
+                    "iam:AttachRolePolicy",
+                    "iam:DetachRolePolicy",
+                    "iam:DeleteRolePolicy",
+                    "iam:TagRole",
+                    "iam:UntagRole",
+                ],
+                resources=[self._post_pipelines_handler.function.role.role_arn],
+            )
+        )
+
         self._post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
@@ -529,6 +548,25 @@ class ApiGatewayPipelinesConstruct(Construct):
             ),
         )
 
+        # Prevent self-mutation (Scenario 1.1 privilege escalation)
+        self._post_pipelines_async_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.DENY,
+                actions=[
+                    "iam:CreateRole",
+                    "iam:DeleteRole",
+                    "iam:UpdateRole",
+                    "iam:PutRolePolicy",
+                    "iam:AttachRolePolicy",
+                    "iam:DetachRolePolicy",
+                    "iam:DeleteRolePolicy",
+                    "iam:TagRole",
+                    "iam:UntagRole",
+                ],
+                resources=[self._post_pipelines_async_handler.function.role.role_arn],
+            )
+        )
+
         # Grant the front-end Lambda permission to start the Step Function
         self._pipeline_creation_state_machine.grant_start_execution(
             self._post_pipelines_async_handler.function
@@ -678,6 +716,25 @@ class ApiGatewayPipelinesConstruct(Construct):
             config=put_pipeline_id_lambda_config,
         )
 
+        # Prevent self-mutation (Scenario 1.1 privilege escalation)
+        self._put_pipeline_id_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.DENY,
+                actions=[
+                    "iam:CreateRole",
+                    "iam:DeleteRole",
+                    "iam:UpdateRole",
+                    "iam:PutRolePolicy",
+                    "iam:AttachRolePolicy",
+                    "iam:DetachRolePolicy",
+                    "iam:DeleteRolePolicy",
+                    "iam:TagRole",
+                    "iam:UntagRole",
+                ],
+                resources=[self._put_pipeline_id_handler.function.role.role_arn],
+            )
+        )
+
         self._put_pipeline_id_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["dynamodb:GetItem", "dynamodb:UpdateItem"],
@@ -722,6 +779,24 @@ class ApiGatewayPipelinesConstruct(Construct):
             self,
             "DeletePipelineIdHandler",
             config=del_pipeline_id_lambda_config,
+        )
+
+        # Prevent self-mutation (Scenario 1.1 privilege escalation)
+        self._del_pipeline_id_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.DENY,
+                actions=[
+                    "iam:DeleteRole",
+                    "iam:UpdateRole",
+                    "iam:PutRolePolicy",
+                    "iam:AttachRolePolicy",
+                    "iam:DetachRolePolicy",
+                    "iam:DeleteRolePolicy",
+                    "iam:TagRole",
+                    "iam:UntagRole",
+                ],
+                resources=[self._del_pipeline_id_handler.function.role.role_arn],
+            )
         )
 
         # Add Lambda function deletion permissions
