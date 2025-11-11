@@ -168,6 +168,7 @@ class BaseInfrastructureStack(Stack):
                 description=config.vpc.security_groups.new_groups[
                     "media_lake_sg"
                 ].description,
+                allow_all_outbound=False,
             )
 
             # Allow HTTPS ingress from the VPC CIDR
@@ -182,6 +183,22 @@ class BaseInfrastructureStack(Stack):
                 peer=ec2.Peer.ipv4(self._vpc.vpc.vpc_cidr_block),
                 connection=ec2.Port.tcp(80),
                 description="Allow HTTP ingress from VPC CIDR",
+            )
+
+            # Add explicit egress rules for Lambda functions
+            # Allow HTTPS egress to VPC CIDR for OpenSearch and internal services
+            self._security_group.add_egress_rule(
+                peer=ec2.Peer.ipv4(self._vpc.vpc.vpc_cidr_block),
+                connection=ec2.Port.tcp(443),
+                description="Allow HTTPS egress to VPC CIDR",
+            )
+
+            # Allow HTTPS egress to internet for AWS services
+            # (S3, DynamoDB, Secrets Manager, etc. via VPC endpoints or public endpoints)
+            self._security_group.add_egress_rule(
+                peer=ec2.Peer.any_ipv4(),
+                connection=ec2.Port.tcp(443),
+                description="Allow HTTPS egress for AWS services",
             )
 
         # Create OpenSearch managed cluster
