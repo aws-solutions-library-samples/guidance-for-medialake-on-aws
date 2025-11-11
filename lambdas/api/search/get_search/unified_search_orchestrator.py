@@ -151,6 +151,10 @@ class UnifiedSearchOrchestrator:
             if response.get("Item") and response["Item"].get("providers"):
                 return response["Item"]["providers"]
 
+            # Get the embedding store configuration
+            embedding_store = self._get_embedding_store_type(system_settings_table)
+            self.logger.info(f"Using embedding store type: {embedding_store}")
+
             # Fall back to checking for individual provider configurations
             configs = []
 
@@ -203,7 +207,7 @@ class UnifiedSearchOrchestrator:
                             "type": "bedrock",
                             "secret_arn": item.get("secretArn"),
                         },
-                        "store": "opensearch",  # Default to opensearch for bedrock
+                        "store": embedding_store,
                         "metadata_mapping": item.get("metadataMapping", {}),
                         "name": item.get("name", "Bedrock TwelveLabs"),
                         "id": item.get("id"),
@@ -224,7 +228,7 @@ class UnifiedSearchOrchestrator:
                             "type": "api_key",
                             "secret_arn": item.get("secretArn"),
                         },
-                        "store": "opensearch",  # Default to opensearch for twelvelabs api
+                        "store": embedding_store,
                         "metadata_mapping": item.get("metadataMapping", {}),
                         "name": item.get("name", "TwelveLabs API"),
                         "id": item.get("id"),
@@ -263,6 +267,35 @@ class UnifiedSearchOrchestrator:
         except Exception as e:
             self.logger.error(f"Error loading search provider configs: {str(e)}")
             return []
+
+    def _get_embedding_store_type(self, system_settings_table) -> str:
+        """Get the configured embedding store type from DynamoDB"""
+        try:
+            response = system_settings_table.get_item(
+                Key={"PK": "SYSTEM_SETTINGS", "SK": "EMBEDDING_STORE"}
+            )
+
+            if response.get("Item") and response["Item"].get("isEnabled"):
+                store_type = response["Item"].get("type", "opensearch")
+                # Map DynamoDB type to internal type
+                if store_type == "s3-vector":
+                    return "s3_vectors"
+                elif store_type == "opensearch":
+                    return "opensearch"
+                else:
+                    self.logger.warning(
+                        f"Unknown embedding store type: {store_type}, defaulting to opensearch"
+                    )
+                    return "opensearch"
+            else:
+                self.logger.info(
+                    "No embedding store configuration found, defaulting to opensearch"
+                )
+                return "opensearch"
+
+        except Exception as e:
+            self.logger.error(f"Error loading embedding store config: {str(e)}")
+            return "opensearch"  # Safe default
 
     def _get_coactive_api_key(self, secret_arn: str) -> Optional[str]:
         """Get Coactive API key from AWS Secrets Manager"""

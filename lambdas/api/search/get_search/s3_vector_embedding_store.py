@@ -80,8 +80,17 @@ class S3VectorEmbeddingStore(BaseEmbeddingStore):
             self.logger.warning(f"S3 Vector availability check failed: {str(e)}")
             return False
 
-    def build_semantic_query(self, params) -> Dict[str, Any]:
-        """Build S3 Vector semantic query using Twelve Labs embeddings"""
+    def build_semantic_query(
+        self, params, allowed_embedding_types: List[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Build S3 Vector semantic query using Twelve Labs embeddings.
+
+        Args:
+            params: Query parameters
+            allowed_embedding_types: Optional list of embedding types to include (e.g., ["visual-text"])
+                                    If not provided, defaults to ["visual-text"] for timeline display
+        """
         start_time = time.time()
         self.logger.info(
             f"[PERF] Starting S3 Vector semantic query build for: {params.q}"
@@ -90,6 +99,10 @@ class S3VectorEmbeddingStore(BaseEmbeddingStore):
         # Use centralized embedding generation
         embedding = self.generate_text_embedding(params.q)
 
+        # Default to visual-text only if not specified (safest for timeline display)
+        if allowed_embedding_types is None:
+            allowed_embedding_types = ["visual-text"]
+
         # Return S3 Vector query parameters - using actual environment variable names
         query = {
             "embedding": embedding,
@@ -97,6 +110,7 @@ class S3VectorEmbeddingStore(BaseEmbeddingStore):
             "params": params,
             "bucket_name": os.environ.get("S3_VECTOR_BUCKET_NAME"),
             "index_name": os.environ.get("S3_VECTOR_INDEX_NAME", "media-vectors"),
+            "allowed_embedding_types": allowed_embedding_types,
         }
 
         self.logger.info(
@@ -171,14 +185,25 @@ class S3VectorEmbeddingStore(BaseEmbeddingStore):
 
             # Step 3: Query S3 Vector Store for each valid inventory_id to get clips and parent assets
             all_results = []
+            allowed_types = query.get("allowed_embedding_types", ["visual-text"])
+
             for inventory_id in valid_inventory_ids:
-                # Query for this specific inventory_id
+                # Build filter for this inventory_id and allowed embedding types
+                # This filters out unwanted embedding types (e.g., audio, visual-image for Marengo 2.7)
+                vector_filter = {
+                    "$and": [
+                        {"inventory_id": {"$eq": inventory_id}},
+                        {"embedding_option": {"$in": allowed_types}},
+                    ]
+                }
+
+                # Query for this specific inventory_id with embedding type filter
                 filtered_response = s3_vector_client.query_vectors(
                     vectorBucketName=bucket_name,
                     indexName=index_name,
                     queryVector={"float32": query["embedding"]},
                     topK=vector_topK,
-                    filter={"inventory_id": {"$eq": inventory_id}},
+                    filter=vector_filter,
                     returnMetadata=True,
                     returnDistance=True,
                 )
