@@ -84,8 +84,8 @@ class SearchConstruct(Construct):
                     # CLOUDFRONT_DISTRIBUTION_DOMAIN removed to break circular dependency
                     # Lambda will fetch this from SSM parameter at runtime
                     # Bedrock inference profile ID for TwelveLabs Marengo Embed v2.7
-                    # Using AWS system-defined cross-Region inference profile
-                    "BEDROCK_INFERENCE_PROFILE_ARN": "us.twelvelabs.marengo-embed-2-7-v1:0",
+                    # Dynamically set based on deployment region
+                    "BEDROCK_INFERENCE_PROFILE_ARN": self._get_regional_inference_profile_id(),
                 },
             ),
         )
