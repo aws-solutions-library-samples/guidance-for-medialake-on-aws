@@ -49,10 +49,9 @@ def encode_last_evaluated_key(
     last_sort_value: Any = None,
 ) -> str:
     """Encode the LastEvaluatedKey and sort parameters to a base64 string"""
-    if not last_evaluated_key:
-        return ""
+    # Create token data - last_key can be empty dict for client-side pagination
     token_data = {
-        "last_key": last_evaluated_key,
+        "last_key": last_evaluated_key if last_evaluated_key else {},
         "sort_by": sort_by,
         "sort_order": sort_order,
         "last_sort_value": last_sort_value,
@@ -181,17 +180,23 @@ def get_pipeline_executions(
                     last_sort_value = token_data.get("last_sort_value")
 
         # Configure scan parameters
-        scan_kwargs = {
-            "limit": page_size * 3,  # Get more items to account for filtering
-        }
+        scan_kwargs = {}
 
         # Add status filter if provided
         if status:
             scan_kwargs["filter_condition"] = PipelineExecution.status == status
 
-        # Add LastEvaluatedKey if token_data is valid
+        # For initial request (no token): scan ALL items to ensure correct sorting
+        # DynamoDB scan returns items in arbitrary order, so we must retrieve all items
+        # to sort properly by any field (start_time, end_time, pipeline_name, status, etc.)
+        # For subsequent pages: continue from where we left off using last_sort_value filtering
         if token_data and token_data.get("last_key"):
-            scan_kwargs["last_evaluated_key"] = token_data["last_key"]
+            last_key = token_data["last_key"]
+            # Only use DynamoDB last_evaluated_key if it's not an empty placeholder
+            if last_key:  # Check if not empty dict
+                scan_kwargs["last_evaluated_key"] = last_key
+                scan_kwargs["limit"] = page_size * 3  # Limit for subsequent pages
+        # else: no limit - scan all items for proper sorting across any sortable field
 
         # Execute scan
         executions = []
@@ -360,17 +365,25 @@ def get_pipeline_executions(
             ):
                 last_sort_val = int(last_execution.end_time)
 
-            # Encode with DynamoDB pagination key and sort info
+            # Create next token with last_evaluated_key if available (for subsequent pages)
+            # or with empty dict (for initial full scan) - the last_sort_value is what matters
+            last_key = None
             if (
                 hasattr(scan_operation, "last_evaluated_key")
                 and scan_operation.last_evaluated_key
             ):
-                next_token = encode_last_evaluated_key(
-                    scan_operation.last_evaluated_key,
-                    sort_by,
-                    sort_order,
-                    last_sort_val,
-                )
+                last_key = scan_operation.last_evaluated_key
+            else:
+                # For initial full scan, use empty dict as placeholder
+                # The last_sort_value will handle pagination
+                last_key = {}
+
+            next_token = encode_last_evaluated_key(
+                last_key,
+                sort_by,
+                sort_order,
+                last_sort_val,
+            )
 
         # Add metrics for monitoring
         metrics.add_metric(name="SuccessfulQueries", unit="Count", value=1)
