@@ -11,6 +11,25 @@ tracer = Tracer()
 # Initialize DynamoDB
 dynamodb = boto3.resource("dynamodb")
 
+# Provider metadata with capabilities and location info
+PROVIDER_METADATA = {
+    "twelvelabs-api": {
+        "name": "TwelveLabs API",
+        "isExternal": True,
+        "supportedMediaTypes": ["image", "video", "audio"],
+    },
+    "twelvelabs-bedrock": {
+        "name": "TwelveLabs Bedrock",
+        "isExternal": False,
+        "supportedMediaTypes": ["image", "video", "audio"],
+    },
+    "coactive": {
+        "name": "Coactive AI",
+        "isExternal": True,
+        "supportedMediaTypes": ["image", "video"],
+    },
+}
+
 
 def register_route(app):
     """Register GET /settings/system/search route"""
@@ -48,6 +67,15 @@ def register_route(app):
                 is_bedrock = original_item.get("type") == "twelvelabs-bedrock"
 
                 search_provider["isConfigured"] = has_secret or is_bedrock
+
+                # Add provider metadata (location and supported media types)
+                provider_type = search_provider.get("type", "")
+                if provider_type in PROVIDER_METADATA:
+                    metadata = PROVIDER_METADATA[provider_type]
+                    search_provider["isExternal"] = metadata["isExternal"]
+                    search_provider["supportedMediaTypes"] = metadata[
+                        "supportedMediaTypes"
+                    ]
 
             # Get embedding store settings
             embedding_response = system_settings_table.get_item(

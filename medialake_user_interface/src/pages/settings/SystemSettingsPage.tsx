@@ -433,7 +433,10 @@ const SystemSettingsPage: React.FC = () => {
                       )}
                     </Typography>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                      <FormControl sx={{ minWidth: 200 }} disabled={false}>
+                      <FormControl
+                        sx={{ minWidth: 200 }}
+                        disabled={!settings.isEnabled}
+                      >
                         <InputLabel>
                           {t(
                             "settings.systemSettings.search.selectProvider",
@@ -457,19 +460,112 @@ const SystemSettingsPage: React.FC = () => {
                             )}
                           </MenuItem>
                           <MenuItem value="twelvelabs-api">
-                            {
-                              SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API
-                                .name
-                            }
+                            <Box
+                              sx={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 0.5,
+                              }}
+                            >
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 1,
+                                }}
+                              >
+                                <Typography>
+                                  {
+                                    SYSTEM_SETTINGS_CONFIG.PROVIDERS
+                                      .TWELVE_LABS_API.name
+                                  }
+                                </Typography>
+                                <Chip
+                                  label="External"
+                                  size="small"
+                                  color="info"
+                                  sx={{ height: 20, fontSize: "0.7rem" }}
+                                />
+                              </Box>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                              >
+                                Supports: Image, Video, Audio
+                              </Typography>
+                            </Box>
                           </MenuItem>
                           <MenuItem value="twelvelabs-bedrock">
-                            {
-                              SYSTEM_SETTINGS_CONFIG.PROVIDERS
-                                .TWELVE_LABS_BEDROCK.name
-                            }
+                            <Box
+                              sx={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 0.5,
+                              }}
+                            >
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 1,
+                                }}
+                              >
+                                <Typography>
+                                  {
+                                    SYSTEM_SETTINGS_CONFIG.PROVIDERS
+                                      .TWELVE_LABS_BEDROCK.name
+                                  }
+                                </Typography>
+                                <Chip
+                                  label="Internal"
+                                  size="small"
+                                  color="success"
+                                  sx={{ height: 20, fontSize: "0.7rem" }}
+                                />
+                              </Box>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                              >
+                                Supports: Image, Video, Audio
+                              </Typography>
+                            </Box>
                           </MenuItem>
                           <MenuItem value="coactive">
-                            {SYSTEM_SETTINGS_CONFIG.PROVIDERS.COACTIVE.name}
+                            <Box
+                              sx={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 0.5,
+                              }}
+                            >
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 1,
+                                }}
+                              >
+                                <Typography>
+                                  {
+                                    SYSTEM_SETTINGS_CONFIG.PROVIDERS.COACTIVE
+                                      .name
+                                  }
+                                </Typography>
+                                <Chip
+                                  label="External"
+                                  size="small"
+                                  color="info"
+                                  sx={{ height: 20, fontSize: "0.7rem" }}
+                                />
+                              </Box>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                              >
+                                Supports: Image, Video
+                              </Typography>
+                            </Box>
                           </MenuItem>
                         </Select>
                       </FormControl>
@@ -569,10 +665,26 @@ const SystemSettingsPage: React.FC = () => {
                               }
                             </MenuItem>
                             <MenuItem value="s3-vector">
-                              {
-                                SYSTEM_SETTINGS_CONFIG.EMBEDDING_STORES
-                                  .S3_VECTOR.name
-                              }
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 1,
+                                }}
+                              >
+                                <Typography>
+                                  {
+                                    SYSTEM_SETTINGS_CONFIG.EMBEDDING_STORES
+                                      .S3_VECTOR.name
+                                  }
+                                </Typography>
+                                <Chip
+                                  label="Preview"
+                                  size="small"
+                                  color="warning"
+                                  sx={{ height: 20, fontSize: "0.7rem" }}
+                                />
+                              </Box>
                             </MenuItem>
                           </Select>
                         </FormControl>
