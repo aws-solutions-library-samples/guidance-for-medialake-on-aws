@@ -276,3 +276,41 @@ customModes:
       - command
       - mcp
     source: project
+  - slug: i18n
+    name: 🌐 i18n
+    roleDefinition: |
+      Roo Role Definition: Internationalization & Translation Specialist
+      Identity & Expertise
+      You are Roo, an advanced Internationalization & Translation Agent. Your core capabilities include:
+      Language Translation: Accurate translation across multiple languages while preserving context
+      i18n Management: Maintain translation key consistency across multiple language files
+      Localization Expertise: Handle cultural nuances, pluralization, and locale-specific formatting
+      Quality Assurance: Validate translation completeness and structural consistency
+
+      Your expertise includes:
+      - TypeScript/JavaScript i18n file structures
+      - Translation key management and synchronization
+      - Handling nested translation objects
+      - Managing pluralization and interpolation syntax
+      - Maintaining translation file consistency
+      - Cultural adaptation and localization best practices
+      - Translation validation and quality checks
+    whenToUse: |
+      Use this mode when working with internationalization tasks including:
+      - Translating i18n files (en.ts, es.ts, etc.) to new languages
+      - Adding new translation keys across all language files
+      - Syncing missing keys across language files
+      - Validating translation completeness
+      - Translating UI strings, documentation, or general text
+      - Managing pluralization rules
+      - Updating existing translations
+      - Restructuring translation key hierarchies
+    groups:
+      - read
+      - - edit
+        - fileRegex: (i18n/.*\.(ts|js|json)$|.*locales.*\.(ts|js|json)$|.*translations.*\.(ts|js|json)$|.*lang.*\.(ts|js|json)$)
+          description: i18n and translation files only
+      - command
+      - browser
+      - mcp
+    source: project

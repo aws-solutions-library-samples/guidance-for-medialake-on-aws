@@ -1,0 +1,611 @@
+<i18n_workflow_examples>
+  <overview>
+    Complete end-to-end examples demonstrating common i18n workflows.
+    These examples show the entire process from start to finish for typical translation tasks.
+  </overview>
+
+  <example name="add_new_translation_keys">
+    <description>
+      Add new translation keys for API key management feature across all language files
+    </description>
+    <scenario>
+      A new API key management feature needs translation keys for title, description, and actions
+    </scenario>
+
+    <workflow>
+      <step number="1">
+        <title>List Available Language Files</title>
+        <tool>list_files</tool>
+        <action><![CDATA[
+<list_files>
+<path>medialake_user_interface/src/i18n/locales</path>
+<recursive>false</recursive>
+</list_files>
+        ]]></action>
+        <expected_output>
+          en.ts, es.ts, fr.ts, de.ts, pt.ts, zh.ts, ja.ts, ko.ts, ar.ts, he.ts, hi.ts
+        </expected_output>
+      </step>
+
+      <step number="2">
+        <title>Read English File to Find Insertion Point</title>
+        <tool>read_file</tool>
+        <action><![CDATA[
+<read_file>
+<args>
+  <file>
+    <path>medialake_user_interface/src/i18n/locales/en.ts</path>
+    <line_range>450-550</line_range>
+  </file>
+</args>
+</read_file>
+        ]]></action>
+        <purpose>Find the settings section where API keys should be added</purpose>
+      </step>
+
+      <step number="3">
+        <title>Add Keys to English File</title>
+        <tool>apply_diff</tool>
+        <action><![CDATA[
+<apply_diff>
+<path>medialake_user_interface/src/i18n/locales/en.ts</path>
+<diff>
+<<<<<<< SEARCH
+:start_line:520
+-------
+      security: "Security",
+      performance: "Performance",
+    },
+=======
+      security: "Security",
+      performance: "Performance",
+      apiKeys: "API Keys", // pragma: allowlist secret
+    },
+    apiKeys: {
+      title: "API Key Management",
+      description: "Manage API keys for programmatic access",
+      createNew: "Create New API Key",
+      name: "Key Name",
+      expiresAt: "Expires At",
+      actions: {
+        create: "Create Key",
+        revoke: "Revoke",
+        copy: "Copy to Clipboard",
+      },
+      messages: {
+        created: "API key created successfully",
+        revoked: "API key revoked",
+        copied: "API key copied to clipboard",
+      },
+    },
+>>>>>>> REPLACE
+</diff>
+</apply_diff>
+        ]]></action>
+      </step>
+
+      <step number="4">
+        <title>Add Keys to Spanish File</title>
+        <tool>apply_diff</tool>
+        <action><![CDATA[
+<apply_diff>
+<path>medialake_user_interface/src/i18n/locales/es.ts</path>
+<diff>
+<<<<<<< SEARCH
+:start_line:520
+-------
+      security: "Seguridad",
+      performance: "Rendimiento",
+    },
+=======
+      security: "Seguridad",
+      performance: "Rendimiento",
+      apiKeys: "Claves API", // pragma: allowlist secret
+    },
+    apiKeys: {
+      title: "Gestión de Claves API",
+      description: "Administrar claves API para acceso programático",
+      createNew: "Crear Nueva Clave API",
+      name: "Nombre de la Clave",
+      expiresAt: "Expira el",
+      actions: {
+        create: "Crear Clave",
+        revoke: "Revocar",
+        copy: "Copiar al Portapapeles",
+      },
+      messages: {
+        created: "Clave API creada exitosamente",
+        revoked: "Clave API revocada",
+        copied: "Clave API copiada al portapapeles",
+      },
+    },
+>>>>>>> REPLACE
+</diff>
+</apply_diff>
+        ]]></action>
+        <note>Repeat for all other language files</note>
+      </step>
+    </workflow>
+
+    <key_learnings>
+      <learning>Use read_file to find exact insertion points</learning>
+      <learning>Include proper line numbers in apply_diff</learning>
+      <learning>Maintain consistent structure across all languages</learning>
+      <learning>Translate all values while keeping keys identical</learning>
+    </key_learnings>
+  </example>
+
+  <example name="sync_missing_keys_across_languages">
+    <description>
+      Find and add missing translation keys in German file based on English
+    </description>
+    <scenario>
+      The German translation file is missing some keys that exist in English
+    </scenario>
+
+    <workflow>
+      <step number="1">
+        <title>Search for Specific Section in All Files</title>
+        <tool>search_files</tool>
+        <action><![CDATA[
+<search_files>
+<path>medialake_user_interface/src/i18n/locales</path>
+<regex>collections:.*\{</regex>
+<file_pattern>*.ts</file_pattern>
+</search_files>
+        ]]></action>
+        <purpose>Check which languages have the collections section</purpose>
+      </step>
+
+      <step number="2">
+        <title>Read English Collections Section</title>
+        <tool>read_file</tool>
+        <action><![CDATA[
+<read_file>
+<args>
+  <file>
+    <path>medialake_user_interface/src/i18n/locales/en.ts</path>
+    <line_range>110-160</line_range>
+  </file>
+</args>
+</read_file>
+        ]]></action>
+        <purpose>Get all keys that should exist in collections section</purpose>
+      </step>
+
+      <step number="3">
+        <title>Read German Collections Section</title>
+        <tool>read_file</tool>
+        <action><![CDATA[
+<read_file>
+<args>
+  <file>
+    <path>medialake_user_interface/src/i18n/locales/de.ts</path>
+    <line_range>110-160</line_range>
+  </file>
+</args>
+</read_file>
+        ]]></action>
+        <purpose>Compare with English to identify missing keys</purpose>
+      </step>
+
+      <step number="4">
+        <title>Add Missing Keys to German</title>
+        <tool>apply_diff</tool>
+        <action><![CDATA[
+<apply_diff>
+<path>medialake_user_interface/src/i18n/locales/de.ts</path>
+<diff>
+<<<<<<< SEARCH
+:start_line:145
+-------
+    actions: {
+      createNew: "Neue Sammlung erstellen",
+      view: "Anzeigen",
+      edit: "Bearbeiten",
+    },
+=======
+    actions: {
+      createNew: "Neue Sammlung erstellen",
+      view: "Anzeigen",
+      edit: "Bearbeiten",
+      share: "Teilen",
+      delete: "Löschen",
+    },
+    deleteDialog: {
+      title: "Sammlung löschen",
+      description: "Möchten Sie diese Sammlung wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+      cascadeWarning: "Alle Elemente und Untersammlungen in dieser Sammlung werden ebenfalls entfernt.",
+      cancel: "Abbrechen",
+      confirm: "Löschen",
+      deleting: "Wird gelöscht...",
+    },
+>>>>>>> REPLACE
+</diff>
+</apply_diff>
+        ]]></action>
+      </step>
+    </workflow>
+
+    <key_learnings>
+      <learning>Use search_files to quickly compare sections across files</learning>
+      <learning>Read both source and target to identify gaps</learning>
+      <learning>Add all missing keys in logical groups</learning>
+      <learning>Maintain proper nesting and indentation</learning>
+    </key_learnings>
+  </example>
+
+  <example name="fix_interpolation_syntax">
+    <description>
+      Correct interpolation syntax that was accidentally translated
+    </description>
+    <scenario>
+      Variable names in interpolation were incorrectly translated in Spanish file
+    </scenario>
+
+    <workflow>
+      <step number="1">
+        <title>Search for Incorrect Interpolation</title>
+        <tool>search_files</tool>
+        <action><![CDATA[
+<search_files>
+<path>medialake_user_interface/src/i18n/locales/es.ts</path>
+<regex>\{\{[^}]*\}\}</regex>
+</search_files>
+        ]]></action>
+        <purpose>Find all interpolation patterns to check for errors</purpose>
+      </step>
+
+      <step number="2">
+        <title>Read English for Correct Variable Names</title>
+        <tool>read_file</tool>
+        <action><![CDATA[
+<read_file>
+<args>
+  <file>
+    <path>medialake_user_interface/src/i18n/locales/en.ts</path>
+    <line_range>125-127</line_range>
+  </file>
+</args>
+</read_file>
+        ]]></action>
+        <expected_content>
+          itemCount: "{{count}} items"
+        </expected_content>
+      </step>
+
+      <step number="3">
+        <title>Fix Spanish Interpolation</title>
+        <tool>apply_diff</tool>
+        <action><![CDATA[
+<apply_diff>
+<path>medialake_user_interface/src/i18n/locales/es.ts</path>
+<diff>
+<<<<<<< SEARCH
+:start_line:126
+-------
+      itemCount: "{{cantidad}} artículos",
+=======
+      itemCount: "{{count}} artículos",
+>>>>>>> REPLACE
+</diff>
+</apply_diff>
+        ]]></action>
+        <note>Variable name must be "count" not "cantidad"</note>
+      </step>
+    </workflow>
+
+    <key_learnings>
+      <learning>Variable names must remain unchanged across languages</learning>
+      <learning>Use search_files with regex to find interpolation patterns</learning>
+      <learning>Compare with English to verify correct variable names</learning>
+      <learning>Fix issues immediately to prevent runtime errors</learning>
+    </key_learnings>
+  </example>
+
+  <example name="translate_with_html_preservation">
+    <description>
+      Translate strings containing HTML tags while preserving markup
+    </description>
+    <scenario>
+      Help text contains HTML links that must remain functional in all languages
+    </scenario>
+
+    <workflow>
+      <step number="1">
+        <title>Read English Content with HTML</title>
+        <tool>read_file</tool>
+        <action><![CDATA[
+<read_file>
+<args>
+  <file>
+    <path>medialake_user_interface/src/i18n/locales/en.ts</path>
+    <line_range>220-225</line_range>
+  </file>
+</args>
+</read_file>
+        ]]></action>
+        <expected_content><![CDATA[
+      termsText: "By signing up, you agree to our <a href='/terms'>Terms of Service</a>",
+      helpText: "Visit our <strong>Help Center</strong> or <a href='/support'>contact support</a>",
+        ]]></expected_content>
+      </step>
+
+      <step number="2">
+        <title>Translate to French Preserving HTML</title>
+        <tool>apply_diff</tool>
+        <action><![CDATA[
+<apply_diff>
+<path>medialake_user_interface/src/i18n/locales/fr.ts</path>
+<diff>
+<<<<<<< SEARCH
+:start_line:222
+-------
+      termsText: "By signing up, you agree to our <a href='/terms'>Terms of Service</a>",
+      helpText: "Visit our <strong>Help Center</strong> or <a href='/support'>contact support</a>",
+=======
+      termsText: "En vous inscrivant, vous acceptez nos <a href='/terms'>Conditions d'utilisation</a>",
+      helpText: "Visitez notre <strong>Centre d'aide</strong> ou <a href='/support'>contactez le support</a>",
+>>>>>>> REPLACE
+</diff>
+</apply_diff>
+        ]]></action>
+      </step>
+    </workflow>
+
+    <key_learnings>
+      <learning>HTML tags must be preserved exactly</learning>
+      <learning>Translate text content only, not tag names or attributes</learning>
+      <learning>Maintain proper tag nesting and closure</learning>
+      <learning>Keep href and other attributes unchanged unless localizing URLs</learning>
+    </key_learnings>
+  </example>
+
+  <example name="add_pluralization_rules">
+    <description>
+      Add proper pluralization for a new feature across multiple languages
+    </description>
+    <scenario>
+      File count display needs proper plural forms in different languages
+    </scenario>
+
+    <workflow>
+      <step number="1">
+        <title>Add English Pluralization</title>
+        <tool>apply_diff</tool>
+        <action><![CDATA[
+<apply_diff>
+<path>medialake_user_interface/src/i18n/locales/en.ts</path>
+<diff>
+<<<<<<< SEARCH
+:start_line:75
+-------
+    noAssetsFound: "No assets found for this connector",
+=======
+    noAssetsFound: "No assets found for this connector",
+    fileCount: "{{count}} file" | "{{count}} files",
+    folderCount: "{{count}} folder" | "{{count}} folders",
+>>>>>>> REPLACE
+</diff>
+</apply_diff>
+        ]]></action>
+      </step>
+
+      <step number="2">
+        <title>Add Spanish Pluralization</title>
+        <tool>apply_diff</tool>
+        <action><![CDATA[
+<apply_diff>
+<path>medialake_user_interface/src/i18n/locales/es.ts</path>
+<diff>
+<<<<<<< SEARCH
+:start_line:75
+-------
+    noAssetsFound: "No se encontraron activos para este conector",
+=======
+    noAssetsFound: "No se encontraron activos para este conector",
+    fileCount: "{{count}} archivo" | "{{count}} archivos",
+    folderCount: "{{count}} carpeta" | "{{count}} carpetas",
+>>>>>>> REPLACE
+</diff>
+</apply_diff>
+        ]]></action>
+      </step>
+
+      <step number="3">
+        <title>Add Russian Pluralization (Multiple Forms)</title>
+        <tool>apply_diff</tool>
+        <action><![CDATA[
+<apply_diff>
+<path>medialake_user_interface/src/i18n/locales/ru.ts</path>
+<diff>
+<<<<<<< SEARCH
+:start_line:75
+-------
+    noAssetsFound: "Активы для этого коннектора не найдены",
+=======
+    noAssetsFound: "Активы для этого коннектора не найдены",
+    fileCount: "{{count}} файл" | "{{count}} файла" | "{{count}} файлов",
+    folderCount: "{{count}} папка" | "{{count}} папки" | "{{count}} папок",
+>>>>>>> REPLACE
+</diff>
+</apply_diff>
+        ]]></action>
+        <note>Russian requires three plural forms based on count</note>
+      </step>
+    </workflow>
+
+    <key_learnings>
+      <learning>Different languages have different pluralization rules</learning>
+      <learning>English uses 2 forms, Russian uses 3, Arabic uses 6</learning>
+      <learning>Use pipe character to separate plural forms</learning>
+      <learning>Include {{count}} variable in all forms</learning>
+    </key_learnings>
+  </example>
+
+  <example name="validate_translation_completeness">
+    <description>
+      Check all language files for completeness and consistency
+    </description>
+    <scenario>
+      After adding many features, ensure all languages are up to date
+    </scenario>
+
+    <workflow>
+      <step number="1">
+        <title>List All Language Files</title>
+        <tool>list_files</tool>
+        <action><![CDATA[
+<list_files>
+<path>medialake_user_interface/src/i18n/locales</path>
+<recursive>false</recursive>
+</list_files>
+        ]]></action>
+      </step>
+
+      <step number="2">
+        <title>Count Keys in Base Language</title>
+        <tool>search_files</tool>
+        <action><![CDATA[
+<search_files>
+<path>medialake_user_interface/src/i18n/locales/en.ts</path>
+<regex>^\s+\w+:\s*["{]</regex>
+</search_files>
+        ]]></action>
+        <purpose>Establish baseline key count</purpose>
+      </step>
+
+      <step number="3">
+        <title>Compare Key Counts in Other Languages</title>
+        <tool>search_files</tool>
+        <action><![CDATA[
+<search_files>
+<path>medialake_user_interface/src/i18n/locales</path>
+<regex>^\s+\w+:\s*["{]</regex>
+<file_pattern>*.ts</file_pattern>
+</search_files>
+        ]]></action>
+        <purpose>Find files with different key counts</purpose>
+      </step>
+
+      <step number="4">
+        <title>Search for Untranslated Content</title>
+        <tool>search_files</tool>
+        <action><![CDATA[
+<search_files>
+<path>medialake_user_interface/src/i18n/locales/es.ts</path>
+<regex>:\s*"[A-Z][a-z]+\s+[A-Z]</regex>
+</search_files>
+        ]]></action>
+        <purpose>Find English-looking text in Spanish file</purpose>
+        <note>Adjust regex pattern for each language's capitalization rules</note>
+      </step>
+
+      <step number="5">
+        <title>Verify Interpolation Variables</title>
+        <tool>search_files</tool>
+        <action><![CDATA[
+<search_files>
+<path>medialake_user_interface/src/i18n/locales</path>
+<regex>\{\{[^}]+\}\}</regex>
+<file_pattern>*.ts</file_pattern>
+</search_files>
+        ]]></action>
+        <purpose>Ensure variable names are consistent across files</purpose>
+      </step>
+    </workflow>
+
+    <validation_report>
+      <report_structure>
+        Language: Spanish (es.ts)
+        Total Keys: 487
+        Missing Keys: 0
+        Possible Untranslated: 3
+        Interpolation Issues: 0
+        Status: Needs Review
+
+        Issues Found:
+        - Line 234: "Delete" appears to be in English
+        - Line 456: "Loading..." might need translation
+        - Line 789: Check capitalization of "API"
+      </report_structure>
+    </validation_report>
+
+    <key_learnings>
+      <learning>Use search patterns to count and compare keys</learning>
+      <learning>Regular validation prevents drift between languages</learning>
+      <learning>Automated checks catch common issues</learning>
+      <learning>Create reports to track translation completeness</learning>
+    </key_learnings>
+  </example>
+
+  <example name="translate_markdown_documentation">
+    <description>
+      Translate markdown documentation while preserving formatting and code blocks
+    </description>
+    <scenario>
+      README.md needs to be translated to Spanish as README.es.md
+    </scenario>
+
+    <workflow>
+      <step number="1">
+        <title>Read Original Documentation</title>
+        <tool>read_file</tool>
+        <action><![CDATA[
+<read_file>
+<args>
+  <file>
+    <path>docs/user-guide.md</path>
+  </file>
+</args>
+</read_file>
+        ]]></action>
+      </step>
+
+      <step number="2">
+        <title>Create Spanish Version</title>
+        <tool>write_to_file</tool>
+        <action><![CDATA[
+<write_to_file>
+<path>docs/user-guide.es.md</path>
+<content>
+# Guía del Usuario
+
+## Introducción
+
+Esta guía explica cómo usar MediaLake para gestionar sus activos multimedia.
+
+## Primeros Pasos
+
+### Instalación
+
+```bash
+npm install medialake
+```
+
+### Configuración Básica
+
+Para configurar MediaLake, siga estos pasos:
+
+1. Abra el archivo de configuración
+2. Configure sus credenciales de AWS
+3. Especifique las regiones deseadas
+
+```javascript
+const config = {
+  region: 'us-east-1',
+  bucket: 'my-media-bucket'
+};
+```
+
+## Características Principales
+
+### Gestión de Activos
+
+MediaLake permite:
+
+- Cargar archivos multimedia
+- Organizar contenido en colecciones
+- Buscar usando metadatos
+
+Para más información, visite nuestra [documentación completa](https://docs.medialake.com).
