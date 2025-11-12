@@ -387,6 +387,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                     "lambda:UpdateFunctionConfiguration",
                     "lambda:GetFunctionConfiguration",
                     "lambda:ListEventSourceMappings",
+                    "lambda:DeleteEventSourceMapping",  # For deleting SQS-Lambda connections
                     "lambda:DeleteFunction",  # For rollback
                 ],
                 resources=["*"],
