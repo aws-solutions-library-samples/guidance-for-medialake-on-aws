@@ -1,0 +1,606 @@
+<i18n_tool_usage>
+  <overview>
+    Specific guidance for using available tools effectively during i18n and translation tasks.
+    This guide helps you choose the right tool for each step of the workflow.
+  </overview>
+
+  <tool_selection_priority>
+    <priority level="1">
+      <tool>read_file</tool>
+      <when>Start of any task - understand existing structure</when>
+      <why>Essential context before making any changes</why>
+    </priority>
+    <priority level="2">
+      <tool>list_files</tool>
+      <when>Need to find all language files</when>
+      <why>Discover all translation files that need attention</why>
+    </priority>
+    <priority level="3">
+      <tool>search_files</tool>
+      <when>Looking for specific keys or translation patterns</when>
+      <why>Find how terms are translated elsewhere for consistency</why>
+    </priority>
+    <priority level="4">
+      <tool>apply_diff</tool>
+      <when>Making targeted edits to existing translations</when>
+      <why>Surgical edits preserve formatting and are efficient</why>
+    </priority>
+    <priority level="5">
+      <tool>write_to_file</tool>
+      <when>Creating new language files or complete rewrites</when>
+      <why>Best for new files or when restructuring entirely</why>
+    </priority>
+  </tool_selection_priority>
+
+  <tool_specific_guidance>
+    <tool name="read_file">
+      <purpose>Read translation files to understand structure and content</purpose>
+      <best_practices>
+        <practice>Always read the base language file (en.ts) first</practice>
+        <practice>Read target language files to understand current state</practice>
+        <practice>Use line ranges for large files to focus on specific sections</practice>
+        <practice>Read multiple related files to understand consistency</practice>
+      </best_practices>
+      <when_to_use>
+        <scenario>Starting a translation task</scenario>
+        <scenario>Before making any modifications</scenario>
+        <scenario>Verifying file structure</scenario>
+        <scenario>Understanding existing translation patterns</scenario>
+      </when_to_use>
+      <examples>
+        <example type="read_base_language">
+          <description>Read the English base file</description>
+          <code><![CDATA[
+<read_file>
+<args>
+  <file>
+    <path>medialake_user_interface/src/i18n/locales/en.ts</path>
+  </file>
+</args>
+</read_file>
+          ]]></code>
+        </example>
+        <example type="read_specific_section">
+          <description>Read specific lines to check a section</description>
+          <code><![CDATA[
+<read_file>
+<args>
+  <file>
+    <path>medialake_user_interface/src/i18n/locales/es.ts</path>
+    <line_range>100-200</line_range>
+  </file>
+</args>
+</read_file>
+          ]]></code>
+        </example>
+      </examples>
+      <important_notes>
+        <note>Read files one at a time - multiple file reads are disabled</note>
+        <note>Use line ranges efficiently for large files</note>
+        <note>Always confirm file structure before editing</note>
+      </important_notes>
+    </tool>
+
+    <tool name="list_files">
+      <purpose>Discover all language files in i18n directories</purpose>
+      <best_practices>
+        <practice>Use recursive listing to find all locales</practice>
+        <practice>Identify which languages are currently supported</practice>
+        <practice>Check for consistent file naming across languages</practice>
+      </best_practices>
+      <when_to_use>
+        <scenario>Starting a project-wide translation sync</scenario>
+        <scenario>Discovering which languages exist</scenario>
+        <scenario>Finding all i18n-related files</scenario>
+        <scenario>Verifying file organization</scenario>
+      </when_to_use>
+      <examples>
+        <example type="list_locales">
+          <description>List all locale files</description>
+          <code><![CDATA[
+<list_files>
+<path>medialake_user_interface/src/i18n/locales</path>
+<recursive>false</recursive>
+</list_files>
+          ]]></code>
+        </example>
+        <example type="list_all_i18n">
+          <description>List entire i18n directory structure</description>
+          <code><![CDATA[
+<list_files>
+<path>medialake_user_interface/src/i18n</path>
+<recursive>true</recursive>
+</list_files>
+          ]]></code>
+        </example>
+      </examples>
+    </tool>
+
+    <tool name="search_files">
+      <purpose>Find specific translation keys or patterns across files</purpose>
+      <best_practices>
+        <practice>Search for existing translations of similar terms</practice>
+        <practice>Verify key consistency across language files</practice>
+        <practice>Find all occurrences of a specific key</practice>
+        <practice>Use regex patterns to find translation patterns</practice>
+      </best_practices>
+      <when_to_use>
+        <scenario>Finding how a term was translated elsewhere</scenario>
+        <scenario>Checking if a key exists across all languages</scenario>
+        <scenario>Identifying missing translations</scenario>
+        <scenario>Finding interpolation or pluralization patterns</scenario>
+      </when_to_use>
+      <examples>
+        <example type="find_key">
+          <description>Find a specific translation key in all files</description>
+          <code><![CDATA[
+<search_files>
+<path>medialake_user_interface/src/i18n/locales</path>
+<regex>userProfile.*title</regex>
+<file_pattern>*.ts</file_pattern>
+</search_files>
+          ]]></code>
+        </example>
+        <example type="find_interpolation">
+          <description>Find all interpolation patterns</description>
+          <code><![CDATA[
+<search_files>
+<path>medialake_user_interface/src/i18n/locales</path>
+<regex>\{\{[^}]+\}\}</regex>
+<file_pattern>*.ts</file_pattern>
+</search_files>
+          ]]></code>
+        </example>
+        <example type="find_missing_translations">
+          <description>Find English text that might not be translated</description>
+          <code><![CDATA[
+<search_files>
+<path>medialake_user_interface/src/i18n/locales/es.ts</path>
+<regex>: ".*[A-Z].*"</regex>
+</search_files>
+          ]]></code>
+        </example>
+      </examples>
+      <regex_patterns>
+        <pattern use="find_keys_with_variables">
+          <regex>\{\{.*?\}\}</regex>
+          <description>Find all interpolation variables</description>
+        </pattern>
+        <pattern use="find_html_content">
+          <regex>&lt;[^&gt;]+&gt;</regex>
+          <description>Find translations with HTML tags</description>
+        </pattern>
+        <pattern use="find_plurals">
+          <regex>"\s*\|\s*"</regex>
+          <description>Find pluralization patterns</description>
+        </pattern>
+      </regex_patterns>
+    </tool>
+
+    <tool name="apply_diff">
+      <purpose>Make precise, targeted modifications to translation files</purpose>
+      <best_practices>
+        <practice>Use for surgical edits to existing translations</practice>
+        <practice>Make multiple changes in one diff when related</practice>
+        <practice>Always include accurate line numbers</practice>
+        <practice>Preserve exact spacing and indentation</practice>
+        <practice>Read file first to ensure exact content match</practice>
+      </best_practices>
+      <when_to_use>
+        <scenario>Updating specific translation values</scenario>
+        <scenario>Adding new keys to existing sections</scenario>
+        <scenario>Fixing translation errors</scenario>
+        <scenario>Synchronizing keys across languages</scenario>
+      </when_to_use>
+      <examples>
+        <example type="update_translation">
+          <description>Update a single translation value</description>
+          <code><![CDATA[
+<apply_diff>
+<path>medialake_user_interface/src/i18n/locales/es.ts</path>
+<diff>
+<<<<<<< SEARCH
+:start_line:45
+-------
+    welcome: "Bienvenida",
+=======
+    welcome: "Bienvenido",
+>>>>>>> REPLACE
+</diff>
+</apply_diff>
+          ]]></code>
+        </example>
+        <example type="add_new_key">
+          <description>Add a new translation key to existing section</description>
+          <code><![CDATA[
+<apply_diff>
+<path>medialake_user_interface/src/i18n/locales/fr.ts</path>
+<diff>
+<<<<<<< SEARCH
+:start_line:100
+-------
+    save: "Enregistrer",
+    cancel: "Annuler",
+  },
+=======
+    save: "Enregistrer",
+    cancel: "Annuler",
+    delete: "Supprimer",
+  },
+>>>>>>> REPLACE
+</diff>
+</apply_diff>
+          ]]></code>
+        </example>
+        <example type="multiple_edits">
+          <description>Make multiple related changes</description>
+          <code><![CDATA[
+<apply_diff>
+<path>medialake_user_interface/src/i18n/locales/de.ts</path>
+<diff>
+<<<<<<< SEARCH
+:start_line:50
+-------
+    title: "Benutzer",
+=======
+    title: "Benutzerprofil",
+>>>>>>> REPLACE
+
+<<<<<<< SEARCH
+:start_line:75
+-------
+    save: "Speichern",
+=======
+    save: "Änderungen speichern",
+>>>>>>> REPLACE
+</diff>
+</apply_diff>
+          ]]></code>
+        </example>
+      </examples>
+      <critical_rules>
+        <rule>SEARCH content must match file exactly, including whitespace</rule>
+        <rule>Always include :start_line: number</rule>
+        <rule>Use single ======= line between SEARCH and REPLACE</rule>
+        <rule>Read file first if uncertain about exact content</rule>
+        <rule>Multiple SEARCH/REPLACE blocks in one diff for efficiency</rule>
+      </critical_rules>
+    </tool>
+
+    <tool name="write_to_file">
+      <purpose>Create new translation files or perform complete file rewrites</purpose>
+      <best_practices>
+        <practice>Use for creating new language files</practice>
+        <practice>Provide complete file content - never truncate</practice>
+        <practice>Maintain consistent structure with other language files</practice>
+        <practice>Include proper export format</practice>
+        <practice>Count lines accurately</practice>
+      </best_practices>
+      <when_to_use>
+        <scenario>Creating a new language file</scenario>
+        <scenario>Complete file restructure (rare)</scenario>
+        <scenario>Generating initial translation from template</scenario>
+      </when_to_use>
+      <when_not_to_use>
+        <scenario>Making small edits (use apply_diff instead)</scenario>
+        <scenario>Adding single keys (use apply_diff or insert_content)</scenario>
+        <scenario>Files larger than a few hundred lines (use apply_diff)</scenario>
+      </when_not_to_use>
+      <examples>
+        <example type="create_new_language">
+          <description>Create a new Italian translation file</description>
+          <code><![CDATA[
+<write_to_file>
+<path>medialake_user_interface/src/i18n/locales/it.ts</path>
+<content>
+export default {
+  languages: {
+    english: "Inglese",
+    italian: "Italiano",
+  },
+  common: {
+    save: "Salva",
+    cancel: "Annulla",
+    delete: "Elimina",
+  },
+  // ... complete file content
+};
+          ]]></code>
+        </example>
+      </examples>
+    </tool>
+
+    <tool name="ask_followup_question">
+      <purpose>Request clarification or additional information from user</purpose>
+      <best_practices>
+        <practice>Ask when translation context is ambiguous</practice>
+        <practice>Provide 2-4 specific, actionable suggestions</practice>
+        <practice>Make suggestions complete (no placeholders)</practice>
+        <practice>Order suggestions by likelihood or importance</practice>
+      </best_practices>
+      <when_to_use>
+        <scenario>Uncertain which language to translate to</scenario>
+        <scenario>Multiple valid translation options exist</scenario>
+        <scenario>Need clarification on terminology</scenario>
+        <scenario>Missing context for proper translation</scenario>
+      </when_to_use>
+      <examples>
+        <example type="language_selection">
+          <description>Ask which language to translate to</description>
+          <code><![CDATA[
+<ask_followup_question>
+<question>Which language should I translate the i18n file to?</question>
+<follow_up>
+<suggest>Spanish (es.ts)</suggest>
+<suggest>French (fr.ts)</suggest>
+<suggest>German (de.ts)</suggest>
+<suggest>All available languages (es, fr, de, pt, zh, ja, ko, ar, he, hi)</suggest>
+</follow_up>
+</ask_followup_question>
+          ]]></code>
+        </example>
+        <example type="terminology_clarification">
+          <description>Clarify ambiguous terminology</description>
+          <code><![CDATA[
+<ask_followup_question>
+<question>The term "assets" appears in multiple contexts. How should it be translated in Spanish?</question>
+<follow_up>
+<suggest>Use "activos" (business/financial assets)</suggest>
+<suggest>Use "recursos" (media/digital resources)</suggest>
+<suggest>Use "archivos" (files/documents)</suggest>
+</follow_up>
+</ask_followup_question>
+          ]]></code>
+        </example>
+      </examples>
+    </tool>
+
+    <tool name="execute_command">
+      <purpose>Run commands for validation or testing</purpose>
+      <best_practices>
+        <practice>Validate TypeScript/JavaScript syntax</practice>
+        <practice>Run linters to check code quality</practice>
+        <practice>Test that files can be imported</practice>
+      </best_practices>
+      <when_to_use>
+        <scenario>Verify syntax after changes</scenario>
+        <scenario>Run i18n validation scripts</scenario>
+        <scenario>Check for missing translations</scenario>
+      </when_to_use>
+      <examples>
+        <example type="syntax_check">
+          <description>Validate TypeScript syntax</description>
+          <code><![CDATA[
+<execute_command>
+<command>npx tsc --noEmit medialake_user_interface/src/i18n/locales/es.ts</command>
+</execute_command>
+          ]]></code>
+        </example>
+      </examples>
+    </tool>
+  </tool_specific_guidance>
+
+  <workflow_tool_sequences>
+    <sequence name="complete_file_translation">
+      <description>Translate an entire i18n file to a new language</description>
+      <steps>
+        <step number="1">
+          <tool>read_file</tool>
+          <action>Read source language file (en.ts)</action>
+          <rationale>Understand complete structure and all keys</rationale>
+        </step>
+        <step number="2">
+          <tool>write_to_file</tool>
+          <action>Create target language file with translations</action>
+          <rationale>Most efficient for complete new file</rationale>
+        </step>
+        <step number="3">
+          <tool>read_file</tool>
+          <action>Read created file to verify</action>
+          <rationale>Confirm file was created correctly</rationale>
+        </step>
+      </steps>
+    </sequence>
+
+    <sequence name="add_keys_to_all_languages">
+      <description>Add new translation keys across all language files</description>
+      <steps>
+        <step number="1">
+          <tool>list_files</tool>
+          <action>List all locale files</action>
+          <rationale>Identify all languages that need updates</rationale>
+        </step>
+        <step number="2">
+          <tool>read_file</tool>
+          <action>Read each language file to find insertion point</action>
+          <rationale>Determine exact location for new keys</rationale>
+        </step>
+        <step number="3">
+          <tool>apply_diff</tool>
+          <action>Add new keys to each language file</action>
+          <rationale>Surgical edit maintains formatting</rationale>
+        </step>
+      </steps>
+    </sequence>
+
+    <sequence name="sync_missing_keys">
+      <description>Synchronize missing keys across language files</description>
+      <steps>
+        <step number="1">
+          <tool>read_file</tool>
+          <action>Read base language file</action>
+          <rationale>Get complete list of all keys</rationale>
+        </step>
+        <step number="2">
+          <tool>list_files</tool>
+          <action>List all language files</action>
+          <rationale>Identify files to check</rationale>
+        </step>
+        <step number="3">
+          <tool>read_file</tool>
+          <action>Read each target language file</action>
+          <rationale>Compare keys with base</rationale>
+        </step>
+        <step number="4">
+          <tool>apply_diff</tool>
+          <action>Add missing keys with translations</action>
+          <rationale>Fill in gaps efficiently</rationale>
+        </step>
+      </steps>
+    </sequence>
+
+    <sequence name="validate_translations">
+      <description>Check translation files for completeness and correctness</description>
+      <steps>
+        <step number="1">
+          <tool>list_files</tool>
+          <action>Find all language files</action>
+        </step>
+        <step number="2">
+          <tool>read_file</tool>
+          <action>Read each file to check structure</action>
+        </step>
+        <step number="3">
+          <tool>search_files</tool>
+          <action>Search for common issues (missing variables, HTML problems)</action>
+        </step>
+        <step number="4">
+          <tool>execute_command</tool>
+          <action>Run syntax validation</action>
+        </step>
+      </steps>
+    </sequence>
+
+    <sequence name="update_existing_translations">
+      <description>Update existing translation values</description>
+      <steps>
+        <step number="1">
+          <tool>search_files</tool>
+          <action>Find the keys that need updating</action>
+          <rationale>Locate exact positions in files</rationale>
+        </step>
+        <step number="2">
+          <tool>read_file</tool>
+          <action>Read context around the keys</action>
+          <rationale>Understand current values</rationale>
+        </step>
+        <step number="3">
+          <tool>apply_diff</tool>
+          <action>Update translation values</action>
+          <rationale>Make precise targeted changes</rationale>
+        </step>
+      </steps>
+    </sequence>
+  </workflow_tool_sequences>
+
+  <efficiency_strategies>
+    <strategy name="batch_similar_changes">
+      <description>Group similar changes into single tool uses</description>
+      <technique>Use multiple SEARCH/REPLACE blocks in one apply_diff</technique>
+      <benefit>Reduces number of tool calls and file operations</benefit>
+    </strategy>
+
+    <strategy name="read_once_edit_many">
+      <description>Read file once, plan all changes, make them together</description>
+      <technique>Analyze entire file before making any edits</technique>
+      <benefit>Avoid multiple read-edit cycles</benefit>
+    </strategy>
+
+    <strategy name="pattern_reuse">
+      <description>Use search_files to find existing translation patterns</description>
+      <technique>Search for similar keys to maintain consistency</technique>
+      <benefit>Ensures consistent terminology and style</benefit>
+    </strategy>
+
+    <strategy name="validate_early">
+      <description>Validate structure before extensive changes</description>
+      <technique>Check file syntax and structure at start</technique>
+      <benefit>Avoid wasted effort on malformed files</benefit>
+    </strategy>
+  </efficiency_strategies>
+
+  <common_mistakes>
+    <mistake name="not_reading_first">
+      <description>Making changes without reading file first</description>
+      <consequence>Incorrect line numbers, wrong content in SEARCH blocks</consequence>
+      <solution>Always read file before using apply_diff</solution>
+    </mistake>
+
+    <mistake name="truncating_write_to_file">
+      <description>Using placeholders in write_to_file content</description>
+      <consequence>Corrupted files with missing content</consequence>
+      <solution>Provide complete file content always</solution>
+    </mistake>
+
+    <mistake name="wrong_tool_choice">
+      <description>Using write_to_file for small edits</description>
+      <consequence>Inefficient, risk of errors</consequence>
+      <solution>Use apply_diff for targeted changes</solution>
+    </mistake>
+
+    <mistake name="missing_line_numbers">
+      <description>Not including :start_line: in apply_diff</description>
+      <consequence>Diff fails to apply correctly</consequence>
+      <solution>Always include accurate line numbers</solution>
+    </mistake>
+
+    <mistake name="inexact_search">
+      <description>SEARCH block doesn't match file exactly</description>
+      <consequence>Diff fails to apply</consequence>
+      <solution>Copy exact content including whitespace</solution>
+    </mistake>
+  </common_mistakes>
+
+  <troubleshooting>
+    <issue name="apply_diff_fails">
+      <symptoms>Diff doesn't apply, file unchanged</symptoms>
+      <causes>
+        <cause>SEARCH content doesn't match exactly</cause>
+        <cause>Wrong line number</cause>
+        <cause>File was modified since last read</cause>
+      </causes>
+      <solutions>
+        <solution>Read file again to get current content</solution>
+        <solution>Copy exact content for SEARCH block</solution>
+        <solution>Check whitespace and indentation</solution>
+      </solutions>
+    </issue>
+
+    <issue name="syntax_error_after_change">
+      <symptoms>File has syntax errors after modification</symptoms>
+      <causes>
+        <cause>Missing comma or bracket</cause>
+        <cause>Incorrect nesting</cause>
+        <cause>Unescaped quotes</cause>
+      </causes>
+      <solutions>
+        <solution>Use execute_command to run syntax checker</solution>
+        <solution>Read file to identify error location</solution>
+        <solution>Fix syntax with apply_diff</solution>
+      </solutions>
+    </issue>
+
+    <issue name="translations_not_loading">
+      <symptoms>Translations don't appear in application</symptoms>
+      <causes>
+        <cause>File not imported correctly</cause>
+        <cause>Export format wrong</cause>
+        <cause>Syntax errors in file</cause>
+      </causes>
+      <solutions>
+        <solution>Verify export format matches other files</solution>
+        <solution>Check import statements in main i18n config</solution>
+        <solution>Validate file syntax</solution>
+      </solutions>
+    </issue>
+  </troubleshooting>
+
+  <performance_tips>
+    <tip>Read files strategically - don't re-read unnecessarily</tip>
+    <tip>Combine related edits into single apply_diff</tip>
+    <tip>Use search_files to quickly locate keys across multiple files</tip>
+    <tip>Plan all changes before starting edits</tip>
+    <tip>Use line ranges to read only needed sections of large files</tip>
+    <tip>Validate once at end rather than after each change</tip>
+  </performance_tips>
+</i18n_tool_usage>

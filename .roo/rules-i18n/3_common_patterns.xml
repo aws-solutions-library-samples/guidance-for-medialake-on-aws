@@ -1,0 +1,567 @@
+<i18n_common_patterns>
+  <overview>
+    Common code patterns and examples for working with i18n translation files.
+    These patterns demonstrate proper structure and techniques for various translation scenarios.
+  </overview>
+
+  <file_structures>
+    <structure type="typescript_export">
+      <description>TypeScript file with default export (most common in React projects)</description>
+      <template><![CDATA[
+export default {
+  section: {
+    key1: "Translation value 1",
+    key2: "Translation value 2",
+    nested: {
+      deepKey: "Nested translation"
+    }
+  }
+};
+      ]]></template>
+      <usage>Used in React/TypeScript projects with i18next or similar</usage>
+    </structure>
+
+    <structure type="javascript_module">
+      <description>JavaScript file with module.exports</description>
+      <template><![CDATA[
+module.exports = {
+  section: {
+    key1: "Translation value 1",
+    key2: "Translation value 2"
+  }
+};
+      ]]></template>
+      <usage>Used in Node.js or older JavaScript projects</usage>
+    </structure>
+
+    <structure type="json">
+      <description>Pure JSON translation file</description>
+      <template><![CDATA[
+{
+  "section": {
+    "key1": "Translation value 1",
+    "key2": "Translation value 2"
+  }
+}
+      ]]></template>
+      <usage>Simple projects or static translation files</usage>
+    </structure>
+  </file_structures>
+
+  <interpolation_patterns>
+    <pattern type="basic_variable">
+      <description>Simple variable interpolation</description>
+      <examples>
+        <example language="en">
+          <code>welcome: "Welcome, {{username}}!"</code>
+        </example>
+        <example language="es">
+          <code>welcome: "¡Bienvenido, {{username}}!"</code>
+        </example>
+        <example language="fr">
+          <code>welcome: "Bienvenue, {{username}} !"</code>
+          <note>Note the space before the exclamation mark in French</note>
+        </example>
+      </examples>
+      <rules>
+        <rule>Variable names must remain unchanged across all languages</rule>
+        <rule>Maintain spacing around variables for readability</rule>
+        <rule>Variable position can change to match target language grammar</rule>
+      </rules>
+    </pattern>
+
+    <pattern type="multiple_variables">
+      <description>Multiple variables in a single string</description>
+      <examples>
+        <example language="en">
+          <code>userStats: "{{userName}} has {{fileCount}} files and {{folderCount}} folders"</code>
+        </example>
+        <example language="es">
+          <code>userStats: "{{userName}} tiene {{fileCount}} archivos y {{folderCount}} carpetas"</code>
+        </example>
+        <example language="de">
+          <code>userStats: "{{userName}} hat {{fileCount}} Dateien und {{folderCount}} Ordner"</code>
+        </example>
+      </examples>
+      <rules>
+        <rule>All variables must be present in translation</rule>
+        <rule>Order can change to fit target language grammar</rule>
+        <rule>Never add or remove variables</rule>
+      </rules>
+    </pattern>
+
+    <pattern type="formatted_values">
+      <description>Variables with formatting hints</description>
+      <examples>
+        <example language="en">
+          <code>lastModified: "Last modified: {{date, datetime}}"</code>
+        </example>
+        <example language="es">
+          <code>lastModified: "Última modificación: {{date, datetime}}"</code>
+        </example>
+      </examples>
+      <rules>
+        <rule>Preserve formatting parameters (datetime, number, etc.)</rule>
+        <rule>Do not translate formatting type names</rule>
+      </rules>
+    </pattern>
+  </interpolation_patterns>
+
+  <pluralization_patterns>
+    <pattern type="simple_plural">
+      <description>Basic pluralization (English-style)</description>
+      <examples>
+        <example language="en">
+          <code>itemCount: "{{count}} item" | "{{count}} items"</code>
+        </example>
+        <example language="es">
+          <code>itemCount: "{{count}} artículo" | "{{count}} artículos"</code>
+        </example>
+      </examples>
+      <syntax>
+        <separator>Use pipe (|) to separate singular and plural forms</separator>
+        <variable>Include {{count}} variable in both forms</variable>
+      </syntax>
+    </pattern>
+
+    <pattern type="zero_one_many">
+      <description>Three-form pluralization</description>
+      <examples>
+        <example language="en">
+          <code>notifications: "No notifications" | "1 notification" | "{{count}} notifications"</code>
+        </example>
+        <example language="ru">
+          <code>notifications: "Нет уведомлений" | "{{count}} уведомление" | "{{count}} уведомления" | "{{count}} уведомлений"</code>
+          <note>Russian has four forms based on count ending</note>
+        </example>
+      </examples>
+    </pattern>
+
+    <pattern type="contextual_plural">
+      <description>Pluralization with different contexts</description>
+      <examples>
+        <example>
+          <code><![CDATA[
+files: {
+  count_zero: "No files",
+  count_one: "One file",
+  count_other: "{{count}} files"
+}
+          ]]></code>
+        </example>
+      </examples>
+    </pattern>
+  </pluralization_patterns>
+
+  <html_content_patterns>
+    <pattern type="inline_html">
+      <description>HTML tags within translation strings</description>
+      <examples>
+        <example language="en">
+          <code>helpText: "Click &lt;strong&gt;Save&lt;/strong&gt; to continue"</code>
+        </example>
+        <example language="es">
+          <code>helpText: "Haz clic en &lt;strong&gt;Guardar&lt;/strong&gt; para continuar"</code>
+        </example>
+        <example language="fr">
+          <code>helpText: "Cliquez sur &lt;strong&gt;Enregistrer&lt;/strong&gt; pour continuer"</code>
+        </example>
+      </examples>
+      <rules>
+        <rule>Preserve all HTML tags exactly</rule>
+        <rule>Translate only text content, not tag names or attributes</rule>
+        <rule>Maintain proper tag nesting</rule>
+      </rules>
+    </pattern>
+
+    <pattern type="links">
+      <description>Links and anchors in translations</description>
+      <examples>
+        <example language="en">
+          <code>termsText: "By signing up, you agree to our &lt;a href='/terms'&gt;Terms of Service&lt;/a&gt;"</code>
+        </example>
+        <example language="es">
+          <code>termsText: "Al registrarte, aceptas nuestros &lt;a href='/terms'&gt;Términos de Servicio&lt;/a&gt;"</code>
+        </example>
+      </examples>
+      <rules>
+        <rule>Keep href attributes unchanged unless they point to localized pages</rule>
+        <rule>Translate link text content</rule>
+        <rule>Preserve tag structure</rule>
+      </rules>
+    </pattern>
+
+    <pattern type="complex_html">
+      <description>Multiple HTML elements and nesting</description>
+      <examples>
+        <example language="en">
+          <code><![CDATA[richContent: "For help, visit our &lt;a href='/help'&gt;Help Center&lt;/a&gt; or &lt;strong&gt;contact support&lt;/strong&gt;"]]></code>
+        </example>
+        <example language="es">
+          <code><![CDATA[richContent: "Para ayuda, visita nuestro &lt;a href='/help'&gt;Centro de Ayuda&lt;/a&gt; o &lt;strong&gt;contacta soporte&lt;/strong&gt;"]]></code>
+        </example>
+      </examples>
+    </pattern>
+  </html_content_patterns>
+
+  <nested_structures>
+    <pattern type="feature_grouping">
+      <description>Group related translations by feature</description>
+      <example><![CDATA[
+export default {
+  userProfile: {
+    title: "User Profile",
+    sections: {
+      personal: "Personal Information",
+      security: "Security Settings",
+      preferences: "Preferences"
+    },
+    actions: {
+      save: "Save Changes",
+      cancel: "Cancel",
+      delete: "Delete Account"
+    },
+    messages: {
+      saveSuccess: "Profile updated successfully",
+      saveError: "Failed to update profile",
+      deleteConfirm: "Are you sure you want to delete your account?"
+    }
+  }
+};
+      ]]></example>
+      <benefits>
+        <benefit>Logical organization</benefit>
+        <benefit>Easy to find related translations</benefit>
+        <benefit>Prevents naming conflicts</benefit>
+      </benefits>
+    </pattern>
+
+    <pattern type="ui_element_grouping">
+      <description>Group by UI element type</description>
+      <example><![CDATA[
+export default {
+  buttons: {
+    submit: "Submit",
+    cancel: "Cancel",
+    save: "Save",
+    delete: "Delete"
+  },
+  labels: {
+    username: "Username",
+    email: "Email Address",
+    password: "Password" // pragma: allowlist secret
+  },
+  placeholders: {
+    searchFiles: "Search files...",
+    enterName: "Enter your name"
+  },
+  messages: {
+    success: "Operation completed successfully",
+    error: "An error occurred",
+    loading: "Loading..."
+  }
+};
+      ]]></example>
+    </pattern>
+
+    <pattern type="mixed_nesting">
+      <description>Combining multiple organizational approaches</description>
+      <example><![CDATA[
+export default {
+  settings: {
+    title: "Settings",
+    tabs: {
+      general: "General",
+      security: "Security",
+      notifications: "Notifications"
+    },
+    general: {
+      language: "Language",
+      timezone: "Timezone",
+      theme: "Theme"
+    },
+    notifications: {
+      email: "Email Notifications",
+      push: "Push Notifications",
+      frequency: "Notification Frequency",
+      frequencies: {
+        immediate: "Immediate",
+        daily: "Daily Digest",
+        weekly: "Weekly Summary"
+      }
+    }
+  }
+};
+      ]]></example>
+    </pattern>
+  </nested_structures>
+
+  <form_validation_patterns>
+    <pattern type="field_validation">
+      <description>Form field validation messages</description>
+      <example><![CDATA[
+export default {
+  validation: {
+    required: "This field is required",
+    email: "Please enter a valid email address",
+    minLength: "Must be at least {{min}} characters",
+    maxLength: "Must not exceed {{max}} characters",
+    password: {
+      weak: "Password is too weak",
+      format: "Password must contain letters, numbers, and special characters"
+    }
+  }
+};
+      ]]></example>
+      <translations>
+        <translation language="es"><![CDATA[
+validation: {
+  required: "Este campo es obligatorio",
+  email: "Por favor, ingrese un correo electrónico válido",
+  minLength: "Debe tener al menos {{min}} caracteres",
+  maxLength: "No debe exceder {{max}} caracteres",
+  password: {
+    weak: "La contraseña es demasiado débil",
+    format: "La contraseña debe contener letras, números y caracteres especiales"
+  }
+}
+        ]]></translation>
+      </translations>
+    </pattern>
+
+    <pattern type="error_messages">
+      <description>API and system error messages</description>
+      <example><![CDATA[
+export default {
+  errors: {
+    network: "Network connection failed",
+    unauthorized: "You are not authorized to perform this action",
+    notFound: "The requested resource was not found",
+    serverError: "An unexpected server error occurred",
+    timeout: "Request timed out. Please try again",
+    fileSize: "File size exceeds maximum of {{maxSize}}MB"
+  }
+};
+      ]]></example>
+    </pattern>
+  </form_validation_patterns>
+
+  <datetime_patterns>
+    <pattern type="relative_time">
+      <description>Relative time expressions</description>
+      <example><![CDATA[
+export default {
+  time: {
+    now: "just now",
+    minutesAgo: "{{count}} minute ago" | "{{count}} minutes ago",
+    hoursAgo: "{{count}} hour ago" | "{{count}} hours ago",
+    daysAgo: "{{count}} day ago" | "{{count}} days ago",
+    weeksAgo: "{{count}} week ago" | "{{count}} weeks ago"
+  }
+};
+      ]]></example>
+      <translations>
+        <translation language="es"><![CDATA[
+time: {
+  now: "ahora mismo",
+  minutesAgo: "hace {{count}} minuto" | "hace {{count}} minutos",
+  hoursAgo: "hace {{count}} hora" | "hace {{count}} horas",
+  daysAgo: "hace {{count}} día" | "hace {{count}} días",
+  weeksAgo: "hace {{count}} semana" | "hace {{count}} semanas"
+}
+        ]]></translation>
+      </translations>
+    </pattern>
+
+    <pattern type="date_formats">
+      <description>Date format references in text</description>
+      <example language="en">
+        <code>dateHelp: "Enter date in MM/DD/YYYY format"</code>
+      </example>
+      <example language="es">
+        <code>dateHelp: "Ingrese la fecha en formato DD/MM/YYYY"</code>
+      </example>
+      <example language="de">
+        <code>dateHelp: "Datum im Format TT.MM.JJJJ eingeben"</code>
+      </example>
+      <note>Adapt date format references to match target locale conventions</note>
+    </pattern>
+  </datetime_patterns>
+
+  <api_response_patterns>
+    <pattern type="crud_operations">
+      <description>Standard CRUD operation messages</description>
+      <example><![CDATA[
+export default {
+  apiMessages: {
+    creating: {
+      loading: "Creating item...",
+      success: "Item Created",
+      successMessage: "Item has been successfully created",
+      error: "Item Creation Failed"
+    },
+    updating: {
+      loading: "Updating item...",
+      success: "Item Updated",
+      successMessage: "Item has been successfully updated",
+      error: "Item Update Failed"
+    },
+    deleting: {
+      loading: "Deleting item...",
+      success: "Item Deleted",
+      successMessage: "Item has been successfully deleted",
+      error: "Item Deletion Failed"
+    }
+  }
+};
+      ]]></example>
+    </pattern>
+
+    <pattern type="status_messages">
+      <description>Status and progress messages</description>
+      <example><![CDATA[
+export default {
+  status: {
+    processing: "Processing...",
+    uploading: "Uploading {{fileName}}",
+    progress: "{{percent}}% complete",
+    almostDone: "Almost done...",
+    completed: "Completed successfully",
+    failed: "Operation failed"
+  }
+};
+      ]]></example>
+    </pattern>
+  </api_response_patterns>
+
+  <navigation_patterns>
+    <pattern type="breadcrumbs">
+      <description>Breadcrumb navigation labels</description>
+      <example><![CDATA[
+export default {
+  breadcrumbs: {
+    home: "Home",
+    settings: "Settings",
+    profile: "Profile",
+    security: "Security",
+    back: "Back to {{page}}"
+  }
+};
+      ]]></example>
+    </pattern>
+
+    <pattern type="menu_items">
+      <description>Menu and navigation items</description>
+      <example><![CDATA[
+export default {
+  menu: {
+    home: "Home",
+    dashboard: "Dashboard",
+    assets: "Assets",
+    collections: "Collections",
+    settings: "Settings",
+    help: "Help",
+    logout: "Log Out"
+  }
+};
+      ]]></example>
+    </pattern>
+  </navigation_patterns>
+
+  <action_patterns>
+    <pattern type="button_labels">
+      <description>Common button and action labels</description>
+      <example><![CDATA[
+export default {
+  actions: {
+    save: "Save",
+    cancel: "Cancel",
+    delete: "Delete",
+    edit: "Edit",
+    create: "Create",
+    update: "Update",
+    submit: "Submit",
+    close: "Close",
+    confirm: "Confirm",
+    viewDetails: "View Details",
+    download: "Download",
+    upload: "Upload",
+    share: "Share",
+    copy: "Copy",
+    move: "Move"
+  }
+};
+      ]]></example>
+    </pattern>
+
+    <pattern type="contextual_actions">
+      <description>Context-specific action labels</description>
+      <example><![CDATA[
+export default {
+  assets: {
+    actions: {
+      rename: "Rename Asset",
+      delete: "Delete Asset",
+      addToCollection: "Add to Collection",
+      removeFromCollection: "Remove from Collection",
+      favorite: "Add to Favorites",
+      unfavorite: "Remove from Favorites"
+    }
+  }
+};
+      ]]></example>
+    </pattern>
+  </action_patterns>
+
+  <empty_state_patterns>
+    <pattern type="no_data">
+      <description>Empty state messages</description>
+      <example><![CDATA[
+export default {
+  emptyStates: {
+    noAssets: "No assets found",
+    noResults: "No results match your search",
+    noCollections: "You don't have any collections yet",
+    createFirst: "Create your first {{item}} to get started",
+    noFavorites: "You haven't added any favorites yet"
+  }
+};
+      ]]></example>
+    </pattern>
+  </empty_state_patterns>
+
+  <confirmation_patterns>
+    <pattern type="dialogs">
+      <description>Confirmation dialog patterns</description>
+      <example><![CDATA[
+export default {
+  confirmations: {
+    delete: {
+      title: "Confirm Delete",
+      message: "Are you sure you want to delete {{itemName}}?",
+      warning: "This action cannot be undone",
+      confirm: "Delete",
+      cancel: "Cancel"
+    },
+    unsavedChanges: {
+      title: "Unsaved Changes",
+      message: "You have unsaved changes. Do you want to save them?",
+      save: "Save Changes",
+      discard: "Discard Changes",
+      cancel: "Cancel"
+    }
+  }
+};
+      ]]></example>
+    </pattern>
+  </confirmation_patterns>
+
+  <usage_tips>
+    <tip>Always preserve the exact structure when translating</tip>
+    <tip>Use search_files to find similar patterns in existing files</tip>
+    <tip>Maintain consistent terminology across related keys</tip>
+    <tip>Test interpolation by imagining actual values in place of variables</tip>
+    <tip>Consider text length - some languages require more space</tip>
+    <tip>Keep button labels concise - they need to fit in UI</tip>
+  </usage_tips>
+</i18n_common_patterns>
