@@ -123,8 +123,9 @@
             "operationId": "",
             "method": "map",
             "parameters": {
-              "ConcurrencyLimit": 1,
-              "ItemsPath": "$.payload.externalTaskStatus"
+              "ConcurrencyLimit": 100,
+              "MapType": "Distributed",
+              "ItemsPath": "$.payload.data"
             }
           },
           "id": "map"

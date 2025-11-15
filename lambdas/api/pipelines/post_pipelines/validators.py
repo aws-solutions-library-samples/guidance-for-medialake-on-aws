@@ -251,24 +251,32 @@ class StateMachineValidator:
             )
             return False
 
-        # Validate ItemsPath
-        if "ItemsPath" not in state:
-            logger.warning(
-                f"Map state {state_name} has no ItemsPath, adding default $.payload.data"
-            )
-            state["ItemsPath"] = "$.payload.data"
-        elif not state["ItemsPath"].startswith("$"):
-            logger.warning(
-                f"Map state {state_name} has invalid ItemsPath {state['ItemsPath']}, fixing to $.payload.data"
-            )
-            state["ItemsPath"] = "$.payload.data"
+        # Only validate ItemsPath and Parameters for Inline Maps (not Distributed Maps with ItemReader)
+        has_item_reader = "ItemReader" in state
 
-        # Ensure Parameters exists for fallback mechanism
-        if "Parameters" not in state:
+        if not has_item_reader:
+            # Validate ItemsPath for Inline Maps only
+            if "ItemsPath" not in state:
+                logger.warning(
+                    f"Map state {state_name} has no ItemsPath, adding default $.payload.data"
+                )
+                state["ItemsPath"] = "$.payload.data"
+            elif not state["ItemsPath"].startswith("$"):
+                logger.warning(
+                    f"Map state {state_name} has invalid ItemsPath {state['ItemsPath']}, fixing to $.payload.data"
+                )
+                state["ItemsPath"] = "$.payload.data"
+
+            # Ensure Parameters exists for fallback mechanism (Inline Maps only)
+            if "Parameters" not in state:
+                logger.info(
+                    f"Adding Parameters with InputPath to Map state {state_name} for fallback mechanism"
+                )
+                state["Parameters"] = {"item.$": "$$.Map.Item.Value"}
+        else:
             logger.info(
-                f"Adding Parameters with InputPath to Map state {state_name} for fallback mechanism"
+                f"Skipping ItemsPath and Parameters validation for Distributed Map {state_name} with ItemReader"
             )
-            state["Parameters"] = {"item.$": "$$.Map.Item.Value"}
 
         # Ensure the last state in the Iterator has End: true
         if "States" in iterator:

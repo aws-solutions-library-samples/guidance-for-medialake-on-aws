@@ -1,2 +1,5 @@
 {# embed_task_response.jinja #}
-{{ variables.vectors | jsonify }}
+{
+  "data": {{ variables.data | jsonify }},
+  "distributedMapConfig": {{ variables.distributedMapConfig | jsonify }}
+}

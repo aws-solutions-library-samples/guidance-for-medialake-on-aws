@@ -40,7 +40,7 @@
             "operationId": "",
             "method": "map",
             "parameters": {
-              "ConcurrencyLimit": 1,
+              "ConcurrencyLimit": 100,
               "ItemsPath": "$.payload.externalTaskStatus"
             }
           }

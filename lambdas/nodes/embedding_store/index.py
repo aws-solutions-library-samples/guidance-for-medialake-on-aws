@@ -16,10 +16,14 @@ from typing import Any, Dict, List, Optional, Tuple
 import boto3
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from distributed_map_utils import download_s3_external_payload, is_s3_reference
 from lambda_middleware import lambda_middleware
 from lambda_utils import _truncate_floats
 from nodes_utils import seconds_to_smpte
 from opensearchpy import AWSV4SignerAuth, OpenSearch, RequestsHttpConnection, exceptions
+
+# S3 client for downloading external payloads
+s3_client = boto3.client("s3")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Powertools
@@ -53,7 +57,7 @@ def get_opensearch_client() -> Optional[OpenSearch]:
         use_ssl=True,
         verify_certs=True,
         connection_class=RequestsHttpConnection,
-        timeout=60,
+        timeout=600,
         http_compress=True,
         retry_on_timeout=True,
         max_retries=3,
@@ -147,20 +151,88 @@ def extract_embedding_option(container: Dict[str, Any]) -> Optional[str]:
 
 
 def extract_embedding_vector(container: Dict[str, Any]) -> Optional[List[float]]:
+    """Extract embedding vector from container, supporting both direct vectors and S3 references.
+
+    This function supports three input patterns:
+    1. Direct embedding in payload (backward compatible)
+    2. S3 reference in nested data structure (new pattern for distributed map)
+    3. External task results
+    """
+    # Check for S3 reference in nested data structure (distributed map pattern)
+    if isinstance(container.get("data"), dict):
+        data = container["data"]
+
+        # Check for S3 reference in nested data.data structure
+        if isinstance(data.get("data"), dict):
+            nested_data = data["data"]
+            if "s3_bucket" in nested_data and "s3_key" in nested_data:
+                try:
+                    embedding_data = download_s3_external_payload(
+                        s3_client, nested_data, logger
+                    )
+                    if (
+                        isinstance(embedding_data.get("float"), list)
+                        and embedding_data["float"]
+                    ):
+                        logger.info(
+                            "Successfully extracted embedding from S3 reference (nested data.data)"
+                        )
+                        return embedding_data["float"]
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to download embedding from S3 reference: {str(e)}"
+                    )
+
+        # Check for S3 reference directly in data
+        if "s3_bucket" in data and "s3_key" in data:
+            try:
+                embedding_data = download_s3_external_payload(s3_client, data, logger)
+                if (
+                    isinstance(embedding_data.get("float"), list)
+                    and embedding_data["float"]
+                ):
+                    logger.info(
+                        "Successfully extracted embedding from S3 reference (data)"
+                    )
+                    return embedding_data["float"]
+            except Exception as e:
+                logger.warning(
+                    f"Failed to download embedding from S3 reference: {str(e)}"
+                )
+
+        # Direct vector in data (backward compatible)
+        if isinstance(data.get("float"), list) and data["float"]:
+            return data["float"]
+
+    # Check item structure (backward compatible)
     itm = _item(container)
-    if itm and isinstance(itm.get("float"), list) and itm["float"]:
-        return itm["float"]
+    if itm:
+        # Check for S3 reference in item
+        if "s3_bucket" in itm and "s3_key" in itm:
+            try:
+                embedding_data = download_s3_external_payload(s3_client, itm, logger)
+                if (
+                    isinstance(embedding_data.get("float"), list)
+                    and embedding_data["float"]
+                ):
+                    logger.info(
+                        "Successfully extracted embedding from S3 reference (item)"
+                    )
+                    return embedding_data["float"]
+            except Exception as e:
+                logger.warning(
+                    f"Failed to download embedding from S3 reference: {str(e)}"
+                )
 
-    if (
-        isinstance(container.get("data"), dict)
-        and isinstance(container["data"].get("float"), list)
-        and container["data"]["float"]
-    ):
-        return container["data"]["float"]
+        # Direct vector in item (backward compatible)
+        if isinstance(itm.get("float"), list) and itm["float"]:
+            return itm["float"]
 
+    # Direct vector in container (backward compatible)
     if isinstance(container.get("float"), list) and container["float"]:
         return container["float"]
 
+    # Check external task results (backward compatible)
     for res in container.get("externalTaskResults", []):
         if isinstance(res.get("float"), list) and res["float"]:
             return res["float"]
@@ -345,6 +417,11 @@ def process_single_embedding(
     payload: Dict[str, Any], embedding_data: Dict[str, Any], client, inventory_id: str
 ) -> Dict[str, Any]:
     """Process a single embedding object."""
+    # Check if this is a lightweight reference that needs to be downloaded
+    if is_s3_reference(embedding_data):
+        logger.info("Detected lightweight reference, downloading from S3")
+        embedding_data = download_s3_external_payload(s3_client, embedding_data, logger)
+
     embedding_vector = embedding_data.get("float")
     if not embedding_vector:
         return _bad_request("No embedding vector found in embedding data")
@@ -681,6 +758,28 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
             }
 
         # Single embedding processing (original logic)
+        # Check if payload.data contains a nested S3 reference
+        data = payload.get("data")
+        if isinstance(data, dict):
+            # Check for nested data.data structure (Bedrock Results pattern)
+            if isinstance(data.get("data"), dict) and is_s3_reference(data["data"]):
+                logger.info(
+                    "Detected S3 reference in nested data.data structure, downloading from S3"
+                )
+                nested_ref = data["data"]
+                embedding_data = download_s3_external_payload(
+                    s3_client, nested_ref, logger
+                )
+                # Replace the nested reference with the downloaded data
+                data["data"] = embedding_data
+                payload["data"] = data
+            # Check if data itself is an S3 reference (other patterns)
+            elif is_s3_reference(data):
+                logger.info("Detected S3 reference in data, downloading from S3")
+                data = download_s3_external_payload(s3_client, data, logger)
+                # Update payload with the downloaded embedding
+                payload["data"] = data
+
         embedding_vector = extract_embedding_vector(payload)
         if not embedding_vector and payload.get("assets"):
             for asset in payload["assets"]:
