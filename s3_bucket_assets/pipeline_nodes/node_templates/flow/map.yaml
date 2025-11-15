@@ -23,13 +23,22 @@ actions:
           type: string
           description: JSONPath that identifies the array to iterate over
       - in: body
+        name: MapType
+        label: Map Type
+        required: false
+        default: Inline
+        schema:
+          type: select
+          options: ["Inline", "Distributed"]
+          description: Map execution mode - Inline for small datasets, Distributed for large datasets that exceed EventBridge limits
+      - in: body
         name: ConcurrencyLimit
         label: Concurrency Limit
         required: false
         default: 0
         schema:
           type: number
-          description: JSONPath that identifies the array to iterate over
+          description: Maximum number of concurrent iterations (0 = no limit)
     connections:
       incoming:
         type: [any]
