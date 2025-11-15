@@ -1894,6 +1894,28 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
         onChange={handleLoadFlow}
         onClick={(e) => ((e.target as HTMLInputElement).value = "")}
       />
+      {/* Import loading backdrop */}
+      <Backdrop
+        open={isImporting}
+        sx={{
+          color: "#fff",
+          zIndex: (theme) => theme.zIndex.drawer + 1,
+        }}
+      >
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 2,
+          }}
+        >
+          <CircularProgress color="inherit" />
+          <Box sx={{ color: "white", fontSize: "1.1rem" }}>
+            Importing Pipeline...
+          </Box>
+        </Box>
+      </Backdrop>
 
       {/* Integration validation dialog (unchanged) */}
       <IntegrationValidationDialog
