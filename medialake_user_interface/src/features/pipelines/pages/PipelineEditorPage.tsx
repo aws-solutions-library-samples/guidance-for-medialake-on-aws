@@ -2338,7 +2338,7 @@ const PipelineEditorContent = () => {
 
                 // Navigate back to pipelines page after a short delay
                 setTimeout(() => {
-                  navigate("/settings/pipelines");
+                  navigate("/pipelines");
                 }, 1500);
               })
               .catch((error) => {
