@@ -720,9 +720,12 @@ const PipelineEditorContent = () => {
 
   // Fetch all pipelines when the component mounts
 
-  const { data: pipeline } = useGetPipeline(pipelineId || "", {
-    enabled: !!pipelineId && pipelineId !== "new",
-  });
+  const { data: pipeline, isLoading: isPipelineLoading } = useGetPipeline(
+    pipelineId || "",
+    {
+      enabled: !!pipelineId && pipelineId !== "new",
+    },
+  );
 
   // Only fetch node details when the dialog is open and we have a selected node
   // Store the nodeId in a ref to prevent unnecessary re-renders
@@ -2043,11 +2046,11 @@ const PipelineEditorContent = () => {
           flexDirection: "column",
           gap: 2,
         }}
-        open={isImporting}
+        open={isImporting || isPipelineLoading}
       >
         <CircularProgress color="inherit" />
         <Box sx={{ typography: "body1", fontWeight: "medium" }}>
-          Importing Pipeline...
+          {isPipelineLoading ? "Loading Pipeline..." : "Importing Pipeline..."}
         </Box>
       </Backdrop>
       <PipelineToolbar
