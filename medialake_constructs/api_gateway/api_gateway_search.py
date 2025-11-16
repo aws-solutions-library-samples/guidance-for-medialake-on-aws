@@ -86,6 +86,8 @@ class SearchConstruct(Construct):
                     # Bedrock inference profile ID for TwelveLabs Marengo Embed v2.7
                     # Dynamically set based on deployment region
                     "BEDROCK_INFERENCE_PROFILE_ARN": self._get_regional_inference_profile_id(),
+                    # Thumbnail index for video posters (0-4, default 2 = middle thumbnail)
+                    "THUMBNAIL_INDEX": "2",
                 },
             ),
         )

@@ -240,8 +240,13 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
 
           // Load the video/audio then add markers if clips provided
           // For audio assets, pass protocol: "audio"
+          // For video assets with thumbnails, add poster
           const loadOptions =
-            assetType === "Audio" ? { protocol: "audio" as const } : undefined;
+            assetType === "Audio"
+              ? { protocol: "audio" as const }
+              : assetType === "Video" && thumbnailUrl
+                ? { poster: thumbnailUrl }
+                : undefined;
           omakasePlayer.loadVideo(proxyUrl, loadOptions).subscribe({
             next: () => {
               // Defer marker creation to idle time to avoid blocking video playback
