@@ -5,9 +5,6 @@
   "chat-enabled": {
     "value": false
   },
-  "file-upload-enabled": {
-    "value": false
-  },
   "notification-enabled": {
     "value": false
   },

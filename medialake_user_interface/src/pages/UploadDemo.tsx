@@ -1,18 +1,9 @@
 import React, { useState } from "react";
-import {
-  Box,
-  Button,
-  Container,
-  Paper,
-  Typography,
-  Alert,
-} from "@mui/material";
+import { Box, Button, Container, Paper, Typography } from "@mui/material";
 import { S3UploaderModal } from "../features/upload";
-import { useFeatureFlag } from "../contexts/FeatureFlagsContext";
 
 const UploadDemo: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const isFileUploadEnabled = useFeatureFlag("file-upload-enabled", true);
 
   const handleOpenModal = () => {
     setIsModalOpen(true);
@@ -26,23 +17,6 @@ const UploadDemo: React.FC = () => {
     console.log("Upload completed for files:", files);
   };
 
-  // If file upload is disabled, show a message
-  if (!isFileUploadEnabled) {
-    return (
-      <Container maxWidth="lg">
-        <Paper sx={{ p: 4, mt: 4 }}>
-          <Typography variant="h4" component="h1" gutterBottom>
-            S3 Upload System
-          </Typography>
-          <Alert severity="info" sx={{ mt: 2 }}>
-            The file upload feature is currently disabled. Please contact your
-            administrator for more information.
-          </Alert>
-        </Paper>
-      </Container>
-    );
-  }
-
   return (
     <Container maxWidth="lg">
       <Paper sx={{ p: 4, mt: 4 }}>
@@ -50,8 +24,9 @@ const UploadDemo: React.FC = () => {
           S3 Upload System
         </Typography>
         <Typography variant="body1" paragraph>
-          This demo showcases an Uppy-based upload system with dynamic S3
-          connector selection and presigned URL generation.
+          This demo showcases an Uppy 5.0 with unified Dashboard experience and
+          built-in progress tracking for dynamic S3 connector selection and
+          presigned URL generation.
         </Typography>
         <Typography variant="body1" paragraph>
           Features:
@@ -69,16 +44,25 @@ const UploadDemo: React.FC = () => {
           </Box>
           <Box component="li">
             <Typography>
-              Content type restriction to audio, video, HLS, and MPEG-DASH
+              Content type restriction to audio/*, video/*, image/*, HLS, and
+              MPEG-DASH
             </Typography>
           </Box>
           <Box component="li">
             <Typography>
-              Automatic multipart upload for files larger than 100MB
+              Automatic multipart upload for files larger than 100MB with
+              dynamic part size (5MB default, auto-adjusts for files exceeding
+              10,000 parts)
             </Typography>
           </Box>
           <Box component="li">
             <Typography>Support for 5 concurrent uploads</Typography>
+          </Box>
+          <Box component="li">
+            <Typography>
+              Built-in progress UI with upload status, speed, and ETA (powered
+              by Uppy 5.0 Dashboard)
+            </Typography>
           </Box>
         </Box>
         <Box sx={{ mt: 4, textAlign: "center" }}>
@@ -98,7 +82,7 @@ const UploadDemo: React.FC = () => {
         onClose={handleCloseModal}
         onUploadComplete={handleUploadComplete}
         title="Upload Media Files"
-        description="Select an S3 connector and upload your media files. Only audio, video, HLS, and MPEG-DASH formats are supported."
+        description="Select an S3 connector and upload your media files. Files larger than 100MB will automatically use multipart upload with on-demand part signing. Only audio/*, video/*, image/*, HLS, and MPEG-DASH formats are supported."
       />
     </Container>
   );

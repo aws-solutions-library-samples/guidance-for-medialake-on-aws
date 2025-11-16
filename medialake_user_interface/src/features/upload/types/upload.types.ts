@@ -57,3 +57,42 @@ export interface UploadProgress {
   bytesTotal: number;
   percentage: number;
 }
+
+export interface MultipartUploadMetadata {
+  uploadId: string;
+  key: string;
+  bucket: string;
+  connector_id: string;
+}
+
+export interface CompleteMultipartRequest {
+  connector_id: string;
+  upload_id: string;
+  key: string;
+  parts: Array<{ PartNumber: number; ETag: string }>;
+}
+
+export interface CompleteMultipartResponse {
+  location: string;
+  bucket: string;
+  key: string;
+}
+
+export interface AbortMultipartRequest {
+  connector_id: string;
+  upload_id: string;
+  key: string;
+}
+
+export interface SignPartRequest {
+  connector_id: string;
+  upload_id: string;
+  key: string;
+  part_number: number;
+}
+
+export interface SignPartResponse {
+  part_number: number;
+  presigned_url: string;
+  expires_in: number;
+}

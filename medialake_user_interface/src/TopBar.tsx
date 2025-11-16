@@ -75,7 +75,6 @@ function TopBar() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isSemanticConfigDialogOpen, setIsSemanticConfigDialogOpen] =
     useState(false);
-  const isFileUploadEnabled = useFeatureFlag("file-upload-enabled", true);
   const isChatEnabled = useFeatureFlag("chat-enabled", true);
   const isNotificationEnabled = useFeatureFlag("notification-enabled", true);
   const { toggleChat, isOpen: isChatOpen } = useChat();
@@ -735,28 +734,24 @@ function TopBar() {
         }}
       >
         {/* Upload Button */}
-        {isFileUploadEnabled && (
-          <IconButton
-            size="small"
-            onClick={handleOpenUploadModal}
-            sx={{
-              color:
-                theme === "dark" ? "rgba(255,255,255,0.7)" : "text.secondary",
+        <IconButton
+          size="small"
+          onClick={handleOpenUploadModal}
+          sx={{
+            color:
+              theme === "dark" ? "rgba(255,255,255,0.7)" : "text.secondary",
+            backgroundColor:
+              theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.04)",
+            borderRadius: "8px",
+            padding: "8px",
+            "&:hover": {
               backgroundColor:
-                theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.04)",
-              borderRadius: "8px",
-              padding: "8px",
-              "&:hover": {
-                backgroundColor:
-                  theme === "dark"
-                    ? "rgba(255,255,255,0.2)"
-                    : "rgba(0,0,0,0.08)",
-              },
-            }}
-          >
-            <CloudUploadIcon />
-          </IconButton>
-        )}
+                theme === "dark" ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.08)",
+            },
+          }}
+        >
+          <CloudUploadIcon />
+        </IconButton>
 
         {/* Notification Center */}
         {isNotificationEnabled && <NotificationCenter />}
@@ -798,18 +793,16 @@ function TopBar() {
       </Box>
 
       {/* Upload Modal */}
-      {isFileUploadEnabled && (
-        <S3UploaderModal
-          open={isUploadModalOpen}
-          onClose={handleCloseUploadModal}
-          onUploadComplete={handleUploadComplete}
-          title={t("upload.title", "Upload Media Files")}
-          description={t(
-            "upload.description",
-            "Select an S3 connector and upload your media files. Only audio, video, HLS, and MPEG-DASH formats are supported.",
-          )}
-        />
-      )}
+      <S3UploaderModal
+        open={isUploadModalOpen}
+        onClose={handleCloseUploadModal}
+        onUploadComplete={handleUploadComplete}
+        title={t("upload.title", "Upload Media Files")}
+        description={t(
+          "upload.description",
+          "Select an S3 connector and upload your media files. Only audio, video, HLS, and MPEG-DASH formats are supported.",
+        )}
+      />
 
       {/* Filter Modal */}
       <FilterModal facetCounts={searchResults?.data?.searchMetadata?.facets} />

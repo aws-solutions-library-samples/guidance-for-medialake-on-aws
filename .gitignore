@@ -61,6 +61,8 @@ CLAUDE.md
 *.roomodes
 .kiro/
 .sonar/
+.scannerwork/
+.sonarlint/
 
 # Playwrght testing
 playwright-report/

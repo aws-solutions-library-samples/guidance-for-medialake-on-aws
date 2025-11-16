@@ -666,13 +666,15 @@ class UIConstruct(Construct):
 
         # Store CloudFront distribution domain in SSM Parameter Store
         # Only create parameter if not provided externally
+        # Note: This SSM parameter is optional and maintained for backward compatibility
+        # The primary method of passing CloudFront domain is through stack properties
         if props.parameter_name is None:
             ssm.StringParameter(
                 self,
                 "CloudFrontDistributionDomainParameter",
-                parameter_name="/medialake/cloudfront-distribution-domain",
+                parameter_name=f"/medialake/{config.environment}/cloudfront-distribution-domain",
                 string_value=self.cloudfront_distribution.distribution_domain_name,
-                description="CloudFront distribution domain for MediaLake UI",
+                description="CloudFront distribution domain for MediaLake UI (includes environment for multi-env support)",
             )
 
         print(f"Cognito domain prefix: {props.cognito_domain_prefix}")
