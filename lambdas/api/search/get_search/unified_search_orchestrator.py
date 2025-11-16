@@ -497,6 +497,7 @@ class UnifiedSearchOrchestrator:
         """Add presigned URLs for thumbnail and proxy representations"""
         try:
             # Import here to avoid circular imports
+            from index import get_indexed_thumbnail_url
             from url_utils import generate_cloudfront_url
 
             derived_representations = result.get("DerivedRepresentations", [])
@@ -517,7 +518,8 @@ class UnifiedSearchOrchestrator:
                     )
 
                     if purpose == "thumbnail":
-                        thumbnail_url = presigned_url
+                        # Use shared function to convert to indexed thumbnail URL
+                        thumbnail_url = get_indexed_thumbnail_url(presigned_url)
                     elif purpose == "proxy":
                         proxy_url = presigned_url
 

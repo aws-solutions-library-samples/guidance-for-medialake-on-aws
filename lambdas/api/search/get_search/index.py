@@ -29,6 +29,9 @@ from url_utils import generate_cloudfront_url, generate_cloudfront_urls_batch
 # Global flag to enable/disable clip logic
 CLIP_LOGIC_ENABLED = True
 
+# Thumbnail index configuration (0-4, default to middle thumbnail)
+THUMBNAIL_INDEX = int(os.getenv("THUMBNAIL_INDEX", "2"))
+
 # Initialize AWS clients and utilities
 logger = Logger()
 metrics = Metrics()
@@ -687,6 +690,10 @@ def process_search_hit_with_cloudfront_urls(
 
     if hit_data["thumbnail_request_id"]:
         thumbnail_url = cloudfront_urls.get(hit_data["thumbnail_request_id"])
+        # Convert to indexed thumbnail URL
+        thumbnail_url = (
+            get_indexed_thumbnail_url(thumbnail_url) if thumbnail_url else None
+        )
         logger.info(
             f"[URL_DEBUG] Thumbnail URL for {asset_id}: {thumbnail_url} (request_id: {hit_data['thumbnail_request_id']})"
         )
@@ -724,6 +731,41 @@ def process_search_hit_with_cloudfront_urls(
     return final_result
 
 
+def get_indexed_thumbnail_url(thumbnail_url: str, index: int = THUMBNAIL_INDEX) -> str:
+    """
+    Convert a thumbnail URL to use a specific thumbnail index.
+    MediaConvert generates multiple thumbnails: filename_thumbnail.0000000.jpg, etc.
+
+    Args:
+        thumbnail_url: Base thumbnail URL (e.g., .../filename_thumbnail.0000000.jpg)
+        index: Thumbnail index to use (0-4, default from env var)
+
+    Returns:
+        Modified URL with the specific thumbnail index
+    """
+    import re
+
+    if not thumbnail_url or ".jpg" not in thumbnail_url:
+        return thumbnail_url
+
+    # Replace existing .0000000.jpg (or similar) with new index, or add if not present
+    # MediaConvert generates: filename_thumbnail.0000000.jpg, filename_thumbnail.0000001.jpg, etc.
+    pattern = r"\.(\d{7})\.jpg$"
+    match = re.search(pattern, thumbnail_url)
+
+    if match:
+        # Replace existing index
+        indexed_url = re.sub(pattern, f".{index:07d}.jpg", thumbnail_url)
+    else:
+        # No existing index, add it (replace .jpg with .{index:07d}.jpg)
+        indexed_url = thumbnail_url.replace(".jpg", f".{index:07d}.jpg")
+
+    logger.info(
+        f"Converted thumbnail URL from {thumbnail_url} to {indexed_url} (index: {index})"
+    )
+    return indexed_url
+
+
 def process_search_hit(hit: Dict) -> Dict:
     """Process a single search hit and add CloudFront URL if thumbnail representation exists"""
     source = hit["_source"]
@@ -758,7 +800,7 @@ def process_search_hit(hit: Dict) -> Dict:
             )
 
             if purpose == "thumbnail":
-                thumbnail_url = cloudfront_url
+                thumbnail_url = get_indexed_thumbnail_url(cloudfront_url)
             elif purpose == "proxy":
                 proxy_url = cloudfront_url
 
