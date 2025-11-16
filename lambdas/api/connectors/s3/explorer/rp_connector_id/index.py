@@ -5,7 +5,7 @@ from functools import lru_cache
 import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from boto3.dynamodb.conditions import Key
-from common_libraries.cors_utils import create_response
+from cors_utils import create_response
 
 logger = Logger()
 tracer = Tracer()
@@ -44,6 +44,98 @@ def get_connector(connector_id, table_name):
     except Exception as e:
         logger.error(f"Failed to get connector: {str(e)}")
         return None
+
+
+def normalize_prefix(prefix):
+    """
+    Normalize a prefix by trimming whitespace and ensuring a single trailing slash.
+
+    Args:
+        prefix (str): Raw prefix string
+
+    Returns:
+        str: Normalized prefix with trailing slash (empty string if input is empty)
+    """
+    if not prefix:
+        return ""
+
+    # Trim whitespace
+    prefix = prefix.strip()
+
+    if not prefix:
+        return ""
+
+    # Ensure single trailing slash for non-empty prefixes
+    if not prefix.endswith("/"):
+        prefix = prefix + "/"
+
+    return prefix
+
+
+def parse_object_prefixes(object_prefix):
+    """
+    Parse objectPrefix from connector configuration into a list of prefix strings.
+
+    Args:
+        object_prefix: Raw objectPrefix value from connector (str, list, or None)
+
+    Returns:
+        list: List of normalized prefix strings (empty list if no prefixes configured)
+    """
+    if not object_prefix:
+        return []
+
+    if isinstance(object_prefix, str):
+        # Single string prefix - normalize it
+        normalized = normalize_prefix(object_prefix)
+        return [normalized] if normalized else []
+    elif isinstance(object_prefix, list):
+        # List of prefixes - normalize each and filter out empty results
+        return [
+            normalized
+            for prefix in object_prefix
+            if prefix and (normalized := normalize_prefix(prefix))
+        ]
+
+    return []
+
+
+def validate_prefix_access(requested_prefix, allowed_prefixes):
+    """
+    Validate if the requested prefix is allowed based on configured allowed prefixes.
+
+    Args:
+        requested_prefix (str): The prefix being requested
+        allowed_prefixes (list): List of allowed prefix strings (assumed to be normalized)
+
+    Returns:
+        bool: True if access is allowed (requested prefix is within an allowed prefix), False otherwise
+    """
+    # If no prefixes configured, allow all access
+    if not allowed_prefixes:
+        return True
+
+    # Handle edge cases
+    if requested_prefix is None:
+        requested_prefix = ""
+
+    # Normalize the requested prefix for boundary-aware comparison
+    normalized_requested = normalize_prefix(requested_prefix)
+
+    # Check if requested prefix is within any allowed prefix
+    for allowed_prefix in allowed_prefixes:
+        if not allowed_prefix:
+            continue
+
+        # Normalize the allowed prefix for boundary-aware comparison
+        normalized_allowed = normalize_prefix(allowed_prefix)
+
+        # Allow only if requested prefix starts with (is within) an allowed prefix
+        # This prevents accessing parent folders or sibling folders
+        if normalized_requested.startswith(normalized_allowed):
+            return True
+
+    return False
 
 
 @logger.inject_lambda_context(correlation_id_path="requestContext.requestId")
@@ -90,10 +182,49 @@ def lambda_handler(event, context):
             )
 
         bucket = connector.get("storageIdentifier")
-        object_prefix = connector.get("objectPrefix", "")
 
-        if not prefix:
-            prefix = object_prefix
+        # Parse objectPrefix into list format
+        allowed_prefixes = parse_object_prefixes(connector.get("objectPrefix"))
+        logger.debug(
+            f"Parsed allowed prefixes for connector {connector_id}: {allowed_prefixes}"
+        )
+
+        # Sort allowed prefixes for deterministic default selection
+        # Sort lexicographically to ensure consistent behavior
+        if allowed_prefixes:
+            allowed_prefixes = sorted(allowed_prefixes)
+            logger.debug(f"Sorted allowed prefixes: {allowed_prefixes}")
+
+        # Derive default prefix for backward compatibility
+        default_prefix = allowed_prefixes[0] if allowed_prefixes else ""
+
+        # Set default prefix if no prefix requested
+        if not prefix and default_prefix:
+            prefix = default_prefix
+
+        # Normalize the incoming prefix before validation and S3 operations
+        prefix = normalize_prefix(prefix)
+
+        # Validate requested prefix against allowed prefixes
+        if allowed_prefixes:
+            if not validate_prefix_access(prefix, allowed_prefixes):
+                logger.warning(
+                    f"Access denied for connector {connector_id}: "
+                    f"requested prefix '{prefix}' is outside allowed prefixes {allowed_prefixes}"
+                )
+                metrics.add_metric(
+                    name="PrefixValidationFailures", unit="Count", value=1
+                )
+                return create_response(
+                    403,
+                    {
+                        "status": "error",
+                        "message": "Access denied: requested path is outside allowed prefixes",
+                        "allowedPrefixes": allowed_prefixes,
+                    },
+                )
+            logger.info(f"Prefix validation passed for {prefix}")
+            metrics.add_metric(name="PrefixValidationSuccess", unit="Count", value=1)
 
         if not bucket:
             logger.warning(f"Bucket not configured for connector {connector_id}")
@@ -131,34 +262,19 @@ def lambda_handler(event, context):
             )
             logger.info(f"S3 list_objects_v2 latency: {latency}ms")
 
-            # Count objects returned for metrics
-            object_count = len(response.get("Contents", []))
+            # Count prefixes returned for metrics
             prefix_count = len(response.get("CommonPrefixes", []))
-            metrics.add_metric(
-                name="S3ObjectsReturned", unit="Count", value=object_count
-            )
             metrics.add_metric(
                 name="S3PrefixesReturned", unit="Count", value=prefix_count
             )
 
-            subsegment.put_metadata("object_count", object_count)
             subsegment.put_metadata("prefix_count", prefix_count)
 
-        # Process response
+        # Return only folders (commonPrefixes), not individual files
         result = {
-            "objects": [
-                {
-                    "Key": obj["Key"],
-                    "LastModified": obj["LastModified"].isoformat(),
-                    "Size": obj["Size"],
-                    "ETag": obj["ETag"],
-                    "StorageClass": obj["StorageClass"],
-                }
-                for obj in response.get("Contents", [])
-                if not obj["Key"].endswith("/")
-            ],
             "commonPrefixes": [p["Prefix"] for p in response.get("CommonPrefixes", [])],
             "prefix": prefix,
+            "allowedPrefixes": allowed_prefixes,
             "delimiter": "/",
             "isTruncated": response.get("IsTruncated", False),
             "nextContinuationToken": response.get("NextContinuationToken"),

@@ -268,7 +268,9 @@ export const UpgradeSection: React.FC = () => {
                 {t(
                   "settings.systemSettings.upgrade.upgradingTo",
                   "Upgrading to {{version}}",
-                  { version: status.active_upgrade.target_version },
+                  {
+                    version: status.active_upgrade.target_version,
+                  },
                 )}
               </Typography>
               <Box

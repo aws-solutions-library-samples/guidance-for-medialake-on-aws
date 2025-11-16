@@ -1,6 +1,13 @@
 import { useCallback, useState } from "react";
 import { apiClient } from "@/api/apiClient";
 import { API_ENDPOINTS } from "@/api/endpoints";
+import {
+  CompleteMultipartRequest,
+  CompleteMultipartResponse,
+  AbortMultipartRequest,
+  SignPartRequest,
+  SignPartResponse,
+} from "../types/upload.types";
 
 interface UploadRequest {
   connector_id: string;
@@ -30,6 +37,11 @@ interface S3UploadResponse {
 
 interface UseS3UploadReturn {
   getPresignedUrl: (request: UploadRequest) => Promise<S3UploadResponse>;
+  signPart: (request: SignPartRequest) => Promise<SignPartResponse>;
+  completeMultipartUpload: (
+    request: CompleteMultipartRequest,
+  ) => Promise<CompleteMultipartResponse>;
+  abortMultipartUpload: (request: AbortMultipartRequest) => Promise<void>;
   isLoading: boolean;
   error: Error | null;
 }
@@ -75,8 +87,112 @@ const useS3Upload = (): UseS3UploadReturn => {
     [],
   );
 
+  const completeMultipartUpload = useCallback(
+    async (
+      request: CompleteMultipartRequest,
+    ): Promise<CompleteMultipartResponse> => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        console.log("Completing multipart upload:", {
+          upload_id: request.upload_id,
+          key: request.key,
+          parts: request.parts.length,
+        });
+
+        const response = await apiClient.post<{
+          status: string;
+          message: string;
+          data: CompleteMultipartResponse;
+        }>(`${API_ENDPOINTS.ASSETS.UPLOAD}/multipart/complete`, request);
+
+        if (response.data.status === "success" && response.data.data) {
+          return response.data.data;
+        }
+
+        throw new Error(
+          response.data.message || "Failed to complete multipart upload",
+        );
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Unknown error occurred";
+        const error = new Error(
+          `Error completing multipart upload for ${request.key}: ${errorMessage}`,
+        );
+        setError(error);
+        throw error;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [],
+  );
+
+  const signPart = useCallback(
+    async (request: SignPartRequest): Promise<SignPartResponse> => {
+      // Don't set loading state for individual part signing to avoid UI flickering
+      try {
+        const response = await apiClient.post<{
+          status: string;
+          message: string;
+          data: SignPartResponse;
+        }>(`${API_ENDPOINTS.ASSETS.UPLOAD}/multipart/sign`, request);
+
+        if (response.data.status === "success" && response.data.data) {
+          return response.data.data;
+        }
+
+        throw new Error(response.data.message || "Failed to sign part");
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Unknown error occurred";
+        const error = new Error(
+          `Error signing part ${request.part_number}: ${errorMessage}`,
+        );
+        throw error;
+      }
+    },
+    [],
+  );
+
+  const abortMultipartUpload = useCallback(
+    async (request: AbortMultipartRequest): Promise<void> => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        console.log("Aborting multipart upload:", {
+          upload_id: request.upload_id,
+          key: request.key,
+        });
+
+        await apiClient.post<{
+          status: string;
+          message: string;
+        }>(`${API_ENDPOINTS.ASSETS.UPLOAD}/multipart/abort`, request);
+
+        // Success - no return value needed
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Unknown error occurred";
+        const error = new Error(
+          `Error aborting multipart upload for ${request.key}: ${errorMessage}`,
+        );
+        setError(error);
+        throw error;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [],
+  );
+
   return {
     getPresignedUrl,
+    signPart,
+    completeMultipartUpload,
+    abortMultipartUpload,
     isLoading,
     error,
   };

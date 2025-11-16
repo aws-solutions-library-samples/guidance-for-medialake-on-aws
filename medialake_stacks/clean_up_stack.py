@@ -42,6 +42,19 @@ class CleanupStack(Stack):
         props.connector_table.grant_read_write_data(self._clean_up_lambda.function)
         props.pipeline_table.grant_read_write_data(self._clean_up_lambda.function)
 
+        # Grant S3 CORS permissions for cleaning up upload CORS configurations
+        # when connectors with allowUploads=True are deleted during stack teardown
+        self._clean_up_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetBucketCORS",
+                    "s3:PutBucketCORS",
+                    "s3:DeleteBucketCORS",
+                ],
+                resources=["arn:aws:s3:::*"],
+            )
+        )
+
         # Add EventBridge Pipes permissions
         # ListPipes requires * resource - AWS API limitation for list operations
         self._clean_up_lambda.lambda_role.add_to_policy(
