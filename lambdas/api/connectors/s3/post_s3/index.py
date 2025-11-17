@@ -169,7 +169,7 @@ class S3ConnectorConfig(BaseModel):
     bucket: str
     s3IntegrationMethod: str
     objectPrefix: list[str] | None = None
-    bucketType: str | None = None  # "new" or "existing"
+    bucketType: str  # Required: "new" or "existing"
     region: str | None = None  # region for new buckets
     allowUploads: bool | None = False
 
@@ -1289,6 +1289,18 @@ def create_connector(createconnector: S3Connector) -> dict:
         # Handle bucket creation or validation based on bucketType
         bucket_type = createconnector.configuration.bucketType
         bucket_region = createconnector.configuration.region
+
+        # Validate bucketType value
+        if bucket_type not in ["new", "existing"]:
+            return {
+                "status": "400",
+                "message": f"Invalid bucketType '{bucket_type}'. Must be 'new' or 'existing'",
+                "data": {},
+            }
+
+        logger.info(
+            f"Processing connector for bucket '{s3_bucket}' with bucketType='{bucket_type}'"
+        )
 
         if bucket_type == "new":
             # Create new bucket

@@ -321,6 +321,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
           integrationMethod) as "eventbridge" | "s3Notifications",
         objectPrefix: filteredPrefixes.length > 0 ? filteredPrefixes : [],
         allowUploads: allowUploads,
+        bucketType: bucketType as "new" | "existing",
         ...newBucketExtras,
       },
     };
