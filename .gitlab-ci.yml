@@ -414,29 +414,27 @@ pre_commit_checks:
 # Semantic versioning - runs on MR to stable, tags main branch
 semantic-version:
   image: alpine:latest
-  stage: .pre # Run early in the pipeline
+  stage: .pre
   variables:
-    GIT_DEPTH: 0 # Fetch full git history
+    GIT_DEPTH: 0
   rules:
-    # Only run when there's an MR targeting stable
+    # Trigger on MR to stable (preferred workflow)
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"'
+      when: on_success
+    # Also trigger on direct push to stable (fallback for scripts)
+    - if: '$CI_COMMIT_REF_NAME == "stable" && $CI_PIPELINE_SOURCE == "push"'
       when: on_success
     - when: never
   script:
     - apk add --no-cache git bash
     - git config --global user.email "medialake@amazon.com"
     - git config --global user.name "Media Lake CI"
-    # Configure Git to push using GitLab token
     - |
-      echo "DEBUG: Checking for GITLAB_PUSH_TOKEN..."
       if [ -n "$GITLAB_PUSH_TOKEN" ]; then
-        echo "✓ Using GITLAB_PUSH_TOKEN for authentication"
         git remote set-url origin "https://gitlab-ci-token:${GITLAB_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
       else
-        echo "⚠ GITLAB_PUSH_TOKEN not found, using CI_JOB_TOKEN"
         git remote set-url origin "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
       fi
-    # Fetch both main and stable branches
     - git fetch origin main:main
     - git fetch origin stable:stable
     - |
@@ -445,16 +443,27 @@ semantic-version:
       set -e
       echo "=========================================="
       echo "Changelog Generation & Versioning"
-      echo "Triggered by MR: main -> stable"
       echo "=========================================="
 
-      # Checkout main branch (where we'll create the tag)
-      echo "Checking out main branch..."
-      git checkout main
-      echo "Current branch: $(git branch --show-current)"
+      # Determine which branch we're operating on
+      CURRENT_BRANCH=$(git branch --show-current)
+      echo "Current branch: $CURRENT_BRANCH"
+
+      # If we're on stable (direct push), we need to tag main instead
+      if [ "$CURRENT_BRANCH" = "stable" ]; then
+        echo "Running on stable branch (direct push mode)"
+        echo "Will tag main branch and push changelog there"
+        TARGET_BRANCH="main"
+        git checkout main
+      else
+        echo "Running in MR mode (main -> stable)"
+        TARGET_BRANCH="main"
+        git checkout main
+      fi
+
       echo "Current commit: $(git rev-parse HEAD)"
 
-      # Get the last version tag from stable branch (tags are shared across branches)
+      # Get the last version tag
       LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
 
       if [ -z "$LAST_TAG" ]; then
@@ -471,21 +480,17 @@ semantic-version:
       echo "Current version: $MAJOR.$MINOR.$PATCH"
       echo ""
 
-      # Get commits on main that are NOT on stable yet
-      # This gives us only the NEW commits that will be merged
-      echo "Analyzing commits that will be merged from main to stable..."
-
-      # Get the merge base (common ancestor) between main and stable
+      # Get commits between main and stable
+      echo "Analyzing commits between main and stable..."
       MERGE_BASE=$(git merge-base main origin/stable)
       echo "Merge base commit: $MERGE_BASE"
 
-      # Get all commits from merge base to main HEAD
       COMMITS=$(git log ${MERGE_BASE}..main --pretty=format:"%H|%s|%b")
 
       echo "DEBUG: Number of commits to analyze: $(echo "$COMMITS" | grep -c '.' || echo 0)"
 
       if [ -z "$COMMITS" ]; then
-        echo "WARNING: No new commits to merge from main to stable!"
+        echo "WARNING: No new commits to version!"
         echo "No version bump needed."
         exit 0
       fi
@@ -505,55 +510,47 @@ semantic-version:
       PERFORMANCES=""
       OTHERS=""
 
-      # Process each commit
+      # Process each commit (same logic as before)
       while IFS='|' read -r HASH SUBJECT BODY; do
         [ -z "$HASH" ] && continue
 
         echo "DEBUG: Analyzing commit: $SUBJECT"
         FULL_MESSAGE="$SUBJECT"$'\n'"$BODY"
 
-        # Check for breaking changes
         if [[ "$SUBJECT" =~ ^[a-z]+(\([a-zA-Z0-9\-_.]+\))?!:[[:space:]] ]] || [[ "$FULL_MESSAGE" =~ BREAKING[[:space:]]CHANGE: ]]; then
           echo "  [MAJOR] Breaking change detected: $SUBJECT"
           BUMP_TYPE="major"
           BREAKING_CHANGES="${BREAKING_CHANGES}- ${SUBJECT}"$'\n'
-        # Check for features
         elif [[ "$SUBJECT" =~ ^feat(\([a-zA-Z0-9\-_.]+\))?: ]] || [[ "$SUBJECT" == feat:* ]]; then
           echo "  [MINOR] Feature: $SUBJECT"
           if [ "$BUMP_TYPE" != "major" ]; then
             BUMP_TYPE="minor"
           fi
           FEATURES="${FEATURES}- ${SUBJECT}"$'\n'
-        # Check for fixes
         elif [[ "$SUBJECT" =~ ^fix(\([a-zA-Z0-9\-_.]+\))?: ]] || [[ "$SUBJECT" == fix:* ]]; then
           echo "  [PATCH] Fix: $SUBJECT"
           if [ "$BUMP_TYPE" = "none" ]; then
             BUMP_TYPE="patch"
           fi
           FIXES="${FIXES}- ${SUBJECT}"$'\n'
-        # Check for refactor
         elif [[ "$SUBJECT" =~ ^refactor(\([a-zA-Z0-9\-_.]+\))?: ]]; then
           echo "  [PATCH] Refactor: $SUBJECT"
           if [ "$BUMP_TYPE" = "none" ]; then
             BUMP_TYPE="patch"
           fi
           REFACTORS="${REFACTORS}- ${SUBJECT}"$'\n'
-        # Check for performance
         elif [[ "$SUBJECT" =~ ^perf(\([a-zA-Z0-9\-_.]+\))?: ]]; then
           echo "  [PATCH] Performance: $SUBJECT"
           if [ "$BUMP_TYPE" = "none" ]; then
             BUMP_TYPE="patch"
           fi
           PERFORMANCES="${PERFORMANCES}- ${SUBJECT}"$'\n'
-        # Check for release
         elif [[ "$SUBJECT" =~ ^release(\([a-zA-Z0-9\-_.]+\))?: ]]; then
           echo "  [TRACKED] Release: $SUBJECT"
           OTHERS="${OTHERS}- ${SUBJECT}"$'\n'
-        # Docs and CI don't bump version but are tracked
         elif [[ "$SUBJECT" =~ ^(docs|ci)(\([a-zA-Z0-9\-_.]+\))?: ]]; then
           echo "  [NO BUMP] ${SUBJECT}"
           OTHERS="${OTHERS}- ${SUBJECT}"$'\n'
-        # Other types are patches
         elif [[ "$SUBJECT" =~ ^(style|test|build)(\([a-zA-Z0-9\-_.]+\))?: ]]; then
           echo "  [PATCH] ${SUBJECT}"
           if [ "$BUMP_TYPE" = "none" ]; then
@@ -638,12 +635,6 @@ semantic-version:
 
       echo "CHANGELOG.md updated successfully"
       echo ""
-      echo "=========================================="
-      echo "Preview of new CHANGELOG entry:"
-      echo "=========================================="
-      head -n 30 CHANGELOG.md
-      echo "=========================================="
-      echo ""
 
       # Commit the CHANGELOG to main
       git add CHANGELOG.md
@@ -667,7 +658,6 @@ semantic-version:
       echo "✅ Pushed commit and tag to main"
       echo ""
       echo "Version $NEW_VERSION prepared for release!"
-      echo "The MR can now be merged to stable."
       SCRIPT_EOF
       chmod +x /tmp/semantic_version.sh
       bash /tmp/semantic_version.sh
