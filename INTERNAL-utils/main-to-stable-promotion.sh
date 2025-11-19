@@ -1,94 +1,64 @@
 #!/bin/bash
 
+# Fail on any error
 set -e
 
-CUSTOM_MSG="release: Update stable branch for release"
+CUSTOM_MSG="release: Sync main branch changes into stable (prepared for MR)"
 
 echo "======================================"
 echo "Creating MR: main → stable for release"
 echo "======================================"
 
-# Check if glab is installed
-if ! command -v glab &> /dev/null; then
-    echo "❌ ERROR: GitLab CLI (glab) is not installed"
-    echo ""
-    echo "Please install glab:"
-    echo "  macOS:  brew install glab"
-    echo "  Linux:  See https://gitlab.com/gitlab-org/cli#installation"
-    echo ""
-    echo "After installation, authenticate with: glab auth login"
-    exit 1
+# Ensure you are on a clean working tree
+git status
+if ! git diff-index --quiet HEAD --; then
+  echo "❌ ERROR: Working tree is not clean. Please commit or stash changes."
+  exit 1
 fi
 
-# Check if authenticated
-if ! glab auth status &> /dev/null; then
-    echo "❌ ERROR: Not authenticated with GitLab"
-    echo "Please run: glab auth login"
-    exit 1
-fi
-
-# Fetch latest from origin
-echo "Fetching from origin..."
+# Fetch all latest changes
+echo "Fetching latest from origin..."
 git fetch origin
 
-# Ensure we're on main and up to date
-echo "Ensuring main branch is up to date..."
+# Ensure main branch is up to date
+echo "Checking out main..."
 git checkout main
 git pull origin main
 
-echo ""
-echo "Checking for existing MR from main to stable..."
+# Create MR prep branch from main (unique name for each release)
+MR_BRANCH="release/sync-main-into-stable-$(date +%Y%m%d-%H%M%S)"
+echo "Creating MR branch: $MR_BRANCH"
+git checkout -b "$MR_BRANCH" main
 
-# Check if MR already exists
-EXISTING_MR=$(glab mr list --source-branch=main --target-branch=stable --state=opened 2>/dev/null || echo "")
+# Rebase stable into MR branch, preferring main's changes (--strategy=theirs for conflicts)
+echo "Rebasing origin/stable into $MR_BRANCH (preferring main)..."
+git rebase -X theirs origin/stable || {
+    # Manual resolution for remaining conflicts (rare)
+    while git status | grep -q "Unmerged paths"; do
+        for file in $(git diff --name-only --diff-filter=U); do
+            git checkout --theirs -- "$file"
+            git add "$file"
+        done
+        git commit -m "$CUSTOM_MSG (Conflict resolved favoring main)"
+        git rebase --continue || true
+    done
+}
 
-if [ -n "$EXISTING_MR" ]; then
-    echo "⚠️  An open MR from main to stable already exists:"
-    echo "$EXISTING_MR"
-    echo ""
-    read -p "Do you want to close it and create a new one? (y/N): " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        MR_IID=$(echo "$EXISTING_MR" | grep -o '![0-9]*' | head -1 | tr -d '!')
-        echo "Closing existing MR !$MR_IID..."
-        glab mr close "$MR_IID"
-    else
-        echo "Using existing MR. Exiting."
-        exit 0
-    fi
-fi
+# Push MR branch to origin
+echo "Pushing MR branch to origin: $MR_BRANCH"
+git push origin "$MR_BRANCH"
 
-echo ""
-echo "Creating new merge request from main to stable..."
-
-# Create MR with automatic merge when pipeline succeeds
-glab mr create \
-  --source-branch main \
-  --target-branch stable \
-  --title "$CUSTOM_MSG" \
-  --description "Automated release merge from main to stable.
-
-This MR will:
-- Trigger semantic versioning
-- Create a new version tag on main branch
-- Update CHANGELOG.md
-
-**Merge strategy:** Prefer changes from main branch (theirs strategy)" \
-  --remove-source-branch=false \
-  --squash=false \
-  --yes
-
-echo ""
 echo "======================================"
-echo "✅ Merge request created successfully!"
+echo "✅ Branch prepared & pushed: $MR_BRANCH"
 echo "======================================"
 echo ""
-echo "The semantic-version job will run automatically and:"
-echo "  1. Analyze commits between main and stable"
-echo "  2. Calculate new version number"
-echo "  3. Update CHANGELOG.md on main"
-echo "  4. Create version tag on main"
+echo "Next steps:"
+echo "1. Visit your GitLab repository in the browser."
+echo "2. Create a Merge Request:"
+echo "   - Source branch: $MR_BRANCH"
+echo "   - Target branch: stable"
 echo ""
-echo "After the pipeline passes, you can merge the MR."
+echo "Fill in your release description and submit the MR."
 echo ""
-echo "View MR: $(glab mr list --source-branch=main --target-branch=stable | grep -o 'https://[^ ]*' | head -1)"
+echo "When the MR pipeline runs, the semantic-version job will trigger as expected."
+echo ""
