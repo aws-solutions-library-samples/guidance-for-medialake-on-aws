@@ -726,6 +726,7 @@ sync-to-github:
     - rm -f secrets.txt
     - rm -f .roomodes
     - rm -rf .sonar/
+    - rm -rf INTERNAL-utils/
     - rm -rf docs/
     - rm -rf .roo/
     - rm -rf .kiro/
