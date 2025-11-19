@@ -134,9 +134,8 @@ semantic-version:
     GIT_DEPTH: 0
   rules:
     # Only run when there's an MR targeting stable
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^mr-stable/ && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
-      when: on_success
-    - when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
+
   script:
     - apk add --no-cache git bash
     - git config --global user.email "medialake@amazon.com"
