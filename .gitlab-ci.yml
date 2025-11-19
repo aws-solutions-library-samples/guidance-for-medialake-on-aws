@@ -27,9 +27,7 @@ workflow:
     - if: $CI_COMMIT_REF_NAME == "dev5"
     - if: $CI_COMMIT_REF_NAME == "demo"
     - if: $CI_COMMIT_REF_NAME == "stable"
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
     - if: $CI_COMMIT_REF_NAME == "release"
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
     - when: never
 
 # Cache modules in between jobs
@@ -43,9 +41,8 @@ mr-title-check:
   stage: .pre
   image: alpine:latest
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
   script:
     - apk add --no-cache jq
     - |
@@ -69,7 +66,7 @@ mr-title-check:
         echo "  - fix:      Bug fixes"
         echo "  - perf:     Performance improvements"
         echo "  - refactor: Code refactoring"
-        echo "  - release:  Release commits (for stable->release merges)"
+        echo "  - release:  Release commits (for main->stable merges)"
         echo "  - style:    Code style changes"
         echo "  - test:     Test changes"
         echo ""
@@ -77,7 +74,7 @@ mr-title-check:
         echo "  - feat(auth): add login functionality"
         echo "  - fix(ci): retry image build on failure"
         echo "  - docs: update README with new deployment steps"
-        echo "  - release: version 1.2.3"
+        echo "  - release: Update stable branch for release"
         echo ""
         echo "Your title: $TITLE"
         exit 1
@@ -134,24 +131,22 @@ pre_commit_checks:
     - pre-commit run --all-files prettier
     - find . -name .DS_Store -type f -delete
 
-# Semantic versioning - runs on MR to stable OR direct push to stable
+# Semantic versioning - runs on MR to stable (tags main branch)
 semantic-version:
   image: alpine:latest
   stage: .pre
   variables:
     GIT_DEPTH: 0
   rules:
-    # Trigger on MR to stable (preferred workflow)
+    # Only run when there's an MR targeting stable
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"'
-      when: on_success
-    # Also trigger on direct push to stable (fallback for scripts)
-    - if: '$CI_COMMIT_REF_NAME == "stable" && $CI_PIPELINE_SOURCE == "push"'
       when: on_success
     - when: never
   script:
     - apk add --no-cache git bash
     - git config --global user.email "medialake@amazon.com"
     - git config --global user.name "Media Lake CI"
+    # Configure Git to push using GitLab token
     - |
       if [ -n "$GITLAB_PUSH_TOKEN" ]; then
         echo "✓ Using GITLAB_PUSH_TOKEN for authentication"
@@ -160,6 +155,7 @@ semantic-version:
         echo "⚠ GITLAB_PUSH_TOKEN not found, using CI_JOB_TOKEN"
         git remote set-url origin "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
       fi
+    # Fetch both main and stable branches
     - git fetch origin main:main
     - git fetch origin stable:stable
     - |
@@ -168,30 +164,14 @@ semantic-version:
       set -e
       echo "=========================================="
       echo "Changelog Generation & Versioning"
+      echo "Triggered by MR: main -> stable"
       echo "=========================================="
 
-      # Use CI environment variable to determine trigger type
-      echo "CI_COMMIT_REF_NAME: ${CI_COMMIT_REF_NAME:-not set}"
-      echo "CI_PIPELINE_SOURCE: ${CI_PIPELINE_SOURCE:-not set}"
-      echo "CI_MERGE_REQUEST_TARGET_BRANCH_NAME: ${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:-not set}"
-
-      # Determine if this is an MR or direct push
-      if [ "$CI_PIPELINE_SOURCE" = "merge_request_event" ]; then
-        echo "Running in MR mode (main -> stable)"
-        MODE="mr"
-      elif [ "$CI_COMMIT_REF_NAME" = "stable" ] && [ "$CI_PIPELINE_SOURCE" = "push" ]; then
-        echo "Running on stable branch (direct push mode)"
-        MODE="push"
-      else
-        echo "ERROR: Unexpected trigger condition"
-        echo "This job should only run on MR to stable or push to stable"
-        exit 1
-      fi
-
-      # Always work on main branch for tagging
-      echo "Checking out main branch for tagging..."
+      # Checkout main branch (where we'll create the tag)
+      echo "Checking out main branch..."
       git checkout main
-      echo "Current commit on main: $(git rev-parse HEAD)"
+      echo "Current branch: $(git branch --show-current)"
+      echo "Current commit: $(git rev-parse HEAD)"
 
       # Get the last version tag
       LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
@@ -210,17 +190,24 @@ semantic-version:
       echo "Current version: $MAJOR.$MINOR.$PATCH"
       echo ""
 
-      # Get commits between main and stable
-      echo "Analyzing commits between main and stable..."
-      MERGE_BASE=$(git merge-base main origin/stable 2>/dev/null || git rev-parse origin/stable)
-      echo "Merge base commit: $MERGE_BASE"
+      # Get commits on main that are NOT on stable yet
+      echo "Analyzing commits that will be merged from main to stable..."
 
-      COMMITS=$(git log ${MERGE_BASE}..main --pretty=format:"%H|%s|%b")
+      # Get the merge base (common ancestor) between main and stable
+      MERGE_BASE=$(git merge-base main origin/stable 2>/dev/null || echo "")
+
+      if [ -z "$MERGE_BASE" ]; then
+        echo "No common ancestor found. Using all commits from main."
+        COMMITS=$(git log main --pretty=format:"%H|%s|%b")
+      else
+        echo "Merge base commit: $MERGE_BASE"
+        COMMITS=$(git log ${MERGE_BASE}..main --pretty=format:"%H|%s|%b")
+      fi
 
       echo "DEBUG: Number of commits to analyze: $(echo "$COMMITS" | grep -c '.' || echo 0)"
 
       if [ -z "$COMMITS" ]; then
-        echo "WARNING: No new commits between main and stable!"
+        echo "WARNING: No new commits to merge from main to stable!"
         echo "No version bump needed."
         exit 0
       fi
@@ -365,6 +352,12 @@ semantic-version:
 
       echo "CHANGELOG.md updated successfully"
       echo ""
+      echo "=========================================="
+      echo "Preview of new CHANGELOG entry:"
+      echo "=========================================="
+      head -n 30 CHANGELOG.md
+      echo "=========================================="
+      echo ""
 
       # Commit the CHANGELOG to main
       git add CHANGELOG.md
@@ -388,18 +381,9 @@ semantic-version:
       echo "✅ Pushed commit and tag to main"
       echo ""
       echo "Version $NEW_VERSION prepared for release!"
-
-      if [ "$MODE" = "mr" ]; then
-        echo "The MR can now be merged to stable."
-      else
-        echo "Changes pushed from stable branch direct push."
-      fi
+      echo "The MR can now be merged to stable."
       SCRIPT_EOF
       chmod +x /tmp/semantic_version.sh
-      # Export CI variables so the script can access them
-      export CI_COMMIT_REF_NAME
-      export CI_PIPELINE_SOURCE
-      export CI_MERGE_REQUEST_TARGET_BRANCH_NAME
       bash /tmp/semantic_version.sh
 
 sync-to-github:
@@ -415,57 +399,22 @@ sync-to-github:
     - ssh-keyscan github.com >> ~/.ssh/known_hosts
     - git config --global user.email "medialake@amazon.com"
     - git config --global user.name "Media Lake CI"
-    # Extract MR title from the merge commit body (it's on line 3 of the merge commit)
     - 'echo "Debug - Full commit message:"'
     - git log -1 --pretty=%B
     - 'echo "Debug - Extracting line 3..."'
     - 'export COMMIT_MESSAGE=$(git log -1 --pretty=%B | sed -n "3p" | xargs)'
     - 'echo "Debug - Extracted message: [${COMMIT_MESSAGE}]"'
-    # Fallback to commit title if extraction fails or is empty
     - 'if [ -z "$COMMIT_MESSAGE" ]; then export COMMIT_MESSAGE="${CI_COMMIT_TITLE}"; fi'
     - 'echo "Final commit message for GitHub: ${COMMIT_MESSAGE}"'
-    # Clone GitHub repository to maintain its git history
     - git clone git@github.com:aws-solutions-library-samples/guidance-for-medialake-on-aws.git github-repo
     - cd github-repo
     - 'echo "Current GitHub main commit:" && git log --oneline -1'
-    # Copy all files from GitLab workspace (excluding .git) and delete files that do not exist in GitLab
     - rsync -av --delete --exclude=.git ../ ./
-    # Remove files that shouldn't be in the public GitHub repository
-    - rm -f secrets.txt
-    - rm -f .roomodes
-    - rm -rf .sonar/
-    - rm -rf INTERNAL-utils/
-    - rm -rf docs/
-    - rm -rf .roo/
-    - rm -rf .kiro/
-    - rm -rf github-repo/
-    - rm -rf .traycer/
-    - rm -rf INTERNAL-ai-documentation/
-    - rm -rf AUTHORIZATION_FIX.md
-    - rm -rf memory-bank/
-    - rm -rf cdk-test-output/
-    - rm -rf design/
-    - rm -f setup-dev.sh
-    - rm -f manage-hooks.sh
-    - rm -f .gitleaksignore
-    - rm -f fix.sh
-    - rm -f PERFORMANCE_OPTIMIZATION.md
-    - rm -rf tests/
-    - rm -rf scripts/
-    - rm -f .roomodes
-    - rm -f .pre-commit-config.yaml
-    - rm -f .secrets.baseline
-    - rm -f .gitlab-ci.yml
-    - rm -f .gitattributes
-    - rm -f .flake8
-    - rm -rf .githooks/
-    - rm -rf medialake_user_interface/test-results/
-    - rm -rf medialake_user_interface/playwright-report/
-    # Stage all changes and commit with the MR title
+    - rm -f secrets.txt .roomodes .gitleaksignore fix.sh setup-dev.sh manage-hooks.sh PERFORMANCE_OPTIMIZATION.md AUTHORIZATION_FIX.md .pre-commit-config.yaml .secrets.baseline .gitlab-ci.yml .gitattributes .flake8
+    - rm -rf .sonar/ INTERNAL-utils/ docs/ .roo/ .kiro/ github-repo/ .traycer/ INTERNAL-ai-documentation/ memory-bank/ cdk-test-output/ design/ tests/ scripts/ .githooks/ medialake_user_interface/test-results/ medialake_user_interface/playwright-report/
     - git add -A
     - 'git commit --allow-empty -m "${COMMIT_MESSAGE}"'
     - 'echo "New commit created:" && git log --oneline -1'
-    # Push to GitHub main branch
     - git push origin main
 
 # Shared variables for all E2E test jobs
@@ -493,15 +442,12 @@ sync-to-github:
     - echo "CI_JOB_TIMEOUT:$CI_JOB_TIMEOUT"
     - echo "Checking for potential timeout issues..."
     - echo "============================================"
-    # Install required dependencies
     - yum update -y
     - yum install -y python3 python3-pip unzip which findutils zip
-    # Install Node.js (required for Playwright)
     - curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
     - yum install -y nodejs
     - node --version
     - npm --version
-    # Install AWS CLI
     - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
     - unzip awscliv2.zip
     - ./aws/install
@@ -515,7 +461,6 @@ sync-to-github:
     - echo $CDK_DEFAULT_ACCOUNT
     - echo $CDK_DEPLOY_REGION
     - echo "Environment credentials overridden for testing"
-    # Verify AWS access
     - cat /root/.aws/credentials
     - cat /root/.aws/config
     - whoami
