@@ -411,42 +411,50 @@ pre_commit_checks:
     - pre-commit run --all-files prettier
     - find . -name .DS_Store -type f -delete
 
-# Semantic versioning and changelog generation (stable branch only)
+# Semantic versioning - runs on MR to stable, tags main branch
 semantic-version:
   image: alpine:latest
-  stage: deploy
+  stage: .pre # Run early in the pipeline
   variables:
-    GIT_DEPTH: 0 # Fetch full git history to analyze all commits
+    GIT_DEPTH: 0 # Fetch full git history
   rules:
-    - if: '$CI_COMMIT_REF_NAME == "stable"'
+    # Only run when there's an MR targeting stable
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"'
       when: on_success
     - when: never
   script:
     - apk add --no-cache git bash
     - git config --global user.email "medialake@amazon.com"
     - git config --global user.name "Media Lake CI"
-    # Configure Git to push using GitLab token (use project token if available, fallback to CI_JOB_TOKEN)
+    # Configure Git to push using GitLab token
     - |
       echo "DEBUG: Checking for GITLAB_PUSH_TOKEN..."
-      echo "DEBUG: GITLAB_PUSH_TOKEN is set: $(if [ -n "$GITLAB_PUSH_TOKEN" ]; then echo 'YES'; else echo 'NO'; fi)"
-      echo "DEBUG: GITLAB_PUSH_TOKEN length: ${#GITLAB_PUSH_TOKEN}"
       if [ -n "$GITLAB_PUSH_TOKEN" ]; then
         echo "✓ Using GITLAB_PUSH_TOKEN for authentication"
         git remote set-url origin "https://gitlab-ci-token:${GITLAB_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
       else
-        echo "⚠ GITLAB_PUSH_TOKEN not found, using CI_JOB_TOKEN for authentication"
-        echo "⚠ Note: CI_JOB_TOKEN may not have push permissions!"
+        echo "⚠ GITLAB_PUSH_TOKEN not found, using CI_JOB_TOKEN"
         git remote set-url origin "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
       fi
+    # Fetch both main and stable branches
+    - git fetch origin main:main
+    - git fetch origin stable:stable
     - |
       cat > /tmp/semantic_version.sh << 'SCRIPT_EOF'
       #!/bin/bash
       set -e
       echo "=========================================="
-      echo "Changelog Generation & Versioning (stable)"
+      echo "Changelog Generation & Versioning"
+      echo "Triggered by MR: main -> stable"
       echo "=========================================="
 
-      # Get the last version tag (or default to 0.0.0 for initial calculation)
+      # Checkout main branch (where we'll create the tag)
+      echo "Checking out main branch..."
+      git checkout main
+      echo "Current branch: $(git branch --show-current)"
+      echo "Current commit: $(git rev-parse HEAD)"
+
+      # Get the last version tag from stable branch (tags are shared across branches)
       LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
 
       if [ -z "$LAST_TAG" ]; then
@@ -455,32 +463,38 @@ semantic-version:
         LAST_TAG="v0.0.0"
       else
         echo "Last version tag: $LAST_TAG"
-        LAST_VERSION="${LAST_TAG#v}"  # Remove 'v' prefix
+        LAST_VERSION="${LAST_TAG#v}"
       fi
 
       # Parse current version
       IFS='.' read -r MAJOR MINOR PATCH <<< "$LAST_VERSION"
-
       echo "Current version: $MAJOR.$MINOR.$PATCH"
       echo ""
 
-      # Get all commits since last version tag (including merge commits to capture MR titles)
-      if [ "$LAST_TAG" = "v0.0.0" ]; then
-        echo "Getting all commits (no previous tag)"
-        COMMITS=$(git log --pretty=format:"%H|%s|%b")
-      else
-        echo "Getting commits since $LAST_TAG"
-        COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"%H|%s|%b")
-      fi
+      # Get commits on main that are NOT on stable yet
+      # This gives us only the NEW commits that will be merged
+      echo "Analyzing commits that will be merged from main to stable..."
 
-      echo "DEBUG: Number of commits found: $(echo "$COMMITS" | grep -c '.')"
+      # Get the merge base (common ancestor) between main and stable
+      MERGE_BASE=$(git merge-base main origin/stable)
+      echo "Merge base commit: $MERGE_BASE"
+
+      # Get all commits from merge base to main HEAD
+      COMMITS=$(git log ${MERGE_BASE}..main --pretty=format:"%H|%s|%b")
+
+      echo "DEBUG: Number of commits to analyze: $(echo "$COMMITS" | grep -c '.' || echo 0)"
+
       if [ -z "$COMMITS" ]; then
-        echo "WARNING: No commits found to analyze!"
-        echo "No version-bumping changes detected."
+        echo "WARNING: No new commits to merge from main to stable!"
+        echo "No version bump needed."
         exit 0
       fi
 
-      # Initialize bump type (none, patch, minor, major)
+      echo "DEBUG: Commits to be versioned:"
+      echo "$COMMITS" | head -10 | cut -d'|' -f2
+      echo ""
+
+      # Initialize bump type
       BUMP_TYPE="none"
 
       # Arrays to store commits by type
@@ -491,55 +505,28 @@ semantic-version:
       PERFORMANCES=""
       OTHERS=""
 
-      echo "Analyzing commits since $LAST_TAG..."
-      echo ""
-      echo "DEBUG: Total commits to analyze:"
-      echo "$COMMITS" | wc -l
-      echo ""
-      echo "DEBUG: First 5 commit subjects:"
-      echo "$COMMITS" | head -5 | cut -d'|' -f2
-      echo ""
-
       # Process each commit
       while IFS='|' read -r HASH SUBJECT BODY; do
-        # Skip empty lines
         [ -z "$HASH" ] && continue
 
         echo "DEBUG: Analyzing commit: $SUBJECT"
         FULL_MESSAGE="$SUBJECT"$'\n'"$BODY"
 
-        # Check for breaking changes (! after type/scope or BREAKING CHANGE: in message)
-        # Matches: feat!: or feat(scope)!: or BREAKING CHANGE: anywhere in commit message
+        # Check for breaking changes
         if [[ "$SUBJECT" =~ ^[a-z]+(\([a-zA-Z0-9\-_.]+\))?!:[[:space:]] ]] || [[ "$FULL_MESSAGE" =~ BREAKING[[:space:]]CHANGE: ]]; then
           echo "  [MAJOR] Breaking change detected: $SUBJECT"
           BUMP_TYPE="major"
           BREAKING_CHANGES="${BREAKING_CHANGES}- ${SUBJECT}"$'\n'
         # Check for features
-        elif [[ "$SUBJECT" =~ ^feat(\([a-zA-Z0-9\-_.]+\))?: ]]; then
+        elif [[ "$SUBJECT" =~ ^feat(\([a-zA-Z0-9\-_.]+\))?: ]] || [[ "$SUBJECT" == feat:* ]]; then
           echo "  [MINOR] Feature: $SUBJECT"
           if [ "$BUMP_TYPE" != "major" ]; then
             BUMP_TYPE="minor"
           fi
           FEATURES="${FEATURES}- ${SUBJECT}"$'\n'
-        # Debug: check if it starts with feat
-        elif [[ "$SUBJECT" == feat:* ]]; then
-          echo "  [DEBUG] Found feat: prefix but regex didn't match: '$SUBJECT'"
-          echo "  [DEBUG] Treating as MINOR anyway"
-          if [ "$BUMP_TYPE" != "major" ]; then
-            BUMP_TYPE="minor"
-          fi
-          FEATURES="${FEATURES}- ${SUBJECT}"$'\n'
         # Check for fixes
-        elif [[ "$SUBJECT" =~ ^fix(\([a-zA-Z0-9\-_.]+\))?: ]]; then
+        elif [[ "$SUBJECT" =~ ^fix(\([a-zA-Z0-9\-_.]+\))?: ]] || [[ "$SUBJECT" == fix:* ]]; then
           echo "  [PATCH] Fix: $SUBJECT"
-          if [ "$BUMP_TYPE" = "none" ]; then
-            BUMP_TYPE="patch"
-          fi
-          FIXES="${FIXES}- ${SUBJECT}"$'\n'
-        # Debug: check if it starts with fix
-        elif [[ "$SUBJECT" == fix:* ]]; then
-          echo "  [DEBUG] Found fix: prefix but regex didn't match: '$SUBJECT'"
-          echo "  [DEBUG] Treating as PATCH anyway"
           if [ "$BUMP_TYPE" = "none" ]; then
             BUMP_TYPE="patch"
           fi
@@ -566,7 +553,7 @@ semantic-version:
         elif [[ "$SUBJECT" =~ ^(docs|ci)(\([a-zA-Z0-9\-_.]+\))?: ]]; then
           echo "  [NO BUMP] ${SUBJECT}"
           OTHERS="${OTHERS}- ${SUBJECT}"$'\n'
-        # Other types (style, test, build) are patches
+        # Other types are patches
         elif [[ "$SUBJECT" =~ ^(style|test|build)(\([a-zA-Z0-9\-_.]+\))?: ]]; then
           echo "  [PATCH] ${SUBJECT}"
           if [ "$BUMP_TYPE" = "none" ]; then
@@ -606,7 +593,7 @@ semantic-version:
       echo "New tag: $NEW_TAG"
       echo ""
 
-      # Generate CHANGELOG entry with version number
+      # Generate CHANGELOG entry
       CHANGELOG_ENTRY="## [$NEW_VERSION] - $(date +%Y-%m-%d)"$'\n\n'
 
       if [ -n "$BREAKING_CHANGES" ]; then
@@ -635,19 +622,14 @@ semantic-version:
 
       # Create or update CHANGELOG.md
       if [ -f CHANGELOG.md ]; then
-        # Insert new entry after the header
         echo "Updating existing CHANGELOG.md"
         TEMP_FILE=$(mktemp)
-
-        # Keep the header (first line) and insert new entry
         head -n 1 CHANGELOG.md > "$TEMP_FILE"
         echo "" >> "$TEMP_FILE"
         echo "$CHANGELOG_ENTRY" >> "$TEMP_FILE"
         tail -n +2 CHANGELOG.md >> "$TEMP_FILE"
-
         mv "$TEMP_FILE" CHANGELOG.md
       else
-        # Create new CHANGELOG.md
         echo "Creating new CHANGELOG.md"
         echo "# Changelog" > CHANGELOG.md
         echo "" >> CHANGELOG.md
@@ -663,33 +645,29 @@ semantic-version:
       echo "=========================================="
       echo ""
 
-      # Checkout stable branch before committing (CI runs in detached HEAD)
-      echo "Checking out stable branch..."
-      git checkout -B stable
-      echo "Current branch: $(git branch --show-current)"
-
-      # Commit the CHANGELOG
+      # Commit the CHANGELOG to main
       git add CHANGELOG.md
-      git commit -m "chore: update CHANGELOG for $NEW_TAG"
+      git commit -m "chore: update CHANGELOG for $NEW_TAG [skip ci]"
 
-      # Create the tag with message from file to avoid shell escaping issues
+      # Create the tag on main
       echo "Release $NEW_VERSION" > /tmp/tag_message.txt
       echo "" >> /tmp/tag_message.txt
       echo "$CHANGELOG_ENTRY" >> /tmp/tag_message.txt
       git tag -a "$NEW_TAG" -F /tmp/tag_message.txt
 
-      echo "✅ Created tag: $NEW_TAG"
-      echo "✅ Updated CHANGELOG.md"
+      echo "✅ Created tag: $NEW_TAG on main branch"
+      echo "✅ Updated CHANGELOG.md on main branch"
       echo ""
 
-      # Push the changelog commit and tag back to stable
-      echo "Pushing changes to stable..."
-      git push origin stable
+      # Push the changelog commit and tag to main
+      echo "Pushing changes to main..."
+      git push origin main
       git push origin "$NEW_TAG"
 
-      echo "✅ Pushed commit and tag to stable"
+      echo "✅ Pushed commit and tag to main"
       echo ""
-      echo "Version $NEW_VERSION released on stable!"
+      echo "Version $NEW_VERSION prepared for release!"
+      echo "The MR can now be merged to stable."
       SCRIPT_EOF
       chmod +x /tmp/semantic_version.sh
       bash /tmp/semantic_version.sh
