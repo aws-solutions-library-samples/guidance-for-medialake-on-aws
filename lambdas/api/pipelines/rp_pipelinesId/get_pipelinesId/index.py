@@ -10,6 +10,9 @@ from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
+
+# Import centralized file extension constants from common_libraries layer
+from file_extensions import get_extensions_as_uppercase_string
 from pydantic import BaseModel
 
 # Initialize Power Tools
@@ -83,38 +86,27 @@ def extract_event_rule_info(pipeline: dict) -> dict:
                     rule_name = rule_info["ruleName"]
 
                     # Check for default pipeline patterns
+                    # Use centralized file extension lists
                     if "default-image-pipeline" in rule_name:
+                        image_exts_str = get_extensions_as_uppercase_string("Image")
                         rule_info["description"] = (
-                            "Triggers on image files (TIF, JPG, JPEG, PNG, WEBP, GIF, SVG)"
+                            f"Triggers on image files ({image_exts_str})"
                         )
-                        rule_info["fileTypes"] = [
-                            "TIF",
-                            "JPG",
-                            "JPEG",
-                            "PNG",
-                            "WEBP",
-                            "GIF",
-                            "SVG",
-                        ]
+                        rule_info["fileTypes"] = image_exts_str.split(", ")
                         rule_info["eventType"] = "AssetCreated"
                     elif "default-video-pipeline" in rule_name:
+                        video_exts_str = get_extensions_as_uppercase_string("Video")
                         rule_info["description"] = (
-                            "Triggers on video files (MP4, MOV, AVI, MKV, WEBM)"
+                            f"Triggers on video files ({video_exts_str})"
                         )
-                        rule_info["fileTypes"] = ["MP4", "MOV", "AVI", "MKV", "WEBM"]
+                        rule_info["fileTypes"] = video_exts_str.split(", ")
                         rule_info["eventType"] = "AssetCreated"
                     elif "default-audio-pipeline" in rule_name:
+                        audio_exts_str = get_extensions_as_uppercase_string("Audio")
                         rule_info["description"] = (
-                            "Triggers on audio files (WAV, AIFF, AIF, MP3, PCM, M4A)"
+                            f"Triggers on audio files ({audio_exts_str})"
                         )
-                        rule_info["fileTypes"] = [
-                            "WAV",
-                            "AIFF",
-                            "AIF",
-                            "MP3",
-                            "PCM",
-                            "M4A",
-                        ]
+                        rule_info["fileTypes"] = audio_exts_str.split(", ")
                         rule_info["eventType"] = "AssetCreated"
                     elif "pipeline_execution_completed" in rule_name:
                         rule_info["description"] = (

@@ -4,10 +4,6 @@ import {
   Event as EventIcon,
   Api as ApiIcon,
   TouchApp as ManualIcon,
-  Image as ImageIcon,
-  Videocam as VideoIcon,
-  AudioFile as AudioIcon,
-  Code as CodeIcon,
 } from "@mui/icons-material";
 import { Pipeline } from "../types/pipelines.types";
 
@@ -105,37 +101,25 @@ const extractEventRuleInfoFromPipeline = (
           const ruleName = rule.ruleName;
 
           // Check for default pipeline patterns
+          // Note: File type lists should come from the API's eventRuleInfo
+          // This is just fallback logic for rule description/eventType
           if (
             ruleName.includes("default-image-pipeline") ||
             pipeline.name.includes("Image Pipeline")
           ) {
-            rule.description =
-              "Triggers on image files (TIF, JPG, JPEG, PNG, WEBP, GIF, SVG)";
-            rule.fileTypes = [
-              "TIF",
-              "JPG",
-              "JPEG",
-              "PNG",
-              "WEBP",
-              "GIF",
-              "SVG",
-            ];
+            rule.description = "Triggers on image files";
             rule.eventType = "AssetCreated";
           } else if (
             ruleName.includes("default-video-pipeline") ||
             pipeline.name.includes("Video Pipeline")
           ) {
-            rule.description =
-              "Triggers on video files (MP4, MOV, AVI, MKV, WEBM)";
-            rule.fileTypes = ["MP4", "MOV", "AVI", "MKV", "WEBM"];
+            rule.description = "Triggers on video files";
             rule.eventType = "AssetCreated";
           } else if (
             ruleName.includes("default-audio-pipeline") ||
             pipeline.name.includes("Audio Pipeline")
           ) {
-            rule.description =
-              "Triggers on audio files (WAV, AIFF, AIF, MP3, PCM, M4A)";
-            rule.fileTypes = ["WAV", "AIFF", "AIF", "MP3", "PCM", "M4A"];
+            rule.description = "Triggers on audio files";
             rule.eventType = "AssetCreated";
           } else if (ruleName.includes("pipeline_execution_completed")) {
             rule.description =
@@ -196,19 +180,15 @@ const getTooltipContent = (type: string, eventRuleInfo?: EventRuleInfo) => {
           )}
           {rule.fileTypes && rule.fileTypes.length > 0 && (
             <Box sx={{ mt: 0.5, display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-              {rule.fileTypes.map((fileType, i) => {
-                const icon = getFileTypeIcon(fileType);
-                return (
-                  <Chip
-                    key={i}
-                    icon={icon}
-                    label={fileType}
-                    size="small"
-                    variant="outlined"
-                    sx={{ height: 20, "& .MuiChip-label": { px: 0.5 } }}
-                  />
-                );
-              })}
+              {rule.fileTypes.map((fileType, i) => (
+                <Chip
+                  key={i}
+                  label={fileType}
+                  size="small"
+                  variant="outlined"
+                  sx={{ height: 20, "& .MuiChip-label": { px: 0.5 } }}
+                />
+              ))}
             </Box>
           )}
           {rule.eventType && (
@@ -220,25 +200,6 @@ const getTooltipContent = (type: string, eventRuleInfo?: EventRuleInfo) => {
       ))}
     </Box>
   );
-};
-
-/**
- * Get the appropriate icon for a file type
- */
-const getFileTypeIcon = (fileType: string) => {
-  const videoFormats = ["MP4", "MOV", "AVI", "MKV", "WEBM"];
-  const imageFormats = ["TIF", "JPG", "JPEG", "PNG", "WEBP", "GIF", "SVG"];
-  const audioFormats = ["WAV", "AIFF", "AIF", "MP3", "PCM", "M4A"];
-
-  if (videoFormats.includes(fileType)) {
-    return <VideoIcon fontSize="small" />;
-  } else if (imageFormats.includes(fileType)) {
-    return <ImageIcon fontSize="small" />;
-  } else if (audioFormats.includes(fileType)) {
-    return <AudioIcon fontSize="small" />;
-  } else {
-    return <CodeIcon fontSize="small" />;
-  }
 };
 
 /**

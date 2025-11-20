@@ -351,6 +351,7 @@ class SNS:
 
 
 # Media formats and MIME types
+# NOTE: For supported file extensions, see lambdas/common_libraries/file_extensions.py
 class MediaFormats:
     """Supported media formats and their MIME types"""
 

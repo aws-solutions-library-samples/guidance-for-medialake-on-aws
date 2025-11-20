@@ -22,6 +22,9 @@ from botocore.auth import SigV4Auth
 from botocore.awsrequest import AWSRequest
 from botocore.config import Config
 
+# Import centralized file extension constants from common_libraries layer
+from file_extensions import SUPPORTED_EXTENSIONS
+
 # OpenSearch configuration
 OPENSEARCH_ENDPOINT = os.environ.get("OPENSEARCH_ENDPOINT", "")
 OPENSEARCH_INDEX = os.environ.get("INDEX_NAME", "media")
@@ -266,27 +269,15 @@ def determine_asset_type(content_type: str, file_extension: str) -> str:
     content_type = content_type.lower() if content_type else ""
     file_extension = file_extension.lower() if file_extension else ""
 
-    # Image classification - matching Default Image Pipeline: PSD, TIF, JPG, JPEG, PNG, WEBP, GIF, SVG
+    # MIME type prefixes for classification
     image_mimes = ["image/", "application/photoshop", "application/illustrator"]
-    image_extensions = [
-        "psd",
-        "tif",
-        "tiff",
-        "jpg",
-        "jpeg",
-        "png",
-        "webp",
-        "gif",
-        "svg",
-    ]
-
-    # Video classification - matching Default Video Pipeline: FLV, MP4, MOV, AVI, MKV, WEBM, MXF
     video_mimes = ["video/"]
-    video_extensions = ["flv", "mp4", "mov", "avi", "mkv", "webm", "mxf"]
-
-    # Audio classification - matching Default Audio Pipeline: WAV, AIFF, AIF, MP3, PCM, M4A
     audio_mimes = ["audio/"]
-    audio_extensions = ["wav", "aiff", "aif", "mp3", "pcm", "m4a"]
+
+    # Use centralized extension lists from constants
+    image_extensions = SUPPORTED_EXTENSIONS["Image"]
+    video_extensions = SUPPORTED_EXTENSIONS["Video"]
+    audio_extensions = SUPPORTED_EXTENSIONS["Audio"]
 
     # Check MIME type first as it's more reliable
     for prefix in image_mimes:
