@@ -189,23 +189,15 @@ After deployment, you'll need to configure storage connectors to connect media l
 
 ## 4. Incremental Updates
 
-### For Git Source Type (Recommended)
+If you deployed using the **Git** source type, Media Lake can be updated with the latest code from the GitHub repository by following these instructions:
 
-Media lake automatically stays up-to-date when using the Git source type deployment method. The system pulls the latest code from the GitHub repository during each deployment.
+1. In the AWS console, go to **CodePipeline**
+   ![CodePipeline](../images/installation-guide/IncrementalUpdates-1.png)
 
-To trigger an update with the latest media lake features and improvements, simply redeploy using the same CloudFormation steps from [Section 1. Base Installation](#1-base-installation):
+2. Select the `MediaLakeCDKPipeline` pipeline and click **Release change** to trigger the deployment
+   ![ReleaseChange](../images/installation-guide/IncrementalUpdates-2.png)
 
-1. Follow the **Deploy via CloudFormation** steps (steps 1-6) from the Base Installation section above
-2. Use the same stack name `medialake-cf` - CloudFormation will update the existing stack
-3. The deployment will automatically pull the latest version from the GitHub repository and update your media lake instance
-
-### For S3PresignedURL Source Type (Alternative)
-
-If you deployed using the S3PresignedURL source type, you can update by redeploying with a new presigned URL:
-
-1. Follow the same CloudFormation deployment steps from [Section 1. Base Installation](#1-base-installation)
-2. In step 4, update the **S3 Presigned URL** field with the latest presigned URL provided to you
-3. Use the same stack name `medialake-cf` to update the existing deployment
+3. The deployment will automatically pull the latest version from the GitHub repository and update your Media Lake instance
 
 ---
 
