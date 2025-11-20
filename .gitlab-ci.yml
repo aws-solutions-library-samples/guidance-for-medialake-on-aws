@@ -18,14 +18,11 @@ variables:
 
 workflow:
   rules:
-    # Always allow merge request pipelines (highest priority)
+    # Merge request pipelines
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      variables:
-        CI_MERGE_REQUEST_ENABLED: "true"
-    # Allow pipelines on all branches (except explicitly blocked ones)
-    - if: $CI_COMMIT_REF_NAME
-      when: always
+    # Release branch pipeline
     - if: $CI_COMMIT_BRANCH == "release"
+    # Block all other branch pipelines
     - when: never
 
 # Cache modules in between jobs
