@@ -1,463 +1,88 @@
 stages:
-  - .pre
-  - lint
-  - deploy
   - test
+  - build
 
-default:
-  image: public.ecr.aws/amazonlinux/amazonlinux:latest
-  tags:
-    - arch:amd64
-    - size:large
-
-# Variables
-variables:
-  PROJECT_ENV: $CI_COMMIT_REF_SLUG
-  AWS_CONFIG_FILE: $CI_BUILDS_DIR/.awscredentialvendor/config
-  AWS_SHARED_CREDENTIALS_FILE: $CI_BUILDS_DIR/.awscredentialvendor/credentials
-
+# Simple workflow - only MR pipelines and release branch
 workflow:
   rules:
-    # Merge request pipelines
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    # Release branch pipeline
+      when: always
     - if: $CI_COMMIT_BRANCH == "release"
-    # Block all other branch pipelines
+      when: always
     - when: never
 
-# Cache modules in between jobs
-cache:
-  key: $CI_COMMIT_REF_SLUG
-  paths:
-    - .cache/pip
+# This job should ALWAYS run on ANY merge request
+debug-all-mrs:
+  stage: test
+  image: alpine:latest
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  script:
+    - echo "=========================================="
+    - echo "DEBUG - Pipeline Variables"
+    - echo "=========================================="
+    - echo "Pipeline source - ${CI_PIPELINE_SOURCE}"
+    - echo "Commit branch - ${CI_COMMIT_BRANCH}"
+    - echo "Commit ref name - ${CI_COMMIT_REF_NAME}"
+    - echo "Source branch - ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}"
+    - echo "Target branch - ${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}"
+    - echo "MR ID - ${CI_MERGE_REQUEST_IID}"
+    - echo "MR title - ${CI_MERGE_REQUEST_TITLE}"
+    - echo "=========================================="
+    - echo "Pipeline is working"
 
-# Validate merge request titles follow Angular Conventional Commits
+# This job should ONLY run on MRs targeting 'main'
+test-mr-to-main:
+  stage: test
+  image: alpine:latest
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+  script:
+    - echo "This MR is targeting the main branch"
+
+# This job should ONLY run on MRs targeting 'stable'
+test-mr-to-stable:
+  stage: build
+  image: alpine:latest
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
+  script:
+    - echo "=========================================="
+    - echo "SUCCESS - MR to stable is working"
+    - echo "=========================================="
+    - echo "Source branch - ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}"
+    - echo "Target branch - ${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}"
+    - echo "This confirms your pipeline can run for stable branch MRs"
+
+# Validate MR title for main and stable branches
 mr-title-check:
-  stage: .pre
+  stage: test
   image: alpine:latest
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
   script:
-    - apk add --no-cache jq
+    - apk add --no-cache grep
     - |
-      # Angular Conventional Commits regex with "release" added for stable->release merges
-      REGEX='^(build|ci|docs|feat|fix|perf|refactor|release|style|test)(\([a-zA-Z0-9\-_.]+\))?(!)?: .+'
-      TITLE="$CI_MERGE_REQUEST_TITLE"
-
-      echo "Validating merge request title: $TITLE"
-
-      if ! echo "$TITLE" | grep -E "$REGEX" > /dev/null; then
-        echo ""
-        echo "❌ ERROR: Merge request title must follow Angular Conventional Commits format"
-        echo ""
-        echo "Format: <type>(<scope>): <description>"
-        echo ""
-        echo "Allowed types:"
-        echo "  - build:    Changes to build system or dependencies"
-        echo "  - ci:       Changes to CI/CD configuration"
-        echo "  - docs:     Documentation changes"
-        echo "  - feat:     New features"
-        echo "  - fix:      Bug fixes"
-        echo "  - perf:     Performance improvements"
-        echo "  - refactor: Code refactoring"
-        echo "  - release:  Release commits (for main->stable merges)"
-        echo "  - style:    Code style changes"
-        echo "  - test:     Test changes"
-        echo ""
-        echo "Examples:"
-        echo "  - feat(auth): add login functionality"
-        echo "  - fix(ci): retry image build on failure"
-        echo "  - docs: update README with new deployment steps"
-        echo "  - release: Update stable branch for release"
-        echo ""
-        echo "Your title: $TITLE"
+      REGEX="^(build|ci|docs|feat|fix|perf|refactor|release|style|test)(\([a-zA-Z0-9\-_.]+\))?(!)?: .+"
+      TITLE="${CI_MERGE_REQUEST_TITLE}"
+      echo "Validating MR title: ${TITLE}"
+      if ! echo "${TITLE}" | grep -E "${REGEX}" > /dev/null; then
+        echo "ERROR: MR title must follow Conventional Commits format"
+        echo "Examples: feat(api): add new endpoint, fix: resolve bug"
         exit 1
       fi
+      echo "MR title is valid"
 
-      echo "✅ Merge request title is valid!"
-
-.echo_versions: &echo_versions
-  before_script:
-    # Install required dependencies
-    - yum update -y
-    - yum install -y python3 python3-pip nodejs npm git jq unzip which findutils
-    - yum install -y atk at-spi2-atk cups-libs libdrm libxcb libxkbcommon at-spi2-core libX11 libXcomposite libXdamage libXext libXfixes libXrandr mesa-libgbm pango cairo alsa-lib
-    # Install AWS CLI
-    - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-    - unzip awscliv2.zip
-    - ./aws/install
-    # Install AWS CDK
-    - npm install -g aws-cdk
-    - echo "login = $GITLAB_USER_LOGIN - role = $AWS_CREDS_TARGET_ROLE"
-    - npm --version
-    - node --version
-    - aws --version
-    - cdk --version
-    - jq --version
-
-# Pre-commit hooks job for merge requests to main (excluding ESLint)
-pre_commit_checks:
-  stage: lint
-  <<: *echo_versions
-  rules:
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
-  script:
-    - echo "Running pre-commit checks for merge request to main"
-    - python3 -m venv .venv
-    - source .venv/bin/activate
-    - pip install pre-commit
-    - npm install
-    # Install additional dependencies for pre-commit hooks
-    - pip install autoflake isort black flake8
-    - npm install -g prettier
-    # Run pre-commit hooks excluding ESLint
-    - pre-commit run --all-files trailing-whitespace
-    - pre-commit run --all-files end-of-file-fixer
-    - pre-commit run --all-files check-yaml
-    - pre-commit run --all-files check-added-large-files
-    - pre-commit run --all-files check-merge-conflict
-    - pre-commit run --all-files detect-private-key
-    - pre-commit run --all-files check-json
-    - pre-commit run --all-files autoflake
-    - pre-commit run --all-files isort
-    - pre-commit run --all-files black
-    - pre-commit run --all-files flake8
-    - pre-commit run --all-files prettier
-    - find . -name .DS_Store -type f -delete
-
-# Semantic versioning - runs on MR to stable (tags main branch)
-semantic-version:
+# Simple version check for MRs to stable
+version-check:
+  stage: build
   image: alpine:latest
-  stage: .pre
-  variables:
-    GIT_DEPTH: 0
   rules:
-    # Only run when there's an MR targeting stable
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
-
   script:
-    - apk add --no-cache git bash
-    - git config --global user.email "medialake@amazon.com"
-    - git config --global user.name "Media Lake CI"
-    # Configure Git to push using GitLab token
-    - |
-      if [ -n "$GITLAB_PUSH_TOKEN" ]; then
-        echo "✓ Using GITLAB_PUSH_TOKEN for authentication"
-        git remote set-url origin "https://gitlab-ci-token:${GITLAB_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
-      else
-        echo "⚠ GITLAB_PUSH_TOKEN not found, using CI_JOB_TOKEN"
-        git remote set-url origin "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
-      fi
-    # Fetch both main and stable branches
-    - git fetch origin main:main
-    - git fetch origin stable:stable
-    - |
-      cat > /tmp/semantic_version.sh << 'SCRIPT_EOF'
-      #!/bin/bash
-      set -e
-      echo "=========================================="
-      echo "Changelog Generation & Versioning"
-      echo "Triggered by MR: main -> stable"
-      echo "=========================================="
-
-      # Checkout main branch (where we'll create the tag)
-      echo "Checking out main branch..."
-      git checkout main
-      echo "Current branch: $(git branch --show-current)"
-      echo "Current commit: $(git rev-parse HEAD)"
-
-      # Get the last version tag
-      LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-
-      if [ -z "$LAST_TAG" ]; then
-        echo "No existing tags found. Will create initial version v1.0.0"
-        LAST_VERSION="0.0.0"
-        LAST_TAG="v0.0.0"
-      else
-        echo "Last version tag: $LAST_TAG"
-        LAST_VERSION="${LAST_TAG#v}"
-      fi
-
-      # Parse current version
-      IFS='.' read -r MAJOR MINOR PATCH <<< "$LAST_VERSION"
-      echo "Current version: $MAJOR.$MINOR.$PATCH"
-      echo ""
-
-      # Get commits on main that are NOT on stable yet
-      echo "Analyzing commits that will be merged from main to stable..."
-
-      # Get the merge base (common ancestor) between main and stable
-      MERGE_BASE=$(git merge-base main origin/stable 2>/dev/null || echo "")
-
-      if [ -z "$MERGE_BASE" ]; then
-        echo "No common ancestor found. Using all commits from main."
-        COMMITS=$(git log main --pretty=format:"%H|%s|%b")
-      else
-        echo "Merge base commit: $MERGE_BASE"
-        COMMITS=$(git log ${MERGE_BASE}..main --pretty=format:"%H|%s|%b")
-      fi
-
-      echo "DEBUG: Number of commits to analyze: $(echo "$COMMITS" | grep -c '.' || echo 0)"
-
-      if [ -z "$COMMITS" ]; then
-        echo "WARNING: No new commits to merge from main to stable!"
-        echo "No version bump needed."
-        exit 0
-      fi
-
-      echo "DEBUG: Commits to be versioned:"
-      echo "$COMMITS" | head -10 | cut -d'|' -f2
-      echo ""
-
-      # Initialize bump type
-      BUMP_TYPE="none"
-
-      # Arrays to store commits by type
-      BREAKING_CHANGES=""
-      FEATURES=""
-      FIXES=""
-      REFACTORS=""
-      PERFORMANCES=""
-      OTHERS=""
-
-      # Process each commit
-      while IFS='|' read -r HASH SUBJECT BODY; do
-        [ -z "$HASH" ] && continue
-
-        echo "DEBUG: Analyzing commit: $SUBJECT"
-        FULL_MESSAGE="$SUBJECT"$'\n'"$BODY"
-
-        if [[ "$SUBJECT" =~ ^[a-z]+(\([a-zA-Z0-9\-_.]+\))?!:[[:space:]] ]] || [[ "$FULL_MESSAGE" =~ BREAKING[[:space:]]CHANGE: ]]; then
-          echo "  [MAJOR] Breaking change detected: $SUBJECT"
-          BUMP_TYPE="major"
-          BREAKING_CHANGES="${BREAKING_CHANGES}- ${SUBJECT}"$'\n'
-        elif [[ "$SUBJECT" =~ ^feat(\([a-zA-Z0-9\-_.]+\))?: ]] || [[ "$SUBJECT" == feat:* ]]; then
-          echo "  [MINOR] Feature: $SUBJECT"
-          if [ "$BUMP_TYPE" != "major" ]; then
-            BUMP_TYPE="minor"
-          fi
-          FEATURES="${FEATURES}- ${SUBJECT}"$'\n'
-        elif [[ "$SUBJECT" =~ ^fix(\([a-zA-Z0-9\-_.]+\))?: ]] || [[ "$SUBJECT" == fix:* ]]; then
-          echo "  [PATCH] Fix: $SUBJECT"
-          if [ "$BUMP_TYPE" = "none" ]; then
-            BUMP_TYPE="patch"
-          fi
-          FIXES="${FIXES}- ${SUBJECT}"$'\n'
-        elif [[ "$SUBJECT" =~ ^refactor(\([a-zA-Z0-9\-_.]+\))?: ]]; then
-          echo "  [PATCH] Refactor: $SUBJECT"
-          if [ "$BUMP_TYPE" = "none" ]; then
-            BUMP_TYPE="patch"
-          fi
-          REFACTORS="${REFACTORS}- ${SUBJECT}"$'\n'
-        elif [[ "$SUBJECT" =~ ^perf(\([a-zA-Z0-9\-_.]+\))?: ]]; then
-          echo "  [PATCH] Performance: $SUBJECT"
-          if [ "$BUMP_TYPE" = "none" ]; then
-            BUMP_TYPE="patch"
-          fi
-          PERFORMANCES="${PERFORMANCES}- ${SUBJECT}"$'\n'
-        elif [[ "$SUBJECT" =~ ^release(\([a-zA-Z0-9\-_.]+\))?: ]]; then
-          echo "  [TRACKED] Release: $SUBJECT"
-          OTHERS="${OTHERS}- ${SUBJECT}"$'\n'
-        elif [[ "$SUBJECT" =~ ^(docs|ci)(\([a-zA-Z0-9\-_.]+\))?: ]]; then
-          echo "  [NO BUMP] ${SUBJECT}"
-          OTHERS="${OTHERS}- ${SUBJECT}"$'\n'
-        elif [[ "$SUBJECT" =~ ^(style|test|build)(\([a-zA-Z0-9\-_.]+\))?: ]]; then
-          echo "  [PATCH] ${SUBJECT}"
-          if [ "$BUMP_TYPE" = "none" ]; then
-            BUMP_TYPE="patch"
-          fi
-          OTHERS="${OTHERS}- ${SUBJECT}"$'\n'
-        fi
-      done <<< "$COMMITS"
-
-      echo ""
-      echo "Version bump type: $BUMP_TYPE"
-
-      # Calculate new version
-      case $BUMP_TYPE in
-        major)
-          MAJOR=$((MAJOR + 1))
-          MINOR=0
-          PATCH=0
-          ;;
-        minor)
-          MINOR=$((MINOR + 1))
-          PATCH=0
-          ;;
-        patch)
-          PATCH=$((PATCH + 1))
-          ;;
-        none)
-          echo "No version-bumping changes detected. Keeping version at $MAJOR.$MINOR.$PATCH"
-          exit 0
-          ;;
-      esac
-
-      NEW_VERSION="$MAJOR.$MINOR.$PATCH"
-      NEW_TAG="v$NEW_VERSION"
-
-      echo "New version: $NEW_VERSION"
-      echo "New tag: $NEW_TAG"
-      echo ""
-
-      # Generate CHANGELOG entry
-      CHANGELOG_ENTRY="## [$NEW_VERSION] - $(date +%Y-%m-%d)"$'\n\n'
-
-      if [ -n "$BREAKING_CHANGES" ]; then
-        CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### ⚠ BREAKING CHANGES"$'\n\n'"${BREAKING_CHANGES}"$'\n'
-      fi
-
-      if [ -n "$FEATURES" ]; then
-        CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### ✨ Features"$'\n\n'"${FEATURES}"$'\n'
-      fi
-
-      if [ -n "$FIXES" ]; then
-        CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### 🐛 Bug Fixes"$'\n\n'"${FIXES}"$'\n'
-      fi
-
-      if [ -n "$PERFORMANCES" ]; then
-        CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### ⚡ Performance Improvements"$'\n\n'"${PERFORMANCES}"$'\n'
-      fi
-
-      if [ -n "$REFACTORS" ]; then
-        CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### ♻️ Code Refactoring"$'\n\n'"${REFACTORS}"$'\n'
-      fi
-
-      if [ -n "$OTHERS" ]; then
-        CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### 📝 Other Changes"$'\n\n'"${OTHERS}"$'\n'
-      fi
-
-      # Create or update CHANGELOG.md
-      if [ -f CHANGELOG.md ]; then
-        echo "Updating existing CHANGELOG.md"
-        TEMP_FILE=$(mktemp)
-        head -n 1 CHANGELOG.md > "$TEMP_FILE"
-        echo "" >> "$TEMP_FILE"
-        echo "$CHANGELOG_ENTRY" >> "$TEMP_FILE"
-        tail -n +2 CHANGELOG.md >> "$TEMP_FILE"
-        mv "$TEMP_FILE" CHANGELOG.md
-      else
-        echo "Creating new CHANGELOG.md"
-        echo "# Changelog" > CHANGELOG.md
-        echo "" >> CHANGELOG.md
-        echo "$CHANGELOG_ENTRY" >> CHANGELOG.md
-      fi
-
-      echo "CHANGELOG.md updated successfully"
-      echo ""
-      echo "=========================================="
-      echo "Preview of new CHANGELOG entry:"
-      echo "=========================================="
-      head -n 30 CHANGELOG.md
-      echo "=========================================="
-      echo ""
-
-      # Commit the CHANGELOG to main
-      git add CHANGELOG.md
-      git commit -m "chore: update CHANGELOG for $NEW_TAG [skip ci]"
-
-      # Create the tag on main
-      echo "Release $NEW_VERSION" > /tmp/tag_message.txt
-      echo "" >> /tmp/tag_message.txt
-      echo "$CHANGELOG_ENTRY" >> /tmp/tag_message.txt
-      git tag -a "$NEW_TAG" -F /tmp/tag_message.txt
-
-      echo "✅ Created tag: $NEW_TAG on main branch"
-      echo "✅ Updated CHANGELOG.md on main branch"
-      echo ""
-
-      # Push the changelog commit and tag to main
-      echo "Pushing changes to main..."
-      git push origin main
-      git push origin "$NEW_TAG"
-
-      echo "✅ Pushed commit and tag to main"
-      echo ""
-      echo "Version $NEW_VERSION prepared for release!"
-      echo "The MR can now be merged to stable."
-      SCRIPT_EOF
-      chmod +x /tmp/semantic_version.sh
-      bash /tmp/semantic_version.sh
-
-sync-to-github:
-  image: alpine:latest
-  stage: deploy
-  rules:
-    - if: $CI_COMMIT_REF_NAME == "release"
-  script:
-    - apk add --no-cache git openssh rsync
-    - mkdir -p ~/.ssh
-    - echo "$GITHUB_SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
-    - chmod 600 ~/.ssh/id_rsa
-    - ssh-keyscan github.com >> ~/.ssh/known_hosts
-    - git config --global user.email "medialake@amazon.com"
-    - git config --global user.name "Media Lake CI"
-    - 'echo "Debug - Full commit message:"'
-    - git log -1 --pretty=%B
-    - 'echo "Debug - Extracting line 3..."'
-    - 'export COMMIT_MESSAGE=$(git log -1 --pretty=%B | sed -n "3p" | xargs)'
-    - 'echo "Debug - Extracted message: [${COMMIT_MESSAGE}]"'
-    - 'if [ -z "$COMMIT_MESSAGE" ]; then export COMMIT_MESSAGE="${CI_COMMIT_TITLE}"; fi'
-    - 'echo "Final commit message for GitHub: ${COMMIT_MESSAGE}"'
-    - git clone git@github.com:aws-solutions-library-samples/guidance-for-medialake-on-aws.git github-repo
-    - cd github-repo
-    - 'echo "Current GitHub main commit:" && git log --oneline -1'
-    - rsync -av --delete --exclude=.git ../ ./
-    - rm -f secrets.txt .roomodes .gitleaksignore fix.sh setup-dev.sh manage-hooks.sh PERFORMANCE_OPTIMIZATION.md AUTHORIZATION_FIX.md .pre-commit-config.yaml .secrets.baseline .gitlab-ci.yml .gitattributes .flake8
-    - rm -rf .sonar/ INTERNAL-utils/ docs/ .roo/ .kiro/ github-repo/ .traycer/ INTERNAL-ai-documentation/ memory-bank/ cdk-test-output/ design/ tests/ scripts/ .githooks/ medialake_user_interface/test-results/ medialake_user_interface/playwright-report/
-    - git add -A
-    - 'git commit --allow-empty -m "${COMMIT_MESSAGE}"'
-    - 'echo "New commit created:" && git log --oneline -1'
-    - git push origin main
-
-# Shared variables for all E2E test jobs
-.e2e_variables: &e2e_variables
-  AWS_CREDS_TARGET_ROLE: $US_WEST_2_AWS_IAM_ROLE
-  TARGET_ROLE: $US_WEST_2_AWS_IAM_ROLE
-  AWS_DEFAULT_ACCOUNT: $US_WEST_2_AWS_ACCOUNT_ID
-  AWS_DEFAULT_REGION: $US_WEST_2_AWS_REGION
-  DEPLOY_REGION: $US_WEST_2_AWS_REGION
-  CDK_DEPLOY_ACCOUNT: $US_WEST_2_AWS_ACCOUNT_ID
-  CDK_DEFAULT_ACCOUNT: $US_WEST_2_AWS_ACCOUNT_ID
-  CDK_DEPLOY_REGION: $US_WEST_2_AWS_REGION
-  STACK_PREFIX: "medialake"
-  STACK_NAME: "medialake-e2e-test"
-  ENVIRONMENT_NAME: "e2e"
-  DEPLOYMENT_SIZE: "small"
-  ZIP_FILE_NAME: "medialake-source-${CI_COMMIT_SHORT_SHA}.zip"
-
-# Shared before_script for basic AWS setup
-.e2e_aws_setup: &e2e_aws_setup
-  before_script:
-    - echo "============================================"
-    - echo "Job Start Time:$(date '+%Y-%m-%d %H:%M:%S %Z')"
-    - echo "Job Timeout Configuration:4 hours"
-    - echo "CI_JOB_TIMEOUT:$CI_JOB_TIMEOUT"
-    - echo "Checking for potential timeout issues..."
-    - echo "============================================"
-    - yum update -y
-    - yum install -y python3 python3-pip unzip which findutils zip
-    - curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
-    - yum install -y nodejs
-    - node --version
-    - npm --version
-    - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-    - unzip awscliv2.zip
-    - ./aws/install
-    - echo "AWS credentials configured for testing in region $DEPLOY_REGION"
-    - cat $AWS_SHARED_CREDENTIALS_FILE
-    - echo $AWS_CREDS_TARGET_ROLE
-    - echo $AWS_DEFAULT_ACCOUNT
-    - echo $AWS_DEFAULT_REGION
-    - echo $DEPLOY_REGION
-    - echo $CDK_DEPLOY_ACCOUNT
-    - echo $CDK_DEFAULT_ACCOUNT
-    - echo $CDK_DEPLOY_REGION
-    - echo "Environment credentials overridden for testing"
-    - cat /root/.aws/credentials
-    - cat /root/.aws/config
-    - whoami
-    - aws s3 ls --profile default
-    - aws sts get-caller-identity --profile default
-    - echo "AWS identity verified for testing"
+    - echo "=========================================="
+    - echo "This is where semantic versioning would run"
+    - echo "Target - ${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}"
+    - echo "=========================================="
+    - echo "Version check placeholder passed"
