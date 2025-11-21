@@ -86,3 +86,238 @@ version-check:
     - echo "Target - ${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}"
     - echo "=========================================="
     - echo "Version check placeholder passed"
+
+# STEP 1: Add back semantic-version job
+semantic-version:
+  image: alpine:latest
+  stage: build
+  variables:
+    GIT_DEPTH: 0
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
+  script:
+    - apk add --no-cache git bash
+    - git config --global user.email "medialake@amazon.com"
+    - git config --global user.name "Media Lake CI"
+    - |
+      if [ -n "${GITLAB_PUSH_TOKEN}" ]; then
+        echo "Using GITLAB_PUSH_TOKEN for authentication"
+        git remote set-url origin "https://gitlab-ci-token:${GITLAB_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+      else
+        echo "GITLAB_PUSH_TOKEN not found, using CI_JOB_TOKEN"
+        git remote set-url origin "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+      fi
+    - git fetch origin main:main
+    - git fetch origin stable:stable
+    - |
+      cat > /tmp/semantic_version.sh << 'SCRIPT_EOF'
+      #!/bin/bash
+      set -e
+      echo "=========================================="
+      echo "Changelog Generation & Versioning"
+      echo "Triggered by MR: main -> stable"
+      echo "=========================================="
+
+      echo "Checking out main branch..."
+      git checkout main
+      echo "Current branch: $(git branch --show-current)"
+      echo "Current commit: $(git rev-parse HEAD)"
+
+      LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+      if [ -z "${LAST_TAG}" ]; then
+        echo "No existing tags found. Will create initial version v1.0.0"
+        LAST_VERSION="0.0.0"
+        LAST_TAG="v0.0.0"
+      else
+        echo "Last version tag: ${LAST_TAG}"
+        LAST_VERSION="${LAST_TAG#v}"
+      fi
+
+      IFS='.' read -r MAJOR MINOR PATCH <<< "${LAST_VERSION}"
+      echo "Current version: ${MAJOR}.${MINOR}.${PATCH}"
+      echo ""
+
+      echo "Analyzing commits that will be merged from main to stable..."
+
+      MERGE_BASE=$(git merge-base main origin/stable 2>/dev/null || echo "")
+
+      if [ -z "${MERGE_BASE}" ]; then
+        echo "No common ancestor found. Using all commits from main."
+        COMMITS=$(git log main --pretty=format:"%H|%s|%b")
+      else
+        echo "Merge base commit: ${MERGE_BASE}"
+        COMMITS=$(git log ${MERGE_BASE}..main --pretty=format:"%H|%s|%b")
+      fi
+
+      echo "DEBUG: Number of commits to analyze: $(echo "${COMMITS}" | grep -c '.' || echo 0)"
+
+      if [ -z "${COMMITS}" ]; then
+        echo "WARNING: No new commits to merge from main to stable!"
+        echo "No version bump needed."
+        exit 0
+      fi
+
+      echo "DEBUG: Commits to be versioned:"
+      echo "${COMMITS}" | head -10 | cut -d'|' -f2
+      echo ""
+
+      BUMP_TYPE="none"
+      BREAKING_CHANGES=""
+      FEATURES=""
+      FIXES=""
+      REFACTORS=""
+      PERFORMANCES=""
+      OTHERS=""
+
+      while IFS='|' read -r HASH SUBJECT BODY; do
+        [ -z "${HASH}" ] && continue
+
+        echo "DEBUG: Analyzing commit: ${SUBJECT}"
+        FULL_MESSAGE="${SUBJECT}"$'\n'"${BODY}"
+
+        if [[ "${SUBJECT}" =~ ^[a-z]+(\([a-zA-Z0-9\-_.]+\))?!:[[:space:]] ]] || [[ "${FULL_MESSAGE}" =~ BREAKING[[:space:]]CHANGE: ]]; then
+          echo "  [MAJOR] Breaking change detected: ${SUBJECT}"
+          BUMP_TYPE="major"
+          BREAKING_CHANGES="${BREAKING_CHANGES}- ${SUBJECT}"$'\n'
+        elif [[ "${SUBJECT}" =~ ^feat(\([a-zA-Z0-9\-_.]+\))?: ]] || [[ "${SUBJECT}" == feat:* ]]; then
+          echo "  [MINOR] Feature: ${SUBJECT}"
+          if [ "${BUMP_TYPE}" != "major" ]; then
+            BUMP_TYPE="minor"
+          fi
+          FEATURES="${FEATURES}- ${SUBJECT}"$'\n'
+        elif [[ "${SUBJECT}" =~ ^fix(\([a-zA-Z0-9\-_.]+\))?: ]] || [[ "${SUBJECT}" == fix:* ]]; then
+          echo "  [PATCH] Fix: ${SUBJECT}"
+          if [ "${BUMP_TYPE}" = "none" ]; then
+            BUMP_TYPE="patch"
+          fi
+          FIXES="${FIXES}- ${SUBJECT}"$'\n'
+        elif [[ "${SUBJECT}" =~ ^refactor(\([a-zA-Z0-9\-_.]+\))?: ]]; then
+          echo "  [PATCH] Refactor: ${SUBJECT}"
+          if [ "${BUMP_TYPE}" = "none" ]; then
+            BUMP_TYPE="patch"
+          fi
+          REFACTORS="${REFACTORS}- ${SUBJECT}"$'\n'
+        elif [[ "${SUBJECT}" =~ ^perf(\([a-zA-Z0-9\-_.]+\))?: ]]; then
+          echo "  [PATCH] Performance: ${SUBJECT}"
+          if [ "${BUMP_TYPE}" = "none" ]; then
+            BUMP_TYPE="patch"
+          fi
+          PERFORMANCES="${PERFORMANCES}- ${SUBJECT}"$'\n'
+        elif [[ "${SUBJECT}" =~ ^release(\([a-zA-Z0-9\-_.]+\))?: ]]; then
+          echo "  [TRACKED] Release: ${SUBJECT}"
+          OTHERS="${OTHERS}- ${SUBJECT}"$'\n'
+        elif [[ "${SUBJECT}" =~ ^(docs|ci)(\([a-zA-Z0-9\-_.]+\))?: ]]; then
+          echo "  [NO BUMP] ${SUBJECT}"
+          OTHERS="${OTHERS}- ${SUBJECT}"$'\n'
+        elif [[ "${SUBJECT}" =~ ^(style|test|build)(\([a-zA-Z0-9\-_.]+\))?: ]]; then
+          echo "  [PATCH] ${SUBJECT}"
+          if [ "${BUMP_TYPE}" = "none" ]; then
+            BUMP_TYPE="patch"
+          fi
+          OTHERS="${OTHERS}- ${SUBJECT}"$'\n'
+        fi
+      done <<< "${COMMITS}"
+
+      echo ""
+      echo "Version bump type: ${BUMP_TYPE}"
+
+      case ${BUMP_TYPE} in
+        major)
+          MAJOR=$((MAJOR + 1))
+          MINOR=0
+          PATCH=0
+          ;;
+        minor)
+          MINOR=$((MINOR + 1))
+          PATCH=0
+          ;;
+        patch)
+          PATCH=$((PATCH + 1))
+          ;;
+        none)
+          echo "No version-bumping changes detected. Keeping version at ${MAJOR}.${MINOR}.${PATCH}"
+          exit 0
+          ;;
+      esac
+
+      NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+      NEW_TAG="v${NEW_VERSION}"
+
+      echo "New version: ${NEW_VERSION}"
+      echo "New tag: ${NEW_TAG}"
+      echo ""
+
+      CHANGELOG_ENTRY="## [${NEW_VERSION}] - $(date +%Y-%m-%d)"$'\n\n'
+
+      if [ -n "${BREAKING_CHANGES}" ]; then
+        CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### BREAKING CHANGES"$'\n\n'"${BREAKING_CHANGES}"$'\n'
+      fi
+
+      if [ -n "${FEATURES}" ]; then
+        CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### Features"$'\n\n'"${FEATURES}"$'\n'
+      fi
+
+      if [ -n "${FIXES}" ]; then
+        CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### Bug Fixes"$'\n\n'"${FIXES}"$'\n'
+      fi
+
+      if [ -n "${PERFORMANCES}" ]; then
+        CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### Performance Improvements"$'\n\n'"${PERFORMANCES}"$'\n'
+      fi
+
+      if [ -n "${REFACTORS}" ]; then
+        CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### Code Refactoring"$'\n\n'"${REFACTORS}"$'\n'
+      fi
+
+      if [ -n "${OTHERS}" ]; then
+        CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### Other Changes"$'\n\n'"${OTHERS}"$'\n'
+      fi
+
+      if [ -f CHANGELOG.md ]; then
+        echo "Updating existing CHANGELOG.md"
+        TEMP_FILE=$(mktemp)
+        head -n 1 CHANGELOG.md > "${TEMP_FILE}"
+        echo "" >> "${TEMP_FILE}"
+        echo "${CHANGELOG_ENTRY}" >> "${TEMP_FILE}"
+        tail -n +2 CHANGELOG.md >> "${TEMP_FILE}"
+        mv "${TEMP_FILE}" CHANGELOG.md
+      else
+        echo "Creating new CHANGELOG.md"
+        echo "# Changelog" > CHANGELOG.md
+        echo "" >> CHANGELOG.md
+        echo "${CHANGELOG_ENTRY}" >> CHANGELOG.md
+      fi
+
+      echo "CHANGELOG.md updated successfully"
+      echo ""
+      echo "=========================================="
+      echo "Preview of new CHANGELOG entry:"
+      echo "=========================================="
+      head -n 30 CHANGELOG.md
+      echo "=========================================="
+      echo ""
+
+      git add CHANGELOG.md
+      git commit -m "chore: update CHANGELOG for ${NEW_TAG} [skip ci]"
+
+      echo "Release ${NEW_VERSION}" > /tmp/tag_message.txt
+      echo "" >> /tmp/tag_message.txt
+      echo "${CHANGELOG_ENTRY}" >> /tmp/tag_message.txt
+      git tag -a "${NEW_TAG}" -F /tmp/tag_message.txt
+
+      echo "Created tag: ${NEW_TAG} on main branch"
+      echo "Updated CHANGELOG.md on main branch"
+      echo ""
+
+      echo "Pushing changes to main..."
+      git push origin main
+      git push origin "${NEW_TAG}"
+
+      echo "Pushed commit and tag to main"
+      echo ""
+      echo "Version ${NEW_VERSION} prepared for release!"
+      echo "The MR can now be merged to stable."
+      SCRIPT_EOF
+      chmod +x /tmp/semantic_version.sh
+      bash /tmp/semantic_version.sh
