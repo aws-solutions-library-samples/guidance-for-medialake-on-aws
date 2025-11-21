@@ -463,13 +463,34 @@ Media lake supports processing of the following file types through its default p
 
 ### Image Files
 
-- **PSD** - Adobe Photoshop Document
-- **TIF** - Tagged Image File Format
-- **JPG/JPEG** - Joint Photographic Experts Group
-- **PNG** - Portable Network Graphics
-- **WEBP** - WebP Image Format
+**Standard Formats:**
+
+- **APNG** - Animated Portable Network Graphics
+- **AVIF** - AV1 Image File Format
+- **BMP** - Bitmap Image File
 - **GIF** - Graphics Interchange Format
+- **ICO** - Icon File Format
+- **J2K** - JPEG 2000 Code Stream
+- **JP2** - JPEG 2000
+- **JPEG/JPG** - Joint Photographic Experts Group
+- **PBM** - Portable Bitmap
+- **PCX** - Picture Exchange
+- **PGM** - Portable Graymap
+- **PNG** - Portable Network Graphics
+- **PPM** - Portable Pixmap
+- **PSD** - Adobe Photoshop Document
 - **SVG** - Scalable Vector Graphics
+- **TIF/TIFF** - Tagged Image File Format
+- **WEBP** - WebP Image Format
+- **WMF** - Windows Metafile
+- **XBM** - X11 Bitmap
+- **XPM** - X11 Pixmap
+
+**RAW Camera Formats:**
+
+- **CR2** - Canon Raw 2 (Note: CHDK-modified files are not supported)
+- **ERF** - Epson Raw Format
+- **NEF** - Nikon Electronic Format
 
 Each media type is automatically processed through dedicated pipelines that handle metadata extraction, proxy/thumbnail generation, and integration with AI services for enhanced search and analysis capabilities.
 

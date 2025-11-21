@@ -109,7 +109,9 @@ After deployment, you'll need to configure storage connectors to connect media l
 
    **Video Files**: FLV, MP4, MOV, AVI, MKV, WEBM, MXF
 
-   **Image Files**: PSD, TIF, JPG/JPEG, PNG, WEBP, GIF, SVG
+   **Image Files (Standard Formats)**: APNG, AVIF, BMP, GIF, ICO, J2K, JP2, JPEG/JPG, PBM, PCX, PGM, PNG, PPM, PSD, SVG, TIF/TIFF, WEBP, WMF, XBM, XPM
+
+   **Image Files (RAW Camera Formats)**: CR2 (Canon, CHDK-modified files not supported), ERF (Epson), NEF (Nikon)
 
 2. **Browse Assets**: Navigate to the **Assets** section to verify that files from your S3 bucket are visible
 

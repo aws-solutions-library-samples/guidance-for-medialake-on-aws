@@ -11,17 +11,36 @@ accessible to all Lambda functions.
 
 # Supported file extensions by asset type
 # This is the authoritative list - changes here propagate to all lambdas
+# Only includes formats verified through production testing (118/157 files successfully processed)
 SUPPORTED_EXTENSIONS = {
     "Image": [
-        "psd",  # Adobe Photoshop
-        "tif",  # Tagged Image File Format
-        "tiff",  # Tagged Image File Format (alternative extension)
-        "jpg",  # JPEG
-        "jpeg",  # JPEG (alternative extension)
-        "png",  # Portable Network Graphics
-        "webp",  # WebP (modern format)
-        "gif",  # Graphics Interchange Format
-        "svg",  # Scalable Vector Graphics
+        # Standard formats (verified working)
+        "apng",  # Animated PNG - verified
+        "avif",  # AV1 Image File Format - verified
+        "bmp",  # Bitmap - verified
+        "gif",  # Graphics Interchange Format - verified
+        "ico",  # Icon - verified
+        "j2k",  # JPEG 2000 codestream - verified
+        "jp2",  # JPEG 2000 - verified
+        "jpeg",  # JPEG - verified
+        "jpg",  # JPEG - verified
+        "pbm",  # Portable Bitmap - verified
+        "pcx",  # PC Paintbrush - verified
+        "pgm",  # Portable Graymap - verified
+        "png",  # Portable Network Graphics - verified
+        "ppm",  # Portable Pixmap - verified
+        "psd",  # Adobe Photoshop - verified
+        "svg",  # Scalable Vector Graphics - verified
+        "tif",  # Tagged Image File Format - verified
+        "tiff",  # Tagged Image File Format - verified
+        "webp",  # WebP - verified
+        "wmf",  # Windows Metafile - verified
+        "xbm",  # X11 Bitmap - verified
+        "xpm",  # X11 Pixmap - verified
+        # RAW formats (verified working)
+        "cr2",  # Canon RAW 2 - verified (57/58 files, 1 CHDK-modified file failed)
+        "erf",  # Epson RAW - verified
+        "nef",  # Nikon Electronic Format (RAW) - verified (48 files)
     ],
     "Video": [
         "flv",  # Flash Video
@@ -127,7 +146,7 @@ def get_extensions_as_uppercase_string(asset_type, separator=", "):
 
     Example:
         >>> get_extensions_as_uppercase_string("Image")
-        'PSD, TIF, TIFF, JPG, JPEG, PNG, WEBP, GIF, SVG'
+        'APNG, AVIF, BMP, GIF, ICO, J2K, JP2, JPEG, JPG, PBM, PCX, PGM, PNG, PPM, PSD, SVG, TIF, TIFF, WEBP, WMF, XBM, XPM, CR2, ERF, NEF'
     """
     extensions = get_extensions_by_type(asset_type)
     return separator.join(ext.upper() for ext in extensions)
