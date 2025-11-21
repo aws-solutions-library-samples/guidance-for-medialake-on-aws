@@ -22,7 +22,8 @@ const MenuProps = {
   PaperProps: {
     style: {
       maxHeight: ITEM_HEIGHT * 4.5 + ITEM_PADDING_TOP,
-      width: 250,
+      minWidth: 250,
+      maxWidth: 600,
     },
   },
 };
@@ -102,68 +103,77 @@ export const FormSelect = <T extends FieldValues>({
     <Controller
       name={name}
       control={control}
-      render={({ field, fieldState: { error } }) => (
-        <FormControl
-          fullWidth={fullWidth}
-          error={!!error}
-          required={required}
-          variant="outlined"
-        >
-          <InputLabel>{translatedLabel}</InputLabel>
-          <Select<string | string[]>
-            {...field}
-            {...rest}
-            multiple={multiple}
+      render={({ field, fieldState: { error } }) => {
+        // Debug: Log the current field value
+        console.log(
+          `[FormSelect] Field "${name}" value:`,
+          field.value,
+          typeof field.value,
+        );
+
+        return (
+          <FormControl
+            fullWidth={fullWidth}
+            error={!!error}
+            required={required}
             variant="outlined"
-            input={
-              <OutlinedInput
-                label={translatedLabel}
-                endAdornment={tooltipIcon}
-              />
-            }
-            renderValue={(selected) => {
-              if (multiple) {
-                return (
-                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                    {(selected as string[]).map((value) => (
-                      <Chip
-                        key={value}
-                        label={
-                          translatedOptions.find((opt) => opt.value === value)
-                            ?.label || value
-                        }
-                      />
-                    ))}
-                  </Box>
-                );
-              }
-              return (
-                translatedOptions.find((opt) => opt.value === selected)
-                  ?.label || (selected as string)
-              );
-            }}
-            MenuProps={MenuProps}
           >
-            {translatedOptions.map(({ label, value }) => (
-              <MenuItem key={value} value={value}>
-                {label}
-              </MenuItem>
-            ))}
-          </Select>
-          {(error || (showHelper && translatedHelperText)) && (
-            <FormHelperText>
-              {error
-                ? translationPrefix
-                  ? t(
-                      `${translationPrefix}.errors.${error.type}`,
-                      error.message || "",
-                    )
-                  : error.message
-                : translatedHelperText}
-            </FormHelperText>
-          )}
-        </FormControl>
-      )}
+            <InputLabel>{translatedLabel}</InputLabel>
+            <Select<string | string[]>
+              {...field}
+              {...rest}
+              multiple={multiple}
+              variant="outlined"
+              input={
+                <OutlinedInput
+                  label={translatedLabel}
+                  endAdornment={tooltipIcon}
+                />
+              }
+              renderValue={(selected) => {
+                if (multiple) {
+                  return (
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                      {(selected as string[]).map((value) => (
+                        <Chip
+                          key={value}
+                          label={
+                            translatedOptions.find((opt) => opt.value === value)
+                              ?.label || value
+                          }
+                        />
+                      ))}
+                    </Box>
+                  );
+                }
+                return (
+                  translatedOptions.find((opt) => opt.value === selected)
+                    ?.label || (selected as string)
+                );
+              }}
+              MenuProps={MenuProps}
+            >
+              {translatedOptions.map(({ label, value }) => (
+                <MenuItem key={value} value={value}>
+                  {label}
+                </MenuItem>
+              ))}
+            </Select>
+            {(error || (showHelper && translatedHelperText)) && (
+              <FormHelperText>
+                {error
+                  ? translationPrefix
+                    ? t(
+                        `${translationPrefix}.errors.${error.type}`,
+                        error.message || "",
+                      )
+                    : error.message
+                  : translatedHelperText}
+              </FormHelperText>
+            )}
+          </FormControl>
+        );
+      }}
     />
   );
 };

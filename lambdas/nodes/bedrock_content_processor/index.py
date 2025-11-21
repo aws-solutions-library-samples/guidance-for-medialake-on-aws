@@ -3,7 +3,7 @@ import os
 import random
 import time
 from decimal import Decimal
-from typing import Any, Callable, Dict, Union
+from typing import Any, Callable, Dict, Optional, Union
 from urllib.parse import urlparse
 
 import boto3
@@ -308,6 +308,125 @@ def _format_prompt_name_for_dynamo(prompt_name: str) -> str:
     return formatted
 
 
+def sanitize_prompt_label(label: str) -> str:
+    """
+    Convert user-friendly label to DynamoDB-safe key.
+
+    Examples:
+        "Marketing Summary" → "MarketingSummary"
+        "Security-Analysis_2024" → "SecurityAnalysis2024"
+        "My Custom Prompt #1" → "MyCustomPrompt1"
+
+    Rules:
+        - Remove all non-alphanumeric characters except underscores
+        - Remove leading/trailing whitespace
+        - Capitalize first letter of each word
+        - Max length: 50 characters
+        - Must start with letter
+
+    Args:
+        label: User-provided friendly label
+
+    Returns:
+        Sanitized label safe for DynamoDB field name
+
+    Raises:
+        ValueError: If label is empty or doesn't start with a letter after sanitization
+    """
+    import re
+
+    if not label:
+        raise ValueError("Prompt label cannot be empty")
+
+    # Remove leading/trailing whitespace
+    label = label.strip()
+
+    # Replace spaces with nothing, capitalize words
+    words = label.split()
+    camel_case = "".join(word.capitalize() for word in words)
+
+    # Remove all non-alphanumeric characters except underscores
+    sanitized = re.sub(r"[^a-zA-Z0-9_]", "", camel_case)
+
+    # Ensure starts with letter
+    if not sanitized or not sanitized[0].isalpha():
+        raise ValueError(
+            f"Prompt label must start with a letter: '{label}'. "
+            f"After sanitization, got: '{sanitized}'"
+        )
+
+    # Truncate to max length
+    sanitized = sanitized[:50]
+
+    logger.info(f"Sanitized prompt label: '{label}' → '{sanitized}'")
+    return sanitized
+
+
+def generate_default_label() -> str:
+    """
+    Generate a default label when user doesn't provide one.
+
+    Format: CustomPrompt_YYYYMMDD_HHMMSS
+
+    Returns:
+        Timestamp-based default label
+    """
+    from datetime import datetime
+
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    default_label = f"CustomPrompt_{timestamp}"
+    logger.info(f"Generated default prompt label: {default_label}")
+    return default_label
+
+
+def check_key_exists(table, asset_id: str, key_name: str) -> tuple:
+    """
+    Check if a DynamoDB key already exists for the asset.
+
+    IMPORTANT: This check is ASSET-SCOPED, not pipeline-scoped.
+    If ANY pipeline has already written a result with this label,
+    it will be detected regardless of which pipeline is currently running.
+
+    This is the CORRECT behavior because:
+    1. Asset results should not have duplicate labels (confusing to users)
+    2. Labels are meant to be meaningful identifiers, not pipeline-specific
+    3. If different pipelines need different analyses, use different labels
+
+    Args:
+        table: DynamoDB table resource
+        asset_id: Asset InventoryID
+        key_name: The field name to check
+
+    Returns:
+        tuple: (exists: bool, existing_data: dict or None)
+               - exists: True if key exists and has a value
+               - existing_data: The existing result data if found, None otherwise
+    """
+    try:
+        response = table.get_item(
+            Key={"InventoryID": asset_id}, ProjectionExpression=key_name
+        )
+        item = response.get("Item", {})
+
+        if key_name in item and item[key_name] is not None:
+            existing_data = item[key_name]
+            logger.info(f"Key '{key_name}' exists for asset {asset_id}")
+            return True, existing_data
+
+        logger.info(f"Key '{key_name}' does not exist for asset {asset_id}")
+        return False, None
+
+    except ClientError as e:
+        error_code = e.response.get("Error", {}).get("Code", "")
+        if error_code == "ValidationException":
+            # Key doesn't exist in schema - this is expected for first use
+            logger.info(f"Key '{key_name}' not found in schema (first use)")
+            return False, None
+        # Re-raise other errors
+        logger.error(f"Error checking key existence: {e}")
+        raise
+
+
 def _strip_decimals(obj):
     if isinstance(obj, list):
         return [_strip_decimals(v) for v in obj]
@@ -596,7 +715,214 @@ def invoke_bedrock_with_retry(
 
 
 # ────────────────────────────────────────────────────────────
-# Lambda handler (all inner errors bubble up)                  ❶
+# Prompt Configuration Extraction
+# ────────────────────────────────────────────────────────────
+
+
+def get_parameter_value(env_vars: Dict[str, str], param_name: str) -> Optional[str]:
+    """
+    Get parameter value from environment variables or local filesystem.
+
+    This function implements the global pattern for retrieving parameter values:
+    1. First checks for {PARAM_NAME}_FILE_PATH environment variable
+    2. If file path exists, reads the content from the local file
+    3. Otherwise, falls back to reading {PARAM_NAME} directly from env vars
+
+    Args:
+        env_vars: Dictionary of environment variables
+        param_name: Name of the parameter to retrieve (e.g., 'CUSTOM_PROMPT_TEXT')
+
+    Returns:
+        Parameter value as string, or None if not found
+
+    Example:
+        value = get_parameter_value(os.environ, 'CUSTOM_PROMPT_TEXT')
+        # Will check for CUSTOM_PROMPT_TEXT_FILE_PATH first, then CUSTOM_PROMPT_TEXT
+    """
+    file_path_key = f"{param_name}_FILE_PATH"
+
+    # Check if parameter is stored as a file in the Lambda deployment package
+    if file_path_key in env_vars:
+        file_path = env_vars[file_path_key]
+        logger.info(
+            f"Parameter '{param_name}' stored in file, reading from: {file_path}"
+        )
+
+        try:
+            # Read from local filesystem
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            logger.info(
+                f"Successfully read '{param_name}' from file (size: {len(content)} bytes)"
+            )
+            return content
+        except Exception as e:
+            logger.error(
+                f"Failed to read '{param_name}' from file at {file_path}: {e}. "
+                f"Falling back to direct env var if available."
+            )
+            # Fall through to check direct env var
+
+    # Check for direct environment variable
+    if param_name in env_vars:
+        value = env_vars[param_name]
+        logger.info(
+            f"Parameter '{param_name}' found in environment variables "
+            f"(size: {len(value)} bytes)"
+        )
+        return value
+
+    # Parameter not found
+    logger.debug(
+        f"Parameter '{param_name}' not found in environment variables or filesystem"
+    )
+    return None
+
+
+def extract_prompt_configuration(env_vars: Dict[str, str]) -> Dict[str, Any]:
+    """
+    Extract and resolve prompt configuration based on prompt_source.
+
+    Supports both new prompt_source structure and legacy parameters for backward compatibility.
+    Automatically handles parameters stored in Lambda deployment package files.
+
+    New Structure (preferred):
+        - PROMPT_SOURCE: 'default', 'saved', or 'custom'
+        - SAVED_PROMPT_NAME: name of pre-canned prompt (when prompt_source='saved')
+        - CUSTOM_PROMPT_TEXT or CUSTOM_PROMPT_TEXT_FILE_PATH: user-provided prompt text
+        - CUSTOM_PROMPT_LABEL: user-provided label (when prompt_source='custom')
+
+    Legacy Structure (backward compatible):
+        - PROMPT_NAME: name of pre-canned prompt
+        - CUSTOM_PROMPT or CUSTOM_PROMPT_FILE_PATH: user-provided prompt text
+        - PROMPT_LABEL: user-provided label
+
+    Returns:
+        {
+            'prompt_text': str,      # The actual prompt to use
+            'prompt_source': str,    # 'default', 'saved', or 'custom'
+            'prompt_label': str,     # Label for DynamoDB storage
+            'prompt_name': str,      # Name of prompt (if using saved)
+        }
+
+    Raises:
+        ValueError: If configuration is invalid or required fields are missing
+    """
+    # Try new structure first
+    prompt_source = env_vars.get("PROMPT_SOURCE")
+
+    if prompt_source:
+        logger.info(f"Using new prompt_source structure: {prompt_source}")
+
+        if prompt_source == "default":
+            return {
+                "prompt_text": DEFAULT_PROMPTS["summary_100"],
+                "prompt_source": "default",
+                "prompt_label": "Summary100",
+                "prompt_name": "summary_100",
+            }
+
+        elif prompt_source == "saved":
+            saved_prompt_name = env_vars.get("SAVED_PROMPT_NAME")
+            if not saved_prompt_name:
+                raise ValueError(
+                    "SAVED_PROMPT_NAME required when PROMPT_SOURCE is 'saved'"
+                )
+
+            if saved_prompt_name not in DEFAULT_PROMPTS:
+                raise ValueError(f"Unknown saved prompt: {saved_prompt_name}")
+
+            return {
+                "prompt_text": DEFAULT_PROMPTS[saved_prompt_name],
+                "prompt_source": "saved",
+                "prompt_label": _format_prompt_name_for_dynamo(saved_prompt_name),
+                "prompt_name": saved_prompt_name,
+            }
+
+        elif prompt_source == "custom":
+            # Use the new get_parameter_value function to check file path first
+            custom_prompt_text = get_parameter_value(env_vars, "CUSTOM_PROMPT_TEXT")
+            custom_prompt_label = env_vars.get("CUSTOM_PROMPT_LABEL")
+
+            if not custom_prompt_text:
+                raise ValueError(
+                    "CUSTOM_PROMPT_TEXT (or CUSTOM_PROMPT_TEXT_FILE_PATH) required when PROMPT_SOURCE is 'custom'"
+                )
+
+            if not custom_prompt_label:
+                custom_prompt_label = generate_default_label()
+                logger.info(
+                    f"No custom label provided, generated: {custom_prompt_label}"
+                )
+
+            # Sanitize the label
+            sanitized_label = sanitize_prompt_label(custom_prompt_label)
+
+            return {
+                "prompt_text": custom_prompt_text.strip(),
+                "prompt_source": "custom",
+                "prompt_label": sanitized_label,
+                "prompt_name": None,
+            }
+
+        else:
+            raise ValueError(
+                f"Invalid PROMPT_SOURCE: {prompt_source}. Must be 'default', 'saved', or 'custom'"
+            )
+
+    else:
+        # Fall back to legacy structure for backward compatibility
+        logger.info("PROMPT_SOURCE not found, using legacy parameter structure")
+
+        # Use get_parameter_value for backward compatibility with file storage
+        custom_prompt = get_parameter_value(env_vars, "CUSTOM_PROMPT")
+        prompt_name = env_vars.get("PROMPT_NAME")
+        prompt_label = env_vars.get("PROMPT_LABEL")
+
+        # Custom prompt takes precedence (legacy behavior)
+        if custom_prompt:
+            if not prompt_label:
+                prompt_label = generate_default_label()
+                logger.info(f"No label provided, generated default: {prompt_label}")
+
+            sanitized_label = sanitize_prompt_label(prompt_label)
+
+            return {
+                "prompt_text": custom_prompt.strip(),
+                "prompt_source": "custom",
+                "prompt_label": sanitized_label,
+                "prompt_name": None,
+            }
+
+        # Saved/pre-canned prompt
+        elif prompt_name and prompt_name in DEFAULT_PROMPTS:
+            return {
+                "prompt_text": DEFAULT_PROMPTS[prompt_name],
+                "prompt_source": "saved",
+                "prompt_label": _format_prompt_name_for_dynamo(prompt_name),
+                "prompt_name": prompt_name,
+            }
+
+        # Default fallback
+        else:
+            # Check for PROMPT env var as absolute fallback
+            fallback_prompt = env_vars.get("PROMPT")
+            if fallback_prompt:
+                return {
+                    "prompt_text": fallback_prompt,
+                    "prompt_source": "default",
+                    "prompt_label": "Summary100",
+                    "prompt_name": "summary_100",
+                }
+            else:
+                return {
+                    "prompt_text": DEFAULT_PROMPTS["summary_100"],
+                    "prompt_source": "default",
+                    "prompt_label": "Summary100",
+                    "prompt_name": "summary_100",
+                }
+
+
 # ────────────────────────────────────────────────────────────
 @lambda_middleware(event_bus_name=os.getenv("EVENT_BUS_NAME", "default-event-bus"))
 @logger.inject_lambda_context
@@ -605,30 +931,132 @@ def lambda_handler(event, context):
     try:
         logger.info("Event received", extra={"event": event})
 
-        # Extract parameters directly from event without S3 mapping files
+        # ═══════════════════════════════════════════════════════════════════
+        # PHASE 1: EARLY VALIDATION (Fast, No Cost)
+        # Extract parameters and validate BEFORE expensive operations
+        # ═══════════════════════════════════════════════════════════════════
+
         content_src = os.getenv("CONTENT_SOURCE", "proxy")
-        prompt_name = os.getenv("PROMPT_NAME")
-        model_id = os.getenv("MODEL_ID")
 
-        if not model_id:
-            raise KeyError("MODEL_ID environment variable is required")
+        # Determine which model_id to use based on content source
+        if content_src == "transcript":
+            model_id = os.getenv("MODEL_ID_TEXT")
+            if not model_id:
+                raise KeyError(
+                    "MODEL_ID_TEXT environment variable is required when CONTENT_SOURCE is 'transcript'"
+                )
+        elif content_src == "proxy":
+            model_id = os.getenv("MODEL_ID_MEDIA")
+            if not model_id:
+                raise KeyError(
+                    "MODEL_ID_MEDIA environment variable is required when CONTENT_SOURCE is 'proxy'"
+                )
+        else:
+            # Fallback to legacy MODEL_ID for backward compatibility
+            model_id = os.getenv("MODEL_ID")
+            if not model_id:
+                raise KeyError(
+                    f"MODEL_ID environment variable is required for content source '{content_src}'"
+                )
 
-        # Get instruction/prompt
-        instr = DEFAULT_PROMPTS.get(prompt_name) or os.getenv(
-            "PROMPT", DEFAULT_PROMPTS["summary_100"]
-        )
+        logger.info(f"Using model_id: {model_id} for content_source: {content_src}")
 
-        # ── Locate content ────────────────────────────────────────────────
+        # Get asset_id early for validation
         payload = event.get("payload", {})
         assets = payload.get("assets", [])
         if not assets:
             raise ValueError("No assets found in event.payload.assets")
         asset_detail = assets[0]
 
-        # Extract asset_id from the asset
         asset_id = asset_detail.get("InventoryID")
         if not asset_id:
             raise ValueError("No InventoryID found in asset")
+
+        # ═══════════════════════════════════════════════════════════════════
+        # PHASE 2: PROMPT CONFIGURATION (Supports new + legacy structure)
+        # Extract and validate prompt configuration
+        # ═══════════════════════════════════════════════════════════════════
+
+        try:
+            prompt_config = extract_prompt_configuration(dict(os.environ))
+            instr = prompt_config["prompt_text"]
+            prompt_source = prompt_config["prompt_source"]
+            prompt_label = prompt_config["prompt_label"]
+            prompt_name = prompt_config["prompt_name"]
+
+            logger.info(
+                f"Prompt configuration: source={prompt_source}, label={prompt_label}"
+            )
+        except ValueError as e:
+            logger.error(f"Invalid prompt configuration: {e}")
+            raise
+
+        # ═══════════════════════════════════════════════════════════════════
+        # PHASE 3: LABEL VALIDATION (Fast DynamoDB Read, Minimal Cost)
+        # Must happen BEFORE content processing and Bedrock invocation!
+        # This prevents wasting money on Bedrock calls that will fail later.
+        # ═══════════════════════════════════════════════════════════════════
+
+        # Build DynamoDB key based on prompt type
+        if prompt_source == "custom":
+            dynamo_key = f"BedrockPrompt_{prompt_label}"
+
+            # CHECK IF KEY EXISTS - Critical validation before expensive operations!
+            exists, existing_data = check_key_exists(table, asset_id, dynamo_key)
+
+            if exists:
+                # Fail fast with detailed error - BEFORE spending money on Bedrock
+                pipeline_name = (
+                    event.get("metadata", {})
+                    .get("execution", {})
+                    .get("Name", "Unknown")
+                )
+                previous_pipeline = (
+                    existing_data.get("pipeline_name", "Unknown")
+                    if isinstance(existing_data, dict)
+                    else "Unknown"
+                )
+                previous_timestamp = (
+                    existing_data.get("timestamp", "Unknown")
+                    if isinstance(existing_data, dict)
+                    else "Unknown"
+                )
+                previous_model = (
+                    existing_data.get("model_id", "Unknown")
+                    if isinstance(existing_data, dict)
+                    else "Unknown"
+                )
+
+                error_msg = (
+                    f"Label Conflict: A Bedrock result with label '{prompt_label}' already exists on this asset.\n\n"
+                    f"Existing Result Details:\n"
+                    f"  - Created by pipeline: {previous_pipeline}\n"
+                    f"  - Timestamp: {previous_timestamp}\n"
+                    f"  - Model: {previous_model}\n\n"
+                    f"Current Pipeline: {pipeline_name}\n\n"
+                    f"Solutions:\n"
+                    f"  1. Use a more specific label (e.g., '{prompt_label} - {pipeline_name}')\n"
+                    f"  2. Delete the existing result if it should be replaced\n"
+                    f"  3. Choose a different prompt label\n\n"
+                    f"Note: This validation prevented wasting costs on a Bedrock API call that would not be stored."
+                )
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+
+            logger.info(
+                f"Label validation passed: '{prompt_label}' is available for asset {asset_id}"
+            )
+        else:
+            # Saved or default prompts use standard key format
+            dynamo_key = f"{prompt_label}Result"
+            logger.info(f"Using standard DynamoDB key: {dynamo_key}")
+            dynamo_key = "Summary100Result"
+            logger.info("Using default prompt: summary_100")
+
+        # ═══════════════════════════════════════════════════════════════════
+        # PHASE 3: CONTENT PROCESSING (Expensive - S3 reads, processing)
+        # Only reached if validation passed!
+        # ═══════════════════════════════════════════════════════════════════
 
         if content_src == "transcript":
             uri = (
@@ -772,23 +1200,89 @@ def lambda_handler(event, context):
                 )
 
         # ── Persist back to DynamoDB ──────────────────────────────────────
-        formatted_prompt_name = (
-            _format_prompt_name_for_dynamo(prompt_name) if prompt_name else None
-        )
-        dynamo_key = (
-            f"{formatted_prompt_name}Result"
-            if formatted_prompt_name
-            else "customPromptResult"
-        )
-        logger.info(
-            f"DynamoDB key formatting: prompt_name='{prompt_name}' -> formatted='{formatted_prompt_name}' -> dynamo_key='{dynamo_key}'"
-        )
-        table.update_item(
-            Key={"InventoryID": asset_id},
-            UpdateExpression="SET #k = :v",
-            ExpressionAttributeNames={"#k": dynamo_key},
-            ExpressionAttributeValues={":v": result},
-        )
+        from datetime import datetime
+
+        # Get original prompt label (before sanitization) from environment
+        original_prompt_label = os.getenv("CUSTOM_PROMPT_LABEL", "")
+        if not original_prompt_label and prompt_source == "custom":
+            original_prompt_label = prompt_label
+        elif prompt_source in ["saved", "default"]:
+            # For saved prompts, create a user-friendly label
+            if prompt_name == "summary_100":
+                original_prompt_label = "Summary 100"
+            elif prompt_name:
+                # Convert snake_case to Title Case
+                original_prompt_label = prompt_name.replace("_", " ").title()
+            else:
+                original_prompt_label = prompt_label
+
+        # Build result data with metadata
+        result_data = {
+            "result": result,
+            "model_id": model_id,
+            "timestamp": datetime.utcnow().isoformat(),
+            "content_source": content_src,
+            "prompt_label": original_prompt_label,  # Store ORIGINAL label, not sanitized
+        }
+
+        # Add prompt-specific metadata
+        if prompt_source == "custom":
+            result_data["prompt_type"] = "custom"
+            result_data["prompt_preview"] = instr[:200]  # First 200 chars of prompt
+            result_data["pipeline_name"] = (
+                event.get("metadata", {}).get("execution", {}).get("Name", "Unknown")
+            )
+            result_data["pipeline_execution_id"] = (
+                event.get("metadata", {}).get("execution", {}).get("Id")
+            )
+            logger.info(
+                f"Storing custom prompt result with label: {original_prompt_label}"
+            )
+        elif prompt_source in ["saved", "default"]:
+            result_data["prompt_type"] = prompt_source
+            if prompt_name:
+                result_data["prompt_name"] = prompt_name
+            logger.info(f"Storing {prompt_source} prompt result: {prompt_name}")
+
+        # Store in Metadata.Descriptive.[PROMPTKEY] structure
+        descriptive_key = prompt_label  # Use sanitized version for key
+        logger.info(f"Storing result at Metadata.Descriptive.{descriptive_key}")
+
+        # Try to set the nested value directly
+        # If parent paths don't exist, DynamoDB will fail with ValidationException
+        # In that case, create the entire structure at once
+        try:
+            table.update_item(
+                Key={"InventoryID": asset_id},
+                UpdateExpression="SET Metadata.Descriptive.#k = :v",
+                ExpressionAttributeNames={"#k": descriptive_key},
+                ExpressionAttributeValues={":v": result_data},
+            )
+            logger.info(
+                "Successfully stored result in existing Metadata.Descriptive structure"
+            )
+        except ClientError as e:
+            error_code = e.response.get("Error", {}).get("Code", "")
+            if (
+                error_code == "ValidationException"
+                and "document path" in str(e).lower()
+            ):
+                # Parent path doesn't exist, create the entire structure
+                logger.info(
+                    "Parent paths don't exist, creating Metadata.Descriptive structure"
+                )
+                table.update_item(
+                    Key={"InventoryID": asset_id},
+                    UpdateExpression="SET Metadata.Descriptive = :desc",
+                    ExpressionAttributeValues={":desc": {descriptive_key: result_data}},
+                )
+                logger.info(
+                    "Successfully created Metadata.Descriptive structure with result"
+                )
+            else:
+                # Re-raise other errors
+                logger.error(f"Unexpected error storing result: {e}")
+                raise
 
         # Return response directly without S3 template mapping
         updated = table.get_item(Key={"InventoryID": asset_id}).get("Item", {})
@@ -797,7 +1291,12 @@ def lambda_handler(event, context):
             "body": {
                 "result": result,
                 "model_id": model_id,
-                "prompt_name": prompt_name,
+                "prompt_source": prompt_source,
+                "prompt_label": original_prompt_label,
+                "prompt_name": (
+                    prompt_name if prompt_source in ["saved", "default"] else None
+                ),
+                "dynamo_key": f"Metadata.Descriptive.{descriptive_key}",
                 "content_source": content_src,
                 "asset_id": asset_id,
             },

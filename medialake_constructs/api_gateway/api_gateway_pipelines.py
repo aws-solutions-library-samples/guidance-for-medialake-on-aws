@@ -177,6 +177,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                     effect=iam.Effect.ALLOW,
                     actions=[
                         "kms:Decrypt",
+                        "kms:GenerateDataKey",
                     ],
                     resources=["*"],
                 ),
@@ -476,7 +477,7 @@ class ApiGatewayPipelinesConstruct(Construct):
 
         self._post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
-                actions=["kms:Decrypt"],
+                actions=["kms:Decrypt", "kms:GenerateDataKey"],
                 resources=["*"],
             )
         )

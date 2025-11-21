@@ -1,6 +1,10 @@
 import React from "react";
 import { useCallback, useRef, useState, useMemo, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
+import {
+  transformParameterSchema,
+  validateSchemaPreservation,
+} from "../utils/schemaTransformer";
 import ReactFlow, {
   Background,
   Controls,
@@ -200,38 +204,23 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
       let parameters = {};
 
       if (Array.isArray(method.parameters)) {
-        // Standard array format
+        // Standard array format - use centralized transformer
         parameters = method.parameters.reduce((paramAcc, param) => {
-          const parameterData: any = {
-            name: param.name,
-            label: param.label,
-            type:
-              param.schema.type === "string"
-                ? "text"
-                : param.schema.type === "integer"
-                  ? "number"
-                  : (param.schema.type as "number" | "boolean" | "select"),
-            required: param.required || false,
-            description: param.description,
-          };
+          // Use centralized transformer for schema property preservation
+          const parameterData = transformParameterSchema(param);
 
-          // Add options if they exist in the schema
-          if (param.schema.options) {
-            parameterData.options = param.schema.options;
-          }
+          // Validate schema preservation in development
+          validateSchemaPreservation(
+            param,
+            parameterData,
+            "PipelineEditorPage-ArrayParams",
+          );
 
-          // Preserve default value if it exists (API uses 'default', but our type uses 'defaultValue')
-          if (param.schema?.default !== undefined) {
-            parameterData.defaultValue = param.schema.default;
+          // Log default values if found
+          if (parameterData.defaultValue !== undefined) {
             console.log(
               `[PipelineEditorPage] Found default value for ${param.name}:`,
-              param.schema.default,
-            );
-          } else if ((param as any).default !== undefined) {
-            parameterData.defaultValue = (param as any).default;
-            console.log(
-              `[PipelineEditorPage] Found default value for ${param.name}:`,
-              (param as any).default,
+              parameterData.defaultValue,
             );
           }
 
@@ -241,14 +230,13 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
           };
         }, {});
       } else if (method.parameters && typeof method.parameters === "object") {
-        // Single object format (like S3 Vector Store)
+        // Single object format - use centralized transformer
         const param = method.parameters as any;
         const paramName = param.name;
 
         // Skip processing if paramName is undefined or empty
         if (!paramName) {
           console.log("[PipelineEditorPage] Skipping parameter with no name");
-          // Set parameters to empty object and continue
           parameters = {};
         } else if (
           param.schema &&
@@ -258,53 +246,36 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
           // For object parameters, create individual fields for each property
           Object.entries(param.schema.properties).forEach(
             ([propName, propSchema]: [string, any]) => {
-              const parameterData: any = {
+              const propParam = {
                 name: propName,
                 label: propName.charAt(0).toUpperCase() + propName.slice(1),
-                type:
-                  propSchema.type === "string"
-                    ? "text"
-                    : propSchema.type === "integer"
-                      ? "number"
-                      : (propSchema.type as "number" | "boolean" | "select"),
                 required: param.schema.required?.includes(propName) || false,
                 description: propSchema.description || "",
+                schema: propSchema,
               };
 
-              // Add options if they exist in the schema
-              if (propSchema.options) {
-                parameterData.options = propSchema.options;
-              }
-
+              const parameterData = transformParameterSchema(propParam);
+              validateSchemaPreservation(
+                propParam,
+                parameterData,
+                "PipelineEditorPage-ObjectProps",
+              );
               parameters[propName] = parameterData;
             },
           );
         } else {
-          // Single parameter
-          const parameterData: any = {
-            name: paramName,
-            label: param.label || paramName,
-            type:
-              param.schema?.type === "string"
-                ? "text"
-                : param.schema?.type === "integer"
-                  ? "number"
-                  : (param.schema?.type as "number" | "boolean" | "select"),
-            required: param.required || false,
-            description: param.description || param.schema?.description || "",
-          };
+          // Single parameter - use centralized transformer
+          const parameterData = transformParameterSchema(param);
+          validateSchemaPreservation(
+            param,
+            parameterData,
+            "PipelineEditorPage-SingleParam",
+          );
 
-          // Add options if they exist in the schema
-          if (param.schema?.options) {
-            parameterData.options = param.schema.options;
-          }
-
-          // Preserve default value if it exists
-          if (param.default !== undefined) {
-            parameterData.defaultValue = param.default;
+          if (parameterData.defaultValue !== undefined) {
             console.log(
               `[PipelineEditorPage] Found default value for ${paramName}:`,
-              param.default,
+              parameterData.defaultValue,
             );
           }
 
@@ -386,33 +357,26 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
         let flowParameters = {};
 
         if (Array.isArray(method.parameters)) {
+          // Use centralized transformer for FLOW array parameters
           flowParameters = method.parameters.reduce((paramAcc, param) => {
             console.log("[PipelineEditorPage] Processing parameter:", param);
-            const parameterData: any = {
-              name: param.name,
-              label: param.label || param.name,
-              type:
-                param.schema?.type === "string"
-                  ? "text"
-                  : param.schema?.type === "integer"
-                    ? "number"
-                    : (param.schema?.type as "number" | "boolean" | "select"),
-              required: param.required || false,
-              description: param.description,
-            };
+            const parameterData = transformParameterSchema(param);
+            validateSchemaPreservation(
+              param,
+              parameterData,
+              "PipelineEditorPage-FlowArrayParams",
+            );
 
-            // Preserve default value if it exists
-            if ((param as any).default !== undefined) {
-              parameterData.defaultValue = (param as any).default;
+            if (parameterData.defaultValue !== undefined) {
               console.log(
                 `[PipelineEditorPage] Found default value for ${param.name}:`,
-                (param as any).default,
+                parameterData.defaultValue,
               );
             }
             return { ...paramAcc, [param.name]: parameterData };
           }, {});
         } else if (method.parameters && typeof method.parameters === "object") {
-          // Handle single object format for FLOW nodes too
+          // Handle single object format for FLOW nodes - use centralized transformer
           const param = method.parameters as any;
           const paramName = param.name || "parameter";
 
@@ -423,48 +387,31 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
           ) {
             Object.entries(param.schema.properties).forEach(
               ([propName, propSchema]: [string, any]) => {
-                const parameterData: any = {
+                const propParam = {
                   name: propName,
                   label: propName.charAt(0).toUpperCase() + propName.slice(1),
-                  type:
-                    propSchema.type === "string"
-                      ? "text"
-                      : propSchema.type === "integer"
-                        ? "number"
-                        : (propSchema.type as "number" | "boolean" | "select"),
                   required: param.schema.required?.includes(propName) || false,
                   description: propSchema.description || "",
+                  schema: propSchema,
                 };
 
-                if (propSchema.options) {
-                  parameterData.options = propSchema.options;
-                }
-
+                const parameterData = transformParameterSchema(propParam);
+                validateSchemaPreservation(
+                  propParam,
+                  parameterData,
+                  "PipelineEditorPage-FlowObjectProps",
+                );
                 flowParameters[propName] = parameterData;
               },
             );
           } else {
-            const parameterData: any = {
-              name: paramName,
-              label: param.label || paramName,
-              type:
-                param.schema?.type === "string"
-                  ? "text"
-                  : param.schema?.type === "integer"
-                    ? "number"
-                    : (param.schema?.type as "number" | "boolean" | "select"),
-              required: param.required || false,
-              description: param.description || param.schema?.description || "",
-            };
-
-            if (param.schema?.options) {
-              parameterData.options = param.schema.options;
-            }
-
-            if (param.default !== undefined) {
-              parameterData.defaultValue = param.default;
-            }
-
+            // Single parameter - use centralized transformer
+            const parameterData = transformParameterSchema(param);
+            validateSchemaPreservation(
+              param,
+              parameterData,
+              "PipelineEditorPage-FlowSingleParam",
+            );
             flowParameters[paramName] = parameterData;
           }
         }
@@ -1900,6 +1847,21 @@ const PipelineEditorContent = () => {
         "[PipelineEditorPage] Configuration JSON:",
         JSON.stringify(configuration),
       );
+      console.log(
+        "[PipelineEditorPage] Configuration parameters:",
+        configuration.parameters,
+      );
+
+      // Debug: Check if we're receiving label instead of value for select fields
+      if (configuration.parameters) {
+        Object.entries(configuration.parameters).forEach(([key, value]) => {
+          console.log(
+            `[PipelineEditorPage] Parameter ${key}:`,
+            value,
+            typeof value,
+          );
+        });
+      }
       try {
         if (selectedNode) {
           console.log("[PipelineEditorPage] Selected node:", selectedNode);

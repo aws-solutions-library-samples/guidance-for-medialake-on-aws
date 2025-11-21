@@ -171,32 +171,12 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> =
           // Transform parameters to ensure consistent structure
           const paramsArray = Object.entries(topLevelParams).map(
             ([key, param]: [string, any]) => {
-              // Create a new parameter with consistent structure
-              const transformedParam: any = {
-                name: key,
-                label: param.label || key,
-                required: param.required || false,
-                description: param.description || "",
-                defaultValue: param.defaultValue, // Preserve defaultValue from PipelineEditorPage transformation
+              // PipelineEditorPage has already transformed these parameters
+              // Use spread to preserve ALL properties including showWhen, placeholder, etc.
+              return {
+                ...param, // Preserve everything
+                name: key, // Ensure name is set from key
               };
-
-              // Handle select parameters specifically
-              if (param.type === "select") {
-                transformedParam.schema = {
-                  type: "select",
-                  options: param.options || [],
-                };
-              } else {
-                // For other parameter types
-                transformedParam.schema = {
-                  type:
-                    param.type === "integer"
-                      ? "number"
-                      : param.type || "string",
-                };
-              }
-
-              return transformedParam;
             },
           );
 
@@ -260,29 +240,12 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> =
         // Transform parameters to ensure consistent structure
         const paramsArray = Object.entries(topLevelParams).map(
           ([key, param]: [string, any]) => {
-            // Create a new parameter with consistent structure
-            const transformedParam: any = {
-              name: key,
-              label: param.label || key,
-              required: param.required || false,
-              description: param.description || "",
-              defaultValue: param.defaultValue, // Preserve defaultValue from PipelineEditorPage transformation
+            // PipelineEditorPage has already transformed these parameters
+            // Use spread to preserve ALL properties including showWhen, placeholder, etc.
+            return {
+              ...param, // Preserve everything
+              name: key, // Ensure name is set from key
             };
-
-            // Handle select parameters specifically
-            if (param.type === "select") {
-              transformedParam.schema = {
-                type: "select",
-                options: param.options || [],
-              };
-            } else {
-              // For other parameter types
-              transformedParam.schema = {
-                type: param.type || "string",
-              };
-            }
-
-            return transformedParam;
           },
         );
 
@@ -375,6 +338,18 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> =
         console.log("Effective method parameters:", effectiveParameters);
         if (effectiveParameters.length > 0) {
           effectiveParameters.forEach((param: any) => {
+            // DEBUG: Log each parameter being processed
+            console.log(`[NodeConfigurationForm] Processing parameter:`, {
+              name: param.name,
+              label: param.label,
+              schemaType: param.schema?.type,
+              hasShowWhen: !!param.showWhen,
+              showWhen: param.showWhen,
+              hasOptions: !!(param.schema?.options || param.options),
+              optionsCount: (param.schema?.options || param.options || [])
+                .length,
+            });
+
             const field: FormFieldDefinition = {
               name: `parameters.${param.name}`,
               type: mapParameterTypeToFormType(param.schema?.type || "string"),
@@ -382,6 +357,34 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> =
               required: param.required,
               tooltip: param.description,
             };
+
+            // Copy showWhen for conditional field display
+            if (param.showWhen) {
+              field.showWhen = param.showWhen;
+              console.log(
+                `[NodeConfigurationForm] Added showWhen to field ${field.name}:`,
+                field.showWhen,
+              );
+            }
+
+            // Copy placeholder text
+            if (param.placeholder) {
+              field.placeholder = param.placeholder;
+            }
+
+            // Copy multiline and rows properties - check both param level and schema level
+            if (param.multiline !== undefined) {
+              field.multiline = param.multiline;
+            } else if (param.schema?.multiline !== undefined) {
+              field.multiline = param.schema.multiline;
+            }
+
+            if (param.rows !== undefined) {
+              field.rows = param.rows;
+            } else if (param.schema?.rows !== undefined) {
+              field.rows = param.schema.rows;
+            }
+
             // Determine parameter type from either schema.type or direct type
             const paramType = param.schema?.type || param.type || "string";
 
@@ -487,9 +490,21 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> =
       async (data: any) => {
         try {
           console.log("[NodeConfigurationForm] Form data:", data);
+          console.log(
+            "[NodeConfigurationForm] Form data JSON:",
+            JSON.stringify(data),
+          );
           console.log("[NodeConfigurationForm] methodInfo:", methodInfo);
           console.log("[NodeConfigurationForm] Node type:", node.info.nodeType);
           console.log("[NodeConfigurationForm] methodName:", methodName);
+
+          // Debug: Check what values we're receiving from the form
+          if (data.parameters) {
+            console.log("[NodeConfigurationForm] Raw form parameters:");
+            Object.entries(data.parameters).forEach(([key, value]) => {
+              console.log(`  ${key}: "${value}" (type: ${typeof value})`);
+            });
+          }
           let method;
           let path = "";
           let operationId = "";

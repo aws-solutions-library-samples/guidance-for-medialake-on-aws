@@ -31,6 +31,7 @@ export interface FormFieldDefinition {
     | "password";
   label: string;
   tooltip?: string;
+  placeholder?: string;
   required?: boolean;
   multiline?: boolean;
   rows?: number;

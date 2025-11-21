@@ -55,49 +55,69 @@ export const DynamicForm: React.FC<DynamicFormProps> = React.memo(
       reValidateMode: "onBlur",
     });
 
-    const renderField = React.useMemo(() => {
-      return definition.fields.map((field: FormFieldDefinition) => {
-        if (field.showWhen) {
-          const dependentValue = form.watch(field.showWhen.field);
-          if (dependentValue !== field.showWhen.value) {
-            return null;
-          }
+    // Render fields - NOT memoized so it re-evaluates when watched values change
+    const renderField = definition.fields.map((field: FormFieldDefinition) => {
+      if (field.showWhen) {
+        const dependentValue = form.watch(field.showWhen.field);
+
+        // DEBUG: Log conditional field evaluation
+        console.log(`[DynamicForm] Conditional field evaluation:`, {
+          fieldName: field.name,
+          fieldLabel: field.label,
+          showWhenField: field.showWhen.field,
+          showWhenValue: field.showWhen.value,
+          currentValue: dependentValue,
+          shouldShow: dependentValue === field.showWhen.value,
+          allFormValues: form.getValues(),
+        });
+
+        if (dependentValue !== field.showWhen.value) {
+          console.log(
+            `[DynamicForm] Hiding field ${field.name} because ${dependentValue} !== ${field.showWhen.value}`,
+          );
+          return null;
         }
+        console.log(
+          `[DynamicForm] Showing field ${field.name} because condition matched`,
+        );
+      }
 
-        // Common props for all field types
-        const commonProps = {
-          key: field.name,
-          name: field.name,
-          control: form.control,
-          label: field.label, // Use direct label
-          tooltip: field.tooltip,
-          required: field.required,
-          useDirectLabels: true, // New prop to bypass i18n
-        };
+      // Common props for all field types
+      const commonProps = {
+        key: field.name,
+        name: field.name,
+        control: form.control,
+        label: field.label, // Use direct label
+        tooltip: field.tooltip,
+        required: field.required,
+        useDirectLabels: true, // New prop to bypass i18n
+        ...(field.placeholder !== undefined && {
+          placeholder: field.placeholder,
+        }),
+        ...(field.multiline !== undefined && { multiline: field.multiline }),
+        ...(field.rows !== undefined && { rows: field.rows }),
+      };
 
-        switch (field.type) {
-          case "select":
-            return (
-              <FormSelect {...commonProps} options={field.options || []} />
-            );
+      switch (field.type) {
+        case "select":
+          return <FormSelect {...commonProps} options={field.options || []} />;
 
-          case "multiselect":
-            return (
-              <FormSelect
-                {...commonProps}
-                options={field.options || []}
-                multiple
-              />
-            );
+        case "multiselect":
+          return (
+            <FormSelect
+              {...commonProps}
+              options={field.options || []}
+              multiple
+            />
+          );
 
-          case "switch":
-            return <FormSwitch {...commonProps} />;
+        case "switch":
+          return <FormSwitch {...commonProps} />;
 
-          default:
-            return <FormField {...commonProps} type={field.type} />;
-        }
-      });
-    }, [definition.fields, form.control, form.watch]);
+        default:
+          return <FormField {...commonProps} type={field.type} />;
+      }
+    });
 
     const handleSubmit = React.useCallback(
       async (data: any) => {

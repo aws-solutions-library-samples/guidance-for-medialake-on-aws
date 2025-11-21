@@ -435,6 +435,39 @@ def process_standard_node(node_data: dict) -> Dict[str, list]:
         actions = node_data.get("actions", {})
         for action_name, action_details in actions.items():
             method_id = action_name
+
+            # Debug: Log raw parameters from YAML
+            raw_params = action_details.get("parameters", [])
+            logger.info(
+                f"[DEBUG] Processing action '{action_name}' for node '{node_id}'",
+                extra={
+                    "action_name": action_name,
+                    "node_id": node_id,
+                    "raw_params_type": type(raw_params).__name__,
+                    "raw_params_count": (
+                        len(raw_params) if isinstance(raw_params, list) else "N/A"
+                    ),
+                },
+            )
+
+            # Debug: Log each parameter name
+            if isinstance(raw_params, list):
+                for idx, param in enumerate(raw_params):
+                    logger.info(
+                        f"[DEBUG] Parameter {idx} in action '{action_name}'",
+                        extra={
+                            "index": idx,
+                            "param_name": param.get("name", "NO_NAME"),
+                            "param_label": param.get("label", "NO_LABEL"),
+                            "has_showWhen": "showWhen" in param,
+                            "showWhen_value": (
+                                param.get("showWhen", {}).get("value", "N/A")
+                                if "showWhen" in param
+                                else "N/A"
+                            ),
+                        },
+                    )
+
             method_item = {
                 "pk": f"NODE#{node_id}",
                 "sk": f"METHOD#{method_id}",
@@ -442,7 +475,7 @@ def process_standard_node(node_data: dict) -> Dict[str, list]:
                 "methodDescription": action_details.get("description", ""),
                 "methodConfig": {
                     "summary": action_details.get("summary", ""),
-                    "parameters": action_details.get("parameters", {}),
+                    "parameters": raw_params,
                 },
                 "gsi2pk": f"METHOD#{node_id}",
                 "gsi2sk": f"METHOD#{method_id}",

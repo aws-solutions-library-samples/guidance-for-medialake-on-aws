@@ -29,8 +29,12 @@ actions:
         default: Inline
         schema:
           type: select
-          options: ["Inline", "Distributed"]
-          description: Map execution mode - Inline for small datasets, Distributed for large datasets that exceed EventBridge limits
+          options:
+            - label: "Inline (For small datasets, up to 40KB)"
+              value: "Inline"
+            - label: "Distributed (For large datasets exceeding EventBridge limits)"
+              value: "Distributed"
+          description: Map execution mode determines how iterations are processed
       - in: body
         name: ConcurrencyLimit
         label: Concurrency Limit

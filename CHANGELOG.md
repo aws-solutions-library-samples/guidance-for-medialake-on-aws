@@ -74,8 +74,6 @@
 - fix: resolve Bedrock token limit exceeded error in video transcription pipeline
 - fix: resolve Bedrock token limit exceeded error in video transcription pipeline
 
-
-
 ## [2.0.0] - 2025-11-21
 
 ### ⚠ BREAKING CHANGES

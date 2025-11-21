@@ -27,7 +27,13 @@ actions:
         required: true
         schema:
           type: select
-          options: ["Source", "Proxy", "Thumbnail"]
+          options:
+            - label: "Source (Original file)"
+              value: "Source"
+            - label: "Proxy (Web-optimized version)"
+              value: "Proxy"
+            - label: "Thumbnail (Preview image)"
+              value: "Thumbnail"
     connections:
       incoming:
         type: [any]
