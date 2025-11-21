@@ -82,6 +82,26 @@ export const ensureCorrectTypes = (
     parameters: processedParams,
   };
 };
+// Normalize any string-number values to actual numbers in an object
+export const normalizeNumericValues = (obj: any): any => {
+  if (!obj || typeof obj !== "object") return obj;
+
+  const normalized: Record<string, any> = {};
+
+  Object.entries(obj).forEach(([key, value]) => {
+    if (
+      typeof value === "string" &&
+      !isNaN(Number(value)) &&
+      value.trim() !== ""
+    ) {
+      normalized[key] = Number(value);
+    } else {
+      normalized[key] = value;
+    }
+  });
+
+  return normalized;
+};
 
 export interface CustomNodeData {
   id: string;

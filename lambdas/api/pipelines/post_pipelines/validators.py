@@ -251,24 +251,32 @@ class StateMachineValidator:
             )
             return False
 
-        # Validate ItemsPath
-        if "ItemsPath" not in state:
-            logger.warning(
-                f"Map state {state_name} has no ItemsPath, adding default $.payload.data"
-            )
-            state["ItemsPath"] = "$.payload.data"
-        elif not state["ItemsPath"].startswith("$"):
-            logger.warning(
-                f"Map state {state_name} has invalid ItemsPath {state['ItemsPath']}, fixing to $.payload.data"
-            )
-            state["ItemsPath"] = "$.payload.data"
+        # Only validate ItemsPath and Parameters for Inline Maps (not Distributed Maps with ItemReader)
+        has_item_reader = "ItemReader" in state
 
-        # Ensure Parameters exists for fallback mechanism
-        if "Parameters" not in state:
+        if not has_item_reader:
+            # Validate ItemsPath for Inline Maps only
+            if "ItemsPath" not in state:
+                logger.warning(
+                    f"Map state {state_name} has no ItemsPath, adding default $.payload.data"
+                )
+                state["ItemsPath"] = "$.payload.data"
+            elif not state["ItemsPath"].startswith("$"):
+                logger.warning(
+                    f"Map state {state_name} has invalid ItemsPath {state['ItemsPath']}, fixing to $.payload.data"
+                )
+                state["ItemsPath"] = "$.payload.data"
+
+            # Ensure Parameters exists for fallback mechanism (Inline Maps only)
+            if "Parameters" not in state:
+                logger.info(
+                    f"Adding Parameters with InputPath to Map state {state_name} for fallback mechanism"
+                )
+                state["Parameters"] = {"item.$": "$$.Map.Item.Value"}
+        else:
             logger.info(
-                f"Adding Parameters with InputPath to Map state {state_name} for fallback mechanism"
+                f"Skipping ItemsPath and Parameters validation for Distributed Map {state_name} with ItemReader"
             )
-            state["Parameters"] = {"item.$": "$$.Map.Item.Value"}
 
         # Ensure the last state in the Iterator has End: true
         if "States" in iterator:
@@ -498,13 +506,32 @@ class StateMachineValidator:
         unreachable_states = set(states.keys()) - reachable_states
 
         if unreachable_states:
-            logger.warning(f"Found unreachable states: {unreachable_states}")
+            logger.warning(
+                f"Found {len(unreachable_states)} unreachable states: {unreachable_states}"
+            )
+            logger.warning(
+                f"Reachable states ({len(reachable_states)}): {reachable_states}"
+            )
+            logger.warning(f"Start state: {start_at}")
+
+            # Log the state that leads to these being unreachable
+            for state_name in list(states.keys()):
+                state = states[state_name]
+                if state_name in reachable_states:
+                    has_next = "Next" in state
+                    has_end = "End" in state
+                    logger.info(
+                        f"Reachable state '{state_name}': Type={state.get('Type')}, has_Next={has_next}, has_End={has_end}"
+                    )
 
             # Simply remove all unreachable states from the state machine definition
             # This is the most robust approach as it doesn't rely on specific node names
             for state_name in unreachable_states:
                 if state_name in states:
-                    logger.info(f"Removing unreachable state: {state_name}")
+                    state_type = states[state_name].get("Type", "Unknown")
+                    logger.error(
+                        f"REMOVING UNREACHABLE STATE: {state_name} (Type={state_type}). This indicates a connection failure earlier in the build process."
+                    )
                     del states[state_name]
 
         # Ensure at least one terminal state exists

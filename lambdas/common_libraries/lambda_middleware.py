@@ -258,6 +258,54 @@ class LambdaMiddleware:
             and "data" in ev["payload"]
             and "assets" in ev["payload"]
         ):
+            # Check if payload was offloaded to S3
+            meta = ev.get("metadata", {})
+            if meta.get("stepExternalPayload") == "True":
+                ext_loc = meta.get("stepExternalPayloadLocation", {})
+                bucket = ext_loc.get("bucket")
+                key = ext_loc.get("key")
+
+                if bucket and key:
+                    self.logger.info(
+                        "MIDDLEWARE: Downloading external payload from S3",
+                        extra={
+                            "bucket": bucket,
+                            "key": key,
+                        },
+                    )
+                    try:
+                        obj = self.s3.get_object(Bucket=bucket, Key=key)
+                        body = obj["Body"].read().decode("utf-8")
+                        downloaded_payload = json.loads(body)
+
+                        # Replace the empty payload with downloaded data
+                        ev["payload"] = downloaded_payload
+
+                        self.logger.info(
+                            "MIDDLEWARE: Successfully downloaded external payload",
+                            extra={
+                                "payload_keys": (
+                                    list(downloaded_payload.keys())
+                                    if isinstance(downloaded_payload, dict)
+                                    else "N/A"
+                                ),
+                                "data_keys": (
+                                    list(downloaded_payload.get("data", {}).keys())
+                                    if isinstance(downloaded_payload.get("data"), dict)
+                                    else "N/A"
+                                ),
+                            },
+                        )
+                    except Exception as e:
+                        self.logger.error(
+                            f"MIDDLEWARE: Failed to download external payload: {e}",
+                            extra={
+                                "bucket": bucket,
+                                "key": key,
+                            },
+                        )
+                        raise
+
             return ev
 
         # ── 2b) EventBridge envelope whose detail is already standardised ────
@@ -269,6 +317,56 @@ class LambdaMiddleware:
                 and "data" in detail["payload"]
                 and "assets" in detail["payload"]
             ):
+                # Check if payload was offloaded to S3
+                meta = detail.get("metadata", {})
+                if meta.get("stepExternalPayload") == "True":
+                    ext_loc = meta.get("stepExternalPayloadLocation", {})
+                    bucket = ext_loc.get("bucket")
+                    key = ext_loc.get("key")
+
+                    if bucket and key:
+                        self.logger.info(
+                            "MIDDLEWARE: Downloading external payload from S3 (EventBridge envelope)",
+                            extra={
+                                "bucket": bucket,
+                                "key": key,
+                            },
+                        )
+                        try:
+                            obj = self.s3.get_object(Bucket=bucket, Key=key)
+                            body = obj["Body"].read().decode("utf-8")
+                            downloaded_payload = json.loads(body)
+
+                            # Replace the empty payload with downloaded data
+                            detail["payload"] = downloaded_payload
+
+                            self.logger.info(
+                                "MIDDLEWARE: Successfully downloaded external payload (EventBridge envelope)",
+                                extra={
+                                    "payload_keys": (
+                                        list(downloaded_payload.keys())
+                                        if isinstance(downloaded_payload, dict)
+                                        else "N/A"
+                                    ),
+                                    "data_keys": (
+                                        list(downloaded_payload.get("data", {}).keys())
+                                        if isinstance(
+                                            downloaded_payload.get("data"), dict
+                                        )
+                                        else "N/A"
+                                    ),
+                                },
+                            )
+                        except Exception as e:
+                            self.logger.error(
+                                f"MIDDLEWARE: Failed to download external payload (EventBridge envelope): {e}",
+                                extra={
+                                    "bucket": bucket,
+                                    "key": key,
+                                },
+                            )
+                            raise
+
                 exec_id, pipe_id = _pick_pipeline_ids(ev)
                 detail.setdefault("pipelineExecutionId", exec_id)
                 detail.setdefault("pipelineId", pipe_id)
@@ -336,6 +434,25 @@ class LambdaMiddleware:
         to S3 and embedding or listing external payload references for downstream Map states.
         """
         now = time.time()
+
+        self.logger.info(
+            "MIDDLEWARE: _make_output called",
+            extra={
+                "step_name": self.step_name,
+                "result_type": type(result).__name__,
+                "result_keys": (
+                    list(result.keys()) if isinstance(result, dict) else "N/A"
+                ),
+                "orig_keys": list(orig.keys()) if isinstance(orig, dict) else "N/A",
+                "has_externalJobStatus_in_result": isinstance(result, dict)
+                and "externalJobStatus" in result,
+                "has_externalJobStatus_in_orig_metadata": isinstance(
+                    orig.get("metadata"), dict
+                )
+                and "externalJobStatus" in orig["metadata"],
+            },
+        )
+
         data = result
 
         # Extract external job fields
@@ -347,6 +464,18 @@ class LambdaMiddleware:
         )
         ext_rs = safe_pop(data, "externalJobResult") or orig.get("metadata", {}).get(
             "externalJobResult", ""
+        )
+
+        self.logger.info(
+            "MIDDLEWARE: Extracted external job fields",
+            extra={
+                "externalJobId": ext_id,
+                "externalJobStatus": ext_st,
+                "externalJobResult": ext_rs,
+                "data_keys_after_extraction": (
+                    list(data.keys()) if isinstance(data, dict) else type(data).__name__
+                ),
+            },
         )
 
         prev_meta = orig.get("metadata", {})
@@ -382,6 +511,20 @@ class LambdaMiddleware:
             "stepExternalPayload": "False",
             "stepExternalPayloadLocation": {},
         }
+
+        # Check if result contains distributedMapConfig from Results lambda
+        if isinstance(result, dict) and "distributedMapConfig" in result:
+            dmap_cfg = result["distributedMapConfig"]
+            meta["distributedMapConfig"] = dmap_cfg
+            self.logger.info(
+                "DMAP-FIX-v1: Middleware preserving distributedMapConfig",
+                extra={
+                    "version": "DMAP-FIX-v1",
+                    "step_name": self.step_name,
+                    "s3_bucket": dmap_cfg.get("s3_bucket"),
+                    "s3_key": dmap_cfg.get("s3_key"),
+                },
+            )
 
         # Gather previous assets
         def _inner_assets(obj: Any) -> list:
@@ -422,6 +565,18 @@ class LambdaMiddleware:
             map_block = copy.deepcopy(orig["payload"]["map"])
 
         # Prepare payload
+        self.logger.info(
+            "MIDDLEWARE: Preparing payload",
+            extra={
+                "step_name": self.step_name,
+                "data_keys": (
+                    list(data.keys()) if isinstance(data, dict) else type(data).__name__
+                ),
+                "assets_count": len(assets) if isinstance(assets, list) else 0,
+                "has_map_block": map_block is not None,
+            },
+        )
+
         payload: Dict[str, Any] = {"data": data, "assets": assets}
         if map_block:
             payload["map"] = map_block
@@ -433,13 +588,44 @@ class LambdaMiddleware:
             if original_data:  # Only preserve if there's actual data
                 payload["payload_history"] = copy.deepcopy(original_data)
                 self.logger.info(
-                    "Preserved original payload.data in payload_history for pipeline continuity"
+                    "MIDDLEWARE: Preserved original payload.data in payload_history",
+                    extra={
+                        "payload_history_keys": (
+                            list(original_data.keys())
+                            if isinstance(original_data, dict)
+                            else type(original_data).__name__
+                        ),
+                    },
                 )
 
         # Serialize and offload if too large
         raw = json.dumps(payload["data"], default=_json_default).encode()
+        self.logger.info(
+            "MIDDLEWARE: Checking payload size",
+            extra={
+                "payload_data_size": len(raw),
+                "max_size": self.max_response_size,
+                "will_offload": len(raw) > self.max_response_size,
+            },
+        )
+
         if len(raw) > self.max_response_size:
-            key = f"{meta['pipelineExecutionId']}"
+            key = f"{meta['pipelineExecutionId']}/{self.step_name}_{uuid.uuid4()}.json"
+
+            self.logger.info(
+                "DMAP-FIX-v1: Middleware offloading large payload to S3",
+                extra={
+                    "version": "DMAP-FIX-v1",
+                    "step_name": self.step_name,
+                    "payload_size_bytes": len(raw),
+                    "max_size_bytes": self.max_response_size,
+                    "s3_bucket": self.external_payload_bucket,
+                    "s3_key": key,
+                    "has_distributedMapConfig_in_metadata": "distributedMapConfig"
+                    in meta,
+                },
+            )
+
             self.s3.put_object(Bucket=self.external_payload_bucket, Key=key, Body=raw)
             meta["stepExternalPayload"] = "True"
             meta["stepExternalPayloadLocation"] = {
@@ -471,7 +657,27 @@ class LambdaMiddleware:
                     for idx in range(len(external_json))
                 ]
             except Exception as exc:
-                self.logger.error(f"Failed to fetch external payload: {exc}")
+                self.logger.error(
+                    f"MIDDLEWARE: Failed to fetch external payload: {exc}"
+                )
+
+        self.logger.info(
+            "MIDDLEWARE: Returning final response",
+            extra={
+                "metadata_keys": list(meta.keys()),
+                "payload_keys": list(payload.keys()),
+                "payload_data_keys": (
+                    list(payload["data"].keys())
+                    if isinstance(payload.get("data"), dict)
+                    else type(payload.get("data")).__name__
+                ),
+                "has_itemReaderBucket_in_metadata": "itemReaderBucket" in meta,
+                "has_itemReaderBucket_in_payload_data": isinstance(
+                    payload.get("data"), dict
+                )
+                and "itemReaderBucket" in payload.get("data", {}),
+            },
+        )
 
         return {"metadata": meta, "payload": payload}
 

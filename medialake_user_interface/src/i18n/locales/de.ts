@@ -17,6 +17,62 @@ export default {
     connectors: "Connectors",
     selectConnector: "Wählen Sie einen Connector",
   },
+  upload: {
+    title: "Mediendateien hochladen",
+    description:
+      "Wählen Sie einen S3-Connector und laden Sie Ihre Mediendateien hoch. Nur Audio-, Video-, HLS- und MPEG-DASH-Formate werden unterstützt.",
+    uploadDestination: "Upload-Ziel",
+    browsePath: "Pfad durchsuchen",
+    uploadingTo: "Hochladen nach",
+    restrictedToPrefix: "eingeschränkt",
+    allowedPrefixesInfo:
+      "Sie können nur zu {{count}} erlaubten Pfad(en) hochladen",
+    pathInfo:
+      "Dateien werden in den ausgewählten Pfad im S3-Bucket hochgeladen",
+    selectPathFirst: "Wählen Sie zuerst einen Pfad aus, bevor Sie hochladen",
+    pathResetWarning:
+      "Das Ändern des Connectors setzt den ausgewählten Pfad zurück",
+    connectorLabel: "S3-Connector",
+    selectConnectorPlaceholder: "Wählen Sie einen S3-Connector",
+    loadingConnectors: "Connectors werden geladen...",
+    noConnectors:
+      "Keine S3-Connectors verfügbar. Bitte konfigurieren Sie zuerst einen S3-Connector.",
+    dashboardNote:
+      "Nur Dateien der Typen audio/*, video/*, image/*, HLS (application/x-mpegURL) und MPEG-DASH (application/dash+xml) sind erlaubt",
+    meta: {
+      name: "Name",
+    },
+  },
+  pathBrowser: {
+    title: "Upload-Pfad auswählen",
+    descriptionRestricted:
+      "Durchsuchen und wählen Sie einen Ordner innerhalb der erlaubten Pfade zum Hochladen Ihrer Dateien.",
+    descriptionUnrestricted:
+      "Durchsuchen und wählen Sie einen beliebigen Ordner im Bucket zum Hochladen Ihrer Dateien.",
+    prefixLabel: "Erlaubter Pfad",
+    prefixHelper:
+      "Sie können nur Ordner innerhalb des ausgewählten Pfades durchsuchen und hochladen.",
+    selectedPath: "Ausgewählter Pfad",
+    currentPath: "Aktueller Pfad",
+    confirm: "Diesen Pfad verwenden",
+    validation: {
+      invalidPath:
+        "Der ausgewählte Pfad liegt außerhalb der erlaubten Präfixe.",
+      noPathSelected:
+        "Bitte navigieren Sie zu einem Ordner, bevor Sie bestätigen.",
+    },
+    error: {
+      invalidConnector: "Ungültige Connector-ID angegeben.",
+      loadingFailed: "Laden der Connector-Informationen fehlgeschlagen.",
+    },
+    hints: {
+      clickFolder:
+        "Klicken Sie auf einen Ordner, um hineinzunavigieren, und klicken Sie dann auf 'Aktuellen Ordner auswählen', um ihn auszuwählen.",
+      navigateAndConfirm:
+        "Navigieren Sie zu dem gewünschten Ordner und klicken Sie dann auf 'Diesen Pfad verwenden' zum Bestätigen.",
+      rootPath: "Sie befinden sich derzeit auf der Stammebene.",
+    },
+  },
   connectors: {
     apiMessages: {
       creating: {
@@ -146,6 +202,13 @@ export default {
       label: "Semantisch",
       enable: "Semantische Suche aktivieren",
       disable: "Semantische Suche deaktivieren",
+      configure: "Klicken Sie hier, um die semantische Suche zu konfigurieren",
+      configDialog: {
+        title: "Semantische Suche nicht konfiguriert",
+        description:
+          "Die semantische Suche ist derzeit nicht konfiguriert oder deaktiviert. Um diese Funktion zu aktivieren, gehen Sie zu Systemeinstellungen > Suche, um einen Suchanbieter zu konfigurieren, oder drücken Sie die Schaltfläche unten.",
+        goToSettings: "Zu Sucheinstellungen gehen",
+      },
     },
     filters: {
       dateRange: "Datumsbereich",
@@ -464,6 +527,8 @@ export default {
     selectFilter: "Filter auswählen",
     textFilter: "Textfilter",
     all: "Alle",
+    root: "Wurzel",
+    folder: "Ordner",
     filter: "Filter",
     noGroups: "Keine Gruppen",
     actions: {
@@ -489,6 +554,29 @@ export default {
     status: {
       active: "Aktiv",
       inactive: "Inaktiv",
+    },
+  },
+  s3Explorer: {
+    filter: {
+      label: "Nach Name filtern",
+      clear: "Filter löschen",
+      resultsCount: "Zeige {{count}} von {{total}} Elementen",
+    },
+    loading: {
+      initializing: "Lädt...",
+      fetchingContents: "Inhalte werden abgerufen...",
+    },
+    empty: {
+      folder: "Dieser Ordner ist leer",
+      noResults: "Keine Elemente entsprechen Ihrem Filter",
+    },
+    keyboard: {
+      navigation:
+        "Verwenden Sie die Pfeiltasten zum Navigieren, Enter zum Öffnen, Backspace zum Zurückkehren",
+    },
+    menu: {
+      rename: "Umbenennen",
+      delete: "Löschen",
     },
   },
   translation: {
@@ -715,12 +803,33 @@ export default {
     s3Explorer: {
       filter: {
         label: "Nach Name filtern",
+        clear: "Filter löschen",
+        resultsCount: "Zeige {{count}} von {{total}} Elementen",
       },
       error: {
         loading: "Fehler beim Laden der S3-Objekte: {{message}}",
+        network:
+          "Netzwerkfehler. Bitte überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
+        permission:
+          "Zugriff verweigert. Sie haben keine Berechtigung, auf diesen Pfad zuzugreifen.",
+        permissionWithPrefixes:
+          "Zugriff verweigert. Sie können nur auf die folgenden Pfade zugreifen: {{prefixes}}",
+        notFound: "Der angeforderte Pfad existiert nicht.",
+        timeout:
+          "Zeitüberschreitung der Anfrage. Bitte versuchen Sie es erneut.",
+        retry: "Wiederholen",
       },
-      file: {
-        info: "Größe: {{size}} • Speicherklasse: {{storageClass}} • Geändert: {{modified}}",
+      loading: {
+        initializing: "Lädt...",
+        fetchingContents: "Inhalte werden abgerufen...",
+      },
+      empty: {
+        folder: "Dieser Ordner ist leer",
+        noResults: "Keine Elemente entsprechen Ihrem Filter",
+      },
+      keyboard: {
+        navigation:
+          "Verwenden Sie die Pfeiltasten zur Navigation, Enter zum Öffnen, Backspace zum Zurückgehen",
       },
       menu: {
         rename: "Umbenennen",

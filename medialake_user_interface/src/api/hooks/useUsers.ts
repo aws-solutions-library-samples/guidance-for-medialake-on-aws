@@ -61,7 +61,27 @@ export const useGetUser = (userId: string) => {
         "Raw API Response from useGetUser:",
         JSON.stringify(data, null, 2),
       );
-      return data;
+
+      // Handle both wrapped and direct response formats
+      let responseData = data;
+
+      // If response is wrapped in statusCode/body format, parse it
+      if (
+        typeof responseData === "object" &&
+        "statusCode" in responseData &&
+        "body" in responseData
+      ) {
+        const wrappedResponse = responseData as {
+          statusCode: number;
+          body: string;
+        };
+        if (typeof wrappedResponse.body === "string") {
+          responseData = JSON.parse(wrappedResponse.body);
+          console.log("Parsed wrapped response:", responseData);
+        }
+      }
+
+      return responseData as UserProfileResponse;
     },
     enabled: !!userId,
   });

@@ -34,11 +34,18 @@ class EmbeddingStoreFactory:
 
             embedding_store = response.get("Item", {})
             if embedding_store:
-                return embedding_store.get("type", "opensearch")
+                store_type = embedding_store.get("type", "opensearch")
+                self.logger.info(f"Embedding store setting from DynamoDB: {store_type}")
+                return store_type
             else:
+                self.logger.info(
+                    "No embedding store setting found in DynamoDB, defaulting to: opensearch"
+                )
                 return "opensearch"  # Default to opensearch
         except Exception as e:
-            self.logger.warning(f"Error getting embedding store setting: {str(e)}")
+            self.logger.warning(
+                f"Error getting embedding store setting: {str(e)}, defaulting to: opensearch"
+            )
             return "opensearch"  # Default fallback
 
     def create_embedding_store(
@@ -60,18 +67,23 @@ class EmbeddingStoreFactory:
         if store_type is None:
             store_type = self.get_embedding_store_setting()
 
+        self.logger.info(f"Creating embedding store of type: {store_type}")
+
         # Return cached store if it matches the requested type
         if (
             self._cached_store is not None
             and self._cached_setting == store_type
             and self._cached_store.is_available()
         ):
+            self.logger.info(f"Using cached embedding store: {store_type}")
             return self._cached_store
 
         # Create new store instance
         if store_type == "opensearch":
+            self.logger.info("Initializing OpenSearch embedding store")
             store = OpenSearchEmbeddingStore(self.logger, self.metrics)
         elif store_type == "s3-vector":
+            self.logger.info("Initializing S3 Vector embedding store")
             store = S3VectorEmbeddingStore(self.logger, self.metrics)
         else:
             raise ValueError(f"Unsupported embedding store type: {store_type}")

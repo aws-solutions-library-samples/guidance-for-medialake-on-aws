@@ -76,14 +76,14 @@
               "Container": "RAW"
             },
             "VideoDescription": {
-              "Width": {{ variables.thumbnail_width | default(300) }},
-              "Height": {{ variables.thumbnail_height | default(400) }},
+              "Width": {{ variables.thumbnail_width | default(640) }},
+              "Height": {{ variables.thumbnail_height | default(360) }},
               "CodecSettings": {
                 "Codec": "FRAME_CAPTURE",
                 "FrameCaptureSettings": {
                   "FramerateNumerator": 1,
-                  "FramerateDenominator": {{ variables.thumbnail_frame_denominator | default(4) }},
-                  "MaxCaptures": 1,
+                  "FramerateDenominator": {{ variables.thumbnail_frame_denominator | default(2) }},
+                  "MaxCaptures": {{ variables.thumbnail_max_captures | default(5) }},
                   "Quality": 80
                 }
               }

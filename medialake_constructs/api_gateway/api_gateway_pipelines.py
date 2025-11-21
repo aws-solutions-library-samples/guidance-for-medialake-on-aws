@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from aws_cdk import Duration, Stack
+from aws_cdk import Duration, RemovalPolicy, Stack
 from aws_cdk import aws_apigateway as apigateway
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_ec2 as ec2
@@ -302,6 +302,25 @@ class ApiGatewayPipelinesConstruct(Construct):
             config=post_pipelines_lambda_config,
         )
 
+        # Prevent self-mutation (Scenario 1.1 privilege escalation)
+        self._post_pipelines_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.DENY,
+                actions=[
+                    "iam:CreateRole",
+                    "iam:DeleteRole",
+                    "iam:UpdateRole",
+                    "iam:PutRolePolicy",
+                    "iam:AttachRolePolicy",
+                    "iam:DetachRolePolicy",
+                    "iam:DeleteRolePolicy",
+                    "iam:TagRole",
+                    "iam:UntagRole",
+                ],
+                resources=[self._post_pipelines_handler.function.role.role_arn],
+            )
+        )
+
         self._post_pipelines_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
@@ -368,6 +387,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                     "lambda:UpdateFunctionConfiguration",
                     "lambda:GetFunctionConfiguration",
                     "lambda:ListEventSourceMappings",
+                    "lambda:DeleteEventSourceMapping",  # For deleting SQS-Lambda connections
                     "lambda:DeleteFunction",  # For rollback
                 ],
                 resources=["*"],
@@ -496,6 +516,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             "PipelineCreationStateMachineLogGroup",
             log_group_name=f"/aws/vendedlogs/states/{config.resource_prefix}_Pipeline_Creator",
             retention=logs.RetentionDays.ONE_MONTH,
+            removal_policy=RemovalPolicy.DESTROY,
         )
 
         # Create the state machine with logging enabled
@@ -526,6 +547,25 @@ class ApiGatewayPipelinesConstruct(Construct):
                     "PIPELINES_TABLE": props.pipeline_table.table_name,
                 },
             ),
+        )
+
+        # Prevent self-mutation (Scenario 1.1 privilege escalation)
+        self._post_pipelines_async_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.DENY,
+                actions=[
+                    "iam:CreateRole",
+                    "iam:DeleteRole",
+                    "iam:UpdateRole",
+                    "iam:PutRolePolicy",
+                    "iam:AttachRolePolicy",
+                    "iam:DetachRolePolicy",
+                    "iam:DeleteRolePolicy",
+                    "iam:TagRole",
+                    "iam:UntagRole",
+                ],
+                resources=[self._post_pipelines_async_handler.function.role.role_arn],
+            )
         )
 
         # Grant the front-end Lambda permission to start the Step Function
@@ -677,6 +717,25 @@ class ApiGatewayPipelinesConstruct(Construct):
             config=put_pipeline_id_lambda_config,
         )
 
+        # Prevent self-mutation (Scenario 1.1 privilege escalation)
+        self._put_pipeline_id_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.DENY,
+                actions=[
+                    "iam:CreateRole",
+                    "iam:DeleteRole",
+                    "iam:UpdateRole",
+                    "iam:PutRolePolicy",
+                    "iam:AttachRolePolicy",
+                    "iam:DetachRolePolicy",
+                    "iam:DeleteRolePolicy",
+                    "iam:TagRole",
+                    "iam:UntagRole",
+                ],
+                resources=[self._put_pipeline_id_handler.function.role.role_arn],
+            )
+        )
+
         self._put_pipeline_id_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["dynamodb:GetItem", "dynamodb:UpdateItem"],
@@ -721,6 +780,24 @@ class ApiGatewayPipelinesConstruct(Construct):
             self,
             "DeletePipelineIdHandler",
             config=del_pipeline_id_lambda_config,
+        )
+
+        # Prevent self-mutation (Scenario 1.1 privilege escalation)
+        self._del_pipeline_id_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.DENY,
+                actions=[
+                    "iam:DeleteRole",
+                    "iam:UpdateRole",
+                    "iam:PutRolePolicy",
+                    "iam:AttachRolePolicy",
+                    "iam:DetachRolePolicy",
+                    "iam:DeleteRolePolicy",
+                    "iam:TagRole",
+                    "iam:UntagRole",
+                ],
+                resources=[self._del_pipeline_id_handler.function.role.role_arn],
+            )
         )
 
         # Add Lambda function deletion permissions
@@ -813,6 +890,16 @@ class ApiGatewayPipelinesConstruct(Construct):
             iam.PolicyStatement(
                 actions=["dynamodb:DeleteItem", "dynamodb:GetItem", "dynamodb:Scan"],
                 resources=[props.pipeline_table.table_arn],
+            )
+        )
+
+        # Add CloudWatch Logs deletion permissions for Step Functions log groups
+        self._del_pipeline_id_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["logs:DeleteLogGroup", "logs:DescribeLogGroups"],
+                resources=[
+                    f"arn:aws:logs:{self.region}:{self.account_id}:log-group:/aws/vendedlogs/states/{config.resource_prefix}*"
+                ],
             )
         )
 

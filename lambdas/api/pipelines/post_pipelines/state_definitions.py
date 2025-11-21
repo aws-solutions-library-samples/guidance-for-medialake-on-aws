@@ -135,7 +135,9 @@ class StateDefinitionFactory:
 
             # Skip nodes that are used exclusively as Map processors
             if node.id in map_processor_nodes:
-                logger.info(f"Skipping node {node.id} as it's used as a Map processor")
+                logger.info(
+                    f"Skipping node {node.id} ({node.data.label}) as it's used as a Map processor"
+                )
                 continue
 
             state_name = node_id_to_state_name.get(node.id)
@@ -143,7 +145,9 @@ class StateDefinitionFactory:
                 logger.warning(f"No state name found for node {node.id}, skipping")
                 continue
 
-            logger.info(f"Creating state definition for {state_name}")
+            logger.info(
+                f"Creating state definition for node {node.id} ({node.data.label}, type={node.data.type}): state_name={state_name}"
+            )
 
             if node.data.type.lower() == "flow":
                 # Handle flow-type nodes
@@ -171,6 +175,9 @@ class StateDefinitionFactory:
 
                     # Add the main state
                     states[state_name] = state_def
+                    logger.info(
+                        f"Added state {state_name} to states dict. Total states: {len(states)}, Keys: {list(states.keys())}"
+                    )
                     logger.info(f"Created flow state for {state_name}: {state_def}")
 
                     # Add any additional states
@@ -180,11 +187,17 @@ class StateDefinitionFactory:
                     ) in additional_states.items():
                         states[additional_state_name] = additional_state_def
                         logger.info(
-                            f"Added additional state {additional_state_name} for {state_name}"
+                            f"Added additional state {additional_state_name} for {state_name}. Total states: {len(states)}, Keys: {list(states.keys())}"
                         )
                 except Exception as e:
+                    import traceback
+
                     logger.error(
                         f"Failed to create flow state for node {state_name}: {e}"
+                    )
+                    logger.error(f"Stack trace: {traceback.format_exc()}")
+                    logger.error(
+                        f"CRITICAL: Skipping state {state_name} due to exception. This will cause connection failures."
                     )
                     continue
             else:
@@ -251,8 +264,14 @@ class StateDefinitionFactory:
                         )
 
                     states[state_name] = task_state
+                    logger.info(
+                        f"Added task state {state_name} to states dict. Total states: {len(states)}, Keys: {list(states.keys())}"
+                    )
                     logger.info(f"Created task state for {state_name}")
 
+        logger.info(
+            f"Returning {len(states)} states from create_state_definitions: {list(states.keys())}"
+        )
         return states
 
     def _build_lambda_key_mappings(self, nodes: list) -> None:
@@ -529,48 +548,54 @@ class StateDefinitionFactory:
             items_path = self._determine_items_path(node, previous_nodes)
             logger.info(f"Using ItemsPath {items_path} for Map node {node.id}")
 
-            # Check if we need to handle both externalPayloadLocation and externalTaskResults
-            if node.data.configuration.get("supportExternalPayload", False):
+            # Get MapType to determine if we need Distributed Map support
+            parameters = node.data.configuration.get("parameters", {})
+            map_type = parameters.get("MapType", "Inline")
+
+            # Check if we need Distributed Map (static decision based on MapType parameter)
+            if map_type == "Distributed":
                 logger.info(
-                    f"Creating Map state with support for externalPayloadLocation for node {node.id}"
+                    f"Creating Distributed Map with ItemReader for node {node.id}"
                 )
 
-                # Create a state definition that includes a Choice state to check for externalTaskResults
-                state_def = {
-                    "Type": "Choice",
-                    "Choices": [
-                        {
-                            "Variable": "$.payload.data",
-                            "IsPresent": True,
-                            "Next": f"{node.id}_Map",
-                        }
-                    ],
-                    "Default": f"{node.id}_StandardMap",
-                }
-
                 # Get concurrency limit from parameters in configuration, default to 0
-                parameters = node.data.configuration.get("parameters", {})
                 concurrency_limit = parameters.get("ConcurrencyLimit", 0)
+
                 # Cap at maximum of 40
-                if concurrency_limit > 40:
+                if concurrency_limit > 0 and concurrency_limit > 40:
                     concurrency_limit = 40
                     logger.info(
                         f"Capped concurrency limit to maximum value of 40 for Map node {node.id}"
                     )
 
                 logger.info(
-                    f"Using concurrency limit: {concurrency_limit} for Map node {node.id} with external payload support"
+                    f"Using concurrency limit: {concurrency_limit}, MapType: {map_type} for Distributed Map node {node.id}"
                 )
 
-                # We'll need to add these states to the state machine later
-                # Store them as metadata in the state definition
-                map_state = {
+                # Distributed Map with ItemReader - reads array from S3, bypasses EventBridge limit
+                state_def = {
                     "Type": "Map",
-                    "ItemsPath": "$.payload.data",
-                    "Iterator": iterator,
+                    "ItemReader": {
+                        "Resource": "arn:aws:states:::s3:getObject",
+                        "ReaderConfig": {"InputType": "JSON"},
+                        "Parameters": {
+                            "Bucket.$": "$.metadata.distributedMapConfig.s3_bucket",
+                            "Key.$": "$.metadata.distributedMapConfig.s3_key",
+                        },
+                    },
+                    "ItemSelector": {
+                        "item.$": "$$.Map.Item.Value",
+                        "metadata.$": "$.metadata",
+                    },
+                    "Iterator": {
+                        **iterator,
+                        "ProcessorConfig": {
+                            "Mode": "DISTRIBUTED",
+                            "ExecutionType": "STANDARD",
+                        },
+                    },
                     "ResultPath": None,
                     "End": True,
-                    "Parameters": {"item.$": "$$.Map.Item.Value"},
                     "Retry": [
                         {
                             "ErrorEquals": ["Lambda.TooManyRequestsException"],
@@ -587,24 +612,13 @@ class StateDefinitionFactory:
                     ],
                 }
 
-                # Only add MaxConcurrency if it's not zero
                 if concurrency_limit > 0:
-                    map_state["MaxConcurrency"] = concurrency_limit
+                    state_def["MaxConcurrency"] = concurrency_limit
                     logger.info(
-                        f"Set MaxConcurrency to {concurrency_limit} for Map node {node.id}"
+                        f"Set MaxConcurrency to {concurrency_limit} for Distributed Map node {node.id}"
                     )
-
-                # Create both Map states with the same configuration
-                state_def["__metadata__"] = {
-                    "additionalStates": {
-                        f"{node.id}_Map": map_state,
-                        f"{node.id}_StandardMap": {
-                            **map_state  # Use the same configuration
-                        },
-                    }
-                }
             else:
-                # Standard Map state without support for externalPayloadLocation
+                # Standard Inline Map state (when MapType is not "Distributed")
                 # Get concurrency limit from parameters in configuration, default to 0
                 parameters = node.data.configuration.get("parameters", {})
                 concurrency_limit = parameters.get("ConcurrencyLimit", 0)
@@ -616,10 +630,10 @@ class StateDefinitionFactory:
                     )
 
                 logger.info(
-                    f"Using concurrency limit: {concurrency_limit} for Map node {node.id}"
+                    f"Using concurrency limit: {concurrency_limit} for Inline Map node {node.id}"
                 )
 
-                # Create base state definition
+                # Create Inline Map state definition
                 state_def = {
                     "Type": "Map",
                     "ItemsPath": items_path,
@@ -648,7 +662,7 @@ class StateDefinitionFactory:
                 if concurrency_limit > 0:
                     state_def["MaxConcurrency"] = concurrency_limit
                     logger.info(
-                        f"Set MaxConcurrency to {concurrency_limit} for Map node {node.id}"
+                        f"Set MaxConcurrency to {concurrency_limit} for Inline Map node {node.id}"
                     )
         elif step_name == "pass":
             # Pass state
@@ -670,5 +684,7 @@ class StateDefinitionFactory:
             logger.warning(f"Unknown flow step type: {step_name}")
             state_def = {"Type": "Pass", "End": True}
 
-        logger.debug(f"Created flow state definition for node {node.id}: {state_def}")
+        logger.info(
+            f"DEBUG: Returning state_def for node {node.id} with Type={state_def.get('Type')}, has __metadata__={('__metadata__' in state_def)}"
+        )
         return state_def

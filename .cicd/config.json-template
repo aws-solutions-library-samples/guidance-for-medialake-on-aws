@@ -21,6 +21,14 @@
     },
     "vpc": {
         "use_existing_vpc": false,
+        "existing_vpc": {
+            "vpc_id": "",
+            "vpc_cidr": "",
+            "subnet_ids": {
+                "public": [],
+                "private": []
+            }
+        },
         "new_vpc": {
             "vpc_name": "MediaLakeVPC",
             "max_azs": 3,

@@ -5,12 +5,14 @@ import { FaSave } from "react-icons/fa";
 
 interface SavePipelineButtonProps {
   onClick: () => void;
-  isEditMode?: boolean; // New prop to determine if we're editing an existing pipeline
+  isEditMode?: boolean;
+  hasChanges?: boolean;
 }
 
 const SavePipelineButton: React.FC<SavePipelineButtonProps> = ({
   onClick,
   isEditMode = false,
+  hasChanges = true,
 }) => {
   return (
     <Panel position="top-right">
@@ -19,6 +21,7 @@ const SavePipelineButton: React.FC<SavePipelineButtonProps> = ({
         color="primary"
         onClick={onClick}
         startIcon={<FaSave />}
+        disabled={isEditMode && !hasChanges}
         sx={{
           textTransform: "none",
           borderRadius: "8px",

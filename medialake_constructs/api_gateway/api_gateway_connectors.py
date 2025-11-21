@@ -70,6 +70,7 @@ class ConnectorsProps:
     pipelines_event_bus: str | None
     vpc_subnet_ids: str
     security_group_id: str
+    cloudfront_domain: str  # CloudFront distribution domain for CORS AllowedOrigins
 
     # S3 Vector Store configuration
     s3_vector_bucket_name: str
@@ -81,6 +82,7 @@ class ConnectorsProps:
     x_origin_verify_secret: secretsmanager.Secret | None = None
     system_settings_table_name: str | None = None
     system_settings_table_arn: str | None = None
+    ui_origin_host: str | None = None  # Custom domain for UI, if configured
 
 
 class ConnectorsConstruct(Construct):
@@ -329,6 +331,9 @@ class ConnectorsConstruct(Construct):
             )
         )
 
+        # S3 permissions including CORS management for upload functionality
+        # PutBucketCORS/GetBucketCORS/DeleteBucketCORS allow configuring CORS policies
+        # when users enable "Allow Uploads" on connectors
         connectors_del_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
@@ -338,12 +343,33 @@ class ConnectorsConstruct(Construct):
                     "s3:ListBucket",
                     "s3:GetBucketLocation",
                     "s3:DeleteBucketNotification",
+                    "s3:PutBucketCORS",
+                    "s3:GetBucketCORS",
+                    "s3:DeleteBucketCORS",
                 ],
                 resources=["arn:aws:s3:::*"],
             )
         )
 
         # Separate IAM policy with account-specific ARNs
+        # First, explicitly deny permission mutation on the role itself to prevent self-mutation (Scenario 1.1)
+        connectors_del_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.DENY,
+                actions=[
+                    "iam:DeleteRole",
+                    "iam:DeleteRolePolicy",
+                    "iam:DetachRolePolicy",
+                    "iam:AttachRolePolicy",
+                    "iam:PutRolePolicy",
+                    "iam:UpdateRole",
+                    "iam:TagRole",
+                    "iam:UntagRole",
+                ],
+                resources=[connectors_del_lambda.function.role.role_arn],
+            )
+        )
+        # Then allow IAM operations on other roles
         connectors_del_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
@@ -427,6 +453,9 @@ class ConnectorsConstruct(Construct):
         )
 
         # Prepare environment variables
+        # Note: MEDIALAKE_APP_ORIGIN is now read from SSM Parameter at runtime
+        # to avoid deployment order issues. The CloudFront domain is stored in SSM
+        # by the UserInterfaceStack after it's created.
         env_vars = {
             "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
             "MEDIALAKE_CONNECTOR_TABLE": self.connectors_table.table_arn,
@@ -452,6 +481,11 @@ class ConnectorsConstruct(Construct):
             # S3 Vector Store configuration
             "VECTOR_BUCKET_NAME": props.s3_vector_bucket_name,
             "VECTOR_INDEX_NAME": props.s3_vector_index_name,
+            # SSM Parameter name for CloudFront domain (read at runtime by Lambda)
+            # The Lambda will read this parameter to get the CORS origin dynamically
+            "CLOUDFRONT_DOMAIN_SSM_PARAM": f"/medialake/{config.environment}/cloudfront-distribution-domain",
+            # Environment flag for development-specific behavior
+            "ENVIRONMENT": config.environment,
         }
 
         connector_s3_post_lambda = Lambda(
@@ -463,6 +497,16 @@ class ConnectorsConstruct(Construct):
                 memory_size=256,
                 environment_variables=env_vars,
             ),
+        )
+
+        # Grant SSM read permission for CloudFront domain parameter
+        connector_s3_post_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["ssm:GetParameter"],
+                resources=[
+                    f"arn:aws:ssm:{Stack.of(self).region}:{Stack.of(self).account}:parameter/medialake/{config.environment}/cloudfront-distribution-domain"
+                ],
+            )
         )
 
         if props.iac_assets_bucket.bucket.encryption_key:
@@ -543,7 +587,9 @@ class ConnectorsConstruct(Construct):
             )
         )
 
-        # Update IAM/S3 policy with account-specific ARNs
+        # S3 permissions including CORS management for upload functionality
+        # PutBucketCORS/GetBucketCORS/DeleteBucketCORS allow configuring CORS policies
+        # when users enable "Allow Uploads" on connectors
         connector_s3_post_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
@@ -561,12 +607,33 @@ class ConnectorsConstruct(Construct):
                     "s3:GetBucketPublicAccessBlock",
                     "s3:DeleteBucket",
                     "s3:ListObjectsV2",
+                    "s3:PutBucketCORS",
+                    "s3:GetBucketCORS",
+                    "s3:DeleteBucketCORS",
                 ],
                 resources=["arn:aws:s3:::*"],
             )
         )
 
         # Separate IAM policy with account-specific ARNs
+        # First, explicitly deny permission mutation on the role itself to prevent self-mutation (Scenario 1.1)
+        connector_s3_post_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.DENY,
+                actions=[
+                    "iam:DeleteRole",
+                    "iam:UpdateRole",
+                    "iam:PutRolePolicy",
+                    "iam:AttachRolePolicy",
+                    "iam:DeleteRolePolicy",
+                    "iam:DetachRolePolicy",
+                    "iam:TagRole",
+                    "iam:UntagRole",
+                ],
+                resources=[connector_s3_post_lambda.function.role.role_arn],
+            )
+        )
+        # Then allow IAM operations on other roles
         connector_s3_post_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[

@@ -42,19 +42,39 @@ class PipelineExecutionError(Exception):
     """Custom exception for pipeline execution errors"""
 
 
-def encode_last_evaluated_key(last_evaluated_key: Dict) -> str:
-    """Encode the LastEvaluatedKey to a base64 string"""
-    if not last_evaluated_key:
-        return ""
-    return base64.b64encode(json.dumps(last_evaluated_key).encode()).decode()
+def encode_last_evaluated_key(
+    last_evaluated_key: Dict,
+    sort_by: str = None,
+    sort_order: str = None,
+    last_sort_value: Any = None,
+) -> str:
+    """Encode the LastEvaluatedKey and sort parameters to a base64 string"""
+    # Create token data - last_key can be empty dict for client-side pagination
+    token_data = {
+        "last_key": last_evaluated_key if last_evaluated_key else {},
+        "sort_by": sort_by,
+        "sort_order": sort_order,
+        "last_sort_value": last_sort_value,
+    }
+    return base64.b64encode(json.dumps(token_data).encode()).decode()
 
 
 def decode_last_evaluated_key(encoded_key: str) -> Dict:
-    """Decode the base64 string back to LastEvaluatedKey"""
+    """Decode the base64 string back to LastEvaluatedKey and sort parameters"""
     if not encoded_key:
         return None
     try:
-        return json.loads(base64.b64decode(encoded_key.encode()).decode())
+        token_data = json.loads(base64.b64decode(encoded_key.encode()).decode())
+        # Handle old format (just the last_key) for backward compatibility
+        if isinstance(token_data, dict) and "last_key" in token_data:
+            return token_data
+        # Old format - just return as last_key
+        return {
+            "last_key": token_data,
+            "sort_by": None,
+            "sort_order": None,
+            "last_sort_value": None,
+        }
     except:
         return None
 
@@ -141,20 +161,42 @@ def get_pipeline_executions(
         logger.info(
             f"Getting pipeline executions with search: {search}, status: {status}, sort_by: {sort_by}, sort_order: {sort_order}"
         )
+
+        # Decode and validate token if provided
+        token_data = None
+        last_sort_value = None
+        if next_token:
+            token_data = decode_last_evaluated_key(next_token)
+            if token_data:
+                # Check if sort parameters changed - if so, ignore token
+                token_sort_by = token_data.get("sort_by")
+                token_sort_order = token_data.get("sort_order")
+                if token_sort_by != sort_by or token_sort_order != sort_order:
+                    logger.warning(
+                        f"Sort parameters changed (was {token_sort_by}/{token_sort_order}, now {sort_by}/{sort_order}). Resetting pagination."
+                    )
+                    token_data = None
+                else:
+                    last_sort_value = token_data.get("last_sort_value")
+
         # Configure scan parameters
-        scan_kwargs = {
-            "limit": page_size,
-        }
+        scan_kwargs = {}
 
         # Add status filter if provided
         if status:
             scan_kwargs["filter_condition"] = PipelineExecution.status == status
 
-        # Add LastEvaluatedKey if next_token is provided
-        if next_token:
-            last_evaluated_key = decode_last_evaluated_key(next_token)
-            if last_evaluated_key:
-                scan_kwargs["last_evaluated_key"] = last_evaluated_key
+        # For initial request (no token): scan ALL items to ensure correct sorting
+        # DynamoDB scan returns items in arbitrary order, so we must retrieve all items
+        # to sort properly by any field (start_time, end_time, pipeline_name, status, etc.)
+        # For subsequent pages: continue from where we left off using last_sort_value filtering
+        if token_data and token_data.get("last_key"):
+            last_key = token_data["last_key"]
+            # Only use DynamoDB last_evaluated_key if it's not an empty placeholder
+            if last_key:  # Check if not empty dict
+                scan_kwargs["last_evaluated_key"] = last_key
+                scan_kwargs["limit"] = page_size * 3  # Limit for subsequent pages
+        # else: no limit - scan all items for proper sorting across any sortable field
 
         # Execute scan
         executions = []
@@ -262,6 +304,46 @@ def get_pipeline_executions(
             # Default to start_time if unknown sort field
             executions.sort(key=lambda x: int(x.start_time), reverse=reverse_order)
 
+        # Apply pagination to sorted results
+        # If we have a last_sort_value from previous page, filter out items we've already seen
+        if last_sort_value is not None and len(executions) > 0:
+            reverse_order = sort_order.lower() == "desc"
+            filtered_executions = []
+
+            for execution in executions:
+                if sort_by == "start_time":
+                    current_value = int(execution.start_time)
+                    if reverse_order:
+                        # desc: include items older than last value
+                        if current_value < last_sort_value:
+                            filtered_executions.append(execution)
+                    else:
+                        # asc: include items newer than last value
+                        if current_value > last_sort_value:
+                            filtered_executions.append(execution)
+                elif sort_by == "end_time":
+                    if (
+                        hasattr(execution, "end_time")
+                        and execution.end_time is not None
+                    ):
+                        current_value = int(execution.end_time)
+                        if reverse_order:
+                            if current_value < last_sort_value:
+                                filtered_executions.append(execution)
+                        else:
+                            if current_value > last_sort_value:
+                                filtered_executions.append(execution)
+                # Add other sort fields as needed
+                else:
+                    # For string comparisons, just add all (fallback)
+                    filtered_executions.append(execution)
+
+            executions = filtered_executions
+
+        # Limit to requested page size
+        has_more = len(executions) > page_size
+        executions = executions[:page_size]
+
         # Format executions for response
         formatted_executions = [
             format_execution_response(execution) for execution in executions
@@ -269,11 +351,39 @@ def get_pipeline_executions(
 
         # Get the next token for pagination
         next_token = None
-        if (
-            hasattr(scan_operation, "last_evaluated_key")
-            and scan_operation.last_evaluated_key
-        ):
-            next_token = encode_last_evaluated_key(scan_operation.last_evaluated_key)
+        if has_more and len(executions) > 0:
+            # Get the last item's sort value for next page filtering
+            last_execution = executions[-1]
+            last_sort_val = None
+
+            if sort_by == "start_time":
+                last_sort_val = int(last_execution.start_time)
+            elif (
+                sort_by == "end_time"
+                and hasattr(last_execution, "end_time")
+                and last_execution.end_time
+            ):
+                last_sort_val = int(last_execution.end_time)
+
+            # Create next token with last_evaluated_key if available (for subsequent pages)
+            # or with empty dict (for initial full scan) - the last_sort_value is what matters
+            last_key = None
+            if (
+                hasattr(scan_operation, "last_evaluated_key")
+                and scan_operation.last_evaluated_key
+            ):
+                last_key = scan_operation.last_evaluated_key
+            else:
+                # For initial full scan, use empty dict as placeholder
+                # The last_sort_value will handle pagination
+                last_key = {}
+
+            next_token = encode_last_evaluated_key(
+                last_key,
+                sort_by,
+                sort_order,
+                last_sort_val,
+            )
 
         # Add metrics for monitoring
         metrics.add_metric(name="SuccessfulQueries", unit="Count", value=1)

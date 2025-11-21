@@ -279,8 +279,9 @@
             "operationId": "",
             "method": "map",
             "parameters": {
-              "ItemsPath": "$.payload.externalTaskStatus",
-              "ConcurrencyLimit": 1
+              "ConcurrencyLimit": 100,
+              "MapType": "Distributed",
+              "ItemsPath": "$.payload.externalTaskStatus"
             }
           },
           "id": "map"

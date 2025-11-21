@@ -17,6 +17,58 @@ export default {
     connectors: "Conectores",
     selectConnector: "Seleccionar un conector",
   },
+  upload: {
+    title: "Subir archivos multimedia",
+    description:
+      "Selecciona un conector S3 y sube tus archivos multimedia. Solo se admiten formatos de audio, video, HLS y MPEG-DASH.",
+    uploadDestination: "Destino de subida",
+    browsePath: "Explorar ruta",
+    uploadingTo: "Subiendo a",
+    restrictedToPrefix: "restringido",
+    allowedPrefixesInfo: "Solo puedes subir a {{count}} ruta(s) permitida(s)",
+    pathInfo: "Los archivos se subirán a la ruta seleccionada en el bucket S3",
+    selectPathFirst: "Selecciona una ruta antes de subir",
+    pathResetWarning: "Cambiar el conector restablecerá la ruta seleccionada",
+    connectorLabel: "Conector S3",
+    selectConnectorPlaceholder: "Selecciona un conector S3",
+    loadingConnectors: "Cargando conectores...",
+    noConnectors:
+      "No hay conectores S3 disponibles. Por favor, configure un conector S3 primero.",
+    dashboardNote:
+      "Solo se permiten archivos de tipo audio/*, video/*, image/*, HLS (application/x-mpegURL) y MPEG-DASH (application/dash+xml)",
+    meta: {
+      name: "Nombre",
+    },
+  },
+  pathBrowser: {
+    title: "Seleccionar ruta de subida",
+    descriptionRestricted:
+      "Explora y selecciona una carpeta dentro de las rutas permitidas para subir tus archivos.",
+    descriptionUnrestricted:
+      "Explora y selecciona cualquier carpeta en el bucket para subir tus archivos.",
+    prefixLabel: "Ruta permitida",
+    prefixHelper:
+      "Solo puedes explorar y subir a carpetas dentro de la ruta seleccionada.",
+    selectedPath: "Ruta seleccionada",
+    currentPath: "Ruta actual",
+    confirm: "Usar esta ruta",
+    validation: {
+      invalidPath:
+        "La ruta seleccionada está fuera de los prefijos permitidos.",
+      noPathSelected: "Por favor, navega a una carpeta antes de confirmar.",
+    },
+    error: {
+      invalidConnector: "ID de conector no válido proporcionado.",
+      loadingFailed: "Error al cargar la información del conector.",
+    },
+    hints: {
+      clickFolder:
+        "Haz clic en una carpeta para navegar a ella, luego haz clic en 'Seleccionar carpeta actual' para elegirla.",
+      navigateAndConfirm:
+        "Navega a la carpeta que deseas y luego haz clic en 'Usar esta ruta' para confirmar.",
+      rootPath: "Actualmente estás en el nivel raíz.",
+    },
+  },
   connectors: {
     apiMessages: {
       creating: {
@@ -146,6 +198,13 @@ export default {
       label: "Semántico",
       enable: "Habilitar búsqueda semántica",
       disable: "Deshabilitar búsqueda semántica",
+      configure: "Haz clic para configurar la búsqueda semántica",
+      configDialog: {
+        title: "Búsqueda semántica no configurada",
+        description:
+          "La búsqueda semántica no está configurada o está deshabilitada. Para habilitar esta función, ve a Configuración del sistema > Búsqueda para configurar un proveedor de búsqueda, o presiona el botón a continuación.",
+        goToSettings: "Ir a configuración de búsqueda",
+      },
     },
     filters: {
       dateRange: "Rango de fechas",
@@ -459,6 +518,8 @@ export default {
     selectFilter: "Seleccionar filtro",
     textFilter: "Filtro de texto",
     all: "Todos",
+    root: "Raíz",
+    folder: "Carpeta",
     filter: "Filtro",
     noGroups: "Sin grupos",
     actions: {
@@ -484,6 +545,29 @@ export default {
     status: {
       active: "Activo",
       inactive: "Inactivo",
+    },
+  },
+  s3Explorer: {
+    filter: {
+      label: "Filtrar por nombre",
+      clear: "Limpiar filtro",
+      resultsCount: "Mostrando {{count}} de {{total}} elementos",
+    },
+    loading: {
+      initializing: "Cargando...",
+      fetchingContents: "Obteniendo contenidos...",
+    },
+    empty: {
+      folder: "Esta carpeta está vacía",
+      noResults: "No hay elementos que coincidan con tu filtro",
+    },
+    keyboard: {
+      navigation:
+        "Usa las teclas de flecha para navegar, Enter para abrir, Backspace para volver",
+    },
+    menu: {
+      rename: "Renombrar",
+      delete: "Eliminar",
     },
   },
   translation: {
@@ -707,12 +791,32 @@ export default {
     s3Explorer: {
       filter: {
         label: "Filtrar por nombre",
+        clear: "Limpiar filtro",
+        resultsCount: "Mostrando {{count}} de {{total}} elementos",
       },
       error: {
         loading: "Error al cargar objetos S3: {{message}}",
+        network:
+          "Error de red. Por favor, verifica tu conexión y vuelve a intentarlo.",
+        permission:
+          "Acceso denegado. No tienes permiso para acceder a esta ruta.",
+        permissionWithPrefixes:
+          "Acceso denegado. Solo puedes acceder a las siguientes rutas: {{prefixes}}",
+        notFound: "La ruta solicitada no existe.",
+        timeout: "Tiempo de espera agotado. Por favor, inténtalo de nuevo.",
+        retry: "Reintentar",
       },
-      file: {
-        info: "Tamaño: {{size}} • Clase de almacenamiento: {{storageClass}} • Modificado: {{modified}}",
+      loading: {
+        initializing: "Cargando...",
+        fetchingContents: "Obteniendo contenidos...",
+      },
+      empty: {
+        folder: "Esta carpeta está vacía",
+        noResults: "No hay elementos que coincidan con tu filtro",
+      },
+      keyboard: {
+        navigation:
+          "Usa las teclas de flecha para navegar, Enter para abrir, Backspace para volver",
       },
       menu: {
         rename: "Renombrar",

@@ -21,6 +21,52 @@ export default {
     title: "Upload Media Files",
     description:
       "Select an S3 connector and upload your media files. Only audio, video, HLS, and MPEG-DASH formats are supported.",
+    uploadDestination: "Upload Destination",
+    browsePath: "Browse Path",
+    uploadingTo: "Uploading to",
+    restrictedToPrefix: "restricted",
+    allowedPrefixesInfo: "You can only upload to {{count}} allowed path(s)",
+    pathInfo: "Files will be uploaded to the selected path in the S3 bucket",
+    selectPathFirst: "Select a path before uploading",
+    pathResetWarning: "Changing the connector will reset the selected path",
+    connectorLabel: "S3 Connector",
+    selectConnectorPlaceholder: "Select an S3 connector",
+    loadingConnectors: "Loading connectors...",
+    noConnectors:
+      "No S3 connectors available. Please configure an S3 connector first.",
+    dashboardNote:
+      "Only audio/*, video/*, image/*, HLS (application/x-mpegURL), and MPEG-DASH (application/dash+xml) files are allowed",
+    meta: {
+      name: "Name",
+    },
+  },
+  pathBrowser: {
+    title: "Select Upload Path",
+    descriptionRestricted:
+      "Browse and select a folder within the allowed paths for uploading your files.",
+    descriptionUnrestricted:
+      "Browse and select any folder in the bucket for uploading your files.",
+    prefixLabel: "Allowed Path",
+    prefixHelper:
+      "You can only browse and upload to folders within the selected path.",
+    selectedPath: "Selected Path",
+    currentPath: "Current Path",
+    confirm: "Use This Path",
+    validation: {
+      invalidPath: "The selected path is outside the allowed prefixes.",
+      noPathSelected: "Please navigate to a folder before confirming.",
+    },
+    error: {
+      invalidConnector: "Invalid connector ID provided.",
+      loadingFailed: "Failed to load connector information.",
+    },
+    hints: {
+      clickFolder:
+        "Click on a folder to navigate into it, then click 'Select Current Folder' to choose it.",
+      navigateAndConfirm:
+        "Navigate to the folder you want, then click 'Use This Path' to confirm.",
+      rootPath: "You are currently at the root level.",
+    },
   },
   connectors: {
     apiMessages: {
@@ -215,6 +261,13 @@ export default {
       label: "Semantic",
       enable: "Enable semantic search",
       disable: "Disable semantic search",
+      configure: "Click to configure semantic search",
+      configDialog: {
+        title: "Semantic Search Not Configured",
+        description:
+          "Semantic search is currently not configured or disabled. To enable this feature, go to System Settings > Search to configure a search provider, or press the button below.",
+        goToSettings: "Go to Search Settings",
+      },
     },
     filters: {
       dateRange: "Date Range",
@@ -559,6 +612,8 @@ export default {
     all: "All",
     filter: "Filter",
     noGroups: "No Groups",
+    root: "Root",
+    folder: "Folder",
     actions: {
       add: "Add",
       save: "Save",
@@ -582,6 +637,29 @@ export default {
     status: {
       active: "Active",
       inactive: "Inactive",
+    },
+  },
+  s3Explorer: {
+    filter: {
+      label: "Filter by name",
+      clear: "Clear filter",
+      resultsCount: "Showing {{count}} of {{total}} items",
+    },
+    loading: {
+      initializing: "Loading...",
+      fetchingContents: "Fetching contents...",
+    },
+    empty: {
+      folder: "This folder is empty",
+      noResults: "No items match your filter",
+    },
+    keyboard: {
+      navigation:
+        "Use arrow keys to navigate, Enter to open, Backspace to go back",
+    },
+    menu: {
+      rename: "Rename",
+      delete: "Delete",
     },
   },
   translation: {
@@ -803,12 +881,31 @@ export default {
     s3Explorer: {
       filter: {
         label: "Filter by name",
+        clear: "Clear filter",
+        resultsCount: "Showing {{count}} of {{total}} items",
       },
       error: {
         loading: "Error loading S3 objects: {{message}}",
+        network: "Network error. Please check your connection and try again.",
+        permission:
+          "Access denied. You don't have permission to access this path.",
+        permissionWithPrefixes:
+          "Access denied. You can only access the following paths: {{prefixes}}",
+        notFound: "The requested path does not exist.",
+        timeout: "Request timed out. Please try again.",
+        retry: "Retry",
       },
-      file: {
-        info: "Size: {{size}} • Storage Class: {{storageClass}} • Modified: {{modified}}",
+      loading: {
+        initializing: "Loading...",
+        fetchingContents: "Fetching contents...",
+      },
+      empty: {
+        folder: "This folder is empty",
+        noResults: "No items match your filter",
+      },
+      keyboard: {
+        navigation:
+          "Use arrow keys to navigate, Enter to open, Backspace to go back",
       },
       menu: {
         rename: "Rename",

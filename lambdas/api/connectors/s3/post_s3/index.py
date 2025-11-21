@@ -169,8 +169,9 @@ class S3ConnectorConfig(BaseModel):
     bucket: str
     s3IntegrationMethod: str
     objectPrefix: list[str] | None = None
-    bucketType: str | None = None  # "new" or "existing"
+    bucketType: str  # Required: "new" or "existing"
     region: str | None = None  # region for new buckets
+    allowUploads: bool | None = False
 
 
 class S3Connector(BaseModel):
@@ -864,6 +865,142 @@ def update_bucket_notifications(
     return errors
 
 
+def manage_bucket_cors(
+    s3_client, bucket_name: str, allow_uploads: bool, region: str
+) -> dict | None:
+    """
+    Add or skip CORS configuration for MediaLake uploads.
+
+    Args:
+        s3_client: S3 client instance
+        bucket_name: Name of the S3 bucket
+        allow_uploads: Whether to enable uploads
+        region: AWS region
+
+    Returns:
+        dict with corsRuleId and corsRuleIndex if configured, None otherwise
+    """
+    if not allow_uploads:
+        logger.info(
+            f"allowUploads is False, skipping CORS configuration for bucket {bucket_name}"
+        )
+        return None
+
+    try:
+        # Get existing CORS configuration
+        try:
+            cors_config = s3_client.get_bucket_cors(Bucket=bucket_name)
+            existing_rules = cors_config.get("CORSRules", [])
+            logger.info(
+                f"Found {len(existing_rules)} existing CORS rules for bucket {bucket_name}"
+            )
+        except ClientError as e:
+            if e.response["Error"]["Code"] == "NoSuchCORSConfiguration":
+                existing_rules = []
+                logger.info(
+                    f"No existing CORS configuration found for bucket {bucket_name}"
+                )
+            else:
+                raise
+
+        # Get MediaLake application origin from SSM Parameter Store
+        # This is read at runtime to avoid deployment order issues with CloudFront domain
+        ssm_param_name = os.environ.get("CLOUDFRONT_DOMAIN_SSM_PARAM")
+
+        if ssm_param_name:
+            try:
+                ssm_client = boto3.client("ssm", region_name=region)
+                param_response = ssm_client.get_parameter(Name=ssm_param_name)
+                cloudfront_domain = param_response["Parameter"]["Value"]
+                medialake_origin_env = f"https://{cloudfront_domain}"
+                logger.info(
+                    f"Retrieved CloudFront domain from SSM: {cloudfront_domain}"
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Failed to read CloudFront domain from SSM ({ssm_param_name}): {str(e)}, falling back to wildcard"
+                )
+                medialake_origin_env = "*"
+        else:
+            # Fallback to environment variable if SSM parameter name not provided
+            medialake_origin_env = os.environ.get("MEDIALAKE_APP_ORIGIN", "*")
+            logger.info(
+                f"Using MEDIALAKE_APP_ORIGIN from environment: {medialake_origin_env}"
+            )
+
+        # Split by comma, trim whitespace, and discard empties
+        allowed_origins = [
+            origin.strip()
+            for origin in medialake_origin_env.split(",")
+            if origin.strip()
+        ]
+
+        # In dev environment, append localhost origins if not already present
+        environment = os.environ.get("ENVIRONMENT", "")
+        if environment == "dev":
+            localhost_origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
+            for localhost_origin in localhost_origins:
+                if localhost_origin not in allowed_origins:
+                    allowed_origins.append(localhost_origin)
+            logger.info(
+                f"Dev environment detected, added localhost origins: {localhost_origins}"
+            )
+
+        logger.info(f"Final allowed_origins list: {allowed_origins}")
+
+        # Create MediaLake CORS rule with unique identifier
+        cors_rule_id = f"medialake-upload-{uuid.uuid4().hex[:8]}"
+        medialake_cors_rule = {
+            "ID": cors_rule_id,
+            "AllowedOrigins": allowed_origins,
+            "AllowedMethods": ["PUT", "POST", "HEAD", "GET"],
+            "AllowedHeaders": [
+                "*",
+                "Content-Type",
+                "Content-Length",
+                "Content-MD5",
+                "x-amz-*",
+            ],
+            "ExposeHeaders": ["ETag", "x-amz-request-id"],
+            "MaxAgeSeconds": 3600,
+        }
+
+        # Check if a MediaLake upload rule already exists
+        has_medialake_rule = False
+        for rule in existing_rules:
+            rule_id = rule.get("ID", "")
+            if rule_id.startswith("medialake-upload-"):
+                has_medialake_rule = True
+                logger.info(f"Found existing MediaLake CORS rule: {rule_id}")
+                break
+
+        # Append new rule if needed
+        if not has_medialake_rule:
+            existing_rules.append(medialake_cors_rule)
+            cors_rule_index = len(existing_rules) - 1
+            logger.info(f"Adding MediaLake CORS rule at index {cors_rule_index}")
+
+            # Update bucket CORS configuration
+            s3_client.put_bucket_cors(
+                Bucket=bucket_name, CORSConfiguration={"CORSRules": existing_rules}
+            )
+            logger.info(
+                f"Successfully configured CORS for bucket {bucket_name} with rule ID {cors_rule_id}"
+            )
+
+            return {"corsRuleId": cors_rule_id, "corsRuleIndex": cors_rule_index}
+        else:
+            logger.warning(
+                f"MediaLake CORS rule already exists for bucket {bucket_name}, skipping creation"
+            )
+            return None
+
+    except Exception as e:
+        error_msg = f"Error configuring CORS for bucket {bucket_name}: {str(e)}"
+        logger.error(error_msg)
+        raise Exception(error_msg)
+
+
 def create_eventbridge_pipe(
     resource_name_prefix: str,
     queue_arn: str,
@@ -1153,6 +1290,18 @@ def create_connector(createconnector: S3Connector) -> dict:
         bucket_type = createconnector.configuration.bucketType
         bucket_region = createconnector.configuration.region
 
+        # Validate bucketType value
+        if bucket_type not in ["new", "existing"]:
+            return {
+                "status": "400",
+                "message": f"Invalid bucketType '{bucket_type}'. Must be 'new' or 'existing'",
+                "data": {},
+            }
+
+        logger.info(
+            f"Processing connector for bucket '{s3_bucket}' with bucketType='{bucket_type}'"
+        )
+
         if bucket_type == "new":
             # Create new bucket
             if not bucket_region:
@@ -1188,6 +1337,22 @@ def create_connector(createconnector: S3Connector) -> dict:
         s3 = get_optimized_client("s3", bucket_region)
         sqs = get_optimized_client("sqs", bucket_region)
         lambda_client = get_optimized_client("lambda", bucket_region)
+
+        # Manage CORS configuration if allowUploads is enabled
+        cors_metadata = None
+        allow_uploads = createconnector.configuration.allowUploads or False
+        if allow_uploads:
+            try:
+                cors_metadata = manage_bucket_cors(
+                    s3, s3_bucket, allow_uploads, bucket_region
+                )
+                if cors_metadata:
+                    created_resources.append(("bucket_cors", s3_bucket))
+                    logger.info(f"Configured CORS for uploads on bucket {s3_bucket}")
+            except Exception as cors_error:
+                logger.error(f"Failed to configure CORS: {str(cors_error)}")
+                # CORS configuration failure is not critical, continue with connector creation
+                cors_metadata = None
 
         # Set up notifications based on integration method
         queue_url = None
@@ -1753,7 +1918,14 @@ def create_connector(createconnector: S3Connector) -> dict:
             "objectPrefix": object_prefix,
             "pipeArn": pipe_arn,
             "pipeRoleArn": pipe_role_arn,
+            "allowUploads": allow_uploads,
+            "creationType": bucket_type,
         }
+
+        # Add CORS metadata if configured
+        if cors_metadata:
+            connector_item["corsRuleId"] = cors_metadata["corsRuleId"]
+            connector_item["corsRuleIndex"] = cors_metadata["corsRuleIndex"]
 
         table.put_item(Item=connector_item)
         created_resources.append(("dynamodb_item", (table_name, connector_id)))
@@ -1824,6 +1996,28 @@ def create_connector(createconnector: S3Connector) -> dict:
                         Bucket=resource_id, NotificationConfiguration={}
                     )
                     logger.info(f"Removed bucket notifications from: {resource_id}")
+                elif resource_type == "bucket_cors" and s3:
+                    try:
+                        # Get current CORS config
+                        cors_config = s3.get_bucket_cors(Bucket=resource_id)
+                        rules = cors_config.get("CORSRules", [])
+                        # Remove MediaLake upload rules (those with Id starting with "medialake-upload-")
+                        filtered_rules = [
+                            r
+                            for r in rules
+                            if not r.get("ID", "").startswith("medialake-upload-")
+                        ]
+                        if filtered_rules:
+                            s3.put_bucket_cors(
+                                Bucket=resource_id,
+                                CORSConfiguration={"CORSRules": filtered_rules},
+                            )
+                        else:
+                            s3.delete_bucket_cors(Bucket=resource_id)
+                        logger.info(f"Removed CORS config from bucket: {resource_id}")
+                    except ClientError as e:
+                        if e.response["Error"]["Code"] != "NoSuchCORSConfiguration":
+                            logger.warning(f"Error removing CORS: {str(e)}")
                 elif resource_type == "queue_policy" and sqs:
                     sqs.set_queue_attributes(
                         QueueUrl=resource_id, Attributes={"Policy": ""}

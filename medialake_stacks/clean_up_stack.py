@@ -34,13 +34,26 @@ class CleanupStack(Stack):
                 environment_variables={
                     "CONNECTOR_TABLE": props.connector_table.table_name,
                     "PIPELINE_TABLE": props.pipeline_table.table_name,
-                    "VECTOR_BUCKET_NAME": f"medialake-vectors-{Stack.of(self).region}-{Stack.of(self).node.try_get_context('environment') or 'dev'}",
+                    "VECTOR_BUCKET_NAME": f"medialake-vectors-{Stack.of(self).account}-{Stack.of(self).region}-{Stack.of(self).node.try_get_context('environment') or 'dev'}",
                 },
             ),
         )
 
         props.connector_table.grant_read_write_data(self._clean_up_lambda.function)
         props.pipeline_table.grant_read_write_data(self._clean_up_lambda.function)
+
+        # Grant S3 CORS permissions for cleaning up upload CORS configurations
+        # when connectors with allowUploads=True are deleted during stack teardown
+        self._clean_up_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetBucketCORS",
+                    "s3:PutBucketCORS",
+                    "s3:DeleteBucketCORS",
+                ],
+                resources=["arn:aws:s3:::*"],
+            )
+        )
 
         # Add EventBridge Pipes permissions
         # ListPipes requires * resource - AWS API limitation for list operations
@@ -67,6 +80,24 @@ class CleanupStack(Stack):
                 resources=[
                     f"arn:aws:pipes:{Stack.of(self).region}:{Stack.of(self).account}:pipe/*"
                 ],
+            )
+        )
+
+        # Prevent self-mutation (Scenario 1.1 privilege escalation)
+        self._clean_up_lambda.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.DENY,
+                actions=[
+                    "iam:DeleteRole",
+                    "iam:UpdateRole",
+                    "iam:PutRolePolicy",
+                    "iam:AttachRolePolicy",
+                    "iam:DetachRolePolicy",
+                    "iam:DeleteRolePolicy",
+                    "iam:TagRole",
+                    "iam:UntagRole",
+                ],
+                resources=[self._clean_up_lambda.lambda_role.role_arn],
             )
         )
 
@@ -103,9 +134,14 @@ class CleanupStack(Stack):
         self._clean_up_lambda.lambda_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
-                actions=["lambda:DeleteFunction"],
+                actions=[
+                    "lambda:DeleteFunction",
+                    "lambda:DeleteEventSourceMapping",
+                    "lambda:GetEventSourceMapping",
+                ],
                 resources=[
-                    f"arn:aws:lambda:{Stack.of(self).region}:{Stack.of(self).account}:function:*"
+                    f"arn:aws:lambda:{Stack.of(self).region}:{Stack.of(self).account}:function:*",
+                    f"arn:aws:lambda:{Stack.of(self).region}:{Stack.of(self).account}:event-source-mapping:*",
                 ],  # TODO add resource prefix i.e. medialake
             )
         )

@@ -110,8 +110,8 @@ const ApiKeyFormDialog: React.FC<ApiKeyFormDialogProps> = ({
         });
 
         // Check if key was rotated and new secret is returned
-        if (rotateKey && response.data && "secret" in response.data) {
-          setNewSecret(response.data.secret);
+        if (rotateKey && response.data && "apiKey" in response.data) {
+          setNewSecret(response.data.apiKey);
           return; // Don't close dialog yet, show the new secret
         }
 
@@ -127,8 +127,8 @@ const ApiKeyFormDialog: React.FC<ApiKeyFormDialogProps> = ({
         const response = await createMutation.mutateAsync(createData);
 
         // Show the new secret
-        if (response.data && response.data.secret) {
-          setNewSecret(response.data.secret);
+        if (response.data && response.data.apiKey) {
+          setNewSecret(response.data.apiKey);
           return; // Don't close dialog yet, show the new secret
         }
 
@@ -214,7 +214,7 @@ const ApiKeyFormDialog: React.FC<ApiKeyFormDialogProps> = ({
         </Box>
       </DialogTitle>
 
-      <DialogContent>
+      <DialogContent sx={{ overflow: "visible" }}>
         {/* Show new secret if available */}
         {newSecret && (
           <Box sx={{ mb: 3 }}>

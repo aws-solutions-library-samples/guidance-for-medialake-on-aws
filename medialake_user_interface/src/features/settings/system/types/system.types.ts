@@ -6,6 +6,8 @@ export interface SearchProvider {
   endpoint?: string;
   isConfigured?: boolean;
   isEnabled?: boolean;
+  isExternal?: boolean;
+  supportedMediaTypes?: string[];
   createdAt?: string;
   updatedAt?: string;
 }

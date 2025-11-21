@@ -2,6 +2,7 @@ import React, { useRef } from "react";
 import { Box, CircularProgress } from "@mui/material";
 import { type Table as TanStackTable } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { PlaylistPlay as ExecutionsIcon } from "@mui/icons-material";
 import type { PipelineExecution } from "../types/pipelineExecutions.types";
 import { ResizableTable } from "@/components/common/table";
 
@@ -73,12 +74,15 @@ export const ExecutionsTable: React.FC<ExecutionsTableProps> = ({
         virtualizer={rowVirtualizer}
         rows={rows}
         onFilterClick={onFilterColumn}
-        // Comment out these props to remove the tags
         activeFilters={activeFilters}
         activeSorting={activeSorting}
         onRemoveFilter={onRemoveFilter}
         onRemoveSort={onRemoveSort}
         maxHeight="none"
+        emptyState={{
+          message: "No pipeline executions found",
+          icon: <ExecutionsIcon sx={{ fontSize: 40 }} />,
+        }}
       />
     </Box>
   );

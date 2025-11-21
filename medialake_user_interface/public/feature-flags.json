@@ -5,14 +5,11 @@
   "chat-enabled": {
     "value": false
   },
-  "file-upload-enabled": {
+  "notification-enabled": {
     "value": false
   },
-  "notification-enabled": {
-    "value": true
-  },
   "search-multi-select-enabled": {
-    "value": true
+    "value": false
   },
   "user-favorites-enabled": {
     "value": false

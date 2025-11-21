@@ -163,7 +163,7 @@ const ApiKeyManagement: React.FC = () => {
 
       <PageContent>
         {/* Search and Filter Bar */}
-        <Box sx={{ mb: 3 }}>
+        <Box sx={{ mb: 3, overflow: "visible" }}>
           <Grid container spacing={2} alignItems="center">
             <Grid item xs={12} md={6}>
               <TextField
@@ -181,8 +181,13 @@ const ApiKeyManagement: React.FC = () => {
               />
             </Grid>
             <Grid item xs={12} md={3}>
-              <FormControl fullWidth>
-                <InputLabel>Category</InputLabel>
+              <FormControl fullWidth sx={{ overflow: "visible" }}>
+                <InputLabel
+                  shrink
+                  sx={{ backgroundColor: "background.paper", px: 0.5 }}
+                >
+                  Category
+                </InputLabel>
                 <Select
                   value={filterCategory}
                   label="Category"
@@ -192,6 +197,7 @@ const ApiKeyManagement: React.FC = () => {
                       <FilterListIcon />
                     </InputAdornment>
                   }
+                  notched
                 >
                   <MenuItem value="all">All API Keys</MenuItem>
                   <MenuItem value="enabled">Enabled</MenuItem>

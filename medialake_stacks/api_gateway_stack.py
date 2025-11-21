@@ -32,8 +32,6 @@ from medialake_constructs.api_gateway.api_gateway_search import (
     SearchProps,
 )
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
-
-# from medialake_constructs.auth.authorizer_utils import create_shared_custom_authorizer, ensure_shared_authorizer_permissions
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket
 
 
@@ -73,8 +71,10 @@ class ApiGatewayStackProps:
     identity_pool: str
     user_pool_client: str
     waf_acl_arn: str
+    cloudfront_domain: str  # CloudFront distribution domain for CORS configuration
     # user_table: dynamodb.TableV2
     s3_vector_bucket_name: str
+    ui_origin_host: str | None = None  # Custom domain for UI, if configured
 
 
 class ApiGatewayStack(cdk.NestedStack):
@@ -232,6 +232,8 @@ class ApiGatewayStack(cdk.NestedStack):
                 system_settings_table_name=props.system_settings_table,
                 system_settings_table_arn=f"arn:aws:dynamodb:{self.region}:{self.account}:table/{props.system_settings_table}",
                 s3_vector_bucket_name=props.s3_vector_bucket_name,
+                cloudfront_domain=props.cloudfront_domain,
+                ui_origin_host=props.ui_origin_host,
             ),
         )
 
@@ -260,6 +262,7 @@ class ApiGatewayStack(cdk.NestedStack):
             "AssetsApiGateway",
             props=AssetsProps(
                 asset_table=props.asset_table,
+                connector_table=self._connectors_api_gateway.connector_table,
                 api_resource=self._rest_api,
                 authorizer=self._authorizer,
                 x_origin_verify_secret=self._x_origin_verify_secret,
@@ -289,15 +292,6 @@ class ApiGatewayStack(cdk.NestedStack):
         self._create_health_endpoint(
             self._rest_api, self._x_origin_verify_secret, self._authorizer
         )
-
-        # Create a list of dependencies for the deployment
-        # These are the resources that the API Gateway deployment needs to wait for
-        deployment_dependencies = [
-            self._connectors_api_gateway,
-            self._search_construct,
-            self._assets_construct,
-            self._nodes_construct,
-        ]
 
     def _create_health_endpoint(
         self,
@@ -334,14 +328,11 @@ class ApiGatewayStack(cdk.NestedStack):
         x_origin_verify_secret.grant_read(health_lambda.function)
 
         # Create GET method for health endpoint
-        health_get_method = health_resource.add_method(
+        health_resource.add_method(
             "GET",
             apigateway.LambdaIntegration(health_lambda.function),
             authorizer=authorizer,
         )
-
-        # Apply custom authorization to the health endpoint
-        # apply_custom_authorization(health_get_method, self._authorizer)
 
         # Store reference to health lambda for external access if needed
         self._health_lambda = health_lambda

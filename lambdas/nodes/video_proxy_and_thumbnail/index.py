@@ -46,6 +46,58 @@ def _strip_decimals(obj):
     return obj
 
 
+def _calculate_thumbnail_frame_denominator(
+    duration_seconds: float, num_captures: int = 5
+) -> int:
+    """
+    Calculate frame capture denominator for evenly spaced thumbnails.
+    For 5 captures, generates thumbnails at 10%, 30%, 50%, 70%, 90% of duration.
+
+    Args:
+        duration_seconds: Total video duration in seconds
+        num_captures: Number of thumbnails to generate (default: 5)
+
+    Returns: denominator value (interval in seconds between captures)
+    """
+    if duration_seconds <= 0 or num_captures <= 0:
+        return 2
+
+    # Calculate interval to space captures evenly across the video
+    # Skip first 10% and last 10% to avoid black frames
+    usable_duration = duration_seconds * 0.8
+    start_offset = duration_seconds * 0.1
+
+    if num_captures == 1:
+        # Single capture at 10% into video (legacy behavior)
+        return max(2, int(start_offset))
+
+    # Calculate interval between captures
+    interval = (
+        usable_duration / (num_captures - 1) if num_captures > 1 else usable_duration
+    )
+
+    # Ensure minimum 2 second interval
+    return max(2, int(interval))
+
+
+def _extract_video_duration(event: dict) -> float:
+    """
+    Extract video duration from event payload.
+    Returns 0.0 if duration not found.
+    """
+    try:
+        asset = event.get("input", {})
+        duration = (
+            asset.get("DigitalSourceAsset", {})
+            .get("MainRepresentation", {})
+            .get("DigitalSourceMediaInfo", {})
+            .get("VideoDuration")
+        )
+        return float(duration) if duration else 0.0
+    except (ValueError, TypeError):
+        return 0.0
+
+
 def get_mediaconvert_endpoint() -> str:
     override = os.getenv("MEDIACONVERT_ENDPOINT_URL")
     if override:
@@ -176,15 +228,53 @@ def lambda_handler(event: Dict[str, Any], _: LambdaContext) -> Dict[str, Any]:
         input_key_no_ext = os.path.splitext(in_key)[0]
         output_key = f"{in_bucket}/{input_key_no_ext}"
 
-        # delete existing proxy (.mp4) and thumbnail (.jpg) if any
-        for ext in (".mp4", ".jpg"):
-            old_key = f"{output_key}{ext}"
-            try:
-                s3.delete_object(Bucket=out_bucket, Key=old_key)
-                logger.info("Deleted existing object: s3://%s/%s", out_bucket, old_key)
-            except ClientError as e:
-                if e.response["Error"]["Code"] != "NoSuchKey":
-                    logger.warning("Failed deleting %s: %s", old_key, e)
+        # delete existing proxy (.mp4) and thumbnails (.jpg, numbered variants)
+        # Clean up proxy
+        proxy_key = f"{output_key}.mp4"
+        try:
+            s3.delete_object(Bucket=out_bucket, Key=proxy_key)
+            logger.info("Deleted existing proxy: s3://%s/%s", out_bucket, proxy_key)
+        except ClientError as e:
+            if e.response["Error"]["Code"] != "NoSuchKey":
+                logger.warning("Failed deleting proxy %s: %s", proxy_key, e)
+
+        # Clean up thumbnails (handle both single and multiple thumbnail patterns)
+        # MediaConvert generates: filename_thumbnail.0000000.jpg, filename_thumbnail.0000001.jpg, etc.
+        try:
+            # List all objects with the thumbnail prefix
+            prefix = f"{output_key}_thumbnail"
+            response = s3.list_objects_v2(Bucket=out_bucket, Prefix=prefix)
+            if "Contents" in response:
+                for obj in response["Contents"]:
+                    if obj["Key"].endswith(".jpg"):
+                        s3.delete_object(Bucket=out_bucket, Key=obj["Key"])
+                        logger.info(
+                            "Deleted existing thumbnail: s3://%s/%s",
+                            out_bucket,
+                            obj["Key"],
+                        )
+        except ClientError as e:
+            logger.warning("Failed cleaning up thumbnails: %s", e)
+
+        # calculate dynamic thumbnail timing based on video duration
+        duration = _extract_video_duration(event)
+        num_captures = event.get("thumbnail_max_captures", 5)
+
+        if duration > 0:
+            frame_denom = _calculate_thumbnail_frame_denominator(duration, num_captures)
+            logger.info(
+                "Calculated %d thumbnail captures at %d second intervals for %.2fs video",
+                num_captures,
+                frame_denom,
+                duration,
+            )
+        else:
+            frame_denom = 2
+            logger.info(
+                "Using default thumbnail capture: %d captures at %d second intervals",
+                num_captures,
+                frame_denom,
+            )
 
         # inject into event for Jinja template
         event.update(
@@ -193,8 +283,12 @@ def lambda_handler(event: Dict[str, Any], _: LambdaContext) -> Dict[str, Any]:
                 "output_key": output_key,
                 "mediaconvert_role_arn": os.environ["MEDIACONVERT_ROLE_ARN"],
                 "mediaconvert_queue_arn": os.environ["MEDIACONVERT_QUEUE_ARN"],
-                "thumbnail_width": event.get("thumbnail_width", 300),
-                "thumbnail_height": event.get("thumbnail_height", 400),
+                "thumbnail_width": event.get("thumbnail_width", 640),
+                "thumbnail_height": event.get("thumbnail_height", 360),
+                "thumbnail_max_captures": num_captures,
+                "thumbnail_frame_denominator": event.get(
+                    "thumbnail_frame_denominator", frame_denom
+                ),
             }
         )
 

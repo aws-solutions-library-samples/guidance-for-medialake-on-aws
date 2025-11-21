@@ -231,6 +231,30 @@ def delete_event_source_mapping(mapping_uuid: str) -> bool:
         return False
 
 
+def delete_cloudwatch_log_group(log_group_name: str) -> bool:
+    """
+    Delete a CloudWatch Log Group.
+
+    Args:
+        log_group_name: Name of the log group to delete
+
+    Returns:
+        True if deletion was successful, False otherwise
+    """
+    try:
+        logger.info(f"Deleting CloudWatch Log Group: {log_group_name}")
+        logs_client = boto3.client("logs")
+        logs_client.delete_log_group(logGroupName=log_group_name)
+        logger.info(f"Successfully deleted log group: {log_group_name}")
+        return True
+    except logs_client.exceptions.ResourceNotFoundException:
+        logger.warning(f"Log group {log_group_name} not found or already deleted")
+        return True
+    except Exception as e:
+        logger.error(f"Error deleting log group {log_group_name}: {e}")
+        return False
+
+
 def cleanup_pipeline_resources(
     dependent_resources: List[Tuple[str, str]],
 ) -> Dict[str, Any]:
@@ -251,6 +275,7 @@ def cleanup_pipeline_resources(
         "iam_roles": {"success": [], "failed": []},
         "sqs_queues": {"success": [], "failed": []},
         "event_source_mappings": {"success": [], "failed": []},
+        "cloudwatch_log_groups": {"success": [], "failed": []},
         "other_resources": {"success": [], "failed": []},
     }
 
@@ -303,6 +328,13 @@ def cleanup_pipeline_resources(
                     results["event_source_mappings"]["success"].append(resource_arn)
                 else:
                     results["event_source_mappings"]["failed"].append(resource_arn)
+
+            elif resource_type == "cloudwatch_log_group":
+                success = delete_cloudwatch_log_group(resource_arn)
+                if success:
+                    results["cloudwatch_log_groups"]["success"].append(resource_arn)
+                else:
+                    results["cloudwatch_log_groups"]["failed"].append(resource_arn)
 
             else:
                 logger.warning(

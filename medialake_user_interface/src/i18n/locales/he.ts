@@ -17,6 +17,54 @@ export default {
     connectors: "מחברים",
     selectConnector: "בחר מחבר",
   },
+  upload: {
+    title: "העלאת קבצי מדיה",
+    description:
+      "בחר מחבר S3 והעלה את קבצי המדיה שלך. נתמכים רק פורמטים של אודיו, וידאו, HLS ו-MPEG-DASH.",
+    uploadDestination: "יעד ההעלאה",
+    browsePath: "עיון בנתיב",
+    uploadingTo: "מעלה אל",
+    restrictedToPrefix: "מוגבל",
+    allowedPrefixesInfo: "ניתן להעלות רק ל-{{count}} נתיב(ים) מורשה(ים)",
+    pathInfo: "הקבצים יועלו לנתיב שנבחר בדלי S3",
+    selectPathFirst: "בחר נתיב לפני ההעלאה",
+    pathResetWarning: "שינוי המחבר יאפס את הנתיב שנבחר",
+    connectorLabel: "מחבר S3",
+    selectConnectorPlaceholder: "בחר מחבר S3",
+    loadingConnectors: "טוען מחברים...",
+    noConnectors: "אין מחברי S3 זמינים. אנא הגדר תחילה מחבר S3.",
+    dashboardNote:
+      "מותרים רק קבצים מסוג audio/*, video/*, image/*, HLS (application/x-mpegURL) ו-MPEG-DASH (application/dash+xml)",
+    meta: {
+      name: "שם",
+    },
+  },
+  pathBrowser: {
+    title: "בחירת נתיב העלאה",
+    descriptionRestricted:
+      "עיין ובחר תיקייה בתוך הנתיבים המותרים להעלאת הקבצים שלך.",
+    descriptionUnrestricted: "עיין ובחר כל תיקייה בדלי להעלאת הקבצים שלך.",
+    prefixLabel: "נתיב מותר",
+    prefixHelper: "אתה יכול רק לעיין ולהעלות לתיקיות בתוך הנתיב שנבחר.",
+    selectedPath: "נתיב שנבחר",
+    currentPath: "נתיב נוכחי",
+    confirm: "השתמש בנתיב זה",
+    validation: {
+      invalidPath: "הנתיב שנבחר נמצא מחוץ לקידומות המותרות.",
+      noPathSelected: "אנא נווט לתיקייה לפני אישור.",
+    },
+    error: {
+      invalidConnector: "סופק מזהה מחבר לא חוקי.",
+      loadingFailed: "טעינת פרטי המחבר נכשלה.",
+    },
+    hints: {
+      clickFolder:
+        "לחץ על תיקייה כדי לנווט אליה, ואז לחץ על 'בחירת תיקייה נוכחית' כדי לבחור בה.",
+      navigateAndConfirm:
+        "נווט לתיקייה הרצויה, ואז לחץ על 'השתמש בנתיב זה' כדי לאשר.",
+      rootPath: "אתה נמצא כעת ברמת השורש.",
+    },
+  },
   assetExplorer: {
     noConnectorSelected: "בחר מחבר כדי לצפות בנכסים",
     noAssetsFound: "לא נמצאו נכסים עבור מחבר זה",
@@ -83,7 +131,18 @@ export default {
     },
   },
   search: {
-    semantic: "חיפוש סמנטי",
+    semantic: {
+      label: "סמנטי",
+      enable: "הפעל חיפוש סמנטי",
+      disable: "השבת חיפוש סמנטי",
+      configure: "לחץ להגדרת חיפוש סמנטי",
+      configDialog: {
+        title: "חיפוש סמנטי לא מוגדר",
+        description:
+          "חיפוש סמנטי אינו מוגדר כרגע או מושבת. כדי להפעיל תכונה זו, עבור להגדרות מערכת > חיפוש להגדרת ספק חיפוש, או לחץ על הכפתור למטה.",
+        goToSettings: "עבור להגדרות חיפוש",
+      },
+    },
     filters: {
       dateRange: "טווח תאריכים",
       contentType: "סוג תוכן",
@@ -371,6 +430,8 @@ export default {
     language: "שפה",
     delete: "מחק",
     create: "צור",
+    root: "שורש",
+    folder: "תיקייה",
     actions: {
       add: "הוסף",
     },
@@ -388,6 +449,28 @@ export default {
     status: {
       active: "פעיל",
       inactive: "לא פעיל",
+    },
+  },
+  s3Explorer: {
+    filter: {
+      label: "סינון לפי שם",
+      clear: "נקה סינון",
+      resultsCount: "מציג {{count}} מתוך {{total}} פריטים",
+    },
+    loading: {
+      initializing: "טוען...",
+      fetchingContents: "מביא תוכן...",
+    },
+    empty: {
+      folder: "תיקייה זו ריקה",
+      noResults: "אין פריטים התואמים את הסינון שלך",
+    },
+    keyboard: {
+      navigation: "השתמש במקשי החצים לניווט, Enter לפתיחה, Backspace לחזרה",
+    },
+    menu: {
+      rename: "שנה שם",
+      delete: "מחק",
     },
   },
   translation: {
@@ -608,12 +691,29 @@ export default {
     s3Explorer: {
       filter: {
         label: "סנן לפי שם",
+        clear: "נקה סינון",
+        resultsCount: "מציג {{count}} מתוך {{total}} פריטים",
       },
       error: {
         loading: "שגיאה בטעינת עצמים מ-S3: {{message}}",
+        network: "שגיאת רשת. אנא בדוק את החיבור שלך ונסה שוב.",
+        permission: "הגישה נדחתה. אין לך הרשאה לגשת לנתיב זה.",
+        permissionWithPrefixes:
+          "הגישה נדחתה. אתה יכול לגשת רק לנתיבים הבאים: {{prefixes}}",
+        notFound: "הנתיב המבוקש לא קיים.",
+        timeout: "פג הזמן הקצוב לבקשה. אנא נסה שוב.",
+        retry: "נסה שוב",
       },
-      file: {
-        info: "גודל: {{size}} • מחלקת אחסון: {{storageClass}} • עודכן: {{modified}}",
+      loading: {
+        initializing: "טוען...",
+        fetchingContents: "מאחזר תכנים...",
+      },
+      empty: {
+        folder: "תיקייה זו ריקה",
+        noResults: "אין פריטים התואמים את הסינון שלך",
+      },
+      keyboard: {
+        navigation: "השתמש במקשי החצים לניווט, Enter לפתיחה, Backspace לחזרה",
       },
       menu: {
         rename: "שנה שם",

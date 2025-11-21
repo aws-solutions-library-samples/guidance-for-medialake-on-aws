@@ -1,10 +1,5 @@
-import React, {
-  useCallback,
-  useRef,
-  useState,
-  useMemo,
-  useEffect,
-} from "react";
+import React from "react";
+import { useCallback, useRef, useState, useMemo, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import ReactFlow, {
   Background,
@@ -15,7 +10,6 @@ import ReactFlow, {
   addEdge,
   ReactFlowProvider,
   useReactFlow,
-  ReactFlowInstance,
   BackgroundVariant,
   Connection,
   Node,
@@ -28,12 +22,9 @@ import {
   Box,
   Modal,
   Typography,
-  TextField,
-  Stack,
   Dialog,
   DialogTitle,
   DialogContent,
-  Button,
   CircularProgress,
   Backdrop,
 } from "@mui/material";
@@ -57,7 +48,6 @@ import {
 import queryClient from "@/api/queryClient";
 import { useGetNode } from "@/shared/nodes/api/nodesController";
 import type {
-  Pipeline,
   CreatePipelineDto,
   PipelineEdge,
   PipelineNode,
@@ -76,9 +66,8 @@ import {
   NodeConfigurationForm,
   PipelineToolbar,
 } from "../components/PipelineEditor";
-import type { PipelineToolbarProps } from "../components/PipelineEditor/PipelineToolbar";
 import IntegrationValidationDialog from "../components/IntegrationValidationDialog";
-import { Node as NodeType, NodeConfiguration, NodeMethod } from "../types";
+import { Node as NodeType, normalizeNumericValues } from "../types";
 import {
   RightSidebarProvider,
   useRightSidebar,
@@ -725,11 +714,18 @@ const PipelineEditorContent = () => {
     },
   });
 
+  // Track the original pipeline data for change detection
+  const [originalPipelineData, setOriginalPipelineData] =
+    React.useState<CreatePipelineDto | null>(null);
+
   // Fetch all pipelines when the component mounts
 
-  const { data: pipeline } = useGetPipeline(pipelineId || "", {
-    enabled: !!pipelineId && pipelineId !== "new",
-  });
+  const { data: pipeline, isLoading: isPipelineLoading } = useGetPipeline(
+    pipelineId || "",
+    {
+      enabled: !!pipelineId && pipelineId !== "new",
+    },
+  );
 
   // Only fetch node details when the dialog is open and we have a selected node
   // Store the nodeId in a ref to prevent unnecessary re-renders
@@ -803,6 +799,10 @@ const PipelineEditorContent = () => {
 
   const updatePipeline = useUpdatePipeline({
     onSuccess: () => {
+      // Invalidate the pipelines list query to force a refresh
+      queryClient.invalidateQueries({
+        queryKey: ["pipelines", "list"],
+      });
       navigate("/pipelines");
     },
   });
@@ -880,6 +880,11 @@ const PipelineEditorContent = () => {
       setShouldPollStatus(true);
     }
 
+    // Invalidate the pipelines list query to force a refresh
+    queryClient.invalidateQueries({
+      queryKey: ["pipelines", "list"],
+    });
+
     // Always navigate back to pipelines page when modal closes
     navigate("/pipelines");
   }, [executionArn, apiStatusModalState, navigate]);
@@ -891,10 +896,10 @@ const PipelineEditorContent = () => {
         "[PipelineEditorPage] Setting form data from pipeline:",
         pipeline,
       );
-      setFormData({
+      const pipelineData = {
         name: pipeline.name || "",
         description: pipeline.description || "",
-        active: pipeline.active !== false, // Use pipeline active state or default to true
+        active: pipeline.active !== false,
         configuration: pipeline.configuration || {
           nodes: [],
           edges: [],
@@ -904,7 +909,9 @@ const PipelineEditorContent = () => {
             timeout: 3600,
           },
         },
-      });
+      };
+      setFormData(pipelineData);
+      setOriginalPipelineData(JSON.parse(JSON.stringify(pipelineData)));
     }
   }, [pipeline]);
 
@@ -915,6 +922,97 @@ const PipelineEditorContent = () => {
       active,
     }));
   };
+
+  // Detect if there are any changes in the pipeline
+  const hasChanges = React.useMemo(() => {
+    if (!originalPipelineData || !pipelineId || pipelineId === "new") {
+      return true;
+    }
+
+    try {
+      // Compare name, description, and active state
+      if (
+        formData.name !== originalPipelineData.name ||
+        formData.description !== originalPipelineData.description ||
+        formData.active !== originalPipelineData.active
+      ) {
+        return true;
+      }
+
+      // Compare nodes - check count first
+      if (
+        formData.configuration.nodes.length !==
+        originalPipelineData.configuration.nodes.length
+      ) {
+        return true;
+      }
+
+      // Deep compare each node
+      for (const node of formData.configuration.nodes) {
+        const originalNode = originalPipelineData.configuration.nodes.find(
+          (n) => n.id === node.id,
+        );
+        if (!originalNode) {
+          return true;
+        }
+
+        // Compare node properties
+        if (
+          node.position.x !== originalNode.position.x ||
+          node.position.y !== originalNode.position.y ||
+          JSON.stringify(node.data.configuration) !==
+            JSON.stringify(originalNode.data.configuration) ||
+          (node as any).rotation !== (originalNode as any).rotation
+        ) {
+          return true;
+        }
+      }
+
+      // Compare edges - check count first
+      if (
+        formData.configuration.edges.length !==
+        originalPipelineData.configuration.edges.length
+      ) {
+        return true;
+      }
+
+      // Deep compare each edge
+      for (const edge of formData.configuration.edges) {
+        const originalEdge = originalPipelineData.configuration.edges.find(
+          (e) => e.id === edge.id,
+        );
+        if (!originalEdge) {
+          return true;
+        }
+
+        // Compare edge properties
+        if (
+          edge.source !== originalEdge.source ||
+          edge.target !== originalEdge.target ||
+          edge.sourceHandle !== originalEdge.sourceHandle ||
+          edge.targetHandle !== originalEdge.targetHandle
+        ) {
+          return true;
+        }
+      }
+
+      // Compare settings
+      if (
+        JSON.stringify(formData.configuration.settings) !==
+        JSON.stringify(originalPipelineData.configuration.settings)
+      ) {
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error(
+        "[PipelineEditorPage] Error comparing pipeline data:",
+        error,
+      );
+      return true;
+    }
+  }, [formData, originalPipelineData, pipelineId]);
 
   const handleSave = async () => {
     console.log(
@@ -959,17 +1057,40 @@ const PipelineEditorContent = () => {
     setApiStatusModalMessage("Please wait...");
     setApiStatusModalOpen(true);
 
+    // Normalize numeric values in node parameters and settings before submitting
+    const normalizedFormData = {
+      ...formData,
+      configuration: {
+        ...formData.configuration,
+        nodes: formData.configuration.nodes.map((node: any) => ({
+          ...node,
+          data: {
+            ...node.data,
+            configuration: node.data.configuration
+              ? {
+                  ...node.data.configuration,
+                  parameters: normalizeNumericValues(
+                    node.data.configuration.parameters || {},
+                  ),
+                }
+              : node.data.configuration,
+          },
+        })),
+        settings: normalizeNumericValues(formData.configuration.settings || {}),
+      },
+    };
+
     if (pipelineId && pipelineId !== "new") {
       // Add updateDeployed flag for deployed pipelines
       updatePipeline.mutate({
         id: pipelineId,
         data: {
-          ...formData,
+          ...normalizedFormData,
           updateDeployed: true, // Flag to indicate updating a deployed pipeline
         },
       });
     } else {
-      createPipeline.mutate(formData);
+      createPipeline.mutate(normalizedFormData);
     }
   };
 
@@ -1925,11 +2046,11 @@ const PipelineEditorContent = () => {
           flexDirection: "column",
           gap: 2,
         }}
-        open={isImporting}
+        open={isImporting || isPipelineLoading}
       >
         <CircularProgress color="inherit" />
         <Box sx={{ typography: "body1", fontWeight: "medium" }}>
-          Importing Pipeline...
+          {isPipelineLoading ? "Loading Pipeline..." : "Importing Pipeline..."}
         </Box>
       </Backdrop>
       <PipelineToolbar
@@ -1946,6 +2067,7 @@ const PipelineEditorContent = () => {
         onActiveChange={handleActiveChange}
         status={pipeline?.deploymentStatus}
         isEditMode={!!pipelineId && pipelineId !== "new"}
+        hasChanges={hasChanges}
         updateFormData={(importedNodes, importedEdges) => {
           // Convert imported React Flow nodes to pipeline nodes
           const pipelineNodes = importedNodes.map((node) =>
@@ -2212,9 +2334,14 @@ const PipelineEditorContent = () => {
                   "The pipeline has been deleted successfully.",
                 );
 
+                // Invalidate the pipelines list query to force a refresh
+                queryClient.invalidateQueries({
+                  queryKey: ["pipelines", "list"],
+                });
+
                 // Navigate back to pipelines page after a short delay
                 setTimeout(() => {
-                  navigate("/settings/pipelines");
+                  navigate("/pipelines");
                 }, 1500);
               })
               .catch((error) => {

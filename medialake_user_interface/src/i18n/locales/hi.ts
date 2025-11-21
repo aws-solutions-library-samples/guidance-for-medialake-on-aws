@@ -17,6 +17,57 @@ export default {
     connectors: "कनेक्टर",
     selectConnector: "कनेक्टर चुनें",
   },
+  upload: {
+    title: "मीडिया फ़ाइलें अपलोड करें",
+    description:
+      "एक S3 कनेक्टर चुनें और अपनी मीडिया फ़ाइलें अपलोड करें। केवल ऑडियो, वीडियो, HLS और MPEG-DASH प्रारूप समर्थित हैं।",
+    uploadDestination: "अपलोड गंतव्य",
+    browsePath: "पथ ब्राउज़ करें",
+    uploadingTo: "अपलोड हो रहा है",
+    restrictedToPrefix: "प्रतिबंधित",
+    allowedPrefixesInfo: "आप केवल {{count}} अनुमत पथ(ों) पर अपलोड कर सकते हैं",
+    pathInfo: "फ़ाइलें S3 बकेट में चयनित पथ पर अपलोड की जाएंगी",
+    selectPathFirst: "अपलोड करने से पहले एक पथ चुनें",
+    pathResetWarning: "कनेक्टर बदलने से चयनित पथ रीसेट हो जाएगा",
+    connectorLabel: "S3 कनेक्टर",
+    selectConnectorPlaceholder: "S3 कनेक्टर चुनें",
+    loadingConnectors: "कनेक्टर लोड हो रहे हैं...",
+    noConnectors:
+      "कोई S3 कनेक्टर उपलब्ध नहीं है। कृपया पहले एक S3 कनेक्टर कॉन्फ़िगर करें।",
+    dashboardNote:
+      "केवल audio/*, video/*, image/*, HLS (application/x-mpegURL) और MPEG-DASH (application/dash+xml) फ़ाइलों की अनुमति है",
+    meta: {
+      name: "नाम",
+    },
+  },
+  pathBrowser: {
+    title: "अपलोड पथ चुनें",
+    descriptionRestricted:
+      "अपनी फ़ाइलों को अपलोड करने के लिए अनुमत पथों के भीतर एक फ़ोल्डर ब्राउज़ करें और चुनें।",
+    descriptionUnrestricted:
+      "अपनी फ़ाइलों को अपलोड करने के लिए बकेट में किसी भी फ़ोल्डर को ब्राउज़ करें और चुनें।",
+    prefixLabel: "अनुमत पथ",
+    prefixHelper:
+      "आप केवल चयनित पथ के भीतर फ़ोल्डरों को ब्राउज़ और अपलोड कर सकते हैं।",
+    selectedPath: "चयनित पथ",
+    currentPath: "वर्तमान पथ",
+    confirm: "इस पथ का उपयोग करें",
+    validation: {
+      invalidPath: "चयनित पथ अनुमत उपसर्गों के बाहर है।",
+      noPathSelected: "पुष्टि करने से पहले कृपया एक फ़ोल्डर पर नेविगेट करें।",
+    },
+    error: {
+      invalidConnector: "अमान्य कनेक्टर आईडी प्रदान की गई।",
+      loadingFailed: "कनेक्टर जानकारी लोड करने में विफल।",
+    },
+    hints: {
+      clickFolder:
+        "इसमें नेविगेट करने के लिए एक फ़ोल्डर पर क्लिक करें, फिर इसे चुनने के लिए 'वर्तमान फ़ोल्डर चुनें' पर क्लिक करें।",
+      navigateAndConfirm:
+        "आप जिस फ़ोल्डर को चाहते हैं, उस पर नेविगेट करें, फिर पुष्टि करने के लिए 'इस पथ का उपयोग करें' पर क्लिक करें।",
+      rootPath: "आप वर्तमान में रूट स्तर पर हैं।",
+    },
+  },
   assetExplorer: {
     noConnectorSelected: "संपत्तियाँ देखने के लिए कनेक्टर चुनें",
     noAssetsFound: "इस कनेक्टर के लिए कोई संपत्ति नहीं मिली",
@@ -83,7 +134,18 @@ export default {
     },
   },
   search: {
-    semantic: "सार्थक खोज",
+    semantic: {
+      label: "सार्थक",
+      enable: "सार्थक खोज सक्षम करें",
+      disable: "सार्थक खोज अक्षम करें",
+      configure: "सार्थक खोज कॉन्फ़िगर करने के लिए क्लिक करें",
+      configDialog: {
+        title: "सार्थक खोज कॉन्फ़िगर नहीं है",
+        description:
+          "सार्थक खोज वर्तमान में कॉन्फ़िगर नहीं है या अक्षम है। इस सुविधा को सक्षम करने के लिए, खोज प्रदाता को कॉन्फ़िगर करने के लिए सिस्टम सेटिंग्स > खोज पर जाएं, या नीचे दिए गए बटन को दबाएं।",
+        goToSettings: "खोज सेटिंग्स पर जाएं",
+      },
+    },
     filters: {
       dateRange: "तारीख सीमा",
       contentType: "सामग्री का प्रकार",
@@ -375,6 +437,8 @@ export default {
     language: "भाषा",
     delete: "हटाएँ",
     create: "बनाएँ",
+    root: "रूट",
+    folder: "फ़ोल्डर",
     actions: {
       add: "जोड़ें",
     },
@@ -392,6 +456,29 @@ export default {
     status: {
       active: "सक्रिय",
       inactive: "निष्क्रिय",
+    },
+  },
+  s3Explorer: {
+    filter: {
+      label: "नाम से फ़िल्टर करें",
+      clear: "फ़िल्टर साफ़ करें",
+      resultsCount: "{{total}} में से {{count}} आइटम दिखा रहे हैं",
+    },
+    loading: {
+      initializing: "लोड हो रहा है...",
+      fetchingContents: "सामग्री प्राप्त की जा रही है...",
+    },
+    empty: {
+      folder: "यह फ़ोल्डर खाली है",
+      noResults: "आपके फ़िल्टर से मेल खाने वाला कोई आइटम नहीं",
+    },
+    keyboard: {
+      navigation:
+        "नेविगेट करने के लिए तीर कुंजियों का उपयोग करें, खोलने के लिए Enter, वापस जाने के लिए Backspace",
+    },
+    menu: {
+      rename: "नाम बदलें",
+      delete: "हटाएँ",
     },
   },
   translation: {
@@ -612,12 +699,32 @@ export default {
     s3Explorer: {
       filter: {
         label: "नाम से फ़िल्टर करें",
+        clear: "फ़िल्टर साफ़ करें",
+        resultsCount: "{{total}} में से {{count}} आइटम दिखा रहा है",
       },
       error: {
         loading: "S3 वस्तुओं को लोड करते समय त्रुटि: {{message}}",
+        network:
+          "नेटवर्क त्रुटि। कृपया अपना कनेक्शन जांचें और पुनः प्रयास करें।",
+        permission:
+          "पहुँच अस्वीकृत। आपके पास इस पथ तक पहुँचने की अनुमति नहीं है।",
+        permissionWithPrefixes:
+          "पहुँच अस्वीकृत। आप केवल निम्नलिखित पथों तक पहुँच सकते हैं: {{prefixes}}",
+        notFound: "अनुरोधित पथ मौजूद नहीं है।",
+        timeout: "अनुरोध का समय समाप्त हो गया। कृपया पुनः प्रयास करें।",
+        retry: "पुनः प्रयास करें",
       },
-      file: {
-        info: "आकार: {{size}} • स्टोरेज वर्ग: {{storageClass}} • संशोधित: {{modified}}",
+      loading: {
+        initializing: "लोड हो रहा है...",
+        fetchingContents: "सामग्री प्राप्त कर रहा है...",
+      },
+      empty: {
+        folder: "यह फ़ोल्डर खाली है",
+        noResults: "कोई आइटम आपके फ़िल्टर से मेल नहीं खाता",
+      },
+      keyboard: {
+        navigation:
+          "नेविगेट करने के लिए तीर कुंजियों का उपयोग करें, खोलने के लिए Enter, वापस जाने के लिए Backspace",
       },
       menu: {
         rename: "नाम बदलें",

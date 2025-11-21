@@ -6,9 +6,11 @@ import aws_cdk.aws_iam as iam
 from aws_cdk import CustomResource, Fn, Stack
 from aws_cdk import aws_apigateway as apigateway
 from aws_cdk import aws_lambda as lambda_
+from aws_cdk import aws_ssm as ssm
 from aws_cdk import custom_resources as cr
 from constructs import Construct
 
+from config import config
 from medialake_constructs.api_gateway.api_gateway_deployment_construct import (
     ApiGatewayDeploymentConstruct,
     ApiGatewayDeploymentProps,
@@ -52,7 +54,7 @@ class ApiGatewayDeploymentStack(Stack):
         deployment_function = lambda_.Function(
             self,
             "ApiDeploymentLambda",
-            runtime=lambda_.Runtime.PYTHON_3_9,
+            runtime=lambda_.Runtime.PYTHON_3_13,
             handler="index.handler",
             code=lambda_.Code.from_inline(
                 """
@@ -117,12 +119,22 @@ def handler(event, context):
         # Add explicit dependency on the stage
         deployment_resource.node.add_dependency(self.api_deployment.stage)
 
-        # Export the stage name for cross-stack reference
+        # Store the stage name in SSM Parameter Store instead of CloudFormation export
+        # This avoids circular dependency issues with stacks that need the stage name
+        stage_name_param = ssm.StringParameter(
+            self,
+            "ApiGatewayStageNameParameter",
+            parameter_name=f"/medialake/{config.environment}/api-gateway-stage-name",
+            string_value=self.api_deployment.stage.stage_name,
+            description="API Gateway deployment stage name for MediaLake",
+        )
+
+        # Export the SSM parameter name as CloudFormation output for reference
         cdk.CfnOutput(
             self,
-            "ApiGatewayStageName",
-            value=self.api_deployment.stage.stage_name,
-            export_name=f"{self.stack_name}-StageName",
+            "ApiGatewayStageNameParameterName",
+            value=stage_name_param.parameter_name,
+            description="SSM parameter name containing the API Gateway stage name",
         )
 
     @property

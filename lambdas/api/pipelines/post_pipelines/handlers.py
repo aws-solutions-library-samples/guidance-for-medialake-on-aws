@@ -1,6 +1,7 @@
 import json
 from typing import Any, Dict
 
+import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from dynamodb_operations import (
@@ -189,6 +190,69 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                             f"Failed to delete Lambda function {function_name}: {e}"
                         )
 
+                if resource_type == "sqs_queue":
+                    # Clean up SQS queue and associated event source mappings
+                    try:
+                        sqs_client = boto3.client("sqs")
+                        lambda_client = boto3.client("lambda")
+
+                        # Find the queue by ARN
+                        queue_name = resource_arn.split(":")[-1]
+                        logger.info(f"Attempting to delete SQS queue: {queue_name}")
+
+                        # List queues with the name prefix
+                        response = sqs_client.list_queues(QueueNamePrefix=queue_name)
+                        if "QueueUrls" in response and response["QueueUrls"]:
+                            queue_url = response["QueueUrls"][0]
+
+                            # Get the queue ARN
+                            queue_attrs = sqs_client.get_queue_attributes(
+                                QueueUrl=queue_url, AttributeNames=["QueueArn"]
+                            )
+                            queue_arn = queue_attrs["Attributes"]["QueueArn"]
+
+                            # Delete event source mappings first
+                            try:
+                                mapping_response = (
+                                    lambda_client.list_event_source_mappings(
+                                        EventSourceArn=queue_arn
+                                    )
+                                )
+                                for mapping in mapping_response.get(
+                                    "EventSourceMappings", []
+                                ):
+                                    mapping_uuid = mapping["UUID"]
+                                    lambda_client.delete_event_source_mapping(
+                                        UUID=mapping_uuid
+                                    )
+                                    logger.info(
+                                        f"Deleted event source mapping {mapping_uuid} for queue {queue_arn}"
+                                    )
+                            except Exception as mapping_error:
+                                logger.warning(
+                                    f"Error deleting event source mappings for queue {queue_arn}: {mapping_error}"
+                                )
+
+                            # Delete the queue
+                            sqs_client.delete_queue(QueueUrl=queue_url)
+                            logger.info(f"Deleted existing SQS queue: {queue_url}")
+                    except Exception as e:
+                        logger.error(f"Failed to delete SQS queue {resource_arn}: {e}")
+
+                if resource_type == "trigger_lambda":
+                    # Clean up trigger Lambda function
+                    try:
+                        lambda_client = boto3.client("lambda")
+                        function_name = resource_arn.split(":")[-1]
+                        lambda_client.delete_function(FunctionName=function_name)
+                        logger.info(
+                            f"Deleted existing trigger Lambda function: {function_name}"
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to delete trigger Lambda function {resource_arn}: {e}"
+                        )
+
                 if resource_type == "step_function":
                     # Extract state machine name from ARN
                     state_machine_name = resource_arn.split(":")[-1]
@@ -349,6 +413,7 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
             sfn_result = create_step_function(pipeline_name, state_machine_definition)
             state_machine_arn = sfn_result["response"].get("stateMachineArn")
             sfn_role_arn = sfn_result["role_arn"]
+            sfn_log_group_name = sfn_result.get("log_group_name")
             logger.info(f"State machine created with ARN: {state_machine_arn}")
 
             update_pipeline_status(pipeline_id, "STATE MACHINE CREATED")
@@ -442,6 +507,7 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                 sqs_queue_arns=sqs_queue_arns,
                 event_source_mapping_uuids=event_source_mapping_uuids,
                 service_role_arns=service_role_arns,
+                sfn_log_group_name=sfn_log_group_name,
             )
 
             update_pipeline_status(pipeline_id, "DEPLOYED")

@@ -30,6 +30,7 @@ interface S3ExplorerParams {
   prefix?: string;
   delimiter?: string;
   continuationToken?: string | null;
+  showInlineError?: boolean; // If true, suppresses the global error modal
 }
 
 /**
@@ -44,6 +45,7 @@ export const useS3Explorer = ({
   prefix = "",
   delimiter = "/",
   continuationToken = null,
+  showInlineError = false,
 }: S3ExplorerParams) => {
   const { showError } = useErrorModal();
 
@@ -91,10 +93,45 @@ export const useS3Explorer = ({
         );
 
         return response.data;
-      } catch (error) {
+      } catch (error: any) {
         logger.error("S3 Explorer error:", error);
-        showError("Failed to fetch S3 contents");
-        throw error;
+
+        // Enhanced error discrimination
+        let errorMessage = "Failed to fetch S3 contents";
+        if (error.response) {
+          const status = error.response.status;
+          if (status === 403) {
+            errorMessage =
+              "Access denied. You don't have permission to access this path.";
+          } else if (status === 404) {
+            errorMessage = "The requested path does not exist.";
+          } else if (status === 408 || status === 504) {
+            errorMessage = "Request timed out. Please try again.";
+          } else if (status >= 500) {
+            errorMessage = "Server error. Please try again later.";
+          }
+        } else if (
+          error.code === "ECONNABORTED" ||
+          error.message === "Network Error"
+        ) {
+          errorMessage =
+            "Network error. Please check your connection and try again.";
+        }
+
+        // Only show global error modal if not handling errors inline
+        if (!showInlineError) {
+          showError(errorMessage);
+        }
+
+        // Attach error metadata for component use
+        const enhancedError = new Error(errorMessage) as any;
+        enhancedError.status = error.response?.status;
+        enhancedError.originalError = error;
+        // Attach allowedPrefixes if available (for 403 errors)
+        enhancedError.allowedPrefixes =
+          error.response?.data?.data?.allowedPrefixes ||
+          error.response?.data?.allowedPrefixes;
+        throw enhancedError;
       }
     },
     enabled: !!connectorId,
@@ -103,30 +140,40 @@ export const useS3Explorer = ({
 };
 
 /**
- * Prefetch folder contents when hovering over folders
+ * Hook to prefetch folder contents when hovering over folders
  * This improves perceived performance by loading potential
  * navigation targets before the user clicks
+ *
+ * Returns a prefetch callback that accepts connectorId and prefix
  */
-export const prefetchS3FolderContents = (
-  connectorId: string,
-  prefix: string,
-) => {
+export const usePrefetchS3FolderContents = () => {
   const queryClient = useQueryClient();
-  return queryClient.prefetchQuery({
-    queryKey: QUERY_KEYS.CONNECTORS.s3.explorer(connectorId, prefix, null),
-    queryFn: async ({ signal }) => {
-      const response = await apiClient.get<ApiResponse<S3ListObjectsResponse>>(
-        `${API_ENDPOINTS.CONNECTORS}/s3/explorer/${connectorId}`,
-        {
-          params: { prefix, delimiter: "/" },
-          headers: {
-            "Cache-Control": "max-age=300", // Match our stale time
-          },
-          signal,
+
+  return React.useCallback(
+    (connectorId: string, prefix: string) => {
+      return queryClient.prefetchQuery({
+        queryKey: QUERY_KEYS.CONNECTORS.s3.explorer(connectorId, prefix, null),
+        queryFn: async ({ signal }) => {
+          try {
+            const response = await apiClient.get<
+              ApiResponse<S3ListObjectsResponse>
+            >(`${API_ENDPOINTS.CONNECTORS}/s3/explorer/${connectorId}`, {
+              params: { prefix, delimiter: "/" },
+              headers: {
+                "Cache-Control": "max-age=300", // Match our stale time
+              },
+              signal,
+            });
+            return response.data;
+          } catch (error) {
+            // Silently fail prefetch - don't disrupt UI
+            logger.debug(`Prefetch failed for ${prefix}:`, error);
+            throw error;
+          }
         },
-      );
-      return response.data;
+        ...defaultQueryConfig,
+      });
     },
-    ...defaultQueryConfig,
-  });
+    [queryClient],
+  );
 };

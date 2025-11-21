@@ -1,6 +1,13 @@
-import React, { useMemo, useEffect, useState, useCallback } from "react";
+import React, {
+  useMemo,
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Box,
   Button,
@@ -45,6 +52,7 @@ import type {
   PipelineExecutionFilters,
 } from "../types/pipelineExecutions.types";
 import ExecutionSideBar from "../components/ExecutionSideBar";
+import { QUERY_KEYS } from "@/api/queryKeys";
 
 const PAGE_SIZE = 20;
 
@@ -52,6 +60,7 @@ const ExecutionsPage: React.FC = () => {
   const { t } = useTranslation();
   const theme = useTheme();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   // State declarations
   const [sorting, setSorting] = useState<SortingState>([
@@ -113,6 +122,32 @@ const ExecutionsPage: React.FC = () => {
     if (!data?.pages) return [];
     return data.pages.flatMap((page) => page.data.executions);
   }, [data]);
+
+  // Track previous sort values to detect changes
+  const prevSortRef = useRef({
+    sortBy: filters.sortBy,
+    sortOrder: filters.sortOrder,
+  });
+
+  // Reset query cache when sorting changes to prevent mixing sorted pages
+  useEffect(() => {
+    const currentSort = {
+      sortBy: filters.sortBy,
+      sortOrder: filters.sortOrder,
+    };
+    const prevSort = prevSortRef.current;
+
+    // Only reset if sorting actually changed
+    if (
+      currentSort.sortBy !== prevSort.sortBy ||
+      currentSort.sortOrder !== prevSort.sortOrder
+    ) {
+      queryClient.resetQueries({
+        queryKey: QUERY_KEYS.PIPELINE_EXECUTIONS.all,
+      });
+      prevSortRef.current = currentSort;
+    }
+  }, [filters.sortBy, filters.sortOrder, queryClient]);
 
   const handleSortingChange = useCallback((newSorting: SortingState) => {
     setSorting(newSorting);

@@ -92,9 +92,17 @@ class UserInterfaceStack(Stack):
             f"/medialake/{config.environment}/cloudfront-distribution-domain"
         )
 
-        # Import API Gateway values from CloudFormation exports to avoid circular dependencies
+        # Import API Gateway REST API ID from CloudFormation export
         api_gateway_rest_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
-        api_gateway_stage = Fn.import_value("MediaLakeApiGatewayDeployment-StageName")
+
+        # Read API Gateway stage name from SSM Parameter Store instead of CloudFormation export
+        # This avoids circular dependency issues since the deployment stack is created after this stack
+        api_gateway_stage_param = ssm.StringParameter.from_string_parameter_name(
+            self,
+            "ApiGatewayStageNameParameter",
+            string_parameter_name=f"/medialake/{config.environment}/api-gateway-stage-name",
+        )
+        api_gateway_stage = api_gateway_stage_param.string_value
 
         # Import S3 buckets from BaseInfrastructureStack exports
         media_assets_bucket_arn = Fn.import_value(
@@ -267,6 +275,24 @@ class UserInterfaceStack(Stack):
 
         # Add dependency
         create_user_handler.node.add_dependency(self._ui)
+
+        # Export CloudFront distribution domain as a stack output
+        CfnOutput(
+            self,
+            "CloudFrontDistributionDomain",
+            value=self._ui.cloudfront_distribution.distribution_domain_name,
+            export_name=f"{config.resource_prefix}-{config.environment}-cloudfront-domain",
+            description="CloudFront distribution domain for CORS configuration",
+        )
+
+        # Store the domain as a class property for cross-stack references
+        self.cloudfront_domain = (
+            self._ui.cloudfront_distribution.distribution_domain_name
+        )
+
+        # Optional custom UI origin host (can be set to a custom domain in the future)
+        # For now, defaults to None - will fall back to CloudFront domain
+        self.ui_origin_host = None
 
         # Add the initial user to the administrators group
         add_to_admin_group_handler = cr.AwsCustomResource(

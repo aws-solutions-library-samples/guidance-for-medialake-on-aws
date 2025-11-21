@@ -52,6 +52,9 @@ interface AssetResultsProps<T extends AssetBase> {
   showMetadata: boolean;
   onShowMetadataChange: (show: boolean) => void;
   onPageSizeChange: (newPageSize: number) => void;
+  // Semantic search confidence filtering for clips
+  isSemantic?: boolean;
+  confidenceThreshold?: number;
 }
 
 type AssetWithHeader<T> = T | { isHeader: true; type: string };
@@ -72,6 +75,9 @@ function AssetResults<T extends AssetBase>({
   showMetadata = true,
   onShowMetadataChange,
   onPageSizeChange,
+  // Semantic search confidence filtering for clips
+  isSemantic = false,
+  confidenceThreshold = 0,
 }: AssetResultsProps<T>) {
   const navigate = useNavigate();
   const [currentAsset, setCurrentAsset] = useState<T | null>(null);
@@ -264,6 +270,8 @@ function AssetResults<T extends AssetBase>({
         onFavoriteToggle={(e) =>
           console.log("Favorite toggle not implemented in AssetResults")
         }
+        isSemantic={isSemantic}
+        confidenceThreshold={confidenceThreshold}
       />
     </Grid>
   );

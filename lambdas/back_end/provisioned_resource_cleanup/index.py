@@ -217,6 +217,33 @@ def clean_up_connector(item, table):
         except Exception as e:
             errors.append(f"Error removing S3 bucket notification: {str(e)}")
 
+    # Remove CORS configuration if allowUploads was enabled and corsRuleId exists
+    allow_uploads = item.get("allowUploads", False)
+    cors_rule_id = item.get("corsRuleId")
+    bucket_name = item.get("storageIdentifier")
+    if allow_uploads and cors_rule_id and bucket_name:
+        try:
+            logger.info(
+                f"Removing CORS configuration for connector {item['id']} on bucket {bucket_name}"
+            )
+            remove_medialake_cors_rule(s3, bucket_name, cors_rule_id)
+        except Exception as e:
+            error_msg = f"Error removing CORS configuration: {str(e)}"
+            logger.error(error_msg)
+            errors.append(error_msg)
+    elif allow_uploads and not cors_rule_id:
+        logger.warning(
+            f"allowUploads is True but no corsRuleId found for connector {item['id']}, skipping CORS removal"
+        )
+    elif allow_uploads and not bucket_name:
+        logger.warning(
+            f"allowUploads is True but no storageIdentifier found for connector {item['id']}"
+        )
+    else:
+        logger.info(
+            f"allowUploads is False, skipping CORS cleanup for connector {item['id']}"
+        )
+
     # Handle different integration methods
     integration_method = item.get("integrationMethod")
     if integration_method == "eventbridge":
@@ -355,6 +382,8 @@ def clean_up_pipeline(item, table):
                     delete_event_source_mapping(resource_identifier)
                 elif resource_type == "eventbridge_pipe" or resource_type == "pipe":
                     delete_eventbridge_pipe(resource_identifier)
+                elif resource_type == "cloudwatch_log_group":
+                    delete_cloudwatch_log_group(resource_identifier)
                 else:
                     logger.warning(f"Unknown resource type: {resource_type}")
             except Exception as e:
@@ -474,6 +503,18 @@ def delete_event_bus_and_rules(event_bus_name):
         if e.response["Error"]["Code"] != "ResourceNotFoundException":
             raise
         logger.warning(f"EventBridge event bus {event_bus_name} already deleted")
+
+
+def delete_cloudwatch_log_group(log_group_name: str):
+    """Delete a CloudWatch Log Group."""
+    try:
+        logger.info(f"Deleting CloudWatch Log Group: {log_group_name}")
+        cloudwatch_logs.delete_log_group(logGroupName=log_group_name)
+        logger.info(f"Successfully deleted log group: {log_group_name}")
+    except ClientError as e:
+        if e.response["Error"]["Code"] != "ResourceNotFoundException":
+            raise
+        logger.warning(f"Log group {log_group_name} not found or already deleted")
 
 
 def delete_step_function(state_machine_arn):
@@ -626,6 +667,71 @@ def remove_s3_bucket_notification(item):
         if e.response["Error"]["Code"] != "NoSuchBucket":
             raise
         logger.warning(f"S3 bucket {bucket_name} not found")
+
+
+def remove_medialake_cors_rule(
+    s3_client, bucket_name: str, cors_rule_id: str | None = None
+):
+    """
+    Remove MediaLake's CORS rule during cleanup.
+
+    Args:
+        s3_client: S3 client
+        bucket_name: Name of the S3 bucket
+        cors_rule_id: Optional specific rule ID to remove (from connector metadata)
+    """
+    try:
+        # Get current CORS configuration
+        try:
+            cors_config = s3_client.get_bucket_cors(Bucket=bucket_name)
+            rules = cors_config.get("CORSRules", [])
+        except ClientError as e:
+            if e.response["Error"]["Code"] == "NoSuchCORSConfiguration":
+                logger.warning(
+                    f"No CORS configuration found for bucket {bucket_name}, nothing to remove"
+                )
+                return
+            else:
+                raise
+
+        # Filter out MediaLake rules
+        if cors_rule_id:
+            # Remove specific rule by ID
+            filtered_rules = [r for r in rules if r.get("ID") != cors_rule_id]
+            logger.info(f"Filtering CORS rules by specific ID: {cors_rule_id}")
+        else:
+            # Remove all rules starting with "medialake-upload-"
+            filtered_rules = [
+                r for r in rules if not r.get("ID", "").startswith("medialake-upload-")
+            ]
+            logger.info(
+                f"Filtering all MediaLake CORS rules (prefix: medialake-upload-)"
+            )
+
+        rules_removed = len(rules) - len(filtered_rules)
+
+        if rules_removed == 0:
+            logger.info(
+                f"No MediaLake CORS rules found to remove from bucket {bucket_name}"
+            )
+            return
+
+        # Update or delete CORS configuration
+        if filtered_rules:
+            s3_client.put_bucket_cors(
+                Bucket=bucket_name, CORSConfiguration={"CORSRules": filtered_rules}
+            )
+            logger.info(
+                f"Removed MediaLake CORS rule from bucket {bucket_name}, "
+                f"{rules_removed} rule(s) removed, {len(filtered_rules)} rule(s) remaining"
+            )
+        else:
+            s3_client.delete_bucket_cors(Bucket=bucket_name)
+            logger.info(f"Removed all CORS configuration from bucket {bucket_name}")
+
+    except Exception as e:
+        logger.error(f"Error removing CORS rule from bucket {bucket_name}: {str(e)}")
+        raise
 
 
 def delete_cloudwatch_log_groups(log_group_names):

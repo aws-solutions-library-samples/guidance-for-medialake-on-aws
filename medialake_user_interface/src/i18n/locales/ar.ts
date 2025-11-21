@@ -17,6 +17,54 @@ export default {
     connectors: "الموصلات",
     selectConnector: "اختر موصل",
   },
+  upload: {
+    title: "تحميل ملفات الوسائط",
+    description:
+      "حدد موصل S3 وقم بتحميل ملفات الوسائط الخاصة بك. يتم دعم تنسيقات الصوت والفيديو و HLS و MPEG-DASH فقط.",
+    uploadDestination: "وجهة التحميل",
+    browsePath: "تصفح المسار",
+    uploadingTo: "التحميل إلى",
+    restrictedToPrefix: "مقيد",
+    allowedPrefixesInfo: "يمكنك التحميل فقط إلى {{count}} مسار(ات) مسموح بها",
+    pathInfo: "سيتم تحميل الملفات إلى المسار المحدد في حاوية S3",
+    selectPathFirst: "حدد مسارًا قبل التحميل",
+    pathResetWarning: "سيؤدي تغيير الموصل إلى إعادة تعيين المسار المحدد",
+    connectorLabel: "موصل S3",
+    selectConnectorPlaceholder: "حدد موصل S3",
+    loadingConnectors: "جارٍ تحميل الموصلات...",
+    noConnectors: "لا توجد موصلات S3 متاحة. يرجى تكوين موصل S3 أولاً.",
+    dashboardNote:
+      "يُسمح فقط بالملفات من نوع audio/*، وvideo/*، وimage/*، وHLS (application/x-mpegURL)، وMPEG-DASH (application/dash+xml)",
+    meta: {
+      name: "الاسم",
+    },
+  },
+  pathBrowser: {
+    title: "حدد مسار التحميل",
+    descriptionRestricted:
+      "تصفح وحدد مجلدًا ضمن المسارات المسموح بها لتحميل ملفاتك.",
+    descriptionUnrestricted: "تصفح وحدد أي مجلد في الحاوية لتحميل ملفاتك.",
+    prefixLabel: "المسار المسموح به",
+    prefixHelper: "يمكنك فقط التصفح والتحميل إلى المجلدات ضمن المسار المحدد.",
+    selectedPath: "المسار المحدد",
+    currentPath: "المسار الحالي",
+    confirm: "استخدم هذا المسار",
+    validation: {
+      invalidPath: "المسار المحدد خارج البادئات المسموح بها.",
+      noPathSelected: "يرجى الانتقال إلى مجلد قبل التأكيد.",
+    },
+    error: {
+      invalidConnector: "تم توفير معرف موصل غير صالح.",
+      loadingFailed: "فشل تحميل معلومات الموصل.",
+    },
+    hints: {
+      clickFolder:
+        "انقر على مجلد للانتقال إليه، ثم انقر على 'تحديد المجلد الحالي' لاختياره.",
+      navigateAndConfirm:
+        "انتقل إلى المجلد الذي تريده، ثم انقر على 'استخدم هذا المسار' للتأكيد.",
+      rootPath: "أنت حاليًا في المستوى الجذر.",
+    },
+  },
   assetExplorer: {
     noConnectorSelected: "اختر موصل لعرض الأصول",
     noAssetsFound: "لم يتم العثور على أصول لهذا الموصل",
@@ -83,7 +131,18 @@ export default {
     },
   },
   search: {
-    semantic: "البحث الدلالي",
+    semantic: {
+      label: "دلالي",
+      enable: "تفعيل البحث الدلالي",
+      disable: "تعطيل البحث الدلالي",
+      configure: "انقر لتكوين البحث الدلالي",
+      configDialog: {
+        title: "البحث الدلالي غير مكوّن",
+        description:
+          "البحث الدلالي غير مكوّن حالياً أو معطل. لتفعيل هذه الميزة، انتقل إلى إعدادات النظام > البحث لتكوين مزود البحث، أو اضغط على الزر أدناه.",
+        goToSettings: "الانتقال إلى إعدادات البحث",
+      },
+    },
     filters: {
       dateRange: "نطاق التاريخ",
       contentType: "نوع المحتوى",
@@ -372,6 +431,8 @@ export default {
     language: "اللغة",
     delete: "حذف",
     create: "إنشاء",
+    root: "الجذر",
+    folder: "مجلد",
     actions: {
       add: "إضافة",
     },
@@ -389,6 +450,28 @@ export default {
     status: {
       active: "نشط",
       inactive: "غير نشط",
+    },
+  },
+  s3Explorer: {
+    filter: {
+      label: "التصفية حسب الاسم",
+      clear: "مسح التصفية",
+      resultsCount: "عرض {{count}} من {{total}} عنصر",
+    },
+    loading: {
+      initializing: "جارٍ التحميل...",
+      fetchingContents: "جارٍ جلب المحتويات...",
+    },
+    empty: {
+      folder: "هذا المجلد فارغ",
+      noResults: "لا توجد عناصر تطابق التصفية الخاصة بك",
+    },
+    keyboard: {
+      navigation: "استخدم مفاتيح الأسهم للتنقل، Enter للفتح، Backspace للرجوع",
+    },
+    menu: {
+      rename: "إعادة التسمية",
+      delete: "حذف",
     },
   },
   translation: {
@@ -609,12 +692,30 @@ export default {
     s3Explorer: {
       filter: {
         label: "تصفية حسب الاسم",
+        clear: "مسح التصفية",
+        resultsCount: "عرض {{count}} من {{total}} عنصر",
       },
       error: {
         loading: "خطأ في تحميل كائنات S3: {{message}}",
+        network: "خطأ في الشبكة. يرجى التحقق من اتصالك والمحاولة مرة أخرى.",
+        permission: "تم رفض الوصول. ليس لديك إذن للوصول إلى هذا المسار.",
+        permissionWithPrefixes:
+          "تم رفض الوصول. يمكنك الوصول فقط إلى المسارات التالية: {{prefixes}}",
+        notFound: "المسار المطلوب غير موجود.",
+        timeout: "انتهت مهلة الطلب. يرجى المحاولة مرة أخرى.",
+        retry: "إعادة المحاولة",
       },
-      file: {
-        info: "الحجم: {{size}} • فئة التخزين: {{storageClass}} • تم التعديل: {{modified}}",
+      loading: {
+        initializing: "جارٍ التحميل...",
+        fetchingContents: "جارٍ جلب المحتويات...",
+      },
+      empty: {
+        folder: "هذا المجلد فارغ",
+        noResults: "لا توجد عناصر تطابق التصفية الخاصة بك",
+      },
+      keyboard: {
+        navigation:
+          "استخدم مفاتيح الأسهم للتنقل، Enter للفتح، Backspace للرجوع",
       },
       menu: {
         rename: "إعادة التسمية",

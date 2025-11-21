@@ -17,6 +17,58 @@ export default {
     connectors: "コネクタ",
     selectConnector: "コネクタを選択",
   },
+  upload: {
+    title: "メディアファイルをアップロード",
+    description:
+      "S3コネクタを選択してメディアファイルをアップロードします。オーディオ、ビデオ、HLS、MPEG-DASH形式のみがサポートされています。",
+    uploadDestination: "アップロード先",
+    browsePath: "パスを参照",
+    uploadingTo: "アップロード先",
+    restrictedToPrefix: "制限付き",
+    allowedPrefixesInfo:
+      "{{count}}個の許可されたパスにのみアップロードできます",
+    pathInfo: "ファイルはS3バケット内の選択されたパスにアップロードされます",
+    selectPathFirst: "アップロードする前にパスを選択してください",
+    pathResetWarning: "コネクタを変更すると、選択されたパスがリセットされます",
+    connectorLabel: "S3コネクタ",
+    selectConnectorPlaceholder: "S3コネクタを選択",
+    loadingConnectors: "コネクタを読み込んでいます...",
+    noConnectors:
+      "利用可能なS3コネクタがありません。まずS3コネクタを設定してください。",
+    dashboardNote:
+      "audio/*、video/*、image/*、HLS (application/x-mpegURL)、MPEG-DASH (application/dash+xml) ファイルのみが許可されています",
+    meta: {
+      name: "名前",
+    },
+  },
+  pathBrowser: {
+    title: "アップロードパスを選択",
+    descriptionRestricted:
+      "ファイルをアップロードするために、許可されたパス内のフォルダを参照して選択します。",
+    descriptionUnrestricted:
+      "ファイルをアップロードするために、バケット内の任意のフォルダを参照して選択します。",
+    prefixLabel: "許可されたパス",
+    prefixHelper:
+      "選択したパス内のフォルダのみを参照およびアップロードできます。",
+    selectedPath: "選択されたパス",
+    currentPath: "現在のパス",
+    confirm: "このパスを使用",
+    validation: {
+      invalidPath: "選択されたパスは許可されたプレフィックスの範囲外です。",
+      noPathSelected: "確認する前にフォルダに移動してください。",
+    },
+    error: {
+      invalidConnector: "無効なコネクタIDが提供されました。",
+      loadingFailed: "コネクタ情報の読み込みに失敗しました。",
+    },
+    hints: {
+      clickFolder:
+        "フォルダをクリックして移動し、「現在のフォルダを選択」をクリックして選択します。",
+      navigateAndConfirm:
+        "目的のフォルダに移動し、「このパスを使用」をクリックして確認します。",
+      rootPath: "現在、ルートレベルにいます。",
+    },
+  },
   connectors: {
     apiMessages: {
       creating: {
@@ -146,6 +198,13 @@ export default {
       label: "セマンティック",
       enable: "セマンティック検索を有効にする",
       disable: "セマンティック検索を無効にする",
+      configure: "クリックしてセマンティック検索を設定",
+      configDialog: {
+        title: "セマンティック検索が設定されていません",
+        description:
+          "セマンティック検索は現在設定されていないか、無効になっています。この機能を有効にするには、システム設定 > 検索に移動して検索プロバイダーを設定するか、下のボタンを押してください。",
+        goToSettings: "検索設定に移動",
+      },
     },
     filters: {
       dateRange: "日付範囲",
@@ -455,6 +514,8 @@ export default {
     selectFilter: "フィルターを選択",
     textFilter: "テキストフィルター",
     all: "すべて",
+    root: "ルート",
+    folder: "フォルダ",
     filter: "フィルター",
     noGroups: "グループなし",
     actions: {
@@ -480,6 +541,28 @@ export default {
     status: {
       active: "アクティブ",
       inactive: "非アクティブ",
+    },
+  },
+  s3Explorer: {
+    filter: {
+      label: "名前でフィルタリング",
+      clear: "フィルターをクリア",
+      resultsCount: "{{total}}個中{{count}}個を表示",
+    },
+    loading: {
+      initializing: "読み込み中...",
+      fetchingContents: "コンテンツを取得中...",
+    },
+    empty: {
+      folder: "このフォルダは空です",
+      noResults: "フィルターに一致するアイテムはありません",
+    },
+    keyboard: {
+      navigation: "矢印キーでナビゲート、Enterで開く、Backspaceで戻る",
+    },
+    menu: {
+      rename: "名前を変更",
+      delete: "削除",
     },
   },
   translation: {
@@ -701,12 +784,29 @@ export default {
     s3Explorer: {
       filter: {
         label: "名前でフィルター",
+        clear: "フィルターをクリア",
+        resultsCount: "{{total}}件中{{count}}件を表示",
       },
       error: {
         loading: "S3オブジェクトの読み込みエラー: {{message}}",
+        network: "ネットワークエラー。接続を確認して再試行してください。",
+        permission: "アクセス拒否。このパスにアクセスする権限がありません。",
+        permissionWithPrefixes:
+          "アクセス拒否。以下のパスにのみアクセスできます: {{prefixes}}",
+        notFound: "要求されたパスが存在しません。",
+        timeout: "リクエストがタイムアウトしました。再試行してください。",
+        retry: "再試行",
       },
-      file: {
-        info: "サイズ: {{size}} • ストレージクラス: {{storageClass}} • 更新日: {{modified}}",
+      loading: {
+        initializing: "読み込み中...",
+        fetchingContents: "コンテンツを取得中...",
+      },
+      empty: {
+        folder: "このフォルダは空です",
+        noResults: "フィルターに一致するアイテムはありません",
+      },
+      keyboard: {
+        navigation: "矢印キーで移動、Enterで開く、Backspaceで戻る",
       },
       menu: {
         rename: "名前を変更",

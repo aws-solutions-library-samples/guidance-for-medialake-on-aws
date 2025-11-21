@@ -17,6 +17,61 @@ export default {
     connectors: "Connecteurs",
     selectConnector: "Sélectionnez un connecteur",
   },
+  upload: {
+    title: "Télécharger des fichiers multimédias",
+    description:
+      "Sélectionnez un connecteur S3 et téléchargez vos fichiers multimédias. Seuls les formats audio, vidéo, HLS et MPEG-DASH sont pris en charge.",
+    uploadDestination: "Destination du téléchargement",
+    browsePath: "Parcourir le chemin",
+    uploadingTo: "Téléchargement vers",
+    restrictedToPrefix: "restreint",
+    allowedPrefixesInfo:
+      "Vous ne pouvez télécharger que vers {{count}} chemin(s) autorisé(s)",
+    pathInfo:
+      "Les fichiers seront téléchargés vers le chemin sélectionné dans le compartiment S3",
+    selectPathFirst: "Sélectionnez un chemin avant de télécharger",
+    pathResetWarning:
+      "Le changement de connecteur réinitialisera le chemin sélectionné",
+    connectorLabel: "Connecteur S3",
+    selectConnectorPlaceholder: "Sélectionnez un connecteur S3",
+    loadingConnectors: "Chargement des connecteurs...",
+    noConnectors:
+      "Aucun connecteur S3 disponible. Veuillez d'abord configurer un connecteur S3.",
+    dashboardNote:
+      "Seuls les fichiers de type audio/*, video/*, image/*, HLS (application/x-mpegURL) et MPEG-DASH (application/dash+xml) sont autorisés",
+    meta: {
+      name: "Nom",
+    },
+  },
+  pathBrowser: {
+    title: "Sélectionner le chemin de téléchargement",
+    descriptionRestricted:
+      "Parcourez et sélectionnez un dossier dans les chemins autorisés pour télécharger vos fichiers.",
+    descriptionUnrestricted:
+      "Parcourez et sélectionnez n'importe quel dossier dans le compartiment pour télécharger vos fichiers.",
+    prefixLabel: "Chemin autorisé",
+    prefixHelper:
+      "Vous ne pouvez parcourir et télécharger que vers les dossiers dans le chemin sélectionné.",
+    selectedPath: "Chemin sélectionné",
+    currentPath: "Chemin actuel",
+    confirm: "Utiliser ce chemin",
+    validation: {
+      invalidPath:
+        "Le chemin sélectionné est en dehors des préfixes autorisés.",
+      noPathSelected: "Veuillez naviguer vers un dossier avant de confirmer.",
+    },
+    error: {
+      invalidConnector: "ID de connecteur non valide fourni.",
+      loadingFailed: "Échec du chargement des informations du connecteur.",
+    },
+    hints: {
+      clickFolder:
+        "Cliquez sur un dossier pour y naviguer, puis cliquez sur 'Sélectionner le dossier actuel' pour le choisir.",
+      navigateAndConfirm:
+        "Naviguez vers le dossier souhaité, puis cliquez sur 'Utiliser ce chemin' pour confirmer.",
+      rootPath: "Vous êtes actuellement au niveau racine.",
+    },
+  },
   assetExplorer: {
     noConnectorSelected: "Sélectionnez un connecteur pour afficher les actifs",
     noAssetsFound: "Aucun actif trouvé pour ce connecteur",
@@ -84,7 +139,18 @@ export default {
     },
   },
   search: {
-    semantic: "Recherche sémantique",
+    semantic: {
+      label: "Sémantique",
+      enable: "Activer la recherche sémantique",
+      disable: "Désactiver la recherche sémantique",
+      configure: "Cliquez pour configurer la recherche sémantique",
+      configDialog: {
+        title: "Recherche sémantique non configurée",
+        description:
+          "La recherche sémantique n'est actuellement pas configurée ou est désactivée. Pour activer cette fonctionnalité, allez dans Paramètres système > Recherche pour configurer un fournisseur de recherche, ou appuyez sur le bouton ci-dessous.",
+        goToSettings: "Aller aux paramètres de recherche",
+      },
+    },
     filters: {
       dateRange: "Plage de dates",
       contentType: "Type de contenu",
@@ -363,6 +429,8 @@ export default {
     language: "Langue",
     delete: "Supprimer",
     create: "Créer",
+    root: "Racine",
+    folder: "Dossier",
     actions: {
       add: "Ajouter",
     },
@@ -380,6 +448,29 @@ export default {
     status: {
       active: "Actif",
       inactive: "Inactif",
+    },
+  },
+  s3Explorer: {
+    filter: {
+      label: "Filtrer par nom",
+      clear: "Effacer le filtre",
+      resultsCount: "Affichage de {{count}} sur {{total}} éléments",
+    },
+    loading: {
+      initializing: "Chargement...",
+      fetchingContents: "Récupération du contenu...",
+    },
+    empty: {
+      folder: "Ce dossier est vide",
+      noResults: "Aucun élément ne correspond à votre filtre",
+    },
+    keyboard: {
+      navigation:
+        "Utilisez les touches fléchées pour naviguer, Entrée pour ouvrir, Retour arrière pour revenir",
+    },
+    menu: {
+      rename: "Renommer",
+      delete: "Supprimer",
     },
   },
   translation: {
@@ -601,12 +692,32 @@ export default {
     s3Explorer: {
       filter: {
         label: "Filtrer par nom",
+        clear: "Effacer le filtre",
+        resultsCount: "Affichage de {{count}} sur {{total}} éléments",
       },
       error: {
         loading: "Erreur lors du chargement des objets S3 : {{message}}",
+        network:
+          "Erreur réseau. Veuillez vérifier votre connexion et réessayer.",
+        permission:
+          "Accès refusé. Vous n'avez pas la permission d'accéder à ce chemin.",
+        permissionWithPrefixes:
+          "Accès refusé. Vous ne pouvez accéder qu'aux chemins suivants : {{prefixes}}",
+        notFound: "Le chemin demandé n'existe pas.",
+        timeout: "Délai d'attente dépassé. Veuillez réessayer.",
+        retry: "Réessayer",
       },
-      file: {
-        info: "Taille : {{size}} • Classe de stockage : {{storageClass}} • Modifié : {{modified}}",
+      loading: {
+        initializing: "Chargement...",
+        fetchingContents: "Récupération des contenus...",
+      },
+      empty: {
+        folder: "Ce dossier est vide",
+        noResults: "Aucun élément ne correspond à votre filtre",
+      },
+      keyboard: {
+        navigation:
+          "Utilisez les touches fléchées pour naviguer, Entrée pour ouvrir, Retour arrière pour revenir en arrière",
       },
       menu: {
         rename: "Renommer",

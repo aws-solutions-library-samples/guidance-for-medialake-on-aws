@@ -32,6 +32,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
   const [rotate, setRotate] = useState(0);
   const [isCanvasLocked, setIsCanvasLocked] = useState(true);
   const [dragging, setDragging] = useState(false);
+  const draggingRef = useRef(false);
 
   const [isFirstDrawComplete, setIsFirstDrawComplete] = useState(false);
   const [isImageReady, setIsImageReady] = useState(false);
@@ -121,7 +122,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
   // --- On background or rotate, fit and center (skip if dragging/zooming)
   useEffect(() => {
     if (!background) return;
-    if (!dragging && !isZoomingRef.current) {
+    if (!draggingRef.current && !isZoomingRef.current) {
       fitAndCenter();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -132,14 +133,14 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     const c = canvasRef.current;
     if (!c || !background) return;
     const observer = new ResizeObserver(() => {
-      if (!dragging && !isZoomingRef.current) {
+      if (!draggingRef.current && !isZoomingRef.current) {
         fitAndCenter();
       }
     });
     observer.observe(c);
     return () => observer.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [background, rotate, dragging, fitAndCenter]);
+  }, [background, rotate, fitAndCenter]);
 
   // --- Drawing effect
   useEffect(() => {
@@ -218,9 +219,13 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (isCanvasLocked) return;
     touch.current = { x: e.clientX, y: e.clientY };
+    draggingRef.current = true;
     setDragging(true);
   };
-  const handleMouseUp = () => setDragging(false);
+  const handleMouseUp = () => {
+    draggingRef.current = false;
+    setDragging(false);
+  };
 
   const centerImage = () => {
     fitAndCenter();

@@ -17,6 +17,52 @@ export default {
     connectors: "连接器",
     selectConnector: "选择连接器",
   },
+  upload: {
+    title: "上传媒体文件",
+    description:
+      "选择S3连接器并上传您的媒体文件。仅支持音频、视频、HLS和MPEG-DASH格式。",
+    uploadDestination: "上传目标",
+    browsePath: "浏览路径",
+    uploadingTo: "正在上传到",
+    restrictedToPrefix: "受限",
+    allowedPrefixesInfo: "您只能上传到{{count}}个允许的路径",
+    pathInfo: "文件将上传到S3存储桶中的选定路径",
+    selectPathFirst: "上传前请先选择路径",
+    pathResetWarning: "更改连接器将重置所选路径",
+    connectorLabel: "S3连接器",
+    selectConnectorPlaceholder: "选择S3连接器",
+    loadingConnectors: "正在加载连接器...",
+    noConnectors: "没有可用的S3连接器。请先配置S3连接器。",
+    dashboardNote:
+      "仅允许音频/*、视频/*、图像/*、HLS (application/x-mpegURL) 和 MPEG-DASH (application/dash+xml) 文件",
+    meta: {
+      name: "名称",
+    },
+  },
+  pathBrowser: {
+    title: "选择上传路径",
+    descriptionRestricted: "浏览并选择允许路径内的文件夹以上传您的文件。",
+    descriptionUnrestricted: "浏览并选择存储桶中的任何文件夹以上传您的文件。",
+    prefixLabel: "允许的路径",
+    prefixHelper: "您只能浏览并上传到所选路径内的文件夹。",
+    selectedPath: "选定路径",
+    currentPath: "当前路径",
+    confirm: "使用此路径",
+    validation: {
+      invalidPath: "所选路径超出允许的前缀。",
+      noPathSelected: "请在确认前导航到文件夹。",
+    },
+    error: {
+      invalidConnector: "提供了无效的连接器ID。",
+      loadingFailed: "加载连接器信息失败。",
+    },
+    hints: {
+      clickFolder: "点击文件夹进入，然后点击'选择当前文件夹'进行选择。",
+      navigateAndConfirm:
+        "导航到您想要的文件夹，然后点击'使用此路径'进行确认。",
+      rootPath: "您当前位于根目录。",
+    },
+  },
   assetExplorer: {
     noConnectorSelected: "选择连接器以查看资产",
     noAssetsFound: "未找到此连接器的资产",
@@ -81,7 +127,18 @@ export default {
     },
   },
   search: {
-    semantic: "语义搜索",
+    semantic: {
+      label: "语义",
+      enable: "启用语义搜索",
+      disable: "禁用语义搜索",
+      configure: "点击配置语义搜索",
+      configDialog: {
+        title: "语义搜索未配置",
+        description:
+          "语义搜索当前未配置或已禁用。要启用此功能，请转到系统设置 > 搜索以配置搜索提供商，或按下面的按钮。",
+        goToSettings: "前往搜索设置",
+      },
+    },
     filters: {
       dateRange: "日期范围",
       contentType: "内容类型",
@@ -369,6 +426,8 @@ export default {
     language: "语言",
     delete: "删除",
     create: "创建",
+    root: "根目录",
+    folder: "文件夹",
     actions: {
       add: "添加",
     },
@@ -386,6 +445,28 @@ export default {
     status: {
       active: "激活",
       inactive: "未激活",
+    },
+  },
+  s3Explorer: {
+    filter: {
+      label: "按名称过滤",
+      clear: "清除筛选",
+      resultsCount: "显示 {{count}} 条，共 {{total}} 条",
+    },
+    loading: {
+      initializing: "加载中...",
+      fetchingContents: "正在获取内容...",
+    },
+    empty: {
+      folder: "此文件夹为空",
+      noResults: "没有与您的筛选条件匹配的项",
+    },
+    keyboard: {
+      navigation: "使用箭头键导航，Enter键打开，Backspace键返回",
+    },
+    menu: {
+      rename: "重命名",
+      delete: "删除",
     },
   },
   translation: {
@@ -606,12 +687,19 @@ export default {
     s3Explorer: {
       filter: {
         label: "按名称过滤",
+        clear: "清除筛选",
+        resultsCount: "显示 {{count}} 条，共 {{total}} 条",
       },
-      error: {
-        loading: "加载S3对象时出错：{{message}}",
+      loading: {
+        initializing: "加载中...",
+        fetchingContents: "正在获取内容...",
       },
-      file: {
-        info: "大小：{{size}} • 存储类别：{{storageClass}} • 修改时间：{{modified}}",
+      empty: {
+        folder: "此文件夹为空",
+        noResults: "没有与您的筛选条件匹配的项",
+      },
+      keyboard: {
+        navigation: "使用箭头键导航，Enter键打开，Backspace键返回",
       },
       menu: {
         rename: "重命名",

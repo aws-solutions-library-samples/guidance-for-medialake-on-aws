@@ -938,7 +938,7 @@ def update_asset_paths(asset: Dict[str, Any], new_name: str) -> Dict[str, Any]:
 
         # 6) Update the top-level StoragePath
         bucket = main_rep["StorageInfo"]["PrimaryLocation"]["Bucket"]
-        asset["StoragePath"] = f"{bucket}:{new_filename}"
+        asset["StoragePath"] = f"{bucket}:{new_master_full}"
 
         logger.info(
             f"Prepared updates — main + {len(derived_updates)} derived",

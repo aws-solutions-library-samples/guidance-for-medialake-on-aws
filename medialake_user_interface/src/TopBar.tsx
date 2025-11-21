@@ -3,9 +3,13 @@ import {
   Box,
   useTheme as useMuiTheme,
   InputBase,
-  Stack,
   Chip,
   IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { Button } from "@/components/common";
@@ -38,6 +42,7 @@ import {
 import { NotificationCenter } from "./components/NotificationCenter";
 import { QUERY_KEYS } from "./api/queryKeys";
 import SemanticModeToggle from "./components/TopBar/SemanticModeToggle";
+import { useSemanticSearchStatus } from "./features/settings/system/hooks/useSystemSettings";
 
 interface SearchTag {
   key: string;
@@ -68,10 +73,14 @@ function TopBar() {
   const [searchResults, setSearchResults] = useState<any>(null);
   const searchBoxRef = useRef<HTMLDivElement>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const isFileUploadEnabled = useFeatureFlag("file-upload-enabled", true);
+  const [isSemanticConfigDialogOpen, setIsSemanticConfigDialogOpen] =
+    useState(false);
   const isChatEnabled = useFeatureFlag("chat-enabled", true);
   const isNotificationEnabled = useFeatureFlag("notification-enabled", true);
   const { toggleChat, isOpen: isChatOpen } = useChat();
+
+  // Check semantic search configuration status
+  const { isSemanticSearchEnabled, isConfigured } = useSemanticSearchStatus();
 
   // Initialize semantic search from URL params on mount
   useEffect(() => {
@@ -442,11 +451,17 @@ function TopBar() {
       return newTags;
     });
   };
-
   // Handle semantic search toggle
   const handleSemanticSearchToggle = (
     event: React.MouseEvent | React.ChangeEvent<HTMLInputElement>,
   ) => {
+    // Check if semantic search is properly configured
+    if (!isSemanticSearchEnabled || !isConfigured) {
+      // Show dialog to guide user to settings
+      setIsSemanticConfigDialogOpen(true);
+      return;
+    }
+
     let newValue: boolean;
 
     if ("checked" in (event.target as HTMLInputElement)) {
@@ -468,10 +483,18 @@ function TopBar() {
     }
   };
 
+  const handleCloseSemanticConfigDialog = () => {
+    setIsSemanticConfigDialogOpen(false);
+  };
+
+  const handleNavigateToSettings = () => {
+    setIsSemanticConfigDialogOpen(false);
+    navigate("/settings/system");
+  };
+
   const handleUploadComplete = (files: any[]) => {
     console.log("Upload completed:", files);
     handleCloseUploadModal();
-    // Add any feedback if needed
   };
 
   return (
@@ -685,9 +708,14 @@ function TopBar() {
                 : "none",
             }}
             title={
-              storeIsSemantic
-                ? t("search.semantic.disable", "Disable semantic search")
-                : t("search.semantic.enable", "Enable semantic search")
+              !isSemanticSearchEnabled || !isConfigured
+                ? t(
+                    "search.semantic.configure",
+                    "Click to configure semantic search",
+                  )
+                : storeIsSemantic
+                  ? t("search.semantic.disable", "Disable semantic search")
+                  : t("search.semantic.enable", "Enable semantic search")
             }
             aria-pressed={storeIsSemantic}
           >
@@ -706,28 +734,24 @@ function TopBar() {
         }}
       >
         {/* Upload Button */}
-        {isFileUploadEnabled && (
-          <IconButton
-            size="small"
-            onClick={handleOpenUploadModal}
-            sx={{
-              color:
-                theme === "dark" ? "rgba(255,255,255,0.7)" : "text.secondary",
+        <IconButton
+          size="small"
+          onClick={handleOpenUploadModal}
+          sx={{
+            color:
+              theme === "dark" ? "rgba(255,255,255,0.7)" : "text.secondary",
+            backgroundColor:
+              theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.04)",
+            borderRadius: "8px",
+            padding: "8px",
+            "&:hover": {
               backgroundColor:
-                theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.04)",
-              borderRadius: "8px",
-              padding: "8px",
-              "&:hover": {
-                backgroundColor:
-                  theme === "dark"
-                    ? "rgba(255,255,255,0.2)"
-                    : "rgba(0,0,0,0.08)",
-              },
-            }}
-          >
-            <CloudUploadIcon />
-          </IconButton>
-        )}
+                theme === "dark" ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.08)",
+            },
+          }}
+        >
+          <CloudUploadIcon />
+        </IconButton>
 
         {/* Notification Center */}
         {isNotificationEnabled && <NotificationCenter />}
@@ -769,21 +793,58 @@ function TopBar() {
       </Box>
 
       {/* Upload Modal */}
-      {isFileUploadEnabled && (
-        <S3UploaderModal
-          open={isUploadModalOpen}
-          onClose={handleCloseUploadModal}
-          onUploadComplete={handleUploadComplete}
-          title={t("upload.title", "Upload Media Files")}
-          description={t(
-            "upload.description",
-            "Select an S3 connector and upload your media files. Only audio, video, HLS, and MPEG-DASH formats are supported.",
-          )}
-        />
-      )}
+      <S3UploaderModal
+        open={isUploadModalOpen}
+        onClose={handleCloseUploadModal}
+        onUploadComplete={handleUploadComplete}
+        title={t("upload.title", "Upload Media Files")}
+        description={t(
+          "upload.description",
+          "Select an S3 connector and upload your media files. Only audio, video, HLS, and MPEG-DASH formats are supported.",
+        )}
+      />
 
       {/* Filter Modal */}
       <FilterModal facetCounts={searchResults?.data?.searchMetadata?.facets} />
+
+      {/* Semantic Search Configuration Dialog */}
+      <Dialog
+        open={isSemanticConfigDialogOpen}
+        onClose={handleCloseSemanticConfigDialog}
+        aria-labelledby="semantic-config-dialog-title"
+        aria-describedby="semantic-config-dialog-description"
+      >
+        <DialogTitle id="semantic-config-dialog-title">
+          {t(
+            "search.semantic.configDialog.title",
+            "Semantic Search Not Configured",
+          )}
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText id="semantic-config-dialog-description">
+            {t(
+              "search.semantic.configDialog.description",
+              "Semantic search is currently not configured or disabled. To enable this feature, go to System Settings > Search to configure a search provider, or press the button below.",
+            )}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseSemanticConfigDialog} color="inherit">
+            {t("common.cancel", "Cancel")}
+          </Button>
+          <Button
+            onClick={handleNavigateToSettings}
+            variant="contained"
+            color="primary"
+            autoFocus
+          >
+            {t(
+              "search.semantic.configDialog.goToSettings",
+              "Go to Search Settings",
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

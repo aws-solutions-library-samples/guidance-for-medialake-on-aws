@@ -17,6 +17,56 @@ export default {
     connectors: "커넥터",
     selectConnector: "커넥터 선택",
   },
+  upload: {
+    title: "미디어 파일 업로드",
+    description:
+      "S3 커넥터를 선택하고 미디어 파일을 업로드하세요. 오디오, 비디오, HLS 및 MPEG-DASH 형식만 지원됩니다.",
+    uploadDestination: "업로드 대상",
+    browsePath: "경로 찾아보기",
+    uploadingTo: "업로드 중",
+    restrictedToPrefix: "제한됨",
+    allowedPrefixesInfo: "{{count}}개의 허용된 경로에만 업로드할 수 있습니다",
+    pathInfo: "파일은 S3 버킷의 선택된 경로에 업로드됩니다",
+    selectPathFirst: "업로드하기 전에 경로를 선택하세요",
+    pathResetWarning: "커넥터를 변경하면 선택된 경로가 재설정됩니다",
+    connectorLabel: "S3 커넥터",
+    selectConnectorPlaceholder: "S3 커넥터 선택",
+    loadingConnectors: "커넥터 로딩 중...",
+    noConnectors:
+      "사용 가능한 S3 커넥터가 없습니다. 먼저 S3 커넥터를 구성하세요.",
+    dashboardNote:
+      "audio/*, video/*, image/*, HLS (application/x-mpegURL) 및 MPEG-DASH (application/dash+xml) 파일만 허용됩니다",
+    meta: {
+      name: "이름",
+    },
+  },
+  pathBrowser: {
+    title: "업로드 경로 선택",
+    descriptionRestricted:
+      "파일을 업로드할 허용된 경로 내의 폴더를 찾아보고 선택하세요.",
+    descriptionUnrestricted:
+      "파일을 업로드할 버킷 내의 모든 폴더를 찾아보고 선택하세요.",
+    prefixLabel: "허용된 경로",
+    prefixHelper: "선택한 경로 내의 폴더만 찾아보고 업로드할 수 있습니다.",
+    selectedPath: "선택된 경로",
+    currentPath: "현재 경로",
+    confirm: "이 경로 사용",
+    validation: {
+      invalidPath: "선택한 경로가 허용된 접두사 외부에 있습니다.",
+      noPathSelected: "확인하기 전에 폴더로 이동하세요.",
+    },
+    error: {
+      invalidConnector: "잘못된 커넥터 ID가 제공되었습니다.",
+      loadingFailed: "커넥터 정보를 로드하지 못했습니다.",
+    },
+    hints: {
+      clickFolder:
+        "폴더를 클릭하여 이동한 다음 '현재 폴더 선택'을 클릭하여 선택합니다.",
+      navigateAndConfirm:
+        "원하는 폴더로 이동한 다음 '이 경로 사용'을 클릭하여 확인합니다.",
+      rootPath: "현재 루트 수준에 있습니다.",
+    },
+  },
   connectors: {
     apiMessages: {
       creating: {
@@ -145,6 +195,13 @@ export default {
       label: "시맨틱",
       enable: "시맨틱 검색 활성화",
       disable: "시맨틱 검색 비활성화",
+      configure: "클릭하여 시맨틱 검색 구성",
+      configDialog: {
+        title: "시맨틱 검색이 구성되지 않음",
+        description:
+          "시맨틱 검색이 현재 구성되지 않았거나 비활성화되어 있습니다. 이 기능을 활성화하려면 시스템 설정 > 검색으로 이동하여 검색 제공업체를 구성하거나 아래 버튼을 누르세요.",
+        goToSettings: "검색 설정으로 이동",
+      },
     },
     filters: {
       dateRange: "날짜 범위",
@@ -453,6 +510,8 @@ export default {
     selectFilter: "필터 선택",
     textFilter: "텍스트 필터",
     all: "모두",
+    root: "루트",
+    folder: "폴더",
     filter: "필터",
     noGroups: "그룹 없음",
     actions: {
@@ -478,6 +537,28 @@ export default {
     status: {
       active: "활성",
       inactive: "비활성",
+    },
+  },
+  s3Explorer: {
+    filter: {
+      label: "이름으로 필터링",
+      clear: "필터 지우기",
+      resultsCount: "{{total}}개 중 {{count}}개 표시",
+    },
+    loading: {
+      initializing: "로딩 중...",
+      fetchingContents: "콘텐츠 가져오는 중...",
+    },
+    empty: {
+      folder: "이 폴더는 비어 있습니다",
+      noResults: "필터와 일치하는 항목이 없습니다",
+    },
+    keyboard: {
+      navigation: "화살표 키로 탐색, Enter로 열기, Backspace로 뒤로 가기",
+    },
+    menu: {
+      rename: "이름 바꾸기",
+      delete: "삭제",
     },
   },
   translation: {
@@ -699,12 +780,29 @@ export default {
     s3Explorer: {
       filter: {
         label: "이름으로 필터링",
+        clear: "필터 지우기",
+        resultsCount: "총 {{total}}개 중 {{count}}개 항목 표시",
       },
       error: {
         loading: "S3 객체 로딩 오류: {{message}}",
+        network: "네트워크 오류. 연결을 확인하고 다시 시도하세요.",
+        permission: "액세스 거부. 이 경로에 액세스할 권한이 없습니다.",
+        permissionWithPrefixes:
+          "액세스 거부. 다음 경로에만 액세스할 수 있습니다: {{prefixes}}",
+        notFound: "요청한 경로가 존재하지 않습니다.",
+        timeout: "요청 시간 초과. 다시 시도하세요.",
+        retry: "재시도",
       },
-      file: {
-        info: "크기: {{size}} • 스토리지 클래스: {{storageClass}} • 수정됨: {{modified}}",
+      loading: {
+        initializing: "로딩 중...",
+        fetchingContents: "콘텐츠 가져오는 중...",
+      },
+      empty: {
+        folder: "이 폴더는 비어 있습니다",
+        noResults: "필터와 일치하는 항목이 없습니다",
+      },
+      keyboard: {
+        navigation: "화살표 키로 이동, Enter로 열기, Backspace로 뒤로 가기",
       },
       menu: {
         rename: "이름 변경",

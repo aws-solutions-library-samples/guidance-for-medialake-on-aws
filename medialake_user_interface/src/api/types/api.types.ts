@@ -127,7 +127,8 @@ export interface CreateConnectorRequest {
     s3IntegrationMethod?: "s3Notifications" | "eventbridge";
     region?: string;
     objectPrefix?: string | string[];
-    [key: string]: string | string[] | undefined;
+    allowUploads?: boolean;
+    [key: string]: string | string[] | boolean | undefined;
   };
 }
 
@@ -162,12 +163,15 @@ export interface ConnectorResponse {
   iamRoleArn?: string;
   lambdaArn?: string;
   queueUrl?: string;
+  allowUploads?: boolean;
+  corsRuleIndex?: number;
   configuration?: {
     queueUrl?: string;
     lambdaArn?: string;
     iamRoleArn?: string;
     objectPrefix?: string | string[];
-    [key: string]: string | string[] | undefined;
+    allowUploads?: boolean;
+    [key: string]: string | string[] | boolean | undefined;
   };
   settings?: {
     bucket: string;
@@ -241,13 +245,17 @@ export interface S3Object {
   IsFolder?: boolean;
 }
 
+/**
+ * Response from S3 Explorer API - returns only folder structure (commonPrefixes)
+ * Individual file objects are not included to optimize for folder navigation
+ */
 export interface S3ListObjectsResponse {
-  objects: S3Object[];
   prefix: string;
   delimiter: string;
   commonPrefixes: string[];
   isTruncated: boolean;
   nextContinuationToken?: string;
+  allowedPrefixes?: string[];
 }
 
 export interface Connector extends ConnectorResponse {}

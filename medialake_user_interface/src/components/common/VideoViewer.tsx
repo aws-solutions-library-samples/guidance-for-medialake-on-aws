@@ -13,6 +13,8 @@ import {
   MarkerLane,
   OmakasePlayer,
   PeriodMarker,
+  PlayerChromingTheme,
+  StampThemeScale,
 } from "@byomakase/omakase-player";
 import {
   SCRUBBER_LANE_STYLE_DARK,
@@ -69,6 +71,7 @@ export interface VideoViewerProps {
   showThumbnails?: boolean;
   onMarkerAdd?: (time: number) => void;
   playerRef?: React.RefObject<OmakasePlayer>;
+  protocol?: "audio" | "video";
 }
 
 export type Marker = {
@@ -94,6 +97,7 @@ const useOmakasePlayer = (
   containerRef: React.RefObject<HTMLDivElement>,
   callbacks: Partial<VideoViewerProps>,
   markerLaneRef: React.MutableRefObject<any | null>,
+  protocol?: "audio" | "video",
 ) => {
   const playerRef = useRef<OmakasePlayer | null>(null);
   const [playerVolume, setPlayerVolume] = useState(1);
@@ -116,6 +120,9 @@ const useOmakasePlayer = (
 
     const player = new OmakasePlayer({
       playerHTMLElementId: containerRef.current.id,
+      playerChroming: {
+        theme: PlayerChromingTheme.Chromeless,
+      },
     });
     playerRef.current = player;
     player
@@ -134,19 +141,24 @@ const useOmakasePlayer = (
       });
 
     const subscriptions = [
-      player.loadVideo(videoSrc).subscribe({
-        next: (video) => {
-          console.log(`Video loaded. Duration: ${video.duration}`);
-          setDuration(video.duration);
-        },
-        error: (error) => {
-          console.error("Error loading video:", error);
-          callbacksRef.current.onError?.(error);
-        },
-        complete: () => {
-          console.log("Video loading completed");
-        },
-      }),
+      player
+        .loadVideo(
+          videoSrc,
+          protocol === "audio" ? { protocol: "audio" as const } : undefined,
+        )
+        .subscribe({
+          next: (video) => {
+            console.log(`Video loaded. Duration: ${video.duration}`);
+            setDuration(video.duration);
+          },
+          error: (error) => {
+            console.error("Error loading video:", error);
+            callbacksRef.current.onError?.(error);
+          },
+          complete: () => {
+            console.log("Video loading completed");
+          },
+        }),
       player.video.onPlay$.subscribe({
         next: (event) => {
           console.log(`Video play. Timestamp: ${event.currentTime}`);
@@ -471,6 +483,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
       showThumbnails = false,
       onMarkerAdd,
       playerRef,
+      protocol,
     },
     ref,
   ) => {
@@ -558,6 +571,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
       playerContainerRef,
       customCallbacks,
       markerLaneRef,
+      protocol,
     );
 
     // reset UI time when the source changes (optional but nice)

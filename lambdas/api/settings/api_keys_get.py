@@ -63,7 +63,7 @@ def register_route(app):
             api_keys = []
             for item in items:
                 api_key = {
-                    "id": item.get("keyId"),
+                    "id": item.get("id"),
                     "name": item.get("name"),
                     "description": item.get("description"),
                     "isEnabled": item.get("isEnabled", True),

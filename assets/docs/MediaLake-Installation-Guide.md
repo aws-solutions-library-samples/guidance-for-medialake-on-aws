@@ -109,7 +109,9 @@ After deployment, you'll need to configure storage connectors to connect media l
 
    **Video Files**: FLV, MP4, MOV, AVI, MKV, WEBM, MXF
 
-   **Image Files**: PSD, TIF, JPG/JPEG, PNG, WEBP, GIF, SVG
+   **Image Files (Standard Formats)**: APNG, AVIF, BMP, GIF, ICO, J2K, JP2, JPEG/JPG, PBM, PCX, PGM, PNG, PPM, PSD, SVG, TIF/TIFF, WEBP, WMF, XBM, XPM
+
+   **Image Files (RAW Camera Formats)**: CR2 (Canon, CHDK-modified files not supported), ERF (Epson), NEF (Nikon)
 
 2. **Browse Assets**: Navigate to the **Assets** section to verify that files from your S3 bucket are visible
 
@@ -129,16 +131,21 @@ After deployment, you'll need to configure storage connectors to connect media l
     - **OpenSearch**: Recommended for production deployments due to enhanced reliability and performance
     - **S3 Vectors**: Cost-effective option, currently in preview mode
   - **TwelveLabs Integration Methods**:
-    - **TwelveLabs API**: Direct integration with TwelveLabs API (requires TwelveLabs API key)
-    - **TwelveLabs via AWS Bedrock**: Uses TwelveLabs Marengo 2.7 model through AWS Bedrock with automatic regional inference profile selection. Supports US, EU, and APAC regions with optimal performance routing. For current region availability, see [AWS Bedrock Models Documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html).
+    - **TwelveLabs API**: Direct integration with TwelveLabs API (requires TwelveLabs API key - **integration configuration required**)
+    - **TwelveLabs via AWS Bedrock**: Uses TwelveLabs Marengo 2.7 model through AWS Bedrock with automatic regional inference profile selection. Supports US, EU, and APAC regions with optimal performance routing. For current region availability, see [AWS Bedrock Models Documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html). (**No integration configuration required** - uses IAM role permissions)
 
   **2. External Semantic Service Architecture (Coactive)**
   - Uses an external service that manages both embedding generation and storage
   - Media assets are ingested directly into the external service's platform
   - Search queries are executed against the external service, with results enriched by MediaLake metadata
-  - **Coactive Integration**: Direct integration with Coactive API for multimodal search capabilities (requires Coactive API key)
+  - **Coactive Integration**: Direct integration with Coactive API for multimodal search capabilities (requires Coactive API key - **integration configuration required**)
 
-  - Add and configure your preferred semantic search provider integration method.
+- **When to Configure Integrations**:
+  - Integrations provide secure credential storage for pipeline nodes requiring external API access
+  - **Configure integrations before importing dependent pipelines**
+  - Navigate to **Settings > Integrations** to add required integrations
+  - **Integration required for**: TwelveLabs API pipelines, Coactive pipelines
+  - **No integration required for**: TwelveLabs Bedrock pipelines, Default pipelines, Transcription pipelines, and others
 
 - **Import Processing Pipelines**:
   - Navigate to the **Pipelines** menu and click the **Import pipelines** button.
@@ -184,23 +191,15 @@ After deployment, you'll need to configure storage connectors to connect media l
 
 ## 4. Incremental Updates
 
-### For Git Source Type (Recommended)
+If you deployed using the **Git** source type, Media Lake can be updated with the latest code from the GitHub repository by following these instructions:
 
-Media lake automatically stays up-to-date when using the Git source type deployment method. The system pulls the latest code from the GitHub repository during each deployment.
+1. In the AWS console, go to **CodePipeline**
+   ![CodePipeline](../images/installation-guide/IncrementalUpdates-1.png)
 
-To trigger an update with the latest media lake features and improvements, simply redeploy using the same CloudFormation steps from [Section 1. Base Installation](#1-base-installation):
+2. Select the `MediaLakeCDKPipeline` pipeline and click **Release change** to trigger the deployment
+   ![ReleaseChange](../images/installation-guide/IncrementalUpdates-2.png)
 
-1. Follow the **Deploy via CloudFormation** steps (steps 1-6) from the Base Installation section above
-2. Use the same stack name `medialake-cf` - CloudFormation will update the existing stack
-3. The deployment will automatically pull the latest version from the GitHub repository and update your media lake instance
-
-### For S3PresignedURL Source Type (Alternative)
-
-If you deployed using the S3PresignedURL source type, you can update by redeploying with a new presigned URL:
-
-1. Follow the same CloudFormation deployment steps from [Section 1. Base Installation](#1-base-installation)
-2. In step 4, update the **S3 Presigned URL** field with the latest presigned URL provided to you
-3. Use the same stack name `medialake-cf` to update the existing deployment
+3. The deployment will automatically pull the latest version from the GitHub repository and update your Media Lake instance
 
 ---
 
@@ -223,11 +222,26 @@ If you deployed using the S3PresignedURL source type, you can update by redeploy
 
 ## 6. Pipelines & Integration Creation
 
-- **Create Integrations**:
-  - Log in > go to **Integrations** > add/configure required third-party integrations.
-- **Import Pipelines**:
-  - Go to **Pipelines** > **Import**.
-  - Assign credentials if required for specific nodes.
+### Creating Integrations
+
+Configure integrations to securely store API credentials for external services (TwelveLabs API, Coactive API, etc.):
+
+1. Navigate to **Settings** > **Integrations**
+   ![Integrations Page](../images/installation-guide/Integrations-1.png)
+
+2. Click **Add Integration** and configure:
+   - Select Integration (service type)
+   - Enter integration name and description
+   - Provide API key
+   - Set status to Active
+     ![Add Integration](../images/installation-guide/Integrations-2.png)
+
+### Importing Pipelines
+
+- Go to **Pipelines** > **Import**
+  ![Import Pipelines](../images/installation-guide/Pipelines-1.png)
+- Select pipelines from the library based on your business and technical needs
+- Pipelines requiring authenticated external services will automatically use credentials from matching integrations
 
 ---
 

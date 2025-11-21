@@ -24,7 +24,7 @@ def register_route(app):
             api_keys_table = dynamodb.Table(os.environ.get("API_KEYS_TABLE_NAME"))
 
             # Get API key from DynamoDB
-            response = api_keys_table.get_item(Key={"keyId": id})
+            response = api_keys_table.get_item(Key={"id": id})
 
             if "Item" not in response:
                 return {
@@ -37,7 +37,7 @@ def register_route(app):
 
             # Filter out sensitive data (secret ARN)
             api_key = {
-                "id": item.get("keyId"),
+                "id": item.get("id"),
                 "name": item.get("name"),
                 "description": item.get("description"),
                 "isEnabled": item.get("isEnabled", True),

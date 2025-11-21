@@ -27,7 +27,9 @@ import {
   Info as InfoIcon,
   NavigateNext as NavigateNextIcon,
   NavigateBefore as NavigateBeforeIcon,
+  History as HistoryIcon,
 } from "@mui/icons-material";
+import { EmptyTableState } from "@/components/common/table";
 import { useTranslation } from "react-i18next";
 import { getUpgradeHistory, type UpgradeRecord } from "@/api/updatesService";
 
@@ -143,73 +145,86 @@ export const UpgradeHistoryView: React.FC = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {history.map((record) => (
-              <TableRow key={record.upgrade_id} hover>
-                <TableCell>
-                  <Chip
-                    icon={
-                      record.status === "completed" ? (
-                        <CheckCircleIcon />
-                      ) : (
-                        <ErrorIcon />
-                      )
-                    }
-                    label={record.status}
-                    color={record.status === "completed" ? "success" : "error"}
-                    size="small"
+            {history.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} sx={{ p: 0, border: 0 }}>
+                  <EmptyTableState
+                    message="No upgrade history available"
+                    icon={<HistoryIcon sx={{ fontSize: 40 }} />}
                   />
                 </TableCell>
-                <TableCell>
-                  <Typography
-                    variant="body2"
-                    sx={{ fontFamily: "monospace", fontSize: "0.875rem" }}
-                  >
-                    {record.from_version}
-                  </Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography
-                    variant="body2"
-                    sx={{ fontFamily: "monospace", fontSize: "0.875rem" }}
-                  >
-                    {record.to_version}
-                  </Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography variant="body2">
-                    {formatDuration(record.duration)}
-                  </Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography variant="body2" noWrap sx={{ maxWidth: 150 }}>
-                    {record.triggered_by}
-                  </Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography variant="body2">
-                    {new Date(record.end_time).toLocaleString()}
-                  </Typography>
-                </TableCell>
-                <TableCell align="center">
-                  {record.error_message ? (
-                    <Tooltip title={record.error_message} arrow>
-                      <IconButton size="small" color="error">
-                        <InfoIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  ) : (
-                    <Tooltip
-                      title={`Pipeline: ${record.pipeline_execution_id}`}
-                      arrow
-                    >
-                      <IconButton size="small">
-                        <InfoIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  )}
-                </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              history.map((record) => (
+                <TableRow key={record.upgrade_id} hover>
+                  <TableCell>
+                    <Chip
+                      icon={
+                        record.status === "completed" ? (
+                          <CheckCircleIcon />
+                        ) : (
+                          <ErrorIcon />
+                        )
+                      }
+                      label={record.status}
+                      color={
+                        record.status === "completed" ? "success" : "error"
+                      }
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Typography
+                      variant="body2"
+                      sx={{ fontFamily: "monospace", fontSize: "0.875rem" }}
+                    >
+                      {record.from_version}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography
+                      variant="body2"
+                      sx={{ fontFamily: "monospace", fontSize: "0.875rem" }}
+                    >
+                      {record.to_version}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2">
+                      {formatDuration(record.duration)}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" noWrap sx={{ maxWidth: 150 }}>
+                      {record.triggered_by}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2">
+                      {new Date(record.end_time).toLocaleString()}
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="center">
+                    {record.error_message ? (
+                      <Tooltip title={record.error_message} arrow>
+                        <IconButton size="small" color="error">
+                          <InfoIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    ) : (
+                      <Tooltip
+                        title={`Pipeline: ${record.pipeline_execution_id}`}
+                        arrow
+                      >
+                        <IconButton size="small">
+                          <InfoIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </TableContainer>

@@ -24,11 +24,15 @@ import {
   VIDEO_PLACEHOLDER_IMAGE,
 } from "@/utils/placeholderSvg";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
-import { AssetAudio } from "../asset";
 import { InlineTextEditor } from "../common/InlineTextEditor";
-import { OmakasePlayer, PeriodMarker } from "@byomakase/omakase-player";
-import { randomHexColor } from "../common/utils";
+import {
+  OmakasePlayer,
+  PeriodMarker,
+  PlayerChromingTheme,
+  StampThemeScale,
+} from "@byomakase/omakase-player";
 import { useSemanticMode } from "@/stores/searchStore";
+import { getMarkerColorByConfidence } from "../common/utils";
 
 export interface AssetField {
   id: string;
@@ -154,10 +158,14 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
     const markerIdsRef = useRef<string[]>([]);
     const [videoLoadError, setVideoLoadError] = useState(false);
 
-    // IntersectionObserver for lazy loading videos
+    // IntersectionObserver for lazy loading videos and audio
     useEffect(() => {
-      // Only observe if this is a video asset
-      if (assetType !== "Video" || !cardContainerRef.current) return;
+      // Only observe if this is a video or audio asset
+      if (
+        (assetType !== "Video" && assetType !== "Audio") ||
+        !cardContainerRef.current
+      )
+        return;
 
       const observer = new IntersectionObserver(
         (entries) => {
@@ -185,16 +193,18 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
       return () => observer.disconnect();
     }, [assetType]);
 
-    // Initialize Omakase player for video assets
+    // Initialize Omakase player for video and audio assets
     useEffect(() => {
-      // Only initialize if it's a video, has a proxy URL, is visible, and hasn't been initialized yet
+      // Only initialize if it's a video or audio, has a proxy URL, is visible, and hasn't been initialized yet
       if (
-        assetType === "Video" &&
+        (assetType === "Video" || assetType === "Audio") &&
         proxyUrl &&
         isVisible &&
         !playerInitializedRef.current
       ) {
-        const playerId = `omakase-player-${id}`;
+        // Sanitize the ID to remove characters that are invalid in CSS selectors (colons, etc.)
+        const sanitizedId = id.replace(/[^a-zA-Z0-9_-]/g, "-");
+        const playerId = `omakase-player-${sanitizedId}`;
 
         // Check if player container already exists
         let playerContainer = document.getElementById(playerId);
@@ -209,13 +219,13 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
         try {
           const omakasePlayer = new OmakasePlayer({
             playerHTMLElementId: playerId,
-            // playerClickHandler: () => {
-            //   onAssetClick();
-            // },
             playerChroming: {
-              theme: "STAMP",
+              theme: PlayerChromingTheme.Stamp,
               themeConfig: {
-                stampScale: thumbnailScale === "fit" ? "FIT" : "FILL",
+                stampScale:
+                  thumbnailScale === "fit"
+                    ? StampThemeScale.Fit
+                    : StampThemeScale.Fill,
               },
             },
           });
@@ -225,11 +235,19 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
           playerInitializedRef.current = true;
           currentProxyUrlRef.current = proxyUrl;
 
-          // Reset error state when attempting to load video
+          // Reset error state when attempting to load video/audio
           setVideoLoadError(false);
 
-          // Load the video then add markers if clips provided
-          omakasePlayer.loadVideo(proxyUrl).subscribe({
+          // Load the video/audio then add markers if clips provided
+          // For audio assets, pass protocol: "audio"
+          // For video assets with thumbnails, add poster
+          const loadOptions =
+            assetType === "Audio"
+              ? { protocol: "audio" as const }
+              : assetType === "Video" && thumbnailUrl
+                ? { poster: thumbnailUrl }
+                : undefined;
+          omakasePlayer.loadVideo(proxyUrl, loadOptions).subscribe({
             next: () => {
               // Defer marker creation to idle time to avoid blocking video playback
               const scheduleMarkerCreation = () => {
@@ -305,7 +323,8 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                           `  - Clip asset: showing ${filteredClips.length} of ${clips?.length || 0} marker(s)`,
                         );
                       } else {
-                        // This is a full asset, apply confidence filtering
+                        // This is a full asset, show all clips from API response
+                        // Only apply confidence filtering if explicitly enabled and threshold > 0
                         const shouldFilter =
                           isSemantic && confidenceThreshold > 0;
                         console.log(
@@ -321,10 +340,10 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                               );
                               return passes;
                             })
-                          : clips;
+                          : clips; // Show all clips when not filtering
 
                         console.log(
-                          `  - Full asset: showing ${filteredClips.length} of ${clips.length} markers (confidence >= ${confidenceThreshold})`,
+                          `  - Full asset: showing ${filteredClips.length} of ${clips.length} markers${shouldFilter ? ` (confidence >= ${confidenceThreshold})` : " (all clips)"}`,
                         );
                       }
 
@@ -373,8 +392,10 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                             return;
                           }
 
-                          // Use random colors for all markers
-                          const markerColor = randomHexColor();
+                          // Use confidence-based colors for markers
+                          const markerColor = getMarkerColorByConfidence(
+                            clip.score,
+                          );
 
                           // Follow JSFiddle approach: let byomakase library generate its own IDs
                           // This prevents querySelector errors with colon-containing custom IDs
@@ -404,11 +425,11 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                               try {
                                 omakasePlayer.video.seekToTime(start);
                                 console.log(
-                                  `  🎯 Seeked to clip start time: ${start}s for ${isClipAsset ? "clip asset" : "single-clip item"} ${id}`,
+                                  `  🎯 Seeked to clip start time: ${start}s for ${isClipAsset ? "clip asset" : "single-clip item"} ${assetType.toLowerCase()} ${id}`,
                                 );
                               } catch (seekError) {
                                 console.warn(
-                                  `  ⚠️ Failed to seek to clip start time ${start}s:`,
+                                  `  ⚠️ Failed to seek to clip start time ${start}s for ${assetType.toLowerCase()} asset:`,
                                   seekError,
                                 );
                               }
@@ -441,34 +462,44 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
               scheduleMarkerCreation();
             },
             error: (error) => {
-              console.error(`Failed to load video for asset ${id}:`, error);
+              console.error(
+                `Failed to load ${assetType.toLowerCase()} for asset ${id}:`,
+                error,
+              );
               setVideoLoadError(true);
             },
           });
 
-          console.log(`Omakase player initialized for video asset: ${id}`);
+          console.log(
+            `Omakase player initialized for ${assetType.toLowerCase()} asset: ${id}`,
+          );
         } catch (error) {
           console.error(
-            `Failed to initialize Omakase player for video asset ${id}:`,
+            `Failed to initialize Omakase player for ${assetType.toLowerCase()} asset ${id}:`,
             error,
           );
         }
       }
-      // If the proxy URL changed, we need to reload the video
+      // If the proxy URL changed, we need to reload the video/audio
       else if (
-        assetType === "Video" &&
+        (assetType === "Video" || assetType === "Audio") &&
         proxyUrl &&
         playerInitializedRef.current &&
         currentProxyUrlRef.current !== proxyUrl &&
         omakasePlayerRef.current
       ) {
         currentProxyUrlRef.current = proxyUrl;
-        omakasePlayerRef.current.loadVideo(proxyUrl).subscribe({
+        const loadOptions =
+          assetType === "Audio" ? { protocol: "audio" as const } : undefined;
+        omakasePlayerRef.current.loadVideo(proxyUrl, loadOptions).subscribe({
           next: () => {
-            console.log(`Video reloaded for asset ${id}`);
+            console.log(`${assetType} reloaded for asset ${id}`);
           },
           error: (error) => {
-            console.error(`Failed to reload video for asset ${id}:`, error);
+            console.error(
+              `Failed to reload ${assetType.toLowerCase()} for asset ${id}:`,
+              error,
+            );
             setVideoLoadError(true);
           },
         });
@@ -481,21 +512,23 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
             omakasePlayerRef.current.destroy();
             omakasePlayerRef.current = null;
             playerInitializedRef.current = false;
-            console.log(`Omakase player destroyed for video asset: ${id}`);
+            console.log(
+              `Omakase player destroyed for ${assetType.toLowerCase()} asset: ${id}`,
+            );
           } catch (error) {
             console.error(
-              `Failed to destroy Omakase player for video asset ${id}:`,
+              `Failed to destroy Omakase player for ${assetType.toLowerCase()} asset ${id}:`,
               error,
             );
           }
         }
       };
-    }, [assetType, proxyUrl, id, thumbnailScale, isVisible]); // Added isVisible for lazy loading
+    }, [assetType, proxyUrl, id, isVisible]); // Removed thumbnailScale to prevent reload on appearance change
 
     // Separate effect to handle clip marker updates when confidence threshold changes
     useEffect(() => {
       if (
-        assetType === "Video" &&
+        (assetType === "Video" || assetType === "Audio") &&
         omakasePlayerRef.current &&
         Array.isArray(clips) &&
         clips.length > 0
@@ -571,7 +604,8 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                 `  - Clip asset: updating ${filteredClips.length} of ${clips?.length || 0} marker(s)`,
               );
             } else {
-              // This is a full asset, apply confidence filtering
+              // This is a full asset, show all clips from API response
+              // Only apply confidence filtering if explicitly enabled and threshold > 0
               const shouldFilter = isSemantic && confidenceThreshold > 0;
               console.log(
                 `  - shouldFilter: ${shouldFilter} (isSemantic=${isSemantic} && confidenceThreshold=${confidenceThreshold} > 0)`,
@@ -586,10 +620,10 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                     );
                     return passes;
                   })
-                : clips;
+                : clips; // Show all clips when not filtering
 
               console.log(
-                `  - Full asset: updating ${filteredClips.length} of ${clips.length} markers (confidence >= ${confidenceThreshold})`,
+                `  - Full asset: updating ${filteredClips.length} of ${clips.length} markers${shouldFilter ? ` (confidence >= ${confidenceThreshold})` : " (all clips)"}`,
               );
             }
 
@@ -628,8 +662,8 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                   return;
                 }
 
-                // Use random colors for all markers
-                const markerColor = randomHexColor();
+                // Use confidence-based colors for markers
+                const markerColor = getMarkerColorByConfidence(clip.score);
 
                 // Follow JSFiddle approach: let byomakase library generate its own IDs
                 // This prevents querySelector errors with colon-containing custom IDs
@@ -653,13 +687,14 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                   // For clip assets, seek to the beginning of the clip
                   if (isClipAsset) {
                     try {
+                      // Use video.seekToTime for both video and audio assets
                       omakasePlayerRef.current.video.seekToTime(start);
                       console.log(
-                        `  🎯 UPDATE: Seeked to clip start time: ${start}s for clip asset ${id}`,
+                        `  🎯 UPDATE: Seeked to clip start time: ${start}s for ${assetType.toLowerCase()} clip asset ${id}`,
                       );
                     } catch (seekError) {
                       console.warn(
-                        `  ⚠️ UPDATE: Failed to seek to clip start time ${start}s:`,
+                        `  ⚠️ UPDATE: Failed to seek to clip start time ${start}s for ${assetType.toLowerCase()} asset:`,
                         seekError,
                       );
                     }
@@ -687,6 +722,50 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
         }
       }
     }, [clips, isSemantic, confidenceThreshold, assetType, id]); // Update markers when clips or confidence threshold changes
+
+    // Separate effect to handle thumbnailScale changes in real-time without reloading the player
+    useEffect(() => {
+      if (
+        (assetType === "Video" || assetType === "Audio") &&
+        omakasePlayerRef.current &&
+        playerInitializedRef.current
+      ) {
+        try {
+          // Get the HTML video element from the Omakase player
+          const videoElement =
+            omakasePlayerRef.current.video.getHTMLVideoElement();
+
+          // Update the object-fit CSS property directly on the video element
+          if (videoElement) {
+            const objectFitValue =
+              thumbnailScale === "fit" ? "contain" : "cover";
+            videoElement.style.objectFit = objectFitValue;
+
+            // Also update any video elements within the player container
+            const sanitizedId = id.replace(/[^a-zA-Z0-9_-]/g, "-");
+            const playerContainer = document.getElementById(
+              `omakase-player-${sanitizedId}`,
+            );
+            if (playerContainer) {
+              // Find all video elements within the container and update them
+              const videoElements = playerContainer.querySelectorAll("video");
+              videoElements.forEach((video) => {
+                video.style.objectFit = objectFitValue;
+              });
+            }
+
+            console.log(
+              `Updated video object-fit to: ${objectFitValue} for asset ${id}`,
+            );
+          }
+        } catch (error) {
+          console.warn(
+            `Failed to update video object-fit for asset ${id}:`,
+            error,
+          );
+        }
+      }
+    }, [thumbnailScale, assetType, id]); // Update object-fit when thumbnailScale changes
 
     // Determine the card dimensions based on props
     const getCardDimensions = () => {
@@ -879,12 +958,12 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
           }}
         >
           {/* Render appropriate content based on asset type */}
-          {assetType === "Video" ? (
+          {assetType === "Video" || assetType === "Audio" ? (
             <Box sx={{ display: "flex", flexDirection: "column" }}>
               {proxyUrl && !videoLoadError ? (
                 <div
-                  id={`video-asset-${id}`}
-                  className="asset-card-video"
+                  id={`${assetType.toLowerCase()}-asset-${id}`}
+                  className={`asset-card-${assetType.toLowerCase()}`}
                   style={{
                     width: dimensions.width,
                     height: dimensions.height,
@@ -894,7 +973,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                   }}
                 >
                   <div
-                    id={`omakase-player-${id}`}
+                    id={`omakase-player-${id.replace(/[^a-zA-Z0-9_-]/g, "-")}`}
                     style={{ width: "100%", height: "100%" }}
                   />
                 </div>
@@ -917,7 +996,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                 />
               )}
 
-              {/* Video Control Bar */}
+              {/* Video/Audio Control Bar */}
               <Box
                 sx={{
                   display: "flex",
@@ -1031,231 +1110,6 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                 >
                   <DeleteIcon fontSize="small" />
                 </IconButton>
-              </Box>
-            </Box>
-          ) : assetType === "Audio" ? (
-            <Box sx={{ display: "flex", flexDirection: "column" }}>
-              <Box
-                onClick={onAssetClick}
-                sx={{
-                  cursor: "pointer",
-                  width: dimensions.width,
-                  height: dimensions.height,
-                  backgroundColor: "rgba(0,0,0,0.03)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  overflow: "hidden",
-                }}
-              >
-                <AssetAudio src={proxyUrl || ""} alt={name} compact={true} />
-              </Box>
-
-              {/* Audio Control Bar */}
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 1,
-                  p: 1,
-                  bgcolor: "background.paper",
-                  borderTop: "1px solid",
-                  borderColor: "divider",
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <IconButton
-                  size="small"
-                  onClick={handleDownloadClick}
-                  sx={{
-                    color: "primary.main",
-                    "&:hover": {
-                      bgcolor: "primary.main",
-                      color: "primary.contrastText",
-                    },
-                  }}
-                  title="Download"
-                >
-                  <DownloadIcon fontSize="small" />
-                </IconButton>
-
-                <IconButton
-                  size="small"
-                  onClick={(e) => {
-                    console.log("AssetCard: Add to Collection clicked!", e);
-                    e.stopPropagation();
-                    onAddToCollectionClick?.(e);
-                  }}
-                  sx={{
-                    color: "primary.main",
-                    "&:hover": {
-                      bgcolor: "primary.main",
-                      color: "primary.contrastText",
-                    },
-                  }}
-                  title={
-                    showRemoveButton
-                      ? "Remove from Collection"
-                      : "Add to Collection"
-                  }
-                >
-                  {showRemoveButton ? (
-                    <RemoveIcon fontSize="small" />
-                  ) : (
-                    <AddIcon fontSize="small" />
-                  )}
-                </IconButton>
-
-                {(() => {
-                  const [showIcon, setShowIcon] = useState(false);
-                  const buttonRef = useRef<HTMLButtonElement>(null);
-
-                  const checkOverflow = useCallback(() => {
-                    if (buttonRef.current) {
-                      const el = buttonRef.current;
-                      const textSpan = el.querySelector(
-                        ".button-text",
-                      ) as HTMLElement;
-                      const iconSpan = el.querySelector(
-                        ".button-icon",
-                      ) as HTMLElement;
-
-                      if (textSpan && iconSpan) {
-                        // Temporarily show text to measure
-                        const originalTextDisplay = textSpan.style.display;
-                        const originalIconDisplay = iconSpan.style.display;
-
-                        textSpan.style.display = "block";
-                        iconSpan.style.display = "none";
-
-                        // Force reflow
-                        el.offsetWidth;
-
-                        const isOverflowing = el.scrollWidth > el.clientWidth;
-                        console.log("Audio Button overflow check:", {
-                          scrollWidth: el.scrollWidth,
-                          clientWidth: el.clientWidth,
-                          isOverflowing,
-                          timestamp: new Date().toISOString(),
-                        });
-
-                        // Restore original display if we're not changing state
-                        if (!isOverflowing) {
-                          textSpan.style.display = originalTextDisplay;
-                          iconSpan.style.display = originalIconDisplay;
-                        }
-
-                        setShowIcon(isOverflowing);
-                      }
-                    }
-                  }, []);
-
-                  useEffect(() => {
-                    // Initial check
-                    const timer = setTimeout(checkOverflow, 100);
-
-                    // Add resize listener
-                    const handleResize = () => {
-                      console.log(
-                        "Window resized, rechecking audio button overflow",
-                      );
-                      checkOverflow();
-                    };
-
-                    window.addEventListener("resize", handleResize);
-
-                    return () => {
-                      clearTimeout(timer);
-                      window.removeEventListener("resize", handleResize);
-                    };
-                  }, [checkOverflow]);
-
-                  return (
-                    <Button
-                      ref={buttonRef}
-                      size="small"
-                      variant="outlined"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onAssetClick();
-                      }}
-                      sx={{
-                        flex: 1,
-                        mx: 1,
-                        minWidth: "40px",
-                        fontSize: "0.75rem",
-                        py: 0.5,
-                        whiteSpace: "nowrap !important",
-                        overflow: "hidden !important",
-                        textOverflow: "ellipsis !important",
-                        textAlign: "center",
-                        justifyContent: "center",
-                        "& .MuiButton-root": {
-                          whiteSpace: "nowrap !important",
-                          overflow: "hidden !important",
-                          textOverflow: "ellipsis !important",
-                        },
-                        "& .MuiButton-startIcon": {
-                          display: "none !important",
-                        },
-                        "& .MuiButton-endIcon": {
-                          display: "none !important",
-                        },
-                        "& .button-text": {
-                          display: showIcon ? "none" : "block",
-                          textOverflow: "ellipsis !important",
-                          overflow: "hidden !important",
-                          whiteSpace: "nowrap !important",
-                          width: "100%",
-                        },
-                        "& .button-icon": {
-                          display: showIcon ? "block" : "none",
-                        },
-                        "& span, & .MuiButton-label": {
-                          whiteSpace: "nowrap !important",
-                          overflow: "hidden !important",
-                          textOverflow: "ellipsis !important",
-                          width: "100%",
-                          display: "block !important",
-                        },
-                      }}
-                      title="View Asset Details"
-                    >
-                      <Box component="span" className="button-text">
-                        <Box
-                          sx={{
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            width: "100%",
-                            textAlign: "center",
-                          }}
-                        >
-                          Asset Detail
-                        </Box>
-                      </Box>
-                      <InfoIcon fontSize="small" className="button-icon" />
-                    </Button>
-                  );
-                })()}
-
-                {!isClipMode && (
-                  <IconButton
-                    size="small"
-                    onClick={handleDeleteClick}
-                    sx={{
-                      color: "primary.main",
-                      "&:hover": {
-                        bgcolor: "primary.main",
-                        color: "primary.contrastText",
-                      },
-                    }}
-                    title="Delete"
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                )}
               </Box>
             </Box>
           ) : (

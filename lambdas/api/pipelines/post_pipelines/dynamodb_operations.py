@@ -375,6 +375,7 @@ def update_pipeline_status(
     sqs_queue_arns: Optional[Dict[str, str]] = None,
     event_source_mapping_uuids: Optional[Dict[str, str]] = None,
     service_role_arns: Optional[Dict[str, Dict[str, str]]] = None,
+    sfn_log_group_name: Optional[str] = None,
 ) -> None:
     """
     Update the deployment status and optionally resources of a pipeline.
@@ -448,6 +449,13 @@ def update_pipeline_status(
                 dependent_resources.append(["iam_role", sfn_role_arn])
                 logger.info(
                     f"Added Step Functions IAM role {sfn_role_arn} to dependent resources"
+                )
+
+            # Add Step Functions log group if available
+            if sfn_log_group_name:
+                dependent_resources.append(["cloudwatch_log_group", sfn_log_group_name])
+                logger.info(
+                    f"Added Step Functions log group {sfn_log_group_name} to dependent resources"
                 )
         else:
             # Need to get existing dependentResources first
@@ -565,6 +573,7 @@ def store_pipeline_info(
     sqs_queue_arns: Optional[Dict[str, str]] = None,
     event_source_mapping_uuids: Optional[Dict[str, str]] = None,
     service_role_arns: Optional[Dict[str, Dict[str, str]]] = None,
+    sfn_log_group_name: Optional[str] = None,
 ) -> str:
     """
     Store or update pipeline information in DynamoDB.
@@ -636,6 +645,7 @@ def store_pipeline_info(
             sqs_queue_arns=sqs_queue_arns,
             event_source_mapping_uuids=event_source_mapping_uuids,
             service_role_arns=service_role_arns,
+            sfn_log_group_name=sfn_log_group_name,
         )
         return pipeline_id
     else:
@@ -657,6 +667,7 @@ def store_pipeline_info(
                 sqs_queue_arns=sqs_queue_arns,
                 event_source_mapping_uuids=event_source_mapping_uuids,
                 service_role_arns=service_role_arns,
+                sfn_log_group_name=sfn_log_group_name,
             )
             return pipeline_id
         else:
@@ -677,5 +688,6 @@ def store_pipeline_info(
                 sqs_queue_arns=sqs_queue_arns,
                 event_source_mapping_uuids=event_source_mapping_uuids,
                 service_role_arns=service_role_arns,
+                sfn_log_group_name=sfn_log_group_name,
             )
             return pipeline_id

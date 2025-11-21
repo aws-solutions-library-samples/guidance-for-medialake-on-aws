@@ -266,6 +266,23 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext):
                 logger.error(error_msg)
                 errors.append(error_msg)
 
+        # Remove CORS configuration if allowUploads was enabled and corsRuleId exists
+        allow_uploads = connector.get("allowUploads", False)
+        cors_rule_id = connector.get("corsRuleId")
+        if allow_uploads and cors_rule_id:
+            logger.info(
+                f"Attempting to remove CORS configuration for uploads from bucket {bucket_name}"
+            )
+            errors.extend(remove_medialake_cors_rule(s3, bucket_name, cors_rule_id))
+        elif allow_uploads and not cors_rule_id:
+            logger.warning(
+                f"allowUploads is True but no corsRuleId found for connector {connector_id}, skipping CORS removal"
+            )
+        else:
+            logger.info(
+                f"allowUploads is False, skipping CORS removal for bucket {bucket_name}"
+            )
+
         # Delete connector from DynamoDB only if all other resources are cleaned up
         if not errors:
             logger.info(
@@ -422,5 +439,82 @@ def remove_eventbridge_rule(
             error_msg = f"Error removing EventBridge rule: {str(e)}"
             logger.error(error_msg)
             errors.append(error_msg)
+
+    return errors
+
+
+def remove_medialake_cors_rule(
+    s3: Any, bucket_name: str, cors_rule_id: str | None = None
+) -> List[str]:
+    """
+    Remove only MediaLake's CORS rule from the bucket, preserving other rules.
+
+    Args:
+        s3: S3 client
+        bucket_name: Name of the S3 bucket
+        cors_rule_id: Optional specific rule ID to remove (from connector metadata)
+
+    Returns:
+        List of error messages (empty if successful)
+    """
+    errors: List[str] = []
+
+    try:
+        # Get current CORS configuration
+        try:
+            cors_config = s3.get_bucket_cors(Bucket=bucket_name)
+            rules = cors_config.get("CORSRules", [])
+        except ClientError as e:
+            if e.response["Error"]["Code"] == "NoSuchCORSConfiguration":
+                logger.warning(
+                    f"No CORS configuration found for bucket {bucket_name}, nothing to remove"
+                )
+                return errors
+            else:
+                raise
+
+        # Filter out MediaLake rules
+        if cors_rule_id:
+            # Remove specific rule by ID
+            filtered_rules = [r for r in rules if r.get("ID") != cors_rule_id]
+            logger.info(f"Filtering CORS rules by specific ID: {cors_rule_id}")
+        else:
+            # Remove all rules starting with "medialake-upload-"
+            filtered_rules = [
+                r for r in rules if not r.get("ID", "").startswith("medialake-upload-")
+            ]
+            logger.info(
+                f"Filtering all MediaLake CORS rules (prefix: medialake-upload-)"
+            )
+
+        rules_removed = len(rules) - len(filtered_rules)
+
+        if rules_removed == 0:
+            logger.info(
+                f"No MediaLake CORS rules found to remove from bucket {bucket_name}"
+            )
+            return errors
+
+        # Update or delete CORS configuration
+        if filtered_rules:
+            s3.put_bucket_cors(
+                Bucket=bucket_name, CORSConfiguration={"CORSRules": filtered_rules}
+            )
+            logger.info(
+                f"Removed MediaLake CORS rule from bucket {bucket_name}, "
+                f"{rules_removed} rule(s) removed, {len(filtered_rules)} rule(s) remaining"
+            )
+        else:
+            s3.delete_bucket_cors(Bucket=bucket_name)
+            logger.info(f"Removed all CORS configuration from bucket {bucket_name}")
+
+    except ClientError as e:
+        error_msg = f"Error removing CORS rule from bucket {bucket_name}: {str(e)}"
+        logger.error(error_msg)
+        errors.append(error_msg)
+    except Exception as e:
+        error_msg = f"Unexpected error removing CORS rule: {str(e)}"
+        logger.error(error_msg)
+        errors.append(error_msg)
 
     return errors

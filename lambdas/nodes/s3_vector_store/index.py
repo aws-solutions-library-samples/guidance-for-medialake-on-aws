@@ -1,5 +1,5 @@
 """
-Store embedding vectors in S3 Vector Store using custom boto3 SDK.
+Store embedding vectors in S3 Vector Store.
 
 This Lambda function provides operations to store, retrieve, and search vector embeddings
 using the new S3 Vector Store service with the custom unreleased boto3 SDK.
@@ -15,9 +15,13 @@ from typing import Any, Dict, List, Optional, Tuple
 import boto3
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from distributed_map_utils import download_s3_external_payload, is_s3_reference
 from lambda_middleware import lambda_middleware
 from lambda_utils import _truncate_floats
 from nodes_utils import seconds_to_smpte
+
+# S3 client for downloading external payloads
+s3_client = boto3.client("s3")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Powertools
@@ -45,10 +49,27 @@ def detect_content_type(
     if payload.get("content_type"):
         return payload.get("content_type").lower()
 
+    # Check for input_type from TwelveLabs Bedrock data
+    if embedding_data and embedding_data.get("input_type"):
+        input_type = embedding_data.get("input_type").lower()
+        if input_type in ["audio", "video", "image"]:
+            logger.info(
+                f"[CONTENT_TYPE] Detected from TwelveLabs input_type: {input_type}"
+            )
+            return input_type
+
+    # Check embedding_data for image scope (TwelveLabs Bedrock sets this for images)
+    if embedding_data and embedding_data.get("embedding_scope") == "image":
+        logger.info(
+            "[CONTENT_TYPE] Detected from embedding_data.embedding_scope: image"
+        )
+        return "image"
+
     # Check for image-specific indicators (embedding scope = "image")
     data = payload.get("data", {})
     if isinstance(data, dict):
         if data.get("embedding_scope") == "image":
+            logger.info("[CONTENT_TYPE] Detected from data.embedding_scope: image")
             return "image"
         if data.get("content_type"):
             return data.get("content_type").lower()
@@ -539,6 +560,14 @@ def store_vectors(
                 key = f"{key}_image"
             # For video master/other scopes, keep the key as is (inventory_id or inventory_id_embedding_option)
 
+            # Log the constructed key for this vector
+            logger.info(
+                f"[VECTOR_KEY] Constructed key for storage: '{key}' "
+                f"(content_type={content_type}, scope={scope}, "
+                f"inventory_id={meta.get('inventory_id')}, "
+                f"embedding_option={embedding_option})"
+            )
+
             vectors.append(
                 {
                     "key": key,
@@ -557,8 +586,13 @@ def store_vectors(
                     indexName=index_name,
                     vectors=batch,
                 )
-                stored_keys.extend(v["key"] for v in batch)
-                logger.info(f"Stored batch of {len(batch)} vectors")
+                batch_keys = [v["key"] for v in batch]
+                stored_keys.extend(batch_keys)
+                logger.info(
+                    f"[VECTOR_STORAGE] Stored batch of {len(batch)} vectors to "
+                    f"bucket='{bucket_name}', index='{index_name}'. "
+                    f"Keys: {batch_keys[:5]}{'...' if len(batch_keys) > 5 else ''}"
+                )
 
             except Exception as e:
                 logger.error(f"Failed to store batch {i//batch_size + 1}: {e}")
@@ -678,6 +712,13 @@ def process_store_action(payload: Dict[str, Any]) -> Dict[str, Any]:
             if not isinstance(emb, dict):
                 raise ValueError(f"Embedding data at index {i} must be a dictionary")
 
+            # Check if this is a lightweight reference that needs to be downloaded
+            if is_s3_reference(emb):
+                logger.info(
+                    f"Detected lightweight reference at index {i}, downloading from S3"
+                )
+                emb = download_s3_external_payload(s3_client, emb, logger)
+
             tmp = {"data": emb, **{k: v for k, v in payload.items() if k != "data"}}
             sc = emb.get("embedding_scope") or extract_scope(tmp)
 
@@ -777,8 +818,84 @@ def process_store_action(payload: Dict[str, Any]) -> Dict[str, Any]:
     # Single embedding - extract from data.item structure or direct data
     embedding_data = None
 
+    # Check payload.data.data for S3 reference (Bedrock Results nested structure for images)
+    data_field = payload.get("data", {})
+    if isinstance(data_field, dict) and isinstance(data_field.get("data"), dict):
+        nested_data = data_field["data"]
+        if is_s3_reference(nested_data):
+            logger.info(
+                "Detected S3 reference in payload.data.data (Bedrock Results), downloading from S3"
+            )
+            logger.info(
+                f"S3 reference: bucket={nested_data.get('s3_bucket')}, key={nested_data.get('s3_key')}"
+            )
+            embedding_data = download_s3_external_payload(
+                s3_client, nested_data, logger
+            )
+            logger.info(f"Downloaded embedding type: {type(embedding_data)}")
+
+            # Handle list of embeddings (images return a list with 1 item)
+            if isinstance(embedding_data, list):
+                if len(embedding_data) == 1:
+                    logger.info(
+                        "Downloaded embedding is a list with 1 item (image), extracting it"
+                    )
+                    embedding_data = embedding_data[0]
+                elif len(embedding_data) > 1:
+                    logger.warning(
+                        f"Downloaded embedding is a list with {len(embedding_data)} items. "
+                        "This should be handled by distributed map. Using first item only."
+                    )
+                    embedding_data = embedding_data[0]
+                else:
+                    logger.error("Downloaded embedding is an empty list")
+                    embedding_data = None
+
+            # Check if the downloaded data is itself another S3 reference (nested reference)
+            if (
+                embedding_data
+                and isinstance(embedding_data, dict)
+                and is_s3_reference(embedding_data)
+            ):
+                logger.info(
+                    "Downloaded data contains another S3 reference (nested), downloading again"
+                )
+                logger.info(
+                    f"Nested S3 reference: bucket={embedding_data.get('s3_bucket')}, key={embedding_data.get('s3_key')}"
+                )
+                embedding_data = download_s3_external_payload(
+                    s3_client, embedding_data, logger
+                )
+                logger.info(f"Downloaded nested embedding type: {type(embedding_data)}")
+
+    # Check payload_history.data for S3 reference (alternative location)
+    if not embedding_data:
+        payload_history = payload.get("payload_history", {})
+        if isinstance(payload_history.get("data"), dict) and is_s3_reference(
+            payload_history["data"]
+        ):
+            logger.info(
+                "Detected lightweight reference in payload_history.data, downloading from S3"
+            )
+            embedding_data = download_s3_external_payload(
+                s3_client, payload_history["data"], logger
+            )
+
+    # Check payload.data for S3 reference (distributed map: video/audio)
+    if (
+        not embedding_data
+        and isinstance(payload.get("data"), dict)
+        and is_s3_reference(payload["data"])
+    ):
+        logger.info(
+            "Detected S3 reference in data (distributed map), downloading from S3"
+        )
+        embedding_data = download_s3_external_payload(
+            s3_client, payload["data"], logger
+        )
+
     # Try new structure: data.item
-    if isinstance(payload.get("data"), dict):
+    if not embedding_data and isinstance(payload.get("data"), dict):
         item = payload["data"].get("item")
         if isinstance(item, dict):
             embedding_data = item
@@ -790,13 +907,48 @@ def process_store_action(payload: Dict[str, Any]) -> Dict[str, Any]:
             embedding_data = data
 
     if not embedding_data:
-        raise ValueError(
-            "No embedding data found in payload - expected data.item or data with float field"
+        error_details = {
+            "payload_keys": list(payload.keys()),
+            "data_keys": (
+                list(payload.get("data", {}).keys())
+                if isinstance(payload.get("data"), dict)
+                else "N/A"
+            ),
+            "has_data_data": isinstance(payload.get("data", {}).get("data"), dict),
+            "has_payload_history": bool(payload.get("payload_history")),
+            "data_type": (
+                type(payload.get("data")).__name__ if payload.get("data") else None
+            ),
+        }
+        logger.error(f"No embedding data found in payload. Details: {error_details}")
+        raise RuntimeError(
+            f"No embedding data found in payload - expected data.data with S3 reference, data.item, or data with float field. Details: {error_details}"
         )
 
-    embedding_vector = embedding_data.get("float")
+    # Log the actual structure to diagnose field name
+    logger.info(f"Embedding data keys: {list(embedding_data.keys())}")
+
+    # Try multiple possible field names for the embedding vector
+    embedding_vector = (
+        embedding_data.get("float")
+        or embedding_data.get("embedding")
+        or embedding_data.get("vector")
+    )
+
     if not embedding_vector:
-        raise ValueError("No embedding vector found in embedding data")
+        error_details = {
+            "embedding_data_keys": list(embedding_data.keys()),
+            "embedding_data_sample": {
+                k: type(v).__name__ for k, v in list(embedding_data.items())[:5]
+            },
+        }
+        logger.error(
+            f"No embedding vector found in embedding data. Details: {error_details}"
+        )
+        raise ValueError(
+            f"No embedding vector found in embedding data - tried 'float', 'embedding', 'vector'. "
+            f"Available keys: {list(embedding_data.keys())}"
+        )
     if not isinstance(embedding_vector, list) or not embedding_vector:
         raise ValueError("Embedding vector must be a non-empty list")
 
@@ -810,9 +962,12 @@ def process_store_action(payload: Dict[str, Any]) -> Dict[str, Any]:
     if not scope:
         raise ValueError("Cannot determine embedding scope from payload")
 
-    opt = embedding_data.get("embedding_option") or extract_embedding_option(
-        temp_payload
-    )
+    # Get embedding_option from embedding data or extract from payload
+    opt_from_data = embedding_data.get("embedding_option")
+    logger.info(f"[EMBEDDING_OPTION] From embedding_data: {repr(opt_from_data)}")
+
+    opt = opt_from_data or extract_embedding_option(temp_payload)
+    logger.info(f"[EMBEDDING_OPTION] Final value after extraction: {repr(opt)}")
 
     # Dynamically detect content type
     content_type = detect_content_type(payload, embedding_data)

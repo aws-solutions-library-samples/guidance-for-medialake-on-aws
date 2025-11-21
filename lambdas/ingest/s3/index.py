@@ -21,7 +21,9 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.auth import SigV4Auth
 from botocore.awsrequest import AWSRequest
 from botocore.config import Config
-from external_service_manager import MediaLakeExternalServiceManager
+
+# Import centralized file extension constants from common_libraries layer
+from file_extensions import SUPPORTED_EXTENSIONS
 
 # OpenSearch configuration
 OPENSEARCH_ENDPOINT = os.environ.get("OPENSEARCH_ENDPOINT", "")
@@ -33,7 +35,7 @@ AWS_REGION = os.environ.get("REGION", "")
 VECTOR_BUCKET_NAME = os.environ.get("VECTOR_BUCKET_NAME", "")
 VECTOR_INDEX_NAME = os.environ.get("VECTOR_INDEX_NAME", "media-vectors")
 
-# Re-use boto3’s session credentials
+# Re-use boto3's session credentials
 _session = boto3.Session()
 _credentials = _session.get_credentials()
 
@@ -81,6 +83,114 @@ logger.info(
 s3_config = Config(
     retries={"max_attempts": 3, "mode": "adaptive"}, read_timeout=15, connect_timeout=5
 )
+
+
+def acquire_processing_lock(
+    bucket: str, key: str, version_id: Optional[str] = None
+) -> bool:
+    """
+    Atomically acquire a processing lock for an S3 object to prevent race conditions.
+
+    This prevents multiple Lambda invocations from processing the same object simultaneously
+    by using DynamoDB conditional writes.
+
+    Args:
+        bucket: S3 bucket name
+        key: S3 object key
+        version_id: S3 object version ID (optional)
+
+    Returns:
+        True if lock acquired successfully, False if object is already being processed
+    """
+    # Ensure dynamodb_client is initialized
+    if dynamodb_client is None:
+        logger.error("DynamoDB client not initialized")
+        return True  # Fail-open to allow processing
+
+    try:
+        # Create a composite lock key that uniquely identifies this object
+        # Include version_id if provided to handle versioned buckets
+        version_suffix = f"#{version_id}" if version_id and version_id != "null" else ""
+        lock_key = f"LOCK#{bucket}#{key}{version_suffix}"
+
+        # Use current timestamp for lock expiry (locks expire after 5 minutes)
+        current_time = int(datetime.utcnow().timestamp())
+        lock_expiry = current_time + 300  # 5 minutes
+
+        # Attempt to write a processing lock record with conditional expression
+        # This is atomic - only one Lambda can succeed if multiple try simultaneously
+        dynamodb_client.put_item(
+            TableName=os.environ["ASSETS_TABLE"],
+            Item={
+                "InventoryID": {"S": lock_key},
+                "ProcessingStatus": {"S": "in-progress"},
+                "ProcessingStartTime": {"N": str(current_time)},
+                "LockExpiry": {"N": str(lock_expiry)},
+                "StoragePath": {"S": f"{bucket}:{key}"},
+            },
+            ConditionExpression="attribute_not_exists(InventoryID) OR LockExpiry < :current_time",
+            ExpressionAttributeValues={":current_time": {"N": str(current_time)}},
+        )
+
+        logger.info(f"Processing lock acquired for {bucket}/{key}")
+        metrics.add_metric(
+            name="ProcessingLockAcquired", unit=MetricUnit.Count, value=1
+        )
+        return True
+
+    except dynamodb_client.exceptions.ConditionalCheckFailedException:
+        # Another Lambda is currently processing this object
+        logger.warning(
+            f"Race condition detected: {bucket}/{key} is already being processed by another invocation"
+        )
+        metrics.add_metric(name="RaceConditionDetected", unit=MetricUnit.Count, value=1)
+        metrics.add_metric(
+            name="DuplicatesPreventedByAtomicLock", unit=MetricUnit.Count, value=1
+        )
+        return False
+
+    except Exception as e:
+        # If we can't acquire the lock due to an error, log it but allow processing
+        # This is fail-open behavior to prevent blocking legitimate processing
+        logger.error(f"Error acquiring processing lock for {bucket}/{key}: {str(e)}")
+        metrics.add_metric(name="ProcessingLockErrors", unit=MetricUnit.Count, value=1)
+        # Return True to continue processing - better to risk a duplicate than fail
+        return True
+
+
+def release_processing_lock(
+    bucket: str, key: str, version_id: Optional[str] = None
+) -> None:
+    """
+    Release a processing lock after successfully processing an object.
+
+    Args:
+        bucket: S3 bucket name
+        key: S3 object key
+        version_id: S3 object version ID (optional)
+    """
+    # Ensure dynamodb_client is initialized
+    if dynamodb_client is None:
+        logger.warning("DynamoDB client not initialized, cannot release lock")
+        return
+
+    try:
+        version_suffix = f"#{version_id}" if version_id and version_id != "null" else ""
+        lock_key = f"LOCK#{bucket}#{key}{version_suffix}"
+
+        # Delete the lock record
+        dynamodb_client.delete_item(
+            TableName=os.environ["ASSETS_TABLE"], Key={"InventoryID": {"S": lock_key}}
+        )
+
+        logger.info(f"Processing lock released for {bucket}/{key}")
+        metrics.add_metric(
+            name="ProcessingLockReleased", unit=MetricUnit.Count, value=1
+        )
+
+    except Exception as e:
+        # Lock release failure is not critical - locks will expire automatically
+        logger.warning(f"Error releasing processing lock for {bucket}/{key}: {str(e)}")
 
 
 def initialize_global_clients():
@@ -159,27 +269,15 @@ def determine_asset_type(content_type: str, file_extension: str) -> str:
     content_type = content_type.lower() if content_type else ""
     file_extension = file_extension.lower() if file_extension else ""
 
-    # Image classification - matching Default Image Pipeline: PSD, TIF, JPG, JPEG, PNG, WEBP, GIF, SVG
+    # MIME type prefixes for classification
     image_mimes = ["image/", "application/photoshop", "application/illustrator"]
-    image_extensions = [
-        "psd",
-        "tif",
-        "tiff",
-        "jpg",
-        "jpeg",
-        "png",
-        "webp",
-        "gif",
-        "svg",
-    ]
-
-    # Video classification - matching Default Video Pipeline: FLV, MP4, MOV, AVI, MKV, WEBM, MXF
     video_mimes = ["video/"]
-    video_extensions = ["flv", "mp4", "mov", "avi", "mkv", "webm", "mxf"]
-
-    # Audio classification - matching Default Audio Pipeline: WAV, AIFF, AIF, MP3, PCM, M4A
     audio_mimes = ["audio/"]
-    audio_extensions = ["wav", "aiff", "aif", "mp3", "pcm", "m4a"]
+
+    # Use centralized extension lists from constants
+    image_extensions = SUPPORTED_EXTENSIONS["Image"]
+    video_extensions = SUPPORTED_EXTENSIONS["Video"]
+    audio_extensions = SUPPORTED_EXTENSIONS["Audio"]
 
     # Check MIME type first as it's more reliable
     for prefix in image_mimes:
@@ -335,9 +433,6 @@ class AssetProcessor:
 
         _session = boto3.Session()
         self._credentials = _session.get_credentials()
-
-        # Initialize external service manager for handling Coactive and other external services
-        self.external_service_manager = MediaLakeExternalServiceManager(logger, metrics)
 
     def _signed_request(
         self, method: str, url: str, payload: dict | None = None, timeout: int = 60
@@ -620,27 +715,97 @@ class AssetProcessor:
             raise
 
     @tracer.capture_method
-    def _check_existing_file(self, md5_hash: str) -> Optional[Dict]:
-        """Check if file with same MD5 hash exists with optimized query"""
+    def _check_existing_file(
+        self, md5_hash: str, bucket: str = None, key: str = None
+    ) -> Tuple[Optional[Dict], bool]:
+        """
+        Check if file with same MD5 hash exists with pagination support.
+        Returns: (existing_file, is_exact_match)
+        - existing_file: First file with matching hash (or None if no matches)
+        - is_exact_match: True if the file has same hash AND same storage path/key
+        """
         try:
-            # Use ProjectionExpression to only fetch needed attributes
-            response = self.dynamodb.query(
-                IndexName="FileHashIndex",
-                KeyConditionExpression="FileHash = :hash",
-                ExpressionAttributeValues={":hash": md5_hash},
+            all_items = []
+            last_evaluated_key = None
+            page_count = 0
+
+            # Paginate through all results
+            while True:
+                query_params = {
+                    "IndexName": "FileHashIndex",
+                    "KeyConditionExpression": "FileHash = :hash",
+                    "ExpressionAttributeValues": {":hash": md5_hash},
+                }
+
+                if last_evaluated_key:
+                    query_params["ExclusiveStartKey"] = last_evaluated_key
+
+                response = self.dynamodb.query(**query_params)
+                page_count += 1
+                all_items.extend(response["Items"])
+
+                # Log pagination progress for large result sets
+                if page_count > 1:
+                    logger.info(
+                        f"Retrieved page {page_count} with {len(response['Items'])} items for hash {md5_hash}"
+                    )
+
+                # Check if there are more pages
+                last_evaluated_key = response.get("LastEvaluatedKey")
+                if not last_evaluated_key:
+                    break
+
+            logger.info(
+                f"Found {len(all_items)} total items with hash {md5_hash} across {page_count} page(s)"
             )
 
-            if response["Items"]:
-                return response["Items"][0]
+            if not all_items:
+                return None, False
 
-            return None
+            # If bucket and key provided, check if any item is an exact match
+            is_exact_match = False
+            if bucket and key:
+                storage_path = f"{bucket}:{key}"
+                logger.info(
+                    f"Checking for exact match with storage path: {storage_path}"
+                )
+
+                for item in all_items:
+                    item_storage_path = item.get("StoragePath")
+                    item_object_key = (
+                        item.get("DigitalSourceAsset", {})
+                        .get("MainRepresentation", {})
+                        .get("StorageInfo", {})
+                        .get("PrimaryLocation", {})
+                        .get("ObjectKey", {})
+                        .get("FullPath")
+                    )
+
+                    # Check if both storage path AND object key match
+                    if item_storage_path == storage_path and item_object_key == key:
+                        logger.info(
+                            f"Found exact match: StoragePath={item_storage_path}, ObjectKey={item_object_key}"
+                        )
+                        is_exact_match = True
+                        break
+
+                if not is_exact_match:
+                    logger.info(
+                        f"No exact match found for storage path {storage_path} - but returning first duplicate for hash match"
+                    )
+
+            # Always return first item with matching hash for duplicate detection
+            return all_items[0], is_exact_match
+
         except Exception as e:
             logger.exception(f"Error querying DynamoDB for hash {md5_hash}, error {e}")
             raise
 
     @tracer.capture_method
-    def process_asset(self, bucket: str, key: str) -> Optional[Dict]:
-        """Process new asset from S3 with optimized performance"""
+    def process_asset(
+        self, bucket: str, key: str, version_id: Optional[str] = None
+    ) -> Optional[Dict]:
+        """Process new asset from S3 with optimized performance and race condition prevention"""
         original_key = key
         key = self._decode_s3_event_key(key)
 
@@ -649,6 +814,22 @@ class AssetProcessor:
             logger.info(f"Key decoded from '{original_key}' to '{key}'")
 
         try:
+            # CRITICAL: Acquire processing lock FIRST to prevent race conditions
+            # This MUST be the first operation to ensure only one Lambda processes this object
+            lock_acquired = acquire_processing_lock(bucket, key, version_id)
+            if not lock_acquired:
+                # Another Lambda invocation is already processing this object
+                logger.info(
+                    f"Skipping {bucket}/{key} - already being processed by another invocation"
+                )
+                metrics.add_metric(
+                    name="AssetsSkippedDueToRaceLock", unit=MetricUnit.Count, value=1
+                )
+                return None
+
+            # Now we have exclusive lock on this object - safe to proceed
+            logger.info(f"Processing lock acquired for {bucket}/{key}")
+
             # Get S3 object metadata and tags in parallel
             with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
                 head_future = executor.submit(
@@ -666,12 +847,16 @@ class AssetProcessor:
                     response = head_future.result()
                 except Exception as e:
                     logger.exception(f"Error getting S3 object metadata: {str(e)}")
+                    # Release lock before raising
+                    release_processing_lock(bucket, key, version_id)
                     raise
 
                 try:
                     existing_tags = tag_future.result()
                 except Exception as e:
                     logger.exception(f"Error getting S3 object tags: {str(e)}")
+                    # Release lock before raising
+                    release_processing_lock(bucket, key, version_id)
                     raise
 
             # Early check for asset type
@@ -699,19 +884,26 @@ class AssetProcessor:
                 metrics.add_metric(
                     name="UnsupportedAssetTypeSkipped", unit=MetricUnit.Count, value=1
                 )
+                # Release lock before returning
+                release_processing_lock(bucket, key, version_id)
                 return None
 
             tags = {tag["Key"]: tag["Value"] for tag in existing_tags.get("TagSet", [])}
 
-            # Check existing tags first - this is a fast path if object already processed
+            # Check existing tags first - but MUST verify hash hasn't changed (file replacement scenario)
             if "InventoryID" in tags and "AssetID" in tags:
+                # Don't release lock yet - need to verify this isn't a file replacement
+
                 # Use the asset context for consistent logging
                 with self.asset_context(
                     asset_id=tags["AssetID"], inventory_id=tags["InventoryID"]
                 ):
                     self._log_with_asset_context(
-                        f"Asset already fully processed: {tags['AssetID']}"
+                        f"Found tagged asset: {tags['AssetID']} - verifying hash to detect replacements"
                     )
+
+                    # CRITICAL: Calculate hash to detect if file content changed
+                    current_md5_hash = self._calculate_md5(bucket, key)
 
                     # Add logging to check if the record exists in DynamoDB
                     try:
@@ -719,28 +911,108 @@ class AssetProcessor:
                             Key={"InventoryID": tags["InventoryID"]}
                         )
                         if "Item" in existing_record:
-                            self._log_with_asset_context(
-                                f"Found existing record in DynamoDB: {json_serialize(existing_record['Item'])}"
-                            )
+                            stored_hash = existing_record["Item"].get("FileHash")
 
-                            # Update the lastModifiedDate field but preserve originalIngestDate
-                            # Create updateExpression and attributeValues for update operation
-                            update_expression = (
-                                "SET DigitalSourceAsset.lastModifiedDate = :lastModDate"
-                            )
-                            expression_attribute_values = {
-                                ":lastModDate": s3_last_modified_str
-                            }
+                            # Check if hash has changed - this indicates file replacement
+                            if stored_hash and stored_hash != current_md5_hash:
+                                logger.warning(
+                                    f"FILE REPLACEMENT DETECTED (tagged asset): "
+                                    f"StoragePath={bucket}:{key}, "
+                                    f"Old hash={stored_hash}, New hash={current_md5_hash}, "
+                                    f"Old InventoryID={tags['InventoryID']}. "
+                                    f"Deleting old asset and creating new one."
+                                )
 
-                            # Update only the lastModifiedDate
-                            self.dynamodb.update_item(
-                                Key={"InventoryID": tags["InventoryID"]},
-                                UpdateExpression=update_expression,
-                                ExpressionAttributeValues=expression_attribute_values,
-                            )
-                            self._log_with_asset_context(
-                                f"Updated lastModifiedDate to {s3_last_modified_str} for existing asset: {tags['AssetID']}"
-                            )
+                                # Delete the old asset completely
+                                try:
+                                    old_inventory_id = tags["InventoryID"]
+
+                                    # Delete associated S3 files
+                                    self._delete_associated_s3_files(
+                                        existing_record["Item"], bucket, key
+                                    )
+
+                                    # Delete from DynamoDB
+                                    self.dynamodb.delete_item(
+                                        Key={"InventoryID": old_inventory_id}
+                                    )
+                                    logger.info(
+                                        f"Deleted old DynamoDB record: {old_inventory_id}"
+                                    )
+
+                                    # Delete OpenSearch documents
+                                    self.delete_opensearch_docs(old_inventory_id)
+
+                                    # Delete S3 vectors
+                                    vector_count = self.delete_s3_vectors(
+                                        old_inventory_id
+                                    )
+                                    logger.info(
+                                        f"Deleted {vector_count} vectors for old asset {old_inventory_id}"
+                                    )
+
+                                    # Publish deletion event
+                                    self.publish_deletion_event(old_inventory_id)
+
+                                    metrics.add_metric(
+                                        name="TaggedFileReplacementDetected",
+                                        unit=MetricUnit.Count,
+                                        value=1,
+                                    )
+
+                                    logger.info(
+                                        f"Successfully deleted old tagged asset {old_inventory_id} - will create new asset"
+                                    )
+
+                                    # Clear tags dict so we process as new asset below
+                                    # (Don't remove from S3 yet - will be retagged with new IDs)
+                                    tags.clear()
+
+                                    # Keep the lock - we're continuing to process this as a new asset
+                                    # Lock will be released at the end of process_asset
+
+                                    # Fall through to process as new asset
+                                    # by NOT returning here
+
+                                except Exception as e:
+                                    logger.error(
+                                        f"Error during tagged file replacement cleanup: {str(e)}"
+                                    )
+                                    metrics.add_metric(
+                                        name="TaggedFileReplacementCleanupErrors",
+                                        unit=MetricUnit.Count,
+                                        value=1,
+                                    )
+                                    # Release lock before raising
+                                    release_processing_lock(bucket, key, version_id)
+                                    raise
+
+                                # Continue processing below as a new file (don't return)
+
+                            else:
+                                # Hash matches - this is the same file, just update timestamp
+                                self._log_with_asset_context(
+                                    f"Hash matches ({current_md5_hash}) - same file, updating lastModifiedDate only"
+                                )
+
+                                # Update only the lastModifiedDate
+                                update_expression = "SET DigitalSourceAsset.lastModifiedDate = :lastModDate"
+                                expression_attribute_values = {
+                                    ":lastModDate": s3_last_modified_str
+                                }
+
+                                self.dynamodb.update_item(
+                                    Key={"InventoryID": tags["InventoryID"]},
+                                    UpdateExpression=update_expression,
+                                    ExpressionAttributeValues=expression_attribute_values,
+                                )
+                                self._log_with_asset_context(
+                                    f"Updated lastModifiedDate to {s3_last_modified_str} for existing asset: {tags['AssetID']}"
+                                )
+
+                                # Release lock and exit
+                                release_processing_lock(bucket, key, version_id)
+                                return None
                         else:
                             self._log_with_asset_context(
                                 f"Asset has tags but no record found in DynamoDB for InventoryID: {tags['InventoryID']}",
@@ -849,6 +1121,8 @@ class AssetProcessor:
                                     metadata,
                                 )
 
+                                # Release lock after successful recreation
+                                release_processing_lock(bucket, key, version_id)
                                 return item
                             except Exception as e:
                                 self._log_with_asset_context(
@@ -858,6 +1132,8 @@ class AssetProcessor:
                                 logger.exception(
                                     f"Error recreating DynamoDB record: {str(e)}"
                                 )
+                                # Release lock before raising
+                                release_processing_lock(bucket, key, version_id)
                     except Exception as e:
                         self._log_with_asset_context(
                             f"Error checking existing record in DynamoDB: {str(e)}",
@@ -866,22 +1142,128 @@ class AssetProcessor:
                         logger.exception(
                             f"Error checking existing record in DynamoDB: {str(e)}"
                         )
+                        # Release lock before returning
+                        release_processing_lock(bucket, key, version_id)
 
                     return None
 
             # Calculate MD5 hash for duplicate checking
             md5_hash = self._calculate_md5(bucket, key)
 
-            # Always check if file with same hash exists in DynamoDB
-            # We need this check even when DO_NOT_INGEST_DUPLICATES is False to handle same hash + same key scenario
-            existing_file = self._check_existing_file(md5_hash)
+            # CRITICAL: First check if there's already a record at this StoragePath
+            # This handles the file replacement scenario (same path, different hash)
+            storage_path = f"{bucket}:{key}"
+            existing_at_path = None
+
+            try:
+                path_query_response = self.dynamodb.query(
+                    IndexName="S3PathIndex",
+                    KeyConditionExpression="StoragePath = :path",
+                    ExpressionAttributeValues={":path": storage_path},
+                )
+                if path_query_response.get("Items"):
+                    existing_at_path = path_query_response["Items"][0]
+                    logger.info(
+                        f"Found existing record at StoragePath {storage_path}: InventoryID={existing_at_path['InventoryID']}, FileHash={existing_at_path.get('FileHash')}"
+                    )
+            except Exception as e:
+                logger.warning(f"Error checking StoragePath index: {str(e)}")
+
+            # If there's a file at this path with a DIFFERENT hash, it's a replacement
+            if existing_at_path and existing_at_path.get("FileHash") != md5_hash:
+                old_inventory_id = existing_at_path["InventoryID"]
+                old_hash = existing_at_path.get("FileHash")
+
+                logger.warning(
+                    f"FILE REPLACEMENT DETECTED at {storage_path}: "
+                    f"Old hash={old_hash}, New hash={md5_hash}. "
+                    f"Deleting old record {old_inventory_id} and creating new asset."
+                )
+
+                # Delete the old record and all associated resources
+                try:
+                    # Delete associated S3 files (derived representations, transcripts, etc.)
+                    self._delete_associated_s3_files(existing_at_path, bucket, key)
+
+                    # Delete from DynamoDB
+                    self.dynamodb.delete_item(Key={"InventoryID": old_inventory_id})
+                    logger.info(f"Deleted old DynamoDB record: {old_inventory_id}")
+
+                    # Delete OpenSearch documents
+                    self.delete_opensearch_docs(old_inventory_id)
+
+                    # Delete S3 vectors
+                    vector_count = self.delete_s3_vectors(old_inventory_id)
+                    logger.info(
+                        f"Deleted {vector_count} vectors for old asset {old_inventory_id}"
+                    )
+
+                    # Publish deletion event for old asset
+                    self.publish_deletion_event(old_inventory_id)
+
+                    metrics.add_metric(
+                        name="FileReplacementDetected", unit=MetricUnit.Count, value=1
+                    )
+                    metrics.add_metric(
+                        name="OldAssetDeletedDueToReplacement",
+                        unit=MetricUnit.Count,
+                        value=1,
+                    )
+
+                    logger.info(
+                        f"Successfully cleaned up old asset {old_inventory_id} - proceeding to create new asset"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Error deleting old asset during file replacement: {str(e)}"
+                    )
+                    # Continue to create new record even if old deletion fails
+                    metrics.add_metric(
+                        name="FileReplacementCleanupErrors",
+                        unit=MetricUnit.Count,
+                        value=1,
+                    )
+
+                # Clear existing_at_path so we proceed to create new record
+                existing_at_path = None
+
+            # If there's a file at this path with the SAME hash, it's already processed
+            elif existing_at_path and existing_at_path.get("FileHash") == md5_hash:
+                logger.info(
+                    f"File at {storage_path} already exists with same hash {md5_hash} - updating lastModifiedDate only"
+                )
+                # Update lastModifiedDate
+                self.dynamodb.update_item(
+                    Key={"InventoryID": existing_at_path["InventoryID"]},
+                    UpdateExpression="SET DigitalSourceAsset.lastModifiedDate = :lastModDate",
+                    ExpressionAttributeValues={":lastModDate": s3_last_modified_str},
+                )
+                # Release lock and exit
+                release_processing_lock(bucket, key, version_id)
+                return None
+
+            # Now check if file with same hash exists at DIFFERENT locations
+            # Pass bucket and key to check for both hash matches and exact matches
+            existing_file, is_exact_match = self._check_existing_file(
+                md5_hash, bucket, key
+            )
+
             if existing_file:
-                logger.info(f"Found existing file with hash {md5_hash}")
+                if is_exact_match:
+                    logger.info(
+                        f"Found existing file with hash {md5_hash} - EXACT MATCH (same storage path/key)"
+                    )
+                else:
+                    logger.info(
+                        f"Found existing file with hash {md5_hash} - DIFFERENT path/key (duplicate hash)"
+                    )
                 metrics.add_metric(
                     name="DuplicateCheckPerformed", unit=MetricUnit.Count, value=1
                 )
             else:
-                logger.info(f"No existing file found with hash {md5_hash}")
+                logger.info(
+                    f"No existing file found with hash {md5_hash} - this is a unique file"
+                )
                 metrics.add_metric(
                     name="DuplicateCheckPerformed", unit=MetricUnit.Count, value=1
                 )
@@ -890,18 +1272,8 @@ class AssetProcessor:
             if existing_file:
                 logger.info(f"Duplicate file found with hash {md5_hash}")
 
-                # Get the existing object key to check if it's the same file
-                existing_object_key = (
-                    existing_file.get("DigitalSourceAsset", {})
-                    .get("MainRepresentation", {})
-                    .get("StorageInfo", {})
-                    .get("PrimaryLocation", {})
-                    .get("ObjectKey", {})
-                    .get("FullPath")
-                )
-
-                # Check if it's the same object key (same hash + same key = exact same file)
-                if existing_object_key == key:
+                # Check if it's the exact same file (same hash + same storage path + same key)
+                if is_exact_match:
                     logger.info(
                         "Duplicate file with same hash AND same object key - skipping processing regardless of DO_NOT_INGEST_DUPLICATES setting"
                     )
@@ -936,118 +1308,26 @@ class AssetProcessor:
                         f"Updated lastModifiedDate to {s3_last_modified_str} for existing asset: {existing_file['DigitalSourceAsset']['ID']}"
                     )
 
+                    # Release lock before returning
+                    release_processing_lock(bucket, key, version_id)
                     return None
 
                 # Different object key but same hash - behavior depends on DO_NOT_INGEST_DUPLICATES
                 if DO_NOT_INGEST_DUPLICATES:
                     logger.info(
-                        "Same hash but different key with DO_NOT_INGEST_DUPLICATES=True - applying duplicate prevention logic"
+                        "DO_NOT_INGEST_DUPLICATES=True: Hash match found - tagging as duplicate without creating new asset"
                     )
 
-                    # If we have InventoryID tag but no AssetID tag, generate new AssetID under existing inventory
-                    if "InventoryID" in tags and "AssetID" not in tags:
-                        logger.info(
-                            f"Object has InventoryID but no AssetID. Generating new AssetID under existing inventory."
-                        )
+                    # For ANY hash match when DO_NOT_INGEST_DUPLICATES is True:
+                    # - Tag with EXISTING InventoryID and AssetID (no new IDs)
+                    # - Mark as DuplicateHash=true
+                    # - Do NOT create any new DynamoDB entries
+                    # - Do NOT generate new AssetIDs
 
-                        # Extract asset type from content type
-                        content_type = response.get("ContentType", "")
-                        file_ext = key.split(".")[-1] if "." in key else ""
-                        asset_type = determine_asset_type(content_type, file_ext)
-                        type_abbrev = get_type_abbreviation(
-                            asset_type
-                        )  # Use cached function
-
-                        # Generate new AssetID
-                        new_asset_id = f"asset:{type_abbrev}:{str(uuid.uuid4())}"
-
-                        # Tag with existing InventoryID and new AssetID
-                        self.s3.put_object_tagging(
-                            Bucket=bucket,
-                            Key=key,
-                            Tagging={
-                                "TagSet": [
-                                    {
-                                        "Key": "InventoryID",
-                                        "Value": tags["InventoryID"],
-                                    },
-                                    {"Key": "AssetID", "Value": new_asset_id},
-                                    {"Key": "FileHash", "Value": md5_hash},
-                                ]
-                            },
-                        )
-
-                        # Create new asset entry with existing inventory ID
-                        metadata = self._create_asset_metadata(
-                            response, bucket, key, md5_hash
-                        )
-                        dynamo_entry = self.create_dynamo_entry(
-                            metadata,
-                            inventory_id=tags["InventoryID"],
-                            s3_last_modified=s3_last_modified_str,
-                        )
-
-                        self.publish_event(
-                            dynamo_entry["InventoryID"],
-                            dynamo_entry["DigitalSourceAsset"]["ID"],
-                            metadata,
-                        )
-
-                        return dynamo_entry
-
-                    # If hash exists in DB but object has no tags, tag with existing IDs and stop processing
-                    if "InventoryID" not in tags and "AssetID" not in tags:
-                        logger.info(
-                            f"Hash exists in DB but object has no tags. Tagging with existing IDs."
-                        )
-                        self.s3.put_object_tagging(
-                            Bucket=bucket,
-                            Key=key,
-                            Tagging={
-                                "TagSet": [
-                                    {
-                                        "Key": "InventoryID",
-                                        "Value": existing_file["InventoryID"],
-                                    },
-                                    {
-                                        "Key": "AssetID",
-                                        "Value": existing_file["DigitalSourceAsset"][
-                                            "ID"
-                                        ],
-                                    },
-                                    {"Key": "FileHash", "Value": md5_hash},
-                                    {"Key": "DuplicateHash", "Value": "true"},
-                                ]
-                            },
-                        )
-
-                        # Update lastModifiedDate for the existing file in DynamoDB
-                        self.dynamodb.update_item(
-                            Key={"InventoryID": existing_file["InventoryID"]},
-                            UpdateExpression="SET DigitalSourceAsset.lastModifiedDate = :lastModDate",
-                            ExpressionAttributeValues={
-                                ":lastModDate": s3_last_modified_str
-                            },
-                        )
-                        logger.info(
-                            f"Updated lastModifiedDate to {s3_last_modified_str} for existing asset: {existing_file['DigitalSourceAsset']['ID']}"
-                        )
-
-                        return None
-
-                    # Same hash but different key - tag with same InventoryID but new AssetID
                     logger.info(
-                        "Same hash but different key. Tagging with same InventoryID but new AssetID"
+                        f"Tagging duplicate file with existing IDs - InventoryID: {existing_file['InventoryID']}, AssetID: {existing_file['DigitalSourceAsset']['ID']}"
                     )
-                    # Extract asset type from content type
-                    content_type = response.get("ContentType", "")
-                    file_ext = key.split(".")[-1] if "." in key else ""
-                    asset_type = determine_asset_type(content_type, file_ext)
-                    type_abbrev = get_type_abbreviation(
-                        asset_type
-                    )  # Use cached function
 
-                    new_asset_id = f"asset:{type_abbrev}:{str(uuid.uuid4())}"
                     self.s3.put_object_tagging(
                         Bucket=bucket,
                         Key=key,
@@ -1057,12 +1337,28 @@ class AssetProcessor:
                                     "Key": "InventoryID",
                                     "Value": existing_file["InventoryID"],
                                 },
-                                {"Key": "AssetID", "Value": new_asset_id},
+                                {
+                                    "Key": "AssetID",
+                                    "Value": existing_file["DigitalSourceAsset"]["ID"],
+                                },
                                 {"Key": "FileHash", "Value": md5_hash},
                                 {"Key": "DuplicateHash", "Value": "true"},
                             ]
                         },
                     )
+
+                    logger.info(
+                        f"Duplicate marked successfully - no new asset created. Original asset: {existing_file['DigitalSourceAsset']['ID']}"
+                    )
+
+                    metrics.add_metric(
+                        name="DuplicatesTaggedNotIngested",
+                        unit=MetricUnit.Count,
+                        value=1,
+                    )
+
+                    # Release lock before returning
+                    release_processing_lock(bucket, key, version_id)
                     return None
                 else:
                     logger.info(
@@ -1109,6 +1405,8 @@ class AssetProcessor:
                 metadata,
             )
 
+            # Release lock after successful processing
+            release_processing_lock(bucket, key, version_id)
             return dynamo_entry
 
         except Exception as e:
@@ -1116,6 +1414,8 @@ class AssetProcessor:
             metrics.add_metric(
                 name="AssetProcessingErrors", unit=MetricUnit.Count, value=1
             )
+            # Release lock before raising
+            release_processing_lock(bucket, key, version_id)
             raise
 
     def _create_asset_metadata(
@@ -1490,21 +1790,6 @@ class AssetProcessor:
                 # Delete S3 vectors
                 vector_count = self.delete_s3_vectors(inventory_id)
                 logger.info(f"Deleted {vector_count} vectors for asset {inventory_id}")
-
-                # Delete from external services (e.g., Coactive)
-                try:
-                    external_results = self.external_service_manager.delete_asset_from_external_services(
-                        asset_record, inventory_id
-                    )
-                    if external_results:
-                        logger.info(
-                            f"External service deletion results for {inventory_id}: {external_results}"
-                        )
-                except Exception as e:
-                    logger.error(
-                        f"Failed to delete asset from external services: {str(e)}"
-                    )
-                    # Don't fail the entire deletion if external service deletion fails
 
                 # Publish deletion event
                 self.publish_deletion_event(inventory_id)
@@ -2196,7 +2481,7 @@ def process_s3_event(
                     raise s3_error
 
             # Process all ObjectCreated events (including Copy) the same way
-            result = processor.process_asset(bucket, key)
+            result = processor.process_asset(bucket, key, version_id)
             if result:
                 # Add asset information to context for logging
                 logger.append_keys(

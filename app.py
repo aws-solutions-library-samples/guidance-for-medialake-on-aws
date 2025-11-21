@@ -206,6 +206,8 @@ class MediaLakeStackProps:
     authorization_stack: AuthorizationStack
     cognito_stack: CognitoStack
     resource_collector: ApiResourceCollector
+    cloudfront_domain: str  # CloudFront distribution domain for CORS configuration
+    ui_origin_host: str | None = None  # Custom domain for UI, if configured
 
 
 class MediaLakeStack(cdk.Stack):
@@ -302,8 +304,10 @@ class MediaLakeStack(cdk.Stack):
                 identity_pool=props.cognito_stack.identity_pool,
                 user_pool_client=props.cognito_stack.user_pool_client,
                 waf_acl_arn=ResourceImporter.get_waf_acl_arn(),  # Use importer instead of direct access
+                cloudfront_domain=props.cloudfront_domain,  # CloudFront domain passed from UserInterfaceStack
                 # user_table=users_groups_roles_stack.user_table,
                 s3_vector_bucket_name=props.base_infrastructure.s3_vector_bucket_name,
+                ui_origin_host=props.ui_origin_host,  # Custom UI origin host, if configured
             ),
         )
 
@@ -559,6 +563,8 @@ medialake_stack = MediaLakeStack(
         authorization_stack=authorization_stack,
         cognito_stack=cognito_stack,
         resource_collector=api_resource_collector,  # Pass the resource collector
+        cloudfront_domain="",  # Will be set after UI stack is created
+        ui_origin_host=None,  # Will be set after UI stack is created
     ),
     env=env,
 )
@@ -573,6 +579,8 @@ if resource_count == 0:
         "Warning: No resources collected. Deployment stack may not have proper dependencies."
     )
 
+# Create API Gateway Deployment Stack BEFORE User Interface Stack
+# This ensures the SSM parameter for stage name is created before UI stack tries to read it
 api_gateway_deployment_stack = ApiGatewayDeploymentStack(
     app,
     "MediaLakeApiGatewayDeployment",
@@ -584,6 +592,8 @@ api_gateway_deployment_stack = ApiGatewayDeploymentStack(
 api_gateway_deployment_stack.add_dependency(api_gateway_core_stack)
 api_gateway_deployment_stack.add_dependency(medialake_stack)
 
+# NOW create User Interface Stack after deployment stack has created the SSM parameter
+# This stack reads the API Gateway stage name from SSM Parameter Store
 user_interface_stack = UserInterfaceStack(
     app,
     "MediaLakeUserInterface",
@@ -595,16 +605,18 @@ user_interface_stack = UserInterfaceStack(
         cognito_domain_prefix=cognito_stack.cognito_domain_prefix,
         # Use CloudFormation imports to avoid circular dependencies
         api_gateway_rest_id="",  # Will be imported from CloudFormation
-        api_gateway_stage="",  # Will be imported from CloudFormation
+        api_gateway_stage="",  # Will be read from SSM Parameter Store
         # Buckets will be imported from BaseInfrastructureStack exports
         cloudfront_waf_acl_arn=waf_acl_ssm_param_name,
     ),
     env=env,
 )
-# Add dependencies to ensure exports are available
 user_interface_stack.add_dependency(base_infrastructure)
-user_interface_stack.add_dependency(api_gateway_deployment_stack)
+user_interface_stack.add_dependency(api_gateway_core_stack)
 user_interface_stack.add_dependency(edge_lambda_stack)
+user_interface_stack.add_dependency(
+    api_gateway_deployment_stack
+)  # Must wait for SSM parameter
 
 # Create the Cognito Update Stack (between user_interface_stack and cleanup_stack)
 cognito_update_stack = CognitoUpdateStack(

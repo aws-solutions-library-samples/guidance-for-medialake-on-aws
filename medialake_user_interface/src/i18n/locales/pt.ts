@@ -17,6 +17,59 @@ export default {
     connectors: "Conectores",
     selectConnector: "Selecione um conector",
   },
+  upload: {
+    title: "Carregar arquivos de mídia",
+    description:
+      "Selecione um conector S3 e carregue seus arquivos de mídia. Apenas formatos de áudio, vídeo, HLS e MPEG-DASH são suportados.",
+    uploadDestination: "Destino do upload",
+    browsePath: "Navegar caminho",
+    uploadingTo: "Carregando para",
+    restrictedToPrefix: "restrito",
+    allowedPrefixesInfo:
+      "Você só pode carregar para {{count}} caminho(s) permitido(s)",
+    pathInfo:
+      "Os arquivos serão carregados para o caminho selecionado no bucket S3",
+    selectPathFirst: "Selecione um caminho antes de carregar",
+    pathResetWarning: "Alterar o conector redefinirá o caminho selecionado",
+    connectorLabel: "Conector S3",
+    selectConnectorPlaceholder: "Selecione um conector S3",
+    loadingConnectors: "Carregando conectores...",
+    noConnectors:
+      "Nenhum conector S3 disponível. Por favor, configure um conector S3 primeiro.",
+    dashboardNote:
+      "Apenas arquivos do tipo audio/*, video/*, image/*, HLS (application/x-mpegURL) e MPEG-DASH (application/dash+xml) são permitidos",
+    meta: {
+      name: "Nome",
+    },
+  },
+  pathBrowser: {
+    title: "Selecionar Caminho de Upload",
+    descriptionRestricted:
+      "Navegue e selecione uma pasta dentro dos caminhos permitidos para carregar seus arquivos.",
+    descriptionUnrestricted:
+      "Navegue e selecione qualquer pasta no bucket para carregar seus arquivos.",
+    prefixLabel: "Caminho Permitido",
+    prefixHelper:
+      "Você só pode navegar e carregar para pastas dentro do caminho selecionado.",
+    selectedPath: "Caminho Selecionado",
+    currentPath: "Caminho Atual",
+    confirm: "Usar Este Caminho",
+    validation: {
+      invalidPath: "O caminho selecionado está fora dos prefixos permitidos.",
+      noPathSelected: "Por favor, navegue até uma pasta antes de confirmar.",
+    },
+    error: {
+      invalidConnector: "ID de conector inválido fornecido.",
+      loadingFailed: "Falha ao carregar informações do conector.",
+    },
+    hints: {
+      clickFolder:
+        "Clique em uma pasta para navegar nela e, em seguida, clique em 'Selecionar Pasta Atual' para escolhê-la.",
+      navigateAndConfirm:
+        "Navegue até a pasta desejada e, em seguida, clique em 'Usar Este Caminho' para confirmar.",
+      rootPath: "Você está atualmente no nível raiz.",
+    },
+  },
   assetExplorer: {
     noConnectorSelected: "Selecione um conector para visualizar os ativos",
     noAssetsFound: "Nenhum ativo encontrado para este conector",
@@ -83,7 +136,18 @@ export default {
     },
   },
   search: {
-    semantic: "Pesquisa Semântica",
+    semantic: {
+      label: "Semântica",
+      enable: "Ativar pesquisa semântica",
+      disable: "Desativar pesquisa semântica",
+      configure: "Clique para configurar a pesquisa semântica",
+      configDialog: {
+        title: "Pesquisa semântica não configurada",
+        description:
+          "A pesquisa semântica não está configurada ou está desativada. Para ativar este recurso, vá para Configurações do sistema > Pesquisa para configurar um provedor de pesquisa, ou pressione o botão abaixo.",
+        goToSettings: "Ir para configurações de pesquisa",
+      },
+    },
     filters: {
       dateRange: "Intervalo de Data",
       contentType: "Tipo de Conteúdo",
@@ -137,6 +201,8 @@ export default {
     language: "Idioma",
     delete: "Excluir",
     create: "Criar",
+    root: "Raiz",
+    folder: "Pasta",
     actions: {
       add: "Adicionar",
     },
@@ -406,6 +472,29 @@ export default {
       viewDetails: "Ver Detalhes",
     },
   },
+  s3Explorer: {
+    filter: {
+      label: "Filtrar por nome",
+      clear: "Limpar filtro",
+      resultsCount: "Mostrando {{count}} de {{total}} itens",
+    },
+    loading: {
+      initializing: "Carregando...",
+      fetchingContents: "Buscando conteúdo...",
+    },
+    empty: {
+      folder: "Esta pasta está vazia",
+      noResults: "Nenhum item corresponde ao seu filtro",
+    },
+    keyboard: {
+      navigation:
+        "Use as setas para navegar, Enter para abrir, Backspace para voltar",
+    },
+    menu: {
+      rename: "Renomear",
+      delete: "Excluir",
+    },
+  },
   translation: {
     common: {
       actions: {
@@ -614,12 +703,32 @@ export default {
     s3Explorer: {
       filter: {
         label: "Filtrar por nome",
+        clear: "Limpar filtro",
+        resultsCount: "Mostrando {{count}} de {{total}} itens",
       },
       error: {
         loading: "Erro ao carregar objetos S3: {{message}}",
+        network:
+          "Erro de rede. Por favor, verifique sua conexão e tente novamente.",
+        permission:
+          "Acesso negado. Você não tem permissão para acessar este caminho.",
+        permissionWithPrefixes:
+          "Acesso negado. Você só pode acessar os seguintes caminhos: {{prefixes}}",
+        notFound: "O caminho solicitado não existe.",
+        timeout: "A solicitação expirou. Por favor, tente novamente.",
+        retry: "Tentar novamente",
       },
-      file: {
-        info: "Tamanho: {{size}} • Classe de Armazenamento: {{storageClass}} • Modificado: {{modified}}",
+      loading: {
+        initializing: "Carregando...",
+        fetchingContents: "Buscando conteúdos...",
+      },
+      empty: {
+        folder: "Esta pasta está vazia",
+        noResults: "Nenhum item corresponde ao seu filtro",
+      },
+      keyboard: {
+        navigation:
+          "Use as setas para navegar, Enter para abrir, Backspace para voltar",
       },
       menu: {
         rename: "Renomear",

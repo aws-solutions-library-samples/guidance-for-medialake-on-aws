@@ -28,6 +28,11 @@ node:
                 - "*"
             - effect: Allow
               actions:
+                - bedrock:GetAsyncInvoke
+              resources:
+                - "*"
+            - effect: Allow
+              actions:
                 - kms:Decrypt
               resources:
                 - "*"

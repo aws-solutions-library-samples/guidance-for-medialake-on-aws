@@ -18,8 +18,8 @@ import {
   MenuItem,
   MenuList,
   useTheme,
-  useMediaQuery,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import SaveIcon from "@mui/icons-material/Save";
 import CloseIcon from "@mui/icons-material/Close";
 import FileUploadIcon from "@mui/icons-material/FileUpload";
@@ -31,7 +31,7 @@ import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { FaFileVideo } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
-import { ensureCorrectTypes } from "../../types";
+import { ensureCorrectTypes, normalizeNumericValues } from "../../types";
 import { IconSwitch } from "@/components/common";
 import { PipelineNameInput } from "./";
 import { useSidebar } from "@/contexts/SidebarContext";
@@ -49,7 +49,6 @@ import type {
 import type { Integration } from "@/features/settings/integrations/types/integrations.types";
 import { drawerWidth, collapsedDrawerWidth } from "@/constants";
 
-/* —— props unchanged —— */
 export interface PipelineToolbarProps {
   onSave: () => Promise<void>;
   isLoading: boolean;
@@ -64,10 +63,10 @@ export interface PipelineToolbarProps {
   onDelete?: () => void;
   status?: string;
   isEditMode?: boolean;
+  hasChanges?: boolean;
 }
 
 const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
-  /* —— destructuring unchanged props for brevity —— */
   const {
     onSave,
     isLoading,
@@ -82,6 +81,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
     onDelete,
     status,
     isEditMode = false,
+    hasChanges = true,
   } = props;
 
   /* —— routing & sidebar width logic —— */
@@ -1341,9 +1341,11 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
         nodes: fixedFlow.nodes.map((n: any) => {
           // Remove numeric keys in parameters
           if (n.data.configuration?.parameters) {
-            n.data.configuration.parameters = Object.fromEntries(
-              Object.entries(n.data.configuration.parameters).filter(([key]) =>
-                isNaN(Number(key)),
+            n.data.configuration.parameters = normalizeNumericValues(
+              Object.fromEntries(
+                Object.entries(n.data.configuration.parameters).filter(
+                  ([key]) => isNaN(Number(key)),
+                ),
               ),
             );
           }
@@ -1353,8 +1355,8 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
         }),
         // Edges are unchanged
         edges: fixedFlow.edges,
-        // Keep settings under configuration
-        settings: fixedFlow.settings,
+        // Normalize settings to ensure numeric values are numbers, not strings
+        settings: normalizeNumericValues(fixedFlow.settings),
       },
     };
 
@@ -1460,6 +1462,22 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
           py: 1,
           px: 2,
           minHeight: 56,
+          background: (t) => `
+            radial-gradient(ellipse at top, ${alpha(
+              t.palette.primary.main,
+              0.08,
+            )} 0%, transparent 50%),
+            linear-gradient(135deg, ${t.palette.background.default} 0%, ${alpha(
+              t.palette.primary.main,
+              0.02,
+            )} 100%)
+          `,
+          backdropFilter: "blur(10px)",
+          borderRadius: 2,
+          boxShadow: (t) =>
+            t.palette.mode === "dark"
+              ? "0 4px 12px rgba(0, 0, 0, 0.3)"
+              : "0 2px 8px rgba(0, 0, 0, 0.1)",
         }}
       >
         {isCompactMode ? (
@@ -1503,12 +1521,24 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
               </Box>
 
               {/* Save button - always icon in compact mode */}
-              <Tooltip title={isEditMode ? "Update Pipeline" : "Save Pipeline"}>
+              <Tooltip
+                title={
+                  isEditMode && !hasChanges
+                    ? "No changes to save"
+                    : isEditMode
+                      ? "Update Pipeline"
+                      : "Save Pipeline"
+                }
+              >
                 <span>
                   <IconButton
                     color="primary"
                     onClick={onSave}
-                    disabled={isLoading || !pipelineName.trim()}
+                    disabled={
+                      isLoading ||
+                      !pipelineName.trim() ||
+                      (isEditMode && !hasChanges)
+                    }
                     size="medium"
                   >
                     {isLoading ? <CircularProgress size={24} /> : <SaveIcon />}
@@ -1693,21 +1723,32 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                 />
               </Box>
 
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={onSave}
-                disabled={isLoading || !pipelineName || !pipelineName.trim()}
-                sx={{
-                  "&.Mui-disabled": {
-                    opacity: 1,
-                    color: "text.disabled",
-                    backgroundColor: "action.disabledBackground",
-                  },
-                }}
+              <Tooltip
+                title={isEditMode && !hasChanges ? "No changes to save" : ""}
               >
-                {isLoading ? "Saving…" : isEditMode ? "Update" : "Save"}
-              </Button>
+                <span>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={onSave}
+                    disabled={
+                      isLoading ||
+                      !pipelineName ||
+                      !pipelineName.trim() ||
+                      (isEditMode && !hasChanges)
+                    }
+                    sx={{
+                      "&.Mui-disabled": {
+                        opacity: 1,
+                        color: "text.disabled",
+                        backgroundColor: "action.disabledBackground",
+                      },
+                    }}
+                  >
+                    {isLoading ? "Saving…" : isEditMode ? "Update" : "Save"}
+                  </Button>
+                </span>
+              </Tooltip>
 
               <Button variant="outlined" color="inherit" onClick={handleCancel}>
                 Cancel
@@ -1764,16 +1805,6 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                   />
                 }
                 label={active ? "Active" : "Inactive"}
-              />
-
-              {/* Hidden file input */}
-              <input
-                type="file"
-                accept="application/json"
-                ref={fileInputRef}
-                style={{ display: "none" }}
-                onChange={handleLoadFlow}
-                onClick={(e) => ((e.target as HTMLInputElement).value = "")}
               />
 
               {/* Import/Export */}
@@ -1853,6 +1884,38 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
           </>
         )}
       </Box>
+
+      {/* Hidden file input - shared between compact and full mode */}
+      <input
+        type="file"
+        accept="application/json"
+        ref={fileInputRef}
+        style={{ display: "none" }}
+        onChange={handleLoadFlow}
+        onClick={(e) => ((e.target as HTMLInputElement).value = "")}
+      />
+      {/* Import loading backdrop */}
+      <Backdrop
+        open={isImporting}
+        sx={{
+          color: "#fff",
+          zIndex: (theme) => theme.zIndex.drawer + 1,
+        }}
+      >
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 2,
+          }}
+        >
+          <CircularProgress color="inherit" />
+          <Box sx={{ color: "white", fontSize: "1.1rem" }}>
+            Importing Pipeline...
+          </Box>
+        </Box>
+      </Backdrop>
 
       {/* Integration validation dialog (unchanged) */}
       <IntegrationValidationDialog

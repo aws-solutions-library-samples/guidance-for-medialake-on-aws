@@ -28,6 +28,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import LockIcon from "@mui/icons-material/Lock";
 import LockOpenIcon from "@mui/icons-material/LockOpen";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import GroupIcon from "@mui/icons-material/Group";
 import { User } from "@/api/types/api.types";
 import { useGetGroups } from "@/api/hooks/useGroups";
 import { useGetPermissionSets } from "@/api/hooks/usePermissionSets";
@@ -750,6 +751,10 @@ const UserList: React.FC<UserListProps> = ({
           activeSorting={activeSorting}
           onRemoveFilter={onRemoveFilter}
           onRemoveSort={onRemoveSort}
+          emptyState={{
+            message: "No users found",
+            icon: <GroupIcon sx={{ fontSize: 40 }} />,
+          }}
         />
 
         <ColumnVisibilityMenu

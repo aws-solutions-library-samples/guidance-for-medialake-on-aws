@@ -19,15 +19,16 @@ import {
   useTheme,
   Popover,
   CircularProgress,
-  Collapse,
+  Checkbox,
+  FormControlLabel,
+  ToggleButtonGroup,
+  ToggleButton,
 } from "@mui/material";
 import {
   Close as CloseIcon,
   CloudUpload as CloudUploadIcon,
   Info as InfoIcon,
   Refresh as RefreshIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
   Add as AddIcon,
   Delete as DeleteIcon,
 } from "@mui/icons-material";
@@ -130,7 +131,8 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
   const [configuration, setConfiguration] = useState<Record<string, any>>({});
   const [objectPrefixes, setObjectPrefixes] = useState<string[]>([""]);
   const [infoAnchorEl, setInfoAnchorEl] = useState<HTMLElement | null>(null);
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [configTab, setConfigTab] = useState<"basic" | "advanced">("basic");
+  const [allowUploads, setAllowUploads] = useState(false);
   const {
     data: s3BucketsResponse,
     isLoading: isLoadingBuckets,
@@ -145,6 +147,18 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
       setName(editingConnector.name);
       setType(editingConnector.type);
       setConfiguration(editingConnector.configuration || {});
+      const connectorType = editingConnector.configuration?.connectorType;
+      setS3ConnectorType(
+        typeof connectorType === "string" ? connectorType : "non-managed",
+      );
+
+      // Normalize integration method from either field
+      const method =
+        editingConnector.integrationMethod ||
+        editingConnector.configuration?.s3IntegrationMethod;
+      if (method) {
+        setConfiguration((prev) => ({ ...prev, s3IntegrationMethod: method }));
+      }
 
       // Handle object prefixes from existing configuration
       if (editingConnector.objectPrefix) {
@@ -162,22 +176,26 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
         setObjectPrefixes([""]);
       }
 
+      // Initialize allowUploads from top-level field first, fallback to configuration
+      setAllowUploads(
+        editingConnector.allowUploads ??
+          editingConnector.configuration?.allowUploads ??
+          false,
+      );
+
       setActiveStep(2);
-      setBucketType("");
-      setConfiguration({});
-      setObjectPrefixes([""]);
-      setActiveStep(0);
-      setAwsRegion("");
-      setBucketNameError("");
     } else {
       setName("");
       setType("");
       setBucketType("");
-      setConfiguration({});
+      setS3ConnectorType("non-managed");
+      setConfiguration({ s3IntegrationMethod: "eventbridge" });
       setObjectPrefixes([""]);
       setActiveStep(0);
       setAwsRegion("");
       setBucketNameError("");
+      setAllowUploads(false);
+      setConfigTab("basic");
     }
   }, [editingConnector, open]);
 
@@ -272,7 +290,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
       !type ||
       (type === "s3" &&
         (!s3ConnectorType ||
-          !configuration.integrationMethod ||
+          !configuration.s3IntegrationMethod ||
           (bucketType === "existing" && !configuration.bucket) ||
           (bucketType === "new" && !configuration.bucket)))
     ) {
@@ -285,24 +303,26 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
       (prefix) => prefix.trim() !== "",
     );
 
+    // Sanitize configuration to remove integrationMethod and only include valid fields
+    const { integrationMethod, ...restConfig } = configuration as any;
+
+    // Build new bucket extras, only including region if non-empty
+    const newBucketExtras =
+      bucketType === "new" && awsRegion.trim() ? { region: awsRegion } : {};
+
     const connectorData: CreateConnectorRequest = {
       name,
       type,
       description,
       configuration: {
-        ...configuration,
+        ...restConfig,
         connectorType: s3ConnectorType,
-        s3IntegrationMethod: configuration.integrationMethod as
-          | "eventbridge"
-          | "s3Notifications",
+        s3IntegrationMethod: (configuration.s3IntegrationMethod ||
+          integrationMethod) as "eventbridge" | "s3Notifications",
         objectPrefix: filteredPrefixes.length > 0 ? filteredPrefixes : [],
-        ...(bucketType === "new" && {
-          bucketType: "new",
-          region: awsRegion,
-        }),
-        ...(bucketType === "existing" && {
-          bucketType: "existing",
-        }),
+        allowUploads: allowUploads,
+        bucketType: bucketType as "new" | "existing",
+        ...newBucketExtras,
       },
     };
 
@@ -364,100 +384,191 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
 
   const renderS3Configuration = () => (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      {editingConnector ? (
+      {/* Tab Navigation */}
+      <Box sx={{ display: "flex", justifyContent: "center", mb: 3 }}>
+        <ToggleButtonGroup
+          value={configTab}
+          exclusive
+          onChange={(e, newValue) => {
+            if (newValue !== null) setConfigTab(newValue);
+          }}
+          aria-label="configuration tabs"
+          sx={{ width: "100%", maxHeight: "36px" }}
+        >
+          <ToggleButton
+            value="basic"
+            aria-label="configuration"
+            sx={{ flex: 1, textAlign: "center", justifyContent: "center" }}
+          >
+            CONFIGURATION
+          </ToggleButton>
+          <ToggleButton
+            value="advanced"
+            aria-label="advanced configuration"
+            sx={{ flex: 1, textAlign: "center", justifyContent: "center" }}
+          >
+            ADVANCED CONFIGURATION
+          </ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
+
+      {/* Configuration Tab Content */}
+      {configTab === "basic" && (
         <>
+          {editingConnector ? (
+            <>
+              <TextField
+                label="Connector Name"
+                value={name}
+                disabled
+                fullWidth
+                slotProps={{
+                  input: {
+                    sx: { bgcolor: "action.disabledBackground" },
+                  },
+                }}
+                helperText="Connector name cannot be modified after creation"
+              />
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ mt: -1 }}
+              >
+                Amazon S3
+              </Typography>
+            </>
+          ) : (
+            <TextField
+              label="Connector Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              fullWidth
+              required
+            />
+          )}
+
           <TextField
-            label="Connector Name"
-            value={name}
-            disabled
+            label="Description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
             fullWidth
-            slotProps={{
-              input: {
-                sx: { bgcolor: "action.disabledBackground" },
-              },
-            }}
-            helperText="Connector name cannot be modified after creation"
+            multiline
+            rows={2}
           />
-          <Typography variant="caption" color="text.secondary" sx={{ mt: -1 }}>
-            Amazon S3
-          </Typography>
+
+          {editingConnector ? (
+            <>
+              <FormControl fullWidth disabled>
+                <InputLabel>S3 Bucket</InputLabel>
+                <Select
+                  value={configuration.bucket || ""}
+                  label="S3 Bucket"
+                  sx={{ bgcolor: "action.disabledBackground" }}
+                >
+                  <MenuItem value={configuration.bucket}>
+                    {configuration.bucket}
+                  </MenuItem>
+                </Select>
+              </FormControl>
+            </>
+          ) : (
+            <>
+              {bucketType === "existing" && (
+                <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
+                  <FormControl fullWidth required>
+                    <InputLabel>S3 Bucket</InputLabel>
+                    <Select
+                      value={configuration.bucket || ""}
+                      label="S3 Bucket"
+                      onChange={(e) =>
+                        setConfiguration({
+                          ...configuration,
+                          bucket: e.target.value,
+                        })
+                      }
+                      disabled={isLoadingBuckets}
+                      startAdornment={
+                        isLoadingBuckets ? (
+                          <CircularProgress size={20} sx={{ ml: 1 }} />
+                        ) : null
+                      }
+                    >
+                      {buckets.map((bucket) => (
+                        <MenuItem key={bucket} value={bucket}>
+                          {bucket}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <IconButton
+                    onClick={() => refetchBuckets()}
+                    disabled={isLoadingBuckets}
+                    sx={{ mt: 1 }}
+                  >
+                    {isLoadingBuckets ? (
+                      <CircularProgress size={24} />
+                    ) : (
+                      <RefreshIcon />
+                    )}
+                  </IconButton>
+                </Box>
+              )}
+              {bucketType === "new" && (
+                <>
+                  <TextField
+                    label="New Bucket Name"
+                    value={configuration.bucket || ""}
+                    onChange={handleBucketNameChange}
+                    fullWidth
+                    required
+                    error={!!bucketNameError}
+                    helperText={
+                      bucketNameError ||
+                      "Bucket name must be globally unique, follow S3 naming rules."
+                    }
+                  />
+                  {/* AWS Region FormControl hidden as requested */}
+                  {/* <FormControl fullWidth required>
+                                    <InputLabel>AWS Region</InputLabel>
+                                    <Select
+                                        value={awsRegion}
+                                        label="AWS Region"
+                                        onChange={(e) => setAwsRegion(e.target.value)}
+                                    >
+                                        {AWS_REGIONS.map((region) => (
+                                            <MenuItem key={region.value} value={region.value}>
+                                                {region.label} ({region.value})
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl> */}
+                </>
+              )}
+            </>
+          )}
         </>
-      ) : (
-        <TextField
-          label="Connector Name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          fullWidth
-          required
-        />
       )}
 
-      <TextField
-        label="Description"
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        fullWidth
-        multiline
-        rows={2}
-      />
-
-      {editingConnector ? (
+      {/* Advanced Configuration Tab Content */}
+      {configTab === "advanced" && (
         <>
+          {/* S3 Connector Type */}
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <FormControl fullWidth disabled>
-              <InputLabel>S3 Connector Type</InputLabel>
-              <Select
-                value={s3ConnectorType}
-                label="S3 Connector Type"
-                sx={{ bgcolor: "action.disabledBackground" }}
-              >
-                {S3_CONNECTOR_TYPES.map((type) => (
-                  <MenuItem key={type.value} value={type.value}>
-                    {type.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <IconButton onClick={handleInfoClick}>
-              <InfoIcon />
-            </IconButton>
-          </Box>
-          <FormControl fullWidth disabled>
-            <InputLabel>S3 Integration Method</InputLabel>
-            <Select
-              value={configuration.integrationMethod || ""}
-              label="S3 Integration Method"
-              sx={{ bgcolor: "action.disabledBackground" }}
+            <FormControl
+              fullWidth
+              disabled={!!editingConnector}
+              required={!editingConnector}
             >
-              {S3_INTEGRATION_METHODS.map((method) => (
-                <MenuItem key={method.value} value={method.value}>
-                  {method.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl fullWidth disabled>
-            <InputLabel>S3 Bucket</InputLabel>
-            <Select
-              value={configuration.bucket || ""}
-              label="S3 Bucket"
-              sx={{ bgcolor: "action.disabledBackground" }}
-            >
-              <MenuItem value={configuration.bucket}>
-                {configuration.bucket}
-              </MenuItem>
-            </Select>
-          </FormControl>
-        </>
-      ) : (
-        <>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <FormControl fullWidth required>
               <InputLabel>S3 Connector Type</InputLabel>
               <Select
                 value={s3ConnectorType}
                 label="S3 Connector Type"
                 onChange={(e) => setS3ConnectorType(e.target.value)}
+                sx={
+                  editingConnector
+                    ? { bgcolor: "action.disabledBackground" }
+                    : {}
+                }
               >
                 {S3_CONNECTOR_TYPES.map((type) => (
                   <MenuItem key={type.value} value={type.value}>
@@ -470,16 +581,25 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
               <InfoIcon />
             </IconButton>
           </Box>
-          <FormControl fullWidth required>
+
+          {/* S3 Integration Method */}
+          <FormControl
+            fullWidth
+            disabled={!!editingConnector}
+            required={!editingConnector}
+          >
             <InputLabel>S3 Integration Method</InputLabel>
             <Select
-              value={configuration.integrationMethod || ""}
+              value={configuration.s3IntegrationMethod || ""}
               label="S3 Integration Method"
               onChange={(e) =>
                 setConfiguration({
                   ...configuration,
-                  integrationMethod: e.target.value,
+                  s3IntegrationMethod: e.target.value,
                 })
+              }
+              sx={
+                editingConnector ? { bgcolor: "action.disabledBackground" } : {}
               }
             >
               {S3_INTEGRATION_METHODS.map((method) => (
@@ -489,90 +609,33 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
               ))}
             </Select>
           </FormControl>
-          {bucketType === "existing" && (
-            <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
-              <FormControl fullWidth required>
-                <InputLabel>S3 Bucket</InputLabel>
-                <Select
-                  value={configuration.bucket || ""}
-                  label="S3 Bucket"
-                  onChange={(e) =>
-                    setConfiguration({
-                      ...configuration,
-                      bucket: e.target.value,
-                    })
-                  }
-                  disabled={isLoadingBuckets}
-                  startAdornment={
-                    isLoadingBuckets ? (
-                      <CircularProgress size={20} sx={{ ml: 1 }} />
-                    ) : null
-                  }
-                >
-                  {buckets.map((bucket) => (
-                    <MenuItem key={bucket} value={bucket}>
-                      {bucket}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <IconButton
-                onClick={() => refetchBuckets()}
-                disabled={isLoadingBuckets}
-                sx={{ mt: 1 }}
-              >
-                {isLoadingBuckets ? (
-                  <CircularProgress size={24} />
-                ) : (
-                  <RefreshIcon />
-                )}
-              </IconButton>
-            </Box>
-          )}
-          {bucketType === "new" && (
-            <>
-              <TextField
-                label="New Bucket Name"
-                value={configuration.bucket || ""}
-                onChange={handleBucketNameChange}
-                fullWidth
-                required
-                error={!!bucketNameError}
-                helperText={
-                  bucketNameError ||
-                  "Bucket name must be globally unique, follow S3 naming rules."
-                }
-              />
-              {/* AWS Region FormControl hidden as requested */}
-              {/* <FormControl fullWidth required>
-                                <InputLabel>AWS Region</InputLabel>
-                                <Select
-                                    value={awsRegion}
-                                    label="AWS Region"
-                                    onChange={(e) => setAwsRegion(e.target.value)}
-                                >
-                                    {AWS_REGIONS.map((region) => (
-                                        <MenuItem key={region.value} value={region.value}>
-                                            {region.label} ({region.value})
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl> */}
-            </>
-          )}
-        </>
-      )}
 
-      <Button
-        onClick={() => setShowAdvanced(!showAdvanced)}
-        startIcon={showAdvanced ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-        sx={{ alignSelf: "flex-start", mt: 1 }}
-      >
-        Advanced configuration
-      </Button>
+          <Box sx={{ mb: 2 }}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={allowUploads}
+                  onChange={(e) => setAllowUploads(e.target.checked)}
+                  disabled={!!editingConnector}
+                />
+              }
+              label="Allow Uploads"
+            />
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: "block", ml: 4, mt: 0.5 }}
+            >
+              Enable direct browser uploads to this S3 bucket. This will
+              configure CORS policies to allow PUT and POST requests from the
+              MediaLake application.
+            </Typography>
+          </Box>
 
-      <Collapse in={showAdvanced}>
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}>
+          <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
+            Object Prefixes
+          </Typography>
+
           {objectPrefixes.map((prefix, index) => (
             <Box
               key={index}
@@ -600,8 +663,8 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
           >
             Add Prefix
           </Button>
-        </Box>
-      </Collapse>
+        </>
+      )}
     </Box>
   );
 

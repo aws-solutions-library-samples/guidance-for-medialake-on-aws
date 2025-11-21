@@ -1,7 +1,4 @@
-import base64
-import importlib.util
 import json
-import mimetypes
 import os
 import random
 import time
@@ -12,7 +9,6 @@ from urllib.parse import urlparse
 import boto3
 from aws_lambda_powertools import Logger, Tracer
 from botocore.exceptions import ClientError
-from jinja2 import Environment, FileSystemLoader
 from lambda_middleware import lambda_middleware
 
 # ────────────────────────────────────────────────────────────
@@ -170,6 +166,33 @@ def _generic_prompt_builder(instr: str, txt: str) -> Dict[str, Any]:
     }
 
 
+def _twelvelabs_pegasus_builder(
+    instr: str, content: Union[str, Dict[str, Any]]
+) -> Dict[str, Any]:
+    """
+    Builder for TwelveLabs Pegasus model.
+    Requires inputPrompt and mediaSource with S3 URI and bucketOwner.
+    """
+    if isinstance(content, dict) and "s3_uri" in content:
+        # Get AWS account ID from STS
+        import boto3
+
+        sts = boto3.client("sts")
+        account_id = sts.get_caller_identity()["Account"]
+
+        return {
+            "inputPrompt": instr,
+            "mediaSource": {
+                "s3Location": {"uri": content["s3_uri"], "bucketOwner": account_id}
+            },
+        }
+    else:
+        raise ValueError(
+            "TwelveLabs Pegasus requires content dict with 's3_uri' field, "
+            f"got: {type(content)}"
+        )
+
+
 # === 2) Map model IDs to builders ===
 
 MODEL_BODY_BUILDERS: Dict[str, Callable[..., Dict[str, Any]]] = {
@@ -184,6 +207,7 @@ MODEL_BODY_BUILDERS: Dict[str, Callable[..., Dict[str, Any]]] = {
     "meta.llama4": _generic_prompt_builder,
     "pixtral-large": _generic_prompt_builder,
     "mistral.pixtral-large": _generic_prompt_builder,
+    "twelvelabs.pegasus": _twelvelabs_pegasus_builder,
 }
 
 # === 3) Central body‐builder ===
@@ -308,6 +332,125 @@ def get_file_content(s3_uri: str) -> str:
 
 def get_s3_bytes(bucket: str, key: str) -> bytes:
     return s3.Object(bucket, key).get()["Body"].read()
+
+
+def estimate_tokens(text: str) -> int:
+    """
+    Rough token estimation (1 token ≈ 4 characters).
+    This is a conservative estimate that works across most models.
+    """
+    return len(text) // 4
+
+
+def validate_input_size(text: str, model_id: str, max_tokens: int = 100000):
+    """
+    Validate input doesn't exceed model limits.
+
+    Args:
+        text: The input text to validate
+        model_id: The Bedrock model ID
+        max_tokens: Maximum allowed tokens (default: 100K)
+
+    Raises:
+        ValueError: If input exceeds token limit
+    """
+    estimated_tokens = estimate_tokens(text)
+
+    if estimated_tokens > max_tokens:
+        raise ValueError(
+            f"Input too large: {estimated_tokens} tokens (max: {max_tokens}). "
+            f"Text length: {len(text)} characters. "
+            f"Consider chunking or reducing input size."
+        )
+
+    logger.info(f"Input validation passed: {estimated_tokens}/{max_tokens} tokens")
+    return estimated_tokens
+
+
+def chunk_text(text: str, max_tokens: int = 50000) -> list:
+    """
+    Split text into chunks that fit within token limits.
+
+    Args:
+        text: The text to chunk
+        max_tokens: Maximum tokens per chunk (default: 50K to leave room for prompt)
+
+    Returns:
+        List of text chunks
+    """
+    max_chars = max_tokens * 4
+    chunks = []
+
+    for i in range(0, len(text), max_chars):
+        chunk = text[i : i + max_chars]
+        chunks.append(chunk)
+
+    logger.info(f"Split text into {len(chunks)} chunks")
+    return chunks
+
+
+def summarize_chunks(
+    chunks: list, model_id: str, instr: str, bedrock_client, profile_id: str
+) -> str:
+    """
+    Summarize each chunk and combine results.
+
+    Args:
+        chunks: List of text chunks to summarize
+        model_id: Bedrock model ID
+        instr: The instruction/prompt
+        bedrock_client: Bedrock runtime client
+        profile_id: Inference profile ID
+
+    Returns:
+        Combined summary of all chunks
+    """
+    summaries = []
+
+    for i, chunk in enumerate(chunks):
+        logger.info(f"Processing chunk {i+1}/{len(chunks)}")
+        body_json = build_bedrock_body(model_id, instr, chunk).encode("utf-8")
+
+        resp = invoke_bedrock_with_retry(
+            bedrock_client, profile_id, body_json, "application/json"
+        )
+        data = json.loads(resp["body"].read())
+
+        if "anthropic" in model_id.lower():
+            summary = data["content"][0]["text"]
+        elif "nova" in model_id.lower():
+            summary = data["output"]["message"]["content"][0]["text"]
+        elif "titan" in model_id.lower():
+            summary = data["results"][0]["outputText"]
+        else:
+            summary = str(data)
+
+        summaries.append(summary)
+
+    if len(summaries) > 1:
+        combined = "\n\n".join(summaries)
+        final_instr = (
+            "Combine these summaries into a single coherent summary. "
+            "Maintain the key points and overall structure:\n\n" + combined
+        )
+
+        logger.info("Creating final combined summary")
+        body_json = build_bedrock_body(model_id, final_instr, "").encode("utf-8")
+        resp = invoke_bedrock_with_retry(
+            bedrock_client, profile_id, body_json, "application/json"
+        )
+        data = json.loads(resp["body"].read())
+
+        if "anthropic" in model_id.lower():
+            return data["content"][0]["text"]
+        elif "nova" in model_id.lower():
+            return data["output"]["message"]["content"][0]["text"]
+        elif "titan" in model_id.lower():
+            return data["results"][0]["outputText"]
+        else:
+            return str(data)
+
+    return summaries[0]
 
 
 # ────────────────────────────────────────────────────────────
@@ -461,32 +604,31 @@ def invoke_bedrock_with_retry(
 def lambda_handler(event, context):
     try:
         logger.info("Event received", extra={"event": event})
-        bucket = os.getenv("API_TEMPLATE_BUCKET", "medialake-assets")
-        tpl_paths = build_s3_templates_path("bedrock", "content_processor", "post")
 
-        params, mapping = create_request_body(tpl_paths, bucket, event)
-
-        asset_id = params.get("asset_id")
-        file_uri = params.get("file_s3_uri")
-        content_src = os.getenv("CONTENT_SOURCE")
+        # Extract parameters directly from event without S3 mapping files
+        content_src = os.getenv("CONTENT_SOURCE", "proxy")
         prompt_name = os.getenv("PROMPT_NAME")
-        custom_prompt = mapping.get("custom_prompt")
-
-        instr = (
-            custom_prompt
-            or DEFAULT_PROMPTS.get(prompt_name)
-            or os.getenv("PROMPT", DEFAULT_PROMPTS["summary_100"])
-        )
-
         model_id = os.getenv("MODEL_ID")
+
         if not model_id:
             raise KeyError("MODEL_ID environment variable is required")
 
+        # Get instruction/prompt
+        instr = DEFAULT_PROMPTS.get(prompt_name) or os.getenv(
+            "PROMPT", DEFAULT_PROMPTS["summary_100"]
+        )
+
         # ── Locate content ────────────────────────────────────────────────
-        assets = event.get("payload", {}).get("assets", [])
+        payload = event.get("payload", {})
+        assets = payload.get("assets", [])
         if not assets:
             raise ValueError("No assets found in event.payload.assets")
         asset_detail = assets[0]
+
+        # Extract asset_id from the asset
+        asset_id = asset_detail.get("InventoryID")
+        if not asset_id:
+            raise ValueError("No InventoryID found in asset")
 
         if content_src == "transcript":
             uri = (
@@ -496,9 +638,21 @@ def lambda_handler(event, context):
             )
             if not uri:
                 raise ValueError("Asset has no transcript/text/content S3 URI")
+
             text = get_file_content(uri)
             fetched_uri = uri
-            body_json = build_bedrock_body(model_id, instr, text).encode("utf-8")
+            logger.info(f"Loaded transcript from {uri}, length: {len(text)} chars")
+
+            try:
+                estimated_tokens = validate_input_size(
+                    text, model_id, max_tokens=100000
+                )
+                body_json = build_bedrock_body(model_id, instr, text).encode("utf-8")
+                use_chunking = False
+            except ValueError as e:
+                logger.warning(f"Input too large: {e}. Using chunking strategy.")
+                use_chunking = True
+                body_json = None
 
         elif content_src == "proxy":
             rep = next(
@@ -507,21 +661,29 @@ def lambda_handler(event, context):
                 if r["Purpose"] == "proxy"
             )
             loc = rep["StorageInfo"]["PrimaryLocation"]
-            raw = get_s3_bytes(loc["Bucket"], loc["ObjectKey"]["FullPath"])
-            b64 = base64.b64encode(raw).decode("utf-8")
-            mime = (
-                mimetypes.guess_type(loc["ObjectKey"]["FullPath"])[0]
-                or "application/octet-stream"
-            )
             fetched_uri = f"s3://{loc['Bucket']}/{loc['ObjectKey']['FullPath']}"
+
+            # For TwelveLabs models, pass S3 URI directly instead of base64
             body_json = build_bedrock_body(
-                model_id, instr, {"b64": b64, "mime": mime}
+                model_id, instr, {"s3_uri": fetched_uri}
             ).encode("utf-8")
+            use_chunking = False
 
         elif file_uri:
             text = get_file_content(file_uri)
             fetched_uri = file_uri
-            body_json = build_bedrock_body(model_id, instr, text).encode("utf-8")
+            logger.info(f"Loaded file from {file_uri}, length: {len(text)} chars")
+
+            try:
+                estimated_tokens = validate_input_size(
+                    text, model_id, max_tokens=100000
+                )
+                body_json = build_bedrock_body(model_id, instr, text).encode("utf-8")
+                use_chunking = False
+            except ValueError as e:
+                logger.warning(f"Input too large: {e}. Using chunking strategy.")
+                use_chunking = True
+                body_json = None
 
         else:
             raise ValueError(f"Unsupported content source '{content_src}'")
@@ -536,44 +698,84 @@ def lambda_handler(event, context):
 
         # ── Invoke Bedrock ────────────────────────────────────────────────
         logger.info(f"Invoking {model_id} with payload from {fetched_uri}")
-        try:
-            resp = invoke_bedrock_with_retry(
-                bedrock_rt, profile_id, body_json, "application/json"
-            )
-        except ClientError:
-            logger.error(f"Bedrock invoke failed after retries. Payload: {body_json}")
-            raise  # ← propagate
 
-        data = json.loads(resp["body"].read())
-        logger.info(f"Bedrock response structure: {list(data.keys())}")
-
-        if "anthropic" in model_id.lower():
-            result = data["content"][0]["text"]
-        elif "nova" in model_id.lower():
-            # Nova models return response in 'output' -> 'message' -> 'content' -> [0] -> 'text'
-            result = (
-                data.get("output", {})
-                .get("message", {})
-                .get("content", [{}])[0]
-                .get("text", "")
-            )
+        if use_chunking:
+            logger.info("Using chunking strategy for large content")
+            chunks = chunk_text(text, max_tokens=50000)
+            result = summarize_chunks(chunks, model_id, instr, bedrock_rt, profile_id)
             logger.info(
-                f"Nova result extraction: {result[:100]}..."
-                if result
-                else "Nova result is empty"
+                f"Chunked processing complete. Final result length: {len(result)}"
             )
-        elif "images" in data:
-            result = data["images"][0]
-        else:
-            result = data.get("completion", data.get("generated_text", ""))
 
-        logger.info(f"Final extracted result length: {len(result) if result else 0}")
+            data = {"result": result, "chunked": True, "num_chunks": len(chunks)}
+        else:
+            try:
+                resp = invoke_bedrock_with_retry(
+                    bedrock_rt, profile_id, body_json, "application/json"
+                )
+            except ClientError as e:
+                error_code = e.response.get("Error", {}).get("Code", "")
+                if error_code == "ValidationException" and "token" in str(e).lower():
+                    logger.warning(
+                        "Token limit exceeded despite validation. Falling back to chunking."
+                    )
+                    chunks = chunk_text(text, max_tokens=50000)
+                    result = summarize_chunks(
+                        chunks, model_id, instr, bedrock_rt, profile_id
+                    )
+                    logger.info(
+                        f"Fallback chunking complete. Final result length: {len(result)}"
+                    )
+                    data = {
+                        "result": result,
+                        "chunked": True,
+                        "num_chunks": len(chunks),
+                    }
+                else:
+                    logger.error(f"Bedrock invoke failed after retries. Error: {e}")
+                    raise
+
+            if not use_chunking:
+                data = json.loads(resp["body"].read())
+                logger.info(f"Bedrock response structure: {list(data.keys())}")
+
+                # Extract result from Bedrock response
+                if "anthropic" in model_id.lower():
+                    result = data["content"][0]["text"]
+                elif "twelvelabs" in model_id.lower() and "pegasus" in model_id.lower():
+                    # TwelveLabs Pegasus returns message as a direct string
+                    result = data.get("message", "")
+                    logger.info(
+                        f"TwelveLabs Pegasus result extraction: {result[:100]}..."
+                        if result
+                        else "TwelveLabs Pegasus result is empty"
+                    )
+                elif "nova" in model_id.lower():
+                    result = (
+                        data.get("output", {})
+                        .get("message", {})
+                        .get("content", [{}])[0]
+                        .get("text", "")
+                    )
+                    logger.info(
+                        f"Nova result extraction: {result[:100]}..."
+                        if result
+                        else "Nova result is empty"
+                    )
+                elif "images" in data:
+                    result = data["images"][0]
+                else:
+                    result = data.get("completion", data.get("generated_text", ""))
+
+                logger.info(
+                    f"Final extracted result length: {len(result) if result else 0}"
+                )
 
         # ── Persist back to DynamoDB ──────────────────────────────────────
         formatted_prompt_name = (
             _format_prompt_name_for_dynamo(prompt_name) if prompt_name else None
         )
-        dynamo_key = mapping.get("dynamo_key") or (
+        dynamo_key = (
             f"{formatted_prompt_name}Result"
             if formatted_prompt_name
             else "customPromptResult"
@@ -588,10 +790,21 @@ def lambda_handler(event, context):
             ExpressionAttributeValues={":v": result},
         )
 
-        final = create_response_output(tpl_paths, bucket, data, event, mapping)
+        # Return response directly without S3 template mapping
         updated = table.get_item(Key={"InventoryID": asset_id}).get("Item", {})
-        final["updatedAsset"] = _strip_decimals(updated)
-        return final
+        return {
+            "statusCode": 200,
+            "body": {
+                "result": result,
+                "model_id": model_id,
+                "prompt_name": prompt_name,
+                "content_source": content_src,
+                "asset_id": asset_id,
+            },
+            "updatedAsset": _strip_decimals(updated),
+            "metadata": event.get("metadata", {}),
+            "payload": event.get("payload", {}),
+        }
 
     except Exception:
         # Log *and* re-raise so the Lambda ends in an error state         ❶
