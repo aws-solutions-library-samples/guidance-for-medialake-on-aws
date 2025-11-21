@@ -1,6 +1,27 @@
 stages:
+  - .pre
   - test
+  - lint
   - build
+  - deploy
+
+default:
+  image: public.ecr.aws/amazonlinux/amazonlinux:latest
+  tags:
+    - arch:amd64
+    - size:large
+
+# Variables
+variables:
+  PROJECT_ENV: ${CI_COMMIT_REF_SLUG}
+  AWS_CONFIG_FILE: ${CI_BUILDS_DIR}/.awscredentialvendor/config
+  AWS_SHARED_CREDENTIALS_FILE: ${CI_BUILDS_DIR}/.awscredentialvendor/credentials
+
+# Cache modules between jobs
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - .cache/pip
 
 # Simple workflow - only MR pipelines and release branch
 workflow:
@@ -56,7 +77,7 @@ test-mr-to-stable:
 
 # Validate MR title for main and stable branches
 mr-title-check:
-  stage: test
+  stage: .pre
   image: alpine:latest
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
@@ -74,6 +95,50 @@ mr-title-check:
       fi
       echo "MR title is valid"
 
+# STEP 2: Add back echo_versions anchor and pre_commit_checks
+.echo_versions: &echo_versions
+  before_script:
+    - yum update -y
+    - yum install -y python3 python3-pip nodejs npm git jq unzip which findutils
+    - yum install -y atk at-spi2-atk cups-libs libdrm libxcb libxkbcommon at-spi2-core libX11 libXcomposite libXdamage libXext libXfixes libXrandr mesa-libgbm pango cairo alsa-lib
+    - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+    - unzip awscliv2.zip
+    - ./aws/install
+    - npm install -g aws-cdk
+    - echo "login = ${GITLAB_USER_LOGIN} - role = ${AWS_CREDS_TARGET_ROLE}"
+    - npm --version
+    - node --version
+    - aws --version
+    - cdk --version
+    - jq --version
+
+pre_commit_checks:
+  stage: lint
+  <<: *echo_versions
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+  script:
+    - echo "Running pre-commit checks for merge request to main"
+    - python3 -m venv .venv
+    - source .venv/bin/activate
+    - pip install pre-commit
+    - npm install
+    - pip install autoflake isort black flake8
+    - npm install -g prettier
+    - pre-commit run --all-files trailing-whitespace
+    - pre-commit run --all-files end-of-file-fixer
+    - pre-commit run --all-files check-yaml
+    - pre-commit run --all-files check-added-large-files
+    - pre-commit run --all-files check-merge-conflict
+    - pre-commit run --all-files detect-private-key
+    - pre-commit run --all-files check-json
+    - pre-commit run --all-files autoflake
+    - pre-commit run --all-files isort
+    - pre-commit run --all-files black
+    - pre-commit run --all-files flake8
+    - pre-commit run --all-files prettier
+    - find . -name .DS_Store -type f -delete
+
 # Simple version check for MRs to stable
 version-check:
   stage: build
@@ -90,13 +155,14 @@ version-check:
 # STEP 1: Add back semantic-version job
 semantic-version:
   image: alpine:latest
-  stage: build
+  stage: .pre
   variables:
     GIT_DEPTH: 0
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
   script:
-    - apk add --no-cache git bash
+    - apk add --no-cache git bash nodejs npm
+    - npm install -g prettier
     - git config --global user.email "medialake@amazon.com"
     - git config --global user.name "Media Lake CI"
     - |
@@ -298,6 +364,31 @@ semantic-version:
       echo "=========================================="
       echo ""
 
+      echo "Fixing formatting issues in CHANGELOG.md..."
+
+      # Remove trailing whitespace
+      sed -i 's/[[:space:]]*$//' CHANGELOG.md
+      echo "Removed trailing whitespace"
+
+      # Ensure file ends with newline
+      if [ -n "$(tail -c 1 CHANGELOG.md)" ]; then
+        echo "" >> CHANGELOG.md
+        echo "Added missing newline at end of file"
+      fi
+
+      # Run prettier if available
+      if command -v prettier > /dev/null 2>&1; then
+        prettier --write CHANGELOG.md
+        echo "Formatted with prettier"
+      else
+        echo "Warning: prettier not found, skipping prettier formatting"
+      fi
+
+      echo ""
+      echo "CHANGELOG.md after formatting:"
+      head -n 30 CHANGELOG.md
+      echo ""
+
       git add CHANGELOG.md
       git commit -m "chore: update CHANGELOG for ${NEW_TAG} [skip ci]"
 
@@ -321,3 +412,35 @@ semantic-version:
       SCRIPT_EOF
       chmod +x /tmp/semantic_version.sh
       bash /tmp/semantic_version.sh
+
+# STEP 3: Add back sync-to-github job
+sync-to-github:
+  image: alpine:latest
+  stage: deploy
+  rules:
+    - if: $CI_COMMIT_REF_NAME == "release"
+  script:
+    - apk add --no-cache git openssh rsync
+    - mkdir -p ~/.ssh
+    - echo "${GITHUB_SSH_PRIVATE_KEY}" > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - ssh-keyscan github.com >> ~/.ssh/known_hosts
+    - git config --global user.email "medialake@amazon.com"
+    - git config --global user.name "Media Lake CI"
+    - echo "Debug - Full commit message:"
+    - git log -1 --pretty=%B
+    - echo "Debug - Extracting line 3..."
+    - export COMMIT_MESSAGE=$(git log -1 --pretty=%B | sed -n "3p" | xargs)
+    - echo "Debug - Extracted message - ${COMMIT_MESSAGE}"
+    - if [ -z "${COMMIT_MESSAGE}" ]; then export COMMIT_MESSAGE="${CI_COMMIT_TITLE}"; fi
+    - echo "Final commit message for GitHub - ${COMMIT_MESSAGE}"
+    - git clone git@github.com:aws-solutions-library-samples/guidance-for-medialake-on-aws.git github-repo
+    - cd github-repo
+    - echo "Current GitHub main commit:" && git log --oneline -1
+    - rsync -av --delete --exclude=.git ../ ./
+    - rm -f secrets.txt .roomodes .gitleaksignore fix.sh setup-dev.sh manage-hooks.sh PERFORMANCE_OPTIMIZATION.md AUTHORIZATION_FIX.md .pre-commit-config.yaml .secrets.baseline .gitlab-ci.yml .gitattributes .flake8
+    - rm -rf .sonar/ INTERNAL-utils/ docs/ .roo/ .kiro/ github-repo/ .traycer/ INTERNAL-ai-documentation/ memory-bank/ cdk-test-output/ design/ tests/ scripts/ .githooks/ medialake_user_interface/test-results/ medialake_user_interface/playwright-report/
+    - git add -A
+    - git commit --allow-empty -m "${COMMIT_MESSAGE}"
+    - echo "New commit created:" && git log --oneline -1
+    - git push origin main
