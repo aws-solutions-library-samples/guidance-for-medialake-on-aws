@@ -2208,7 +2208,7 @@ const PipelineEditorContent = () => {
         maxWidth="sm"
         PaperProps={{
           sx: {
-            width: "400px",
+            width: "600px",
           },
         }}
         disableEscapeKeyDown

@@ -411,9 +411,19 @@ def update_pipeline_status(
         expr_values[":active"] = active
         expr_names["#active"] = "active"
 
-    # Add resources if provided
+    # Build complete dependent_resources list first
     dependent_resources = []
+    resources_need_update = False
+
+    # Start with existing resources if no new lambda_arns, service_role_arns, or eventbridge_rule_arns
+    if not lambda_arns and not service_role_arns and not eventbridge_rule_arns:
+        pipeline = get_pipeline_by_id(pipeline_id)
+        if pipeline and "dependentResources" in pipeline:
+            dependent_resources = pipeline["dependentResources"]
+
+    # Add Lambda resources
     if lambda_arns:
+        resources_need_update = True
         for node_id, arn in lambda_arns.items():
             if arn:
                 dependent_resources.append(["lambda", arn])
@@ -426,64 +436,9 @@ def update_pipeline_status(
                         f"Added Lambda IAM role {role_arn} to dependent resources"
                     )
 
-        # Add service roles if available
-        if service_role_arns:
-            for node_id, roles in service_role_arns.items():
-                for role_name, role_arn in roles.items():
-                    dependent_resources.append(["service_role", role_arn])
-                    logger.info(
-                        f"Added service role {role_name} ({role_arn}) to dependent resources"
-                    )
-
-        update_expr += ", #res = :res"
-        expr_values[":res"] = dependent_resources
-        expr_names["#res"] = "dependentResources"
-
-    if state_machine_arn:
-        if lambda_arns:
-            # Already added dependentResources, just append to it
-            dependent_resources.append(["step_function", state_machine_arn])
-
-            # Add Step Functions IAM role if available
-            if sfn_role_arn:
-                dependent_resources.append(["iam_role", sfn_role_arn])
-                logger.info(
-                    f"Added Step Functions IAM role {sfn_role_arn} to dependent resources"
-                )
-
-            # Add Step Functions log group if available
-            if sfn_log_group_name:
-                dependent_resources.append(["cloudwatch_log_group", sfn_log_group_name])
-                logger.info(
-                    f"Added Step Functions log group {sfn_log_group_name} to dependent resources"
-                )
-        else:
-            # Need to get existing dependentResources first
-            pipeline = get_pipeline_by_id(pipeline_id)
-            if pipeline and "dependentResources" in pipeline:
-                dependent_resources = pipeline["dependentResources"]
-                dependent_resources.append(["step_function", state_machine_arn])
-                update_expr += ", #res = :res"
-                expr_values[":res"] = dependent_resources
-                expr_names["#res"] = "dependentResources"
-            else:
-                dependent_resources = [["step_function", state_machine_arn]]
-                update_expr += ", #res = :res"
-                expr_values[":res"] = dependent_resources
-                expr_names["#res"] = "dependentResources"
-
-        update_expr += ", #arn = :arn"
-        expr_values[":arn"] = state_machine_arn
-        expr_names["#arn"] = "stateMachineArn"
-
-    # Handle service roles separately if lambda_arns is not provided
-    elif service_role_arns:
-        # Need to get existing dependentResources first
-        pipeline = get_pipeline_by_id(pipeline_id)
-        if pipeline and "dependentResources" in pipeline:
-            dependent_resources = pipeline["dependentResources"]
-
-        # Add service roles
+    # Add service roles
+    if service_role_arns:
+        resources_need_update = True
         for node_id, roles in service_role_arns.items():
             for role_name, role_arn in roles.items():
                 dependent_resources.append(["service_role", role_arn])
@@ -491,25 +446,33 @@ def update_pipeline_status(
                     f"Added service role {role_name} ({role_arn}) to dependent resources"
                 )
 
-        update_expr += ", #res = :res"
-        expr_values[":res"] = dependent_resources
-        expr_names["#res"] = "dependentResources"
+    # Add Step Functions resources
+    if state_machine_arn:
+        resources_need_update = True
+        dependent_resources.append(["step_function", state_machine_arn])
 
-    if eventbridge_rule_arns and not lambda_arns and not service_role_arns:
-        # Need to get existing dependentResources first if lambda_arns not provided
-        pipeline = get_pipeline_by_id(pipeline_id)
-        if pipeline and "dependentResources" in pipeline:
-            dependent_resources = pipeline["dependentResources"]
+        # Add Step Functions IAM role if available
+        if sfn_role_arn:
+            dependent_resources.append(["iam_role", sfn_role_arn])
+            logger.info(
+                f"Added Step Functions IAM role {sfn_role_arn} to dependent resources"
+            )
 
-        for node_id, arn in eventbridge_rule_arns.items():
-            if arn:
-                dependent_resources.append(["eventbridge_rule", arn])
+        # Add Step Functions log group if available
+        if sfn_log_group_name:
+            dependent_resources.append(["cloudwatch_log_group", sfn_log_group_name])
+            logger.info(
+                f"Added Step Functions log group {sfn_log_group_name} to dependent resources"
+            )
 
-        update_expr += ", #res = :res"
-        expr_values[":res"] = dependent_resources
-        expr_names["#res"] = "dependentResources"
-    elif eventbridge_rule_arns:
-        # lambda_arns was provided, so dependentResources is already set up
+        # Set stateMachineArn as separate attribute
+        update_expr += ", #arn = :arn"
+        expr_values[":arn"] = state_machine_arn
+        expr_names["#arn"] = "stateMachineArn"
+
+    # Add EventBridge resources
+    if eventbridge_rule_arns:
+        resources_need_update = True
         for node_id, arn in eventbridge_rule_arns.items():
             if arn:
                 dependent_resources.append(["eventbridge_rule", arn])
@@ -543,6 +506,12 @@ def update_pipeline_status(
                     logger.info(
                         f"Added event source mapping {mapping_uuid} to dependent resources"
                     )
+
+    # Add dependentResources to update expression only once if there are any resources
+    if resources_need_update or dependent_resources:
+        update_expr += ", #res = :res"
+        expr_values[":res"] = dependent_resources
+        expr_names["#res"] = "dependentResources"
 
     try:
         table.update_item(

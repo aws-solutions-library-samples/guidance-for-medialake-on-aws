@@ -29,6 +29,8 @@ const mapParameterTypeToFormType = (
       return "number";
     case "select":
       return "select";
+    case "json_editor":
+      return "json_editor";
     default:
       return "text";
   }

@@ -225,6 +225,24 @@ def get_event_pattern_for_rule(
     Returns:
         Event pattern dictionary for the rule
     """
+    # First check if event_pattern is in node configuration parameters (from UI)
+    parameters = node.data.configuration.get("parameters", {})
+    if "event_pattern" in parameters and parameters["event_pattern"]:
+        try:
+            # Parse the event pattern from parameters (it's stored as a JSON string or dict)
+            if isinstance(parameters["event_pattern"], str):
+                pattern = json.loads(parameters["event_pattern"])
+            else:
+                pattern = parameters["event_pattern"]
+
+            logger.info(f"Using event pattern from node parameters: {pattern}")
+
+            # Don't add default source for custom patterns
+            return pattern
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse event_pattern from parameters: {e}")
+            # Fall through to check YAML
+
     # Check if YAML data contains an event pattern
     if (
         yaml_data
@@ -863,8 +881,23 @@ def create_eventbridge_rule(
         # Create the EventBridge rule
         events_client = boto3.client("events")
 
-        # Get the event bus name from environment variable
-        event_bus_name = PIPELINES_EVENT_BUS_NAME
+        # Get the event bus ARN/name from node parameters if specified, otherwise use environment variable
+        parameters = node.data.configuration.get("parameters", {})
+        event_bus_identifier = parameters.get("event_bus_arn", PIPELINES_EVENT_BUS_NAME)
+
+        # Extract the event bus name from ARN if it's an ARN
+        # ARN format: arn:aws:events:region:account-id:event-bus/bus-name
+        # or just "default" or a simple bus name
+        if event_bus_identifier.startswith("arn:aws:events:"):
+            # Extract bus name from ARN
+            event_bus_name = event_bus_identifier.split("/")[-1]
+        else:
+            # It's already a bus name (e.g., "default" or "custom-bus-name")
+            event_bus_name = event_bus_identifier
+
+        logger.info(
+            f"Using event bus: {event_bus_identifier} (extracted name: {event_bus_name})"
+        )
 
         # Create the rule
         rule_response = events_client.put_rule(
@@ -1229,39 +1262,82 @@ def create_eventbridge_rule(
         return None
 
 
-def update_eventbridge_rule_state(rule_name: str, enabled: bool) -> None:
+def update_eventbridge_rule_state(
+    rule_name: str, enabled: bool, event_bus_name: Optional[str] = None
+) -> None:
     """
     Enable or disable an EventBridge rule.
 
     Args:
         rule_name: Name of the rule
         enabled: True to enable, False to disable
+        event_bus_name: Optional event bus name. If not provided, will try to find the rule across event buses.
     """
     events_client = boto3.client("events")
-    event_bus_name = PIPELINES_EVENT_BUS_NAME
+
+    # If event_bus_name is not provided, try to find the rule by checking multiple event buses
+    if not event_bus_name:
+        # First try the default pipelines event bus
+        event_bus_name = PIPELINES_EVENT_BUS_NAME
+        try:
+            events_client.describe_rule(Name=rule_name, EventBusName=event_bus_name)
+            logger.info(f"Found rule {rule_name} on event bus {event_bus_name}")
+        except events_client.exceptions.ResourceNotFoundException:
+            # Try the default event bus
+            event_bus_name = "default"
+            try:
+                events_client.describe_rule(Name=rule_name, EventBusName=event_bus_name)
+                logger.info(f"Found rule {rule_name} on default event bus")
+            except events_client.exceptions.ResourceNotFoundException:
+                logger.error(f"Could not find rule {rule_name} on any known event bus")
+                raise
 
     try:
         if enabled:
             events_client.enable_rule(Name=rule_name, EventBusName=event_bus_name)
-            logger.info(f"Enabled EventBridge rule: {rule_name}")
+            logger.info(
+                f"Enabled EventBridge rule: {rule_name} on bus {event_bus_name}"
+            )
         else:
             events_client.disable_rule(Name=rule_name, EventBusName=event_bus_name)
-            logger.info(f"Disabled EventBridge rule: {rule_name}")
+            logger.info(
+                f"Disabled EventBridge rule: {rule_name} on bus {event_bus_name}"
+            )
     except Exception as e:
         logger.error(f"Error updating EventBridge rule state for {rule_name}: {e}")
 
 
-def delete_eventbridge_rule(rule_name: str) -> None:
+def delete_eventbridge_rule(
+    rule_name: str, event_bus_name: Optional[str] = None
+) -> None:
     """
     Delete an EventBridge rule, its targets, and associated resources (SQS queue, event source mapping).
 
     Args:
         rule_name: Name of the rule
+        event_bus_name: Optional event bus name. If not provided, will try to find the rule across event buses.
     """
     events_client = boto3.client("events")
     sqs_client = boto3.client("sqs")
     lambda_client = boto3.client("lambda")
-    event_bus_name = PIPELINES_EVENT_BUS_NAME
+
+    # If event_bus_name is not provided, try to find the rule by checking multiple event buses
+    if not event_bus_name:
+        # First try the default pipelines event bus
+        event_bus_name = PIPELINES_EVENT_BUS_NAME
+        try:
+            events_client.describe_rule(Name=rule_name, EventBusName=event_bus_name)
+            logger.info(f"Found rule {rule_name} on event bus {event_bus_name}")
+        except events_client.exceptions.ResourceNotFoundException:
+            # Try the default event bus
+            event_bus_name = "default"
+            try:
+                events_client.describe_rule(Name=rule_name, EventBusName=event_bus_name)
+                logger.info(f"Found rule {rule_name} on default event bus")
+            except events_client.exceptions.ResourceNotFoundException:
+                logger.error(f"Could not find rule {rule_name} on any known event bus")
+                # Continue anyway to try to clean up resources
+                event_bus_name = PIPELINES_EVENT_BUS_NAME
 
     try:
         # Extract the pipeline name from the rule name (it's usually the first part)

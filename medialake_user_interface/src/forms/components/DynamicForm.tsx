@@ -5,6 +5,7 @@ import { Form } from "./Form";
 import { FormField } from "./FormField";
 import { FormSelect } from "./FormSelect";
 import { FormSwitch } from "./FormSwitch";
+import { FormJsonEditor } from "./FormJsonEditor";
 import { useFormWithValidation } from "../hooks/useFormWithValidation";
 import { FormDefinition, FormFieldDefinition } from "../types";
 import { createZodSchema } from "../utils/createZodSchema";
@@ -113,6 +114,9 @@ export const DynamicForm: React.FC<DynamicFormProps> = React.memo(
 
         case "switch":
           return <FormSwitch {...commonProps} />;
+
+        case "json_editor":
+          return <FormJsonEditor {...commonProps} />;
 
         default:
           return <FormField {...commonProps} type={field.type} />;
