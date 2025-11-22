@@ -76,7 +76,6 @@ function TopBar() {
   const [isSemanticConfigDialogOpen, setIsSemanticConfigDialogOpen] =
     useState(false);
   const isChatEnabled = useFeatureFlag("chat-enabled", true);
-  const isNotificationEnabled = useFeatureFlag("notification-enabled", true);
   const { toggleChat, isOpen: isChatOpen } = useChat();
 
   // Check semantic search configuration status
@@ -754,7 +753,7 @@ function TopBar() {
         </IconButton>
 
         {/* Notification Center */}
-        {isNotificationEnabled && <NotificationCenter />}
+        <NotificationCenter />
 
         {/* Chat Icon Button */}
         {isChatEnabled && (

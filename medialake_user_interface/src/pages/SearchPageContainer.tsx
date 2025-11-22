@@ -156,12 +156,6 @@ const SearchPageContainer: React.FC = () => {
   // Asset operations
   const assetOperations = useAssetOperations<AssetItem>();
 
-  // Feature flags
-  const multiSelectFeature = useFeatureFlag(
-    "search-multi-select-enabled",
-    false,
-  );
-
   // Filter state for legacy components
   const typeArray = filters.type ? filters.type.split(",") : [];
   const legacyFilters = {
@@ -308,7 +302,7 @@ const SearchPageContainer: React.FC = () => {
         // Add to Collection
         onAddToCollectionClick={handleAddToCollectionClick}
         // Feature flags
-        multiSelectEnabled={multiSelectFeature.value}
+        multiSelectEnabled={true}
         // Loading states
         isLoading={isSearchLoading}
         isFetching={isSearchFetching}

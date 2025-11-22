@@ -132,11 +132,6 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
     const [isPlayerReady, setIsPlayerReady] = useState(false);
     const cardContainerRef = useRef<HTMLDivElement>(null);
 
-    // Check if features are enabled
-    const multiSelectFeature = useFeatureFlag(
-      "search-multi-select-enabled",
-      true,
-    );
     const favoritesFeature = useFeatureFlag("user-favorites-enabled", true);
 
     // Get semantic mode to conditionally hide buttons
@@ -1260,8 +1255,8 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
             }}
             onClick={(e) => e.stopPropagation()} // Stop propagation at the container level
           >
-            {/* Checkbox for bulk selection - only show if feature flag is enabled */}
-            {multiSelectFeature.value && (
+            {/* Checkbox for bulk selection */}
+            {
               <Box
                 sx={(theme) => ({
                   display: "flex",
@@ -1303,7 +1298,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                   }}
                 />
               </Box>
-            )}
+            }
 
             {/* Favorite button - only show if feature flag is enabled */}
             {favoritesFeature.value && (

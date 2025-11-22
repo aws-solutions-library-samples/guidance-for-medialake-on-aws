@@ -63,11 +63,6 @@ function AssetTableView<T>({
   isRenaming,
   renamingAssetId,
 }: AssetTableViewProps<T>) {
-  // Check if multi-select feature is enabled
-  const multiSelectFeature = useFeatureFlag(
-    "search-multi-select-enabled",
-    false,
-  );
   const favoritesFeature = useFeatureFlag("user-favorites-enabled", false);
   // Group results by type if needed
   const groupedResults = React.useMemo(() => {
@@ -114,8 +109,8 @@ function AssetTableView<T>({
         editedName={editedName}
         onEditNameChange={onEditNameChange}
         onEditNameComplete={onEditNameComplete}
-        isSelected={multiSelectFeature.value ? isSelected : undefined}
-        onSelectToggle={multiSelectFeature.value ? onSelectToggle : undefined}
+        isSelected={isSelected}
+        onSelectToggle={onSelectToggle}
         isFavorite={favoritesFeature.value ? isFavorite : undefined}
         onFavoriteToggle={favoritesFeature.value ? onFavoriteToggle : undefined}
         selectedSearchFields={selectedSearchFields}
@@ -165,10 +160,8 @@ function AssetTableView<T>({
               editedName={editedName}
               onEditNameChange={onEditNameChange}
               onEditNameComplete={onEditNameComplete}
-              isSelected={multiSelectFeature.value ? isSelected : undefined}
-              onSelectToggle={
-                multiSelectFeature.value ? onSelectToggle : undefined
-              }
+              isSelected={isSelected}
+              onSelectToggle={onSelectToggle}
               isFavorite={favoritesFeature.value ? isFavorite : undefined}
               onFavoriteToggle={
                 favoritesFeature.value ? onFavoriteToggle : undefined

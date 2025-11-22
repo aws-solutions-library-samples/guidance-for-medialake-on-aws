@@ -116,12 +116,6 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
   isRenaming = false,
   renamingAssetId,
 }) => {
-  // Check if multi-select feature is enabled
-  const multiSelectFeature = useFeatureFlag(
-    "search-multi-select-enabled",
-    false,
-  );
-
   const renderCardField = (
     fieldId: string,
     asset: AssetItem,
@@ -151,9 +145,9 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
     }
   };
 
-  // Function to check if an asset is selected - only if multi-select feature is enabled
+  // Function to check if an asset is selected
   const isAssetSelected =
-    multiSelectFeature.value && selectedAssets && selectedAssets.length > 0
+    selectedAssets && selectedAssets.length > 0
       ? (assetId: string) => selectedAssets.includes(assetId)
       : undefined;
 

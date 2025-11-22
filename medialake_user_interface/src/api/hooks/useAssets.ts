@@ -556,10 +556,6 @@ export const useBulkDownloadStatus = (
 export const useUserBulkDownloadJobs = (enabled: boolean = true) => {
   const { showError } = useErrorModal();
   const { isAuthenticated } = useAuth();
-  const multiSelectFeature = useFeatureFlag(
-    "search-multi-select-enabled",
-    false,
-  );
 
   return useQuery({
     queryKey: ["userBulkDownloadJobs"],
@@ -606,7 +602,7 @@ export const useUserBulkDownloadJobs = (enabled: boolean = true) => {
         throw error;
       }
     },
-    enabled: enabled && isAuthenticated && multiSelectFeature.value,
+    enabled: enabled && isAuthenticated,
     refetchInterval: 15000, // Poll every 15 seconds
     refetchIntervalInBackground: true, // Continue polling when tab is not active
     retry: 1,

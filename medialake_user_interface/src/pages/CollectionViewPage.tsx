@@ -164,12 +164,6 @@ const CollectionViewPage: React.FC = () => {
   // Get ancestors from collection data (now included in collection response)
   const ancestors = collection?.ancestors || [];
 
-  // Check if multi-select feature is enabled
-  const multiSelectFeature = useFeatureFlag(
-    "search-multi-select-enabled",
-    false,
-  );
-
   // Use custom hooks for view preferences, asset selection, and favorites
   const viewPreferences = useViewPreferences({
     initialViewMode: "card",
@@ -909,35 +903,17 @@ const CollectionViewPage: React.FC = () => {
                 editedName={editedName}
                 isAssetFavorited={assetFavorites.isAssetFavorited}
                 onFavoriteToggle={assetFavorites.handleFavoriteToggle}
-                // Only pass selection props if multi-select feature is enabled
-                isAssetSelected={
-                  multiSelectFeature.value
-                    ? (assetId: string) =>
-                        assetSelection.selectedAssetIds.includes(assetId)
-                    : undefined
+                isAssetSelected={(assetId: string) =>
+                  assetSelection.selectedAssetIds.includes(assetId)
                 }
-                onSelectToggle={
-                  multiSelectFeature.value
-                    ? assetSelection.handleSelectToggle
-                    : undefined
-                }
-                hasSelectedAssets={
-                  multiSelectFeature.value
-                    ? assetSelection.selectedAssets.length > 0
-                    : false
-                }
-                selectAllState={
-                  multiSelectFeature.value
-                    ? assetSelection.getSelectAllState(filteredResults)
-                    : "none"
-                }
-                onSelectAllToggle={
-                  multiSelectFeature.value
-                    ? () => {
-                        assetSelection.handleSelectAll(filteredResults);
-                      }
-                    : undefined
-                }
+                onSelectToggle={assetSelection.handleSelectToggle}
+                hasSelectedAssets={assetSelection.selectedAssets.length > 0}
+                selectAllState={assetSelection.getSelectAllState(
+                  filteredResults,
+                )}
+                onSelectAllToggle={() => {
+                  assetSelection.handleSelectAll(filteredResults);
+                }}
                 isRenaming={assetOperationsLoading.rename}
                 renamingAssetId={renamingAssetId}
                 error={

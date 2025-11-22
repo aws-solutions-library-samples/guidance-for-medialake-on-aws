@@ -270,12 +270,6 @@ const SearchPage: React.FC = () => {
     },
   });
 
-  // Check if multi-select feature is enabled
-  const multiSelectFeature = useFeatureFlag(
-    "search-multi-select-enabled",
-    false,
-  );
-
   // Use custom hooks for view preferences, asset selection, and favorites
   const viewPreferences = useViewPreferences({
     initialViewMode: location.state?.preserveSearch
@@ -737,34 +731,15 @@ const SearchPage: React.FC = () => {
                 editedName={editedName}
                 isAssetFavorited={assetFavorites.isAssetFavorited}
                 onFavoriteToggle={assetFavorites.handleFavoriteToggle}
-                // Only pass selection props if multi-select feature is enabled
-                selectedAssets={
-                  multiSelectFeature.value
-                    ? assetSelection.selectedAssetIds
-                    : []
-                }
-                onSelectToggle={
-                  multiSelectFeature.value
-                    ? assetSelection.handleSelectToggle
-                    : undefined
-                }
-                hasSelectedAssets={
-                  multiSelectFeature.value
-                    ? assetSelection.selectedAssets.length > 0
-                    : false
-                }
-                selectAllState={
-                  multiSelectFeature.value
-                    ? assetSelection.getSelectAllState(filteredResults)
-                    : "none"
-                }
-                onSelectAllToggle={
-                  multiSelectFeature.value
-                    ? () => {
-                        assetSelection.handleSelectAll(filteredResults);
-                      }
-                    : undefined
-                }
+                selectedAssets={assetSelection.selectedAssetIds}
+                onSelectToggle={assetSelection.handleSelectToggle}
+                hasSelectedAssets={assetSelection.selectedAssets.length > 0}
+                selectAllState={assetSelection.getSelectAllState(
+                  filteredResults,
+                )}
+                onSelectAllToggle={() => {
+                  assetSelection.handleSelectAll(filteredResults);
+                }}
                 isRenaming={assetOperationsLoading.rename}
                 renamingAssetId={renamingAssetId}
                 error={

@@ -42,12 +42,6 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
 }) => {
   const { setHasSelectedItems } = useRightSidebar();
 
-  // Check if multi-select feature is enabled
-  const multiSelectFeature = useFeatureFlag(
-    "search-multi-select-enabled",
-    false,
-  );
-
   // Update selected items state
   React.useEffect(() => {
     if (selectedAssets.length > 0) {
@@ -87,8 +81,8 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
     }
   };
 
-  // Don't render anything if feature flag is disabled or no assets are selected
-  if (!multiSelectFeature.value || selectedAssets.length === 0) {
+  // Don't render anything if no assets are selected
+  if (selectedAssets.length === 0) {
     return null;
   }
 

@@ -108,12 +108,6 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
   const handleFieldsClose = () => setFieldsAnchor(null);
   const handleAppearanceClose = () => setAppearanceAnchor(null);
 
-  // Check if multi-select feature is enabled
-  const multiSelectFeature = useFeatureFlag(
-    "search-multi-select-enabled",
-    false,
-  );
-
   // Create a mapping between API field IDs and column IDs
   const fieldMapping: Record<string, string> = {
     // Root level fields (new API structure)
@@ -227,7 +221,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
       </Box>
 
       <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-        {multiSelectFeature.value && (
+        {
           <Box
             sx={{
               display: "flex",
@@ -267,7 +261,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
               }}
             />
           </Box>
-        )}
+        }
         {/* Sort Button */}
         <Button
           size="small"

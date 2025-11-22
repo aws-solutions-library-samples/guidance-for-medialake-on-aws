@@ -36,12 +36,6 @@ export const RightSidebarProvider: React.FC<RightSidebarProviderProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [hasSelectedItems, setHasSelectedItems] = useState(false);
 
-  // Check if multi-select feature is enabled
-  const multiSelectFeature = useFeatureFlag(
-    "search-multi-select-enabled",
-    false,
-  );
-
   const openSidebar = () => setIsExpanded(true);
   const closeSidebar = () => setIsExpanded(false);
 
