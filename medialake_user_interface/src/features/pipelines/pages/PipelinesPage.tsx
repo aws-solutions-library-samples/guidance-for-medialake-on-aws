@@ -391,7 +391,13 @@ const PipelinesPage: React.FC = () => {
         description={t("pipelines.description")}
         action={
           <>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 3.5 }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: { xs: 1, md: 3.5 },
+              }}
+            >
               <RefreshButton
                 onRefresh={handleRefresh}
                 isRefreshing={isRefreshing}
@@ -415,17 +421,31 @@ const PipelinesPage: React.FC = () => {
                   sx={{
                     borderRadius: "8px 0 0 8px",
                     textTransform: "none",
-                    px: 3,
+                    px: { xs: 1.5, md: 3 },
                     height: 40,
+                    minWidth: { xs: "auto", md: "auto" },
+                    "& .MuiButton-startIcon": {
+                      marginRight: { xs: 0, md: 1 },
+                      marginLeft: 0,
+                    },
                   }}
                 >
-                  {t("pipelines.actions.create")}
+                  <Box
+                    component="span"
+                    sx={{
+                      display: { xs: "none", md: "inline" },
+                    }}
+                  >
+                    {t("pipelines.actions.create")}
+                  </Box>
                 </Button>
                 <Button
                   size="small"
                   sx={{
                     borderRadius: "0 8px 8px 0",
                     height: 40,
+                    minWidth: { xs: 32, md: "auto" },
+                    px: { xs: 0.5, md: 1 },
                   }}
                   aria-controls={
                     addPipelineMenuOpen ? "add-pipeline-menu" : undefined
