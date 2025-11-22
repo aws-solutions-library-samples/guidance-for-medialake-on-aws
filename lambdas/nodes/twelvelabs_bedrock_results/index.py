@@ -395,21 +395,6 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                 },
             }
 
-            logger.info(
-                "DMAP-FIX-v1: Results lambda returning with distributedMapConfig",
-                extra={
-                    "version": "DMAP-FIX-v1",
-                    "result_keys": list(result.keys()),
-                    "result_size_bytes": len(json.dumps(result, default=str)),
-                    "has_distributedMapConfig": "distributedMapConfig" in result,
-                    "s3_bucket": EXTERNAL_PAYLOAD_BUCKET,
-                    "s3_key": refs_s3_key,
-                    "embedding_count": embedding_count,
-                    "refs_count": len(lightweight_refs),
-                    "inventory_id": inventory_id,
-                },
-            )
-
             # Return minimal response with S3 location for ItemReader
             # Put S3 info at BOTH data and metadata levels to survive middleware offloading
             return result

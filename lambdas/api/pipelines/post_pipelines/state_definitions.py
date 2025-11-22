@@ -684,7 +684,4 @@ class StateDefinitionFactory:
             logger.warning(f"Unknown flow step type: {step_name}")
             state_def = {"Type": "Pass", "End": True}
 
-        logger.info(
-            f"DEBUG: Returning state_def for node {node.id} with Type={state_def.get('Type')}, has __metadata__={('__metadata__' in state_def)}"
-        )
         return state_def

@@ -1,4 +1,3 @@
-import json
 import os
 from typing import Any, Dict
 
@@ -242,17 +241,6 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                         extra={
                             "result_keys": list(result.keys()),
                             "externalJobStatus": result.get("externalJobStatus"),
-                        },
-                    )
-
-                    logger.info(
-                        "DMAP-FIX-v1: Status lambda returning result",
-                        extra={
-                            "version": "DMAP-FIX-v1",
-                            "result_keys": list(result.keys()),
-                            "result_size_bytes": len(json.dumps(result)),
-                            "has_inventory_id": "inventory_id" in result,
-                            "invocation_arn": invocation_arn,
                         },
                     )
 

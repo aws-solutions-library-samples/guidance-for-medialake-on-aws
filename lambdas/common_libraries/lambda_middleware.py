@@ -516,15 +516,6 @@ class LambdaMiddleware:
         if isinstance(result, dict) and "distributedMapConfig" in result:
             dmap_cfg = result["distributedMapConfig"]
             meta["distributedMapConfig"] = dmap_cfg
-            self.logger.info(
-                "DMAP-FIX-v1: Middleware preserving distributedMapConfig",
-                extra={
-                    "version": "DMAP-FIX-v1",
-                    "step_name": self.step_name,
-                    "s3_bucket": dmap_cfg.get("s3_bucket"),
-                    "s3_key": dmap_cfg.get("s3_key"),
-                },
-            )
 
         # Gather previous assets
         def _inner_assets(obj: Any) -> list:
@@ -611,20 +602,6 @@ class LambdaMiddleware:
 
         if len(raw) > self.max_response_size:
             key = f"{meta['pipelineExecutionId']}/{self.step_name}_{uuid.uuid4()}.json"
-
-            self.logger.info(
-                "DMAP-FIX-v1: Middleware offloading large payload to S3",
-                extra={
-                    "version": "DMAP-FIX-v1",
-                    "step_name": self.step_name,
-                    "payload_size_bytes": len(raw),
-                    "max_size_bytes": self.max_response_size,
-                    "s3_bucket": self.external_payload_bucket,
-                    "s3_key": key,
-                    "has_distributedMapConfig_in_metadata": "distributedMapConfig"
-                    in meta,
-                },
-            )
 
             self.s3.put_object(Bucket=self.external_payload_bucket, Key=key, Body=raw)
             meta["stepExternalPayload"] = "True"

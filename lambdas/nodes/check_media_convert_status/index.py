@@ -150,47 +150,6 @@ def lambda_handler(event: Dict[str, Any], _: LambdaContext):
     # ── get_job with retry ──
     response = get_job_with_retry(job_id)
 
-    # ── DEBUG: Log the complete MediaConvert response structure ──
-    logger.info("=== MEDIACONVERT RESPONSE DEBUG ===")
-    logger.info(f"Job Status: {response.get('Job', {}).get('Status')}")
-    logger.info(f"Job ID: {response.get('Job', {}).get('Id')}")
-
-    # Log OutputGroupDetails structure
-    output_group_details = response.get("Job", {}).get("OutputGroupDetails", [])
-    logger.info(f"OutputGroupDetails count: {len(output_group_details)}")
-
-    for i, group_detail in enumerate(output_group_details):
-        logger.info(f"OutputGroup {i}:")
-        logger.info(f"  Type: {group_detail.get('Type')}")
-
-        output_details = group_detail.get("OutputDetails", [])
-        logger.info(f"  OutputDetails count: {len(output_details)}")
-
-        for j, output_detail in enumerate(output_details):
-            logger.info(f"    Output {j}:")
-            logger.info(
-                f"      OutputFilePaths: {output_detail.get('OutputFilePaths', [])}"
-            )
-            logger.info(f"      DurationInMs: {output_detail.get('DurationInMs')}")
-
-            # Log all keys in the output detail to see what's available
-            logger.info(f"      Available keys: {list(output_detail.keys())}")
-
-            # Check for video details
-            if "VideoDetails" in output_detail:
-                video_details = output_detail["VideoDetails"]
-                logger.info(f"      VideoDetails: {video_details}")
-
-            # Check for audio details
-            if "AudioDetails" in output_detail:
-                audio_details = output_detail["AudioDetails"]
-                logger.info(f"      AudioDetails: {audio_details}")
-
-    # Also log the complete response as JSON for full visibility
-    logger.info("=== COMPLETE MEDIACONVERT RESPONSE ===")
-    logger.info(json.dumps(response, indent=2, default=str))
-    logger.info("=== END MEDIACONVERT RESPONSE DEBUG ===")
-
     # ── translate response ──
     result = create_response_output(s3_tmpls, api_template_bucket, response, event)
 
