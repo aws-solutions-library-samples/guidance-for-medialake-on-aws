@@ -94,7 +94,7 @@
   "name": "medialake",
   "private": true,
   "scripts": {
-    "build": "tsc && vite build",
+    "build": "NODE_OPTIONS='--max-old-space-size=2560' tsc && NODE_OPTIONS='--max-old-space-size=2560' vite build",
     "dev": "vite",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,scss}\"",
     "prepare": "husky install",
