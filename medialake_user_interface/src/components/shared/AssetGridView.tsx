@@ -126,7 +126,12 @@ function AssetGridView<T>({
     return (
       <Grid container spacing={3}>
         {results.map((asset) => (
-          <Grid item {...getGridSizes()} key={getAssetId(asset)}>
+          <Grid
+            item
+            {...getGridSizes()}
+            key={getAssetId(asset)}
+            data-testid={`asset-card-${getAssetId(asset)}`}
+          >
             <AssetCard
               id={getAssetId(asset)}
               name={getAssetName(asset)}
@@ -202,7 +207,12 @@ function AssetGridView<T>({
               </Typography>
               <Grid container spacing={3}>
                 {assets.map((asset) => (
-                  <Grid item {...getGridSizes()} key={getAssetId(asset)}>
+                  <Grid
+                    item
+                    {...getGridSizes()}
+                    key={getAssetId(asset)}
+                    data-testid={`asset-card-${getAssetId(asset)}`}
+                  >
                     <AssetCard
                       id={getAssetId(asset)}
                       name={getAssetName(asset)}

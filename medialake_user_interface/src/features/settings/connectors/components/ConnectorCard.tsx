@@ -123,6 +123,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
   return (
     <>
       <Card
+        data-testid={`connector-card-${connector.id}`}
         sx={{
           height: "100%",
           display: "flex",
@@ -401,6 +402,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                   onClick={handleSyncClick}
                   size="small"
                   disabled={isSyncing}
+                  data-testid={`connector-sync-button-${connector.id}`}
                   sx={{
                     backgroundColor: alpha(theme.palette.primary.main, 0.1),
                     width: 40,
@@ -430,6 +432,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
             <IconButton
               onClick={handleDeleteClick}
               size="small"
+              data-testid={`connector-delete-button-${connector.id}`}
               sx={{
                 backgroundColor: alpha(theme.palette.error.main, 0.1),
                 width: 40,

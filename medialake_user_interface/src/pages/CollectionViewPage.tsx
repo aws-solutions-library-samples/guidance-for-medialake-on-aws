@@ -40,6 +40,7 @@ import { AddToCollectionModal } from "@/components/collections/AddToCollectionMo
 import { CreateCollectionModal } from "@/components/collections/CreateCollectionModal";
 import { EditCollectionModal } from "@/components/collections/EditCollectionModal";
 import { CollectionTreeView } from "@/components/collections/CollectionTreeView";
+import { BulkDeleteDialog } from "@/components/assets/BulkDeleteDialog";
 import {
   useAddItemToCollection,
   useGetCollection,
@@ -985,15 +986,14 @@ const CollectionViewPage: React.FC = () => {
               onClearSelection={assetSelection.handleClearSelection}
               onRemoveItem={assetSelection.handleRemoveAsset}
               isDownloadLoading={assetSelection.isDownloadLoading}
+              isDeleteLoading={assetSelection.isDeleteLoading}
               filterComponent={
-                <>
-                  <SearchFilters
-                    filters={filters}
-                    expandedSections={expandedSections}
-                    onFilterChange={handleFilterChange}
-                    onSectionToggle={handleSectionToggle}
-                  />
-                </>
+                <SearchFilters
+                  filters={filters}
+                  expandedSections={expandedSections}
+                  onFilterChange={handleFilterChange}
+                  onSectionToggle={handleSectionToggle}
+                />
               }
             />
           </RightSidebar>
@@ -1065,7 +1065,18 @@ const CollectionViewPage: React.FC = () => {
           </DialogActions>
         </Dialog>
 
-        {/* API Status Modal for bulk download */}
+        {/* Bulk Delete Confirmation Dialog */}
+        <BulkDeleteDialog
+          open={assetSelection.isDeleteDialogOpen}
+          onClose={assetSelection.handleDeleteDialogClose}
+          onConfirm={assetSelection.handleConfirmDelete}
+          selectedCount={assetSelection.selectedAssets.length}
+          confirmationText={assetSelection.deleteConfirmationText}
+          onConfirmationTextChange={assetSelection.setDeleteConfirmationText}
+          isLoading={assetSelection.isDeleteLoading}
+        />
+
+        {/* API Status Modal for bulk operations */}
         <ApiStatusModal
           open={assetSelection.modalState.open}
           onClose={assetSelection.handleModalClose}

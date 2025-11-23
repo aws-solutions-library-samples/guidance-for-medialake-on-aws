@@ -1,6 +1,12 @@
 import { useState, useCallback, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useBulkDownload } from "@/api/hooks/useAssets";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  useBulkDownload,
+  useBatchDelete,
+  useUserBatchDeleteJobs,
+  useCancelBatchDelete,
+} from "@/api/hooks/useAssets";
 
 /**
  * Hook for managing asset selection and bulk operations.
@@ -31,12 +37,20 @@ export function useAssetSelection<T>({
   getAssetType: (asset: T) => string;
   onDownloadSuccess?: () => void; // Callback to close side panel
 }) {
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedAssets, setSelectedAssets] = useState<SelectedAsset[]>([]);
   const [bulkDownloadJobId, setBulkDownloadJobId] = useState<string | null>(
     null,
   );
+  const [batchDeleteJobId, setBatchDeleteJobId] = useState<string | null>(null);
   const [isDownloadLoading, setIsDownloadLoading] = useState(false);
+  const [isDeleteLoading, setIsDeleteLoading] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  // Delete dialog state
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
 
   // Modal state for API status
   const [modalState, setModalState] = useState<{
@@ -44,15 +58,24 @@ export function useAssetSelection<T>({
     status: "loading" | "success" | "error";
     action: string;
     message?: string;
+    progress?: number;
+    jobId?: string;
+    onCancel?: () => void;
+    cancelDisabled?: boolean;
   }>({
     open: false,
     status: "loading",
     action: "",
     message: "",
+    progress: undefined,
+    jobId: undefined,
   });
 
   // Hooks
   const bulkDownloadMutation = useBulkDownload();
+  const batchDeleteMutation = useBatchDelete();
+  const cancelBatchDeleteMutation = useCancelBatchDelete();
+  const { data: deleteJobsResponse } = useUserBatchDeleteJobs();
 
   // Load selections from localStorage on component mount
   useEffect(() => {
@@ -81,6 +104,132 @@ export function useAssetSelection<T>({
       localStorage.removeItem("selectedAssets");
     }
   }, [selectedAssets]);
+
+  // Handle cancel batch delete
+  const handleCancelBatchDelete = useCallback(async () => {
+    if (!batchDeleteJobId || isCancelling) return;
+
+    setIsCancelling(true);
+
+    try {
+      await cancelBatchDeleteMutation.mutateAsync(batchDeleteJobId);
+
+      setModalState({
+        open: true,
+        status: "loading",
+        action: "Cancelling deletion...",
+        message: "Please wait while the deletion is being cancelled...",
+        jobId: batchDeleteJobId,
+        cancelDisabled: true,
+      });
+    } catch (error) {
+      console.error("Failed to cancel batch delete:", error);
+
+      setModalState({
+        open: true,
+        status: "error",
+        action: "Cancel Failed",
+        message: "Failed to cancel the deletion. Please try again.",
+        jobId: batchDeleteJobId,
+      });
+    } finally {
+      setIsCancelling(false);
+    }
+  }, [batchDeleteJobId, cancelBatchDeleteMutation, isCancelling]);
+
+  // Track batch delete job progress and update modal
+  useEffect(() => {
+    if (!batchDeleteJobId) return;
+
+    const deleteJobs = deleteJobsResponse?.data?.jobs || [];
+    const currentJob = deleteJobs.find((job) => job.jobId === batchDeleteJobId);
+
+    if (!currentJob) return;
+
+    // Update modal based on job status
+    if (currentJob.status === "PENDING" || currentJob.status === "PROCESSING") {
+      const progress = currentJob.progress || 0;
+      const processedAssets = currentJob.processedAssets || 0;
+      const totalAssets = currentJob.totalAssets || 0;
+
+      setModalState({
+        open: true,
+        status: "loading",
+        action:
+          currentJob.status === "PENDING"
+            ? "Starting deletion..."
+            : "Deleting assets...",
+        message: `${processedAssets} of ${totalAssets} assets processed`,
+        progress,
+        jobId: batchDeleteJobId,
+        // Cancel button temporarily disabled
+        // onCancel: handleCancelBatchDelete,
+        // cancelDisabled: isCancelling,
+      });
+    } else if (currentJob.status === "COMPLETED") {
+      const successCount =
+        currentJob.totalAssets - (currentJob.failedAssets || 0);
+
+      setModalState({
+        open: true,
+        status: "success",
+        action: "Delete Complete",
+        message: `Successfully deleted ${successCount} of ${currentJob.totalAssets} assets`,
+        jobId: batchDeleteJobId,
+      });
+
+      // Refresh the view after completion
+      queryClient.invalidateQueries({ queryKey: ["search"] });
+      queryClient.invalidateQueries({ queryKey: ["collection-assets"] });
+      queryClient.invalidateQueries({ queryKey: ["collections"] });
+
+      // Clear job ID after short delay
+      setTimeout(() => {
+        setBatchDeleteJobId(null);
+      }, 3000);
+    } else if (currentJob.status === "CANCELLED") {
+      const processedAssets = currentJob.processedAssets || 0;
+      const totalAssets = currentJob.totalAssets || 0;
+
+      setModalState({
+        open: true,
+        status: "success",
+        action: "Deletion Cancelled",
+        message: `Deletion was cancelled. ${processedAssets} of ${totalAssets} assets were processed before cancellation.`,
+        jobId: batchDeleteJobId,
+      });
+
+      // Refresh the view after cancellation
+      queryClient.invalidateQueries({ queryKey: ["search"] });
+      queryClient.invalidateQueries({ queryKey: ["collection-assets"] });
+      queryClient.invalidateQueries({ queryKey: ["collections"] });
+
+      // Clear job ID after short delay
+      setTimeout(() => {
+        setBatchDeleteJobId(null);
+        setIsCancelling(false);
+      }, 5000);
+    } else if (currentJob.status === "FAILED") {
+      setModalState({
+        open: true,
+        status: "error",
+        action: "Delete Failed",
+        message: currentJob.error || "An error occurred during deletion",
+        jobId: batchDeleteJobId,
+      });
+
+      // Clear job ID after short delay
+      setTimeout(() => {
+        setBatchDeleteJobId(null);
+      }, 5000);
+    }
+  }, [
+    batchDeleteJobId,
+    deleteJobsResponse,
+    queryClient,
+    handleCancelBatchDelete,
+    isCancelling,
+  ]);
 
   // Handle selection toggle
   const handleSelectToggle = useCallback(
@@ -227,11 +376,111 @@ export function useAssetSelection<T>({
 
   // Handle batch operations
   const handleBatchDelete = useCallback(() => {
-    console.log("Batch delete:", selectedAssets);
-    // Implement batch delete functionality
-    // After deletion, clear selection
-    handleClearSelection();
-  }, [selectedAssets, handleClearSelection]);
+    console.log(
+      "handleBatchDelete called, selectedAssets:",
+      selectedAssets.length,
+    );
+    if (selectedAssets.length === 0) {
+      console.log("No assets selected, returning");
+      return;
+    }
+    console.log("Setting isDeleteDialogOpen to true");
+    setIsDeleteDialogOpen(true);
+  }, [selectedAssets]);
+
+  const handleDeleteDialogClose = useCallback(() => {
+    setIsDeleteDialogOpen(false);
+    setDeleteConfirmationText("");
+  }, []);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (selectedAssets.length === 0 || deleteConfirmationText !== "DELETE") {
+      return;
+    }
+
+    if (isDeleteLoading) {
+      return;
+    }
+
+    setIsDeleteLoading(true);
+
+    setModalState({
+      open: true,
+      status: "loading",
+      action: "Starting bulk delete...",
+      jobId: undefined,
+    });
+
+    try {
+      console.log("Starting batch delete for:", selectedAssets);
+
+      // Extract actual inventory IDs, removing any collection-specific suffixes
+      // (e.g., "asset:uuid:xxx#FULL#timestamp" -> "asset:uuid:xxx")
+      const assetIds = selectedAssets.map((asset) => {
+        const id = asset.id;
+        // Remove #FULL# or #CLIP# suffixes if present
+        const actualId = id.split("#")[0];
+        return actualId;
+      });
+
+      console.log("Cleaned asset IDs for deletion:", assetIds);
+
+      const response = await batchDeleteMutation.mutateAsync({
+        assetIds,
+        confirmationToken: "DELETE",
+      });
+
+      if (response.data?.jobId) {
+        console.log("Bulk delete job started:", response.data.jobId);
+
+        // Store job ID to track progress
+        setBatchDeleteJobId(response.data.jobId);
+
+        handleClearSelection();
+        handleDeleteDialogClose();
+
+        // Modal will be updated by the useEffect tracking job progress
+        setModalState({
+          open: true,
+          status: "loading",
+          action: "Starting deletion...",
+          message: `Preparing to delete ${selectedAssets.length} assets...`,
+          progress: 0,
+          jobId: response.data.jobId,
+        });
+
+        if (onDownloadSuccess) {
+          onDownloadSuccess();
+        }
+      } else {
+        throw new Error("No job ID returned from server");
+      }
+    } catch (error) {
+      console.error("Failed to start bulk delete:", error);
+
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to start bulk delete. Please try again.";
+
+      setModalState({
+        open: true,
+        status: "error",
+        action: "Delete Failed",
+        message: errorMessage,
+      });
+    } finally {
+      setIsDeleteLoading(false);
+    }
+  }, [
+    selectedAssets,
+    deleteConfirmationText,
+    batchDeleteMutation,
+    isDeleteLoading,
+    handleClearSelection,
+    handleDeleteDialogClose,
+    onDownloadSuccess,
+  ]);
 
   const handleBatchDownload = useCallback(async () => {
     if (selectedAssets.length === 0) {
@@ -331,6 +580,8 @@ export function useAssetSelection<T>({
 
   const handleModalClose = useCallback(() => {
     setModalState((prev) => ({ ...prev, open: false }));
+    // Clear job ID when manually closing
+    setBatchDeleteJobId(null);
   }, []);
 
   return {
@@ -349,6 +600,13 @@ export function useAssetSelection<T>({
     bulkDownloadJobId,
     isDownloadInProgress: !!bulkDownloadJobId,
     isDownloadLoading,
+    // Bulk delete state
+    isDeleteLoading,
+    isDeleteDialogOpen,
+    deleteConfirmationText,
+    setDeleteConfirmationText,
+    handleDeleteDialogClose,
+    handleConfirmDelete,
     // Modal state
     modalState,
     handleModalClose,

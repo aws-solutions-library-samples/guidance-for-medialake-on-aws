@@ -12,6 +12,7 @@ interface BatchOperationsWrapperProps {
   onBatchDownload?: () => void;
   onBatchShare?: () => void;
   isDownloadLoading?: boolean;
+  isDeleteLoading?: boolean;
   onClearSelection?: () => void;
   onRemoveItem?: (assetId: string) => void;
 }
@@ -22,6 +23,7 @@ const BatchOperationsWrapper: React.FC<BatchOperationsWrapperProps> = ({
   onBatchDownload,
   onBatchShare,
   isDownloadLoading,
+  isDeleteLoading,
   onClearSelection,
   onRemoveItem,
 }) => {
@@ -34,6 +36,7 @@ const BatchOperationsWrapper: React.FC<BatchOperationsWrapperProps> = ({
           onBatchDownload={onBatchDownload}
           onBatchShare={onBatchShare}
           isDownloadLoading={isDownloadLoading}
+          isDeleteLoading={isDeleteLoading}
           onClearSelection={onClearSelection}
           onRemoveItem={onRemoveItem}
         />

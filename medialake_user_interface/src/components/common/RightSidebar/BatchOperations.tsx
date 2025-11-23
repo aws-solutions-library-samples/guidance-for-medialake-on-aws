@@ -29,6 +29,7 @@ interface BatchOperationsProps {
   onClearSelection?: () => void;
   onRemoveItem?: (assetId: string) => void;
   isDownloadLoading?: boolean;
+  isDeleteLoading?: boolean;
 }
 
 const BatchOperations: React.FC<BatchOperationsProps> = ({
@@ -39,6 +40,7 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
   onClearSelection,
   onRemoveItem,
   isDownloadLoading = false,
+  isDeleteLoading = false,
 }) => {
   const { setHasSelectedItems } = useRightSidebar();
 
@@ -98,17 +100,38 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
           borderColor: "divider",
         }}
       >
-        {/* <Tooltip title="Delete selected">
+        <Tooltip title="Delete selected">
           <Button
-            variant="outlined"
-            color="error"
+            variant="contained"
             size="small"
-            startIcon={<DeleteIcon />}
-            onClick={onBatchDelete}
+            data-testid="batch-delete-button"
+            startIcon={
+              isDeleteLoading ? <CircularProgress size={16} /> : <DeleteIcon />
+            }
+            onClick={() => {
+              console.log(
+                "Delete button clicked, onBatchDelete:",
+                onBatchDelete,
+              );
+              if (onBatchDelete) {
+                onBatchDelete();
+              }
+            }}
+            disabled={isDeleteLoading || !onBatchDelete}
+            sx={{
+              bgcolor: "error.main",
+              color: "white",
+              "&:hover": {
+                bgcolor: "error.dark",
+              },
+              "&:disabled": {
+                bgcolor: "action.disabledBackground",
+              },
+            }}
           >
-            Delete
+            {isDeleteLoading ? "Deleting..." : "Delete"}
           </Button>
-        </Tooltip> */}
+        </Tooltip>
         <Tooltip title="Download selected">
           <Button
             variant="outlined"

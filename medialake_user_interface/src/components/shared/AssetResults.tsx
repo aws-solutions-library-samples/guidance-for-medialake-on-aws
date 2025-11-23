@@ -227,7 +227,15 @@ function AssetResults<T extends AssetBase>({
   };
 
   const renderAsset = (asset: T) => (
-    <Grid item xs={12} sm={6} md={4} lg={3} key={asset.InventoryID}>
+    <Grid
+      item
+      xs={12}
+      sm={6}
+      md={4}
+      lg={3}
+      key={asset.InventoryID}
+      data-testid={`asset-card-${asset.InventoryID}`}
+    >
       <AssetCard
         id={asset.InventoryID}
         name={

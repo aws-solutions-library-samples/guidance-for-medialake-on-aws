@@ -101,8 +101,8 @@ export class CognitoServiceAdapter implements ServiceAdapter {
 
       // Build AWS CLI command for user creation - only add profile if it's not 'default'
       let createUserCommand = `aws cognito-idp admin-create-user --user-pool-id ${userPoolId} --username '${username}' --user-attributes Name=email,Value='${email}' Name=email_verified,Value=true --message-action SUPPRESS --region ${this.config.region}`;
-      if (process.env.AWS_PROFILE && process.env.AWS_PROFILE !== "default") {
-        createUserCommand = `aws cognito-idp admin-create-user --user-pool-id ${userPoolId} --username '${username}' --user-attributes Name=email,Value='${email}' Name=email_verified,Value=true --message-action SUPPRESS --profile ${process.env.AWS_PROFILE} --region ${this.config.region}`;
+      if (this.config.profile && this.config.profile !== "default") {
+        createUserCommand = `aws cognito-idp admin-create-user --user-pool-id ${userPoolId} --username '${username}' --user-attributes Name=email,Value='${email}' Name=email_verified,Value=true --message-action SUPPRESS --profile ${this.config.profile} --region ${this.config.region}`;
       }
 
       console.log(
@@ -121,8 +121,8 @@ export class CognitoServiceAdapter implements ServiceAdapter {
       };
 
       let setPasswordCommand = `aws cognito-idp admin-set-user-password --user-pool-id ${escapeShellArg(userPoolId)} --username ${escapeShellArg(username)} --password ${escapeShellArg(password)} --permanent --region ${this.config.region}`; // pragma: allowlist secret
-      if (process.env.AWS_PROFILE && process.env.AWS_PROFILE !== "default") {
-        setPasswordCommand = `aws cognito-idp admin-set-user-password --user-pool-id ${escapeShellArg(userPoolId)} --username ${escapeShellArg(username)} --password ${escapeShellArg(password)} --permanent --profile ${process.env.AWS_PROFILE} --region ${this.config.region}`; // pragma: allowlist secret
+      if (this.config.profile && this.config.profile !== "default") {
+        setPasswordCommand = `aws cognito-idp admin-set-user-password --user-pool-id ${escapeShellArg(userPoolId)} --username ${escapeShellArg(username)} --password ${escapeShellArg(password)} --permanent --profile ${this.config.profile} --region ${this.config.region}`; // pragma: allowlist secret
       }
 
       console.log(
@@ -166,8 +166,8 @@ export class CognitoServiceAdapter implements ServiceAdapter {
 
       // Build AWS CLI command for adding user to group - only add profile if it's not 'default'
       let addToGroupCommand = `aws cognito-idp admin-add-user-to-group --user-pool-id ${userPoolId} --username '${username}' --group-name ${groupName} --region ${this.config.region}`;
-      if (process.env.AWS_PROFILE && process.env.AWS_PROFILE !== "default") {
-        addToGroupCommand = `aws cognito-idp admin-add-user-to-group --user-pool-id ${userPoolId} --username '${username}' --group-name ${groupName} --profile ${process.env.AWS_PROFILE} --region ${this.config.region}`;
+      if (this.config.profile && this.config.profile !== "default") {
+        addToGroupCommand = `aws cognito-idp admin-add-user-to-group --user-pool-id ${userPoolId} --username '${username}' --group-name ${groupName} --profile ${this.config.profile} --region ${this.config.region}`;
       }
 
       console.log(
@@ -251,8 +251,8 @@ export class CognitoServiceAdapter implements ServiceAdapter {
 
       // Build AWS CLI command - only add profile if it's not 'default'
       let awsCommand = `aws cognito-idp list-user-pools --max-results 50 --region ${this.config.region}`;
-      if (process.env.AWS_PROFILE && process.env.AWS_PROFILE !== "default") {
-        awsCommand = `aws cognito-idp list-user-pools --max-results 50 --profile ${process.env.AWS_PROFILE} --region ${this.config.region}`;
+      if (this.config.profile && this.config.profile !== "default") {
+        awsCommand = `aws cognito-idp list-user-pools --max-results 50 --profile ${this.config.profile} --region ${this.config.region}`;
       }
 
       const result = execSync(awsCommand, {
@@ -279,8 +279,8 @@ export class CognitoServiceAdapter implements ServiceAdapter {
 
       // Get user pool clients
       let clientsCommand = `aws cognito-idp list-user-pool-clients --user-pool-id ${mediaLakePool.Id} --region ${this.config.region}`;
-      if (process.env.AWS_PROFILE && process.env.AWS_PROFILE !== "default") {
-        clientsCommand = `aws cognito-idp list-user-pool-clients --user-pool-id ${mediaLakePool.Id} --profile ${process.env.AWS_PROFILE} --region ${this.config.region}`;
+      if (this.config.profile && this.config.profile !== "default") {
+        clientsCommand = `aws cognito-idp list-user-pool-clients --user-pool-id ${mediaLakePool.Id} --profile ${this.config.profile} --region ${this.config.region}`;
       }
 
       const clientsResult = execSync(clientsCommand, {

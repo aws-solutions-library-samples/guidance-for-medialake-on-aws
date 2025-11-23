@@ -21,6 +21,7 @@ import {
   Alert,
 } from "@mui/material";
 import { AddToCollectionModal } from "@/components/collections/AddToCollectionModal";
+import { BulkDeleteDialog } from "@/components/assets/BulkDeleteDialog";
 import { useAddItemToCollection } from "@/api/hooks/useCollections";
 import SearchOffIcon from "@mui/icons-material/SearchOff";
 import {
@@ -768,6 +769,7 @@ const SearchPage: React.FC = () => {
               onClearSelection={assetSelection.handleClearSelection}
               onRemoveItem={assetSelection.handleRemoveAsset}
               isDownloadLoading={assetSelection.isDownloadLoading}
+              isDeleteLoading={assetSelection.isDeleteLoading}
               filterComponent={
                 <>
                   <SearchFilters
@@ -805,14 +807,28 @@ const SearchPage: React.FC = () => {
             </Button>
           </DialogActions>
         </Dialog>
+        {/* Bulk Delete Confirmation Dialog */}
+        <BulkDeleteDialog
+          open={assetSelection.isDeleteDialogOpen}
+          onClose={assetSelection.handleDeleteDialogClose}
+          onConfirm={assetSelection.handleConfirmDelete}
+          selectedCount={assetSelection.selectedAssets.length}
+          confirmationText={assetSelection.deleteConfirmationText}
+          onConfirmationTextChange={assetSelection.setDeleteConfirmationText}
+          isLoading={assetSelection.isDeleteLoading}
+        />
 
-        {/* API Status Modal for bulk download */}
+        {/* API Status Modal for bulk operations */}
         <ApiStatusModal
           open={assetSelection.modalState.open}
           onClose={assetSelection.handleModalClose}
           status={assetSelection.modalState.status}
           action={assetSelection.modalState.action}
           message={assetSelection.modalState.message}
+          progress={assetSelection.modalState.progress}
+          jobId={assetSelection.modalState.jobId}
+          onCancel={assetSelection.modalState.onCancel}
+          cancelDisabled={assetSelection.modalState.cancelDisabled}
         />
 
         <Snackbar

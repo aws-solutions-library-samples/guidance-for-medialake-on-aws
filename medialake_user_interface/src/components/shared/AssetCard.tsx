@@ -1284,6 +1284,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                   size="small"
                   disableRipple
                   checked={isSelected}
+                  data-testid="asset-checkbox"
                   onClick={(e) => {
                     e.stopPropagation();
                     onSelectToggle?.(id, e);

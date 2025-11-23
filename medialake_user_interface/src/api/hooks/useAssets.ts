@@ -237,6 +237,20 @@ interface BulkDownloadResponse {
     createdAt: string;
   };
 }
+interface BatchDeleteRequest {
+  assetIds: string[];
+  confirmationToken: string;
+}
+
+interface BatchDeleteResponse {
+  status: string;
+  message: string;
+  data: {
+    jobId: string;
+    status: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+    createdAt: string;
+  };
+}
 
 interface BulkDownloadStatusResponse {
   status: string;
@@ -635,6 +649,123 @@ export const useDeleteBulkDownloadJob = () => {
   });
 };
 
+// Hook to initiate batch delete
+export const useBatchDelete = () => {
+  const queryClient = useQueryClient();
+  const { showError } = useErrorModal();
+
+  return useMutation({
+    mutationFn: async (request: BatchDeleteRequest) => {
+      try {
+        const response = await apiClient.delete<BatchDeleteResponse>(
+          API_ENDPOINTS.ASSETS.BATCH_DELETE,
+          { data: request },
+        );
+        return response.data;
+      } catch (error) {
+        logger.error("Error initiating batch delete:", error);
+        showError("Failed to initiate batch delete");
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.ASSETS.all,
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.SEARCH.all,
+      });
+      // Invalidate batch delete jobs list
+      queryClient.invalidateQueries({ queryKey: ["userBatchDeleteJobs"] });
+    },
+    onError: (error) => {
+      logger.error("Error in batch delete mutation:", error);
+      showError("Failed to initiate batch delete");
+    },
+  });
+};
+
+// Hook to get all batch delete jobs for the current user
+export const useUserBatchDeleteJobs = (enabled: boolean = true) => {
+  const { showError } = useErrorModal();
+  const { isAuthenticated } = useAuth();
+
+  return useQuery({
+    queryKey: ["userBatchDeleteJobs"],
+    queryFn: async () => {
+      try {
+        const response = await apiClient.get<{
+          status: string;
+          message: string;
+          data: {
+            jobs: Array<{
+              jobId: string;
+              status:
+                | "PENDING"
+                | "PROCESSING"
+                | "COMPLETED"
+                | "FAILED"
+                | "CANCELLED";
+              totalAssets: number;
+              processedAssets: number;
+              failedAssets: number;
+              progress?: number;
+              createdAt: string;
+              updatedAt: string;
+              executionArn?: string;
+              completedAt?: string;
+              error?: string;
+            }>;
+          };
+        }>(API_ENDPOINTS.ASSETS.BATCH_DELETE_USER_JOBS);
+        return response.data;
+      } catch (error) {
+        logger.error("Error fetching user batch delete jobs:", error);
+        showError("Failed to fetch delete jobs");
+        throw error;
+      }
+    },
+    enabled: enabled && isAuthenticated,
+    refetchInterval: 15000, // Poll every 15 seconds
+    refetchIntervalInBackground: true,
+    retry: 1,
+  });
+};
+
+// Hook to cancel a batch delete job
+export const useCancelBatchDelete = () => {
+  const queryClient = useQueryClient();
+  const { showError } = useErrorModal();
+
+  return useMutation({
+    mutationFn: async (jobId: string) => {
+      try {
+        const response = await apiClient.put<{
+          status: string;
+          message: string;
+          job?: {
+            jobId: string;
+            status: string;
+          };
+        }>(API_ENDPOINTS.ASSETS.BATCH_DELETE_CANCEL(jobId));
+        return response.data;
+      } catch (error) {
+        logger.error("Error cancelling batch delete:", error);
+        showError("Failed to cancel batch delete");
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      // Invalidate batch delete jobs list to refresh status
+      queryClient.invalidateQueries({ queryKey: ["userBatchDeleteJobs"] });
+    },
+    onError: (error) => {
+      logger.error("Error in cancel batch delete mutation:", error);
+      showError("Failed to cancel batch delete");
+    },
+  });
+};
+
 // Export types for use in components
 export type {
   Asset,
@@ -644,4 +775,6 @@ export type {
   BulkDownloadRequest,
   BulkDownloadResponse,
   BulkDownloadStatusResponse,
+  BatchDeleteRequest,
+  BatchDeleteResponse,
 };
