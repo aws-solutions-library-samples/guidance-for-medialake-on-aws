@@ -116,12 +116,58 @@ def lambda_handler(event, context):
                 "stringValue", "Insert the Index"
             )
 
+            failure_reason = message_attrs.get("FailureReason", {}).get(
+                "stringValue", "Unknown"
+            )
+            event_name = message_attrs.get("EventName", {}).get(
+                "stringValue", "Unknown"
+            )
+            inventory_id = message_attrs.get("InventoryID", {}).get(
+                "stringValue", body.get("InventoryID", "unknown")
+            )
+
+            # Skip internal LOCK records - they should never be indexed
+            if inventory_id.startswith("LOCK#"):
+                logger.info(
+                    f"Skipping LOCK record from DLQ",
+                    extra={
+                        "inventory_id": inventory_id,
+                        "message_id": sqs_record.get("messageId"),
+                    },
+                )
+                continue
+
+            error_status = message_attrs.get("ErrorStatus", {}).get("stringValue")
+            error_type = message_attrs.get("ErrorType", {}).get("stringValue")
+            error_reason = message_attrs.get("ErrorReason", {}).get("stringValue")
+            error_index = message_attrs.get("ErrorIndex", {}).get("stringValue")
+            opensearch_error = message_attrs.get("OpenSearchError", {}).get(
+                "stringValue"
+            )
+
+            log_extra = {
+                "message_type": message_type,
+                "inventory_id": inventory_id,
+                "failure_reason": failure_reason,
+                "event_name": event_name,
+            }
+
+            if error_status:
+                log_extra.update(
+                    {
+                        "error_status": error_status,
+                        "error_type": error_type,
+                        "error_reason": error_reason,
+                        "error_index": error_index,
+                    }
+                )
+
+                if opensearch_error:
+                    log_extra["opensearch_error"] = opensearch_error
+
             logger.info(
-                f"Processing DLQ message",
-                extra={
-                    "message_type": message_type,
-                    "inventory_id": body.get("InventoryID"),
-                },
+                f"Processing DLQ message with detailed error information",
+                extra=log_extra,
             )
 
             # Prepare bulk action
@@ -176,12 +222,24 @@ def lambda_handler(event, context):
                     error_info = item.get(
                         "index", item.get("update", item.get("delete", {}))
                     )
+                    error_details = error_info.get("error", {})
+
                     logger.error(
-                        "Failed to reprocess item",
+                        "Failed to reprocess item from DLQ",
                         extra={
                             "item_id": error_info.get("_id"),
-                            "error": error_info.get("error"),
                             "status": error_info.get("status"),
+                            "error_type": (
+                                error_details.get("type")
+                                if isinstance(error_details, dict)
+                                else "unknown"
+                            ),
+                            "error_reason": (
+                                error_details.get("reason")
+                                if isinstance(error_details, dict)
+                                else str(error_details)
+                            ),
+                            "full_error": error_details,
                         },
                     )
 
