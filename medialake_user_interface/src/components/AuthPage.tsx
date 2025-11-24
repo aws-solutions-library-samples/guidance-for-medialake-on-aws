@@ -251,6 +251,24 @@ const AuthPage = () => {
                   signUpAttributes={["email"]}
                   hideSignUp={true}
                   components={components}
+                  formFields={{
+                    forceNewPassword: {
+                      password: {
+                        placeholder: "Enter your Password",
+                      },
+                      confirm_password: {
+                        placeholder: "Confirm Password",
+                      },
+                    },
+                    signIn: {
+                      username: {
+                        placeholder: "Enter your email",
+                      },
+                      password: {
+                        placeholder: "Enter your Password",
+                      },
+                    },
+                  }}
                   services={{
                     async handleSignIn(input) {
                       try {
