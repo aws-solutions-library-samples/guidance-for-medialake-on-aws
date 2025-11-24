@@ -601,9 +601,9 @@ Resources:
                 - echo "$( jq --arg v "${ExistingVPCId}" '.vpc.existing_vpc.vpc_id = $v' config.json )" > config.json
                 - echo "$( jq --arg c "${ExistingVPCCIDR}" '.vpc.existing_vpc.vpc_cidr = $c' config.json )" > config.json
                 - |
-                  # Convert comma-separated subnet IDs to JSON arrays
-                  PUBLIC_SUBNETS=$(echo "${ExistingPublicSubnetIds}" | jq -R 'split(",") | map(select(length > 0))')
-                  PRIVATE_SUBNETS=$(echo "${ExistingPrivateSubnetIds}" | jq -R 'split(",") | map(select(length > 0))')
+                  # Convert comma-separated subnet IDs to JSON arrays and trim whitespace
+                  PUBLIC_SUBNETS=$(echo "${ExistingPublicSubnetIds}" | jq -R 'split(",") | map(select(length > 0) | gsub("^\\s+|\\s+$";""))')
+                  PRIVATE_SUBNETS=$(echo "${ExistingPrivateSubnetIds}" | jq -R 'split(",") | map(select(length > 0) | gsub("^\\s+|\\s+$";""))')
                   echo "$( jq --argjson pub "$PUBLIC_SUBNETS" '.vpc.existing_vpc.subnet_ids.public = $pub' config.json )" > config.json
                   echo "$( jq --argjson priv "$PRIVATE_SUBNETS" '.vpc.existing_vpc.subnet_ids.private = $priv' config.json )" > config.json
                 - echo "Final config.json:"
