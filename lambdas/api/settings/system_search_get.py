@@ -15,7 +15,7 @@ dynamodb = boto3.resource("dynamodb")
 PROVIDER_METADATA = {
     "twelvelabs-api": {
         "name": "TwelveLabs API",
-        "isExternal": True,
+        "isExternal": False,
         "supportedMediaTypes": ["image", "video", "audio"],
     },
     "twelvelabs-bedrock": {

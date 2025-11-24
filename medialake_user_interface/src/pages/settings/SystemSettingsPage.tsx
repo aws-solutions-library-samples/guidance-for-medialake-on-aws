@@ -481,9 +481,9 @@ const SystemSettingsPage: React.FC = () => {
                                   }
                                 </Typography>
                                 <Chip
-                                  label="External"
+                                  label="Internal"
                                   size="small"
-                                  color="info"
+                                  color="success"
                                   sx={{ height: 20, fontSize: "0.7rem" }}
                                 />
                               </Box>
