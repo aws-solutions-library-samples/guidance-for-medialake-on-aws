@@ -37,8 +37,13 @@ export const TriggerTypeChips: React.FC<TriggerTypeChipsProps> = ({
 }) => {
   // If eventRuleInfo is not provided but pipeline is, extract the info from the pipeline
   const derivedEventRuleInfo = React.useMemo(() => {
-    if (eventRuleInfo) return eventRuleInfo;
-    if (!pipeline) return undefined;
+    if (eventRuleInfo) {
+      // Process the API-provided eventRuleInfo to fix descriptions
+      return processEventRuleInfo(eventRuleInfo, pipeline);
+    }
+    if (!pipeline) {
+      return undefined;
+    }
 
     return extractEventRuleInfoFromPipeline(pipeline);
   }, [eventRuleInfo, pipeline]);
@@ -65,6 +70,64 @@ export const TriggerTypeChips: React.FC<TriggerTypeChipsProps> = ({
 };
 
 /**
+ * Process API-provided eventRuleInfo to fix descriptions
+ */
+const processEventRuleInfo = (
+  eventRuleInfo: EventRuleInfo,
+  pipeline?: Pipeline,
+): EventRuleInfo => {
+  const processed: EventRuleInfo = {
+    ...eventRuleInfo,
+    eventRules: eventRuleInfo.eventRules.map((rule) => {
+      const ruleName = rule.ruleName || "";
+      const ruleNameLower = ruleName.toLowerCase();
+      const pipelineName = pipeline?.name || "";
+
+      // Apply case-insensitive pattern matching to fix descriptions
+      let newDescription = rule.description;
+      let eventType = rule.eventType;
+
+      if (
+        ruleNameLower.includes("default-image-pipeline") ||
+        pipelineName.includes("Image Pipeline")
+      ) {
+        newDescription = "Triggers on image files";
+        eventType = "AssetCreated";
+      } else if (
+        ruleNameLower.includes("default-video-pipeline") ||
+        pipelineName.includes("Video Pipeline")
+      ) {
+        newDescription = "Triggers on video files";
+        eventType = "AssetCreated";
+      } else if (
+        ruleNameLower.includes("default-audio-pipeline") ||
+        pipelineName.includes("Audio Pipeline")
+      ) {
+        newDescription = "Triggers on audio files";
+        eventType = "AssetCreated";
+      } else if (
+        ruleNameLower.includes("pipeline_execution_completed") ||
+        ruleNameLower.includes("pipeline_execut")
+      ) {
+        newDescription = "Triggers when another pipeline completes execution";
+        eventType = "Pipeline Execution Completed";
+      } else if (rule.description?.startsWith("Custom event rule:")) {
+        // Remove the "Custom event rule:" prefix for unrecognized rules
+        newDescription = undefined;
+      }
+
+      return {
+        ...rule,
+        description: newDescription,
+        eventType: eventType || rule.eventType,
+      };
+    }),
+  };
+
+  return processed;
+};
+
+/**
  * Extract event rule information from a pipeline object
  */
 const extractEventRuleInfoFromPipeline = (
@@ -79,7 +142,6 @@ const extractEventRuleInfoFromPipeline = (
   if (pipeline.dependentResources) {
     for (const [resourceType, resourceValue] of pipeline.dependentResources) {
       if (resourceType === "eventbridge_rule") {
-        // Extract rule name and eventbus name if available
         const rule: EventRule = {};
 
         if (typeof resourceValue === "object" && resourceValue !== null) {
@@ -99,34 +161,31 @@ const extractEventRuleInfoFromPipeline = (
         // Try to extract human-friendly information from the rule name
         if (rule.ruleName) {
           const ruleName = rule.ruleName;
+          const ruleNameLower = ruleName.toLowerCase();
 
-          // Check for default pipeline patterns
-          // Note: File type lists should come from the API's eventRuleInfo
-          // This is just fallback logic for rule description/eventType
+          // Check for default pipeline patterns (case-insensitive)
           if (
-            ruleName.includes("default-image-pipeline") ||
+            ruleNameLower.includes("default-image-pipeline") ||
             pipeline.name.includes("Image Pipeline")
           ) {
             rule.description = "Triggers on image files";
             rule.eventType = "AssetCreated";
           } else if (
-            ruleName.includes("default-video-pipeline") ||
+            ruleNameLower.includes("default-video-pipeline") ||
             pipeline.name.includes("Video Pipeline")
           ) {
             rule.description = "Triggers on video files";
             rule.eventType = "AssetCreated";
           } else if (
-            ruleName.includes("default-audio-pipeline") ||
+            ruleNameLower.includes("default-audio-pipeline") ||
             pipeline.name.includes("Audio Pipeline")
           ) {
             rule.description = "Triggers on audio files";
             rule.eventType = "AssetCreated";
-          } else if (ruleName.includes("pipeline_execution_completed")) {
+          } else if (ruleNameLower.includes("pipeline_execution_completed")) {
             rule.description =
               "Triggers when another pipeline completes execution";
             rule.eventType = "Pipeline Execution Completed";
-          } else {
-            rule.description = `Custom event rule: ${ruleName}`;
           }
         }
 
@@ -168,13 +227,20 @@ const getTooltipContent = (type: string, eventRuleInfo?: EventRuleInfo) => {
 
   return (
     <Box sx={{ p: 1, maxWidth: 300 }}>
-      <Typography variant="subtitle2" gutterBottom>
+      <Typography
+        variant="subtitle2"
+        gutterBottom
+        sx={{ color: "common.white" }}
+      >
         {type}
       </Typography>
       {eventRuleInfo.eventRules.map((rule, index) => (
         <Box key={index} sx={{ mt: 1 }}>
           {rule.description && (
-            <Typography variant="body2" color="text.secondary">
+            <Typography
+              variant="body2"
+              sx={{ color: "rgba(255, 255, 255, 0.9)" }}
+            >
               {rule.description}
             </Typography>
           )}
@@ -186,13 +252,21 @@ const getTooltipContent = (type: string, eventRuleInfo?: EventRuleInfo) => {
                   label={fileType}
                   size="small"
                   variant="outlined"
-                  sx={{ height: 20, "& .MuiChip-label": { px: 0.5 } }}
+                  sx={{
+                    height: 20,
+                    "& .MuiChip-label": { px: 0.5, color: "common.white" },
+                    borderColor: "rgba(255, 255, 255, 0.5)",
+                  }}
                 />
               ))}
             </Box>
           )}
           {rule.eventType && (
-            <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
+            <Typography
+              variant="caption"
+              display="block"
+              sx={{ mt: 0.5, color: "rgba(255, 255, 255, 0.7)" }}
+            >
               Event: {rule.eventType}
             </Typography>
           )}
