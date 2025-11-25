@@ -241,7 +241,8 @@ class CognitoConstruct(Construct):
 
         # Using stack name, region, account, and environment ensures uniqueness across different deployments
         unique_id = hashlib.md5(
-            f"{config.resource_prefix}-{config.primary_region}-{config.account_id}-{config.environment}".encode()
+            f"{config.resource_prefix}-{config.primary_region}-{config.account_id}-{config.environment}".encode(),
+            usedforsecurity=False,
         ).hexdigest()[:16]
         domain_prefix = (
             f"{config.resource_prefix}-{config.environment.lower()}-{unique_id}"

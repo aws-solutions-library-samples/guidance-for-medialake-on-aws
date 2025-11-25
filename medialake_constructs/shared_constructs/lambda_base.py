@@ -673,7 +673,7 @@ class Lambda(Construct):
         """Generate MD5 hash of all source files in the entry directory"""
         import hashlib
 
-        hash_md5 = hashlib.md5()
+        hash_md5 = hashlib.md5(usedforsecurity=False)
 
         # Hash application code
         for file_path in entry_path.glob("**/*"):
