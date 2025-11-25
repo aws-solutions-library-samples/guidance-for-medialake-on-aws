@@ -42,7 +42,7 @@ git rebase -X theirs origin/main --reapply-cherry-picks || {
             echo "File deleted in main, removing: $file"
             git rm "$file"
         done
-        
+
         # Handle regular merge conflicts - prefer main's version
         for file in $(git diff --name-only --diff-filter=U 2>/dev/null); do
             echo "Resolving conflict in $file (using main's version)"
@@ -60,7 +60,7 @@ git rebase -X theirs origin/main --reapply-cherry-picks || {
                 git rm "$file"
             fi
         done
-        
+
         # Continue rebase if we resolved conflicts
         if ! git diff --name-only --diff-filter=U 2>/dev/null | grep -q .; then
             git rebase --continue || break
