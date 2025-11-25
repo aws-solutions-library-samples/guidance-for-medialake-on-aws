@@ -2876,6 +2876,71 @@ class AssetsConstruct(Construct):
             )
         )
 
+    def _create_bulk_download_mediaconvert_resources(self):
+        """Resources required to run MediaConvert for Bulk Download operations.
+
+        Includes tasks like sub-clipping. These are being created separate from the
+        MediaConvert resources related to pipeline operations to separate permissions and
+        keep queue operations distinct between bulk download sub-clipping jobs
+        and pipeline processing.
+        """
+        self.subclip_mediaconvert_queue = MediaConvert.create_queue(
+            self,
+            "MediaLakeSubClipQueue",
+            props=MediaConvertProps(
+                description="A MediaLake queue for creating Sub-Clips of source assets",
+                name="MediaLakeSubClipQueue",  # If omitted, one is auto-generated
+                pricing_plan="ON_DEMAND",  # Must be ON_DEMAND for CF-based queue creation
+                status="ACTIVE",  # Could also be "PAUSED"
+                tags=[
+                    {"Environment": config.environment},
+                    {"Owner": config.resource_prefix},
+                ],
+            ),
+        )
+
+        self.subclip_mediaconvert_role = iam.Role(
+            self,
+            "SubClipMediaConvertRole",
+            assumed_by=iam.ServicePrincipal("mediaconvert.amazonaws.com"),
+            role_name=f"{config.resource_prefix}_SubClip_MediaConvert_Role",
+            description="IAM role for MediaConvert SubClip Operations",
+        )
+
+        self.subclip_mediaconvert_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                    "s3:PutObject",
+                ],
+                resources=["arn:aws:s3:::*"],
+            )
+        )
+
+        self.subclip_mediaconvert_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "kms:Encrypt",
+                    "kms:Decrypt",
+                    "kms:ReEncrypt*",
+                    "kms:GenerateDataKey*",
+                    "kms:DescribeKey",
+                ],
+                resources=["*"],
+            )
+        )
+
+        self.subclip_mediaconvert_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                ],
+                resources=["arn:aws:logs:*:*:*"],
+            )
+        )
+
     @property
     def bulk_download_table(self) -> dynamodb.TableV2:
         return (

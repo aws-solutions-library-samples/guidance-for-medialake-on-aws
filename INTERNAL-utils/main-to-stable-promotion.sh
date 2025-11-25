@@ -32,7 +32,7 @@ git pull origin stable
 
 # Rebase stable onto main, preferring main's changes for all conflicts
 echo "Rebasing stable onto main (preferring main)..."
-git rebase -X theirs origin/main || {
+git rebase -X theirs origin/main --reapply-cherry-picks || {
     echo "Rebase encountered conflicts. Resolving in favor of main..."
     # Manual resolution for remaining conflicts
     while git status | grep -q "rebase in progress"; do
@@ -41,14 +41,14 @@ git rebase -X theirs origin/main || {
             echo "File deleted in main, removing: $file"
             git rm "$file"
         done
-
+        
         # Handle regular merge conflicts - prefer main's version
         for file in $(git diff --name-only --diff-filter=U 2>/dev/null); do
             echo "Resolving conflict in $file (using main's version)"
             git checkout --ours -- "$file"
             git add "$file"
         done
-
+        
         # Continue rebase if we resolved conflicts
         if ! git diff --name-only --diff-filter=U 2>/dev/null | grep -q .; then
             git rebase --continue || break
@@ -59,10 +59,29 @@ git rebase -X theirs origin/main || {
     done
 }
 
-# Commit the rebased changes
+# Commit the rebased changes with retry logic for pre-commit hooks
 echo "Committing rebased changes..."
 git add -A
-git commit -m "$COMMIT_MSG" --allow-empty
+
+# Try to commit, if pre-commit hooks fail, stage their fixes and retry
+MAX_RETRIES=3
+RETRY_COUNT=0
+
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    if git commit -m "$COMMIT_MSG" --allow-empty; then
+        echo "Commit successful!"
+        break
+    else
+        RETRY_COUNT=$((RETRY_COUNT + 1))
+        if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+            echo "Pre-commit checks failed. Staging fixes and retrying (attempt $RETRY_COUNT/$MAX_RETRIES)..."
+            git add -A
+        else
+            echo "ERROR: Commit failed after $MAX_RETRIES attempts"
+            exit 1
+        fi
+    fi
+done
 
 # Push the rebased stable branch
 echo "Pushing rebased stable branch to origin..."
