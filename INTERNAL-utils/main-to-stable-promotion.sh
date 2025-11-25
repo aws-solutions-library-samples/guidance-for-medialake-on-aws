@@ -4,6 +4,7 @@
 set -e
 
 COMMIT_MSG="release: rebase main from stable"
+SCRIPT_PATH="INTERNAL-utils/main-to-stable-promotion.sh"
 
 echo "======================================"
 echo "Rebasing stable with main (favoring main)"
@@ -41,14 +42,25 @@ git rebase -X theirs origin/main --reapply-cherry-picks || {
             echo "File deleted in main, removing: $file"
             git rm "$file"
         done
-
+        
         # Handle regular merge conflicts - prefer main's version
         for file in $(git diff --name-only --diff-filter=U 2>/dev/null); do
             echo "Resolving conflict in $file (using main's version)"
-            git checkout --ours -- "$file"
-            git add "$file"
+            # Special handling for the script itself - keep current version
+            if [ "$file" = "$SCRIPT_PATH" ]; then
+                echo "  (keeping current script version)"
+                git add "$file"
+            elif git cat-file -e "HEAD:$file" 2>/dev/null; then
+                # File exists in HEAD (main), use that version
+                git checkout --ours -- "$file"
+                git add "$file"
+            else
+                # File doesn't exist in main, remove it
+                echo "  (file doesn't exist in main, removing)"
+                git rm "$file"
+            fi
         done
-
+        
         # Continue rebase if we resolved conflicts
         if ! git diff --name-only --diff-filter=U 2>/dev/null | grep -q .; then
             git rebase --continue || break
