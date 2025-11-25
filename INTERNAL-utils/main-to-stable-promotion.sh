@@ -5,13 +5,11 @@ set -e
 
 echo "======================================"
 echo "Rebasing stable with main (favoring main)"
-echo "Rebasing stable with main (favoring main)"
 echo "======================================"
 
 # Ensure you are on a clean working tree
 git status
 if ! git diff-index --quiet HEAD --; then
-  echo "ERROR: Working tree is not clean. Please commit or stash changes."
   echo "ERROR: Working tree is not clean. Please commit or stash changes."
   exit 1
 fi
@@ -22,7 +20,6 @@ git fetch origin
 
 # Ensure main branch is up to date
 echo "Checking out and updating main..."
-echo "Checking out and updating main..."
 git checkout main
 git pull origin main
 
@@ -30,14 +27,7 @@ git pull origin main
 echo "Checking out and updating stable..."
 git checkout stable
 git pull origin stable
-# Ensure stable branch is up to date
-echo "Checking out and updating stable..."
-git checkout stable
-git pull origin stable
 
-# Rebase stable onto main, preferring main's changes for all conflicts
-echo "Rebasing stable onto main (preferring main)..."
-git rebase -X theirs origin/main || {
 # Rebase stable onto main, preferring main's changes for all conflicts
 echo "Rebasing stable onto main (preferring main)..."
 git rebase -X theirs origin/main || {
@@ -49,15 +39,14 @@ git rebase -X theirs origin/main || {
             echo "File deleted in main, removing: $file"
             git rm "$file"
         done
-
+        
         # Handle regular merge conflicts - prefer main's version
         for file in $(git diff --name-only --diff-filter=U 2>/dev/null); do
             echo "Resolving conflict in $file (using main's version)"
             git checkout --ours -- "$file"
-            git checkout --ours -- "$file"
             git add "$file"
         done
-
+        
         # Continue rebase if we resolved conflicts
         if ! git diff --name-only --diff-filter=U 2>/dev/null | grep -q .; then
             git rebase --continue || break
@@ -71,11 +60,7 @@ git rebase -X theirs origin/main || {
 # Push the rebased stable branch
 echo "Pushing rebased stable branch to origin..."
 git push origin stable --force-with-lease
-# Push the rebased stable branch
-echo "Pushing rebased stable branch to origin..."
-git push origin stable --force-with-lease
 
 echo "======================================"
-echo "Stable branch successfully rebased with main"
 echo "Stable branch successfully rebased with main"
 echo "======================================"
