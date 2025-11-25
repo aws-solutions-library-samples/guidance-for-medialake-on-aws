@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.1.0] - 2025-11-25
+
+### Features
+
+- feat: enhance DLQ with detailed OpenSearch error information
+- feat: implement bulk delete with centralized deletion service
+- feat: eventbridge trigger node
+- feat: add custom prompts with user-friendly labels to bedrock content processor
+
+### Bug Fixes
+
+- fix: prevent label duplication in node configuration
+- fix: improve list view UI consistency and functionality
+- fix: trim whitespace from subnet IDs to prevent null AZ error
+- fix: resolve case-sensitive pattern matching in TriggerTypeChips
+- fix: shorten password confirmation placeholder text
+- fix: change twelvelabs-api isExternal flag to false
+- fix: resolve lambda_handler not found error in asset deletion
+- fix: improve pipeline button responsiveness
+- fix: remove debug logs
+- fix: remove sensitive data from log statements
+- fix: missing support for vbr/cbr audio/video
+
 ## [6.0.0] - 2025-11-22
 
 ### ⚠ BREAKING CHANGES
