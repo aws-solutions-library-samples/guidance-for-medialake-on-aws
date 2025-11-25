@@ -1873,7 +1873,14 @@ const PipelineEditorContent = () => {
               ...selectedNode.data,
               configuration,
               label: configuration.method
-                ? `${selectedNode.data.label} (${configuration.method})`
+                ? (() => {
+                    // Remove any existing method suffix (pattern: "(methodname)")
+                    const baseLabel = selectedNode.data.label.replace(
+                      /\s*\([^)]+\)\s*$/,
+                      "",
+                    );
+                    return `${baseLabel} (${configuration.method})`;
+                  })()
                 : selectedNode.data.label,
             },
           };

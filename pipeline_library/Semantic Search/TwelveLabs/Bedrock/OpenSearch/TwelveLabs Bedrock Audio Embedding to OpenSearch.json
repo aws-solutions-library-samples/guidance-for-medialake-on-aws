@@ -127,7 +127,7 @@
         },
         "data": {
           "nodeId": "embedding_store",
-          "label": "Embedding Store (store) (store)",
+          "label": "Embedding Store (store)",
           "description": "Store embeddings in OpenSearch for semantic search",
           "icon": {
             "key": null,

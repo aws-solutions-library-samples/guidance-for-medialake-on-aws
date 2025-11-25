@@ -210,7 +210,7 @@
         },
         "data": {
           "nodeId": "conditional",
-          "label": "Conditional (conditional) (conditional) (conditional)",
+          "label": "Conditional (conditional)",
           "description": "This step will branch the workflow into two paths based on a boolean condition evaluation",
           "icon": {
             "key": null,
@@ -423,7 +423,7 @@
         },
         "data": {
           "nodeId": "coactive",
-          "label": "Coactive (post) (post)",
+          "label": "Coactive (post)",
           "description": "Ingest assets from public URLs",
           "icon": {
             "key": null,
