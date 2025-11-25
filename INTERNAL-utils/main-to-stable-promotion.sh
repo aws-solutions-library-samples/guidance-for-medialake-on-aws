@@ -3,6 +3,8 @@
 # Fail on any error
 set -e
 
+COMMIT_MSG="release: rebase main from stable"
+
 echo "======================================"
 echo "Rebasing stable with main (favoring main)"
 echo "======================================"
@@ -56,6 +58,11 @@ git rebase -X theirs origin/main || {
         fi
     done
 }
+
+# Commit the rebased changes
+echo "Committing rebased changes..."
+git add -A
+git commit -m "$COMMIT_MSG" --allow-empty
 
 # Push the rebased stable branch
 echo "Pushing rebased stable branch to origin..."
