@@ -204,28 +204,47 @@ semantic-version:
       echo "Current version: ${MAJOR}.${MINOR}.${PATCH}"
       echo ""
 
-      echo "Analyzing commits that will be merged from main to stable..."
+      echo "Analyzing commits since last version tag..."
+      echo ""
+      echo "=========================================="
+      echo "DEBUG: Git State Information"
+      echo "=========================================="
+      echo "Last tag: ${LAST_TAG}"
+      echo "Main branch HEAD: $(git rev-parse main)"
+      echo "Stable branch HEAD: $(git rev-parse origin/stable 2>/dev/null || echo 'N/A')"
 
-      MERGE_BASE=$(git merge-base main origin/stable 2>/dev/null || echo "")
+      if [ -n "${LAST_TAG}" ]; then
+        echo "Last tag commit: $(git rev-parse ${LAST_TAG})"
+        echo "Last tag date: $(git log -1 --format=%ci ${LAST_TAG})"
+      fi
+      echo "=========================================="
+      echo ""
 
-      if [ -z "${MERGE_BASE}" ]; then
-        echo "No common ancestor found. Using all commits from main."
-        COMMITS=$(git log main --pretty=format:"%H|%s|%b")
+      if [ -n "${LAST_TAG}" ]; then
+        echo "Using last tag ${LAST_TAG} as baseline for commit analysis"
+        COMMITS=$(git log ${LAST_TAG}..main --pretty=format:"%H|%s|%b")
       else
-        echo "Merge base commit: ${MERGE_BASE}"
-        COMMITS=$(git log ${MERGE_BASE}..main --pretty=format:"%H|%s|%b")
+        echo "No tags found. Analyzing all commits on main branch."
+        COMMITS=$(git log main --pretty=format:"%H|%s|%b")
       fi
 
       echo "DEBUG: Number of commits to analyze: $(echo "${COMMITS}" | grep -c '.' || echo 0)"
 
       if [ -z "${COMMITS}" ]; then
-        echo "WARNING: No new commits to merge from main to stable!"
+        echo "=========================================="
+        echo "No new commits since ${LAST_TAG}"
+        echo "All commits have already been versioned."
         echo "No version bump needed."
+        echo "=========================================="
         exit 0
       fi
 
-      echo "DEBUG: Commits to be versioned:"
+      echo ""
+      echo "=========================================="
+      echo "DEBUG: Commits to be versioned (first 10):"
+      echo "=========================================="
       echo "${COMMITS}" | head -10 | cut -d'|' -f2
+      echo "=========================================="
       echo ""
 
       BUMP_TYPE="none"
