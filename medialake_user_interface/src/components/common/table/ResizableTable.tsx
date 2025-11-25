@@ -122,6 +122,9 @@ const useTableStyles = (
           "& .MuiIconButton-root, & .MuiChip-root": {
             cursor: "pointer",
           },
+          "& .column-resizer": {
+            cursor: "col-resize !important",
+          },
         },
         "& .MuiTableHead-root .MuiTableCell-root": {
           backgroundColor: isDark

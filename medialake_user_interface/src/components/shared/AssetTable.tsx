@@ -29,6 +29,11 @@ import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import { type AssetTableColumn } from "@/types/shared/assetComponents";
 import { AssetAudio } from "../asset";
+import {
+  PLACEHOLDER_IMAGE,
+  VIDEO_PLACEHOLDER_IMAGE,
+} from "@/utils/placeholderSvg";
+import { useFeatureFlag } from "@/utils/featureFlags";
 
 export interface AssetTableProps<T> {
   data: T[];
@@ -103,6 +108,7 @@ export function AssetTable<T>({
   const hasInitialFocusRef = useRef<boolean>(false);
   const preventCommitRef = useRef<boolean>(false);
   const commitRef = useRef<(() => void) | null>(null);
+  const favoritesFeature = useFeatureFlag("user-favorites-enabled", true);
 
   // Create a mapping between API field IDs and column IDs
   const fieldMapping: Record<string, string> = {
@@ -183,10 +189,12 @@ export function AssetTable<T>({
   }, [data, isSelected]);
 
   const tableColumns = React.useMemo(() => {
-    // Filter columns based on selectedSearchFields
-    let visibleColumns = columns.filter((col) => col.visible);
+    // When selectedSearchFields are provided, use those to determine visibility
+    // Otherwise, fall back to the column's visible property
+    let visibleColumns = columns;
 
     if (selectedSearchFields && selectedSearchFields.length > 0) {
+      // Filter by selectedSearchFields
       visibleColumns = visibleColumns.filter((col) => {
         // Special case for name field
         if (col.id === "name") {
@@ -212,12 +220,25 @@ export function AssetTable<T>({
           );
         }
 
+        // Special case for fullPath field
+        if (col.id === "fullPath") {
+          return selectedSearchFields.some(
+            (field) =>
+              field.includes("FullPath") ||
+              field.includes("Path") ||
+              field === "fullPath",
+          );
+        }
+
         // For other fields, check if any of their mapped API field IDs are in the selectedSearchFields
         const apiFieldIds = reverseFieldMapping[col.id] || [];
         return apiFieldIds.some((apiFieldId) =>
           selectedSearchFields.includes(apiFieldId),
         );
       });
+    } else {
+      // No selectedSearchFields - use the visible property
+      visibleColumns = columns.filter((col) => col.visible);
     }
 
     const tableColumns = [];
@@ -326,6 +347,12 @@ export function AssetTable<T>({
                 component="img"
                 src={info.getValue()}
                 alt={getName(info.row.original)}
+                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                  e.currentTarget.src =
+                    assetType === "Video"
+                      ? VIDEO_PLACEHOLDER_IMAGE
+                      : PLACEHOLDER_IMAGE;
+                }}
                 sx={{
                   width: 60,
                   height: 60,
@@ -492,7 +519,12 @@ export function AssetTable<T>({
                 );
               }
 
-              // 2) Default case for *every other* column:
+              // 2) For other columns, use the custom cell renderer if provided, otherwise default display:
+              if (col.cell) {
+                return <Box sx={{ p: 1 }}>{col.cell(info)}</Box>;
+              }
+
+              // 3) Final fallback - display raw value:
               return <Box sx={{ p: 1 }}>{info.getValue()}</Box>;
             },
           },
@@ -506,24 +538,26 @@ export function AssetTable<T>({
           <Box
             sx={{ display: "flex", gap: 1, justifyContent: "flex-end", p: 1 }}
           >
-            <IconButton
-              size="small"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onFavoriteToggle) {
-                  onFavoriteToggle(info.row.original, e);
-                }
-              }}
-              sx={{
-                padding: "4px",
-              }}
-            >
-              {isFavorite(info.row.original) ? (
-                <FavoriteIcon fontSize="small" color="error" />
-              ) : (
-                <FavoriteBorderIcon fontSize="small" />
-              )}
-            </IconButton>
+            {favoritesFeature.value && (
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onFavoriteToggle) {
+                    onFavoriteToggle(info.row.original, e);
+                  }
+                }}
+                sx={{
+                  padding: "4px",
+                }}
+              >
+                {isFavorite(info.row.original) ? (
+                  <FavoriteIcon fontSize="small" color="error" />
+                ) : (
+                  <FavoriteBorderIcon fontSize="small" />
+                )}
+              </IconButton>
+            )}
             <IconButton
               size="small"
               onClick={(e) => onDeleteClick(info.row.original, e)}

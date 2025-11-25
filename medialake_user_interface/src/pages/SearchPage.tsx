@@ -519,6 +519,23 @@ const SearchPage: React.FC = () => {
         return a - b;
       },
     },
+    {
+      id: "fullPath",
+      label: "Full Path",
+      visible: false,
+      minWidth: 250,
+      accessorFn: (row: AssetItem) =>
+        row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
+          .ObjectKey.FullPath,
+      cell: (info: CellContext<AssetItem, unknown>) =>
+        info.getValue() as string,
+      sortable: true,
+      sortingFn: (rowA, rowB) =>
+        rowA.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath.localeCompare(
+          rowB.original.DigitalSourceAsset.MainRepresentation.StorageInfo
+            .PrimaryLocation.ObjectKey.FullPath,
+        ),
+    },
   ]);
 
   const handleColumnToggle = (columnId: string) => {
