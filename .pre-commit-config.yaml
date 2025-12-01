@@ -61,7 +61,9 @@ repos:
           (?x)^(
             lambdas/nodes/image_metadata_extractor/.*|
             lambdas/layers/warmer/nodejs/.*|
-            \.kiro/.*
+            \.kiro/.*|
+            medialake_user_interface/tests/integration/comprehensive-user-lifecycle-e2e\.spec\.ts|
+            medialake_user_interface/src/types/shared/assetComponents\.ts
           )$
 
   # Commit message validation (Phase 1)

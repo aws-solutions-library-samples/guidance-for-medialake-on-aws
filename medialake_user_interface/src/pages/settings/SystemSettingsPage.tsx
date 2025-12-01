@@ -434,7 +434,7 @@ const SystemSettingsPage: React.FC = () => {
                     </Typography>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                       <FormControl
-                        sx={{ minWidth: 200 }}
+                        sx={{ minWidth: 400 }}
                         disabled={!settings.isEnabled}
                       >
                         <InputLabel>

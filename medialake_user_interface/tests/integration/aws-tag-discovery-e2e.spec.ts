@@ -386,7 +386,9 @@ async function performE2ELogin(
     // Wait for login form
     await page.waitForSelector(
       'input[name="email"], [role="textbox"][name*="Email"]',
-      { timeout: 10000 },
+      {
+        timeout: 10000,
+      },
     );
 
     // Fill and submit login form
