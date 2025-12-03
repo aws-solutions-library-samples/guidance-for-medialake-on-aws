@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import React, { useState } from "react";
 import { useRenameAsset, useDeleteAsset } from "../api/hooks/useAssets";
 import { useGeneratePresignedUrl } from "../api/hooks/usePresignedUrl";
 import { type AssetBase } from "../types/search/searchResults";
@@ -295,7 +295,7 @@ export function useAssetOperations<
   const handleRenameConfirm = async (newName: string) => {
     if (editingAssetId) {
       try {
-        const response = await renameAsset.mutateAsync({
+        await renameAsset.mutateAsync({
           inventoryId: editingAssetId,
           newName,
         });

@@ -11,6 +11,7 @@ import {
   EnvironmentFormData,
   defaultEnvironmentFormData,
   EnvironmentStatus,
+  EnvironmentStatusValues,
 } from "../../schemas/environmentFormSchema";
 
 interface EnvironmentFormProps {
@@ -90,11 +91,11 @@ export const EnvironmentForm: React.FC<EnvironmentFormProps> = ({
             options={[
               {
                 label: t("settings.environments.form.status.active"),
-                value: EnvironmentStatus.Active,
+                value: EnvironmentStatusValues.Active,
               },
               {
                 label: t("settings.environments.form.status.disabled"),
-                value: EnvironmentStatus.Disabled,
+                value: EnvironmentStatusValues.Disabled,
               },
             ]}
             required

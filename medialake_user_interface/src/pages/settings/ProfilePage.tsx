@@ -3,7 +3,6 @@ import {
   Box,
   Paper,
   Typography,
-  Avatar,
   Grid,
   List,
   ListItem,
@@ -13,11 +12,9 @@ import {
   Chip,
   CircularProgress,
   FormControl,
-  InputLabel,
   Select,
   MenuItem,
   SelectChangeEvent,
-  Stack,
 } from "@mui/material";
 import { UserAvatar } from "../../components/common/UserAvatar";
 import {
@@ -28,30 +25,9 @@ import {
 import { useGetUser } from "../../api/hooks/useUsers";
 import { getCurrentUser } from "aws-amplify/auth";
 import { useEffect, useState, useMemo } from "react";
-import { UserAttributes } from "../../api/types/api.types";
 import { useTranslation } from "react-i18next";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { useDirection } from "../../contexts/DirectionContext";
-
-interface UserProfileData {
-  username: string;
-  user_status: string;
-  enabled: boolean;
-  user_created: string;
-  last_modified: string;
-  attributes: UserAttributes;
-}
-
-interface UserProfileResponse {
-  status: string;
-  message: string;
-  data: UserProfileData;
-}
-
-// Helper function to check if a language is RTL
-const isRTL = (language: string): boolean => {
-  return ["ar", "he"].includes(language);
-};
 
 const ProfilePage: React.FC = () => {
   const theme = useTheme();
@@ -151,7 +127,6 @@ const ProfilePage: React.FC = () => {
   const email = userProfile.data?.attributes?.email || unavailable;
   const firstName = userProfile.data?.attributes?.given_name || "";
   const lastName = userProfile.data?.attributes?.family_name || "";
-  const username = userProfile.data?.username || unavailable;
   const userStatus = userProfile.data?.user_status || unavailable;
 
   // Messages for missing name fields

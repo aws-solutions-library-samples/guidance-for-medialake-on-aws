@@ -5,7 +5,7 @@ import {
   Position,
   useReactFlow,
 } from "reactflow";
-import { Box, Stack, Typography, useTheme } from "@mui/material";
+import { Box, Typography } from "@mui/material";
 import { FlashOn } from "@mui/icons-material";
 
 type Nudge = { along?: number; perp?: number };
@@ -222,9 +222,6 @@ const CustomEdge: React.FC<EdgeProps> = ({
         return "#2B6CB0"; // Default blue
     }
   }, [getChoiceLabel]);
-
-  const isVertical =
-    targetPosition === Position.Top || targetPosition === Position.Bottom;
 
   // stroke-scaled marker like React Flow's default
   const markerId = `${id}-arrow`;

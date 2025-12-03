@@ -17,7 +17,6 @@ const RoleManagement: React.FC = () => {
   const { t } = useTranslation();
   const [openRoleForm, setOpenRoleForm] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | undefined>();
-  const [error, setError] = useState<string | null>(null);
 
   // API Hooks
   const {
@@ -50,26 +49,16 @@ const RoleManagement: React.FC = () => {
         await createRoleMutation.mutateAsync(roleData);
       }
       setOpenRoleForm(false);
-      setError(null);
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "An error occurred while saving the role",
-      );
+      console.error("Error saving role:", err);
     }
   };
 
   const handleDeleteRole = async (roleId: string) => {
     try {
       await deleteRoleMutation.mutateAsync(roleId);
-      setError(null);
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "An error occurred while deleting the role",
-      );
+      console.error("Error deleting role:", err);
     }
   };
 

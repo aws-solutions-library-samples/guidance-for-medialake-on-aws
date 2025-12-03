@@ -233,7 +233,7 @@ export function useAssetSelection<T>({
 
   // Handle selection toggle
   const handleSelectToggle = useCallback(
-    (asset: T, event: React.MouseEvent<HTMLElement>) => {
+    (asset: T) => {
       console.log("handleSelectToggle called with asset:", getAssetId(asset));
 
       const assetId = getAssetId(asset);

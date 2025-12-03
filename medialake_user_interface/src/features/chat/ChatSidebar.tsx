@@ -1,12 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import {
-  Box,
-  Typography,
-  IconButton,
-  Divider,
-  Slide,
-  Fade,
-} from "@mui/material";
+import { Box, Typography, IconButton, Slide, Fade } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/Delete";
 import {
@@ -15,13 +8,12 @@ import {
 } from "../../contexts/ChatContext";
 import ChatMessage from "./ChatMessage";
 import ChatInput from "./ChatInput";
-import { useTheme, alpha } from "@mui/material/styles";
+import { alpha } from "@mui/material/styles";
 
 const SIDEBAR_WIDTH = 350;
 
 const ChatSidebar: React.FC = () => {
   const { isOpen, messages, closeChat, clearHistory } = useChat();
-  const theme = useTheme();
   const [isResizing, setIsResizing] = useState(false);
   const [width, setWidth] = useState(SIDEBAR_WIDTH);
   const resizeHandleRef = useRef<HTMLDivElement | null>(null);

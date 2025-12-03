@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Box, Grid, Paper, Typography, Snackbar, Alert } from "@mui/material";
+import { Box, Grid, Paper, Snackbar, Alert } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { ConfirmationModal } from "../common/ConfirmationModal";
 import { RenameDialog } from "../common/RenameDialog";
@@ -18,7 +18,6 @@ import AssetActionsMenu from "./AssetActionsMenu";
 import { useAssetResults } from "@/hooks/useAssetResults";
 import { useAssetOperations } from "@/hooks/useAssetOperations";
 import { sortAssets } from "@/utils/sortAssets";
-import { type AssetViewControlsProps } from "@/types/shared/assetComponents";
 import { getOriginalAssetId } from "@/utils/clipTransformation";
 
 export interface AssetResultsConfig<T extends AssetBase> {
@@ -81,7 +80,6 @@ function AssetResults<T extends AssetBase>({
   confidenceThreshold = 0,
 }: AssetResultsProps<T>) {
   const navigate = useNavigate();
-  const [currentAsset, setCurrentAsset] = useState<T | null>(null);
   const [columnFilters, setColumnFilters] = useState<
     Array<{ columnId: string; value: string }>
   >([]);
@@ -104,7 +102,7 @@ function AssetResults<T extends AssetBase>({
     page,
     cardFields,
     columns,
-    failedAssets,
+    // failedAssets,
     handleViewModeChange,
     handleRequestSort,
     handlePageChange,
@@ -112,7 +110,6 @@ function AssetResults<T extends AssetBase>({
     handleColumnToggle,
     handleAssetError,
   } = useAssetResults<T>({
-    assets,
     searchMetadata,
     onPageChange,
     defaultCardFields,
@@ -145,7 +142,7 @@ function AssetResults<T extends AssetBase>({
       // Convert groups back to array, maintaining format-based ordering
       result = Object.entries(groups)
         .sort(([formatA], [formatB]) => formatA.localeCompare(formatB))
-        .flatMap(([_, assets]) => assets);
+        .flatMap(([, assets]) => assets);
     }
 
     return result;
@@ -196,10 +193,6 @@ function AssetResults<T extends AssetBase>({
     deleteModalState,
     handleDeleteModalClose,
   } = useAssetOperations<T>();
-
-  const handleNavigationPageChange = (newPage: number) => {
-    handlePageChange({} as React.ChangeEvent<unknown>, newPage);
-  };
 
   const handleAssetClick = (asset: T) => {
     const assetType = asset.DigitalSourceAsset.Type.toLowerCase();
@@ -278,7 +271,7 @@ function AssetResults<T extends AssetBase>({
           handleNameEditComplete(asset, save, value);
         }}
         isFavorite={false} // Default to false since we don't have favorite info here
-        onFavoriteToggle={(e) =>
+        onFavoriteToggle={() =>
           console.log("Favorite toggle not implemented in AssetResults")
         }
         isSemantic={isSemantic}

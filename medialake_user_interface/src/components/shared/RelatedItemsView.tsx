@@ -1,12 +1,5 @@
 import React from "react";
-import {
-  Box,
-  Grid,
-  Typography,
-  CircularProgress,
-  Button,
-  useTheme,
-} from "@mui/material";
+import { Box, Grid, Typography, CircularProgress, Button } from "@mui/material";
 import { formatFileSize } from "../../utils/imageUtils";
 import { formatLocalDateTime } from "../../shared/utils/dateUtils";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
@@ -39,10 +32,8 @@ export const RelatedItemsView: React.FC<RelatedItemsViewProps> = ({
   isLoading,
   onLoadMore,
   hasMore,
-  viewMode = "grid",
   onItemClick,
 }) => {
-  const theme = useTheme();
   console.log("RelatedItemsView - Received items:", items);
   console.log("RelatedItemsView - isLoading:", isLoading);
 
@@ -116,7 +107,7 @@ export const RelatedItemsView: React.FC<RelatedItemsViewProps> = ({
                 thumbnailScale="fill"
                 showMetadata={true}
                 isFavorite={false} // Default to false since we don't have favorite info here
-                onFavoriteToggle={(e) =>
+                onFavoriteToggle={() =>
                   console.log(
                     "Favorite toggle not implemented in RelatedItemsView",
                   )

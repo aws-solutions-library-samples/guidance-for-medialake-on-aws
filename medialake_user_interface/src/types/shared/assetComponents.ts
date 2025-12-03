@@ -1,4 +1,3 @@
-import { type AssetBase } from "../search/searchResults";
 import {
   type SortingState,
   type ColumnDef,

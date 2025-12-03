@@ -6,7 +6,6 @@ import {
   Role,
   CreateRoleRequest,
   UpdateRoleRequest,
-  RoleListResponse,
   RoleResponse,
 } from "../types/api.types";
 

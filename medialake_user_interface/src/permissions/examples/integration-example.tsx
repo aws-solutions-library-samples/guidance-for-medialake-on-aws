@@ -2,64 +2,10 @@
 import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { PermissionProvider } from "../context/permission-context";
-import { Can } from "../components/Can";
 import {
   PermissionGuard,
   RoutePermissionGuard,
 } from "../components/PermissionGuard";
-import { usePermission } from "../hooks/usePermission";
-
-/**
- * Example component showing how to use the Can component for conditional rendering
- */
-function AssetActions({ asset }: { asset: any }) {
-  return (
-    <div className="asset-actions">
-      {/* Show View button only if user has 'view' permission on 'asset' */}
-      <Can I="view" a="asset" subject={asset}>
-        <button>View Details</button>
-      </Can>
-
-      {/* Show Edit button only if user has 'edit' permission on 'asset' */}
-      <Can I="edit" a="asset" subject={asset}>
-        <button>Edit</button>
-      </Can>
-
-      {/* Show Delete button but disable it if user doesn't have 'delete' permission */}
-      <Can I="delete" a="asset" subject={asset} passThrough>
-        {(allowed) => (
-          <button
-            disabled={!allowed}
-            title={
-              !allowed ? "You don't have permission to delete this asset" : ""
-            }
-          >
-            Delete
-          </button>
-        )}
-      </Can>
-    </div>
-  );
-}
-
-/**
- * Example component showing how to use the usePermission hook
- */
-function AssetHeader({ asset }: { asset: any }) {
-  const { can } = usePermission();
-
-  // Check if user can share the asset
-  const canShare = can("share", "asset", asset);
-
-  return (
-    <div className="asset-header">
-      <h1>{asset.name}</h1>
-
-      {/* Conditionally render share button based on permissions */}
-      {canShare && <button>Share</button>}
-    </div>
-  );
-}
 
 /**
  * Example component showing how to use the PermissionGuard component

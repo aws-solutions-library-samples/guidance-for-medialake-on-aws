@@ -98,9 +98,9 @@ export const useJobNotifications = () => {
       .filter((n) => n.jobId && n.type !== "sticky")
       .map((n) => n.jobId);
 
-    dismissibleJobIds.forEach((jobId) => {
+    dismissibleJobIds.forEach((_jobId) => {
       const jobKeysToRemove = [...seenJobs].filter((key) =>
-        key.startsWith(`${jobId}:`),
+        key.startsWith(`${_jobId}:`),
       );
       jobKeysToRemove.forEach((key) => seenJobs.delete(key));
     });
@@ -144,19 +144,6 @@ export const useJobNotifications = () => {
       return new Set();
     }
   }, []);
-
-  const markJobAsSeen = useCallback(
-    (jobId: string, status: string) => {
-      const seenJobs = getSeenJobNotifications();
-      const jobKey = `${jobId}:${status}`;
-      seenJobs.add(jobKey);
-      localStorage.setItem(
-        "medialake_seen_job_notifications",
-        JSON.stringify([...seenJobs]),
-      );
-    },
-    [getSeenJobNotifications],
-  );
 
   const isJobNotificationSeen = useCallback(
     (jobId: string, status: string): boolean => {
@@ -208,7 +195,7 @@ export const useJobNotifications = () => {
               message: `Deleting assets: ${deleteJob.progress || 0}% complete (${deleteJob.processedAssets}/${deleteJob.totalAssets})`,
               type: "sticky" as const,
             };
-          case "COMPLETED":
+          case "COMPLETED": {
             const successCount =
               deleteJob.totalAssets - (deleteJob.failedAssets || 0);
             return {
@@ -216,6 +203,7 @@ export const useJobNotifications = () => {
               message: `Deleted ${successCount} of ${deleteJob.totalAssets} assets successfully`,
               type: "sticky-dismissible" as const,
             };
+          }
           case "FAILED":
             return {
               ...baseNotification,
@@ -223,13 +211,14 @@ export const useJobNotifications = () => {
               type: "dismissible" as const,
               autoCloseMs: 10000,
             };
-          case "CANCELLED":
+          case "CANCELLED": {
             const processedBeforeCancellation = deleteJob.processedAssets || 0;
             return {
               ...baseNotification,
               message: `Delete cancelled: ${processedBeforeCancellation} of ${deleteJob.totalAssets} assets were processed`,
               type: "sticky-dismissible" as const,
             };
+          }
           default:
             return {
               ...baseNotification,
@@ -271,7 +260,7 @@ export const useJobNotifications = () => {
             type: "sticky" as const,
           };
 
-        case "STAGING":
+        case "STAGING": {
           const stagingProgress = downloadJob.progress || 0;
           let stagingMessage = "Preparing download archive...";
 
@@ -290,8 +279,9 @@ export const useJobNotifications = () => {
             message: stagingMessage,
             type: "sticky" as const,
           };
+        }
 
-        case "PROCESSING":
+        case "PROCESSING": {
           const progress = downloadJob.progress || 0;
           let progressMessage = "";
 
@@ -308,6 +298,7 @@ export const useJobNotifications = () => {
             message: progressMessage,
             type: "sticky" as const,
           };
+        }
 
         case "COMPLETED":
           return {
@@ -410,7 +401,7 @@ export const useJobNotifications = () => {
     });
 
     // Remove duplicate notifications (keep the most recent one)
-    jobNotificationMap.forEach((notificationsForJob, jobId) => {
+    jobNotificationMap.forEach((notificationsForJob) => {
       if (notificationsForJob.length > 1) {
         // Sort by updatedAt or createdAt, keep the most recent
         const sortedNotifications = notificationsForJob.sort((a, b) => {

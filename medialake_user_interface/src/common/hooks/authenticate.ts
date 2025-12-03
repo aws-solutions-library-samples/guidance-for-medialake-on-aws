@@ -27,14 +27,10 @@ export const useAuthenticate = () => {
 
     // If SAML is configured, redirect to SAML login
     if (samlProvider) {
-      try {
-        await signInWithRedirect({
-          provider: { custom: samlProvider.identity_provider_name || "" },
-        });
-        return { type: "SAML_REDIRECT" };
-      } catch (error) {
-        throw error;
-      }
+      await signInWithRedirect({
+        provider: { custom: samlProvider.identity_provider_name || "" },
+      });
+      return { type: "SAML_REDIRECT" };
     }
 
     // Otherwise, proceed with Cognito authentication

@@ -11,9 +11,6 @@ import {
   FormControlLabel,
   Checkbox,
   Switch,
-  Radio,
-  ListItemIcon,
-  ListItemText,
   Tooltip,
 } from "@mui/material";
 
@@ -30,16 +27,11 @@ import PhotoSizeSelectSmallIcon from "@mui/icons-material/PhotoSizeSelectSmall";
 import PhotoSizeSelectLargeIcon from "@mui/icons-material/PhotoSizeSelectLarge";
 import FitScreenIcon from "@mui/icons-material/FitScreen";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
-import InfoIcon from "@mui/icons-material/Info";
-import { type SortingState } from "@tanstack/react-table";
 import {
-  type AssetField,
-  type SortOption,
   type CardSize,
   type AspectRatio,
   type AssetViewControlsProps as BaseAssetViewControlsProps,
 } from "../../types/shared/assetComponents";
-import { useFeatureFlag } from "@/utils/featureFlags";
 
 interface AssetViewControlsProps extends BaseAssetViewControlsProps {
   // Search fields
@@ -72,7 +64,6 @@ interface AssetViewControlsProps extends BaseAssetViewControlsProps {
 const AssetViewControls: React.FC<AssetViewControlsProps> = ({
   viewMode,
   onViewModeChange,
-  title,
   sorting,
   sortOptions,
   onSortChange,
@@ -93,7 +84,6 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
   showMetadata,
   onShowMetadataChange,
   // Selection props
-  hasSelectedAssets = false,
   selectAllState = "none",
   onSelectAllToggle,
 }) => {

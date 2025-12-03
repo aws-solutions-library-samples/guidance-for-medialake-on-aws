@@ -19,15 +19,11 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  IconButton,
   InputAdornment,
-  Divider,
   Snackbar,
-  FormHelperText,
   List,
   ListItem,
   ListItemText,
-  ListItemSecondaryAction,
   Tabs,
   Tab,
 } from "@mui/material";
@@ -36,7 +32,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
-import RemoveCircleOutlineIcon from "@mui/icons-material/RemoveCircleOutline";
+// import RemoveCircleOutlineIcon from "@mui/icons-material/RemoveCircleOutline";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import { useTranslation } from "react-i18next";
 import { PageHeader, PageContent } from "@/components/common/layout";
@@ -69,9 +65,9 @@ const convertToPermissionArray = (permissions: any): Permission[] => {
     const result: Permission[] = [];
 
     // Handle flat structure with dot notation (e.g., "resource.action": true)
-    Object.entries(permissions).forEach(([key, value]) => {
+    Object.entries(permissions).forEach(([permKey, value]) => {
       if (typeof value === "boolean") {
-        const parts = key.split(".");
+        const parts = permKey.split(".");
         if (parts.length === 2) {
           result.push({
             resource: parts[0],
@@ -122,72 +118,6 @@ const convertToPermissionArray = (permissions: any): Permission[] => {
   return [];
 };
 
-// Helper function to determine if a permission is allowed or denied
-const getPermissionStatus = (
-  permissions: any,
-  action: string,
-  resource: string,
-): "Allowed" | "Denied" | "Not Set" => {
-  // Handle permissions as an object with boolean properties
-  if (
-    permissions &&
-    typeof permissions === "object" &&
-    !Array.isArray(permissions)
-  ) {
-    // Check if there's a key like "resource.action" (e.g., "asset.view")
-    const key = `${resource}.${action}`;
-    if (key in permissions) {
-      return permissions[key] ? "Allowed" : "Denied";
-    }
-
-    // Check nested structure
-    if (permissions[resource] && typeof permissions[resource] === "object") {
-      if (permissions[resource][action] === true) return "Allowed";
-      if (permissions[resource][action] === false) return "Denied";
-
-      // Check for deeply nested structure
-      if (action.includes(".")) {
-        const [mainAction, subAction] = action.split(".");
-        if (
-          permissions[resource][mainAction] &&
-          typeof permissions[resource][mainAction] === "object" &&
-          permissions[resource][mainAction][subAction] !== undefined
-        ) {
-          return permissions[resource][mainAction][subAction]
-            ? "Allowed"
-            : "Denied";
-        }
-      }
-    }
-
-    return "Not Set";
-  }
-
-  // Handle permissions as an array of Permission objects
-  if (Array.isArray(permissions)) {
-    const permission = permissions.find(
-      (p) => p.action === action && p.resource === resource,
-    );
-    if (!permission) return "Not Set";
-    return permission.effect === "Allow" ? "Allowed" : "Denied";
-  }
-
-  return "Not Set";
-};
-
-// Component to display permission status
-const PermissionStatus: React.FC<{
-  status: "Allowed" | "Denied" | "Not Set";
-}> = ({ status }) => {
-  const color =
-    status === "Allowed"
-      ? "success"
-      : status === "Denied"
-        ? "error"
-        : "default";
-  return <Chip label={status} size="small" color={color} variant="outlined" />;
-};
-
 // Permission Set Card Component
 const PermissionSetCard: React.FC<{
   permissionSet: PermissionSet;
@@ -216,7 +146,7 @@ const PermissionSetCard: React.FC<{
 
     // Otherwise check permissions directly
     // Check if it has full admin access
-    const hasFullAdmin = Object.entries(permissions).some(([key, value]) => {
+    const hasFullAdmin = Object.values(permissions).some((value) => {
       if (typeof value === "object" && value !== null) {
         return Object.values(value).some((v) => v === true);
       }
@@ -608,7 +538,7 @@ const PermissionSetDetailDialog: React.FC<{
               permissions={permissionSet.permissions}
               title={`Permissions for ${permissionSet.name}`}
               interactive={true}
-              onCellClick={(resource, action, status) => {
+              onCellClick={() => {
                 if (onEditPermissions) {
                   onEditPermissions(permissionSet);
                 }
@@ -678,7 +608,7 @@ const PermissionSetDetailDialog: React.FC<{
 
 // Main Permission Sets Page Component
 const PermissionSetsPage: React.FC = () => {
-  const { t } = useTranslation();
+  useTranslation();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState("all");
   const [openPermissionSetForm, setOpenPermissionSetForm] = useState(false);

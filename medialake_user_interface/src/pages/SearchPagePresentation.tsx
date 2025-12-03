@@ -182,7 +182,7 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
   selectedFields,
   confidenceThreshold,
   onConfidenceThresholdChange,
-  defaultFields,
+
   availableFields,
   onFieldsChange,
   filters,
@@ -197,9 +197,8 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
   multiSelectEnabled,
   isLoading,
   isFetching,
-  isFieldsLoading,
+
   error,
-  fieldsError,
 }) => {
   const navigate = useNavigate();
 
@@ -227,17 +226,6 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
       });
     },
     [navigate, query],
-  );
-
-  // Handle Add to Collection click
-  const handleAddToCollectionClick = useCallback(
-    (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => {
-      console.log("Add to Collection clicked!", asset);
-      event.stopPropagation();
-      setSelectedAssetForCollection(asset);
-      setAddToCollectionModalOpen(true);
-    },
-    [],
   );
 
   // Handle actually adding the asset to a collection
@@ -284,11 +272,11 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
     ],
   );
 
-  const handlePageChange = (newPage: number) => {
+  const handlePageChange = () => {
     // This will be handled by the container through URL sync
   };
 
-  const handlePageSizeChange = (newPageSize: number) => {
+  const handlePageSizeChange = () => {
     // This will be handled by the container through URL sync
   };
 
@@ -404,7 +392,7 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
     },
   ];
 
-  const handleColumnToggle = (columnId: string) => {
+  const handleColumnToggle = () => {
     // This could be enhanced with column state management
   };
 

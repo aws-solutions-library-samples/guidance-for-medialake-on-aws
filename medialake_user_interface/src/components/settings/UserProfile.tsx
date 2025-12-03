@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   Box,
   Paper,
@@ -10,13 +10,13 @@ import {
   Divider,
   Switch,
   FormControlLabel,
-  IconButton,
+  // IconButton,
   useTheme,
   Alert,
   Select,
   MenuItem,
   FormControl,
-  InputLabel,
+  // InputLabel,
 } from "@mui/material";
 import {
   Edit as EditIcon,
@@ -25,7 +25,6 @@ import {
   PhotoCamera as PhotoCameraIcon,
   Notifications as NotificationsIcon,
   Security as SecurityIcon,
-  Language as LanguageIcon,
   Palette as PaletteIcon,
   Schedule as ScheduleIcon,
 } from "@mui/icons-material";

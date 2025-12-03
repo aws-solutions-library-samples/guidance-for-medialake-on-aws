@@ -18,7 +18,7 @@ const Breadcrumb: React.FC<BreadcrumbProps> = ({
   searchQuery,
   currentResult,
   totalResults,
-  onBack,
+
   onPrevious,
   onNext,
 }) => {

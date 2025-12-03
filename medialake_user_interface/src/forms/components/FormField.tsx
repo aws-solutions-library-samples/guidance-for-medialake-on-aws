@@ -5,7 +5,6 @@ import {
   TextFieldProps,
   Tooltip,
   IconButton,
-  Box,
   InputAdornment,
 } from "@mui/material";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
@@ -34,7 +33,6 @@ export const FormField = <T extends FieldValues>({
   tooltip,
   translationPrefix,
   useDirectLabels = false,
-  showHelper = false,
   ...rest
 }: FormFieldProps<T>) => {
   const { t } = useTranslation();

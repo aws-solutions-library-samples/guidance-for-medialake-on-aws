@@ -6,7 +6,6 @@ import {
   Select,
   MenuItem,
   Button,
-  useTheme,
   Typography,
   Stack,
 } from "@mui/material";
@@ -28,7 +27,6 @@ export const UserFilterPopover: React.FC<UserFilterPopoverProps> = ({
   users,
 }) => {
   const { t } = useTranslation();
-  const theme = useTheme();
 
   const formatDateOnly = (dateString: string) => {
     const date = new Date(dateString);

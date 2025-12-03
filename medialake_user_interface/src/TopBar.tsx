@@ -25,9 +25,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash/debounce";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "./hooks/useTheme";
-import { useSidebar } from "./contexts/SidebarContext";
 import { useDirection } from "./contexts/DirectionContext";
-import { drawerWidth, collapsedDrawerWidth } from "./constants";
 import { S3UploaderModal } from "./features/upload";
 import { useFeatureFlag } from "./contexts/FeatureFlagsContext";
 import FilterModal from "./components/search/FilterModal";
@@ -35,7 +33,6 @@ import {
   useSearchFilters,
   useSearchQuery,
   useSemanticSearch,
-  useSemanticMode,
   useDomainActions,
   useUIActions,
 } from "./stores/searchStore";
@@ -52,7 +49,6 @@ interface SearchTag {
 function TopBar() {
   const muiTheme = useMuiTheme();
   const { theme } = useTheme();
-  const { isCollapsed } = useSidebar();
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -67,8 +63,7 @@ function TopBar() {
   const storeQuery = useSearchQuery();
   const storeIsSemantic = useSemanticSearch();
   const filters = useSearchFilters();
-  const { setQuery, setIsSemantic, setSemanticMode, setFilters } =
-    useDomainActions();
+  const { setQuery, setIsSemantic } = useDomainActions();
   const { openFilterModal } = useUIActions();
   const [searchResults, setSearchResults] = useState<any>(null);
   const searchBoxRef = useRef<HTMLDivElement>(null);
@@ -167,61 +162,6 @@ function TopBar() {
     }, 500),
     [navigate, storeIsSemantic, setQuery, setIsSemantic, filters, queryClient],
   );
-
-  const handleApplyFilters = (newFilters: any) => {
-    setFilters(newFilters);
-    // Trigger search with the new filters
-    const searchQuery = getSearchQuery();
-
-    // Build facet parameters for cache invalidation
-    const facetParams = {
-      type: newFilters.type,
-      extension: newFilters.extension,
-      asset_size_gte: newFilters.asset_size_gte,
-      asset_size_lte: newFilters.asset_size_lte,
-      ingested_date_gte: newFilters.ingested_date_gte,
-      ingested_date_lte: newFilters.ingested_date_lte,
-      filename: newFilters.filename,
-    };
-
-    // Remove undefined values from facetParams
-    Object.keys(facetParams).forEach((key) => {
-      if (facetParams[key as keyof typeof facetParams] === undefined) {
-        delete facetParams[key as keyof typeof facetParams];
-      }
-    });
-
-    // Invalidate search cache to force refetch with new filters
-    queryClient.invalidateQueries({
-      queryKey: QUERY_KEYS.SEARCH.list(
-        searchQuery,
-        1,
-        50,
-        storeIsSemantic,
-        [],
-        facetParams,
-      ),
-    });
-
-    // Build URLSearchParams
-    const queryParams = new URLSearchParams();
-    queryParams.set("q", searchQuery);
-    queryParams.set("semantic", storeIsSemantic.toString());
-    if (newFilters.type) queryParams.set("type", newFilters.type);
-    if (newFilters.extension)
-      queryParams.set("extension", newFilters.extension);
-    if (newFilters.asset_size_lte)
-      queryParams.set("asset_size_lte", newFilters.asset_size_lte.toString());
-    if (newFilters.asset_size_gte)
-      queryParams.set("asset_size_gte", newFilters.asset_size_gte.toString());
-    if (newFilters.ingested_date_lte)
-      queryParams.set("ingested_date_lte", newFilters.ingested_date_lte);
-    if (newFilters.ingested_date_gte)
-      queryParams.set("ingested_date_gte", newFilters.ingested_date_gte);
-    if (newFilters.filename) queryParams.set("filename", newFilters.filename);
-
-    navigate(`/search?${queryParams.toString()}`);
-  };
 
   // Handle search results from session storage
   useEffect(() => {

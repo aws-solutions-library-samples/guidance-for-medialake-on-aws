@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useFeatureFlag } from "@/utils/featureFlags";
 import { formatDate } from "@/utils/dateFormat";
 import {
   Box,
@@ -17,13 +16,6 @@ import {
   Alert,
   Breadcrumbs,
   Link,
-  TextField,
-  Stack,
-  Grid,
-  Card,
-  CardContent,
-  CardActionArea,
-  Chip,
   useTheme,
 } from "@mui/material";
 import {
@@ -45,7 +37,6 @@ import {
   useAddItemToCollection,
   useGetCollection,
   useGetChildCollections,
-  useUpdateCollection,
   useDeleteCollection,
   useDeleteItemFromCollection,
 } from "@/api/hooks/useCollections";
@@ -58,12 +49,11 @@ import SearchFilters from "../components/search/SearchFilters";
 import AssetResultsView from "../components/shared/AssetResultsView";
 import { useAssetOperations } from "@/hooks/useAssetOperations";
 import {
-  type AssetBase,
   type ImageItem,
   type VideoItem,
   type AudioItem,
 } from "@/types/search/searchResults";
-import { type SortingState, type CellContext } from "@tanstack/react-table";
+import { type CellContext } from "@tanstack/react-table";
 import { type AssetTableColumn } from "@/types/shared/assetComponents";
 import TabbedSidebar from "../components/common/RightSidebar/TabbedSidebar";
 import { useSearchParams } from "react-router-dom";
@@ -158,9 +148,8 @@ const CollectionViewPage: React.FC = () => {
   const assets = assetsData?.results || [];
   const searchMetadata = assetsData?.searchMetadata;
 
-  // Get child collections
-  const { data: childCollectionsResponse, isLoading: isLoadingChildren } =
-    useGetChildCollections(id!);
+  // Get child collections (not currently used but kept for future feature)
+  useGetChildCollections(id!);
 
   // Get ancestors from collection data (now included in collection response)
   const ancestors = collection?.ancestors || [];
@@ -235,14 +224,12 @@ const CollectionViewPage: React.FC = () => {
     handleStartEditing,
     handleNameChange,
     handleNameEditComplete,
-    handleAction,
     handleDeleteConfirm,
     handleDeleteCancel,
     handleDownloadClick,
     editingAssetId: currentEditingAssetId,
     editedName: currentEditedName,
     isDeleteModalOpen,
-    selectedAsset,
     alert,
     handleAlertClose,
     isLoading: assetOperationsLoading,
@@ -250,7 +237,6 @@ const CollectionViewPage: React.FC = () => {
     deleteModalState,
     handleDeleteModalClose,
   } = useAssetOperations<AssetItem>();
-
   const handleAssetClick = useCallback(
     (asset: AssetItem) => {
       const assetType = asset.DigitalSourceAsset.Type.toLowerCase();

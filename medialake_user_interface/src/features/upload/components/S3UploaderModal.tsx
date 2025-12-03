@@ -38,7 +38,7 @@ const S3UploaderModal: React.FC<S3UploaderModalProps> = ({
   onUploadError,
 }) => {
   const { t } = useTranslation();
-  const [uploadedFiles, setUploadedFiles] = useState<any[]>([]);
+  const [, setUploadedFiles] = useState<any[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [currentPath, setCurrentPath] = useState<string>(path || "");
 

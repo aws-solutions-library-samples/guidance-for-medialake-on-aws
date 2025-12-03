@@ -2,8 +2,7 @@ import React from "react";
 import { Box } from "@mui/material";
 import { VideoViewer, VideoViewerRef } from "../common/VideoViewer";
 
-import { forwardRef, useImperativeHandle, useRef, useEffect } from "react";
-import { OmakasePlayer } from "@byomakase/omakase-player";
+import { forwardRef, useEffect } from "react";
 
 interface AssetVideoProps {
   src: string;
@@ -16,7 +15,7 @@ interface AssetVideoProps {
 }
 
 export const AssetVideo = forwardRef<VideoViewerRef, AssetVideoProps>(
-  ({ src, alt, onTimeUpdate, onVideoElementReady, protocol }, ref) => {
+  ({ src, onTimeUpdate, onVideoElementReady, protocol }, ref) => {
     // Register the video element when the component mounts
     useEffect(() => {
       if (

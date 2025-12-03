@@ -2,8 +2,6 @@ import React, { useState } from "react";
 import {
   Box,
   Button,
-  Card,
-  CardContent,
   Chip,
   CircularProgress,
   IconButton,
@@ -15,7 +13,6 @@ import {
   TableHead,
   TableRow,
   Typography,
-  useTheme,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -47,7 +44,6 @@ const ICON_MAP: Record<string, React.ReactElement> = {
 };
 
 const CollectionTypesManagement: React.FC = () => {
-  const theme = useTheme();
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [migrateDialogOpen, setMigrateDialogOpen] = useState(false);
   const [selectedType, setSelectedType] = useState<CollectionType | null>(null);

@@ -55,7 +55,7 @@ const UserManagement: React.FC = () => {
     error: usersError,
   } = useGetUsers();
   const { data: groups, isLoading: isLoadingGroups } = useGetGroups(true); // Always fetch groups when this component loads
-  const { data: permissionSets } = useGetPermissionSets(true); // Enable API call when this page is loaded
+  useGetPermissionSets(true); // Enable API call when this page is loaded
 
   // Debug logs
   console.log("Groups data in UserManagement:", groups);
@@ -125,7 +125,7 @@ const UserManagement: React.FC = () => {
 
     if (isNewUser) {
       console.log("Creating new user with groups:", userData.groups);
-      const result = await handleMutation(
+      await handleMutation(
         {
           mutation: createUserMutation,
           actionMessages: {

@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useTranslation } from "react-i18next";
 import { useGeneratePresignedUrl } from "../../api/hooks/usePresignedUrl";
 import { useSemanticSearchStatus } from "../../features/settings/system/hooks/useSystemSettings";
 import { fetchUserAttributes } from "aws-amplify/auth";
@@ -11,15 +10,11 @@ import {
   Tab,
   List,
   ListItem,
-  ListItemText,
-  ListItemIcon,
   Divider,
   Button,
   IconButton,
   Badge,
-  Avatar,
   TextField,
-  Paper,
   alpha,
   useTheme,
   Tooltip,
@@ -33,37 +28,21 @@ import { RightSidebar } from "../common/RightSidebar";
 // Icons
 import HistoryIcon from "@mui/icons-material/History";
 import BookmarkIcon from "@mui/icons-material/Bookmark";
-import GroupsIcon from "@mui/icons-material/Groups";
-import AccountTreeIcon from "@mui/icons-material/AccountTree";
-import TimelineIcon from "@mui/icons-material/Timeline";
-import SendIcon from "@mui/icons-material/Send";
 import PersonIcon from "@mui/icons-material/Person";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
 import PlayCircleOutlineIcon from "@mui/icons-material/PlayCircleOutline";
 import ImageIcon from "@mui/icons-material/Image";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import MovieIcon from "@mui/icons-material/Movie";
 import DownloadIcon from "@mui/icons-material/Download";
-import PreviewIcon from "@mui/icons-material/Preview";
-import SettingsIcon from "@mui/icons-material/Settings";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import SmartToyIcon from "@mui/icons-material/SmartToy";
 import RestoreIcon from "@mui/icons-material/Restore";
 import { RefObject } from "react";
-import { VideoViewer, VideoViewerRef, Marker } from "../common/VideoViewer";
+import { VideoViewerRef } from "../common/VideoViewer";
 import { randomHexColor, getMarkerColorByConfidence } from "../common/utils";
-import {
-  SCRUBBER_LANE_STYLE_DARK,
-  TIMELINE_STYLE_DARK,
-  PERIOD_MARKER_STYLE,
-} from "../common/OmakaseTimeLineConstants";
-import {
-  MarkerLane,
-  OmakasePlayer,
-  PeriodMarker,
-} from "@byomakase/omakase-player";
-import { subscribe } from "diagnostics_channel";
+import { PERIOD_MARKER_STYLE } from "../common/OmakaseTimeLineConstants";
+import { PeriodMarker } from "@byomakase/omakase-player";
 
 interface MarkerInfo {
   id: string;
@@ -146,16 +125,6 @@ const saveSemanticModificationsToStorage = (
       error,
     );
   }
-};
-
-// Helper function to check if a semantic marker has been modified
-const isSemanticMarkerModified = (
-  assetId: string,
-  markerId: string,
-): boolean => {
-  if (!assetId) return false;
-  const modifications = loadSemanticModificationsFromStorage(assetId);
-  return markerId in modifications;
 };
 
 // Storage utilities for confidence level persistence
@@ -389,15 +358,6 @@ interface AssetMarkersProps {
   setClipsMarkersCreated: (created: boolean) => void;
 }
 
-interface AssetCollaborationProps {
-  comments?: any[];
-  onAddComment?: (comment: string) => void;
-}
-
-interface AssetPipelinesProps {}
-
-interface AssetActivityProps {}
-
 // Version content component (using existing data)
 const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
   const theme = useTheme();
@@ -576,7 +536,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
   videoViewerRef,
   asset,
   assetId,
-  assetType,
+
   searchTerm,
   clipsMarkersCreated,
   setClipsMarkersCreated,
@@ -610,12 +570,6 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
   const [semanticModifications, setSemanticModifications] = useState<
     Record<string, Partial<MarkerInfo>>
   >({});
-
-  // State for timecode editing
-  const [editingTimecode, setEditingTimecode] = useState<{
-    markerId: string;
-    field: "start" | "end";
-  } | null>(null);
 
   // Flag to prevent subscription events during reset operations
   const isResettingMarker = useRef<Set<string>>(new Set());
@@ -1563,168 +1517,6 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
       }
     },
     [videoViewerRef, markers],
-  );
-
-  // Function to update markers incrementally based on new threshold
-  const updateMarkersForThreshold = useCallback(
-    (newThreshold: number) => {
-      if (!asset?.clips || !Array.isArray(asset.clips)) return;
-
-      // Get all visual-text clips
-      const allVisualTextClips = asset.clips
-        .filter((clip) => {
-          // Support both embedding_option (TwelveLabs API/Coative) and embedding_scope (TwelveLabs Bedrock)
-          const isValidEmbedding =
-            clip.embedding_option === "visual-text" ||
-            clip.embedding_scope === "clip";
-
-          const hasValidScore = clip.score !== null && clip.score !== undefined;
-
-          return isValidEmbedding && hasValidScore;
-        })
-        .sort((a, b) => (b.score || 0) - (a.score || 0));
-
-      // Filter by new threshold
-      const newFilteredClips = allVisualTextClips.filter(
-        (clip) => (clip.score || 0) >= newThreshold,
-      );
-
-      console.log("Updating markers for threshold:", newThreshold);
-      console.log(
-        "New filtered clips:",
-        newFilteredClips.map((c) => ({
-          score: c.score,
-          start: c.start_timecode,
-          end: c.end_timecode,
-        })),
-      );
-
-      // If no clips pass the threshold, clear all markers
-      if (newFilteredClips.length === 0) {
-        console.log("No clips passed the score threshold:", newThreshold);
-
-        // Remove all existing markers
-        if (videoViewerRef?.current) {
-          const lane = videoViewerRef.current.getMarkerLane();
-          if (lane) {
-            markerRefsMap.current.forEach((marker, id) => {
-              lane.removeMarker(id);
-            });
-          }
-        }
-        markerRefsMap.current.clear();
-        setMarkers([]);
-        return;
-      }
-
-      // Show all filtered clips (no duration-based limiting)
-      const selectedClips = newFilteredClips;
-
-      // Get current marker IDs that should exist based on new clips
-      const newMarkerIds = new Set(
-        selectedClips.map(
-          (clip, index) =>
-            `clip_${clip.start_timecode}_${clip.end_timecode}_${index}`,
-        ),
-      );
-
-      // Remove markers that should no longer exist
-      const currentMarkerIds = new Set(markers.map((m) => m.id));
-      const markersToRemove = Array.from(currentMarkerIds).filter(
-        (id) => !newMarkerIds.has(id),
-      );
-
-      if (videoViewerRef?.current) {
-        const lane = videoViewerRef.current.getMarkerLane();
-        if (lane) {
-          markersToRemove.forEach((markerId) => {
-            const markerRef = markerRefsMap.current.get(markerId);
-            if (markerRef) {
-              lane.removeMarker(markerId);
-              markerRefsMap.current.delete(markerId);
-            }
-          });
-        }
-      }
-
-      // Add new markers that don't exist yet
-      const markersToAdd: MarkerInfo[] = [];
-      selectedClips.forEach((clip, index) => {
-        const markerId = `clip_${clip.start_timecode}_${clip.end_timecode}_${index}`;
-
-        if (!currentMarkerIds.has(markerId)) {
-          // This is a new marker, create it
-          const startSeconds = timecodeToSeconds(clip.start_timecode);
-          const endSeconds = timecodeToSeconds(clip.end_timecode);
-
-          if (videoViewerRef?.current) {
-            const lane = videoViewerRef.current.getMarkerLane();
-            if (lane) {
-              // Use confidence-based color for semantic markers
-              const markerColor = getMarkerColorByConfidence(clip.score);
-
-              const periodMarker = new PeriodMarker({
-                timeObservation: {
-                  start: startSeconds,
-                  end: endSeconds,
-                },
-                editable: true,
-                id: markerId,
-                style: {
-                  ...PERIOD_MARKER_STYLE,
-                  color: markerColor,
-                },
-              });
-
-              markerRefsMap.current.set(markerId, periodMarker);
-
-              // Note: Subscription will be handled by the main useEffect hook
-              // to avoid duplicate subscriptions and ensure proper cleanup
-
-              lane.addMarker(periodMarker);
-
-              const defaultName = searchTerm
-                ? searchTerm
-                : `Marker ${markerId}`;
-
-              markersToAdd.push({
-                id: markerId,
-                name: defaultName,
-                timeObservation: {
-                  start: startSeconds,
-                  end: endSeconds,
-                },
-                style: {
-                  color: markerColor,
-                },
-                score: clip.score !== null ? clip.score : undefined,
-                type: "semantic" as const,
-              });
-            }
-          }
-        }
-      });
-
-      // Update markers state incrementally
-      setMarkers((prevMarkers) => {
-        // Remove markers that should no longer exist
-        const filteredMarkers = prevMarkers.filter((marker) =>
-          newMarkerIds.has(marker.id),
-        );
-        // Add new markers
-        return [...filteredMarkers, ...markersToAdd];
-      });
-
-      // No additional state updates needed
-    },
-    [
-      asset?.clips,
-      videoViewerRef,
-      timecodeToSeconds,
-      searchTerm,
-      markers,
-      setMarkers,
-    ],
   );
 
   // Retry mechanism for marker creation
@@ -2709,326 +2501,8 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
   );
 };
 
-// Collaboration content component
-const AssetCollaboration: React.FC<AssetCollaborationProps> = ({
-  comments = [],
-  onAddComment,
-}) => {
-  const [newComment, setNewComment] = useState("");
-  const theme = useTheme();
-
-  const handleSubmitComment = () => {
-    if (newComment.trim() && onAddComment) {
-      onAddComment(newComment);
-      setNewComment("");
-    }
-  };
-
-  return (
-    <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <Box sx={{ flex: 1, overflowY: "auto", p: 2 }}>
-        {comments.length === 0 ? (
-          <Paper
-            variant="outlined"
-            sx={{
-              p: 3,
-              textAlign: "center",
-              bgcolor: alpha(theme.palette.background.paper, 0.4),
-            }}
-          >
-            <GroupsIcon
-              color="disabled"
-              sx={{ fontSize: 40, mb: 1, opacity: 0.7 }}
-            />
-            <Typography color="text.secondary" sx={{ mb: 1 }}>
-              No comments yet
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Start the conversation by adding a comment below.
-            </Typography>
-          </Paper>
-        ) : (
-          <List disablePadding>
-            {comments.map((comment, index) => (
-              <ListItem
-                key={index}
-                alignItems="flex-start"
-                sx={{
-                  px: 1,
-                  py: 1.5,
-                  borderRadius: 1,
-                  mb: 1,
-                  bgcolor:
-                    index % 2 === 0
-                      ? "transparent"
-                      : alpha(theme.palette.background.paper, 0.4),
-                }}
-              >
-                <ListItemIcon sx={{ minWidth: 40 }}>
-                  <Avatar
-                    src={comment.avatar}
-                    alt={comment.user}
-                    sx={{ width: 32, height: 32 }}
-                  >
-                    {comment.user.charAt(0)}
-                  </Avatar>
-                </ListItemIcon>
-                <ListItemText
-                  primary={
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                      }}
-                    >
-                      <Typography variant="subtitle2" component="span">
-                        {comment.user}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {comment.timestamp}
-                      </Typography>
-                    </Box>
-                  }
-                  secondary={
-                    <Typography
-                      variant="body2"
-                      color="text.primary"
-                      sx={{ mt: 0.5, whiteSpace: "pre-wrap" }}
-                    >
-                      {comment.content}
-                    </Typography>
-                  }
-                />
-              </ListItem>
-            ))}
-          </List>
-        )}
-      </Box>
-
-      <Divider />
-
-      <Box sx={{ p: 2, bgcolor: alpha(theme.palette.background.paper, 0.3) }}>
-        <TextField
-          variant="outlined"
-          size="small"
-          fullWidth
-          multiline
-          rows={2}
-          placeholder="Add a comment..."
-          value={newComment}
-          onChange={(e) => setNewComment(e.target.value)}
-          sx={{
-            mb: 1,
-            "& .MuiOutlinedInput-root": {
-              backgroundColor: theme.palette.background.paper,
-            },
-          }}
-        />
-        <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-          <Tooltip title="Post your comment">
-            <span>
-              <Button
-                variant="contained"
-                size="small"
-                endIcon={<SendIcon />}
-                disabled={!newComment.trim()}
-                onClick={handleSubmitComment}
-              >
-                Post
-              </Button>
-            </span>
-          </Tooltip>
-        </Box>
-      </Box>
-    </Box>
-  );
-};
-
-// Pipelines content component
-const AssetPipelines: React.FC<AssetPipelinesProps> = () => {
-  const theme = useTheme();
-  const { t } = useTranslation();
-
-  return (
-    <Box sx={{ p: 2 }}>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Run processing pipelines on this asset to transform or analyze it.
-      </Typography>
-
-      <Paper
-        variant="outlined"
-        sx={{
-          p: 2,
-          mb: 2,
-          borderColor: alpha(theme.palette.info.main, 0.2),
-          transition: "all 0.2s ease",
-          "&:hover": {
-            borderColor: theme.palette.info.main,
-            boxShadow: `0 4px 8px ${alpha(theme.palette.info.main, 0.15)}`,
-          },
-        }}
-      >
-        <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-          <AccountTreeIcon color="info" fontSize="small" sx={{ mr: 1 }} />
-          <Typography variant="subtitle2">Thumbnail Generation</Typography>
-        </Box>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          Creates multiple thumbnail images at different resolutions.
-        </Typography>
-        <Tooltip title="Run this pipeline on the current asset">
-          <Button variant="outlined" size="small" color="info">
-            Run Pipeline
-          </Button>
-        </Tooltip>
-      </Paper>
-
-      <Paper
-        variant="outlined"
-        sx={{
-          p: 2,
-          mb: 2,
-          borderColor: alpha(theme.palette.warning.main, 0.2),
-          transition: "all 0.2s ease",
-          "&:hover": {
-            borderColor: theme.palette.warning.main,
-            boxShadow: `0 4px 8px ${alpha(theme.palette.warning.main, 0.15)}`,
-          },
-        }}
-      >
-        <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-          <AccountTreeIcon color="warning" fontSize="small" sx={{ mr: 1 }} />
-          <Typography variant="subtitle2">AI Analysis</Typography>
-        </Box>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          Extracts metadata, tags, and insights using machine learning.
-        </Typography>
-        <Tooltip title="Run this pipeline on the current asset">
-          <Button variant="outlined" size="small" color="warning">
-            Run Pipeline
-          </Button>
-        </Tooltip>
-      </Paper>
-
-      <Tooltip title="Browse all available pipelines">
-        <Button variant="text" fullWidth sx={{ mt: 2 }}>
-          {t("pipelines.viewAll", "View All Pipelines")}
-        </Button>
-      </Tooltip>
-    </Box>
-  );
-};
-
-// Activity content component
-const AssetActivity: React.FC<AssetActivityProps> = () => {
-  const theme = useTheme();
-  const activities = [
-    {
-      user: "System",
-      action: "Created asset",
-      timestamp: "2023-11-15 09:30:22",
-      icon: <PersonIcon color="primary" />,
-    },
-    {
-      user: "John Doe",
-      action: "Added to collection",
-      timestamp: "2023-11-15 10:15:43",
-      icon: <PersonIcon color="primary" />,
-    },
-    {
-      user: "AI Pipeline",
-      action: "Generated metadata",
-      timestamp: "2023-11-15 11:22:17",
-      icon: <TimelineIcon color="secondary" />,
-    },
-    {
-      user: "Jane Smith",
-      action: "Added comment",
-      timestamp: "2023-11-15 14:05:36",
-      icon: <PersonIcon color="primary" />,
-    },
-  ];
-
-  return (
-    <Box sx={{ p: 2 }}>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Recent activity history for this asset.
-      </Typography>
-
-      <List
-        disablePadding
-        sx={{
-          bgcolor: alpha(theme.palette.background.paper, 0.4),
-          borderRadius: 1,
-          p: 1,
-        }}
-      >
-        {activities.map((activity, index) => (
-          <React.Fragment key={index}>
-            <ListItem
-              alignItems="flex-start"
-              sx={{
-                px: 1,
-                py: 1.5,
-                borderRadius: 1,
-                "&:hover": {
-                  bgcolor: alpha(theme.palette.background.paper, 0.6),
-                },
-              }}
-            >
-              <ListItemIcon sx={{ minWidth: 36 }}>{activity.icon}</ListItemIcon>
-              <ListItemText
-                primary={activity.action}
-                secondary={
-                  <Box
-                    sx={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      mt: 0.5,
-                    }}
-                  >
-                    <Typography variant="caption" component="span">
-                      {activity.user}
-                    </Typography>
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      component="span"
-                    >
-                      {activity.timestamp}
-                    </Typography>
-                  </Box>
-                }
-              />
-            </ListItem>
-            {index < activities.length - 1 && (
-              <Divider component="li" sx={{ my: 0.5 }} />
-            )}
-          </React.Fragment>
-        ))}
-      </List>
-
-      <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
-        <Tooltip title="Load more activities">
-          <Button size="small" color="primary">
-            Load More
-          </Button>
-        </Tooltip>
-      </Box>
-    </Box>
-  );
-};
 export const AssetSidebar: React.FC<AssetSidebarProps> = (props) => {
-  const {
-    videoViewerRef,
-    versions = [],
-    comments = [],
-    onAddComment,
-    assetId,
-    asset,
-    assetType,
-    searchTerm,
-  } = props;
+  const { videoViewerRef, versions = [], assetId, asset, searchTerm } = props;
   const [currentTab, setCurrentTab] = useState(0);
   const theme = useTheme();
   const [markers, setMarkers] = useState<MarkerInfo[]>([]);
@@ -3129,7 +2603,7 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = (props) => {
                 setMarkers={setMarkers}
                 asset={asset}
                 assetId={assetId}
-                assetType={assetType}
+                assetType={asset?.DigitalSourceAsset?.Type || "video"}
                 searchTerm={searchTerm}
                 clipsMarkersCreated={clipsMarkersCreated}
                 setClipsMarkersCreated={setClipsMarkersCreated}

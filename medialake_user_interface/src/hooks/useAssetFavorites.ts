@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import React, { useCallback } from "react";
 import { useFeatureFlag } from "../utils/featureFlags";
 import {
   useGetFavorites,

@@ -14,7 +14,6 @@ import {
   OmakasePlayer,
   PeriodMarker,
   PlayerChromingTheme,
-  StampThemeScale,
 } from "@byomakase/omakase-player";
 import {
   SCRUBBER_LANE_STYLE_DARK,
@@ -48,7 +47,6 @@ import "../../styles/player-overrides.css";
 import { createTimecodePlaceholder } from "@/utils/placeholderSvg";
 import { useVideoKeyboardShortcuts } from "./useVideoKeyboardShortcuts";
 
-import { filter } from "rxjs";
 import { randomHexColor } from "./utils";
 
 export interface VideoViewerProps {
@@ -100,9 +98,9 @@ const useOmakasePlayer = (
   protocol?: "audio" | "video",
 ) => {
   const playerRef = useRef<OmakasePlayer | null>(null);
-  const [playerVolume, setPlayerVolume] = useState(1);
+  const [, setPlayerVolume] = useState(1);
 
-  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const callbacksRef = useRef(callbacks);
   useEffect(() => {
@@ -192,7 +190,7 @@ const useOmakasePlayer = (
         },
       }),
       player.video.onFullscreenChange$.subscribe({
-        next: (event) => {
+        next: () => {
           // Forward fullscreen changes if needed.
         },
       }),
@@ -307,7 +305,7 @@ const useOmakasePlayer = (
     const timelineContainer = document.getElementById("omakase-timeline");
     if (!timelineContainer) return;
 
-    const resizeObserver = new ResizeObserver((entries) => {
+    const resizeObserver = new ResizeObserver(() => {
       // When the timeline container's size changes, settle the layout.
       if (playerRef.current?.timeline) {
         playerRef.current.timeline.zoomTo(100);
@@ -408,7 +406,7 @@ function ThumbLabel(props: any) {
   const [thumbnailUrl, setThumbnailUrl] = useState(() =>
     getThumbnailForTime(value),
   );
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     lastValueRef.current = value;
@@ -472,10 +470,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
       onVolumeChange,
       onMute,
       onUnmute,
-      onPlaybackRateChange,
       onFullscreenChange,
-      onRemoveSafeZone,
-      onClearSafeZones,
       onBuffering,
       onEnded,
       onError,
@@ -507,7 +502,9 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
       setShortcutsAnchor(null);
     };
 
-    const volumeHoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const volumeHoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+      null,
+    );
     const lastNonZeroVolumeRef = useRef(100);
 
     // state near other useStates in VideoViewer
@@ -560,11 +557,8 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
       unmute,
       setPlaybackRate,
       toggleFullscreen,
-      removeSafeZone,
-      clearSafeZones,
       currentTime,
       duration,
-      setCurrentTime,
       playerRef: omakaseRef, // get the internal ref from the hook
     } = useOmakasePlayer(
       videoSrc,
@@ -635,12 +629,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
     }, [omakaseRef, videoSrc]);
 
     // Use keyboard shortcuts hook
-    const {
-      SHORTCUTS,
-      toggleTransport,
-      currentPlaybackRate,
-      isShuttlingReverse,
-    } = useVideoKeyboardShortcuts({
+    const { SHORTCUTS, isShuttlingReverse } = useVideoKeyboardShortcuts({
       play,
       pause,
       seek,

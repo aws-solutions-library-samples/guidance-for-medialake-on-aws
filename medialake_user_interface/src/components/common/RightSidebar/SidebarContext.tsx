@@ -5,7 +5,6 @@ import React, {
   ReactNode,
   useEffect,
 } from "react";
-import { useFeatureFlag } from "@/utils/featureFlags";
 
 // Default width values
 export const DEFAULT_WIDTH = 375;

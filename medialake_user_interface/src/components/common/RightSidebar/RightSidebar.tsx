@@ -1,11 +1,7 @@
 import React, { ReactNode, useState, useEffect, useRef } from "react";
 import { Box, Button } from "@mui/material";
 import { ChevronLeft, ChevronRight } from "@mui/icons-material";
-import {
-  useRightSidebar,
-  COLLAPSED_WIDTH,
-  DEFAULT_WIDTH,
-} from "./SidebarContext";
+import { useRightSidebar, COLLAPSED_WIDTH } from "./SidebarContext";
 import { useLocation } from "react-router-dom";
 import { alpha } from "@mui/material/styles";
 

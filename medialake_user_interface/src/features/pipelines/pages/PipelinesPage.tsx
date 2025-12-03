@@ -11,9 +11,8 @@ import {
   ClickAwayListener,
   MenuList,
   MenuItem,
-  useTheme,
-  alpha,
-  IconButton,
+  // alpha,
+  // IconButton,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -58,7 +57,6 @@ const PIPELINES_QUERY_KEYS = {
 const PipelinesPage: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const theme = useTheme();
 
   // Add Pipeline Button Menu state
   const addPipelineButtonRef = useRef<HTMLDivElement>(null);

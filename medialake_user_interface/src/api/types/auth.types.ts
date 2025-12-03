@@ -2,7 +2,6 @@
 
 import type {
   AuthUser as AmplifyAuthUser,
-  AuthTokens,
   FetchUserAttributesOutput,
 } from "aws-amplify/auth";
 

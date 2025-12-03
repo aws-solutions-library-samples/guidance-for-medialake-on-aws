@@ -1,5 +1,3 @@
-import { Environment } from "@/types/environment";
-
 export interface IntegrationNode {
   nodeId: string;
   info: {

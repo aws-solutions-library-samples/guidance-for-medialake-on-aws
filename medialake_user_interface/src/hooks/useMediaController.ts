@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import { VideoViewerRef } from "../components/common/VideoViewer";
 
 export interface MediaController {

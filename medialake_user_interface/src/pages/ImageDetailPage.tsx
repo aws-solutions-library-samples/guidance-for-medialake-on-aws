@@ -162,11 +162,10 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
 };
 
 const RelatedItemsTab: React.FC<{
-  assetId: string;
   relatedVersionsData: RelatedVersionsResponse | undefined;
   isLoading: boolean;
   onLoadMore: () => void;
-}> = ({ assetId, relatedVersionsData, isLoading, onLoadMore }) => {
+}> = ({ relatedVersionsData, isLoading, onLoadMore }) => {
   console.log("RelatedItemsTab - relatedVersionsData:", relatedVersionsData);
 
   const items = useMemo(() => {
@@ -227,7 +226,7 @@ const ImageDetailContent: React.FC = () => {
   const { data: assetData, isLoading: isLoadingAsset } = useAsset(id || "");
   const { data: relatedVersionsData, isLoading: isLoadingRelated } =
     useRelatedVersions(id || "", relatedPage);
-  const { isExpanded, closeSidebar } = useRightSidebar();
+  const { isExpanded } = useRightSidebar();
   const [commentAnchorEl, setCommentAnchorEl] = useState<null | HTMLElement>(
     null,
   );
@@ -345,18 +344,6 @@ const ImageDetailContent: React.FC = () => {
     currentResult = 1,
     totalResults = 0,
   } = location.state || {};
-
-  const handleCommentClick = useCallback(
-    (event: React.MouseEvent<HTMLElement>, index: number) => {
-      setCommentAnchorEl(
-        commentAnchorEl && selectedComment === index
-          ? null
-          : event.currentTarget,
-      );
-      setSelectedComment(selectedComment === index ? null : index);
-    },
-    [commentAnchorEl, selectedComment],
-  );
 
   const transformMetadata = useCallback((metadata: any) => {
     if (!metadata) return [];
@@ -517,7 +504,6 @@ const ImageDetailContent: React.FC = () => {
         console.log("Rendering RelatedItemsTab");
         return (
           <RelatedItemsTab
-            assetId={assetData.data.asset.DigitalSourceAsset.ID}
             relatedVersionsData={relatedVersionsData}
             isLoading={isLoadingRelated}
             onLoadMore={() => setRelatedPage((prev) => prev + 1)}

@@ -11,14 +11,12 @@ import {
   InputLabel,
   CircularProgress,
   Alert,
-  IconButton,
   InputAdornment,
   Snackbar,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import SearchIcon from "@mui/icons-material/Search";
 import FilterListIcon from "@mui/icons-material/FilterList";
-import { useTranslation } from "react-i18next";
 import { PageHeader, PageContent } from "@/components/common/layout";
 import { Can } from "@/permissions/components/Can";
 import { useGetApiKeys } from "@/api/hooks/useApiKeys";
@@ -30,7 +28,6 @@ import DeleteApiKeyDialog from "./DeleteApiKeyDialog";
 import ApiKeyDetailsDialog from "./ApiKeyDetailsDialog";
 
 const ApiKeyManagement: React.FC = () => {
-  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState("all");
   const [selectedApiKey, setSelectedApiKey] = useState<ApiKey | null>(null);

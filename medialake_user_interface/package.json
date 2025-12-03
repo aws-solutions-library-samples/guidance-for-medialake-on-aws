@@ -89,6 +89,9 @@
   "lint-staged": {
     "src/**/*.{ts,tsx,js,jsx,json,css,scss}": [
       "prettier --write"
+    ],
+    "src/**/*.{ts,tsx}": [
+      "eslint --max-warnings=0 --rule '@typescript-eslint/no-unused-vars: error' --rule 'no-unused-vars: error'"
     ]
   },
   "name": "medialake",

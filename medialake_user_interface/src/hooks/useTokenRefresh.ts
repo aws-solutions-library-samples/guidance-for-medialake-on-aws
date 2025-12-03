@@ -1,6 +1,5 @@
 import { useEffect, useCallback, useRef } from "react";
 import { useAuth } from "../common/hooks/auth-context";
-import { authService } from "../api/authService";
 import { isTokenExpiringSoon } from "../common/helpers/token-helper";
 import { StorageHelper } from "../common/helpers/storage-helper";
 import { logPermissionDebugInfo } from "../utils/permission-debug";

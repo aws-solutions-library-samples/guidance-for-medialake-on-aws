@@ -20,19 +20,13 @@ import {
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import { useTranslation } from "react-i18next";
-import { Form } from "@/forms/components/Form";
-import { FormField } from "@/forms/components/FormField";
-import { FormSelect } from "@/forms/components/FormSelect";
 import { useFormWithValidation } from "@/forms/hooks/useFormWithValidation";
 import {
   IntegrationFormProps,
   IntegrationFormData,
   IntegrationFormResult,
 } from "./types";
-import {
-  integrationFormSchema,
-  createIntegrationFormDefaults,
-} from "./schemas/integrationFormSchema";
+import { integrationFormSchema } from "./schemas/integrationFormSchema";
 import {
   useCreateIntegration,
   useUpdateIntegration,

@@ -9,13 +9,12 @@ import {
 } from "@mui/material";
 import SendIcon from "@mui/icons-material/Send";
 import { useChat } from "../../contexts/ChatContext";
-import { useTheme, alpha } from "@mui/material/styles";
+import { alpha } from "@mui/material/styles";
 
 const ChatInput: React.FC = () => {
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { addMessage, updateLastMessage, isOpen } = useChat();
-  const theme = useTheme();
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Auto-focus the input field when the chat is opened

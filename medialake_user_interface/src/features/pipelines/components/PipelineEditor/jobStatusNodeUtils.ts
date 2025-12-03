@@ -1,5 +1,4 @@
-import React from "react";
-import { FaRegCheckCircle } from "react-icons/fa";
+// import { FaRegCheckCircle } from "react-icons/fa";
 
 // Job status node constants
 export const JOB_STATUS_NODE_TYPE = "jobStatusNode";
@@ -18,7 +17,7 @@ export const createJobStatusNodeData = () => {
     inputTypes: ["*"],
     outputTypes: ["completed", "in-progress", "failed"],
     selectedMethod: JOB_STATUS_NODE_METHOD,
-    icon: "", //React.createElement(FaRegCheckCircle, { size: 18, color: "#4CAF50" }),
+    icon: "", //React.createElement({ size: 18, color: "#4CAF50" }),
     methodConfig: {
       method: JOB_STATUS_NODE_METHOD,
       parameters: {

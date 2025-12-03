@@ -19,10 +19,8 @@ import {
   alpha,
 } from "@mui/material";
 import {
-  Edit as EditIcon,
   Delete as DeleteIcon,
   CloudUpload as CloudUploadIcon,
-  PowerSettingsNew as PowerIcon,
   AccessTime as AccessTimeIcon,
   Sync as SyncIcon,
 } from "@mui/icons-material";
@@ -31,19 +29,11 @@ import ConnectorEditModal from "@/features/settings/connectors/components/Connec
 import { useDateFormat } from "@/shared/hooks/useDateFormat";
 import { Warning as WarningIcon } from "@mui/icons-material";
 
-const formatBytes = (bytes: number): string => {
-  if (bytes === 0) return "0 Bytes";
-  const k = 1024;
-  const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
-};
-
 interface ConnectorCardProps {
   connector: ConnectorResponse;
   onEdit: (connector: ConnectorResponse) => void;
   onDelete: (id: string) => Promise<void>;
-  onToggleStatus: (id: string, enabled: boolean) => Promise<void>;
+  onToggleStatus?: (id: string, enabled: boolean) => Promise<void>;
   onSync?: (id: string) => Promise<void>;
   showSeconds?: boolean;
   allowSecondsToggle?: boolean;
@@ -53,7 +43,6 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
   connector,
   onEdit,
   onDelete,
-  onToggleStatus,
   onSync,
   showSeconds: initialShowSeconds = false,
   allowSecondsToggle = true,
@@ -89,10 +78,6 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
       setIsDeleting(false);
       setDeleteDialogOpen(false);
     }
-  };
-
-  const handleToggleStatus = async () => {
-    await onToggleStatus(connector.id, connector.status === "disabled");
   };
 
   const handleSyncClick = async () => {

@@ -1,3 +1,5 @@
+import React from "react";
+
 export interface TableState {
   globalFilter: string;
   columnFilters: any[];

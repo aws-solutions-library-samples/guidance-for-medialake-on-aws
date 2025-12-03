@@ -66,6 +66,24 @@ repos:
             medialake_user_interface/src/types/shared/assetComponents\.ts
           )$
 
+  # ESLint for TypeScript/JavaScript - Check for unused imports
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint
+        entry: bash -c 'cd medialake_user_interface && npx eslint "${@#medialake_user_interface/}"' --
+        language: system
+        files: ^medialake_user_interface/src/.*\.(ts|tsx)$
+        args:
+          [
+            "--quiet",
+            "--rule",
+            "@typescript-eslint/no-unused-vars: error",
+            "--rule",
+            "no-unused-vars: error",
+          ]
+        pass_filenames: true
+
   # Commit message validation (Phase 1)
   - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v4.2.0

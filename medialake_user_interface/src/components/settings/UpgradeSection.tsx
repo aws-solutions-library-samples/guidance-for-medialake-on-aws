@@ -30,8 +30,6 @@ import {
 } from "@mui/material";
 import {
   Refresh as RefreshIcon,
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
   CloudUpload as CloudUploadIcon,
   History as HistoryIcon,
 } from "@mui/icons-material";
@@ -77,7 +75,7 @@ export const UpgradeSection: React.FC = () => {
 
   // Poll for status updates when upgrade is in progress
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
 
     if (status?.upgrade_status === "in_progress") {
       interval = setInterval(() => {

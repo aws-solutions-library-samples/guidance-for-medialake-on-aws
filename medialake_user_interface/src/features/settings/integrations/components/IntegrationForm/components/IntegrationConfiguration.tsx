@@ -12,7 +12,6 @@ import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { Form } from "@/forms/components/Form";
 import { FormField } from "@/forms/components/FormField";
-import { FormSelect } from "@/forms/components/FormSelect";
 import { useFormWithValidation } from "@/forms/hooks/useFormWithValidation";
 import {
   IntegrationConfigurationProps,
@@ -140,8 +139,6 @@ export const IntegrationConfiguration: React.FC<
         data,
       );
       try {
-        const now = new Date().toISOString();
-
         // Handle the case where API key is the placeholder (not changed in edit mode)
         const submissionData = { ...data };
         if (data.auth.credentials.apiKey === "***existing***") {

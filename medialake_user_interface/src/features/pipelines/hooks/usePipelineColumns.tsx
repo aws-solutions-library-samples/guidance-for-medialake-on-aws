@@ -5,7 +5,6 @@ import {
   Tooltip,
   IconButton,
   Typography,
-  Chip,
   FormControlLabel,
 } from "@mui/material";
 import { IconSwitch } from "@/components/common";

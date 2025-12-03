@@ -352,7 +352,7 @@ const RelatedItemsTab: React.FC<{
   relatedVersionsData: RelatedVersionsResponse | undefined;
   isLoading: boolean;
   onLoadMore: () => void;
-}> = ({ assetId, relatedVersionsData, isLoading, onLoadMore }) => {
+}> = ({ relatedVersionsData, isLoading, onLoadMore }) => {
   console.log("RelatedItemsTab - relatedVersionsData:", relatedVersionsData);
 
   const items = useMemo(() => {
@@ -417,11 +417,11 @@ const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
 }) => {
   const audioViewerRef = useRef<VideoViewerRef>(null);
   const seekAttemptsRef = useRef<number>(0);
-  const seekTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const seekTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { isExpanded, closeSidebar } = useRightSidebar();
+  const { isExpanded } = useRightSidebar();
   const {
     data: assetData,
     isLoading,
@@ -501,7 +501,7 @@ const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
 
       try {
         // Try to get current time to verify audio is ready
-        const currentTime = audioViewerRef.current.getCurrentTime();
+        audioViewerRef.current.getCurrentTime();
         // If we can get current time, audio is ready
         audioViewerRef.current.seek(startTime!);
         console.log(

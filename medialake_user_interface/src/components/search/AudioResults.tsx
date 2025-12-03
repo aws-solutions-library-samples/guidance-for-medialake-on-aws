@@ -4,7 +4,6 @@ import { type AssetTableColumn } from "@/types/shared/assetComponents";
 import AssetResults from "@/components/shared/AssetResults";
 import { formatFileSize } from "@/utils/fileSize";
 import { formatDate } from "@/utils/dateFormat";
-import { RecentlyViewedProvider } from "@/contexts/RecentlyViewedContext";
 
 interface AudioResultsProps {
   audios: AudioItem[];
@@ -97,12 +96,6 @@ const renderCardField = (fieldId: string, audio: AudioItem): string => {
       return "";
   }
 };
-
-const actions = [
-  { id: "rename", label: "Rename" },
-  { id: "download", label: "Download" },
-  { id: "share", label: "Share" },
-];
 
 const AudioResults: React.FC<AudioResultsProps> = ({ audios, ...props }) => {
   return (

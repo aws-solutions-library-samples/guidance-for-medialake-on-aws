@@ -213,7 +213,7 @@ const EditPermissionMatrixModal: React.FC<EditPermissionMatrixModalProps> = ({
     action: string;
     status: PermissionStatus;
     onChange: (status: PermissionStatus) => void;
-  }> = ({ resource, action, status, onChange }) => {
+  }> = ({ status, onChange }) => {
     return (
       <ToggleButtonGroup
         value={status}

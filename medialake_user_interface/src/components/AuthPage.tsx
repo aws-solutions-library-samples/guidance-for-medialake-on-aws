@@ -309,7 +309,7 @@ const AuthPage = () => {
                     },
                     async handleConfirmSignIn(input) {
                       try {
-                        const confirmResult = await confirmSignIn(input);
+                        await confirmSignIn(input);
 
                         const session = await fetchAuthSession();
                         const token = session.tokens?.idToken?.toString();

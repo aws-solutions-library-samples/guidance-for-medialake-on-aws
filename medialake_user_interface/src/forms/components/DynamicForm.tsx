@@ -1,6 +1,5 @@
 import React from "react";
-import { Box, Button } from "@mui/material";
-import { useTranslation } from "react-i18next";
+import { Box } from "@mui/material";
 import { Form } from "./Form";
 import { FormField } from "./FormField";
 import { FormSelect } from "./FormSelect";
@@ -9,28 +8,18 @@ import { FormJsonEditor } from "./FormJsonEditor";
 import { useFormWithValidation } from "../hooks/useFormWithValidation";
 import { FormDefinition, FormFieldDefinition } from "../types";
 import { createZodSchema } from "../utils/createZodSchema";
-import { z } from "zod";
+import "zod";
 
 interface DynamicFormProps {
   definition: FormDefinition;
   defaultValues?: Record<string, any>;
   onSubmit: (data: any) => Promise<void>;
   onCancel?: () => void;
-  onBack?: () => void;
   showButtons?: boolean;
 }
 
 export const DynamicForm: React.FC<DynamicFormProps> = React.memo(
-  ({
-    definition,
-    defaultValues,
-    onSubmit,
-    onCancel,
-    onBack,
-    showButtons = true,
-  }) => {
-    const { t } = useTranslation();
-
+  ({ definition, defaultValues, onSubmit, onCancel, showButtons = true }) => {
     // Only log initial mount
     React.useEffect(() => {
       console.log("[DynamicForm] Mounted:", {

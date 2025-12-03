@@ -1,5 +1,4 @@
 import React from "react";
-import { useFeatureFlag } from "@/utils/featureFlags";
 import {
   type ImageItem,
   type VideoItem,
@@ -7,7 +6,6 @@ import {
 } from "@/types/search/searchResults";
 import { type SortingState } from "@tanstack/react-table";
 import { type AssetTableColumn } from "@/types/shared/assetComponents";
-import { useNavigate, useLocation } from "react-router-dom";
 import { formatFileSize } from "@/utils/fileSize";
 import { formatDate } from "@/utils/dateFormat";
 import AssetResultsView from "../shared/AssetResultsView";
@@ -128,11 +126,12 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
         return asset.DigitalSourceAsset.Type;
       case "format":
         return asset.DigitalSourceAsset.MainRepresentation.Format;
-      case "size":
+      case "size": {
         const sizeInBytes =
           asset.DigitalSourceAsset.MainRepresentation.StorageInfo
             .PrimaryLocation.FileInfo.Size;
         return formatFileSize(sizeInBytes);
+      }
       case "createdAt":
         return formatDate(asset.DigitalSourceAsset.CreateDate);
       case "modifiedAt":

@@ -134,9 +134,8 @@ export function transformResultsToClipMode(
           // Only process clips that have a valid score for semantic search
           if (clip.score !== undefined && clip.score !== null) {
             // Create a new asset item for each clip
-            const { clips: originalClips, ...assetWithoutClips } = asset as any;
             const clipAsset: ClipAssetItem = {
-              ...assetWithoutClips,
+              ...asset,
               // Generate unique ID for the clip
               InventoryID: `${asset.InventoryID}_clip_${clipIndex}`,
               // Use clip score if available, otherwise use asset score
@@ -174,9 +173,8 @@ export function transformResultsToClipMode(
       }
       // For non-video/audio assets (Image), treat the entire asset as a "clip"
       else if (assetType === "Image") {
-        const { clips: originalClips, ...assetWithoutClips } = asset as any;
         const wholeAssetClip: ClipAssetItem = {
-          ...assetWithoutClips,
+          ...asset,
           // Keep original ID for non-video assets
           InventoryID: asset.InventoryID,
           // Use asset score
@@ -195,9 +193,8 @@ export function transformResultsToClipMode(
       }
       // For video/audio assets without clips, also treat as whole asset
       else if (assetType === "Video" || assetType === "Audio") {
-        const { clips: originalClips, ...assetWithoutClips } = asset as any;
         const wholeAssetClip: ClipAssetItem = {
-          ...assetWithoutClips,
+          ...asset,
           InventoryID: asset.InventoryID,
           score: asset.score ?? 0,
           clipData: {

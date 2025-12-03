@@ -1,5 +1,5 @@
 import { createTheme, Theme } from "@mui/material/styles";
-import { colorTokens, componentTokens, typography } from "./tokens";
+import { colorTokens, typography } from "./tokens";
 import { alpha } from "@mui/material/styles";
 
 export const createUnifiedTheme = (mode: "light" | "dark"): Theme => {
@@ -113,7 +113,7 @@ export const createUnifiedTheme = (mode: "light" | "dark"): Theme => {
             backgroundColor: "transparent",
             borderColor: alpha(theme.palette.divider, 0.1),
           }),
-          head: ({ theme }) => ({
+          head: () => ({
             backgroundColor:
               mode === "dark"
                 ? alpha(colorTokens.background.default.dark, 0.3)

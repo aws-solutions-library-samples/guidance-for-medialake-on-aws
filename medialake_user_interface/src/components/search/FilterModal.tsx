@@ -1,5 +1,4 @@
 import React from "react";
-import { FacetFilters } from "../../types/facetSearch";
 import {
   useFilterModalOpen,
   useFilterModalDraft,
@@ -81,7 +80,7 @@ export interface FilterModalProps {
   };
 }
 
-const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
+const FilterModal: React.FC<FilterModalProps> = () => {
   const { t } = useTranslation();
   const theme = useTheme();
 
@@ -166,7 +165,7 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
   };
 
   // Get available extensions from facet counts if available
-  const availableExtensions = facetCounts?.file_extensions?.buckets || [];
+  // const _availableExtensions = facetCounts?.file_extensions?.buckets || [];
 
   return (
     <Dialog

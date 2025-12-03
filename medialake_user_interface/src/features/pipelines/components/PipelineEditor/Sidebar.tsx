@@ -8,7 +8,6 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
-  Divider,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import {
@@ -453,7 +452,7 @@ const SidebarContent: React.FC = () => {
           });
         } else {
           // For non-integration nodes or nodes with object methods, use the original logic
-          Object.entries(node.methods).forEach(([methodName, method]) => {
+          Object.entries(node.methods).forEach(([, method]) => {
             const nodeType = node.info.nodeType;
             const section = groupedNodes.find((s) =>
               s.types.some((type) => nodeType.includes(type)),

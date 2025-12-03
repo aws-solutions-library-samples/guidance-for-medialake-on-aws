@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useFeatureFlag } from "@/utils/featureFlags";
 import { formatDate } from "@/utils/dateFormat";
 import {
   Box,
-  Typography,
+  // Typography,
   LinearProgress,
   Dialog,
   DialogTitle,
@@ -11,11 +10,6 @@ import {
   DialogContentText,
   DialogActions,
   Button,
-  FormControl,
-  InputLabel,
-  Select,
-  Chip,
-  OutlinedInput,
   SelectChangeEvent,
   Snackbar,
   Alert,
@@ -23,7 +17,6 @@ import {
 import { AddToCollectionModal } from "@/components/collections/AddToCollectionModal";
 import { BulkDeleteDialog } from "@/components/assets/BulkDeleteDialog";
 import { useAddItemToCollection } from "@/api/hooks/useCollections";
-import SearchOffIcon from "@mui/icons-material/SearchOff";
 import {
   RightSidebar,
   RightSidebarProvider,
@@ -32,19 +25,14 @@ import SearchFilters from "../components/search/SearchFilters";
 import MasterResultsView from "../components/search/MasterResultsView";
 import NoResultsFound from "../components/search/NoResultsFound";
 import { useSearch } from "../api/hooks/useSearch";
-import { useSearchFields, type FieldInfo } from "../api/hooks/useSearchFields";
+import { useSearchFields } from "../api/hooks/useSearchFields";
 import { useAssetOperations } from "@/hooks/useAssetOperations";
 import {
-  type AssetBase,
   type ImageItem,
   type VideoItem,
   type AudioItem,
 } from "@/types/search/searchResults";
-import {
-  type SortingState,
-  type ColumnDef,
-  type CellContext,
-} from "@tanstack/react-table";
+import { type CellContext } from "@tanstack/react-table";
 import { type AssetTableColumn } from "@/types/shared/assetComponents";
 import { SearchError } from "@/api/hooks/useSearch";
 import TabbedSidebar from "../components/common/RightSidebar/TabbedSidebar";
@@ -99,13 +87,6 @@ interface Filters {
 }
 
 const DEFAULT_PAGE_SIZE = 50;
-
-interface SelectedAsset {
-  id: string;
-  name: string;
-  type: string;
-  inventoryID: string;
-}
 
 const SearchPage: React.FC = () => {
   const location = useLocation();
@@ -210,11 +191,7 @@ const SearchPage: React.FC = () => {
   }, [searchResults]);
 
   // Fetch search fields
-  const {
-    data: fieldsData,
-    isLoading: isFieldsLoading,
-    error: fieldsError,
-  } = useSearchFields();
+  const { data: fieldsData } = useSearchFields();
 
   // Extract fields data
   const defaultFields = fieldsData?.data?.defaultFields || [];
@@ -331,14 +308,12 @@ const SearchPage: React.FC = () => {
     handleStartEditing,
     handleNameChange,
     handleNameEditComplete,
-    handleAction,
     handleDeleteConfirm,
     handleDeleteCancel,
     handleDownloadClick,
     editingAssetId: currentEditingAssetId,
     editedName: currentEditedName,
     isDeleteModalOpen,
-    selectedAsset,
     alert,
     handleAlertClose,
     isLoading: assetOperationsLoading,
@@ -583,16 +558,6 @@ const SearchPage: React.FC = () => {
 
       return (isImage || isVideo || isAudio) && passesTimeFilter;
     }) || [];
-
-  const imageResults = filteredResults.filter(
-    (item) => item.DigitalSourceAsset.Type === "Image",
-  );
-  const videoResults = filteredResults.filter(
-    (item) => item.DigitalSourceAsset.Type === "Video",
-  );
-  const audioResults = filteredResults.filter(
-    (item) => item.DigitalSourceAsset.Type === "Audio",
-  );
 
   const [expandedSections, setExpandedSections] = useState({
     mediaTypes: true,

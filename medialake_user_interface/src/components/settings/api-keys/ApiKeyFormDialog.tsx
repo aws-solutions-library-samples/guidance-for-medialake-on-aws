@@ -16,7 +16,6 @@ import {
   Checkbox,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import { useTranslation } from "react-i18next";
 import { ActionButton } from "@/components/common/button/ActionButton";
 import { useCreateApiKey, useUpdateApiKey } from "@/api/hooks/useApiKeys";
 import {
@@ -40,7 +39,6 @@ const ApiKeyFormDialog: React.FC<ApiKeyFormDialogProps> = ({
   apiKey,
   isEditMode = false,
 }) => {
-  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     name: "",
     description: "",

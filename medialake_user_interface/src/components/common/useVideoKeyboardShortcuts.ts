@@ -1,4 +1,10 @@
-import { useCallback, useRef, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useRef,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { PeriodMarker } from "@byomakase/omakase-player";
 import { PERIOD_MARKER_STYLE } from "./OmakaseTimeLineConstants";
 import { randomHexColor } from "./utils";
@@ -26,7 +32,9 @@ interface UseVideoKeyboardShortcutsProps {
   setMuted: (muted: boolean) => void;
   setIsVolumeHovered: (hovered: boolean) => void;
   lastNonZeroVolumeRef: React.MutableRefObject<number>;
-  volumeHoverTimeoutRef: React.MutableRefObject<NodeJS.Timeout | null>;
+  volumeHoverTimeoutRef: React.MutableRefObject<ReturnType<
+    typeof setTimeout
+  > | null>;
 
   // Marker functionality
   markerLaneRef: React.MutableRefObject<any | null>;
@@ -77,7 +85,7 @@ export const useVideoKeyboardShortcuts = ({
       [-16, -8, -4, -2, -1, -0.5, -0.25, 0, 0.25, 0.5, 1, 2, 4, 8, 16] as const,
     [],
   );
-  const [shuttleIdx, setShuttleIdx] = useState(
+  const [, setShuttleIdx] = useState(
     SHUTTLE_STOPS.indexOf(1 as (typeof SHUTTLE_STOPS)[number]),
   );
 
@@ -162,7 +170,9 @@ export const useVideoKeyboardShortcuts = ({
       try {
         const fr = v.getFrameRate();
         if (Number.isFinite(fr) && fr > 0) fpsRef.current = fr;
-      } catch {}
+      } catch {
+        // Ignore frame rate detection errors
+      }
     });
     return () => sub?.unsubscribe();
   }, [omakaseRef]);

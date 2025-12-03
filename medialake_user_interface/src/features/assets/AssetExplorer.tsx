@@ -55,7 +55,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({
   const [pageSize, setPageSize] = useState(50);
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
-  const [assetType, setAssetType] = useState<string | undefined>(undefined);
+  const [assetType] = useState<string | undefined>(undefined);
 
   // UI state
   const [viewMode, setViewMode] = useState<"card" | "table">("card");

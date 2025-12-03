@@ -26,7 +26,6 @@ import {
   Error as ErrorIcon,
   Info as InfoIcon,
   NavigateNext as NavigateNextIcon,
-  NavigateBefore as NavigateBeforeIcon,
   History as HistoryIcon,
 } from "@mui/icons-material";
 import { EmptyTableState } from "@/components/common/table";

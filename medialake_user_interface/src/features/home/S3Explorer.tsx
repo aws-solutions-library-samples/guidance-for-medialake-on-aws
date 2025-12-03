@@ -107,12 +107,14 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({
   const [debouncedFilter, setDebouncedFilter] = useState<string>("");
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const [hoverTimeout, setHoverTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [hoverTimeout, setHoverTimeout] = useState<ReturnType<
+    typeof setTimeout
+  > | null>(null);
   const queryClient = useQueryClient();
   const containerRef = useRef<HTMLDivElement>(null);
   const listContainerRef = useRef<HTMLDivElement>(null);
   const typeAheadBuffer = useRef<string>("");
-  const typeAheadTimeout = useRef<NodeJS.Timeout | null>(null);
+  const typeAheadTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastHoverPrefetchTime = useRef<number>(0);
   const prefetchedPrefixes = useRef<Set<string>>(new Set());
 

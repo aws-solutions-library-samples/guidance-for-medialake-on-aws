@@ -1,9 +1,9 @@
 import {
-  useGetNodes,
+  // useGetNodes,
   useGetNode,
   useGetUnconfiguredNodeMethods,
 } from "@/shared/nodes/api/nodesController";
-import { Node, NodesError } from "@/shared/nodes/types/nodes.types";
+import { Node } from "@/shared/nodes/types/nodes.types";
 
 export class IntegrationsNodesService {
   public static useNodes() {

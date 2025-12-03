@@ -21,7 +21,7 @@ const CommentPopper: React.FC<CommentPopperProps> = ({
   open,
   anchorEl,
   comment,
-  onClose,
+  // onClose,
 }) => {
   return (
     <Popper id={id} open={open} anchorEl={anchorEl}>

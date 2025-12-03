@@ -42,7 +42,7 @@ const ApiStatusModal: React.FC<ApiStatusModalProps> = ({
   const theme = useTheme();
 
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
+    let timeoutId: ReturnType<typeof setTimeout>;
     // Only auto-close on success if there's no job ID (not a tracked job)
     if (open && status === "success" && onClose && !jobId) {
       timeoutId = setTimeout(() => {

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Box,
   Button,
@@ -21,10 +21,7 @@ import {
   IntegrationsResponse,
   Integration,
 } from "@/features/settings/integrations/types/integrations.types";
-import {
-  IntegrationFormResult,
-  IntegrationFormData,
-} from "@/features/settings/integrations/components/IntegrationForm/types";
+import { IntegrationFormData } from "@/features/settings/integrations/components/IntegrationForm/types";
 import {
   useGetIntegrations,
   useCreateIntegration,

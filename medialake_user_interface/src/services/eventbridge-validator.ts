@@ -118,13 +118,13 @@ export class EventBridgePatternValidator {
 
         switch (operator) {
           case "numeric":
-            this.validateNumericOperator(value, path, errors, warnings);
+            this.validateNumericOperator(value, path, errors);
             break;
           case "cidr":
-            this.validateCidrOperator(value, path, errors, warnings);
+            this.validateCidrOperator(value, path, errors);
             break;
           case "exists":
-            this.validateExistsOperator(value, path, errors, warnings);
+            this.validateExistsOperator(value, path, errors);
             break;
           case "wildcard":
             this.validateWildcardOperator(value, path, errors, warnings);
@@ -138,7 +138,6 @@ export class EventBridgePatternValidator {
     value: any,
     path: string,
     errors: ValidationError[],
-    warnings: ValidationError[],
   ): void {
     if (!Array.isArray(value)) {
       errors.push({
@@ -198,7 +197,6 @@ export class EventBridgePatternValidator {
     value: any,
     path: string,
     errors: ValidationError[],
-    warnings: ValidationError[],
   ): void {
     if (typeof value !== "string") {
       errors.push({
@@ -224,7 +222,6 @@ export class EventBridgePatternValidator {
     value: any,
     path: string,
     errors: ValidationError[],
-    warnings: ValidationError[],
   ): void {
     if (typeof value !== "boolean") {
       errors.push({

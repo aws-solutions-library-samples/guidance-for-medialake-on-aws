@@ -30,7 +30,6 @@ const JobStatusNode: React.FC<NodeProps<JobStatusNodeData>> = ({
 
   const handleNodeClick = useCallback(
     (event: React.MouseEvent) => {
-      const rect = (event.target as HTMLElement).getBoundingClientRect();
       const clickX = event.clientX;
       const clickY = event.clientY;
 

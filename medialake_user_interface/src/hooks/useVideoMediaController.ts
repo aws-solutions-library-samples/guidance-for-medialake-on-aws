@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import { VideoViewerRef } from "../components/common/VideoViewer";
 
 export interface VideoMediaController {
@@ -14,8 +14,8 @@ export interface VideoMediaController {
 
 export const useVideoMediaController = (): VideoMediaController => {
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [duration] = useState(0);
+  const [isPlaying] = useState(false);
   const videoViewerRef = useRef<React.RefObject<VideoViewerRef> | null>(null);
   const timeUpdateCallbacksRef = useRef<Set<(time: number) => void>>(new Set());
 

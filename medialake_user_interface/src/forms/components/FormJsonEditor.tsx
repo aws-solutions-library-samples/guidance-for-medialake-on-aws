@@ -14,16 +14,12 @@ interface FormJsonEditorProps<T extends FieldValues> {
 export function FormJsonEditor<T extends FieldValues>({
   name,
   control,
-  label,
-  required = false,
-  tooltip,
-  placeholder,
 }: FormJsonEditorProps<T>) {
   return (
     <Controller
       name={name}
       control={control}
-      render={({ field, fieldState }) => {
+      render={({ field }) => {
         // Parse string value to object for the editor
         const parseValue = (val: any): Record<string, any> => {
           if (!val) return {};

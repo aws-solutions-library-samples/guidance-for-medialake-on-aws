@@ -8,7 +8,6 @@ import {
   alpha,
 } from "@mui/material";
 import { formatCamelCase } from "../utils/stringUtils";
-import { TruncatedTextWithTooltip } from "./common/TruncatedTextWithTooltip";
 
 // Output filters for metadata categories
 export const outputFilters = {

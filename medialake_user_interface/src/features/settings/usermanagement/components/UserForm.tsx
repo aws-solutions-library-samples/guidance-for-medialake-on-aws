@@ -100,25 +100,20 @@ export const UserForm: React.FC<UserFormProps> = ({
   }, [user, open, form.reset, availableGroups]);
 
   const handleSubmit = async (data: UserFormData) => {
-    try {
-      const requestData: CreateUserRequest = {
-        username: data.email,
-        email: data.email,
-        given_name: data.given_name,
-        family_name: data.family_name,
-        permissions: [], // Set empty array for permissions
-        groups: [data.groups], // Convert single group ID back to array
-        enabled: true, // Default to enabled
-      };
+    const requestData: CreateUserRequest = {
+      username: data.email,
+      email: data.email,
+      given_name: data.given_name,
+      family_name: data.family_name,
+      permissions: [], // Set empty array for permissions
+      groups: [data.groups], // Convert single group ID back to array
+      enabled: true, // Default to enabled
+    };
 
-      console.log("Submitting user creation request:", requestData);
-      await onSave(requestData);
-      onClose();
-      form.reset();
-    } catch (error) {
-      // Error handling is done at the parent level
-      throw error;
-    }
+    console.log("Submitting user creation request:", requestData);
+    await onSave(requestData);
+    onClose();
+    form.reset();
   };
 
   return (

@@ -2,7 +2,6 @@ import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { apiClient } from "@/api/apiClient";
 import { API_ENDPOINTS } from "@/api/endpoints";
 import { logger } from "@/common/helpers/logger";
-import { useErrorModal } from "@/hooks/useErrorModal";
 import { QUERY_KEYS } from "@/api/queryKeys";
 import axios from "axios";
 
@@ -51,7 +50,6 @@ export const useSearch = (query: string, params?: SearchParams) => {
   const pageSize = params?.pageSize || 20;
   const isSemantic = params?.isSemantic ?? false;
   const fields = params?.fields || [];
-  const { showError } = useErrorModal();
 
   // Extract facet parameters from params
   const facetParams = params

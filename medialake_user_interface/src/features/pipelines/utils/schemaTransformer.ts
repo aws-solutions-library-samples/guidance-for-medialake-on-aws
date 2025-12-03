@@ -10,8 +10,6 @@
  * @module schemaTransformer
  */
 
-import type { NodeParameter, ParameterSchema } from "../types/schema.types";
-
 /**
  /**
   * Normalizes parameter type strings to match our internal format

@@ -31,7 +31,6 @@ import {
   BarChart as BarChartIcon,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
-import { EmptyTableState } from "@/components/common/table";
 
 interface User {
   id: string;
@@ -113,7 +112,7 @@ const AdminSettings: React.FC = () => {
     },
   ];
 
-  const handleDeleteUser = (userId: string) => {
+  const handleDeleteUser = () => {
     // TODO: Implement user deletion
     setError(
       t(
@@ -301,7 +300,7 @@ const AdminSettings: React.FC = () => {
                       <Tooltip title={t("actions.delete", "Delete user")}>
                         <IconButton
                           size="small"
-                          onClick={() => handleDeleteUser(user.id)}
+                          onClick={() => handleDeleteUser()}
                           sx={{ color: theme.palette.error.main }}
                         >
                           <DeleteIcon fontSize="small" />

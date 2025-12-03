@@ -1,15 +1,10 @@
 import React, { useState } from "react";
-import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   Button,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Box,
   Typography,
   CircularProgress,
@@ -20,7 +15,6 @@ import {
   ListItemIcon,
   ListItemText,
   ListItemButton,
-  Divider,
 } from "@mui/material";
 import {
   Folder as FolderIcon,
@@ -42,12 +36,9 @@ interface AddToCollectionModalProps {
 export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
   open,
   onClose,
-  assetId,
   assetName,
-  assetType,
   onAddToCollection,
 }) => {
-  const { t } = useTranslation();
   const [selectedCollectionId, setSelectedCollectionId] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);

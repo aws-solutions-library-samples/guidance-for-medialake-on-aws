@@ -30,7 +30,7 @@ const ConnectorsPage: React.FC = () => {
   const {
     data: connectorsResponse,
     isLoading,
-    isError,
+    // isError,
     error,
   } = useGetConnectors();
 

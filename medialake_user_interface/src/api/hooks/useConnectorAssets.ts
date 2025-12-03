@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/api/apiClient";
 import { API_ENDPOINTS } from "@/api/endpoints";
 import { logger } from "@/common/helpers/logger";
-import { useErrorModal } from "@/hooks/useErrorModal";
 import { QUERY_KEYS } from "@/api/queryKeys";
 import axios from "axios";
 import {
@@ -54,8 +53,6 @@ export const useConnectorAssets = ({
   sortDirection = "desc",
   assetType,
 }: ConnectorAssetsParams) => {
-  const { showError } = useErrorModal();
-
   // Construct the query string for bucket search
   const query = bucketName
     ? `storageIdentifier:${bucketName}${assetType ? ` type:${assetType}` : ""}`

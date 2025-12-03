@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useFeatureFlag } from "@/utils/featureFlags";
 import { useSemanticSearch } from "@/stores/searchStore";
 import {
@@ -16,7 +16,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
-import InfoIcon from "@mui/icons-material/Info";
+// import InfoIcon from "@mui/icons-material/Info";
 import AddIcon from "@mui/icons-material/Add";
 import RemoveIcon from "@mui/icons-material/Remove";
 import {
@@ -129,7 +129,6 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
 
     // Lazy loading state for video assets
     const [isVisible, setIsVisible] = useState(false);
-    const [isPlayerReady, setIsPlayerReady] = useState(false);
     const cardContainerRef = useRef<HTMLDivElement>(null);
 
     const favoritesFeature = useFeatureFlag("user-favorites-enabled", true);

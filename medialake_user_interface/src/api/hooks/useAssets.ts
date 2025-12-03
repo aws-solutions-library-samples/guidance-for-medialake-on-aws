@@ -4,8 +4,7 @@ import { apiClient } from "@/api/apiClient";
 import { API_ENDPOINTS } from "@/api/endpoints";
 import { logger } from "@/common/helpers/logger";
 import { useErrorModal } from "@/hooks/useErrorModal";
-import { useFeatureFlag } from "@/utils/featureFlags";
-import { useSnackbar, closeSnackbar } from "notistack";
+import { useSnackbar } from "notistack";
 import { useAuth } from "@/common/hooks/auth-context";
 
 interface Asset {
@@ -90,31 +89,6 @@ interface DeleteAssetResponse {
   data: {
     InventoryID: string;
   };
-}
-
-interface RelatedVersionHit {
-  InventoryID: string;
-  DigitalSourceAsset: {
-    ID: string;
-    Type: string;
-    CreateDate: string;
-    MainRepresentation: {
-      Format: string;
-      StorageInfo: {
-        PrimaryLocation: {
-          ObjectKey: {
-            Name: string;
-          };
-          FileInfo: {
-            Size: number;
-          };
-        };
-      };
-    };
-  };
-  thumbnailUrl?: string;
-  proxyUrl?: string;
-  score: number;
 }
 
 interface TranscriptionResponse {

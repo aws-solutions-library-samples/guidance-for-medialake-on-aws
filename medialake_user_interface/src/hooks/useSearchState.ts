@@ -18,7 +18,7 @@ export const useSearchState = ({
   initialSemantic = false,
   initialFilters = {},
 }: UseSearchStateProps = {}) => {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const isInitialized = useRef(false);
 
   // Get state from Zustand store

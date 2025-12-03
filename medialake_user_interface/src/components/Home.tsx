@@ -6,14 +6,13 @@ import {
   Typography,
   Paper,
   useTheme,
-  useMediaQuery,
 } from "@mui/material";
 import { SmartFolders } from "@/features/home/SmartFolders";
 import { ConnectedStorage } from "@/features/home/ConnectedStorage";
 
 const Home: React.FC = () => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  // const _isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   return (
     <Box

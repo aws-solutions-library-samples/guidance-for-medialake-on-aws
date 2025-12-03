@@ -6,13 +6,7 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
-import { Ability } from "@casl/ability";
-import {
-  AppAbility,
-  Actions,
-  Subjects,
-  createAppAbility,
-} from "../types/ability.types";
+import { AppAbility, createAppAbility } from "../types/ability.types";
 import { PermissionContextType, User } from "../types/permission.types";
 import {
   defineAbilityFor,

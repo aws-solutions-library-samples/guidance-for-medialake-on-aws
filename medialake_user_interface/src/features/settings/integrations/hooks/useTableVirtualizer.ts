@@ -1,3 +1,4 @@
+import React from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Row } from "@tanstack/react-table";
 import { Integration } from "../components/IntegrationList/types";

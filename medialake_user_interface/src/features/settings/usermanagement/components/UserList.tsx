@@ -201,7 +201,7 @@ const PermissionSetChips: React.FC<{
   theme: any;
   permissionSets: any[] | undefined;
   userAssignments: any | undefined;
-}> = ({ user, theme, permissionSets, userAssignments }) => {
+}> = ({ theme, userAssignments }) => {
   const { t } = useTranslation();
 
   return (

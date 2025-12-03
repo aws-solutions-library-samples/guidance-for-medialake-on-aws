@@ -1,6 +1,5 @@
-import { useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { type SortingState } from "@tanstack/react-table";
-import { type AssetTableColumn } from "@/types/shared/assetComponents";
 
 interface ViewPreferencesOptions {
   initialViewMode?: "card" | "table";
@@ -12,7 +11,7 @@ interface ViewPreferencesOptions {
   initialSorting?: SortingState;
 }
 
-export function useViewPreferences<T>({
+export function useViewPreferences({
   initialViewMode = "card",
   initialCardSize = "medium",
   initialAspectRatio = "square",
@@ -100,7 +99,7 @@ export function useViewPreferences<T>({
   }, []);
 
   // Handle column toggle
-  const handleColumnToggle = useCallback((columnId: string) => {
+  const handleColumnToggle = useCallback(() => {
     // This function will be implemented in the component that uses this hook
     // since columns are typically defined in the component
   }, []);

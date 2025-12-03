@@ -15,7 +15,6 @@ import { alpha } from "@mui/material/styles";
 
 const Home: React.FC = () => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const isSmall = useMediaQuery(theme.breakpoints.down("sm"));
   const { t } = useTranslation();
   const { direction } = useDirection();
@@ -100,7 +99,7 @@ const Home: React.FC = () => {
 
             {/* Main Header */}
             <Typography
-              variant={isSmall ? "h2" : isMobile ? "h1" : "h1"}
+              variant={isSmall ? "h2" : "h1"}
               component="h1"
               sx={{
                 fontWeight: 800,
@@ -162,7 +161,7 @@ const Home: React.FC = () => {
 
             {/* Subtitle */}
             <Typography
-              variant={isSmall ? "h5" : isMobile ? "h4" : "h3"}
+              variant={isSmall ? "h5" : "h3"}
               component="p"
               sx={{
                 fontWeight: 300,

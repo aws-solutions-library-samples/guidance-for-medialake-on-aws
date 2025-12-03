@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { useSearchState } from "@/hooks/useSearchState";
 import { useSearch } from "@/api/hooks/useSearch";
@@ -7,7 +7,6 @@ import { useAssetOperations } from "@/hooks/useAssetOperations";
 import { useViewPreferences } from "@/hooks/useViewPreferences";
 import { useAssetSelection } from "@/hooks/useAssetSelection";
 import { useAssetFavorites } from "@/hooks/useAssetFavorites";
-import { useFeatureFlag } from "@/utils/featureFlags";
 import {
   useSearchQuery,
   useSemanticSearch,
@@ -34,7 +33,7 @@ const SearchPageContainer: React.FC = () => {
   const addItemToCollectionMutation = useAddItemToCollection();
 
   // Initialize search state with URL sync
-  const searchState = useSearchState({
+  useSearchState({
     initialQuery: locationState?.query || "",
     initialSemantic: false,
     initialFilters: {},
@@ -51,10 +50,8 @@ const SearchPageContainer: React.FC = () => {
     React.useState<number>(0.57);
 
   // Actions
-  const { setQuery, setIsSemantic, setFilters, updateFilter } =
-    useDomainActions();
-  const { openFilterModal, closeFilterModal, setLoading, setError } =
-    useUIActions();
+  const { updateFilter } = useDomainActions();
+  const { setLoading, setError } = useUIActions();
 
   // Convert filters to legacy format for useSearch
   const legacyParams = {
@@ -203,8 +200,7 @@ const SearchPageContainer: React.FC = () => {
       }
     }
   };
-
-  const handleSectionToggle = (section: string) => {
+  const handleSectionToggle = () => {
     // Legacy implementation - could be enhanced with UI store
   };
 
@@ -214,8 +210,8 @@ const SearchPageContainer: React.FC = () => {
         ? event.target.value.split(",")
         : event.target.value;
 
-    // This will be handled by the field actions in the store
-    // For now, maintain compatibility
+    // Future implementation: use newFields with field actions in the store
+    console.log("Fields changed:", newFields);
   };
 
   // Handle Add to Collection click

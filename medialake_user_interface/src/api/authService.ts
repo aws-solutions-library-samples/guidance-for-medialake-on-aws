@@ -64,11 +64,7 @@ class AuthService {
   }
 
   async signInWithSAML(): Promise<void> {
-    try {
-      await signInWithRedirect();
-    } catch (error) {
-      throw error;
-    }
+    await signInWithRedirect();
   }
 
   async refreshToken(): Promise<string | null> {

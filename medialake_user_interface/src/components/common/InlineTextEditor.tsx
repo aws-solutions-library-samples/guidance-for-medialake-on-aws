@@ -26,7 +26,7 @@ export const InlineTextEditor: React.FC<InlineTextEditorProps> = React.memo(
     initialValue,
     onChangeCommit,
     onComplete,
-    isEditing,
+
     editingCellId,
     preventCommitRef,
     commitRef,

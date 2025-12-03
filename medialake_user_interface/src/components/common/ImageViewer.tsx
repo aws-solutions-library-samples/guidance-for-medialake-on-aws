@@ -125,7 +125,6 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     if (!draggingRef.current && !isZoomingRef.current) {
       fitAndCenter();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [background, rotate]);
 
   // --- On resize, fit and center (skip if dragging/zooming)
@@ -139,7 +138,6 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     });
     observer.observe(c);
     return () => observer.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [background, rotate, fitAndCenter]);
 
   // --- Drawing effect
@@ -227,9 +225,6 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     setDragging(false);
   };
 
-  const centerImage = () => {
-    fitAndCenter();
-  };
   const resetImage = () => {
     fitAndCenter();
     setRotate(0);

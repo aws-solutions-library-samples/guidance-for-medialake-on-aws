@@ -17,7 +17,6 @@ import { TableHeader } from "./TableHeader";
 import { TableCellContent } from "./TableCellContent";
 import { EmptyTableState, EmptyTableStateProps } from "./EmptyTableState";
 import { useTableDensity } from "../../../contexts/TableDensityContext";
-import { Table as MUITable } from "@mui/material";
 
 interface ResizableTableProps<T> {
   table: TanStackTable<T>;
@@ -40,8 +39,6 @@ interface ResizableTableProps<T> {
   // Empty state configuration
   emptyState?: EmptyTableStateProps;
 }
-
-type TableProps = React.ComponentProps<typeof MUITable>;
 
 const useTableStyles = (
   theme: any,
@@ -185,17 +182,13 @@ const useTableStyles = (
 export function ResizableTable<T>({
   table,
   containerRef,
-  virtualizer,
+  // virtualizer,
   rows,
-  maxHeight = "100%",
   onRowClick,
   onFilterClick,
-  activeFilters = [],
-  activeSorting = [],
-  onRemoveFilter,
-  onRemoveSort,
-  togglingPipelines = {},
-  onToggleActive,
+  // onRemoveFilter,
+  // onRemoveSort,
+  // onToggleActive,
   emptyState,
 }: ResizableTableProps<T>) {
   const theme = useTheme();

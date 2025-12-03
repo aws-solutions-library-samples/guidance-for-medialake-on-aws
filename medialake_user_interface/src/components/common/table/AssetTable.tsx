@@ -1,13 +1,13 @@
 import React, { useRef, useState } from "react";
 import { Box, IconButton, TextField, Button } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
-import DownloadIcon from "@mui/icons-material/Download";
+// import DownloadIcon from "@mui/icons-material/Download";
 import {
   useReactTable,
   getCoreRowModel,
   getSortedRowModel,
   getFilteredRowModel,
-  ColumnDef,
+  // ColumnDef,
   SortingState,
   ColumnFiltersState,
   ColumnSizingState,
@@ -18,7 +18,6 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { ResizableTable } from "./ResizableTable";
 import { BaseTableToolbar } from "./BaseTableToolbar";
 import { TableCellContent } from "./TableCellContent";
-import { type AssetBase } from "@/types/search/searchResults";
 import { type AssetTableColumn } from "@/types/shared/assetComponents";
 
 interface AssetTableProps<T> {
@@ -50,9 +49,6 @@ export function AssetTable<T>({
   const [columnVisibility, setColumnVisibility] = useState({});
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
   const [globalFilter, setGlobalFilter] = useState("");
-  const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(
-    null,
-  );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editedName, setEditedName] = useState("");
 
@@ -291,7 +287,7 @@ export function AssetTable<T>({
       <BaseTableToolbar
         globalFilter={globalFilter}
         onGlobalFilterChange={setGlobalFilter}
-        onColumnMenuOpen={(event) => setColumnMenuAnchor(event.currentTarget)}
+        onColumnMenuOpen={() => {}}
         activeFilters={columnFilters.map((f) => ({
           columnId: f.id,
           value: f.value as string,

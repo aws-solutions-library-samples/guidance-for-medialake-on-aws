@@ -10,20 +10,17 @@ import {
   CircularProgress,
   Typography,
   Paper,
-  Button,
   Chip,
   useTheme,
   alpha,
   TextField,
   InputAdornment,
   IconButton,
-  Tooltip,
   Divider,
-  Badge,
-  Collapse,
   Menu,
   MenuItem,
   ListItemText,
+  Collapse,
 } from "@mui/material";
 import { TranscriptionResponse } from "../../api/hooks/useAssets";
 import MarkdownRenderer from "../common/MarkdownRenderer";
@@ -31,11 +28,8 @@ import TabContentContainer from "../common/TabContentContainer";
 
 // MUI Icons
 import SearchIcon from "@mui/icons-material/Search";
-import ClearIcon from "@mui/icons-material/Clear";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PersonIcon from "@mui/icons-material/Person";
-import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
-import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import LanguageIcon from "@mui/icons-material/Language";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
@@ -47,7 +41,7 @@ interface TranscriptWordAlternative {
   confidence: number;
 }
 
-interface TranscriptWord {
+interface TranscriptWordType {
   id: number;
   content: string;
   startTime: number;
@@ -57,23 +51,18 @@ interface TranscriptWord {
   alternatives?: TranscriptWordAlternative[];
 }
 
-interface LanguageIdentification {
-  code: string;
-  score: number;
-}
-
-interface TranscriptSegment {
+interface TranscriptSegmentType {
   id: number;
   text: string;
   startTime: number;
   endTime: number;
-  words: TranscriptWord[];
+  words: TranscriptWordType[];
   speaker?: string;
 }
 
 interface SearchResult {
-  word: TranscriptWord;
-  segment: TranscriptSegment;
+  word: TranscriptWordType;
+  segment: TranscriptSegmentType;
   timestamp: number;
   matchIndex: number;
 }
@@ -119,7 +108,7 @@ const useTranscriptProcessor = (
 
     // If audio_segments exist, use them for better organization
     if (audioSegments.length > 0) {
-      const segments: TranscriptSegment[] = audioSegments.map(
+      const segments: TranscriptSegmentType[] = audioSegments.map(
         (segment: any) => {
           const segmentWords = segment.items
             .map((itemId: number) => items[itemId])
@@ -160,7 +149,7 @@ const useTranscriptProcessor = (
       (item) => item.type === "pronunciation",
     );
     const wordsPerSegment = 20; // Group words into segments
-    const segments: TranscriptSegment[] = [];
+    const segments: TranscriptSegmentType[] = [];
 
     for (let i = 0; i < pronunciationItems.length; i += wordsPerSegment) {
       const segmentItems = pronunciationItems.slice(i, i + wordsPerSegment);
@@ -197,7 +186,7 @@ const useTranscriptProcessor = (
   }, [transcriptionData]);
 };
 
-const useTranscriptSearch = (segments: TranscriptSegment[]) => {
+const useTranscriptSearch = (segments: TranscriptSegmentType[]) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
 
@@ -241,7 +230,7 @@ const useTranscriptSearch = (segments: TranscriptSegment[]) => {
 
 const useCurrentWordHighlight = (
   currentTime: number,
-  segments: TranscriptSegment[],
+  segments: TranscriptSegmentType[],
 ) => {
   return useMemo(() => {
     if (!currentTime) return null;
@@ -277,88 +266,9 @@ const useCurrentWordHighlight = (
 };
 
 // Components
-const LanguageDetectionInfo: React.FC<{
-  languageData: {
-    primaryLanguage: string;
-    detectedLanguages: LanguageIdentification[];
-  } | null;
-}> = ({ languageData }) => {
-  const theme = useTheme();
-
-  if (!languageData || !languageData.detectedLanguages.length) return null;
-
-  const primaryLang = languageData.detectedLanguages[0];
-  const hasMultipleLanguages = languageData.detectedLanguages.length > 1;
-
-  return (
-    <Paper
-      elevation={0}
-      sx={{
-        mb: 2,
-        p: 1.5,
-        backgroundColor: alpha(theme.palette.background.paper, 0.5),
-        borderRadius: 1,
-        border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-      }}
-    >
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-        <LanguageIcon
-          sx={{ fontSize: 16, color: theme.palette.text.secondary }}
-        />
-        <Typography variant="caption" sx={{ fontWeight: 600 }}>
-          Language Detection:
-        </Typography>
-        <Chip
-          label={`${primaryLang.code} (${Math.round(primaryLang.score * 100)}%)`}
-          size="small"
-          sx={{
-            backgroundColor: alpha(theme.palette.primary.main, 0.1),
-            color: theme.palette.primary.main,
-            fontSize: "0.7rem",
-          }}
-        />
-        {hasMultipleLanguages && (
-          <Tooltip
-            title={
-              <Box>
-                <Typography
-                  variant="caption"
-                  sx={{ fontWeight: 600, display: "block" }}
-                >
-                  Other detected languages:
-                </Typography>
-                {languageData.detectedLanguages
-                  .slice(1, 4)
-                  .map((lang, index) => (
-                    <Typography
-                      key={index}
-                      variant="caption"
-                      sx={{ display: "block" }}
-                    >
-                      {lang.code}: {Math.round(lang.score * 100)}%
-                    </Typography>
-                  ))}
-              </Box>
-            }
-          >
-            <Chip
-              label={`+${languageData.detectedLanguages.length - 1} more`}
-              size="small"
-              sx={{
-                backgroundColor: alpha(theme.palette.secondary.main, 0.1),
-                color: theme.palette.secondary.main,
-                fontSize: "0.7rem",
-              }}
-            />
-          </Tooltip>
-        )}
-      </Box>
-    </Paper>
-  );
-};
-
+// Components
 const TranscriptWord: React.FC<{
-  word: TranscriptWord;
+  word: TranscriptWordType;
   isHighlighted: boolean;
   isSearchMatch: boolean;
   onSeek: (time: number) => void;
@@ -381,7 +291,7 @@ const TranscriptWord: React.FC<{
     setAnchorEl(null);
   };
 
-  const handleAlternativeSelect = (alternative: TranscriptWordAlternative) => {
+  const handleAlternativeSelect = () => {
     // In a real implementation, this would update the transcript
     // For now, we'll just close the menu
     handleClose();
@@ -471,7 +381,7 @@ const TranscriptWord: React.FC<{
           {word.alternatives?.map((alternative, index) => (
             <MenuItem
               key={index}
-              onClick={() => handleAlternativeSelect(alternative)}
+              onClick={handleAlternativeSelect}
               selected={alternative.content === word.content}
             >
               <ListItemText
@@ -487,7 +397,7 @@ const TranscriptWord: React.FC<{
 };
 
 const TranscriptSegment: React.FC<{
-  segment: TranscriptSegment;
+  segment: TranscriptSegmentType;
   currentHighlight: { segmentId: number; wordId: number } | null;
   searchResults: SearchResult[];
   onSeek: (time: number) => void;
@@ -551,80 +461,6 @@ const TranscriptSegment: React.FC<{
         ))}
       </Typography>
     </Paper>
-  );
-};
-
-const SearchBar: React.FC<{
-  searchQuery: string;
-  onSearchChange: (query: string) => void;
-  searchResults: SearchResult[];
-  onJumpToResult: (result: SearchResult) => void;
-}> = ({ searchQuery, onSearchChange, searchResults, onJumpToResult }) => {
-  const [showResults, setShowResults] = useState(false);
-
-  return (
-    <Box sx={{ mb: 3 }}>
-      <TextField
-        fullWidth
-        variant="outlined"
-        placeholder="Search transcript..."
-        value={searchQuery}
-        onChange={(e) => onSearchChange(e.target.value)}
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start">
-              <SearchIcon />
-            </InputAdornment>
-          ),
-          endAdornment: searchQuery && (
-            <InputAdornment position="end">
-              <Badge badgeContent={searchResults.length} color="primary">
-                <IconButton
-                  size="small"
-                  onClick={() => setShowResults(!showResults)}
-                >
-                  {showResults ? (
-                    <KeyboardArrowUpIcon />
-                  ) : (
-                    <KeyboardArrowDownIcon />
-                  )}
-                </IconButton>
-              </Badge>
-              <IconButton size="small" onClick={() => onSearchChange("")}>
-                <ClearIcon />
-              </IconButton>
-            </InputAdornment>
-          ),
-        }}
-      />
-
-      <Collapse in={showResults && searchResults.length > 0}>
-        <Paper sx={{ mt: 1, maxHeight: 200, overflow: "auto" }}>
-          {searchResults.map((result, index) => (
-            <Box
-              key={index}
-              sx={{
-                p: 1,
-                borderBottom:
-                  index < searchResults.length - 1 ? "1px solid" : "none",
-                borderColor: "divider",
-                cursor: "pointer",
-                "&:hover": { backgroundColor: "action.hover" },
-              }}
-              onClick={() => onJumpToResult(result)}
-            >
-              <Typography variant="body2">
-                <strong>{result.word.content}</strong> -{" "}
-                {result.segment.speaker} at {result.timestamp.toFixed(1)}s
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {result.segment.text.substring(0, 100)}...
-              </Typography>
-            </Box>
-          ))}
-        </Paper>
-      </Collapse>
-    </Box>
   );
 };
 

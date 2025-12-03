@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef, useMemo } from "react";
 import Uppy from "@uppy/core";
 import Dashboard from "@uppy/react/dashboard";
 import AwsS3, { type AwsS3Options } from "@uppy/aws-s3";
-import type { BasePlugin } from "@uppy/core";
 import "@uppy/core/css/style.min.css";
 import "@uppy/dashboard/css/style.min.css";
 import {
@@ -431,7 +430,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
           },
 
           // Abort multipart upload - calls backend to abort
-          abortMultipartUpload: async (file: any, data: any) => {
+          abortMultipartUpload: async (file: any) => {
             const multipartData = multipartDataRef.current.get(file.id);
             if (multipartData) {
               try {

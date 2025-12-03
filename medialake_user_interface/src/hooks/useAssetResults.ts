@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { type SortingState } from "@tanstack/react-table";
 import { type AssetBase } from "../types/search/searchResults";
 import {
@@ -7,7 +7,6 @@ import {
 } from "../types/shared/assetComponents";
 
 interface UseAssetResultsProps<T extends AssetBase> {
-  assets: T[];
   searchMetadata: {
     totalResults: number;
     page: number;
@@ -41,7 +40,6 @@ interface UseAssetResultsReturn<T extends AssetBase> {
 }
 
 export function useAssetResults<T extends AssetBase>({
-  assets,
   searchMetadata,
   onPageChange,
   defaultCardFields,

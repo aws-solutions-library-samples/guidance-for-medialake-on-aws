@@ -124,7 +124,7 @@ export function defineAbilityFor(
         // Skip 'full' as it's handled in the admin section
         // Handle settings.* format (e.g., settings.users:edit) FIRST
         if (resource.startsWith("settings.")) {
-          const [_, settingsResource] = resource.split(".");
+          const [, settingsResource] = resource.split(".");
 
           // Map settings resources to CASL subjects
           const settingsMapping: { [key: string]: string } = {

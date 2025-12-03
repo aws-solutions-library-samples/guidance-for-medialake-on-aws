@@ -6,17 +6,8 @@ import React, {
   useRef,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  Box,
-  Button,
-  useTheme,
-  alpha,
-  Chip,
-  Popover,
-  IconButton,
-} from "@mui/material";
+import { Box, Button, useTheme, alpha, Chip, IconButton } from "@mui/material";
 import { formatLocalDateTime } from "@/shared/utils/dateUtils";
 import { useDebounce } from "@/hooks/useDebounce";
 import {
@@ -59,7 +50,6 @@ const PAGE_SIZE = 20;
 const ExecutionsPage: React.FC = () => {
   const { t } = useTranslation();
   const theme = useTheme();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   // State declarations
@@ -164,17 +154,6 @@ const ExecutionsPage: React.FC = () => {
   const handleFilterMenuClose = useCallback(() => {
     setColumnMenuAnchor(null);
     setActiveFilterColumn(null);
-  }, []);
-
-  const handleFilterChange = useCallback((columnId: string, value: string) => {
-    setColumnFilters((prev) => {
-      const existing = prev.find((f) => f.id === columnId);
-      if (existing) {
-        return prev.map((f) => (f.id === columnId ? { ...f, value } : f));
-      }
-      return [...prev, { id: columnId, value }];
-    });
-    setColumnMenuAnchor(null);
   }, []);
 
   const getStatusColor = useCallback(
@@ -467,10 +446,6 @@ const ExecutionsPage: React.FC = () => {
       },
     },
   });
-
-  const activeColumn = activeFilterColumn
-    ? table.getColumn(activeFilterColumn)
-    : null;
 
   return (
     <Box

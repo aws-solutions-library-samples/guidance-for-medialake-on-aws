@@ -1,7 +1,6 @@
 import { NavigationPanelState } from "../types";
 
 const PREFIX = "medialake";
-const THEME_STORAGE_NAME = `${PREFIX}-theme`;
 const NAVIGATION_PANEL_STATE_STORAGE_NAME = `${PREFIX}-navigation-panel-state`;
 const TOKEN_KEY = `${PREFIX}-auth-token`;
 const REFRESH_TOKEN_KEY = `${PREFIX}-refresh-token`;

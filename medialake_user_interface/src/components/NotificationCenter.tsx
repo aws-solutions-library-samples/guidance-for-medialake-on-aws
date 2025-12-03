@@ -252,8 +252,7 @@ export const NotificationProvider: React.FC<React.PropsWithChildren> = ({
 // ──────────────────────────/
 export const NotificationCenter: React.FC = () => {
   const { notifications, markAsSeen, dismiss } = useNotifications();
-  const { dismissJobNotification, clearAllJobNotifications } =
-    useJobNotifications();
+  const { dismissJobNotification } = useJobNotifications();
   const deleteBulkDownloadJob = useDeleteBulkDownloadJob();
 
   const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);

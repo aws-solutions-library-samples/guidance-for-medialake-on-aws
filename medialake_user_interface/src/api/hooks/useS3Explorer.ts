@@ -1,4 +1,4 @@
-import { useQuery, UseQueryOptions } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "../apiClient";
 import { API_ENDPOINTS } from "../endpoints";
 import { QUERY_KEYS } from "../queryKeys";

@@ -3,7 +3,6 @@ import { apiClient } from "@/api/apiClient";
 import { logger } from "@/common/helpers/logger";
 import { useErrorModal } from "@/hooks/useErrorModal";
 import {
-  Environment,
   EnvironmentsResponse,
   EnvironmentResponse,
   EnvironmentError,

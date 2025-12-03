@@ -1,12 +1,10 @@
 import React from "react";
-import { useFeatureFlag } from "@/utils/featureFlags";
 import {
   Box,
   Typography,
   List,
   ListItem,
   ListItemText,
-  Divider,
   Button,
   IconButton,
   Tooltip,
@@ -14,7 +12,7 @@ import {
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import DownloadIcon from "@mui/icons-material/Download";
-import ShareIcon from "@mui/icons-material/Share";
+// import ShareIcon from "@mui/icons-material/Share";
 import { useRightSidebar } from "./SidebarContext";
 
 interface BatchOperationsProps {
@@ -36,7 +34,7 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
   selectedAssets,
   onBatchDelete,
   onBatchDownload,
-  onBatchShare,
+
   onClearSelection,
   onRemoveItem,
   isDownloadLoading = false,

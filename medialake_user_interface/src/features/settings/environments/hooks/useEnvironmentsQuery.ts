@@ -5,7 +5,6 @@ import { logger } from "@/common/helpers/logger";
 import { useErrorModal } from "@/hooks/useErrorModal";
 import { ENVIRONMENTS_API } from "../api/environments.endpoints";
 import type {
-  Environment,
   EnvironmentsResponse,
   EnvironmentResponse,
   EnvironmentCreate,
@@ -25,7 +24,7 @@ const useEnvironmentsQueryWithClient = <T>(
 export const useEnvironmentsQuery = () => {
   const { showError } = useErrorModal();
 
-  return useEnvironmentsQueryWithClient((queryClient) =>
+  return useEnvironmentsQueryWithClient(() =>
     useQuery<EnvironmentsResponse, EnvironmentError>({
       queryKey: [ENVIRONMENTS_CACHE_KEY],
       queryFn: async ({ signal }) => {

@@ -1,5 +1,5 @@
 import React from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Box, Typography, Button, Container, Paper } from "@mui/material";
 import LockIcon from "@mui/icons-material/Lock";
 
@@ -11,8 +11,6 @@ import LockIcon from "@mui/icons-material/Lock";
  */
 const AccessDeniedPage: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
-  const from = location.state?.from?.pathname || "/";
 
   const handleGoBack = () => {
     navigate(-1);

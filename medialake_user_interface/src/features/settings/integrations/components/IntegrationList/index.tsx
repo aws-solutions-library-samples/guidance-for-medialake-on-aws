@@ -69,11 +69,7 @@ const IntegrationList: React.FC<IntegrationListProps> = ({
     columnId: sort.id,
     desc: sort.desc,
   }));
-
-  const handleFilterClick = (
-    event: React.MouseEvent<HTMLElement>,
-    columnId: string,
-  ) => {
+  const handleFilterClick = () => {
     // Handle filter click if needed
   };
 

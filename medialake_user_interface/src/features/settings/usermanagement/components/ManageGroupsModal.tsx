@@ -40,7 +40,6 @@ import {
   useRemoveGroupAssignment,
 } from "@/api/hooks/useAssignments";
 import { Group, UpdateGroupRequest } from "@/api/types/group.types";
-import { PermissionSet } from "@/api/types/permissionSet.types";
 
 interface ManageGroupsModalProps {
   open: boolean;

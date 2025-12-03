@@ -14,7 +14,7 @@ export const Favorites: React.FC = () => {
     data: unsortedFavorites,
     isLoading,
     error,
-    refetch,
+    // refetch,
   } = useGetFavorites("ASSET");
   const { mutate: removeFavorite } = useRemoveFavorite();
 

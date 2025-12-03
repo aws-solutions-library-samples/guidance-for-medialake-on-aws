@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import queryClient from "@/api/queryClient";
 import { apiClient } from "@/api/apiClient";

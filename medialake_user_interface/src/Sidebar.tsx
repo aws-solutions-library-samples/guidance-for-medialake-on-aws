@@ -37,7 +37,6 @@ import {
   Security as SecurityIcon,
   Home as HomeIcon,
   Extension as IntegrationIcon,
-  Cloud as EnvironmentIcon,
   Terrain as LogoIcon,
   Folder as FolderIcon,
 } from "@mui/icons-material";
@@ -116,7 +115,7 @@ function Sidebar() {
     return customTheme === "dark" ? "white" : theme.palette.text.secondary;
   };
 
-  const { ability, loading: permissionsLoading } = usePermission();
+  const { ability } = usePermission();
 
   // Feature flags
   const advancedPermissionsEnabled = useFeatureFlag(

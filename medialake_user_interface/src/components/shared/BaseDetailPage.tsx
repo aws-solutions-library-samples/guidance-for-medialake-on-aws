@@ -6,15 +6,7 @@ import React, {
   ReactNode,
 } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import {
-  Box,
-  CircularProgress,
-  Typography,
-  Paper,
-  Tabs,
-  Tab,
-  alpha,
-} from "@mui/material";
+import { Box, CircularProgress, Paper, Tabs, Tab, alpha } from "@mui/material";
 import {
   useAsset,
   useRelatedVersions,
@@ -31,7 +23,7 @@ import type { RelatedVersionsResponse } from "../../api/hooks/useAssets";
 import { formatFileSize } from "../../utils/imageUtils";
 import TechnicalMetadataTab from "../TechnicalMetadataTab";
 import TranscriptionTab from "./TranscriptionTab";
-import TabContentContainer from "../common/TabContentContainer";
+// import TabContentContainer from "../common/TabContentContainer";
 
 interface TabConfig {
   value: string;
@@ -60,7 +52,7 @@ const RelatedItemsTab: React.FC<{
   relatedVersionsData: RelatedVersionsResponse | undefined;
   isLoading: boolean;
   onLoadMore: () => void;
-}> = ({ assetId, relatedVersionsData, isLoading, onLoadMore }) => {
+}> = ({ relatedVersionsData, isLoading, onLoadMore }) => {
   const items = useMemo(() => {
     if (!relatedVersionsData?.data?.results) {
       return [];

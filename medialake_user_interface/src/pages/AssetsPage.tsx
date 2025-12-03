@@ -27,7 +27,7 @@ import {
   ChevronRight,
 } from "@mui/icons-material";
 import { PageHeader, PageContent } from "@/components/common/layout";
-import { S3Explorer } from "../features/home/S3Explorer";
+// import { S3Explorer } from "../features/home/S3Explorer";
 import AssetExplorer from "../features/assets/AssetExplorer";
 import { useGetConnectors } from "../api/hooks/useConnectors";
 

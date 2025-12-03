@@ -1,6 +1,5 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useTranslation } from "react-i18next";
 import { ColumnFiltersState, PaginationState } from "@tanstack/react-table";
 import {
   useGetPipelines,
@@ -9,7 +8,6 @@ import {
   useStopPipeline,
   useUpdatePipeline,
 } from "../api/pipelinesController";
-import type { Pipeline, PipelinesResponse } from "../types/pipelines.types";
 import queryClient from "@/api/queryClient";
 
 const PAGE_SIZE = 20;
@@ -19,7 +17,6 @@ export const usePipelineManager = () => {
   const [togglingPipelines, setTogglingPipelines] = useState<
     Record<string, boolean>
   >({});
-  const { t } = useTranslation();
   const navigate = useNavigate();
   const [showDeleteButton, setShowDeleteButton] = useState(false);
   const [globalFilter, setGlobalFilter] = useState("");
@@ -44,14 +41,6 @@ export const usePipelineManager = () => {
     pipelineId: "",
     pipelineName: "",
     userInput: "",
-  });
-
-  const [filters, setFilters] = useState({
-    type: "",
-    name: "",
-    system: "",
-    sortBy: "createdAt",
-    sortOrder: "desc" as "asc" | "desc",
   });
 
   const [snackbar, setSnackbar] = useState({

@@ -56,7 +56,6 @@ interface CollectionCardProps {
 
 export const CollectionCard: React.FC<CollectionCardProps> = ({
   collection,
-  onOpen,
 }) => {
   // Fetch collection types to get icon and color
   const { data: collectionTypesResponse, isLoading: isLoadingTypes } =

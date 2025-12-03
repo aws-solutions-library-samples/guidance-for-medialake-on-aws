@@ -69,8 +69,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setIsAuthenticated(true);
             // Only try to get user after we have a valid token
             try {
-              const user = await getCurrentUser();
-            } catch (userError) {
+              await getCurrentUser();
+            } catch (_userError) {
               // Silent fail
             }
           } else {

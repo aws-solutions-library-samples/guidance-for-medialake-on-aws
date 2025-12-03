@@ -253,11 +253,12 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
           return asset.DigitalSourceAsset.Type;
         case "format":
           return asset.DigitalSourceAsset.MainRepresentation.Format;
-        case "size":
+        case "size": {
           const sizeInBytes =
             asset.DigitalSourceAsset.MainRepresentation.StorageInfo
               .PrimaryLocation.FileInfo.Size;
           return formatFileSize(sizeInBytes);
+        }
         case "createdAt":
           return formatDate(asset.DigitalSourceAsset.CreateDate);
         case "modifiedAt":

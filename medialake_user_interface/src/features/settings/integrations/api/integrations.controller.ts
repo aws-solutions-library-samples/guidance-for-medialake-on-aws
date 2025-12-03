@@ -6,7 +6,6 @@ import type {
   IntegrationsResponse,
   IntegrationsError,
   Integration,
-  CreateIntegrationDto,
   UpdateIntegrationDto,
 } from "../types/integrations.types";
 import queryClient from "@/api/queryClient";

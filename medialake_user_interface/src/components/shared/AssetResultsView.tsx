@@ -454,7 +454,7 @@ function AssetResultsView<T>({
                 valueA = getAssetType(a);
                 valueB = getAssetType(b);
                 break;
-              case "size":
+              case "size": {
                 // Assuming there's a way to get size from the asset
                 const sizeFieldA = a as any;
                 const sizeFieldB = b as any;
@@ -465,7 +465,8 @@ function AssetResultsView<T>({
                   sizeFieldB?.DigitalSourceAsset?.MainRepresentation
                     ?.StorageInfo?.PrimaryLocation?.FileInfo?.Size || 0;
                 break;
-              case "date":
+              }
+              case "date": {
                 // Assuming there's a way to get date from the asset
                 const dateFieldA = a as any;
                 const dateFieldB = b as any;
@@ -476,6 +477,7 @@ function AssetResultsView<T>({
                   ? new Date(dateFieldB.DigitalSourceAsset.CreateDate).getTime()
                   : 0;
                 break;
+              }
               default:
                 valueA = (a as any)[sortField];
                 valueB = (b as any)[sortField];

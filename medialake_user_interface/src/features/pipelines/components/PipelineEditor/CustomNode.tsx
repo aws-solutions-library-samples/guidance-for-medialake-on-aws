@@ -212,12 +212,6 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
     );
   };
 
-  const getEdgeOffsetStyle = (position: Position) => {
-    if (position === Position.Top) return { top: -6 }; // use -7 if your border is 2px
-    if (position === Position.Bottom) return { bottom: -6 }; // use -7 if your border is 2px
-    return {};
-  };
-
   // Helper function to get handle container styles based on rotation
   const getHandleContainerStyles = (isInput: boolean, rotation: number) => {
     const baseStyles = {
@@ -356,7 +350,6 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
 
   const handleNodeClick = useCallback(
     (event: React.MouseEvent) => {
-      const rect = (event.target as HTMLElement).getBoundingClientRect();
       const clickX = event.clientX;
       const clickY = event.clientY;
 
@@ -430,7 +423,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
         transition: "all 0.3s linear",
         zIndex: currentRotation === 90 || currentRotation === 270 ? 1 : 5, // Lower z-index when handles are on top/bottom
       }}
-      onFocus={(e) => setSelected(true)}
+      onFocus={() => setSelected(true)}
     >
       <Box
         onClick={handleNodeClick}
@@ -570,7 +563,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
         "name" in (outputTypes[0] as any) ? (
           // Multiple output types as objects with name/description
           <Box sx={getHandleContainerStyles(false, currentRotation)}>
-            {(outputTypes as OutputType[]).map((output, index) => (
+            {(outputTypes as OutputType[]).map((output) => (
               <Box key={output.name} sx={getHandleItemStyles(currentRotation)}>
                 <Tooltip title={output.name}>
                   <Handle

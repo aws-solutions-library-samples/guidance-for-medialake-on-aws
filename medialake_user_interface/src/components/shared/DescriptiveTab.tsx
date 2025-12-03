@@ -2,8 +2,6 @@ import React from "react";
 import { Box, Typography, Paper, Divider } from "@mui/material";
 import MarkdownRenderer from "../common/MarkdownRenderer";
 import TabContentContainer from "../common/TabContentContainer";
-import { formatLocalDateTime } from "@/shared/utils/dateUtils";
-
 interface DescriptiveTabProps {
   assetData: any;
 }

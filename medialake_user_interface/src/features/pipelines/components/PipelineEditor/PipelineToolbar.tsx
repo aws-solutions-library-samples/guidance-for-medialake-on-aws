@@ -17,7 +17,6 @@ import {
   Popper,
   MenuItem,
   MenuList,
-  useTheme,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import SaveIcon from "@mui/icons-material/Save";
@@ -90,8 +89,6 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
   const { isExpanded: isRightSidebarExpanded, width } = useRightSidebar(); // width includes manual resizing
 
   /* —— NEW: Two-mode responsive approach —— */
-  const theme = useTheme();
-
   // Calculate available width for toolbar
   const leftSidebarWidth = isLeftSidebarCollapsed
     ? collapsedDrawerWidth
@@ -1119,22 +1116,6 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
     return false;
   };
 
-  // Helper function to get tooltip message for disabled export
-  const getExportTooltipMessage = (): string => {
-    if (!pipelineName || !pipelineName.trim()) {
-      return "Pipeline name is required before exporting";
-    }
-
-    if (reactFlowInstance) {
-      const flow = reactFlowInstance.toObject();
-      if (!flow.nodes || flow.nodes.length === 0) {
-        return "At least one node must be added to the canvas before exporting";
-      }
-    }
-
-    return "Export Pipeline";
-  };
-
   const onExport = (): void => {
     if (reactFlowInstance) {
       // Get the flow object from ReactFlow
@@ -1350,6 +1331,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
             );
           }
           // Drop positionAbsolute
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars, no-unused-vars
           const { positionAbsolute, ...keep } = n;
           return keep;
         }),

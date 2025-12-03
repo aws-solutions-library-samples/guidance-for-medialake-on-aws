@@ -104,8 +104,6 @@ export function AssetTable<T>({
   const containerRef = useRef<HTMLDivElement>(null);
   const columnHelper = createColumnHelper<T>();
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const editInputRef = useRef<HTMLInputElement>(null);
-  const hasInitialFocusRef = useRef<boolean>(false);
   const preventCommitRef = useRef<boolean>(false);
   const commitRef = useRef<(() => void) | null>(null);
   const favoritesFeature = useFeatureFlag("user-favorites-enabled", true);

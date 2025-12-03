@@ -25,7 +25,6 @@ import {
   useEnvironmentsQuery,
   useCreateEnvironmentMutation,
   useUpdateEnvironmentMutation,
-  useDeleteEnvironmentMutation,
 } from "@/features/settings/environments/hooks/useEnvironmentsQuery";
 import {
   Environment,
@@ -85,17 +84,11 @@ const EnvironmentsPage: React.FC = () => {
   } = useEnvironmentsQuery();
   const createEnvironmentMutation = useCreateEnvironmentMutation();
   const updateEnvironmentMutation = useUpdateEnvironmentMutation();
-  const deleteEnvironmentMutation = useDeleteEnvironmentMutation();
 
   const columns = useEnvironmentColumns();
 
   const handleAddEnvironment = () => {
     setEditingEnvironment(undefined);
-    setOpenEnvironmentForm(true);
-  };
-
-  const handleEditEnvironment = (environment: Environment) => {
-    setEditingEnvironment(environment);
     setOpenEnvironmentForm(true);
   };
 

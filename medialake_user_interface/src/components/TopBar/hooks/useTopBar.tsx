@@ -1,5 +1,5 @@
 // components/TopBar/hooks/useTopBar.ts
-import { useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { signOut } from "aws-amplify/auth";
 import { useSearch } from "@/api/hooks/useSearch";

@@ -1,4 +1,3 @@
-import { Triangle } from "lucide-react";
 import {
   ScrubberLaneStyle,
   TimelineLaneStyle,

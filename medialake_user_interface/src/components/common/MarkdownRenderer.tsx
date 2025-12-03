@@ -13,7 +13,6 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   const parseMarkdown = (text: string) => {
     const lines = text.split("\n");
     const elements: React.ReactNode[] = [];
-    const currentIndex = 0;
 
     lines.forEach((line, index) => {
       const trimmedLine = line.trim();

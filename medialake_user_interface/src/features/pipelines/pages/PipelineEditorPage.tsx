@@ -1,5 +1,5 @@
 import React from "react";
-import { useCallback, useRef, useState, useMemo, useEffect } from "react";
+import { useCallback, useRef, useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   transformParameterSchema,
@@ -640,9 +640,6 @@ const PipelineEditorContent = () => {
   const [updateConfirmationOpen, setUpdateConfirmationOpen] = useState(false);
 
   // State for pipeline creation status tracking
-  const [creatingPipelineId, setCreatingPipelineId] = useState<string | null>(
-    null,
-  );
   const [executionArn, setExecutionArn] = useState<string | null>(null);
   const [shouldPollStatus, setShouldPollStatus] = useState(false);
 
@@ -728,8 +725,7 @@ const PipelineEditorContent = () => {
       );
       setApiStatusModalOpen(true);
 
-      // Store the pipeline ID and execution ARN for status polling
-      setCreatingPipelineId(data.pipeline_id);
+      // Store the execution ARN for status polling
       setExecutionArn(data.execution_arn);
     },
     onError: (error) => {
@@ -1975,25 +1971,6 @@ const PipelineEditorContent = () => {
     // Default icon for other types
     return <FaCogs size={20} />;
   };
-
-  const stableIcon = useMemo(() => <FaFileVideo size={20} />, []);
-
-  const convertNodeToReactFlowNode = (
-    node: NodeType,
-  ): Node<CustomNodeData> => ({
-    id: node.nodeId || getId(),
-    type: "custom",
-    position: { x: 0, y: 0 },
-    data: {
-      nodeId: node.nodeId || "",
-      label: node.info.title,
-      description: node.info.description || "",
-      icon: getNodeIcon(node.info.nodeType),
-      inputTypes: node.info.inputTypes || [],
-      outputTypes: node.info.outputTypes || [],
-      configuration: null,
-    },
-  });
 
   return (
     <Box

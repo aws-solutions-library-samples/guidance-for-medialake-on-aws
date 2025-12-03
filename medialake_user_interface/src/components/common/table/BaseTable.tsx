@@ -1,13 +1,12 @@
-import React, { useRef } from "react";
+import React from "react";
 import { Box } from "@mui/material";
-import { ColumnDef, FilterFn } from "@tanstack/react-table";
-import { useVirtualizer } from "@tanstack/react-virtual";
-import { useTable } from "@/hooks/useTable";
-import { useTableDensity } from "@/contexts/TableDensityContext";
-import { ResizableTable } from "./ResizableTable";
-import { ColumnVisibilityMenu } from "./ColumnVisibilityMenu";
-import { BaseTableToolbar } from "./BaseTableToolbar";
-import { BaseFilterPopover } from "./BaseFilterPopover";
+// import { useVirtualizer } from "@tanstack/react-virtual";
+// import { useTable } from "@/hooks/useTable";
+// import { useTableDensity } from "@/contexts/TableDensityContext";
+// import { ResizableTable } from "./ResizableTable";
+// import { ColumnVisibilityMenu } from "./ColumnVisibilityMenu";
+// import { BaseTableToolbar } from "./BaseTableToolbar";
+// import { BaseFilterPopover } from "./BaseFilterPopover";
 import {
   Table,
   TableBody,
@@ -44,11 +43,6 @@ export const BaseTable = <T extends object>({
   table,
   virtualizer,
   isLoading,
-  activeFilters,
-  activeSorting,
-  onRemoveFilter,
-  onRemoveSort,
-  searchPlaceholder,
 }: BaseTableProps<T>) => {
   const { rows } = table.getRowModel();
   const paddingTop = virtualizer.getVirtualItems()[0]?.start || 0;

@@ -331,7 +331,7 @@ const RelatedItemsTab: React.FC<{
   relatedVersionsData: RelatedVersionsResponse | undefined;
   isLoading: boolean;
   onLoadMore: () => void;
-}> = ({ assetId, relatedVersionsData, isLoading, onLoadMore }) => {
+}> = ({ relatedVersionsData, isLoading, onLoadMore }) => {
   console.log("RelatedItemsTab - relatedVersionsData:", relatedVersionsData);
 
   const items = useMemo(() => {
@@ -390,11 +390,11 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
 }) => {
   const videoViewerRef = useRef<VideoViewerRef>(null);
   const seekAttemptsRef = useRef<number>(0);
-  const seekTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const seekTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { isExpanded, closeSidebar } = useRightSidebar();
+  const { isExpanded } = useRightSidebar();
   const {
     data: assetData,
     isLoading,
@@ -473,9 +473,7 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
       }
 
       try {
-        // Try to get current time to verify video is ready
-        const currentTime = videoViewerRef.current.getCurrentTime();
-        // If we can get current time, video is ready
+        // Video is ready, seek to clip start time
         videoViewerRef.current.seek(startTime!);
         console.log(`Seeked to clip start time: ${startTime}s for asset ${id}`);
         // Success - clear any pending timeouts

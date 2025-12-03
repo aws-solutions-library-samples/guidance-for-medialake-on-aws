@@ -17,7 +17,7 @@ import {
 import { ThumbUp, ThumbDown, Comment, Close } from "@mui/icons-material";
 import { PLACEHOLDER_IMAGE } from "../utils/placeholderSvg";
 
-interface Comment {
+interface ReviewComment {
   id: string;
   text: string;
   timestamp: Date;
@@ -30,7 +30,7 @@ interface VideoReviewData {
   description: string;
   thumbnailUrl: string;
   status: "pending" | "approved" | "denied";
-  comments: Comment[];
+  comments: ReviewComment[];
 }
 
 interface VideoReviewInterfaceProps {
@@ -63,7 +63,7 @@ const VideoReviewInterface: React.FC<VideoReviewInterfaceProps> = ({
   const handleAddComment = () => {
     if (!newComment.trim()) return;
 
-    const comment: Comment = {
+    const comment: ReviewComment = {
       id: Date.now().toString(),
       text: newComment,
       timestamp: new Date(),

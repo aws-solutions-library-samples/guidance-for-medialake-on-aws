@@ -42,7 +42,9 @@ export const EventBridgePatternEditor: React.FC<
     errors: [],
     warnings: [],
   });
-  const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const validationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Use refs to avoid recreating the editor when callbacks change
