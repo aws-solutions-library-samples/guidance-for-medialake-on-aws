@@ -53,9 +53,51 @@ def convert_to_unix_timestamp(time_ms: float) -> int:
 
 
 @tracer.capture_method
-def extract_pipeline_name(execution_arn: str) -> str:
+def is_map_child_execution(execution_arn: str) -> bool:
+    """
+    Detect if an execution is a child execution from a Map state (especially distributed maps).
+
+    Map child executions have a slash in the state machine name part:
+    Parent: arn:aws:states:region:account:execution:stateMachine:executionId
+    Child:  arn:aws:states:region:account:execution:stateMachine/parentId:childId
+
+    The slash separates the state machine name from the parent execution ID.
+    """
     try:
-        return execution_arn.split(":")[-2]
+        parts = execution_arn.split(":")
+        if len(parts) < 7:
+            return False
+
+        # Check if the state machine name part (index 6) contains a slash
+        state_machine_part = parts[6]
+        return "/" in state_machine_part
+    except Exception:
+        return False
+
+
+@tracer.capture_method
+def extract_pipeline_name(execution_arn: str) -> str:
+    """
+    Extract the pipeline (state machine) name from the execution ARN.
+    For parent executions: arn:aws:states:region:account:execution:PIPELINE_NAME:executionId
+    For map children: arn:aws:states:region:account:execution:PIPELINE_NAME/PARENT_ID:childId...
+
+    Step Functions uses a slash to separate state machine name from parent execution ID in distributed maps.
+    Example map child: ...execution:my-pipeline/parent-exec-id:child-exec-id
+    We need to extract just "my-pipeline", not "my-pipeline/parent-exec-id"
+    """
+    try:
+        parts = execution_arn.split(":")
+        if len(parts) < 8:
+            raise ValueError(f"Invalid execution ARN format: {execution_arn}")
+
+        # Pipeline name is at index 6, but may include "/parent-exec-id" for map children
+        pipeline_part = parts[6]
+
+        # Strip everything after the first slash to get just the state machine name
+        pipeline_name = pipeline_part.split("/")[0]
+
+        return pipeline_name
     except Exception:
         raise ValueError(f"Invalid execution ARN format: {execution_arn}")
 
@@ -139,6 +181,43 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         detail = evt.detail
 
         execution_arn = detail.get("executionArn")
+
+        # DEBUG: Log ARN structure details
+        arn_parts = execution_arn.split(":")
+        colon_count = execution_arn.count(":")
+        logger.info(
+            "ARN Analysis",
+            extra={
+                "execution_arn": execution_arn,
+                "arn_parts": arn_parts,
+                "arn_parts_count": len(arn_parts),
+                "colon_count": colon_count,
+                "part_6_pipeline_name": arn_parts[6] if len(arn_parts) > 6 else "N/A",
+                "part_7_execution_id": arn_parts[7] if len(arn_parts) > 7 else "N/A",
+                "part_8_extra": arn_parts[8] if len(arn_parts) > 8 else "N/A",
+            },
+        )
+
+        # Skip map state child executions - only track parent/main pipeline executions
+        if is_map_child_execution(execution_arn):
+            logger.info(
+                f"Skipping map child execution: {execution_arn}",
+                extra={
+                    "execution_arn": execution_arn,
+                    "colon_count": colon_count,
+                    "reason": "Map child execution detected",
+                },
+            )
+            metrics.add_metric(name="SkippedMapChildExecutions", unit="Count", value=1)
+            return {
+                "statusCode": 200,
+                "body": json.dumps(
+                    {
+                        "message": "Skipped map child execution",
+                        "execution_arn": execution_arn,
+                    }
+                ),
+            }
         execution_id = execution_arn.split(":")[-1]
         state_machine_arn = detail["stateMachineArn"]
         status = detail["status"]
@@ -148,6 +227,17 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         current_time_iso = datetime.utcnow().isoformat()
 
         pipeline_name = extract_pipeline_name(execution_arn)
+
+        # DEBUG: Log what we extracted
+        logger.info(
+            "Extracted pipeline info",
+            extra={
+                "execution_id": execution_id,
+                "pipeline_name": pipeline_name,
+                "execution_arn": execution_arn,
+                "state_machine_arn": state_machine_arn,
+            },
+        )
 
         base_item: Dict[str, Any] = {
             "execution_id": execution_id,
