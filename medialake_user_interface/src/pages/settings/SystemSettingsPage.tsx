@@ -26,13 +26,18 @@ import {
   Card,
   CardContent,
   Chip,
+  IconButton,
+  InputAdornment,
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import {
   Edit as EditIcon,
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
+  Visibility as VisibilityIcon,
+  VisibilityOff as VisibilityOffIcon,
 } from "@mui/icons-material";
+import ApiStatusModal from "@/components/ApiStatusModal";
 import { useSemanticSearchSettings } from "@/features/settings/system/hooks/useSystemSettings";
 import { SYSTEM_SETTINGS_CONFIG } from "@/features/settings/system/config";
 import { ApiKeyManagement } from "@/components/settings/api-keys";
@@ -114,6 +119,18 @@ const SystemSettingsPage: React.FC = () => {
   const { t } = useTranslation();
   const theme = useTheme();
   const [tabValue, setTabValue] = useState(0);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [apiKeySaveModalState, setApiKeySaveModalState] = useState<{
+    open: boolean;
+    status: "loading" | "success" | "error";
+    action: string;
+    message?: string;
+  }>({
+    open: false,
+    status: "loading",
+    action: "",
+    message: undefined,
+  });
 
   // Feature flags
   const systemUpgradesEnabled = useFeatureFlag(
@@ -209,37 +226,76 @@ const SystemSettingsPage: React.FC = () => {
   }, [isApiKeyDialogOpen, settings.provider.config, setApiKeyInput]);
 
   const onSaveApiKey = async () => {
+    // Close the API key dialog and show loading modal
+    handleCloseApiKeyDialog();
+    setApiKeySaveModalState({
+      open: true,
+      status: "loading",
+      action: t(
+        "settings.systemSettings.search.savingApiKey",
+        "Saving API Key",
+      ),
+      message: t(
+        "settings.systemSettings.search.savingApiKeyMessage",
+        "Configuring search provider...",
+      ),
+    });
+
     try {
       const success = await handleSaveApiKey();
       if (success) {
-        handleCloseApiKeyDialog();
         // Enable the toggle after successful API key save
         handleToggleChange(true);
-        showNotification(
-          t(
+        setApiKeySaveModalState({
+          open: true,
+          status: "success",
+          action: t(
             "settings.systemSettings.search.apiKeySaveSuccess",
-            "API key saved and enabled",
+            "API Key Saved",
           ),
-          "success",
-        );
+          message: t(
+            "settings.systemSettings.search.apiKeySaveSuccessMessage",
+            "Search provider has been configured and enabled successfully.",
+          ),
+        });
       } else {
-        showNotification(
-          t(
+        setApiKeySaveModalState({
+          open: true,
+          status: "error",
+          action: t(
             "settings.systemSettings.search.apiKeySaveError",
-            "Failed to save API key",
+            "Save Failed",
           ),
-          "error",
-        );
+          message: t(
+            "settings.systemSettings.search.apiKeySaveErrorMessage",
+            "Failed to save API key. Please try again.",
+          ),
+        });
       }
     } catch (err) {
-      showNotification(
-        t(
+      setApiKeySaveModalState({
+        open: true,
+        status: "error",
+        action: t(
           "settings.systemSettings.search.apiKeySaveError",
-          "Failed to save API key",
+          "Save Failed",
         ),
-        "error",
-      );
+        message: t(
+          "settings.systemSettings.search.apiKeySaveErrorMessage",
+          "Failed to save API key. Please try again.",
+        ),
+      });
     }
+  };
+
+  const handleApiKeySaveModalClose = () => {
+    setApiKeySaveModalState({
+      open: false,
+      status: "loading",
+      action: "",
+      message: undefined,
+    });
+    setShowApiKey(false);
   };
 
   return (
@@ -873,14 +929,23 @@ const SystemSettingsPage: React.FC = () => {
             onChange={(e) => setApiKeyInput(e.target.value)}
             fullWidth
             margin="normal"
-            type={
-              isEditingApiKey && apiKeyInput === "••••••••••••••••"
-                ? "password"
-                : "text"
-            }
+            type={showApiKey ? "text" : "password"}
             placeholder="Enter your API key"
             required
             autoFocus
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label={showApiKey ? "Hide API key" : "Show API key"}
+                    onClick={() => setShowApiKey(!showApiKey)}
+                    edge="end"
+                  >
+                    {showApiKey ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
           />
         </DialogContent>
         <DialogActions>
@@ -897,6 +962,15 @@ const SystemSettingsPage: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* API Key Save Status Modal */}
+      <ApiStatusModal
+        open={apiKeySaveModalState.open}
+        onClose={handleApiKeySaveModalClose}
+        status={apiKeySaveModalState.status}
+        action={apiKeySaveModalState.action}
+        message={apiKeySaveModalState.message}
+      />
     </Box>
   );
 };
