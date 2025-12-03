@@ -19,6 +19,7 @@ import {
   Alert,
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
+import ApiStatusModal from "@/components/ApiStatusModal";
 import { type SortingState } from "@tanstack/react-table";
 import { type AssetTableColumn } from "@/types/shared/assetComponents";
 import { formatFileSize } from "@/utils/fileSize";
@@ -154,6 +155,8 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({
     handleAlertClose,
     isLoading: assetOperationsLoading,
     renamingAssetId,
+    deleteModalState,
+    handleDeleteModalClose,
   } = useAssetOperations<AssetItem>();
 
   // Card fields configuration
@@ -576,6 +579,15 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({
           {alert?.message}
         </Alert>
       </Snackbar>
+
+      {/* API Status Modal for delete operation */}
+      <ApiStatusModal
+        open={deleteModalState.open}
+        onClose={handleDeleteModalClose}
+        status={deleteModalState.status}
+        action={deleteModalState.action}
+        message={deleteModalState.message}
+      />
     </Box>
   );
 };

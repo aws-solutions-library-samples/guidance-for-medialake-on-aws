@@ -3,6 +3,13 @@ import { useRenameAsset, useDeleteAsset } from "../api/hooks/useAssets";
 import { useGeneratePresignedUrl } from "../api/hooks/usePresignedUrl";
 import { type AssetBase } from "../types/search/searchResults";
 
+interface DeleteModalState {
+  open: boolean;
+  status: "loading" | "success" | "error";
+  action: string;
+  message?: string;
+}
+
 interface UseAssetOperationsReturn<T extends AssetBase> {
   selectedAsset: T | null;
   menuAnchorEl: HTMLElement | null;
@@ -31,6 +38,8 @@ interface UseAssetOperationsReturn<T extends AssetBase> {
     download: boolean;
   };
   renamingAssetId?: string;
+  deleteModalState: DeleteModalState;
+  handleDeleteModalClose: () => void;
 }
 
 export function useAssetOperations<
@@ -50,6 +59,12 @@ export function useAssetOperations<
     message: string;
     severity: "success" | "error";
   } | null>(null);
+  const [deleteModalState, setDeleteModalState] = useState<DeleteModalState>({
+    open: false,
+    status: "loading",
+    action: "",
+    message: undefined,
+  });
 
   const handleRenameError = (message: string) => {
     setAlert({ message, severity: "error" });
@@ -182,16 +197,43 @@ export function useAssetOperations<
 
   const handleDeleteConfirm = async () => {
     if (assetToDelete) {
+      // Close confirmation dialog and show loading modal
+      setIsDeleteModalOpen(false);
+      setDeleteModalState({
+        open: true,
+        status: "loading",
+        action: "Deleting Asset",
+        message: `Deleting "${assetToDelete.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name}"...`,
+      });
+
       try {
         await deleteAsset.mutateAsync(assetToDelete.InventoryID);
-        setIsDeleteModalOpen(false);
+        setDeleteModalState({
+          open: true,
+          status: "success",
+          action: "Asset Deleted",
+          message: "The asset has been successfully deleted.",
+        });
         setAssetToDelete(null);
       } catch (error) {
-        // Error handling is done in the mutation
-        setIsDeleteModalOpen(false);
+        setDeleteModalState({
+          open: true,
+          status: "error",
+          action: "Delete Failed",
+          message: "Failed to delete the asset. Please try again.",
+        });
         setAssetToDelete(null);
       }
     }
+  };
+
+  const handleDeleteModalClose = () => {
+    setDeleteModalState({
+      open: false,
+      status: "loading",
+      action: "",
+      message: undefined,
+    });
   };
 
   const handleStartEditing = (
@@ -316,5 +358,7 @@ export function useAssetOperations<
         (selectedAsset && selectedAsset.InventoryID === downloadingAssetId),
     },
     renamingAssetId: renameAsset.variables?.inventoryId,
+    deleteModalState,
+    handleDeleteModalClose,
   };
 }

@@ -3,6 +3,7 @@ import { Box, Grid, Paper, Typography, Snackbar, Alert } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { ConfirmationModal } from "../common/ConfirmationModal";
 import { RenameDialog } from "../common/RenameDialog";
+import ApiStatusModal from "../ApiStatusModal";
 import {
   type AssetBase,
   type CardFieldConfig,
@@ -192,6 +193,8 @@ function AssetResults<T extends AssetBase>({
     handleRenameCancel,
     handleAlertClose,
     isLoading,
+    deleteModalState,
+    handleDeleteModalClose,
   } = useAssetOperations<T>();
 
   const handleNavigationPageChange = (newPage: number) => {
@@ -439,6 +442,15 @@ function AssetResults<T extends AssetBase>({
             {alert?.message}
           </Alert>
         </Snackbar>
+
+        {/* API Status Modal for delete operation */}
+        <ApiStatusModal
+          open={deleteModalState.open}
+          onClose={handleDeleteModalClose}
+          status={deleteModalState.status}
+          action={deleteModalState.action}
+          message={deleteModalState.message}
+        />
       </Box>
     </Paper>
   );

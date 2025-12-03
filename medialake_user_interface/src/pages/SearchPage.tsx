@@ -343,6 +343,8 @@ const SearchPage: React.FC = () => {
     handleAlertClose,
     isLoading: assetOperationsLoading,
     renamingAssetId,
+    deleteModalState,
+    handleDeleteModalClose,
   } = useAssetOperations<AssetItem>();
 
   const handleAssetClick = useCallback(
@@ -846,6 +848,15 @@ const SearchPage: React.FC = () => {
           jobId={assetSelection.modalState.jobId}
           onCancel={assetSelection.modalState.onCancel}
           cancelDisabled={assetSelection.modalState.cancelDisabled}
+        />
+
+        {/* API Status Modal for single asset delete operation */}
+        <ApiStatusModal
+          open={deleteModalState.open}
+          onClose={handleDeleteModalClose}
+          status={deleteModalState.status}
+          action={deleteModalState.action}
+          message={deleteModalState.message}
         />
 
         <Snackbar

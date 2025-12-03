@@ -247,6 +247,8 @@ const CollectionViewPage: React.FC = () => {
     handleAlertClose,
     isLoading: assetOperationsLoading,
     renamingAssetId,
+    deleteModalState,
+    handleDeleteModalClose,
   } = useAssetOperations<AssetItem>();
 
   const handleAssetClick = useCallback(
@@ -1083,6 +1085,15 @@ const CollectionViewPage: React.FC = () => {
           status={assetSelection.modalState.status}
           action={assetSelection.modalState.action}
           message={assetSelection.modalState.message}
+        />
+
+        {/* API Status Modal for single asset delete operation */}
+        <ApiStatusModal
+          open={deleteModalState.open}
+          onClose={handleDeleteModalClose}
+          status={deleteModalState.status}
+          action={deleteModalState.action}
+          message={deleteModalState.message}
         />
 
         {/* Asset operation alerts */}

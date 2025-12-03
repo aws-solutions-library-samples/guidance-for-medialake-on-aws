@@ -146,6 +146,13 @@ interface SearchPagePresentationProps {
     editedName?: string;
     isDeleteModalOpen: boolean;
     selectedAsset?: AssetItem;
+    deleteModalState: {
+      open: boolean;
+      status: "loading" | "success" | "error";
+      action: string;
+      message?: string;
+    };
+    handleDeleteModalClose: () => void;
   };
 
   // Add to Collection handler
@@ -669,6 +676,15 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
           }
           action={assetSelection.modalState.action}
           message={assetSelection.modalState.message}
+        />
+
+        {/* API Status Modal for delete operation */}
+        <ApiStatusModal
+          open={assetOperations.deleteModalState.open}
+          onClose={assetOperations.handleDeleteModalClose}
+          status={assetOperations.deleteModalState.status}
+          action={assetOperations.deleteModalState.action}
+          message={assetOperations.deleteModalState.message}
         />
 
         {/* Add to Collection Modal */}
