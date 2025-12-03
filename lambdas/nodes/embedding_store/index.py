@@ -158,18 +158,21 @@ def extract_embedding_option(container: Dict[str, Any]) -> Optional[str]:
 def extract_embedding_vector(container: Dict[str, Any]) -> Optional[List[float]]:
     """Extract embedding vector from container, supporting both direct vectors and S3 references.
 
-    This function supports three input patterns:
+    This function supports multiple input patterns:
     1. Direct embedding in payload (backward compatible)
     2. S3 reference in nested data structure (new pattern for distributed map)
-    3. External task results
+    3. Already-resolved embedding in nested data.data structure (retry scenario)
+    4. External task results
     """
     # Check for S3 reference in nested data structure (distributed map pattern)
     if isinstance(container.get("data"), dict):
         data = container["data"]
 
-        # Check for S3 reference in nested data.data structure
+        # Check for nested data.data structure (Bedrock Results pattern)
         if isinstance(data.get("data"), dict):
             nested_data = data["data"]
+
+            # First check if it's an S3 reference that needs to be downloaded
             if "s3_bucket" in nested_data and "s3_key" in nested_data:
                 try:
                     embedding_data = download_s3_external_payload(
@@ -187,6 +190,14 @@ def extract_embedding_vector(container: Dict[str, Any]) -> Optional[List[float]]
                     logger.warning(
                         f"Failed to download embedding from S3 reference: {str(e)}"
                     )
+            # Handle already-resolved embedding data in nested data.data (retry scenario)
+            # This happens when Step Functions retries after an error - the S3 reference
+            # was already resolved to actual embedding data in a previous invocation
+            elif isinstance(nested_data.get("float"), list) and nested_data["float"]:
+                logger.info(
+                    "Successfully extracted embedding from nested data.data.float (already resolved)"
+                )
+                return nested_data["float"]
 
         # Check for S3 reference directly in data
         if "s3_bucket" in data and "s3_key" in data:
