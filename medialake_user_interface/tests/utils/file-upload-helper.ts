@@ -64,10 +64,7 @@ const UPLOAD_PROGRESS_SELECTORS = [
 /**
  * Create test files for upload testing
  */
-export function createTestFiles(
-  testDir: string,
-  options: TestFileOptions = {},
-): string[] {
+export function createTestFiles(testDir: string, options: TestFileOptions = {}): string[] {
   const {
     count = 3,
     prefix = "test-file",
@@ -89,7 +86,9 @@ export function createTestFiles(
 
     const content = contentGenerator
       ? contentGenerator(i)
-      : `This is test file ${i} for upload testing.\nCreated at: ${new Date().toISOString()}\nFile size: ${i * baseSize} bytes\nTimestamp: ${timestamp}`;
+      : `This is test file ${i} for upload testing.\nCreated at: ${new Date().toISOString()}\nFile size: ${
+          i * baseSize
+        } bytes\nTimestamp: ${timestamp}`;
 
     const paddedContent = content.padEnd(i * baseSize, " ");
     fs.writeFileSync(filePath, paddedContent);
@@ -103,10 +102,7 @@ export function createTestFiles(
 /**
  * Cleanup test files after testing
  */
-export function cleanupTestFiles(
-  files: string[],
-  removeDir: boolean = true,
-): void {
+export function cleanupTestFiles(files: string[], removeDir: boolean = true): void {
   const directories = new Set<string>();
 
   files.forEach((file) => {
@@ -139,7 +135,7 @@ async function findUploadButton(page: Page): Promise<Locator | null> {
 
   if (!buttonExists) {
     console.warn(
-      `[FileUploadHelper] Upload button not found (data-testid="${UPLOAD_BUTTON_TEST_ID}")`,
+      `[FileUploadHelper] Upload button not found (data-testid="${UPLOAD_BUTTON_TEST_ID}")`
     );
     return null;
   }
@@ -186,9 +182,7 @@ async function checkUploadProgress(page: Page): Promise<number> {
 
     if (count > 0) {
       foundCount += count;
-      console.log(
-        `[FileUploadHelper] Found upload indicator: ${selector} (${count} elements)`,
-      );
+      console.log(`[FileUploadHelper] Found upload indicator: ${selector} (${count} elements)`);
     }
   }
 
@@ -201,7 +195,7 @@ async function checkUploadProgress(page: Page): Promise<number> {
 export async function uploadFiles(
   page: Page,
   filePaths: string[],
-  options: UploadOptions = {},
+  options: UploadOptions = {}
 ): Promise<UploadResult> {
   const {
     timeout = 5000,
@@ -210,9 +204,7 @@ export async function uploadFiles(
     screenshotDir = "test-results",
   } = options;
 
-  console.log(
-    `[FileUploadHelper] Attempting to upload ${filePaths.length} files`,
-  );
+  console.log(`[FileUploadHelper] Attempting to upload ${filePaths.length} files`);
 
   if (captureScreenshots && !fs.existsSync(screenshotDir)) {
     fs.mkdirSync(screenshotDir, { recursive: true });
@@ -230,7 +222,7 @@ export async function uploadFiles(
 
   if (!uploadButton) {
     console.warn(
-      `[FileUploadHelper] ⚠️  Upload button not found (expected data-testid="${UPLOAD_BUTTON_TEST_ID}")`,
+      `[FileUploadHelper] ⚠️  Upload button not found (expected data-testid="${UPLOAD_BUTTON_TEST_ID}")`
     );
 
     if (captureScreenshots) {
@@ -282,9 +274,7 @@ export async function uploadFiles(
       uploadedFiles: filePaths,
     };
   } catch (error: any) {
-    console.log(
-      "[FileUploadHelper] File chooser method failed, trying direct file input",
-    );
+    console.log("[FileUploadHelper] File chooser method failed, trying direct file input");
 
     // Fallback: Try to find and use file input directly
     const fileInput = await findFileInput(page);
@@ -307,9 +297,7 @@ export async function uploadFiles(
 
     try {
       await fileInput.setInputFiles(filePaths);
-      console.log(
-        "[FileUploadHelper] Files set on file input (fallback method)",
-      );
+      console.log("[FileUploadHelper] Files set on file input (fallback method)");
 
       await page.waitForTimeout(waitAfterUpload);
       await checkUploadProgress(page);
@@ -327,10 +315,7 @@ export async function uploadFiles(
         uploadedFiles: filePaths,
       };
     } catch (fallbackError: any) {
-      console.error(
-        "[FileUploadHelper] File input upload failed:",
-        fallbackError.message,
-      );
+      console.error("[FileUploadHelper] File input upload failed:", fallbackError.message);
 
       if (captureScreenshots) {
         await page.screenshot({
@@ -356,7 +341,7 @@ export async function createAndUploadFiles(
   page: Page,
   testDir: string,
   fileOptions: TestFileOptions = {},
-  uploadOptions: UploadOptions = {},
+  uploadOptions: UploadOptions = {}
 ): Promise<UploadResult & { testFiles: string[] }> {
   const testFiles = createTestFiles(testDir, fileOptions);
   const result = await uploadFiles(page, testFiles, uploadOptions);
@@ -374,7 +359,7 @@ export async function uploadFilesWithCleanup(
   page: Page,
   testDir: string,
   fileOptions: TestFileOptions = {},
-  uploadOptions: UploadOptions = {},
+  uploadOptions: UploadOptions = {}
 ): Promise<UploadResult> {
   const testFiles = createTestFiles(testDir, fileOptions);
 
@@ -391,7 +376,7 @@ export async function uploadFilesWithCleanup(
  */
 export async function waitForUploadComplete(
   page: Page,
-  maxWaitMs: number = 30000,
+  maxWaitMs: number = 30000
 ): Promise<boolean> {
   const startTime = Date.now();
 
@@ -429,7 +414,7 @@ export async function uploadFilesViaModal(
   page: Page,
   filePaths: string[],
   connectorName?: string,
-  options: UploadOptions = {},
+  options: UploadOptions = {}
 ): Promise<UploadResult> {
   const {
     timeout = 5000,
@@ -438,9 +423,7 @@ export async function uploadFilesViaModal(
     screenshotDir = "test-results",
   } = options;
 
-  console.log(
-    `[FileUploadHelper] Uploading ${filePaths.length} files via modal`,
-  );
+  console.log(`[FileUploadHelper] Uploading ${filePaths.length} files via modal`);
 
   if (captureScreenshots && !fs.existsSync(screenshotDir)) {
     fs.mkdirSync(screenshotDir, { recursive: true });
@@ -490,9 +473,7 @@ export async function uploadFilesViaModal(
       console.log(`[FileUploadHelper] Selected connector: ${connectorName}`);
     } else {
       // Select the first ENABLED connector (skip the disabled placeholder)
-      console.log(
-        "[FileUploadHelper] Selecting first available enabled connector",
-      );
+      console.log("[FileUploadHelper] Selecting first available enabled connector");
 
       // Get all options and filter for enabled ones
       const allOptions = page.getByRole("option");
@@ -506,9 +487,7 @@ export async function uploadFilesViaModal(
         if (isDisabled !== "true") {
           // This is an enabled option, click it
           const optionText = await option.textContent();
-          console.log(
-            `[FileUploadHelper] Clicking enabled connector: ${optionText}`,
-          );
+          console.log(`[FileUploadHelper] Clicking enabled connector: ${optionText}`);
           await option.click();
           selectedConnector = true;
           break;
@@ -535,14 +514,10 @@ export async function uploadFilesViaModal(
     await page.waitForTimeout(1500);
 
     // Find the Uppy file input (the one WITHOUT webkitdirectory attribute)
-    const uppyFileInput = page
-      .locator('.uppy-Dashboard-input[type="file"][multiple]')
-      .first();
+    const uppyFileInput = page.locator('.uppy-Dashboard-input[type="file"][multiple]').first();
     await uppyFileInput.waitFor({ state: "attached", timeout: 5000 });
 
-    console.log(
-      `[FileUploadHelper] Setting ${filePaths.length} files on Uppy input`,
-    );
+    console.log(`[FileUploadHelper] Setting ${filePaths.length} files on Uppy input`);
     console.log(`[FileUploadHelper] Files to upload:`);
     filePaths.forEach((fp, idx) => {
       console.log(`  ${idx + 1}. ${path.basename(fp)}`);
@@ -554,26 +529,22 @@ export async function uploadFilesViaModal(
 
     // Wait longer for Uppy to process and validate files
     console.log(
-      "[FileUploadHelper] Waiting for Uppy to process files (file type validation, etc.)",
+      "[FileUploadHelper] Waiting for Uppy to process files (file type validation, etc.)"
     );
     await page.waitForTimeout(4000);
 
     // Check if any files were actually added to Uppy's dashboard
     const fileItems = page.locator(".uppy-Dashboard-Item");
     const fileItemCount = await fileItems.count();
-    console.log(
-      `[FileUploadHelper] Files visible in Uppy dashboard: ${fileItemCount}`,
-    );
+    console.log(`[FileUploadHelper] Files visible in Uppy dashboard: ${fileItemCount}`);
 
     if (fileItemCount === 0) {
+      console.warn("[FileUploadHelper] ⚠️  No files visible in Uppy dashboard!");
       console.warn(
-        "[FileUploadHelper] ⚠️  No files visible in Uppy dashboard!",
+        "[FileUploadHelper] This usually means files were rejected due to invalid MIME types"
       );
       console.warn(
-        "[FileUploadHelper] This usually means files were rejected due to invalid MIME types",
-      );
-      console.warn(
-        "[FileUploadHelper] Uppy only accepts: audio/*, video/*, image/*, HLS, MPEG-DASH",
+        "[FileUploadHelper] Uppy only accepts: audio/*, video/*, image/*, HLS, MPEG-DASH"
       );
 
       // Take a screenshot showing the empty state
@@ -586,13 +557,11 @@ export async function uploadFilesViaModal(
 
       throw new Error(
         `Files were rejected by Uppy. Ensure files are valid media types (audio/video/image/HLS/MPEG-DASH). ` +
-          `Files attempted: ${filePaths.map((f) => path.basename(f)).join(", ")}`,
+          `Files attempted: ${filePaths.map((f) => path.basename(f)).join(", ")}`
       );
     }
 
-    console.log(
-      `[FileUploadHelper] ✓ Successfully added ${fileItemCount} file(s) to Uppy`,
-    );
+    console.log(`[FileUploadHelper] ✓ Successfully added ${fileItemCount} file(s) to Uppy`);
     await page.waitForTimeout(2000);
 
     if (captureScreenshots) {
@@ -606,9 +575,7 @@ export async function uploadFilesViaModal(
     console.log("[FileUploadHelper] Looking for upload button");
 
     // Find the upload button using the specific Uppy class
-    const uploadSubmitButton = page
-      .locator(".uppy-StatusBar-actionBtn--upload")
-      .first();
+    const uploadSubmitButton = page.locator(".uppy-StatusBar-actionBtn--upload").first();
 
     // Wait for the button to be visible (with a reasonable timeout)
     await uploadSubmitButton.waitFor({ state: "visible", timeout: 15000 });
@@ -619,9 +586,7 @@ export async function uploadFilesViaModal(
       await uploadSubmitButton.scrollIntoViewIfNeeded({ timeout: 5000 });
       console.log("[FileUploadHelper] Button scrolled into view");
     } catch (scrollError) {
-      console.log(
-        "[FileUploadHelper] Button already in view or scroll not needed",
-      );
+      console.log("[FileUploadHelper] Button already in view or scroll not needed");
     }
 
     await page.waitForTimeout(500);
@@ -642,9 +607,7 @@ export async function uploadFilesViaModal(
     let uploadComplete = false;
     let lastProgress = "";
 
-    console.log(
-      `[FileUploadHelper] Monitoring upload progress (max ${maxUploadWaitTime / 1000}s)`,
-    );
+    console.log(`[FileUploadHelper] Monitoring upload progress (max ${maxUploadWaitTime / 1000}s)`);
 
     while (Date.now() - startTime < maxUploadWaitTime && !uploadComplete) {
       // Check if "Uploading" text is still present
@@ -652,9 +615,7 @@ export async function uploadFilesViaModal(
       const uploadingCount = await uploadingIndicator.count();
 
       if (uploadingCount === 0) {
-        console.log(
-          "[FileUploadHelper] ✓ Upload complete - 'Uploading' indicator disappeared",
-        );
+        console.log("[FileUploadHelper] ✓ Upload complete - 'Uploading' indicator disappeared");
         uploadComplete = true;
         break;
       }
@@ -676,14 +637,14 @@ export async function uploadFilesViaModal(
 
     if (!uploadComplete) {
       console.warn(
-        `[FileUploadHelper] ⚠️  Upload still showing 'Uploading' after ${maxUploadWaitTime / 1000}s - may still be processing`,
+        `[FileUploadHelper] ⚠️  Upload still showing 'Uploading' after ${
+          maxUploadWaitTime / 1000
+        }s - may still be processing`
       );
     }
 
     // Extra wait to ensure backend processing and modal update
-    console.log(
-      "[FileUploadHelper] Waiting for backend processing to complete",
-    );
+    console.log("[FileUploadHelper] Waiting for backend processing to complete");
     await page.waitForTimeout(Math.max(waitAfterUpload, 5000));
 
     if (captureScreenshots) {
@@ -732,15 +693,10 @@ export async function createAndUploadFilesViaModal(
   testDir: string,
   fileOptions: TestFileOptions = {},
   connectorName?: string,
-  uploadOptions: UploadOptions = {},
+  uploadOptions: UploadOptions = {}
 ): Promise<UploadResult & { testFiles: string[] }> {
   const testFiles = createTestFiles(testDir, fileOptions);
-  const result = await uploadFilesViaModal(
-    page,
-    testFiles,
-    connectorName,
-    uploadOptions,
-  );
+  const result = await uploadFilesViaModal(page, testFiles, connectorName, uploadOptions);
 
   return {
     ...result,
@@ -761,7 +717,7 @@ export async function uploadFilesFromDirectory(
   page: Page,
   sourceDir: string,
   connectorName?: string,
-  uploadOptions: UploadOptions = {},
+  uploadOptions: UploadOptions = {}
 ): Promise<UploadResult> {
   console.log(`[FileUploadHelper] Scanning directory: ${sourceDir}`);
 

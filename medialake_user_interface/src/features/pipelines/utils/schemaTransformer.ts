@@ -22,11 +22,7 @@
   */
 function normalizeType(type: string, schema?: any): string {
   // If the field has options, it should be rendered as a select dropdown
-  if (
-    schema?.options &&
-    Array.isArray(schema.options) &&
-    schema.options.length > 0
-  ) {
+  if (schema?.options && Array.isArray(schema.options) && schema.options.length > 0) {
     return "select";
   }
 
@@ -143,10 +139,7 @@ export function transformParameterSchema(param: any): any {
  */
 export function transformParametersArray(parameters: any[]): any[] {
   if (!Array.isArray(parameters)) {
-    console.warn(
-      "[schemaTransformer] Expected array but received:",
-      typeof parameters,
-    );
+    console.warn("[schemaTransformer] Expected array but received:", typeof parameters);
     return [];
   }
 
@@ -160,14 +153,9 @@ export function transformParametersArray(parameters: any[]): any[] {
  * @param parameters - Parameters in Record<string, any> format
  * @returns Array of transformed parameters
  */
-export function transformParametersRecordToArray(
-  parameters: Record<string, any>,
-): any[] {
+export function transformParametersRecordToArray(parameters: Record<string, any>): any[] {
   if (!parameters || typeof parameters !== "object") {
-    console.warn(
-      "[schemaTransformer] Expected object but received:",
-      typeof parameters,
-    );
+    console.warn("[schemaTransformer] Expected object but received:", typeof parameters);
     return [];
   }
 
@@ -190,33 +178,26 @@ export function transformParametersRecordToArray(
  */
 export function transformObjectParameter(param: any): any[] {
   if (!param.schema?.properties) {
-    console.warn(
-      "[schemaTransformer] Object parameter has no properties:",
-      param.name,
-    );
+    console.warn("[schemaTransformer] Object parameter has no properties:", param.name);
     return [];
   }
 
   const required = param.schema.required || [];
 
-  return Object.entries(param.schema.properties).map(
-    ([propName, propSchema]: [string, any]) => ({
-      name: propName,
-      label:
-        propSchema.label ||
-        propName.charAt(0).toUpperCase() + propName.slice(1),
-      required: required.includes(propName),
-      description: propSchema.description || "",
-      defaultValue: propSchema.default,
-      // Preserve ALL properties from propSchema
-      schema: {
-        ...propSchema,
-        type: normalizeType(propSchema.type || "string", propSchema),
-      },
-      // Copy options to parameter level if they exist
-      options: propSchema.options,
-    }),
-  );
+  return Object.entries(param.schema.properties).map(([propName, propSchema]: [string, any]) => ({
+    name: propName,
+    label: propSchema.label || propName.charAt(0).toUpperCase() + propName.slice(1),
+    required: required.includes(propName),
+    description: propSchema.description || "",
+    defaultValue: propSchema.default,
+    // Preserve ALL properties from propSchema
+    schema: {
+      ...propSchema,
+      type: normalizeType(propSchema.type || "string", propSchema),
+    },
+    // Copy options to parameter level if they exist
+    options: propSchema.options,
+  }));
 }
 
 /**
@@ -227,11 +208,7 @@ export function transformObjectParameter(param: any): any[] {
  * @param transformed - Transformed parameter object
  * @param context - Context string for logging (e.g., 'PipelineEditorPage')
  */
-export function validateSchemaPreservation(
-  original: any,
-  transformed: any,
-  context: string,
-): void {
+export function validateSchemaPreservation(original: any, transformed: any, context: string): void {
   if (process.env.NODE_ENV !== "development") return;
 
   const originalSchema = original.schema || {};
@@ -240,9 +217,7 @@ export function validateSchemaPreservation(
   const originalKeys = new Set(Object.keys(originalSchema));
   const transformedKeys = new Set(Object.keys(transformedSchema));
 
-  const lostKeys = Array.from(originalKeys).filter(
-    (key) => !transformedKeys.has(key),
-  );
+  const lostKeys = Array.from(originalKeys).filter((key) => !transformedKeys.has(key));
 
   if (lostKeys.length > 0) {
     console.warn(
@@ -251,7 +226,7 @@ export function validateSchemaPreservation(
       "\nOriginal:",
       original,
       "\nTransformed:",
-      transformed,
+      transformed
     );
   }
 }

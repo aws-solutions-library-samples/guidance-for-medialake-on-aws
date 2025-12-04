@@ -32,8 +32,7 @@ export default {
     connectorLabel: "S3 कनेक्टर",
     selectConnectorPlaceholder: "S3 कनेक्टर चुनें",
     loadingConnectors: "कनेक्टर लोड हो रहे हैं...",
-    noConnectors:
-      "कोई S3 कनेक्टर उपलब्ध नहीं है। कृपया पहले एक S3 कनेक्टर कॉन्फ़िगर करें।",
+    noConnectors: "कोई S3 कनेक्टर उपलब्ध नहीं है। कृपया पहले एक S3 कनेक्टर कॉन्फ़िगर करें।",
     dashboardNote:
       "केवल audio/*, video/*, image/*, HLS (application/x-mpegURL) और MPEG-DASH (application/dash+xml) फ़ाइलों की अनुमति है",
     meta: {
@@ -47,8 +46,7 @@ export default {
     descriptionUnrestricted:
       "अपनी फ़ाइलों को अपलोड करने के लिए बकेट में किसी भी फ़ोल्डर को ब्राउज़ करें और चुनें।",
     prefixLabel: "अनुमत पथ",
-    prefixHelper:
-      "आप केवल चयनित पथ के भीतर फ़ोल्डरों को ब्राउज़ और अपलोड कर सकते हैं।",
+    prefixHelper: "आप केवल चयनित पथ के भीतर फ़ोल्डरों को ब्राउज़ और अपलोड कर सकते हैं।",
     selectedPath: "चयनित पथ",
     currentPath: "वर्तमान पथ",
     confirm: "इस पथ का उपयोग करें",
@@ -162,11 +160,9 @@ export default {
     },
     errors: {
       userDeletionNotImplemented: "उपयोगकर्ता हटाना अभी लागू नहीं किया गया है।",
-      userCreationNotImplemented:
-        "उपयोगकर्ता निर्माण अभी लागू नहीं किया गया है।",
+      userCreationNotImplemented: "उपयोगकर्ता निर्माण अभी लागू नहीं किया गया है।",
       userEditingNotImplemented: "उपयोगकर्ता संपादन अभी लागू नहीं किया गया है।",
-      analyticsExportNotImplemented:
-        "एनालिटिक्स निर्यात अभी लागू नहीं किया गया है।",
+      analyticsExportNotImplemented: "एनालिटिक्स निर्यात अभी लागू नहीं किया गया है।",
       systemResetNotImplemented: "सिस्टम रीसेट अभी लागू नहीं किया गया है।",
     },
     columns: {
@@ -384,8 +380,7 @@ export default {
         endpoint: "एंडपॉइंट URL (वैकल्पिक)",
         enabled: "खोज सक्षम",
         noProvider: "कोई खोज प्रदाता कॉन्फ़िगर नहीं है।",
-        configurePrompt:
-          "खोज क्षमताओं को सक्षम करने के लिए Twelve Labs कॉन्फ़िगर करें।",
+        configurePrompt: "खोज क्षमताओं को सक्षम करने के लिए Twelve Labs कॉन्फ़िगर करें।",
       },
       notifications: {
         title: "सूचना सेटिंग्स",
@@ -704,10 +699,8 @@ export default {
       },
       error: {
         loading: "S3 वस्तुओं को लोड करते समय त्रुटि: {{message}}",
-        network:
-          "नेटवर्क त्रुटि। कृपया अपना कनेक्शन जांचें और पुनः प्रयास करें।",
-        permission:
-          "पहुँच अस्वीकृत। आपके पास इस पथ तक पहुँचने की अनुमति नहीं है।",
+        network: "नेटवर्क त्रुटि। कृपया अपना कनेक्शन जांचें और पुनः प्रयास करें।",
+        permission: "पहुँच अस्वीकृत। आपके पास इस पथ तक पहुँचने की अनुमति नहीं है।",
         permissionWithPrefixes:
           "पहुँच अस्वीकृत। आप केवल निम्नलिखित पथों तक पहुँच सकते हैं: {{prefixes}}",
         notFound: "अनुरोधित पथ मौजूद नहीं है।",
@@ -737,8 +730,7 @@ export default {
     },
     metadata: {
       title: "जल्द ही आ रहा है",
-      description:
-        "हम आपके लिए मेटाडाटा प्रबंधन क्षमताएँ लाने पर काम कर रहे हैं। जुड़े रहें!",
+      description: "हम आपके लिए मेटाडाटा प्रबंधन क्षमताएँ लाने पर काम कर रहे हैं। जुड़े रहें!",
     },
     pipelines: {
       title: "पाइपलाइन्स",
@@ -783,8 +775,7 @@ export default {
         modals: {
           error: {
             title: "त्रुटि",
-            incompatibleNodes:
-              "पिछले नोड का आउटपुट लक्ष्य नोड के इनपुट के अनुकूल नहीं है।",
+            incompatibleNodes: "पिछले नोड का आउटपुट लक्ष्य नोड के इनपुट के अनुकूल नहीं है।",
             validation: "पाइपलाइन सत्यापन विफल",
           },
           delete: {

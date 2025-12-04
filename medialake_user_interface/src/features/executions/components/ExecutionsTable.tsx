@@ -13,10 +13,7 @@ interface ExecutionsTableProps {
   onViewDetails: (execution: PipelineExecution) => void;
   onRetryFromCurrent: (executionId: string) => void;
   onRetryFromStart: (executionId: string) => void;
-  onFilterColumn: (
-    event: React.MouseEvent<HTMLElement>,
-    columnId: string,
-  ) => void;
+  onFilterColumn: (event: React.MouseEvent<HTMLElement>, columnId: string) => void;
   activeFilters?: { columnId: string; value: string }[];
   activeSorting?: { columnId: string; desc: boolean }[];
   onRemoveFilter?: (columnId: string) => void;

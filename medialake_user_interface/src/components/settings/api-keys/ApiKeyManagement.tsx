@@ -37,9 +37,7 @@ const ApiKeyManagement: React.FC = () => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
-  const [snackbarSeverity, setSnackbarSeverity] = useState<"success" | "error">(
-    "success",
-  );
+  const [snackbarSeverity, setSnackbarSeverity] = useState<"success" | "error">("success");
 
   const { showError } = useErrorModal();
 
@@ -55,7 +53,7 @@ const ApiKeyManagement: React.FC = () => {
       filtered = filtered.filter(
         (apiKey) =>
           apiKey.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          apiKey.description.toLowerCase().includes(searchTerm.toLowerCase()),
+          apiKey.description.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -147,11 +145,7 @@ const ApiKeyManagement: React.FC = () => {
         description="Manage API keys for programmatic access to the system"
         action={
           <Can I="create" a="api-key">
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={handleAddApiKey}
-            >
+            <Button variant="contained" startIcon={<AddIcon />} onClick={handleAddApiKey}>
               Add API Key
             </Button>
           </Can>
@@ -179,10 +173,7 @@ const ApiKeyManagement: React.FC = () => {
             </Grid>
             <Grid item xs={12} md={3}>
               <FormControl fullWidth sx={{ overflow: "visible" }}>
-                <InputLabel
-                  shrink
-                  sx={{ backgroundColor: "background.paper", px: 0.5 }}
-                >
+                <InputLabel shrink sx={{ backgroundColor: "background.paper", px: 0.5 }}>
                   Category
                 </InputLabel>
                 <Select
@@ -239,11 +230,7 @@ const ApiKeyManagement: React.FC = () => {
                 : "Create your first API key to get started"}
             </Typography>
             <Can I="create" a="api-key">
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={handleAddApiKey}
-              >
+              <Button variant="contained" startIcon={<AddIcon />} onClick={handleAddApiKey}>
                 Add API Key
               </Button>
             </Can>
@@ -297,11 +284,7 @@ const ApiKeyManagement: React.FC = () => {
         onClose={handleSnackbarClose}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
       >
-        <Alert
-          onClose={handleSnackbarClose}
-          severity={snackbarSeverity}
-          sx={{ width: "100%" }}
-        >
+        <Alert onClose={handleSnackbarClose} severity={snackbarSeverity} sx={{ width: "100%" }}>
           {snackbarMessage}
         </Alert>
       </Snackbar>

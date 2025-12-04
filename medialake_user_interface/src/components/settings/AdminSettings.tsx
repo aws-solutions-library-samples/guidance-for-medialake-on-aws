@@ -114,12 +114,7 @@ const AdminSettings: React.FC = () => {
 
   const handleDeleteUser = () => {
     // TODO: Implement user deletion
-    setError(
-      t(
-        "admin.errors.userDeletionNotImplemented",
-        "User deletion is not implemented yet.",
-      ),
-    );
+    setError(t("admin.errors.userDeletionNotImplemented", "User deletion is not implemented yet."));
   };
 
   return (
@@ -199,9 +194,7 @@ const AdminSettings: React.FC = () => {
             mb: 3,
           }}
         >
-          <Typography variant="h6">
-            {t("users.title", "User Management")}
-          </Typography>
+          <Typography variant="h6">{t("users.title", "User Management")}</Typography>
           <Button
             variant="contained"
             startIcon={<PersonAddIcon />}
@@ -209,8 +202,8 @@ const AdminSettings: React.FC = () => {
               setError(
                 t(
                   "admin.errors.userCreationNotImplemented",
-                  "User creation is not implemented yet.",
-                ),
+                  "User creation is not implemented yet."
+                )
               )
             }
           >
@@ -226,12 +219,8 @@ const AdminSettings: React.FC = () => {
                 <TableCell>{t("columns.email", "Email")}</TableCell>
                 <TableCell>{t("roles.title", "Role")}</TableCell>
                 <TableCell>{t("columns.status", "Status")}</TableCell>
-                <TableCell>
-                  {t("admin.columns.lastActive", "Last Active")}
-                </TableCell>
-                <TableCell align="right">
-                  {t("columns.actions", "Actions")}
-                </TableCell>
+                <TableCell>{t("admin.columns.lastActive", "Last Active")}</TableCell>
+                <TableCell align="right">{t("columns.actions", "Actions")}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -271,9 +260,7 @@ const AdminSettings: React.FC = () => {
                       }}
                     />
                   </TableCell>
-                  <TableCell>
-                    {new Date(user.lastActive).toLocaleDateString()}
-                  </TableCell>
+                  <TableCell>{new Date(user.lastActive).toLocaleDateString()}</TableCell>
                   <TableCell align="right">
                     <Box
                       sx={{
@@ -289,8 +276,8 @@ const AdminSettings: React.FC = () => {
                             setError(
                               t(
                                 "admin.errors.userEditingNotImplemented",
-                                "User editing is not implemented yet.",
-                              ),
+                                "User editing is not implemented yet."
+                              )
                             )
                           }
                         >
@@ -337,8 +324,8 @@ const AdminSettings: React.FC = () => {
                 setError(
                   t(
                     "admin.errors.analyticsExportNotImplemented",
-                    "Analytics export is not implemented yet.",
-                  ),
+                    "Analytics export is not implemented yet."
+                  )
                 )
               }
             >
@@ -354,8 +341,8 @@ const AdminSettings: React.FC = () => {
                 setError(
                   t(
                     "admin.errors.systemResetNotImplemented",
-                    "System reset is not implemented yet.",
-                  ),
+                    "System reset is not implemented yet."
+                  )
                 )
               }
             >

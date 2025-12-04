@@ -290,11 +290,7 @@ export const EVENTBRIDGE_PATTERN_EXAMPLES: PatternCategory[] = [
           "detail-type": ["Object Created"],
           detail: {
             object: {
-              key: [
-                { suffix: ".jpg" },
-                { suffix: ".jpeg" },
-                { suffix: ".png" },
-              ],
+              key: [{ suffix: ".jpg" }, { suffix: ".jpeg" }, { suffix: ".png" }],
             },
           },
         },

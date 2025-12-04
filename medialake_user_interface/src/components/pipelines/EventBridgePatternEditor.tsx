@@ -1,15 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createJSONEditor, Mode, JSONContent } from "vanilla-jsoneditor";
-import {
-  Box,
-  Alert,
-  Typography,
-  Paper,
-  alpha,
-  IconButton,
-  Tooltip,
-  Divider,
-} from "@mui/material";
+import { Box, Alert, Typography, Paper, alpha, IconButton, Tooltip, Divider } from "@mui/material";
 import {
   MenuBook as DocsIcon,
   Clear as ClearIcon,
@@ -18,10 +9,7 @@ import {
   Download as DownloadIcon,
   Upload as UploadIcon,
 } from "@mui/icons-material";
-import {
-  EventBridgePatternValidator,
-  ValidationResult,
-} from "@/services/eventbridge-validator";
+import { EventBridgePatternValidator, ValidationResult } from "@/services/eventbridge-validator";
 
 interface EventBridgePatternEditorProps {
   value: Record<string, any>;
@@ -30,21 +18,20 @@ interface EventBridgePatternEditorProps {
   readonly?: boolean;
 }
 
-export const EventBridgePatternEditor: React.FC<
-  EventBridgePatternEditorProps
-> = ({ value, onChange, onValidationChange, readonly = false }) => {
+export const EventBridgePatternEditor: React.FC<EventBridgePatternEditorProps> = ({
+  value,
+  onChange,
+  onValidationChange,
+  readonly = false,
+}) => {
   const editorRef = useRef<HTMLDivElement>(null);
-  const jsonEditorRef = useRef<ReturnType<typeof createJSONEditor> | undefined>(
-    undefined,
-  );
+  const jsonEditorRef = useRef<ReturnType<typeof createJSONEditor> | undefined>(undefined);
   const [validationResult, setValidationResult] = useState<ValidationResult>({
     valid: true,
     errors: [],
     warnings: [],
   });
-  const validationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
+  const validationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Use refs to avoid recreating the editor when callbacks change
@@ -97,7 +84,7 @@ export const EventBridgePatternEditor: React.FC<
               if (onValidationChangeRef.current) {
                 onValidationChangeRef.current(
                   result.valid,
-                  result.errors.map((e) => e.message),
+                  result.errors.map((e) => e.message)
                 );
               }
             }, 500); // Validate 500ms after user stops typing
@@ -141,11 +128,11 @@ export const EventBridgePatternEditor: React.FC<
       if (onValidationChange) {
         onValidationChange(
           result.valid,
-          result.errors.map((e) => e.message),
+          result.errors.map((e) => e.message)
         );
       }
     },
-    [onValidationChange],
+    [onValidationChange]
   );
 
   const handleFormat = useCallback(() => {
@@ -192,7 +179,7 @@ export const EventBridgePatternEditor: React.FC<
     window.open(
       "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-create-pattern-operators.html",
       "_blank",
-      "noopener,noreferrer",
+      "noopener,noreferrer"
     );
   }, []);
 
@@ -261,7 +248,7 @@ export const EventBridgePatternEditor: React.FC<
       // Reset input so same file can be selected again
       event.target.value = "";
     },
-    [onChange, validatePattern],
+    [onChange, validatePattern]
   );
 
   return (

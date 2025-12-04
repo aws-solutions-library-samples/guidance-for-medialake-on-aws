@@ -48,7 +48,7 @@ export interface AssetResultsViewProps<T> {
   viewMode: "card" | "table";
   onViewModeChange: (
     event: React.MouseEvent<HTMLElement>,
-    newMode: "card" | "table" | null,
+    newMode: "card" | "table" | null
   ) => void;
   cardSize: "small" | "medium" | "large";
   onCardSizeChange: (size: "small" | "medium" | "large") => void;
@@ -68,10 +68,7 @@ export interface AssetResultsViewProps<T> {
   onAssetClick: (asset: T) => void;
   onDeleteClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onDownloadClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
-  onAddToCollectionClick?: (
-    asset: T,
-    event: React.MouseEvent<HTMLElement>,
-  ) => void;
+  onAddToCollectionClick?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   showRemoveButton?: boolean; // Show - icon instead of + for collection view
   onEditClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
@@ -170,7 +167,7 @@ function AssetResultsView<T>({
   console.log(
     "AssetResultsView: onAddToCollectionClick prop is:",
     typeof onAddToCollectionClick,
-    onAddToCollectionClick,
+    onAddToCollectionClick
   );
 
   // Local state for slider value during dragging (to prevent constant re-filtering)
@@ -219,8 +216,7 @@ function AssetResultsView<T>({
             }))}
           onSortChange={(columnId) => {
             const currentSort = sorting[0];
-            const desc =
-              currentSort?.id === columnId ? !currentSort.desc : false;
+            const desc = currentSort?.id === columnId ? !currentSort.desc : false;
             onSortChange([{ id: columnId, desc }]);
           }}
           fields={
@@ -232,9 +228,7 @@ function AssetResultsView<T>({
                   visible: col.visible,
                 }))
           }
-          onFieldToggle={
-            viewMode === "card" ? onCardFieldToggle : onColumnToggle
-          }
+          onFieldToggle={viewMode === "card" ? onCardFieldToggle : onColumnToggle}
           selectedFields={selectedFields}
           availableFields={availableFields}
           onFieldsChange={onFieldsChange}
@@ -459,11 +453,11 @@ function AssetResultsView<T>({
                 const sizeFieldA = a as any;
                 const sizeFieldB = b as any;
                 valueA =
-                  sizeFieldA?.DigitalSourceAsset?.MainRepresentation
-                    ?.StorageInfo?.PrimaryLocation?.FileInfo?.Size || 0;
+                  sizeFieldA?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation
+                    ?.FileInfo?.Size || 0;
                 valueB =
-                  sizeFieldB?.DigitalSourceAsset?.MainRepresentation
-                    ?.StorageInfo?.PrimaryLocation?.FileInfo?.Size || 0;
+                  sizeFieldB?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation
+                    ?.FileInfo?.Size || 0;
                 break;
               }
               case "date": {
@@ -488,9 +482,7 @@ function AssetResultsView<T>({
 
             // Handle string comparison
             if (typeof valueA === "string" && typeof valueB === "string") {
-              return desc
-                ? valueB.localeCompare(valueA)
-                : valueA.localeCompare(valueB);
+              return desc ? valueB.localeCompare(valueA) : valueA.localeCompare(valueB);
             }
 
             // Handle number comparison
@@ -555,16 +547,10 @@ function AssetResultsView<T>({
             getAssetName={getAssetName}
             getAssetType={getAssetType}
             getAssetThumbnail={getAssetThumbnail}
-            isSelected={
-              isAssetSelected
-                ? (asset) => isAssetSelected(getAssetId(asset))
-                : undefined
-            }
+            isSelected={isAssetSelected ? (asset) => isAssetSelected(getAssetId(asset)) : undefined}
             onSelectToggle={onSelectToggle}
             isFavorite={
-              isAssetFavorited
-                ? (asset) => isAssetFavorited(getAssetId(asset))
-                : undefined
+              isAssetFavorited ? (asset) => isAssetFavorited(getAssetId(asset)) : undefined
             }
             onFavoriteToggle={onFavoriteToggle}
             selectedSearchFields={selectedFields}

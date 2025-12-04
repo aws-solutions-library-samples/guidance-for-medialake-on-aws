@@ -25,13 +25,10 @@ export default {
     browsePath: "Pfad durchsuchen",
     uploadingTo: "Hochladen nach",
     restrictedToPrefix: "eingeschränkt",
-    allowedPrefixesInfo:
-      "Sie können nur zu {{count}} erlaubten Pfad(en) hochladen",
-    pathInfo:
-      "Dateien werden in den ausgewählten Pfad im S3-Bucket hochgeladen",
+    allowedPrefixesInfo: "Sie können nur zu {{count}} erlaubten Pfad(en) hochladen",
+    pathInfo: "Dateien werden in den ausgewählten Pfad im S3-Bucket hochgeladen",
     selectPathFirst: "Wählen Sie zuerst einen Pfad aus, bevor Sie hochladen",
-    pathResetWarning:
-      "Das Ändern des Connectors setzt den ausgewählten Pfad zurück",
+    pathResetWarning: "Das Ändern des Connectors setzt den ausgewählten Pfad zurück",
     connectorLabel: "S3-Connector",
     selectConnectorPlaceholder: "Wählen Sie einen S3-Connector",
     loadingConnectors: "Connectors werden geladen...",
@@ -56,10 +53,8 @@ export default {
     currentPath: "Aktueller Pfad",
     confirm: "Diesen Pfad verwenden",
     validation: {
-      invalidPath:
-        "Der ausgewählte Pfad liegt außerhalb der erlaubten Präfixe.",
-      noPathSelected:
-        "Bitte navigieren Sie zu einem Ordner, bevor Sie bestätigen.",
+      invalidPath: "Der ausgewählte Pfad liegt außerhalb der erlaubten Präfixe.",
+      noPathSelected: "Bitte navigieren Sie zu einem Ordner, bevor Sie bestätigen.",
     },
     error: {
       invalidConnector: "Ungültige Connector-ID angegeben.",
@@ -225,14 +220,10 @@ export default {
       systemLoad: "Systemauslastung",
     },
     errors: {
-      userDeletionNotImplemented:
-        "Benutzerlöschung ist noch nicht implementiert.",
-      userCreationNotImplemented:
-        "Benutzererstellung ist noch nicht implementiert.",
-      userEditingNotImplemented:
-        "Benutzerbearbeitung ist noch nicht implementiert.",
-      analyticsExportNotImplemented:
-        "Analytics-Export ist noch nicht implementiert.",
+      userDeletionNotImplemented: "Benutzerlöschung ist noch nicht implementiert.",
+      userCreationNotImplemented: "Benutzererstellung ist noch nicht implementiert.",
+      userEditingNotImplemented: "Benutzerbearbeitung ist noch nicht implementiert.",
+      analyticsExportNotImplemented: "Analytics-Export ist noch nicht implementiert.",
       systemResetNotImplemented: "System-Reset ist noch nicht implementiert.",
     },
     columns: {
@@ -426,8 +417,7 @@ export default {
         },
         email_verified: {
           label: "E-Mail verifiziert",
-          tooltip:
-            "Geben Sie an, ob die E-Mail des Benutzers verifiziert wurde",
+          tooltip: "Geben Sie an, ob die E-Mail des Benutzers verifiziert wurde",
         },
         enabled: {
           label: "Aktiviert",
@@ -489,8 +479,7 @@ export default {
         endpoint: "Endpunkt-URL (Optional)",
         enabled: "Suche aktiviert",
         noProvider: "Kein Suchanbieter konfiguriert.",
-        configurePrompt:
-          "Konfigurieren Sie Twelve Labs, um Suchfunktionen zu aktivieren.",
+        configurePrompt: "Konfigurieren Sie Twelve Labs, um Suchfunktionen zu aktivieren.",
       },
       notifications: {
         title: "Benachrichtigungseinstellungen",
@@ -689,8 +678,7 @@ export default {
           },
           email_verified: {
             label: "E-Mail verifiziert",
-            tooltip:
-              "Geben Sie an, ob die E-Mail des Benutzers verifiziert wurde",
+            tooltip: "Geben Sie an, ob die E-Mail des Benutzers verifiziert wurde",
             errors: {
               required: "E-Mail-Verifizierung ist erforderlich",
             },
@@ -742,8 +730,7 @@ export default {
     },
     home: {
       welcome: "Willkommen bei Media Lake",
-      description:
-        "Verwalten und organisieren Sie Ihre Mediendateien effizient",
+      description: "Verwalten und organisieren Sie Ihre Mediendateien effizient",
       statistics: "Statistiken",
       collections: "Sammlungen",
       sharedCollections: "Geteilte Sammlungen",
@@ -760,14 +747,11 @@ export default {
       "Storage Warning": "Speicherwarnung",
       "Storage capacity reaching 80%": "Speicherkapazität erreicht 80%",
       "Pipeline Failed": "Pipeline fehlgeschlagen",
-      "Video processing pipeline failed":
-        "Video-Verarbeitungspipeline fehlgeschlagen",
+      "Video processing pipeline failed": "Video-Verarbeitungspipeline fehlgeschlagen",
     },
     modal: {
-      confirmDelete:
-        "Sind Sie sicher, dass Sie dieses Element löschen möchten?",
-      confirmAction:
-        "Sind Sie sicher, dass Sie diese Aktion ausführen möchten?",
+      confirmDelete: "Sind Sie sicher, dass Sie dieses Element löschen möchten?",
+      confirmAction: "Sind Sie sicher, dass Sie diese Aktion ausführen möchten?",
       error: "Ein Fehler ist aufgetreten",
       success: "Vorgang erfolgreich abgeschlossen",
     },
@@ -815,8 +799,7 @@ export default {
         permissionWithPrefixes:
           "Zugriff verweigert. Sie können nur auf die folgenden Pfade zugreifen: {{prefixes}}",
         notFound: "Der angeforderte Pfad existiert nicht.",
-        timeout:
-          "Zeitüberschreitung der Anfrage. Bitte versuchen Sie es erneut.",
+        timeout: "Zeitüberschreitung der Anfrage. Bitte versuchen Sie es erneut.",
         retry: "Wiederholen",
       },
       loading: {
@@ -896,8 +879,7 @@ export default {
             title: "Pipeline löschen",
             message:
               "Sind Sie sicher, dass Sie diese Pipeline löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.",
-            confirm:
-              "Geben Sie den Pipeline-Namen ein, um die Löschung zu bestätigen:",
+            confirm: "Geben Sie den Pipeline-Namen ein, um die Löschung zu bestätigen:",
           },
         },
         controls: {
@@ -980,8 +962,7 @@ export default {
               apiKey: {
                 label: "API-Schlüssel",
                 tooltip: "Geben Sie Ihren API-Schlüssel ein",
-                helper:
-                  "API-Schlüssel für die Authentifizierung mit dem Dienst",
+                helper: "API-Schlüssel für die Authentifizierung mit dem Dienst",
                 errors: {
                   required: "API-Schlüssel ist erforderlich",
                 },

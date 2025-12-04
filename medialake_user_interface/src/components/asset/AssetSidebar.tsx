@@ -60,8 +60,7 @@ interface MarkerInfo {
 }
 
 // localStorage utilities for marker persistence
-const getMarkerStorageKey = (assetId: string): string =>
-  `medialake_markers_${assetId}`;
+const getMarkerStorageKey = (assetId: string): string => `medialake_markers_${assetId}`;
 
 const loadUserMarkersFromStorage = (assetId: string): MarkerInfo[] => {
   try {
@@ -74,10 +73,7 @@ const loadUserMarkersFromStorage = (assetId: string): MarkerInfo[] => {
   }
 };
 
-const saveUserMarkersToStorage = (
-  assetId: string,
-  userMarkers: MarkerInfo[],
-): void => {
+const saveUserMarkersToStorage = (assetId: string, userMarkers: MarkerInfo[]): void => {
   try {
     const key = getMarkerStorageKey(assetId);
     const markersToSave = userMarkers.filter((m) => m.type === "user");
@@ -92,7 +88,7 @@ const getSemanticModificationsStorageKey = (assetId: string): string =>
   `medialake_semantic_modifications_${assetId}`;
 
 const loadSemanticModificationsFromStorage = (
-  assetId: string,
+  assetId: string
 ): Record<string, Partial<MarkerInfo>> => {
   try {
     const key = getSemanticModificationsStorageKey(assetId);
@@ -102,17 +98,14 @@ const loadSemanticModificationsFromStorage = (
     console.log("LOADED from localStorage:", result);
     return result;
   } catch (error) {
-    console.warn(
-      "Failed to load semantic modifications from localStorage:",
-      error,
-    );
+    console.warn("Failed to load semantic modifications from localStorage:", error);
     return {};
   }
 };
 
 const saveSemanticModificationsToStorage = (
   assetId: string,
-  modifications: Record<string, Partial<MarkerInfo>>,
+  modifications: Record<string, Partial<MarkerInfo>>
 ): void => {
   try {
     const key = getSemanticModificationsStorageKey(assetId);
@@ -120,10 +113,7 @@ const saveSemanticModificationsToStorage = (
     localStorage.setItem(key, JSON.stringify(modifications));
     console.log("SAVED successfully to localStorage");
   } catch (error) {
-    console.error(
-      "Failed to save semantic modifications to localStorage:",
-      error,
-    );
+    console.error("Failed to save semantic modifications to localStorage:", error);
   }
 };
 
@@ -142,10 +132,7 @@ const loadConfidenceLevelFromStorage = (): number | null => {
 
 const saveConfidenceLevelToStorage = (confidenceLevel: number): void => {
   try {
-    localStorage.setItem(
-      CONFIDENCE_LEVEL_STORAGE_KEY,
-      confidenceLevel.toString(),
-    );
+    localStorage.setItem(CONFIDENCE_LEVEL_STORAGE_KEY, confidenceLevel.toString());
   } catch (error) {
     console.error("Failed to save confidence level to localStorage:", error);
   }
@@ -186,10 +173,7 @@ const parseTimecodeToSeconds = (timecode: string): number | null => {
             parseInt(match[4]) / 1000;
           break;
         case 2: // MM:SS.mmm
-          result =
-            parseInt(match[1]) * 60 +
-            parseInt(match[2]) +
-            parseInt(match[3]) / 1000;
+          result = parseInt(match[1]) * 60 + parseInt(match[2]) + parseInt(match[3]) / 1000;
           break;
         case 3: // SS.mmm
           result = parseInt(match[1]) + parseInt(match[2]) / 1000;
@@ -216,7 +200,9 @@ const formatSecondsToTimecode = (seconds: number): string => {
   const frames = Math.floor((seconds % 1) * 30); // Assume 30fps
 
   // Always use HH:MM:SS:FF format to match the system
-  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}:${frames.toString().padStart(2, "0")}`;
+  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${secs
+    .toString()
+    .padStart(2, "0")}:${frames.toString().padStart(2, "0")}`;
 };
 
 const clearMarkersFromStorage = (assetId: string): void => {
@@ -237,11 +223,7 @@ const EditableTimecode: React.FC<{
   value: number;
   markerId: string;
   field: "start" | "end";
-  onUpdate: (
-    markerId: string,
-    field: "start" | "end",
-    newTimeSeconds: number,
-  ) => void;
+  onUpdate: (markerId: string, field: "start" | "end", newTimeSeconds: number) => void;
   videoViewerRef?: RefObject<VideoViewerRef>;
 }> = ({ value, markerId, field, onUpdate, videoViewerRef }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -249,8 +231,7 @@ const EditableTimecode: React.FC<{
 
   const handleStartEdit = () => {
     const formattedTime =
-      videoViewerRef?.current?.formatToTimecode(value) ||
-      formatSecondsToTimecode(value);
+      videoViewerRef?.current?.formatToTimecode(value) || formatSecondsToTimecode(value);
     setEditValue(formattedTime);
     setIsEditing(true);
   };
@@ -324,8 +305,7 @@ const EditableTimecode: React.FC<{
       onClick={handleStartEdit}
       title="Click to edit"
     >
-      {videoViewerRef?.current?.formatToTimecode(value) ||
-        formatSecondsToTimecode(value)}
+      {videoViewerRef?.current?.formatToTimecode(value) || formatSecondsToTimecode(value)}
     </Typography>
   );
 };
@@ -362,9 +342,7 @@ interface AssetMarkersProps {
 const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
   const theme = useTheme();
   const generatePresignedUrl = useGeneratePresignedUrl();
-  const [downloadingVersionId, setDownloadingVersionId] = useState<
-    string | null
-  >(null);
+  const [downloadingVersionId, setDownloadingVersionId] = useState<string | null>(null);
 
   const handleDownload = async (version: any) => {
     try {
@@ -385,8 +363,7 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
       link.href = result.presigned_url;
 
       // Use version name or extract filename from the URL
-      const fileName =
-        version.name || (version.src ? version.src.split("/").pop() : purpose);
+      const fileName = version.name || (version.src ? version.src.split("/").pop() : purpose);
       link.setAttribute("download", fileName);
 
       document.body.appendChild(link);
@@ -405,19 +382,10 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
     if (type === "original") {
       return <MovieIcon fontSize="small" color="primary" sx={{ mr: 1 }} />;
     } else if (type === "proxy" || type.includes("proxy")) {
-      return (
-        <PlayCircleOutlineIcon
-          fontSize="small"
-          color="secondary"
-          sx={{ mr: 1 }}
-        />
-      );
+      return <PlayCircleOutlineIcon fontSize="small" color="secondary" sx={{ mr: 1 }} />;
     } else if (type === "thumbnail" || type.includes("thumb")) {
       return <ImageIcon fontSize="small" color="success" sx={{ mr: 1 }} />;
-    } else if (
-      type === "pdf" ||
-      version.format?.toLowerCase()?.includes("pdf")
-    ) {
+    } else if (type === "pdf" || version.format?.toLowerCase()?.includes("pdf")) {
       return <PictureAsPdfIcon fontSize="small" color="error" sx={{ mr: 1 }} />;
     }
 
@@ -471,14 +439,9 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
                 <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                   {getVersionIcon(version)}
                   <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                    {version.type.charAt(0).toUpperCase() +
-                      version.type.slice(1).toLowerCase()}
+                    {version.type.charAt(0).toUpperCase() + version.type.slice(1).toLowerCase()}
                   </Typography>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ ml: "auto" }}
-                  >
+                  <Typography variant="caption" color="text.secondary" sx={{ ml: "auto" }}>
                     {version.format}
                   </Typography>
                 </Box>
@@ -501,9 +464,7 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
                         )
                       }
                     >
-                      {downloadingVersionId === version.id
-                        ? "Downloading..."
-                        : "Download"}
+                      {downloadingVersionId === version.id ? "Downloading..." : "Download"}
                     </Button>
                   </Tooltip>
                   {/* <Tooltip title="Preview this version">
@@ -519,9 +480,7 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
                 </Box>
               </Box>
             </ListItem>
-            {index < versions.length - 1 && (
-              <Divider component="li" sx={{ my: 0.5 }} />
-            )}
+            {index < versions.length - 1 && <Divider component="li" sx={{ my: 0.5 }} />}
           </React.Fragment>
         ))
       )}
@@ -549,8 +508,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
   // State for score threshold slider (start with a low value to show all clips by default)
   const [scoreThreshold, setScoreThreshold] = useState<number>(0);
   // State to track if score threshold has been initialized
-  const [scoreThresholdInitialized, setScoreThresholdInitialized] =
-    useState<boolean>(false);
+  const [scoreThresholdInitialized, setScoreThresholdInitialized] = useState<boolean>(false);
 
   // Marker filtering state
   const [showUserMarkers, setShowUserMarkers] = useState<boolean>(true);
@@ -563,8 +521,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
   const [userName, setUserName] = useState<string>("");
 
   // Loading state for semantic markers
-  const [isLoadingSemanticMarkers, setIsLoadingSemanticMarkers] =
-    useState<boolean>(false);
+  const [isLoadingSemanticMarkers, setIsLoadingSemanticMarkers] = useState<boolean>(false);
 
   // Track semantic modifications for reset button visibility
   const [semanticModifications, setSemanticModifications] = useState<
@@ -579,8 +536,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
     const fetchUserInfo = async () => {
       try {
         const attributes = await fetchUserAttributes();
-        const name =
-          attributes.given_name || attributes.email?.split("@")[0] || "User";
+        const name = attributes.given_name || attributes.email?.split("@")[0] || "User";
         setUserName(name);
       } catch (error) {
         console.error("Error fetching user attributes:", error);
@@ -634,21 +590,14 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
   }, [providerData]);
   // Initialize score threshold from localStorage or based on available clips
   useEffect(() => {
-    if (
-      !asset?.clips ||
-      !Array.isArray(asset.clips) ||
-      scoreThresholdInitialized
-    ) {
+    if (!asset?.clips || !Array.isArray(asset.clips) || scoreThresholdInitialized) {
       return;
     }
 
     // First, try to load from localStorage
     const storedThreshold = loadConfidenceLevelFromStorage();
     if (storedThreshold !== null) {
-      console.log(
-        "Loading confidence level from localStorage:",
-        storedThreshold,
-      );
+      console.log("Loading confidence level from localStorage:", storedThreshold);
       setScoreThreshold(storedThreshold);
       setScoreThresholdInitialized(true);
       return;
@@ -657,20 +606,16 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
     // If no stored value, calculate default based on clips
     const visualTextClips = asset.clips.filter(
       (clip) =>
-        clip.embedding_option === "visual-text" &&
-        clip.score !== null &&
-        clip.score !== undefined,
+        clip.embedding_option === "visual-text" && clip.score !== null && clip.score !== undefined
     );
 
     if (visualTextClips.length > 0) {
       // Set threshold slightly below the minimum score to show all clips by default
-      const minScore = Math.min(
-        ...visualTextClips.map((clip) => clip.score || 0),
-      );
+      const minScore = Math.min(...visualTextClips.map((clip) => clip.score || 0));
       const defaultThreshold = Math.max(0, minScore - 0.1); // 0.1 below minimum score
       console.log(
         "Available clip scores:",
-        visualTextClips.map((c) => c.score),
+        visualTextClips.map((c) => c.score)
       );
       console.log("Setting default score threshold to:", defaultThreshold);
       setScoreThreshold(defaultThreshold);
@@ -726,10 +671,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
       return;
     }
 
-    console.log(
-      "Creating timeline markers for user markers:",
-      userMarkers.length,
-    );
+    console.log("Creating timeline markers for user markers:", userMarkers.length);
 
     userMarkers.forEach((marker) => {
       // Skip if marker already exists in timeline
@@ -748,9 +690,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
         },
       });
 
-      console.log(
-        `Adding user marker ${marker.id} to timeline and markerRefsMap`,
-      );
+      console.log(`Adding user marker ${marker.id} to timeline and markerRefsMap`);
       markerRefsMap.current.set(marker.id, periodMarker);
       lane.addMarker(periodMarker);
     });
@@ -785,14 +725,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
         }
       });
     }, 100);
-  }, [
-    videoViewerRef,
-    markers,
-    assetId,
-    showUserMarkers,
-    showSemanticMarkers,
-    scoreThreshold,
-  ]);
+  }, [videoViewerRef, markers, assetId, showUserMarkers, showSemanticMarkers, scoreThreshold]);
 
   // Save user markers to localStorage whenever markers change
   useEffect(() => {
@@ -823,11 +756,11 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
       if (lane) {
         console.log(
           "Setting up subscriptions for markers:",
-          Array.from(markerRefsMap.current.keys()),
+          Array.from(markerRefsMap.current.keys())
         );
         console.log(
           "Current markers in state:",
-          markers.map((m) => ({ id: m.id, type: m.type })),
+          markers.map((m) => ({ id: m.id, type: m.type }))
         );
 
         markerRefsMap.current.forEach((periodMarker, id) => {
@@ -859,15 +792,14 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                             end: event.timeObservation.end,
                           },
                         }
-                      : marker,
+                      : marker
                   );
 
                   // If this is a semantic marker and we have an assetId, save the modification
                   const changedMarker = updatedMarkers.find((m) => m.id === id);
                   if (changedMarker?.type === "semantic" && assetId) {
                     console.log("Saving semantic marker modification for:", id);
-                    const currentModifications =
-                      loadSemanticModificationsFromStorage(assetId);
+                    const currentModifications = loadSemanticModificationsFromStorage(assetId);
                     const newModifications = {
                       ...currentModifications,
                       [id]: {
@@ -877,10 +809,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                         },
                       },
                     };
-                    saveSemanticModificationsToStorage(
-                      assetId,
-                      newModifications,
-                    );
+                    saveSemanticModificationsToStorage(assetId, newModifications);
                     setSemanticModifications(newModifications);
                     console.log("Saved semantic marker modification:", {
                       id,
@@ -890,7 +819,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
 
                   console.log(
                     "Returning updated markers:",
-                    updatedMarkers.filter((m) => m.id === id),
+                    updatedMarkers.filter((m) => m.id === id)
                   );
                   return updatedMarkers;
                 });
@@ -974,21 +903,17 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
 
         // Remove from markers state and update localStorage
         setMarkers((prevMarkers) => {
-          const updatedMarkers = prevMarkers.filter(
-            (marker) => marker.id !== markerId,
-          );
+          const updatedMarkers = prevMarkers.filter((marker) => marker.id !== markerId);
 
           // Update localStorage after deletion
           if (assetId) {
-            const remainingUserMarkers = updatedMarkers.filter(
-              (m) => m.type === "user",
-            );
+            const remainingUserMarkers = updatedMarkers.filter((m) => m.type === "user");
 
             console.log(
               "Deleting marker:",
               markerId,
               "Remaining user markers:",
-              remainingUserMarkers.length,
+              remainingUserMarkers.length
             );
 
             if (remainingUserMarkers.length === 0) {
@@ -997,16 +922,11 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
               clearMarkersFromStorage(assetId);
             } else {
               // Save remaining user markers with current names
-              const markersWithCurrentNames = remainingUserMarkers.map(
-                (marker) => ({
-                  ...marker,
-                  name: markerNames[marker.id] || marker.name,
-                }),
-              );
-              console.log(
-                "Saving remaining user markers:",
-                markersWithCurrentNames,
-              );
+              const markersWithCurrentNames = remainingUserMarkers.map((marker) => ({
+                ...marker,
+                name: markerNames[marker.id] || marker.name,
+              }));
+              console.log("Saving remaining user markers:", markersWithCurrentNames);
               saveUserMarkersToStorage(assetId, markersWithCurrentNames);
             }
           }
@@ -1025,9 +945,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
 
     try {
       // Find the original clip data for this marker
-      const marker = markers.find(
-        (m) => m.id === markerId && m.type === "semantic",
-      );
+      const marker = markers.find((m) => m.id === markerId && m.type === "semantic");
       if (!marker) return;
 
       // Find the original clip from asset.clips
@@ -1056,10 +974,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
       const endTime = originalClip.end_time || originalClip.end_timecode;
 
       if (!startTime || !endTime) {
-        console.warn(
-          "Could not find valid start/end time for clip:",
-          originalClip,
-        );
+        console.warn("Could not find valid start/end time for clip:", originalClip);
         return;
       }
 
@@ -1068,37 +983,24 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
 
       // Remove this marker's modification from localStorage
       const storedModifications = loadSemanticModificationsFromStorage(assetId);
-      console.log(
-        "Current stored modifications before reset:",
-        storedModifications,
-      );
+      console.log("Current stored modifications before reset:", storedModifications);
       console.log(
         "Checking if marker exists in modifications:",
         markerId,
         "exists:",
-        !!storedModifications[markerId],
+        !!storedModifications[markerId]
       );
 
       if (storedModifications[markerId]) {
         const updatedModifications = { ...storedModifications };
         delete updatedModifications[markerId];
         saveSemanticModificationsToStorage(assetId, updatedModifications);
-        console.log(
-          "Updated modifications after deletion:",
-          updatedModifications,
-        );
+        console.log("Updated modifications after deletion:", updatedModifications);
         setSemanticModifications(updatedModifications);
-        console.log(
-          "Set semantic modifications state to:",
-          updatedModifications,
-        );
+        console.log("Set semantic modifications state to:", updatedModifications);
         console.log("Removed semantic modification for marker:", markerId);
       } else {
-        console.log(
-          "No modification found for marker:",
-          markerId,
-          "in stored modifications",
-        );
+        console.log("No modification found for marker:", markerId, "in stored modifications");
         // Force update the state anyway to ensure consistency
         setSemanticModifications(storedModifications);
       }
@@ -1135,8 +1037,8 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                   end: endSeconds,
                 },
               }
-            : m,
-        ),
+            : m
+        )
       );
 
       console.log("Reset semantic marker to original position:", {
@@ -1150,11 +1052,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
   };
 
   // Function to update marker time (start or end) for both user and semantic markers
-  const updateMarkerTime = (
-    markerId: string,
-    field: "start" | "end",
-    newTimeSeconds: number,
-  ) => {
+  const updateMarkerTime = (markerId: string, field: "start" | "end", newTimeSeconds: number) => {
     console.log("updateMarkerTime called:", {
       markerId,
       field,
@@ -1183,7 +1081,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
           "Marker not found:",
           markerId,
           "Available markers:",
-          markers.map((m) => m.id),
+          markers.map((m) => m.id)
         );
         return;
       }
@@ -1197,7 +1095,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
           "Marker reference not found:",
           markerId,
           "Available refs:",
-          Array.from(markerRefsMap.current.keys()),
+          Array.from(markerRefsMap.current.keys())
         );
         return;
       }
@@ -1207,8 +1105,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
       // Calculate new time observation
       const currentTimeObservation = marker.timeObservation;
       const newTimeObservation = {
-        start:
-          field === "start" ? newTimeSeconds : currentTimeObservation.start,
+        start: field === "start" ? newTimeSeconds : currentTimeObservation.start,
         end: field === "end" ? newTimeSeconds : currentTimeObservation.end,
       };
 
@@ -1221,10 +1118,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
 
       // Validate that start < end
       if (newTimeObservation.start >= newTimeObservation.end) {
-        console.warn(
-          "Invalid time range: start must be less than end",
-          newTimeObservation,
-        );
+        console.warn("Invalid time range: start must be less than end", newTimeObservation);
         return;
       }
 
@@ -1237,11 +1131,11 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
       console.log("Updating markers state...");
       setMarkers((prevMarkers) => {
         const updatedMarkers = prevMarkers.map((m) =>
-          m.id === markerId ? { ...m, timeObservation: newTimeObservation } : m,
+          m.id === markerId ? { ...m, timeObservation: newTimeObservation } : m
         );
         console.log(
           "Markers state updated:",
-          updatedMarkers.find((m) => m.id === markerId),
+          updatedMarkers.find((m) => m.id === markerId)
         );
         return updatedMarkers;
       });
@@ -1258,15 +1152,14 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                 timeObservation: newTimeObservation,
                 name: markerNames[m.id] || m.name,
               }
-            : { ...m, name: markerNames[m.id] || m.name },
+            : { ...m, name: markerNames[m.id] || m.name }
         );
         saveUserMarkersToStorage(assetId, updatedUserMarkers);
         console.log("User marker saved to localStorage");
       } else if (marker.type === "semantic") {
         console.log("Updating semantic marker modifications...");
         // For semantic markers, track as modification
-        const currentModifications =
-          loadSemanticModificationsFromStorage(assetId);
+        const currentModifications = loadSemanticModificationsFromStorage(assetId);
         const newModifications = {
           ...currentModifications,
           [markerId]: {
@@ -1281,7 +1174,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
 
       console.log(
         `Successfully updated ${marker.type} marker ${markerId} ${field} time to:`,
-        newTimeSeconds,
+        newTimeSeconds
       );
     } catch (error) {
       console.error("Error updating marker time:", error);
@@ -1386,14 +1279,9 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
         }
       }
 
-      console.log(
-        `Using frame rate: ${framesPerSecond} FPS for timecode conversion`,
-      );
+      console.log(`Using frame rate: ${framesPerSecond} FPS for timecode conversion`);
     } catch (error) {
-      console.warn(
-        "Could not extract frame rate from asset metadata, using default 25 FPS",
-        error,
-      );
+      console.warn("Could not extract frame rate from asset metadata, using default 25 FPS", error);
     }
 
     // Convert to seconds
@@ -1421,10 +1309,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
           return;
         }
 
-        console.log(
-          "Updating timeline marker visibility for threshold:",
-          newThreshold,
-        );
+        console.log("Updating timeline marker visibility for threshold:", newThreshold);
         console.log("Total markers to process:", markers.length);
         console.log("Markers by type:", {
           user: markers.filter((m) => m.type === "user").length,
@@ -1434,27 +1319,21 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
         // Debug: Show all marker IDs in state vs markerRefsMap
         console.log(
           "Marker IDs in state:",
-          markers.map((m) => m.id),
+          markers.map((m) => m.id)
         );
-        console.log(
-          "Marker IDs in markerRefsMap:",
-          Array.from(markerRefsMap.current.keys()),
-        );
+        console.log("Marker IDs in markerRefsMap:", Array.from(markerRefsMap.current.keys()));
 
         // Iterate through all markers and show/hide based on threshold
         markers.forEach((marker) => {
           const markerRef = markerRefsMap.current.get(marker.id);
           if (!markerRef) {
             console.warn(`❌ No marker reference found for ${marker.id}`);
-            console.warn(
-              `Available marker refs:`,
-              Array.from(markerRefsMap.current.keys()),
-            );
+            console.warn(`Available marker refs:`, Array.from(markerRefsMap.current.keys()));
             return;
           }
 
           console.log(
-            `✅ Processing marker ${marker.id}: type=${marker.type}, score=${marker.score}`,
+            `✅ Processing marker ${marker.id}: type=${marker.type}, score=${marker.score}`
           );
 
           // Always show user markers
@@ -1466,10 +1345,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
               console.log(`✓ User marker ${marker.id} added/ensured visible`);
             } catch (error) {
               // Marker might already be added, which is fine
-              console.log(
-                `User marker ${marker.id} already visible:`,
-                error.message,
-              );
+              console.log(`User marker ${marker.id} already visible:`, error.message);
             }
             return;
           }
@@ -1477,36 +1353,26 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
           // For semantic markers, check score threshold
           const shouldShow = (marker.score || 0) >= newThreshold;
           console.log(
-            `Semantic marker ${marker.id}: shouldShow=${shouldShow} (score: ${marker.score} >= ${newThreshold})`,
+            `Semantic marker ${marker.id}: shouldShow=${shouldShow} (score: ${marker.score} >= ${newThreshold})`
           );
 
           if (shouldShow) {
             // Show marker by adding it to the lane
             try {
               lane.addMarker(markerRef);
-              console.log(
-                `✓ Showing semantic marker ${marker.id} (score: ${marker.score})`,
-              );
+              console.log(`✓ Showing semantic marker ${marker.id} (score: ${marker.score})`);
             } catch (error) {
               // Marker might already be added, which is fine
-              console.log(
-                `Semantic marker ${marker.id} already visible:`,
-                error.message,
-              );
+              console.log(`Semantic marker ${marker.id} already visible:`, error.message);
             }
           } else {
             // Hide marker by removing it from the lane
             try {
               lane.removeMarker(marker.id);
-              console.log(
-                `✗ Hiding semantic marker ${marker.id} (score: ${marker.score})`,
-              );
+              console.log(`✗ Hiding semantic marker ${marker.id} (score: ${marker.score})`);
             } catch (error) {
               // Marker might already be removed, which is fine
-              console.log(
-                `Semantic marker ${marker.id} already hidden:`,
-                error.message,
-              );
+              console.log(`Semantic marker ${marker.id} already hidden:`, error.message);
             }
           }
         });
@@ -1516,7 +1382,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
         console.error("Error updating timeline marker visibility:", error);
       }
     },
-    [videoViewerRef, markers],
+    [videoViewerRef, markers]
   );
 
   // Retry mechanism for marker creation
@@ -1530,18 +1396,17 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
         if (!lane) {
           if (retryCount < maxRetries) {
             console.log(
-              `Marker lane not available, retrying in ${retryDelay}ms (attempt ${retryCount + 1}/${maxRetries})`,
+              `Marker lane not available, retrying in ${retryDelay}ms (attempt ${
+                retryCount + 1
+              }/${maxRetries})`
             );
 
             // Try to force timeline settlement on every few attempts
             if (retryCount % 3 === 2) {
-              console.log(
-                "Attempting to trigger timeline layout settlement...",
-              );
+              console.log("Attempting to trigger timeline layout settlement...");
               try {
                 // Force timeline resize/settlement
-                const timelineElement =
-                  document.getElementById("omakase-timeline");
+                const timelineElement = document.getElementById("omakase-timeline");
                 if (timelineElement) {
                   // Trigger multiple events that might cause timeline settlement
                   const resizeEvent = new Event("resize");
@@ -1550,9 +1415,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                   // Also try to trigger a resize observer manually
                   setTimeout(() => {
                     const rect = timelineElement.getBoundingClientRect();
-                    console.log(
-                      `Timeline element dimensions: ${rect.width}x${rect.height}`,
-                    );
+                    console.log(`Timeline element dimensions: ${rect.width}x${rect.height}`);
                   }, 100);
                 }
               } catch (error) {
@@ -1579,14 +1442,11 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
           .filter((clip) => {
             // Support both embedding_option (TwelveLabs API/Coative) and embedding_scope (TwelveLabs Bedrock)
             const isValidEmbedding =
-              clip.embedding_option === "visual-text" ||
-              clip.embedding_scope === "clip";
+              clip.embedding_option === "visual-text" || clip.embedding_scope === "clip";
 
-            const hasValidScore =
-              clip.score !== null && clip.score !== undefined;
+            const hasValidScore = clip.score !== null && clip.score !== undefined;
             const hasValidTimes =
-              (clip.start_timecode || clip.start_time) &&
-              (clip.end_timecode || clip.end_time);
+              (clip.start_timecode || clip.start_time) && (clip.end_timecode || clip.end_time);
 
             return isValidEmbedding && hasValidScore && hasValidTimes;
           })
@@ -1616,7 +1476,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
             end: clip.end_timecode || clip.end_time,
             score: clip.score,
             embedding_option: clip.embedding_option,
-          })),
+          }))
         );
         console.log(
           `Selected ${selectedClips.length} visual-text clips:`,
@@ -1625,7 +1485,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
             end: clip.end_timecode || clip.end_time,
             score: clip.score,
             embedding_option: clip.embedding_option,
-          })),
+          }))
         );
 
         selectedClips.forEach((clip, index) => {
@@ -1655,9 +1515,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
           const newId = `clip_${startTime}_${endTime}_${index}`;
 
           // Use confidence-based color for semantic markers
-          const markerColor = getMarkerColorByConfidence(
-            clipScore ?? undefined,
-          );
+          const markerColor = getMarkerColorByConfidence(clipScore ?? undefined);
 
           const periodMarker = new PeriodMarker({
             timeObservation: {
@@ -1713,24 +1571,14 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
 
         // Load and apply stored semantic modifications
         if (assetId) {
-          const storedModifications =
-            loadSemanticModificationsFromStorage(assetId);
-          if (
-            storedModifications &&
-            Object.keys(storedModifications).length > 0
-          ) {
-            console.log(
-              "Applying stored semantic modifications:",
-              storedModifications,
-            );
+          const storedModifications = loadSemanticModificationsFromStorage(assetId);
+          if (storedModifications && Object.keys(storedModifications).length > 0) {
+            console.log("Applying stored semantic modifications:", storedModifications);
 
             // Apply modifications to both state and timeline markers
             setMarkers((prevMarkers) =>
               prevMarkers.map((marker) => {
-                if (
-                  marker.type === "semantic" &&
-                  storedModifications[marker.id]
-                ) {
+                if (marker.type === "semantic" && storedModifications[marker.id]) {
                   const modification = storedModifications[marker.id];
                   const updatedMarker = {
                     ...marker,
@@ -1748,7 +1596,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                   return updatedMarker;
                 }
                 return marker;
-              }),
+              })
             );
           }
         }
@@ -1768,7 +1616,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
         console.error("Error creating markers from clips:", error);
         if (retryCount < maxRetries) {
           console.log(
-            `Retrying marker creation in ${retryDelay}ms (attempt ${retryCount + 1}/${maxRetries})`,
+            `Retrying marker creation in ${retryDelay}ms (attempt ${retryCount + 1}/${maxRetries})`
           );
           setTimeout(() => {
             createMarkersWithRetry(retryCount + 1);
@@ -1786,7 +1634,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
       searchTerm,
       scoreThreshold,
       updateTimelineMarkerVisibility,
-    ],
+    ]
   );
 
   useEffect(() => {
@@ -1802,11 +1650,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
     // console.log("Clips markers already created?", clipsMarkersCreated);
     // console.log("=== CLIP MARKERS DEBUG - END ===");
 
-    if (
-      !videoViewerRef?.current ||
-      !asset?.clips ||
-      !Array.isArray(asset.clips)
-    ) {
+    if (!videoViewerRef?.current || !asset?.clips || !Array.isArray(asset.clips)) {
       // console.warn("Skipping marker creation - missing requirements:", {
       //   hasVideoViewerRef: !!videoViewerRef?.current,
       //   hasClips: !!asset?.clips,
@@ -1830,13 +1674,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
     return () => {
       clearTimeout(timer);
     };
-  }, [
-    asset?.clips,
-    videoViewerRef,
-    clipsMarkersCreated,
-    createMarkersWithRetry,
-    scoreThreshold,
-  ]);
+  }, [asset?.clips, videoViewerRef, clipsMarkersCreated, createMarkersWithRetry, scoreThreshold]);
 
   // Function to update marker visibility in timeline
   const updateMarkerVisibility = useCallback(() => {
@@ -1851,7 +1689,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
       "User markers visible:",
       showUserMarkers,
       "Semantic markers visible:",
-      showSemanticMarkers,
+      showSemanticMarkers
     );
 
     markers.forEach((marker) => {
@@ -1863,9 +1701,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
           showSemanticMarkers &&
           (marker.score || 0) >= scoreThreshold);
 
-      console.log(
-        `Marker ${marker.id} (${marker.type}): shouldShow=${shouldShow}`,
-      );
+      console.log(`Marker ${marker.id} (${marker.type}): shouldShow=${shouldShow}`);
 
       if (shouldShow) {
         // Create marker reference if it doesn't exist
@@ -1908,13 +1744,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
         markerRefsMap.current.delete(marker.id);
       }
     });
-  }, [
-    markers,
-    showUserMarkers,
-    showSemanticMarkers,
-    scoreThreshold,
-    videoViewerRef,
-  ]);
+  }, [markers, showUserMarkers, showSemanticMarkers, scoreThreshold, videoViewerRef]);
 
   // Update timeline visibility when show/hide states change
   useEffect(() => {
@@ -1941,8 +1771,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
               <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                 <PersonIcon fontSize="small" />
                 <Typography variant="body2">
-                  User Markers (
-                  {markers?.filter((m) => m.type === "user").length || 0})
+                  User Markers ({markers?.filter((m) => m.type === "user").length || 0})
                 </Typography>
               </Box>
             }
@@ -1960,10 +1789,8 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                 <SmartToyIcon fontSize="small" />
                 <Typography variant="body2">
                   Semantic Markers (
-                  {markers?.filter(
-                    (m) =>
-                      m.type === "semantic" && (m.score || 0) >= scoreThreshold,
-                  ).length || 0}
+                  {markers?.filter((m) => m.type === "semantic" && (m.score || 0) >= scoreThreshold)
+                    .length || 0}
                   )
                 </Typography>
               </Box>
@@ -1996,8 +1823,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
             }}
           >
             <PersonIcon fontSize="small" />
-            User Markers (
-            {markers?.filter((m) => m.type === "user").length || 0})
+            User Markers ({markers?.filter((m) => m.type === "user").length || 0})
           </Typography>
           {markers?.filter((m) => m.type === "user").length === 0 ? (
             <Box
@@ -2023,7 +1849,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                     if (videoViewerRef?.current?.seek) {
                       videoViewerRef.current.seek(marker.timeObservation.start);
                       console.log(
-                        `Seeking to user marker start time: ${marker.timeObservation.start}s`,
+                        `Seeking to user marker start time: ${marker.timeObservation.start}s`
                       );
                     }
                   }}
@@ -2075,8 +1901,8 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                           }));
                           setMarkers((prevMarkers) =>
                             prevMarkers.map((m) =>
-                              m.id === marker.id ? { ...m, name: newName } : m,
-                            ),
+                              m.id === marker.id ? { ...m, name: newName } : m
+                            )
                           );
                         }}
                         onClick={(e) => e.stopPropagation()}
@@ -2121,10 +1947,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                         onUpdate={updateMarkerTime}
                         videoViewerRef={videoViewerRef}
                       />
-                      <Typography
-                        variant="caption"
-                        sx={{ color: "text.secondary" }}
-                      >
+                      <Typography variant="caption" sx={{ color: "text.secondary" }}>
                         {" - "}
                       </Typography>
                       <EditableTimecode
@@ -2193,9 +2016,8 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
           >
             <SmartToyIcon fontSize="small" />
             Semantic Markers (
-            {markers?.filter(
-              (m) => m.type === "semantic" && (m.score || 0) >= scoreThreshold,
-            ).length || 0}
+            {markers?.filter((m) => m.type === "semantic" && (m.score || 0) >= scoreThreshold)
+              .length || 0}
             )
           </Typography>
 
@@ -2209,8 +2031,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
             }}
           >
             <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
-              Confidence Level: {getConfidenceLabel(scoreThreshold)} (
-              {scoreThreshold.toFixed(3)})
+              Confidence Level: {getConfidenceLabel(scoreThreshold)} ({scoreThreshold.toFixed(3)})
             </Typography>
             <Box sx={{ position: "relative" }}>
               <Slider
@@ -2221,14 +2042,8 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                   setScoreThreshold(newThreshold);
                   // Save to localStorage for persistence
                   saveConfidenceLevelToStorage(newThreshold);
-                  console.log(
-                    "Saved confidence level to localStorage:",
-                    newThreshold,
-                  );
-                  console.log(
-                    "Calling updateTimelineMarkerVisibility with:",
-                    newThreshold,
-                  );
+                  console.log("Saved confidence level to localStorage:", newThreshold);
+                  console.log("Calling updateTimelineMarkerVisibility with:", newThreshold);
                   updateTimelineMarkerVisibility(newThreshold);
                 }}
                 min={0}
@@ -2295,9 +2110,8 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                 </Typography>
               </Box>
             </Box>
-          ) : markers?.filter(
-              (m) => m.type === "semantic" && (m.score || 0) >= scoreThreshold,
-            ).length === 0 ? (
+          ) : markers?.filter((m) => m.type === "semantic" && (m.score || 0) >= scoreThreshold)
+              .length === 0 ? (
             <Box
               sx={{
                 p: 2,
@@ -2312,10 +2126,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
             </Box>
           ) : (
             markers
-              .filter(
-                (m) =>
-                  m.type === "semantic" && (m.score || 0) >= scoreThreshold,
-              )
+              .filter((m) => m.type === "semantic" && (m.score || 0) >= scoreThreshold)
               .sort((a, b) => (b.score || 0) - (a.score || 0)) // Sort by score descending
               .map((marker, index) => (
                 <Box
@@ -2324,7 +2135,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                     if (videoViewerRef?.current?.seek) {
                       videoViewerRef.current.seek(marker.timeObservation.start);
                       console.log(
-                        `Seeking to semantic marker start time: ${marker.timeObservation.start}s`,
+                        `Seeking to semantic marker start time: ${marker.timeObservation.start}s`
                       );
                     }
                   }}
@@ -2388,18 +2199,13 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                           const clipNumber = index + 1;
                           const searchTerm = marker.name || "Unknown";
                           // Remove score from search term if present
-                          const cleanSearchTerm = searchTerm.replace(
-                            /\s+\d+\.\d+$/,
-                            "",
-                          );
+                          const cleanSearchTerm = searchTerm.replace(/\s+\d+\.\d+$/, "");
                           return `Clip ${clipNumber} (Match for: ${cleanSearchTerm})`;
                         })()}
                       </Typography>
                     </Box>
                     <Box sx={{ flexShrink: 0, position: "relative" }}>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                         <EditableTimecode
                           value={marker.timeObservation.start}
                           markerId={marker.id}
@@ -2407,10 +2213,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                           onUpdate={updateMarkerTime}
                           videoViewerRef={videoViewerRef}
                         />
-                        <Typography
-                          variant="caption"
-                          sx={{ color: "text.secondary" }}
-                        >
+                        <Typography variant="caption" sx={{ color: "text.secondary" }}>
                           {" - "}
                         </Typography>
                         <EditableTimecode
@@ -2455,8 +2258,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                     )}
                   </Box>
                   {(() => {
-                    const shouldShow =
-                      assetId && semanticModifications[marker.id];
+                    const shouldShow = assetId && semanticModifications[marker.id];
                     console.log(`Reset button visibility for ${marker.id}:`, {
                       assetId: !!assetId,
                       hasModification: !!semanticModifications[marker.id],
@@ -2655,10 +2457,8 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = (props) => {
                         // Convert back to bytes based on unit, then reformat
                         let bytes = numericValue;
                         if (v.fileSize.includes("KB")) bytes *= 1024;
-                        else if (v.fileSize.includes("MB"))
-                          bytes *= 1024 * 1024;
-                        else if (v.fileSize.includes("GB"))
-                          bytes *= 1024 * 1024 * 1024;
+                        else if (v.fileSize.includes("MB")) bytes *= 1024 * 1024;
+                        else if (v.fileSize.includes("GB")) bytes *= 1024 * 1024 * 1024;
                         size = formatFileSize(bytes);
                       } else {
                         size = v.fileSize; // Keep original if parsing fails

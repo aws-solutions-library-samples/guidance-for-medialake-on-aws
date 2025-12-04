@@ -118,10 +118,7 @@ const ApiStatusModal: React.FC<ApiStatusModalProps> = ({
               {action}
             </Typography>
             {message && (
-              <Typography
-                variant="body2"
-                sx={{ mt: 1, color: theme.palette.text.secondary }}
-              >
+              <Typography variant="body2" sx={{ mt: 1, color: theme.palette.text.secondary }}>
                 {message}
               </Typography>
             )}
@@ -143,17 +140,12 @@ const ApiStatusModal: React.FC<ApiStatusModalProps> = ({
       case "success":
         return (
           <>
-            <CheckCircleIcon
-              sx={{ fontSize: 48, mb: 2, color: theme.palette.success.main }}
-            />
+            <CheckCircleIcon sx={{ fontSize: 48, mb: 2, color: theme.palette.success.main }} />
             <Typography variant="h6" sx={{ color: theme.palette.text.primary }}>
               {action}
             </Typography>
             {message && (
-              <Typography
-                variant="body1"
-                sx={{ mt: 1, color: theme.palette.text.secondary }}
-              >
+              <Typography variant="body1" sx={{ mt: 1, color: theme.palette.text.secondary }}>
                 {message}
               </Typography>
             )}
@@ -162,17 +154,12 @@ const ApiStatusModal: React.FC<ApiStatusModalProps> = ({
       case "error":
         return (
           <>
-            <ErrorIcon
-              sx={{ fontSize: 48, mb: 2, color: theme.palette.error.main }}
-            />
+            <ErrorIcon sx={{ fontSize: 48, mb: 2, color: theme.palette.error.main }} />
             <Typography variant="h6" sx={{ color: theme.palette.text.primary }}>
               {action}
             </Typography>
             {message && (
-              <Typography
-                variant="body1"
-                sx={{ mt: 1, color: theme.palette.error.main }}
-              >
+              <Typography variant="body1" sx={{ mt: 1, color: theme.palette.error.main }}>
                 {message}
               </Typography>
             )}

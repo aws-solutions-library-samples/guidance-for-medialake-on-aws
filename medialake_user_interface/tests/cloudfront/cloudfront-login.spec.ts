@@ -77,7 +77,7 @@ function getMediaLakeTagFilters(): TagFilter[] {
  */
 async function discoverCloudFrontForLogin(
   discoveryEngine: ResourceDiscoveryEngine,
-  serviceAdapter: CloudFrontServiceAdapter,
+  serviceAdapter: CloudFrontServiceAdapter
 ): Promise<{
   distribution: CloudFrontDistribution | null;
   method: "tag-based" | "fallback";
@@ -85,33 +85,28 @@ async function discoverCloudFrontForLogin(
   const tagFilters = getMediaLakeTagFilters();
 
   try {
-    console.log(
-      "[CloudFrontLogin] Discovering CloudFront distribution for login testing...",
-    );
+    console.log("[CloudFrontLogin] Discovering CloudFront distribution for login testing...");
 
     // Primary: Tag-based discovery
     const tagBasedDistributions = await discoveryEngine.discoverByTags(
       "cloudfront-distribution",
-      tagFilters,
+      tagFilters
     );
 
     if (tagBasedDistributions.length > 0) {
       const distribution = tagBasedDistributions[0] as CloudFrontDistribution;
       console.log(
-        `[CloudFrontLogin] Found distribution via tags: ${distribution.name} (${distribution.id})`,
+        `[CloudFrontLogin] Found distribution via tags: ${distribution.name} (${distribution.id})`
       );
 
       // Validate distribution has web application endpoints
-      if (
-        distribution.aliases.length > 0 ||
-        distribution.domainName.includes("cloudfront.net")
-      ) {
+      if (distribution.aliases.length > 0 || distribution.domainName.includes("cloudfront.net")) {
         return { distribution, method: "tag-based" };
       }
     }
 
     console.warn(
-      "[CloudFrontLogin] No suitable distributions found via tag-based discovery, trying fallback...",
+      "[CloudFrontLogin] No suitable distributions found via tag-based discovery, trying fallback..."
     );
   } catch (error) {
     console.warn("[CloudFrontLogin] Tag-based discovery failed:", error);
@@ -119,13 +114,12 @@ async function discoverCloudFrontForLogin(
 
   try {
     // Fallback: Service adapter fallback discovery
-    const fallbackDistributions =
-      await serviceAdapter.fallbackDiscovery(tagFilters);
+    const fallbackDistributions = await serviceAdapter.fallbackDiscovery(tagFilters);
 
     if (fallbackDistributions.length > 0) {
       const distribution = fallbackDistributions[0];
       console.log(
-        `[CloudFrontLogin] Found distribution via fallback: ${distribution.name} (${distribution.id})`,
+        `[CloudFrontLogin] Found distribution via fallback: ${distribution.name} (${distribution.id})`
       );
       return { distribution, method: "fallback" };
     }
@@ -142,9 +136,7 @@ async function discoverCloudFrontForLogin(
  */
 function generateLoginTestUrls(distribution: CloudFrontDistribution): any {
   const primaryDomain =
-    distribution.aliases.length > 0
-      ? distribution.aliases[0]
-      : distribution.domainName;
+    distribution.aliases.length > 0 ? distribution.aliases[0] : distribution.domainName;
 
   const baseUrl = `https://${primaryDomain}`;
 
@@ -163,7 +155,7 @@ async function performCloudFrontLogin(
   page: Page,
   loginUrl: string,
   username: string,
-  password: string,
+  password: string
 ): Promise<{ success: boolean; responseTime: number; error?: string }> {
   const startTime = Date.now();
 
@@ -177,9 +169,7 @@ async function performCloudFrontLogin(
     });
 
     if (!response || response.status() >= 400) {
-      throw new Error(
-        `Login page returned status: ${response?.status() || "unknown"}`,
-      );
+      throw new Error(`Login page returned status: ${response?.status() || "unknown"}`);
     }
 
     // Wait for login form to be available - use working selectors from login.spec.ts
@@ -199,7 +189,7 @@ async function performCloudFrontLogin(
         url.toString().includes("/dashboard") ||
         url.toString().endsWith("/") ||
         !url.toString().includes("/sign-in"),
-      { timeout: 30000 },
+      { timeout: 30000 }
     );
 
     // Additional wait to ensure page is fully loaded
@@ -211,10 +201,7 @@ async function performCloudFrontLogin(
     return { success: true, responseTime };
   } catch (error: any) {
     const responseTime = Date.now() - startTime;
-    console.error(
-      `[CloudFrontLogin] Login failed after ${responseTime}ms:`,
-      error.message,
-    );
+    console.error(`[CloudFrontLogin] Login failed after ${responseTime}ms:`, error.message);
 
     return {
       success: false,
@@ -229,7 +216,7 @@ async function performCloudFrontLogin(
  */
 async function validateAuthenticatedAccess(
   page: Page,
-  testUrls: any,
+  testUrls: any
 ): Promise<{ success: boolean; accessibleUrls: string[]; errors: string[] }> {
   const accessibleUrls: string[] = [];
   const errors: string[] = [];
@@ -242,9 +229,7 @@ async function validateAuthenticatedAccess(
 
   for (const { name, url } of urlsToTest) {
     try {
-      console.log(
-        `[CloudFrontLogin] Testing authenticated access to ${name}: ${url}`,
-      );
+      console.log(`[CloudFrontLogin] Testing authenticated access to ${name}: ${url}`);
 
       const response = await page.goto(url, {
         waitUntil: "networkidle",
@@ -253,9 +238,7 @@ async function validateAuthenticatedAccess(
 
       if (response && response.status() < 400) {
         accessibleUrls.push(url);
-        console.log(
-          `[CloudFrontLogin] Successfully accessed ${name} (${response.status()})`,
-        );
+        console.log(`[CloudFrontLogin] Successfully accessed ${name} (${response.status()})`);
       } else {
         const error = `${name} returned status: ${response?.status() || "unknown"}`;
         errors.push(error);
@@ -283,14 +266,11 @@ const cloudFrontLoginTest = test.extend<CloudFrontLoginFixtures>({
   cloudFrontLoginContext: [
     async ({ enhancedCognitoTestUser }, use, testInfo) => {
       console.log(
-        `[CloudFrontLogin Worker ${testInfo.workerIndex}] Setting up CloudFront login context`,
+        `[CloudFrontLogin Worker ${testInfo.workerIndex}] Setting up CloudFront login context`
       );
 
       const config = createCloudFrontLoginDiscoveryConfig();
-      const discoveryEngine = createResourceDiscoveryEngine(
-        config,
-        testInfo.workerIndex,
-      );
+      const discoveryEngine = createResourceDiscoveryEngine(config, testInfo.workerIndex);
       const cloudFrontAdapter = createCloudFrontServiceAdapter(config);
 
       // Register CloudFront service adapter
@@ -303,15 +283,13 @@ const cloudFrontLoginTest = test.extend<CloudFrontLoginFixtures>({
         // Discover CloudFront distribution
         const discoveryResult = await discoverCloudFrontForLogin(
           discoveryEngine,
-          cloudFrontAdapter,
+          cloudFrontAdapter
         );
         cloudFrontDistribution = discoveryResult.distribution;
         cloudFrontMethod = discoveryResult.method;
 
         if (!cloudFrontDistribution) {
-          throw new Error(
-            "No CloudFront distribution could be discovered for login testing",
-          );
+          throw new Error("No CloudFront distribution could be discovered for login testing");
         }
 
         // Generate test URLs
@@ -329,16 +307,13 @@ const cloudFrontLoginTest = test.extend<CloudFrontLoginFixtures>({
         };
 
         console.log(
-          `[CloudFrontLogin] Context ready - Cognito: ${context.discoveryMethods.cognito}, CloudFront: ${context.discoveryMethods.cloudfront}`,
+          `[CloudFrontLogin] Context ready - Cognito: ${context.discoveryMethods.cognito}, CloudFront: ${context.discoveryMethods.cloudfront}`
         );
         console.log(`[CloudFrontLogin] Login URL: ${context.loginUrl}`);
 
         await use(context);
       } catch (error) {
-        console.error(
-          `[CloudFrontLogin] Error setting up CloudFront login context:`,
-          error,
-        );
+        console.error(`[CloudFrontLogin] Error setting up CloudFront login context:`, error);
         throw error;
       } finally {
         // Cleanup
@@ -354,16 +329,14 @@ const cloudFrontLoginTest = test.extend<CloudFrontLoginFixtures>({
    */
   authenticatedCloudFrontPage: [
     async ({ page, cloudFrontLoginContext }, use) => {
-      console.log(
-        "[CloudFrontLogin] Performing automated login through CloudFront...",
-      );
+      console.log("[CloudFrontLogin] Performing automated login through CloudFront...");
 
       // Perform login through CloudFront
       const loginResult = await performCloudFrontLogin(
         page,
         cloudFrontLoginContext.loginUrl,
         cloudFrontLoginContext.cognitoUser.username,
-        cloudFrontLoginContext.cognitoUser.password,
+        cloudFrontLoginContext.cognitoUser.password
       );
 
       if (!loginResult.success) {
@@ -371,14 +344,13 @@ const cloudFrontLoginTest = test.extend<CloudFrontLoginFixtures>({
       }
 
       console.log(
-        `[CloudFrontLogin] Login successful, response time: ${loginResult.responseTime}ms`,
+        `[CloudFrontLogin] Login successful, response time: ${loginResult.responseTime}ms`
       );
 
       // Configure page for CloudFront testing
       await page.setExtraHTTPHeaders({
         "User-Agent": "MediaLake-CloudFront-E2E-Test/1.0",
-        Accept:
-          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       });
 
       // Set appropriate timeouts for CloudFront responses
@@ -404,10 +376,10 @@ cloudFrontLoginTest.describe("CloudFront Login Integration Tests", () => {
 
       // Validate discovery methods
       expect(["tag-based", "name-based", "fallback"]).toContain(
-        cloudFrontLoginContext.discoveryMethods.cognito,
+        cloudFrontLoginContext.discoveryMethods.cognito
       );
       expect(["tag-based", "fallback"]).toContain(
-        cloudFrontLoginContext.discoveryMethods.cloudfront,
+        cloudFrontLoginContext.discoveryMethods.cloudfront
       );
 
       // Validate authenticated page is ready
@@ -416,22 +388,24 @@ cloudFrontLoginTest.describe("CloudFront Login Integration Tests", () => {
       // Test authenticated access to various endpoints
       const accessResult = await validateAuthenticatedAccess(
         authenticatedCloudFrontPage,
-        cloudFrontLoginContext.testUrls,
+        cloudFrontLoginContext.testUrls
       );
 
       expect(accessResult.success).toBe(true);
       expect(accessResult.accessibleUrls.length).toBeGreaterThan(0);
 
       console.log(
-        `[Test] End-to-end login successful via CloudFront distribution: ${cloudFrontLoginContext.cloudFrontDistribution.name}`,
+        `[Test] End-to-end login successful via CloudFront distribution: ${cloudFrontLoginContext.cloudFrontDistribution.name}`
       );
       console.log(
-        `[Test] Discovery methods - Cognito: ${cloudFrontLoginContext.discoveryMethods.cognito}, CloudFront: ${cloudFrontLoginContext.discoveryMethods.cloudfront}`,
+        `[Test] Discovery methods - Cognito: ${cloudFrontLoginContext.discoveryMethods.cognito}, CloudFront: ${cloudFrontLoginContext.discoveryMethods.cloudfront}`
       );
       console.log(
-        `[Test] Accessible URLs: ${accessResult.accessibleUrls.length}/${Object.keys(cloudFrontLoginContext.testUrls).length - 1}`,
+        `[Test] Accessible URLs: ${accessResult.accessibleUrls.length}/${
+          Object.keys(cloudFrontLoginContext.testUrls).length - 1
+        }`
       );
-    },
+    }
   );
 
   cloudFrontLoginTest(
@@ -448,19 +422,15 @@ cloudFrontLoginTest.describe("CloudFront Login Integration Tests", () => {
       expect(currentUrl).not.toContain("/reset-password");
 
       // Test that we can navigate to authenticated endpoints
-      await authenticatedCloudFrontPage.goto(
-        cloudFrontLoginContext.testUrls.root,
-      );
+      await authenticatedCloudFrontPage.goto(cloudFrontLoginContext.testUrls.root);
       await authenticatedCloudFrontPage.waitForLoadState("networkidle");
 
       const finalUrl = authenticatedCloudFrontPage.url();
       expect(finalUrl).not.toContain("/sign-in");
 
-      console.log(
-        `[Test] Permanent password login successful - no reset required`,
-      );
+      console.log(`[Test] Permanent password login successful - no reset required`);
       console.log(`[Test] Final authenticated URL: ${finalUrl}`);
-    },
+    }
   );
 
   cloudFrontLoginTest(
@@ -488,28 +458,23 @@ cloudFrontLoginTest.describe("CloudFront Login Integration Tests", () => {
       expect(cacheValidation).toBeDefined();
 
       // Log performance and cache information
-      const cacheStatus =
-        headers["x-cache"] || headers["cloudfront-cache-status"] || "unknown";
+      const cacheStatus = headers["x-cache"] || headers["cloudfront-cache-status"] || "unknown";
       console.log(
-        `[Test] CloudFront performance - Response time: ${responseTime}ms, Cache status: ${cacheStatus}`,
+        `[Test] CloudFront performance - Response time: ${responseTime}ms, Cache status: ${cacheStatus}`
       );
-      console.log(
-        `[Test] Cache headers present: ${cacheValidation.hasCacheHeaders}`,
-      );
+      console.log(`[Test] Cache headers present: ${cacheValidation.hasCacheHeaders}`);
 
       if (cacheValidation.cacheStatus) {
         console.log(`[Test] Cache status: ${cacheValidation.cacheStatus}`);
       }
-    },
+    }
   );
 
   cloudFrontLoginTest(
     "should support parallel execution with proper isolation",
     async ({ cloudFrontLoginContext }, testInfo) => {
       // Validate worker isolation
-      expect(cloudFrontLoginContext.cognitoUser.username).toContain(
-        `-${testInfo.workerIndex}-`,
-      );
+      expect(cloudFrontLoginContext.cognitoUser.username).toContain(`-${testInfo.workerIndex}-`);
 
       // Validate unique test context per worker
       expect(cloudFrontLoginContext.cloudFrontDistribution.id).toBeTruthy();
@@ -526,15 +491,13 @@ cloudFrontLoginTest.describe("CloudFront Login Integration Tests", () => {
 
       console.log(
         `[Test] Worker ${testInfo.workerIndex} isolation validated:`,
-        JSON.stringify(contextInfo, null, 2),
+        JSON.stringify(contextInfo, null, 2)
       );
 
       // Validate that each worker has its own resources
-      expect(contextInfo.cognitoUser).toMatch(
-        new RegExp(`-${testInfo.workerIndex}-`),
-      );
+      expect(contextInfo.cognitoUser).toMatch(new RegExp(`-${testInfo.workerIndex}-`));
       expect(contextInfo.distributionId).toBeTruthy();
-    },
+    }
   );
 });
 
@@ -548,17 +511,17 @@ cloudFrontLoginTest.describe("CloudFront Login Error Handling", () => {
       expect(cloudFrontLoginContext.cloudFrontDistribution).toBeTruthy();
 
       // Validate that error handling mechanisms are in place
-      expect(cloudFrontLoginContext.discoveryMethods.cloudfront).toMatch(
-        /^(tag-based|fallback)$/,
-      );
+      expect(cloudFrontLoginContext.discoveryMethods.cloudfront).toMatch(/^(tag-based|fallback)$/);
 
       console.log(
-        `[Test] CloudFront discovery method: ${cloudFrontLoginContext.discoveryMethods.cloudfront}`,
+        `[Test] CloudFront discovery method: ${cloudFrontLoginContext.discoveryMethods.cloudfront}`
       );
       console.log(
-        `[Test] Distribution status: ${cloudFrontLoginContext.cloudFrontDistribution.status || "unknown"}`,
+        `[Test] Distribution status: ${
+          cloudFrontLoginContext.cloudFrontDistribution.status || "unknown"
+        }`
       );
-    },
+    }
   );
 
   cloudFrontLoginTest(
@@ -566,11 +529,9 @@ cloudFrontLoginTest.describe("CloudFront Login Error Handling", () => {
     async ({ cloudFrontLoginContext, authenticatedCloudFrontPage }) => {
       // Test that the system recovered from any discovery issues
       expect(cloudFrontLoginContext.cognitoUser.discoveryMethod).toMatch(
-        /^(tag-based|name-based|fallback)$/,
+        /^(tag-based|name-based|fallback)$/
       );
-      expect(cloudFrontLoginContext.discoveryMethods.cloudfront).toMatch(
-        /^(tag-based|fallback)$/,
-      );
+      expect(cloudFrontLoginContext.discoveryMethods.cloudfront).toMatch(/^(tag-based|fallback)$/);
 
       // Test that login was successful despite any discovery challenges
       const currentUrl = authenticatedCloudFrontPage.url();
@@ -578,9 +539,9 @@ cloudFrontLoginTest.describe("CloudFront Login Error Handling", () => {
       expect(currentUrl).not.toContain("/sign-in");
 
       console.log(
-        `[Test] Error recovery successful - Cognito: ${cloudFrontLoginContext.cognitoUser.discoveryMethod}, CloudFront: ${cloudFrontLoginContext.discoveryMethods.cloudfront}`,
+        `[Test] Error recovery successful - Cognito: ${cloudFrontLoginContext.cognitoUser.discoveryMethod}, CloudFront: ${cloudFrontLoginContext.discoveryMethods.cloudfront}`
       );
-    },
+    }
   );
 });
 

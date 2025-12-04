@@ -7,9 +7,5 @@ interface DateCellProps {
 }
 
 export const DateCell: React.FC<DateCellProps> = ({ value }) => {
-  return (
-    <TableCellContent variant="secondary">
-      {formatLocalDateTime(value)}
-    </TableCellContent>
-  );
+  return <TableCellContent variant="secondary">{formatLocalDateTime(value)}</TableCellContent>;
 };

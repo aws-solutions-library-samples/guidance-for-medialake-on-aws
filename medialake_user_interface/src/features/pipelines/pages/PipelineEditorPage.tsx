@@ -1,10 +1,7 @@
 import React from "react";
 import { useCallback, useRef, useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import {
-  transformParameterSchema,
-  validateSchemaPreservation,
-} from "../utils/schemaTransformer";
+import { transformParameterSchema, validateSchemaPreservation } from "../utils/schemaTransformer";
 import ReactFlow, {
   Background,
   Controls,
@@ -33,14 +30,7 @@ import {
   Backdrop,
 } from "@mui/material";
 import ApiStatusModal from "@/components/ApiStatusModal";
-import {
-  FaFileVideo,
-  FaBolt,
-  FaCodeBranch,
-  FaTools,
-  FaPlug,
-  FaCogs,
-} from "react-icons/fa";
+import { FaFileVideo, FaBolt, FaCodeBranch, FaTools, FaPlug, FaCogs } from "react-icons/fa";
 import { PipelineDeleteDialog } from "../components";
 import { PipelineUpdateConfirmationDialog } from "../components/PipelineUpdateConfirmationDialog";
 import {
@@ -51,11 +41,7 @@ import {
 } from "../api/pipelinesController";
 import queryClient from "@/api/queryClient";
 import { useGetNode } from "@/shared/nodes/api/nodesController";
-import type {
-  CreatePipelineDto,
-  PipelineEdge,
-  PipelineNode,
-} from "../types/pipelines.types";
+import type { CreatePipelineDto, PipelineEdge, PipelineNode } from "../types/pipelines.types";
 import type { NodesResponse } from "@/shared/nodes/types/nodes.types";
 import { IntegrationValidationService } from "../services/integrationValidation.service";
 import type {
@@ -182,10 +168,7 @@ const convertToPipelineNode = (node: Node<CustomNodeData>): PipelineNode => ({
 });
 
 const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
-  console.log(
-    "[PipelineEditorPage] convertApiResponseToNode called with:",
-    response,
-  );
+  console.log("[PipelineEditorPage] convertApiResponseToNode called with:", response);
   if (!response || !response.data || !response.data[0]) {
     console.log("[PipelineEditorPage] Invalid response structure");
     return null;
@@ -210,17 +193,13 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
           const parameterData = transformParameterSchema(param);
 
           // Validate schema preservation in development
-          validateSchemaPreservation(
-            param,
-            parameterData,
-            "PipelineEditorPage-ArrayParams",
-          );
+          validateSchemaPreservation(param, parameterData, "PipelineEditorPage-ArrayParams");
 
           // Log default values if found
           if (parameterData.defaultValue !== undefined) {
             console.log(
               `[PipelineEditorPage] Found default value for ${param.name}:`,
-              parameterData.defaultValue,
+              parameterData.defaultValue
             );
           }
 
@@ -238,11 +217,7 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
         if (!paramName) {
           console.log("[PipelineEditorPage] Skipping parameter with no name");
           parameters = {};
-        } else if (
-          param.schema &&
-          param.schema.type === "object" &&
-          param.schema.properties
-        ) {
+        } else if (param.schema && param.schema.type === "object" && param.schema.properties) {
           // For object parameters, create individual fields for each property
           Object.entries(param.schema.properties).forEach(
             ([propName, propSchema]: [string, any]) => {
@@ -258,24 +233,20 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
               validateSchemaPreservation(
                 propParam,
                 parameterData,
-                "PipelineEditorPage-ObjectProps",
+                "PipelineEditorPage-ObjectProps"
               );
               parameters[propName] = parameterData;
-            },
+            }
           );
         } else {
           // Single parameter - use centralized transformer
           const parameterData = transformParameterSchema(param);
-          validateSchemaPreservation(
-            param,
-            parameterData,
-            "PipelineEditorPage-SingleParam",
-          );
+          validateSchemaPreservation(param, parameterData, "PipelineEditorPage-SingleParam");
 
           if (parameterData.defaultValue !== undefined) {
             console.log(
               `[PipelineEditorPage] Found default value for ${paramName}:`,
-              parameterData.defaultValue,
+              parameterData.defaultValue
             );
           }
 
@@ -361,16 +332,12 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
           flowParameters = method.parameters.reduce((paramAcc, param) => {
             console.log("[PipelineEditorPage] Processing parameter:", param);
             const parameterData = transformParameterSchema(param);
-            validateSchemaPreservation(
-              param,
-              parameterData,
-              "PipelineEditorPage-FlowArrayParams",
-            );
+            validateSchemaPreservation(param, parameterData, "PipelineEditorPage-FlowArrayParams");
 
             if (parameterData.defaultValue !== undefined) {
               console.log(
                 `[PipelineEditorPage] Found default value for ${param.name}:`,
-                parameterData.defaultValue,
+                parameterData.defaultValue
               );
             }
             return { ...paramAcc, [param.name]: parameterData };
@@ -380,11 +347,7 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
           const param = method.parameters as any;
           const paramName = param.name || "parameter";
 
-          if (
-            param.schema &&
-            param.schema.type === "object" &&
-            param.schema.properties
-          ) {
+          if (param.schema && param.schema.type === "object" && param.schema.properties) {
             Object.entries(param.schema.properties).forEach(
               ([propName, propSchema]: [string, any]) => {
                 const propParam = {
@@ -399,27 +362,20 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
                 validateSchemaPreservation(
                   propParam,
                   parameterData,
-                  "PipelineEditorPage-FlowObjectProps",
+                  "PipelineEditorPage-FlowObjectProps"
                 );
                 flowParameters[propName] = parameterData;
-              },
+              }
             );
           } else {
             // Single parameter - use centralized transformer
             const parameterData = transformParameterSchema(param);
-            validateSchemaPreservation(
-              param,
-              parameterData,
-              "PipelineEditorPage-FlowSingleParam",
-            );
+            validateSchemaPreservation(param, parameterData, "PipelineEditorPage-FlowSingleParam");
             flowParameters[paramName] = parameterData;
           }
         }
 
-        console.log(
-          "[PipelineEditorPage] Converted flow parameters:",
-          flowParameters,
-        );
+        console.log("[PipelineEditorPage] Converted flow parameters:", flowParameters);
 
         const config = {
           path: "",
@@ -452,13 +408,9 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
           operationId: (method as any).config?.operationId || "",
           parameters: (method as any).config?.parameters || [],
           requestMapping:
-            (method as any).requestMapping ||
-            (method as any).config?.requestMapping ||
-            null,
+            (method as any).requestMapping || (method as any).config?.requestMapping || null,
           responseMapping:
-            (method as any).responseMapping ||
-            (method as any).config?.responseMapping ||
-            null,
+            (method as any).responseMapping || (method as any).config?.responseMapping || null,
         };
       }
 
@@ -488,7 +440,7 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
         },
       };
     },
-    {} as Record<string, any>,
+    {} as Record<string, any>
   );
 
   // Determine inputTypes:
@@ -500,10 +452,8 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
   } else if (nodeData.connections && nodeData.connections.incoming) {
     // Flatten all types found in all incoming connections
 
-    const typesFromConnections = Object.values(
-      nodeData.connections.incoming,
-    ).flatMap((conns: any) =>
-      conns.flatMap((conn: any) => conn.connectionConfig?.type || []),
+    const typesFromConnections = Object.values(nodeData.connections.incoming).flatMap(
+      (conns: any) => conns.flatMap((conn: any) => conn.connectionConfig?.type || [])
     );
     inputTypes = Array.from(new Set(typesFromConnections));
   }
@@ -517,10 +467,8 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
   } else if (nodeData.connections && nodeData.connections.outgoing) {
     // Flatten all types found in all outgoing connections
 
-    const typesFromConnections = Object.values(
-      nodeData.connections.outgoing,
-    ).flatMap((conns: any) =>
-      conns.flatMap((conn: any) => conn.connectionConfig?.type || []),
+    const typesFromConnections = Object.values(nodeData.connections.outgoing).flatMap(
+      (conns: any) => conns.flatMap((conn: any) => conn.connectionConfig?.type || [])
     );
     outputTypes = Array.from(new Set(typesFromConnections));
   }
@@ -576,10 +524,7 @@ const PipelineEditorContent = () => {
           setFormData((prev) => {
             const updatedNodes = prev.configuration.nodes.map((node) => {
               if (node.id === change.id) {
-                console.log(
-                  "[PipelineEditorPage] Updating node position in form data:",
-                  node.id,
-                );
+                console.log("[PipelineEditorPage] Updating node position in form data:", node.id);
                 return {
                   ...node,
                   position: {
@@ -606,26 +551,22 @@ const PipelineEditorContent = () => {
         }
       });
     },
-    [onNodesChange],
+    [onNodesChange]
   );
   const { screenToFlowPosition } = useReactFlow();
   const reactFlowInstance = useReactFlow();
   const updateNodeInternals = useUpdateNodeInternals();
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
-  const [errorType, setErrorType] = useState<"trigger" | "compatibility">(
-    "compatibility",
-  );
-  const [selectedNode, setSelectedNode] = useState<Node<CustomNodeData> | null>(
-    null,
-  );
+  const [errorType, setErrorType] = useState<"trigger" | "compatibility">("compatibility");
+  const [selectedNode, setSelectedNode] = useState<Node<CustomNodeData> | null>(null);
   const [isNodeConfigOpen, setIsNodeConfigOpen] = useState(false);
   const { isExpanded } = useRightSidebar();
 
   // State for API status modal
   const [apiStatusModalOpen, setApiStatusModalOpen] = useState(false);
-  const [apiStatusModalState, setApiStatusModalState] = useState<
-    "loading" | "success" | "error"
-  >("loading");
+  const [apiStatusModalState, setApiStatusModalState] = useState<"loading" | "success" | "error">(
+    "loading"
+  );
   const [apiStatusModalMessage, setApiStatusModalMessage] = useState("");
   const [apiStatusModalAction, setApiStatusModalAction] = useState("");
   // Delete dialog state
@@ -659,17 +600,15 @@ const PipelineEditorContent = () => {
   });
 
   // Track the original pipeline data for change detection
-  const [originalPipelineData, setOriginalPipelineData] =
-    React.useState<CreatePipelineDto | null>(null);
+  const [originalPipelineData, setOriginalPipelineData] = React.useState<CreatePipelineDto | null>(
+    null
+  );
 
   // Fetch all pipelines when the component mounts
 
-  const { data: pipeline, isLoading: isPipelineLoading } = useGetPipeline(
-    pipelineId || "",
-    {
-      enabled: !!pipelineId && pipelineId !== "new",
-    },
-  );
+  const { data: pipeline, isLoading: isPipelineLoading } = useGetPipeline(pipelineId || "", {
+    enabled: !!pipelineId && pipelineId !== "new",
+  });
 
   // Only fetch node details when the dialog is open and we have a selected node
   // Store the nodeId in a ref to prevent unnecessary re-renders
@@ -684,25 +623,16 @@ const PipelineEditorContent = () => {
     }
   }, [isNodeConfigOpen, selectedNode]);
 
-  const { data: nodeDetails, isLoading: isNodeDetailsLoading } = useGetNode(
-    nodeIdRef.current,
-    {
-      enabled: isNodeConfigOpen && !!nodeIdRef.current,
-    },
-  );
+  const { data: nodeDetails, isLoading: isNodeDetailsLoading } = useGetNode(nodeIdRef.current, {
+    enabled: isNodeConfigOpen && !!nodeIdRef.current,
+  });
 
   // Add debug logging for node details
   React.useEffect(() => {
     if (nodeDetails) {
       console.log("[PipelineEditorPage] Node details from API:", nodeDetails);
-      console.log(
-        "[PipelineEditorPage] Node type:",
-        nodeDetails.data?.[0]?.info?.nodeType,
-      );
-      console.log(
-        "[PipelineEditorPage] Node methods:",
-        nodeDetails.data?.[0]?.methods,
-      );
+      console.log("[PipelineEditorPage] Node type:", nodeDetails.data?.[0]?.info?.nodeType);
+      console.log("[PipelineEditorPage] Node methods:", nodeDetails.data?.[0]?.methods);
     }
   }, [nodeDetails]);
 
@@ -721,7 +651,7 @@ const PipelineEditorContent = () => {
       setApiStatusModalState("success");
       setApiStatusModalAction("Pipeline Creation Started");
       setApiStatusModalMessage(
-        "Pipeline creation started. This might take a while. You can monitor the status in the pipeline page.",
+        "Pipeline creation started. This might take a while. You can monitor the status in the pipeline page."
       );
       setApiStatusModalOpen(true);
 
@@ -733,9 +663,7 @@ const PipelineEditorContent = () => {
       // Show error message in ApiStatusModal
       setApiStatusModalState("error");
       setApiStatusModalAction("Pipeline Creation Failed");
-      setApiStatusModalMessage(
-        error.message || "An error occurred while creating the pipeline.",
-      );
+      setApiStatusModalMessage(error.message || "An error occurred while creating the pipeline.");
       setApiStatusModalOpen(true);
     },
   });
@@ -751,11 +679,13 @@ const PipelineEditorContent = () => {
   });
 
   // Set up the pipeline status polling
-  const { data: pipelineStatus, refetch: refetchPipelineStatus } =
-    useGetPipelineStatus(executionArn || "", {
+  const { data: pipelineStatus, refetch: refetchPipelineStatus } = useGetPipelineStatus(
+    executionArn || "",
+    {
       enabled: !!executionArn && shouldPollStatus,
       refetchInterval: 5000, // Poll every 5 seconds
-    });
+    }
+  );
 
   // Handle pipeline status changes
   useEffect(() => {
@@ -763,40 +693,31 @@ const PipelineEditorContent = () => {
       console.log("[PipelineEditorPage] Pipeline status:", pipelineStatus);
       console.log(
         "[PipelineEditorPage] Step function status:",
-        pipelineStatus.step_function_status,
+        pipelineStatus.step_function_status
       );
-      console.log(
-        "[PipelineEditorPage] Pipeline record:",
-        pipelineStatus.pipeline,
-      );
+      console.log("[PipelineEditorPage] Pipeline record:", pipelineStatus.pipeline);
 
       if (pipelineStatus.pipeline) {
         console.log(
           "[PipelineEditorPage] Pipeline deploymentStatus:",
-          pipelineStatus.pipeline.deploymentStatus,
+          pipelineStatus.pipeline.deploymentStatus
         );
       }
 
       // Check if the pipeline creation is complete
       if (pipelineStatus.step_function_status === "SUCCEEDED") {
         // Pipeline creation completed successfully
-        console.log(
-          "[PipelineEditorPage] Pipeline creation completed successfully",
-        );
+        console.log("[PipelineEditorPage] Pipeline creation completed successfully");
         setShouldPollStatus(false);
         queryClient.invalidateQueries({ queryKey: ["pipelines", "list"] });
 
         // Force a refetch of the pipeline status to ensure we have the latest data
         refetchPipelineStatus();
-      } else if (
-        ["FAILED", "TIMED_OUT", "ABORTED"].includes(
-          pipelineStatus.step_function_status,
-        )
-      ) {
+      } else if (["FAILED", "TIMED_OUT", "ABORTED"].includes(pipelineStatus.step_function_status)) {
         // Pipeline creation failed
         console.error(
           "[PipelineEditorPage] Pipeline creation failed:",
-          pipelineStatus.step_function_status,
+          pipelineStatus.step_function_status
         );
         setShouldPollStatus(false);
 
@@ -807,7 +728,7 @@ const PipelineEditorContent = () => {
         setApiStatusModalState("error");
         setApiStatusModalAction("Pipeline Creation Failed");
         setApiStatusModalMessage(
-          `Pipeline creation failed with status: ${pipelineStatus.step_function_status}`,
+          `Pipeline creation failed with status: ${pipelineStatus.step_function_status}`
         );
         setApiStatusModalOpen(true);
       }
@@ -835,10 +756,7 @@ const PipelineEditorContent = () => {
   // Set form data when pipeline data is loaded
   React.useEffect(() => {
     if (pipeline) {
-      console.log(
-        "[PipelineEditorPage] Setting form data from pipeline:",
-        pipeline,
-      );
+      console.log("[PipelineEditorPage] Setting form data from pipeline:", pipeline);
       const pipelineData = {
         name: pipeline.name || "",
         description: pipeline.description || "",
@@ -883,18 +801,13 @@ const PipelineEditorContent = () => {
       }
 
       // Compare nodes - check count first
-      if (
-        formData.configuration.nodes.length !==
-        originalPipelineData.configuration.nodes.length
-      ) {
+      if (formData.configuration.nodes.length !== originalPipelineData.configuration.nodes.length) {
         return true;
       }
 
       // Deep compare each node
       for (const node of formData.configuration.nodes) {
-        const originalNode = originalPipelineData.configuration.nodes.find(
-          (n) => n.id === node.id,
-        );
+        const originalNode = originalPipelineData.configuration.nodes.find((n) => n.id === node.id);
         if (!originalNode) {
           return true;
         }
@@ -912,18 +825,13 @@ const PipelineEditorContent = () => {
       }
 
       // Compare edges - check count first
-      if (
-        formData.configuration.edges.length !==
-        originalPipelineData.configuration.edges.length
-      ) {
+      if (formData.configuration.edges.length !== originalPipelineData.configuration.edges.length) {
         return true;
       }
 
       // Deep compare each edge
       for (const edge of formData.configuration.edges) {
-        const originalEdge = originalPipelineData.configuration.edges.find(
-          (e) => e.id === edge.id,
-        );
+        const originalEdge = originalPipelineData.configuration.edges.find((e) => e.id === edge.id);
         if (!originalEdge) {
           return true;
         }
@@ -949,34 +857,22 @@ const PipelineEditorContent = () => {
 
       return false;
     } catch (error) {
-      console.error(
-        "[PipelineEditorPage] Error comparing pipeline data:",
-        error,
-      );
+      console.error("[PipelineEditorPage] Error comparing pipeline data:", error);
       return true;
     }
   }, [formData, originalPipelineData, pipelineId]);
 
   const handleSave = async () => {
-    console.log(
-      "[PipelineEditorPage] Saving pipeline with form data:",
-      formData,
-    );
-    console.log(
-      "[PipelineEditorPage] Number of nodes:",
-      formData.configuration.nodes.length,
-    );
-    console.log(
-      "[PipelineEditorPage] Number of edges:",
-      formData.configuration.edges.length,
-    );
+    console.log("[PipelineEditorPage] Saving pipeline with form data:", formData);
+    console.log("[PipelineEditorPage] Number of nodes:", formData.configuration.nodes.length);
+    console.log("[PipelineEditorPage] Number of edges:", formData.configuration.edges.length);
     console.log(
       "[PipelineEditorPage] Node positions:",
       formData.configuration.nodes.map((node) => ({
         id: node.id,
         position: node.position,
         positionAbsolute: node.positionAbsolute,
-      })),
+      }))
     );
 
     // If we're updating an existing pipeline, show confirmation dialog
@@ -993,9 +889,7 @@ const PipelineEditorContent = () => {
     // Show the ApiStatusModal in loading state
     setApiStatusModalState("loading");
     setApiStatusModalAction(
-      pipelineId && pipelineId !== "new"
-        ? "Updating Pipeline"
-        : "Creating Pipeline",
+      pipelineId && pipelineId !== "new" ? "Updating Pipeline" : "Creating Pipeline"
     );
     setApiStatusModalMessage("Please wait...");
     setApiStatusModalOpen(true);
@@ -1012,9 +906,7 @@ const PipelineEditorContent = () => {
             configuration: node.data.configuration
               ? {
                   ...node.data.configuration,
-                  parameters: normalizeNumericValues(
-                    node.data.configuration.parameters || {},
-                  ),
+                  parameters: normalizeNumericValues(node.data.configuration.parameters || {}),
                 }
               : node.data.configuration,
           },
@@ -1040,9 +932,7 @@ const PipelineEditorContent = () => {
   const onDeleteNode = useCallback(
     (nodeId: string) => {
       setNodes((nds) => nds.filter((node) => node.id !== nodeId));
-      setEdges((eds) =>
-        eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId),
-      );
+      setEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
 
       // Update pipeline configuration
       setFormData((prev) => ({
@@ -1051,7 +941,7 @@ const PipelineEditorContent = () => {
           ...prev.configuration,
           nodes: prev.configuration.nodes.filter((node) => node.id !== nodeId),
           edges: prev.configuration.edges.filter(
-            (edge) => edge.source !== nodeId && edge.target !== nodeId,
+            (edge) => edge.source !== nodeId && edge.target !== nodeId
           ),
           settings: prev.configuration.settings || {
             autoStart: false,
@@ -1061,7 +951,7 @@ const PipelineEditorContent = () => {
         },
       }));
     },
-    [setNodes, setEdges],
+    [setNodes, setEdges]
   );
 
   const onConfigureNode = useCallback(
@@ -1072,7 +962,7 @@ const PipelineEditorContent = () => {
         setIsNodeConfigOpen(true);
       }
     },
-    [nodes],
+    [nodes]
   );
 
   const onRotateNode = useCallback(
@@ -1080,10 +970,8 @@ const PipelineEditorContent = () => {
       // 1. Update the node's rotation
       setNodes((nds) =>
         nds.map((node) =>
-          node.id === nodeId
-            ? { ...node, data: { ...node.data, rotation } }
-            : node,
-        ),
+          node.id === nodeId ? { ...node, data: { ...node.data, rotation } } : node
+        )
       );
 
       // 2. Tell React Flow to recalc all the edge handles for this node
@@ -1094,32 +982,25 @@ const PipelineEditorContent = () => {
         ...prev,
         configuration: {
           ...prev.configuration,
-          nodes: prev.configuration.nodes.map((n) =>
-            n.id === nodeId ? { ...n, rotation } : n,
-          ),
+          nodes: prev.configuration.nodes.map((n) => (n.id === nodeId ? { ...n, rotation } : n)),
         },
       }));
     },
-    [setNodes, setFormData, updateNodeInternals],
+    [setNodes, setFormData, updateNodeInternals]
   );
 
   // Debug pipeline object
   React.useEffect(() => {
     if (pipeline) {
       console.log("[PipelineEditorPage] Pipeline object:", pipeline);
-      console.log(
-        "[PipelineEditorPage] Pipeline deploymentStatus:",
-        pipeline.deploymentStatus,
-      );
+      console.log("[PipelineEditorPage] Pipeline deploymentStatus:", pipeline.deploymentStatus);
     }
   }, [pipeline]);
 
   // State for integration validation
   const [validationDialogOpen, setValidationDialogOpen] = useState(false);
   const [invalidNodes, setInvalidNodes] = useState<InvalidNodeInfo[]>([]);
-  const [availableIntegrations, setAvailableIntegrations] = useState<
-    Integration[]
-  >([]);
+  const [availableIntegrations, setAvailableIntegrations] = useState<Integration[]>([]);
   const [importedFlowData, setImportedFlowData] = useState<any>(null);
   const [isImporting, setIsImporting] = useState(false);
 
@@ -1138,30 +1019,19 @@ const PipelineEditorContent = () => {
             ...prev,
             name: state.pipelineName,
             // Ensure active property is set from imported flow or default to true
-            active:
-              state.importedFlow.active !== undefined
-                ? state.importedFlow.active
-                : true,
+            active: state.importedFlow.active !== undefined ? state.importedFlow.active : true,
           }));
         } else {
           // If no pipeline name, still set the active property
           setFormData((prev) => ({
             ...prev,
-            active:
-              state.importedFlow.active !== undefined
-                ? state.importedFlow.active
-                : true,
+            active: state.importedFlow.active !== undefined ? state.importedFlow.active : true,
           }));
         }
-        console.log(
-          "[PipelineEditorPage] Initializing from imported flow:",
-          state.importedFlow,
-        );
+        console.log("[PipelineEditorPage] Initializing from imported flow:", state.importedFlow);
 
         // Set importing state based on the flag from navigation state or default to true
-        setIsImporting(
-          state.showImporting !== undefined ? state.showImporting : true,
-        );
+        setIsImporting(state.showImporting !== undefined ? state.showImporting : true);
 
         try {
           // Check if nodes and edges are under a configuration property
@@ -1171,9 +1041,7 @@ const PipelineEditorContent = () => {
             importedFlow.configuration.nodes &&
             importedFlow.configuration.edges
           ) {
-            console.log(
-              "[PipelineEditorPage] Found nodes and edges under configuration property",
-            );
+            console.log("[PipelineEditorPage] Found nodes and edges under configuration property");
             // Move nodes and edges to the top level
             importedFlow.nodes = importedFlow.configuration.nodes;
             importedFlow.edges = importedFlow.configuration.edges;
@@ -1217,9 +1085,7 @@ const PipelineEditorContent = () => {
                 nodeId: node.data.nodeId || node.data.id,
                 // Fix icon if needed
                 icon:
-                  node.data.icon &&
-                  typeof node.data.icon === "object" &&
-                  node.data.icon.props
+                  node.data.icon && typeof node.data.icon === "object" && node.data.icon.props
                     ? getNodeIcon(node.data.type)
                     : node.data.icon,
               };
@@ -1240,14 +1106,10 @@ const PipelineEditorContent = () => {
             try {
               console.log("[PipelineEditorPage] Validating integration IDs...");
               const validationResult =
-                await IntegrationValidationService.validateIntegrationIds(
-                  fixedNodes,
-                );
+                await IntegrationValidationService.validateIntegrationIds(fixedNodes);
 
               if (validationResult.isValid) {
-                console.log(
-                  "[PipelineEditorPage] All integration IDs are valid",
-                );
+                console.log("[PipelineEditorPage] All integration IDs are valid");
                 // All integration IDs are valid, proceed with import
                 // Update ID counter to avoid conflicts with existing nodes
                 updateIdCounter(fixedNodes);
@@ -1277,19 +1139,17 @@ const PipelineEditorContent = () => {
               } else {
                 console.log(
                   "[PipelineEditorPage] Invalid integration IDs found:",
-                  validationResult.invalidNodes,
+                  validationResult.invalidNodes
                 );
                 // Some integration IDs are invalid, show validation dialog
                 setInvalidNodes(validationResult.invalidNodes);
-                setAvailableIntegrations(
-                  validationResult.availableIntegrations,
-                );
+                setAvailableIntegrations(validationResult.availableIntegrations);
                 setValidationDialogOpen(true);
               }
             } catch (validationError) {
               console.error(
                 "[PipelineEditorPage] Error validating integration IDs:",
-                validationError,
+                validationError
               );
               // Proceed with import without validation
               // Update ID counter to avoid conflicts with existing nodes
@@ -1320,10 +1180,7 @@ const PipelineEditorContent = () => {
             }
           }
         } catch (error) {
-          console.error(
-            "[PipelineEditorPage] Error initializing from imported flow:",
-            error,
-          );
+          console.error("[PipelineEditorPage] Error initializing from imported flow:", error);
         } finally {
           setIsImporting(false);
         }
@@ -1337,18 +1194,14 @@ const PipelineEditorContent = () => {
   const handleValidationConfirm = async (mappings: IntegrationMapping[]) => {
     if (importedFlowData) {
       setIsImporting(true);
-      console.log(
-        "[PipelineEditorPage] Applying integration mappings:",
-        mappings,
-      );
+      console.log("[PipelineEditorPage] Applying integration mappings:", mappings);
 
       try {
         // Update nodes with new integration IDs
-        const updatedPipelineNodes =
-          IntegrationValidationService.mapInvalidIntegrationIds(
-            importedFlowData.nodes,
-            mappings,
-          );
+        const updatedPipelineNodes = IntegrationValidationService.mapInvalidIntegrationIds(
+          importedFlowData.nodes,
+          mappings
+        );
 
         // Convert PipelineNode[] to Node[] for ReactFlow
         const updatedReactFlowNodes = updatedPipelineNodes.map((node: any) => ({
@@ -1357,21 +1210,13 @@ const PipelineEditorContent = () => {
             ...node.data,
             // Fix the icon property to ensure it's properly rendered
             icon:
-              node.data.icon &&
-              typeof node.data.icon === "object" &&
-              node.data.icon.props
+              node.data.icon && typeof node.data.icon === "object" && node.data.icon.props
                 ? getNodeIcon(node.data.type)
                 : node.data.icon,
           },
           position: {
-            x:
-              typeof node.position.x === "string"
-                ? parseFloat(node.position.x)
-                : node.position.x,
-            y:
-              typeof node.position.y === "string"
-                ? parseFloat(node.position.y)
-                : node.position.y,
+            x: typeof node.position.x === "string" ? parseFloat(node.position.x) : node.position.x,
+            y: typeof node.position.y === "string" ? parseFloat(node.position.y) : node.position.y,
           },
           // Convert other string numbers to actual numbers if needed
           ...(node.positionAbsolute && {
@@ -1405,10 +1250,7 @@ const PipelineEditorContent = () => {
           },
         }));
       } catch (error) {
-        console.error(
-          "[PipelineEditorPage] Error applying integration mappings:",
-          error,
-        );
+        console.error("[PipelineEditorPage] Error applying integration mappings:", error);
       } finally {
         // Close the dialog
         setValidationDialogOpen(false);
@@ -1425,19 +1267,11 @@ const PipelineEditorContent = () => {
       pipeline.configuration.nodes.length > 0 &&
       !pipelineInitialized.current
     ) {
-      console.log(
-        "[PipelineEditorPage] Initializing ReactFlow from pipeline configuration",
-      );
+      console.log("[PipelineEditorPage] Initializing ReactFlow from pipeline configuration");
       // Update ID counter to avoid conflicts with existing nodes
       updateIdCounter(pipeline.configuration.nodes);
-      console.log(
-        "[PipelineEditorPage] Configuration nodes:",
-        pipeline.configuration.nodes,
-      );
-      console.log(
-        "[PipelineEditorPage] Configuration edges:",
-        pipeline.configuration.edges,
-      );
+      console.log("[PipelineEditorPage] Configuration nodes:", pipeline.configuration.nodes);
+      console.log("[PipelineEditorPage] Configuration edges:", pipeline.configuration.edges);
 
       // Convert configuration nodes to ReactFlow nodes
       const reactFlowNodes = pipeline.configuration.nodes.map((node) => {
@@ -1449,14 +1283,8 @@ const PipelineEditorContent = () => {
           id: node.id,
           type: node.type || "custom",
           position: {
-            x:
-              typeof node.position.x === "string"
-                ? parseFloat(node.position.x)
-                : node.position.x,
-            y:
-              typeof node.position.y === "string"
-                ? parseFloat(node.position.y)
-                : node.position.y,
+            x: typeof node.position.x === "string" ? parseFloat(node.position.x) : node.position.x,
+            y: typeof node.position.y === "string" ? parseFloat(node.position.y) : node.position.y,
           },
           data: {
             nodeId: node.data.id,
@@ -1473,14 +1301,8 @@ const PipelineEditorContent = () => {
             rotation: (node.data as any).rotation || 0,
           },
           // Preserve width and height
-          width:
-            typeof node.width === "string"
-              ? parseFloat(node.width)
-              : node.width,
-          height:
-            typeof node.height === "string"
-              ? parseFloat(node.height)
-              : node.height,
+          width: typeof node.width === "string" ? parseFloat(node.width) : node.width,
+          height: typeof node.height === "string" ? parseFloat(node.height) : node.height,
           // Preserve positionAbsolute if it exists
           ...(node.positionAbsolute && {
             positionAbsolute: {
@@ -1506,10 +1328,7 @@ const PipelineEditorContent = () => {
       setNodes(reactFlowNodes);
 
       // Convert configuration edges to ReactFlow edges
-      if (
-        pipeline.configuration.edges &&
-        pipeline.configuration.edges.length > 0
-      ) {
+      if (pipeline.configuration.edges && pipeline.configuration.edges.length > 0) {
         const reactFlowEdges = pipeline.configuration.edges.map((edge) => {
           console.log("[PipelineEditorPage] Processing edge:", edge);
 
@@ -1551,14 +1370,7 @@ const PipelineEditorContent = () => {
       pipelineInitialized.current = true;
       console.log("[PipelineEditorPage] Pipeline initialized");
     }
-  }, [
-    pipeline,
-    onDeleteNode,
-    onConfigureNode,
-    onRotateNode,
-    setNodes,
-    setEdges,
-  ]);
+  }, [pipeline, onDeleteNode, onConfigureNode, onRotateNode, setNodes, setEdges]);
 
   // Update existing nodes with handlers
   React.useEffect(() => {
@@ -1571,7 +1383,7 @@ const PipelineEditorContent = () => {
           onConfigure: onConfigureNode,
           onRotate: onRotateNode,
         },
-      })),
+      }))
     );
   }, [onDeleteNode, onConfigureNode, onRotateNode, setNodes]);
 
@@ -1619,7 +1431,7 @@ const PipelineEditorContent = () => {
         };
       });
     },
-    [setEdges],
+    [setEdges]
   );
 
   // Handle edge reconnection end - delete edge if reconnection failed
@@ -1642,7 +1454,7 @@ const PipelineEditorContent = () => {
       // Reset the flag
       edgeReconnectSuccessful.current = true;
     },
-    [setEdges],
+    [setEdges]
   );
 
   const onConnect = useCallback(
@@ -1703,7 +1515,7 @@ const PipelineEditorContent = () => {
         },
       }));
     },
-    [nodes, setEdges],
+    [nodes, setEdges]
   );
 
   const onDrop = useCallback(
@@ -1712,9 +1524,7 @@ const PipelineEditorContent = () => {
 
       if (!reactFlowWrapper.current) return;
 
-      const nodeData = JSON.parse(
-        event.dataTransfer.getData("application/reactflow"),
-      );
+      const nodeData = JSON.parse(event.dataTransfer.getData("application/reactflow"));
       console.log(nodeData);
       if (typeof nodeData === "undefined" || !nodeData) {
         return;
@@ -1795,7 +1605,7 @@ const PipelineEditorContent = () => {
       } else {
         // No configuration needed—skip opening the dialog
         console.log(
-          "Node has no configuration parameters and is not an integration node; skipping config dialog.",
+          "Node has no configuration parameters and is not an integration node; skipping config dialog."
         );
       }
 
@@ -1819,13 +1629,7 @@ const PipelineEditorContent = () => {
       // setSelectedNode(nodeWithHandlers);
       // setIsNodeConfigOpen(true);
     },
-    [
-      screenToFlowPosition,
-      setNodes,
-      onDeleteNode,
-      onConfigureNode,
-      onRotateNode,
-    ],
+    [screenToFlowPosition, setNodes, onDeleteNode, onConfigureNode, onRotateNode]
   );
 
   const handleNodeConfigClose = useCallback(() => {
@@ -1835,27 +1639,14 @@ const PipelineEditorContent = () => {
 
   const handleNodeConfigSave = useCallback(
     async (configuration: any) => {
-      console.log(
-        "[PipelineEditorPage] handleNodeConfigSave called with:",
-        configuration,
-      );
-      console.log(
-        "[PipelineEditorPage] Configuration JSON:",
-        JSON.stringify(configuration),
-      );
-      console.log(
-        "[PipelineEditorPage] Configuration parameters:",
-        configuration.parameters,
-      );
+      console.log("[PipelineEditorPage] handleNodeConfigSave called with:", configuration);
+      console.log("[PipelineEditorPage] Configuration JSON:", JSON.stringify(configuration));
+      console.log("[PipelineEditorPage] Configuration parameters:", configuration.parameters);
 
       // Debug: Check if we're receiving label instead of value for select fields
       if (configuration.parameters) {
         Object.entries(configuration.parameters).forEach(([key, value]) => {
-          console.log(
-            `[PipelineEditorPage] Parameter ${key}:`,
-            value,
-            typeof value,
-          );
+          console.log(`[PipelineEditorPage] Parameter ${key}:`, value, typeof value);
         });
       }
       try {
@@ -1871,10 +1662,7 @@ const PipelineEditorContent = () => {
               label: configuration.method
                 ? (() => {
                     // Remove any existing method suffix (pattern: "(methodname)")
-                    const baseLabel = selectedNode.data.label.replace(
-                      /\s*\([^)]+\)\s*$/,
-                      "",
-                    );
+                    const baseLabel = selectedNode.data.label.replace(/\s*\([^)]+\)\s*$/, "");
                     return `${baseLabel} (${configuration.method})`;
                   })()
                 : selectedNode.data.label,
@@ -1884,14 +1672,14 @@ const PipelineEditorContent = () => {
           console.log("[PipelineEditorPage] Updated node:", updatedNode);
           console.log(
             "[PipelineEditorPage] Updated node configuration:",
-            updatedNode.data.configuration,
+            updatedNode.data.configuration
           );
 
           // Update ReactFlow state
           setNodes((nds) => {
             console.log("[PipelineEditorPage] Current nodes:", nds);
             const updatedNodes = nds.map((node) =>
-              node.id === selectedNode.id ? updatedNode : node,
+              node.id === selectedNode.id ? updatedNode : node
             );
             console.log("[PipelineEditorPage] Updated nodes:", updatedNodes);
             return updatedNodes;
@@ -1900,25 +1688,16 @@ const PipelineEditorContent = () => {
 
           // Convert to pipeline node format and update form data
           const updatedPipelineNode = convertToPipelineNode(updatedNode);
-          console.log(
-            "[PipelineEditorPage] Updated pipeline node:",
-            updatedPipelineNode,
-          );
-          console.log(
-            "[PipelineEditorPage] Updated pipeline node data:",
-            updatedPipelineNode.data,
-          );
+          console.log("[PipelineEditorPage] Updated pipeline node:", updatedPipelineNode);
+          console.log("[PipelineEditorPage] Updated pipeline node data:", updatedPipelineNode.data);
 
           // Update pipeline configuration in form data
           setFormData((prev) => {
             console.log("[PipelineEditorPage] Previous form data:", prev);
             const updatedNodes = prev.configuration.nodes.map((node) =>
-              node.id === selectedNode.id ? updatedPipelineNode : node,
+              node.id === selectedNode.id ? updatedPipelineNode : node
             );
-            console.log(
-              "[PipelineEditorPage] Updated nodes in form data:",
-              updatedNodes,
-            );
+            console.log("[PipelineEditorPage] Updated nodes in form data:", updatedNodes);
 
             const newFormData = {
               ...prev,
@@ -1942,14 +1721,11 @@ const PipelineEditorContent = () => {
         console.log("[PipelineEditorPage] Closing node config dialog");
         handleNodeConfigClose();
       } catch (error) {
-        console.error(
-          "[PipelineEditorPage] Error saving node configuration:",
-          error,
-        );
+        console.error("[PipelineEditorPage] Error saving node configuration:", error);
         // Don't close the dialog on error so the user can try again
       }
     },
-    [selectedNode, setNodes, handleNodeConfigClose],
+    [selectedNode, setNodes, handleNodeConfigClose]
   );
 
   // Function to get the appropriate icon based on node type
@@ -2003,9 +1779,7 @@ const PipelineEditorContent = () => {
         onSave={handleSave}
         isLoading={createPipeline.isPending || updatePipeline.isPending}
         pipelineName={formData.name}
-        onPipelineNameChange={(value) =>
-          setFormData((prev) => ({ ...prev, name: value }))
-        }
+        onPipelineNameChange={(value) => setFormData((prev) => ({ ...prev, name: value }))}
         reactFlowInstance={reactFlowInstance}
         setNodes={setNodes}
         setEdges={setEdges}
@@ -2016,9 +1790,7 @@ const PipelineEditorContent = () => {
         hasChanges={hasChanges}
         updateFormData={(importedNodes, importedEdges) => {
           // Convert imported React Flow nodes to pipeline nodes
-          const pipelineNodes = importedNodes.map((node) =>
-            convertToPipelineNode(node),
-          );
+          const pipelineNodes = importedNodes.map((node) => convertToPipelineNode(node));
 
           // Convert imported React Flow edges to pipeline edges
           const pipelineEdges = importedEdges.map((edge) => ({
@@ -2057,20 +1829,10 @@ const PipelineEditorContent = () => {
               },
             },
           }));
-          console.log(
-            "[PipelineEditorPage] Updated formData with imported pipeline",
-          );
-          console.log(
-            "[PipelineEditorPage] Imported nodes:",
-            pipelineNodes.length,
-          );
-          console.log(
-            "[PipelineEditorPage] Imported edges:",
-            pipelineEdges.length,
-          );
-          console.log(
-            "[PipelineEditorPage] Updated formData with imported pipeline",
-          );
+          console.log("[PipelineEditorPage] Updated formData with imported pipeline");
+          console.log("[PipelineEditorPage] Imported nodes:", pipelineNodes.length);
+          console.log("[PipelineEditorPage] Imported edges:", pipelineEdges.length);
+          console.log("[PipelineEditorPage] Updated formData with imported pipeline");
         }}
         onDelete={
           pipelineId && pipelineId !== "new"
@@ -2276,9 +2038,7 @@ const PipelineEditorContent = () => {
                 // Show success message
                 setApiStatusModalState("success");
                 setApiStatusModalAction("Pipeline Deleted");
-                setApiStatusModalMessage(
-                  "The pipeline has been deleted successfully.",
-                );
+                setApiStatusModalMessage("The pipeline has been deleted successfully.");
 
                 // Invalidate the pipelines list query to force a refresh
                 queryClient.invalidateQueries({
@@ -2295,15 +2055,12 @@ const PipelineEditorContent = () => {
                 setApiStatusModalState("error");
                 setApiStatusModalAction("Delete Failed");
                 setApiStatusModalMessage(
-                  error.message ||
-                    "An error occurred while deleting the pipeline.",
+                  error.message || "An error occurred while deleting the pipeline."
                 );
               });
           });
         }}
-        onUserInputChange={(input) =>
-          setDeleteDialog((prev) => ({ ...prev, userInput: input }))
-        }
+        onUserInputChange={(input) => setDeleteDialog((prev) => ({ ...prev, userInput: input }))}
         isDeleting={false}
       />
 

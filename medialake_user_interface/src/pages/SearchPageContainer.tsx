@@ -26,10 +26,10 @@ const SearchPageContainer: React.FC = () => {
   const locationState = location.state as LocationState;
 
   // Add to Collection state
-  const [addToCollectionModalOpen, setAddToCollectionModalOpen] =
-    useState(false);
-  const [selectedAssetForCollection, setSelectedAssetForCollection] =
-    useState<AssetItem | null>(null);
+  const [addToCollectionModalOpen, setAddToCollectionModalOpen] = useState(false);
+  const [selectedAssetForCollection, setSelectedAssetForCollection] = useState<AssetItem | null>(
+    null
+  );
   const addItemToCollectionMutation = useAddItemToCollection();
 
   // Initialize search state with URL sync
@@ -46,8 +46,7 @@ const SearchPageContainer: React.FC = () => {
   const filters = useSearchFilters();
 
   // Confidence threshold state for semantic search
-  const [confidenceThreshold, setConfidenceThreshold] =
-    React.useState<number>(0.57);
+  const [confidenceThreshold, setConfidenceThreshold] = React.useState<number>(0.57);
 
   // Actions
   const { updateFilter } = useDomainActions();
@@ -76,11 +75,7 @@ const SearchPageContainer: React.FC = () => {
     error: searchError,
   } = useSearch(query, legacyParams);
 
-  const {
-    data: fieldsData,
-    isLoading: isFieldsLoading,
-    error: fieldsError,
-  } = useSearchFields();
+  const { data: fieldsData, isLoading: isFieldsLoading, error: fieldsError } = useSearchFields();
 
   // Sync loading state
   useEffect(() => {
@@ -108,31 +103,18 @@ const SearchPageContainer: React.FC = () => {
   // Asset accessors for hooks
   const getAssetId = (asset: AssetItem) => asset.InventoryID;
   const getAssetName = (asset: AssetItem) =>
-    asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-      .ObjectKey.Name;
+    asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name;
   const getAssetType = (asset: AssetItem) => asset.DigitalSourceAsset.Type;
   const getAssetThumbnail = (asset: AssetItem) => asset.thumbnailUrl || "";
 
   // View preferences
   const viewPreferences = useViewPreferences({
-    initialViewMode: locationState?.preserveSearch
-      ? locationState.viewMode
-      : "card",
-    initialCardSize: locationState?.preserveSearch
-      ? locationState.cardSize
-      : "medium",
-    initialAspectRatio: locationState?.preserveSearch
-      ? locationState.aspectRatio
-      : "square",
-    initialThumbnailScale: locationState?.preserveSearch
-      ? locationState.thumbnailScale
-      : "fit",
-    initialShowMetadata: locationState?.preserveSearch
-      ? locationState.showMetadata
-      : true,
-    initialGroupByType: locationState?.preserveSearch
-      ? locationState.groupByType
-      : false,
+    initialViewMode: locationState?.preserveSearch ? locationState.viewMode : "card",
+    initialCardSize: locationState?.preserveSearch ? locationState.cardSize : "medium",
+    initialAspectRatio: locationState?.preserveSearch ? locationState.aspectRatio : "square",
+    initialThumbnailScale: locationState?.preserveSearch ? locationState.thumbnailScale : "fit",
+    initialShowMetadata: locationState?.preserveSearch ? locationState.showMetadata : true,
+    initialGroupByType: locationState?.preserveSearch ? locationState.groupByType : false,
   });
 
   // Asset selection
@@ -193,10 +175,7 @@ const SearchPageContainer: React.FC = () => {
         } else {
           currentTypes.push(actualType);
         }
-        updateFilter(
-          "type",
-          currentTypes.length > 0 ? currentTypes.join(",") : undefined,
-        );
+        updateFilter("type", currentTypes.length > 0 ? currentTypes.join(",") : undefined);
       }
     }
   };
@@ -206,9 +185,7 @@ const SearchPageContainer: React.FC = () => {
 
   const handleFieldsChange = (event: any) => {
     const newFields =
-      typeof event.target.value === "string"
-        ? event.target.value.split(",")
-        : event.target.value;
+      typeof event.target.value === "string" ? event.target.value.split(",") : event.target.value;
 
     // Future implementation: use newFields with field actions in the store
     console.log("Fields changed:", newFields);
@@ -222,7 +199,7 @@ const SearchPageContainer: React.FC = () => {
       setSelectedAssetForCollection(asset);
       setAddToCollectionModalOpen(true);
     },
-    [],
+    []
   );
 
   // Handle actually adding the asset to a collection
@@ -255,18 +232,12 @@ const SearchPageContainer: React.FC = () => {
         collectionId,
         data: {
           assetId: assetId,
-          clipBoundary:
-            Object.keys(clipBoundary).length > 0 ? clipBoundary : undefined,
+          clipBoundary: Object.keys(clipBoundary).length > 0 ? clipBoundary : undefined,
           addAllClips: addAllClips,
         },
       });
     },
-    [
-      selectedAssetForCollection,
-      addItemToCollectionMutation,
-      semantic,
-      semanticMode,
-    ],
+    [selectedAssetForCollection, addItemToCollectionMutation, semantic, semanticMode]
   );
 
   return (
@@ -318,8 +289,8 @@ const SearchPageContainer: React.FC = () => {
           }}
           assetId={getOriginalAssetId(selectedAssetForCollection)}
           assetName={
-            selectedAssetForCollection.DigitalSourceAsset.MainRepresentation
-              .StorageInfo.PrimaryLocation.ObjectKey.Name
+            selectedAssetForCollection.DigitalSourceAsset.MainRepresentation.StorageInfo
+              .PrimaryLocation.ObjectKey.Name
           }
           assetType={selectedAssetForCollection.DigitalSourceAsset.Type}
           onAddToCollection={handleAddToCollection}

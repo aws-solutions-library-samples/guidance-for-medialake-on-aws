@@ -15,9 +15,7 @@ const ThemeContext = createContext<ThemeContextType>({
   setMode: () => {},
 });
 
-export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
+export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [mode, setMode] = useState<ThemeMode>(() => {
     const savedMode = localStorage.getItem("theme-mode");
     return (savedMode as ThemeMode) || "system";

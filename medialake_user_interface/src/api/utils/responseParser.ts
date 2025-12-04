@@ -1,10 +1,6 @@
 // Response parser utilities for API responses
 // Compatible with React Query and existing apiClient (Axios responses)
-import {
-  ApiKey,
-  ApiKeyListResponse,
-  ApiKeyResponse,
-} from "../types/apiKey.types";
+import { ApiKey, ApiKeyListResponse, ApiKeyResponse } from "../types/apiKey.types";
 
 export const isValidApiKey = (apiKey: any): apiKey is ApiKey => {
   return (
@@ -29,17 +25,11 @@ export const isStringBody = (data: any): data is { body: string } => {
   return data && typeof data.body === "string";
 };
 
-export const isNestedBodyData = (
-  data: any,
-): data is { body: { data: any } } => {
-  return (
-    data?.body && typeof data.body === "object" && data.body.data !== undefined
-  );
+export const isNestedBodyData = (data: any): data is { body: { data: any } } => {
+  return data?.body && typeof data.body === "object" && data.body.data !== undefined;
 };
 
-export const isDirectData = (
-  data: any,
-): data is { status: string; data: any } => {
+export const isDirectData = (data: any): data is { status: string; data: any } => {
   return data?.status && data?.data !== undefined;
 };
 
@@ -51,9 +41,7 @@ export const parseApiKeysList = (axiosResponseData: any): ApiKey[] => {
   try {
     // Handle string body format (older API format)
     if (isStringBody(axiosResponseData)) {
-      const parsedBody = JSON.parse(
-        axiosResponseData.body,
-      ) as ApiKeyListResponse;
+      const parsedBody = JSON.parse(axiosResponseData.body) as ApiKeyListResponse;
       if (parsedBody?.data?.apiKeys && Array.isArray(parsedBody.data.apiKeys)) {
         return parsedBody.data.apiKeys.filter(isValidApiKey);
       }
@@ -75,10 +63,7 @@ export const parseApiKeysList = (axiosResponseData: any): ApiKey[] => {
       }
     }
 
-    console.warn(
-      "Unexpected API response structure for API keys list:",
-      axiosResponseData,
-    );
+    console.warn("Unexpected API response structure for API keys list:", axiosResponseData);
     return [];
   } catch (error) {
     console.error("Failed to parse API keys list response:", error);
@@ -154,9 +139,7 @@ export const parseStringBodyResponse = <T>(axiosResponseData: any): T => {
  */
 export const handleApiKeysError = (error: any): ApiKey[] => {
   if (error?.response?.status === 403) {
-    console.log(
-      "API keys API returned 403 Forbidden - User likely does not have permission",
-    );
+    console.log("API keys API returned 403 Forbidden - User likely does not have permission");
     return [];
   }
   // Re-throw other errors to maintain existing error handling

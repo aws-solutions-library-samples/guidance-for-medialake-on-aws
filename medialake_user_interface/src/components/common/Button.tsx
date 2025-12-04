@@ -1,9 +1,5 @@
 import React from "react";
-import {
-  Button as MuiButton,
-  ButtonProps as MuiButtonProps,
-  styled,
-} from "@mui/material";
+import { Button as MuiButton, ButtonProps as MuiButtonProps, styled } from "@mui/material";
 
 export interface ButtonProps extends Omit<MuiButtonProps, "size"> {
   startIcon?: React.ReactNode;

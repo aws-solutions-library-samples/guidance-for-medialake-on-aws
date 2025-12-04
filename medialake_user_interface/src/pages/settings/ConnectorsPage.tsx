@@ -11,17 +11,12 @@ import {
   useCreateS3Connector,
   useSyncConnector,
 } from "@/api/hooks/useConnectors";
-import {
-  ConnectorResponse,
-  CreateConnectorRequest,
-} from "@/api/types/api.types";
+import { ConnectorResponse, CreateConnectorRequest } from "@/api/types/api.types";
 import queryClient from "@/api/queryClient";
 
 const ConnectorsPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingConnector, setEditingConnector] = useState<
-    ConnectorResponse | undefined
-  >();
+  const [editingConnector, setEditingConnector] = useState<ConnectorResponse | undefined>();
   const [alert, setAlert] = useState<{
     message: string;
     severity: "success" | "error";
@@ -37,14 +32,11 @@ const ConnectorsPage: React.FC = () => {
   const { mutateAsync: deleteConnector } = useDeleteConnector();
   const { mutateAsync: toggleConnector } = useToggleConnector();
   const { mutateAsync: syncConnector } = useSyncConnector();
-  const { mutateAsync: createS3Connector, isPending: isCreatingConnector } =
-    useCreateS3Connector();
+  const { mutateAsync: createS3Connector, isPending: isCreatingConnector } = useCreateS3Connector();
 
   // Safely pull out the connectors array
   const rawConnectors = connectorsResponse?.data?.connectors;
-  const connectors = Array.isArray(rawConnectors)
-    ? rawConnectors.filter(Boolean)
-    : [];
+  const connectors = Array.isArray(rawConnectors) ? rawConnectors.filter(Boolean) : [];
 
   const handleAddClick = () => {
     setEditingConnector(undefined);
@@ -105,9 +97,7 @@ const ConnectorsPage: React.FC = () => {
     }
   };
 
-  const handleSave = async (
-    connectorData: CreateConnectorRequest,
-  ): Promise<void> => {
+  const handleSave = async (connectorData: CreateConnectorRequest): Promise<void> => {
     try {
       if (connectorData.type === "s3") {
         const response = await createS3Connector(connectorData);
@@ -150,18 +140,12 @@ const ConnectorsPage: React.FC = () => {
   };
 
   return (
-    <Box
-      sx={{ p: 3, height: "100%", display: "flex", flexDirection: "column" }}
-    >
+    <Box sx={{ p: 3, height: "100%", display: "flex", flexDirection: "column" }}>
       <PageHeader
         title="Connectors"
         description="Manage storage connectors for your media assets"
         action={
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={handleAddClick}
-          >
+          <Button variant="contained" startIcon={<AddIcon />} onClick={handleAddClick}>
             Add Connector
           </Button>
         }
@@ -211,11 +195,7 @@ const ConnectorsPage: React.FC = () => {
         onClose={handleAlertClose}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
       >
-        <Alert
-          onClose={handleAlertClose}
-          severity={alert?.severity}
-          sx={{ width: "100%" }}
-        >
+        <Alert onClose={handleAlertClose} severity={alert?.severity} sx={{ width: "100%" }}>
           {alert?.message}
         </Alert>
       </Snackbar>

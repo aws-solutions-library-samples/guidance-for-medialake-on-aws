@@ -88,11 +88,8 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
   onSelectAllToggle,
 }) => {
   const [sortAnchor, setSortAnchor] = React.useState<null | HTMLElement>(null);
-  const [fieldsAnchor, setFieldsAnchor] = React.useState<null | HTMLElement>(
-    null,
-  );
-  const [appearanceAnchor, setAppearanceAnchor] =
-    React.useState<null | HTMLElement>(null);
+  const [fieldsAnchor, setFieldsAnchor] = React.useState<null | HTMLElement>(null);
+  const [appearanceAnchor, setAppearanceAnchor] = React.useState<null | HTMLElement>(null);
 
   const handleSortClose = () => setSortAnchor(null);
   const handleFieldsClose = () => setFieldsAnchor(null);
@@ -114,21 +111,15 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
     // Legacy nested fields (for backward compatibility)
     "DigitalSourceAsset.Type": "type",
     "DigitalSourceAsset.MainRepresentation.Format": "format",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate":
-      "date",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate":
-      "date",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate": "date",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate": "date",
     "DigitalSourceAsset.CreateDate": "date",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name":
-      "name",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size":
-      "size",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize":
-      "size",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name": "name",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size": "size",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize": "size",
     "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath":
       "fullPath",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket":
-      "bucket",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket": "bucket",
     "Metadata.Consolidated": "metadata",
     InventoryID: "id",
   };
@@ -151,33 +142,26 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
     return sortOptions.filter((option) => {
       // Special case for name field
       if (option.id === "name") {
-        return selectedFields.some(
-          (field) => field.includes("Name") || field === "objectName",
-        );
+        return selectedFields.some((field) => field.includes("Name") || field === "objectName");
       }
 
       // Special case for date field
       if (option.id === "date") {
         return selectedFields.some(
-          (field) => field.includes("CreateDate") || field === "createdAt",
+          (field) => field.includes("CreateDate") || field === "createdAt"
         );
       }
 
       // Special case for size field
       if (option.id === "size") {
         return selectedFields.some(
-          (field) =>
-            field.includes("FileSize") ||
-            field.includes("Size") ||
-            field === "fileSize",
+          (field) => field.includes("FileSize") || field.includes("Size") || field === "fileSize"
         );
       }
 
       // For other fields, check if any of their mapped API field IDs are in the selectedSearchFields
       const apiFieldIds = reverseFieldMapping[option.id] || [];
-      return apiFieldIds.some((apiFieldId) =>
-        selectedFields.includes(apiFieldId),
-      );
+      return apiFieldIds.some((apiFieldId) => selectedFields.includes(apiFieldId));
     });
   }, [sortOptions, selectedFields, reverseFieldMapping]);
 
@@ -191,12 +175,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
       }}
     >
       <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-        <ToggleButtonGroup
-          value={viewMode}
-          exclusive
-          onChange={onViewModeChange}
-          size="small"
-        >
+        <ToggleButtonGroup value={viewMode} exclusive onChange={onViewModeChange} size="small">
           <Tooltip title="Card view">
             <ToggleButton value="card">
               <ViewModuleIcon />
@@ -369,9 +348,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                         onChange={(e) => {
                           const newSelectedFields = e.target.checked
                             ? [...selectedFields, field.name]
-                            : selectedFields.filter(
-                                (name) => name !== field.name,
-                              );
+                            : selectedFields.filter((name) => name !== field.name);
 
                           onFieldsChange({
                             target: { value: newSelectedFields },
@@ -442,11 +419,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
           {viewMode === "card" && (
             <>
               <Box sx={{ mb: 2 }}>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ mb: 1 }}
-                >
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                   Card Size
                 </Typography>
                 <Box sx={{ display: "flex", gap: 1 }}>
@@ -484,11 +457,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
               </Box>
 
               <Box sx={{ mb: 2 }}>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ mb: 1 }}
-                >
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                   Aspect Ratio
                 </Typography>
                 <Box sx={{ display: "flex", gap: 1 }}>
@@ -526,11 +495,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
               </Box>
 
               <Box sx={{ mb: 2 }}>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ mb: 1 }}
-                >
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                   Thumbnail Scale
                 </Typography>
                 <Box sx={{ display: "flex", gap: 1 }}>

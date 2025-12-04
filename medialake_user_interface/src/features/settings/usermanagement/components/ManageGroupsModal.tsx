@@ -28,11 +28,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import CloseIcon from "@mui/icons-material/Close";
 import { useTranslation } from "react-i18next";
-import {
-  useGetGroups,
-  useUpdateGroup,
-  useDeleteGroup,
-} from "@/api/hooks/useGroups";
+import { useGetGroups, useUpdateGroup, useDeleteGroup } from "@/api/hooks/useGroups";
 import { useGetPermissionSets } from "@/api/hooks/usePermissionSets";
 import {
   useListGroupAssignments,
@@ -52,10 +48,7 @@ interface EditGroupFormData {
   department: string;
 }
 
-const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({
-  open,
-  onClose,
-}) => {
+const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({ open, onClose }) => {
   const { t } = useTranslation();
   const [selectedTab, setSelectedTab] = useState(0);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
@@ -65,13 +58,11 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({
     department: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [confirmDeleteGroup, setConfirmDeleteGroup] = useState<Group | null>(
-    null,
+  const [confirmDeleteGroup, setConfirmDeleteGroup] = useState<Group | null>(null);
+  const [permissionSetMenuAnchor, setPermissionSetMenuAnchor] = useState<null | HTMLElement>(null);
+  const [activeGroupForPermissionSet, setActiveGroupForPermissionSet] = useState<string | null>(
+    null
   );
-  const [permissionSetMenuAnchor, setPermissionSetMenuAnchor] =
-    useState<null | HTMLElement>(null);
-  const [activeGroupForPermissionSet, setActiveGroupForPermissionSet] =
-    useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -100,7 +91,7 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({
 
   // Get assignments for the selected group
   const { data: groupAssignments } = useListGroupAssignments(
-    groups && groups.length > 0 ? groups[selectedTab]?.id : "",
+    groups && groups.length > 0 ? groups[selectedTab]?.id : ""
   );
 
   // Reset editing state when modal closes
@@ -235,10 +226,7 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({
     }
   };
 
-  const handleOpenPermissionSetMenu = (
-    event: React.MouseEvent<HTMLElement>,
-    groupId: string,
-  ) => {
+  const handleOpenPermissionSetMenu = (event: React.MouseEvent<HTMLElement>, groupId: string) => {
     setPermissionSetMenuAnchor(event.currentTarget);
     setActiveGroupForPermissionSet(groupId);
   };
@@ -276,10 +264,7 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({
     }
   };
 
-  const handleRemovePermissionSet = async (
-    groupId: string,
-    permissionSetId: string,
-  ) => {
+  const handleRemovePermissionSet = async (groupId: string, permissionSetId: string) => {
     try {
       await removeGroupAssignmentMutation.mutateAsync({
         groupId,
@@ -311,18 +296,13 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({
 
   // Filter out already assigned permission sets
   const availablePermissionSets =
-    permissionSets?.filter((ps) => !assignedPermissionSetIds.includes(ps.id)) ||
-    [];
+    permissionSets?.filter((ps) => !assignedPermissionSetIds.includes(ps.id)) || [];
 
   return (
     <>
       <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
         <DialogTitle>
-          <Box
-            display="flex"
-            justifyContent="space-between"
-            alignItems="center"
-          >
+          <Box display="flex" justifyContent="space-between" alignItems="center">
             <Typography variant="h6" fontWeight={600}>
               {t("groups.actions.manageGroups")}
             </Typography>
@@ -366,11 +346,7 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({
                         {confirmDeleteGroup?.id === group.id ? (
                           <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
                             <CardContent>
-                              <Typography
-                                variant="h6"
-                                color="error"
-                                gutterBottom
-                              >
+                              <Typography variant="h6" color="error" gutterBottom>
                                 {t("groups.messages.confirmDelete")}
                               </Typography>
                               <Typography>
@@ -380,10 +356,7 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({
                               </Typography>
                             </CardContent>
                             <CardActions>
-                              <Button
-                                onClick={handleCancelDelete}
-                                variant="outlined"
-                              >
+                              <Button onClick={handleCancelDelete} variant="outlined">
                                 {t("common.actions.cancel")}
                               </Button>
                               <Button
@@ -438,10 +411,7 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({
                               />
                             </CardContent>
                             <CardActions>
-                              <Button
-                                onClick={handleCancelEdit}
-                                variant="outlined"
-                              >
+                              <Button onClick={handleCancelEdit} variant="outlined">
                                 {t("common.actions.cancel")}
                               </Button>
                               <Button
@@ -470,12 +440,8 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({
                                   <Typography variant="h6" gutterBottom>
                                     {group.name}
                                   </Typography>
-                                  <Typography
-                                    variant="body2"
-                                    color="text.secondary"
-                                  >
-                                    {group.description ||
-                                      t("groups.noDescription")}
+                                  <Typography variant="body2" color="text.secondary">
+                                    {group.description || t("groups.noDescription")}
                                   </Typography>
                                   {group.department && (
                                     <Typography
@@ -483,27 +449,20 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({
                                       color="text.secondary"
                                       sx={{ mt: 0.5 }}
                                     >
-                                      <strong>
-                                        {t("groups.fields.department")}:
-                                      </strong>{" "}
+                                      <strong>{t("groups.fields.department")}:</strong>{" "}
                                       {group.department}
                                     </Typography>
                                   )}
                                 </Box>
                                 <Box>
                                   <Tooltip title={t("common.actions.edit")}>
-                                    <IconButton
-                                      onClick={() => handleEditGroup(group)}
-                                      size="small"
-                                    >
+                                    <IconButton onClick={() => handleEditGroup(group)} size="small">
                                       <EditIcon fontSize="small" />
                                     </IconButton>
                                   </Tooltip>
                                   <Tooltip title={t("common.actions.delete")}>
                                     <IconButton
-                                      onClick={() =>
-                                        handleConfirmDeleteGroup(group)
-                                      }
+                                      onClick={() => handleConfirmDeleteGroup(group)}
                                       size="small"
                                       color="error"
                                     >
@@ -523,14 +482,10 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({
                             alignItems="center"
                             mb={2}
                           >
-                            <Typography variant="h6">
-                              {t("groups.permissionSets")}
-                            </Typography>
+                            <Typography variant="h6">{t("groups.permissionSets")}</Typography>
                             <Button
                               startIcon={<AddIcon />}
-                              onClick={(e) =>
-                                handleOpenPermissionSetMenu(e, group.id)
-                              }
+                              onClick={(e) => handleOpenPermissionSetMenu(e, group.id)}
                               variant="outlined"
                               size="small"
                               disabled={availablePermissionSets.length === 0}
@@ -543,27 +498,17 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({
 
                           {groupAssignments?.assignments &&
                           groupAssignments.assignments.length > 0 ? (
-                            <Stack
-                              direction="row"
-                              spacing={1}
-                              flexWrap="wrap"
-                              useFlexGap
-                            >
-                              {groupAssignments.assignments.map(
-                                (assignment) => (
-                                  <Chip
-                                    key={assignment.permissionSetId}
-                                    label={assignment.permissionSetName}
-                                    onDelete={() =>
-                                      handleRemovePermissionSet(
-                                        group.id,
-                                        assignment.permissionSetId,
-                                      )
-                                    }
-                                    sx={{ mb: 1 }}
-                                  />
-                                ),
-                              )}
+                            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                              {groupAssignments.assignments.map((assignment) => (
+                                <Chip
+                                  key={assignment.permissionSetId}
+                                  label={assignment.permissionSetName}
+                                  onDelete={() =>
+                                    handleRemovePermissionSet(group.id, assignment.permissionSetId)
+                                  }
+                                  sx={{ mb: 1 }}
+                                />
+                              ))}
                             </Stack>
                           ) : (
                             <Typography variant="body2" color="text.secondary">
@@ -582,12 +527,7 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({
               <Typography variant="body1" gutterBottom>
                 {t("groups.noGroups")}
               </Typography>
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={onClose}
-                sx={{ mt: 2 }}
-              >
+              <Button variant="contained" startIcon={<AddIcon />} onClick={onClose} sx={{ mt: 2 }}>
                 {t("groups.actions.createGroup")}
               </Button>
             </Box>
@@ -602,10 +542,7 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({
       >
         {availablePermissionSets.length > 0 ? (
           availablePermissionSets.map((ps) => (
-            <MenuItem
-              key={ps.id}
-              onClick={() => handleAssignPermissionSet(ps.id)}
-            >
+            <MenuItem key={ps.id} onClick={() => handleAssignPermissionSet(ps.id)}>
               {ps.name}
             </MenuItem>
           ))
@@ -620,11 +557,7 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
-        <Alert
-          onClose={handleCloseSnackbar}
-          severity={snackbar.severity}
-          sx={{ width: "100%" }}
-        >
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: "100%" }}>
           {snackbar.message}
         </Alert>
       </Snackbar>

@@ -1,8 +1,6 @@
 import { formatLocalDateTime } from "@/shared/utils/dateUtils";
 
-export function formatDate(
-  dateString: string | number | null | undefined,
-): string {
+export function formatDate(dateString: string | number | null | undefined): string {
   if (!dateString) {
     return "";
   }

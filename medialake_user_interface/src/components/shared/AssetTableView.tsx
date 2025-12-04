@@ -12,10 +12,7 @@ interface AssetTableViewProps<T> {
   onAssetClick: (asset: T) => void;
   onDeleteClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onDownloadClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
-  onAddToCollectionClick?: (
-    asset: T,
-    event: React.MouseEvent<HTMLElement>,
-  ) => void;
+  onAddToCollectionClick?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   showRemoveButton?: boolean;
   onEditClick?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
@@ -84,7 +81,7 @@ function AssetTableView<T>({
         acc[normalizedType].push(item);
         return acc;
       },
-      {} as Record<string, T[]>,
+      {} as Record<string, T[]>
     );
   }, [results, groupByType, getAssetType]);
 
@@ -124,9 +121,7 @@ function AssetTableView<T>({
     <React.Fragment>
       {Object.entries(groupedResults)
         .filter(
-          ([type]) =>
-            ["Image", "Video", "Audio"].includes(type) &&
-            groupedResults[type].length > 0,
+          ([type]) => ["Image", "Video", "Audio"].includes(type) && groupedResults[type].length > 0
         )
         .map(([type, assets]) => (
           <div key={type} style={{ marginBottom: "2rem" }}>
@@ -163,9 +158,7 @@ function AssetTableView<T>({
               isSelected={isSelected}
               onSelectToggle={onSelectToggle}
               isFavorite={favoritesFeature.value ? isFavorite : undefined}
-              onFavoriteToggle={
-                favoritesFeature.value ? onFavoriteToggle : undefined
-              }
+              onFavoriteToggle={favoritesFeature.value ? onFavoriteToggle : undefined}
               selectedSearchFields={selectedSearchFields}
               isRenaming={isRenaming}
               renamingAssetId={renamingAssetId}

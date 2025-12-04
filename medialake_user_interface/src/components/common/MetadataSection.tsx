@@ -58,11 +58,7 @@ interface MetadataSectionProps {
   onTabChange?: (newValue: number) => void;
 }
 
-const MetadataSection: React.FC<MetadataSectionProps> = ({
-  tabs,
-  defaultTab = 0,
-  onTabChange,
-}) => {
+const MetadataSection: React.FC<MetadataSectionProps> = ({ tabs, defaultTab = 0, onTabChange }) => {
   const [value, setValue] = React.useState(defaultTab);
 
   const handleChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -75,11 +71,7 @@ const MetadataSection: React.FC<MetadataSectionProps> = ({
   return (
     <Box>
       <Box sx={{ borderBottom: 1, borderColor: "#e5e7eb" }}>
-        <StyledTabs
-          value={value}
-          onChange={handleChange}
-          aria-label="metadata tabs"
-        >
+        <StyledTabs value={value} onChange={handleChange} aria-label="metadata tabs">
           {tabs.map((tab, index) => (
             <StyledTab
               key={index}

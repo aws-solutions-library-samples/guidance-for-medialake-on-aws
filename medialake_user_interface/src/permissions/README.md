@@ -31,14 +31,7 @@ The new system implements a three-tier caching strategy:
 ```typescript
 class GlobalPermissionCache {
   // Stores complete user, permissions, and ability data
-  setGlobalCache(
-    user,
-    customPermissions,
-    ability,
-    permissionSets,
-    token,
-    expiresIn,
-  );
+  setGlobalCache(user, customPermissions, ability, permissionSets, token, expiresIn);
 
   // Retrieves cached data if valid
   getGlobalCache(currentToken);

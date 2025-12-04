@@ -13,9 +13,7 @@ test.describe("User Management", () => {
     await page.getByRole("button", { name: "Add User" }).click();
     await page.getByRole("textbox", { name: "First Name" }).fill("load");
     await page.getByRole("textbox", { name: "Last Name" }).fill("user");
-    await page
-      .getByRole("textbox", { name: "Email" })
-      .fill("medialake+testuser@amazon.com");
+    await page.getByRole("textbox", { name: "Email" }).fill("medialake+testuser@amazon.com");
 
     // Select role
     await page.getByLabel("", { exact: true }).click();
@@ -26,9 +24,7 @@ test.describe("User Management", () => {
     await page.getByRole("button", { name: "Add", exact: true }).click();
 
     // Verify user was added
-    await expect(
-      page.getByRole("row", { name: "load user medialake+testuser@" }),
-    ).toBeVisible({
+    await expect(page.getByRole("row", { name: "load user medialake+testuser@" })).toBeVisible({
       timeout: 10000,
     });
 
@@ -40,9 +36,7 @@ test.describe("User Management", () => {
     await page.getByRole("button").click();
 
     // Verify user was deleted
-    await expect(
-      page.getByRole("row", { name: "load user medialake+testuser@" }),
-    ).not.toBeVisible({
+    await expect(page.getByRole("row", { name: "load user medialake+testuser@" })).not.toBeVisible({
       timeout: 10000,
     });
   });

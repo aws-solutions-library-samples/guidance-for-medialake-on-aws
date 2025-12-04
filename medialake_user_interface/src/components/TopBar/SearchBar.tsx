@@ -22,11 +22,7 @@ Examples:
 • "metadata:resolution:1080p type:video"
 `;
 
-const SearchBar: React.FC<SearchBarProps> = ({
-  searchQuery,
-  onSearchChange,
-  onSearchSubmit,
-}) => (
+const SearchBar: React.FC<SearchBarProps> = ({ searchQuery, onSearchChange, onSearchSubmit }) => (
   <Box sx={{ display: "flex", flexGrow: 1, mr: 2, alignItems: "center" }}>
     <TextField
       label="Search"
@@ -48,11 +44,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
         <HelpIcon />
       </IconButton>
     </Tooltip>
-    <Button
-      variant="contained"
-      startIcon={<SearchIcon />}
-      onClick={onSearchSubmit}
-    >
+    <Button variant="contained" startIcon={<SearchIcon />} onClick={onSearchSubmit}>
       Search
     </Button>
   </Box>

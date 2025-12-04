@@ -48,7 +48,7 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
       console.log(
         "BatchOperations: Setting selected items state for",
         selectedAssets.length,
-        "selected assets",
+        "selected assets"
       );
       setHasSelectedItems(true);
     } else {
@@ -66,7 +66,7 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
         acc[asset.type].push(asset);
         return acc;
       },
-      {} as Record<string, typeof selectedAssets>,
+      {} as Record<string, typeof selectedAssets>
     );
   }, [selectedAssets]);
 
@@ -103,14 +103,9 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
             variant="contained"
             size="small"
             data-testid="batch-delete-button"
-            startIcon={
-              isDeleteLoading ? <CircularProgress size={16} /> : <DeleteIcon />
-            }
+            startIcon={isDeleteLoading ? <CircularProgress size={16} /> : <DeleteIcon />}
             onClick={() => {
-              console.log(
-                "Delete button clicked, onBatchDelete:",
-                onBatchDelete,
-              );
+              console.log("Delete button clicked, onBatchDelete:", onBatchDelete);
               if (onBatchDelete) {
                 onBatchDelete();
               }
@@ -134,13 +129,7 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
           <Button
             variant="outlined"
             size="small"
-            startIcon={
-              isDownloadLoading ? (
-                <CircularProgress size={16} />
-              ) : (
-                <DownloadIcon />
-              )
-            }
+            startIcon={isDownloadLoading ? <CircularProgress size={16} /> : <DownloadIcon />}
             onClick={onBatchDownload}
             disabled={isDownloadLoading}
           >

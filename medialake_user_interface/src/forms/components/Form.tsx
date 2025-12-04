@@ -14,15 +14,7 @@ interface FormProps {
 }
 
 export const Form: React.FC<FormProps> = React.memo(
-  ({
-    form,
-    onSubmit,
-    onCancel,
-    submitLabel = "common.save",
-    children,
-    showButtons = true,
-    id,
-  }) => {
+  ({ form, onSubmit, onCancel, submitLabel = "common.save", children, showButtons = true, id }) => {
     const { t } = useTranslation();
 
     // Only log initial mount
@@ -51,7 +43,7 @@ export const Form: React.FC<FormProps> = React.memo(
           throw error;
         }
       },
-      [onSubmit, id],
+      [onSubmit, id]
     );
 
     const handleFormSubmit = React.useCallback(
@@ -59,7 +51,7 @@ export const Form: React.FC<FormProps> = React.memo(
         e.preventDefault();
         return form.handleSubmit(handleSubmit)(e);
       },
-      [form, handleSubmit],
+      [form, handleSubmit]
     );
 
     const handleCancel = React.useCallback(() => {
@@ -81,12 +73,7 @@ export const Form: React.FC<FormProps> = React.memo(
       >
         {children}
         {showButtons && (
-          <Stack
-            direction="row"
-            spacing={2}
-            justifyContent="flex-end"
-            sx={{ mt: 2 }}
-          >
+          <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ mt: 2 }}>
             {onCancel && (
               <Button onClick={handleCancel} variant="outlined">
                 {t("common.cancel")}
@@ -99,7 +86,7 @@ export const Form: React.FC<FormProps> = React.memo(
         )}
       </Box>
     );
-  },
+  }
 );
 
 Form.displayName = "Form";

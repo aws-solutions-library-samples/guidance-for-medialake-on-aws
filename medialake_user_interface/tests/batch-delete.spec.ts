@@ -12,10 +12,7 @@ import {
   CloudFrontDistribution,
 } from "./utils/cloudfront-service-adapter.js";
 import { TagFilter, STANDARD_TAG_PATTERNS } from "./utils/tag-matcher.js";
-import {
-  uploadFilesFromDirectory,
-  waitForUploadComplete,
-} from "./utils/file-upload-helper.js";
+import { uploadFilesFromDirectory, waitForUploadComplete } from "./utils/file-upload-helper.js";
 import {
   checkConnectorsConfigured,
   verifyMinimumConnectors,
@@ -28,8 +25,7 @@ const AWS_REGION = process.env.AWS_REGION || "us-east-1";
 const AWS_PROFILE = process.env.AWS_PROFILE || "dev3";
 const ENVIRONMENT = process.env.MEDIALAKE_ENV || "dev";
 const UPLOAD_FILES_DIR =
-  process.env.UPLOAD_FILES_DIR ||
-  path.join(process.cwd(), "test-results", "batch-delete-files");
+  process.env.UPLOAD_FILES_DIR || path.join(process.cwd(), "test-results", "batch-delete-files");
 
 // Store connector info for cleanup
 let testConnectorName: string | null = null;
@@ -61,7 +57,7 @@ interface BatchDeleteFixtures {
  */
 async function discoverCloudFrontDistribution(
   discoveryEngine: ResourceDiscoveryEngine,
-  serviceAdapter: CloudFrontServiceAdapter,
+  serviceAdapter: CloudFrontServiceAdapter
 ): Promise<CloudFrontDistribution | null> {
   const tagFilters: TagFilter[] = [
     STANDARD_TAG_PATTERNS.APPLICATION_TAG,
@@ -73,28 +69,21 @@ async function discoverCloudFrontDistribution(
     console.log("[BatchDelete] Discovering CloudFront distribution...");
     const distributions = await discoveryEngine.discoverByTags(
       "cloudfront-distribution",
-      tagFilters,
+      tagFilters
     );
 
     if (distributions.length > 0) {
       const distribution = distributions[0] as CloudFrontDistribution;
-      console.log(
-        `[BatchDelete] Found distribution: ${distribution.name} (${distribution.id})`,
-      );
+      console.log(`[BatchDelete] Found distribution: ${distribution.name} (${distribution.id})`);
       return distribution;
     }
 
-    console.warn(
-      "[BatchDelete] No distributions found via tags, trying fallback...",
-    );
-    const fallbackDistributions =
-      await serviceAdapter.fallbackDiscovery(tagFilters);
+    console.warn("[BatchDelete] No distributions found via tags, trying fallback...");
+    const fallbackDistributions = await serviceAdapter.fallbackDiscovery(tagFilters);
 
     if (fallbackDistributions.length > 0) {
       const distribution = fallbackDistributions[0];
-      console.log(
-        `[BatchDelete] Found distribution via fallback: ${distribution.name}`,
-      );
+      console.log(`[BatchDelete] Found distribution via fallback: ${distribution.name}`);
       return distribution;
     }
   } catch (error) {
@@ -115,29 +104,22 @@ const batchDeleteTest = test.extend<BatchDeleteFixtures>({
         enableFallback: true,
       };
 
-      const discoveryEngine = createResourceDiscoveryEngine(
-        config,
-        testInfo.workerIndex,
-      );
+      const discoveryEngine = createResourceDiscoveryEngine(config, testInfo.workerIndex);
       const cloudFrontAdapter = createCloudFrontServiceAdapter(config);
       discoveryEngine.registerAdapter(cloudFrontAdapter);
 
       try {
         const distribution = await discoverCloudFrontDistribution(
           discoveryEngine,
-          cloudFrontAdapter,
+          cloudFrontAdapter
         );
 
         if (!distribution) {
-          throw new Error(
-            "Could not discover CloudFront distribution for testing",
-          );
+          throw new Error("Could not discover CloudFront distribution for testing");
         }
 
         const primaryDomain =
-          distribution.aliases.length > 0
-            ? distribution.aliases[0]
-            : distribution.domainName;
+          distribution.aliases.length > 0 ? distribution.aliases[0] : distribution.domainName;
 
         const baseUrl = `https://${primaryDomain}`;
         console.log(`[BatchDelete] Using CloudFront URL: ${baseUrl}`);
@@ -153,16 +135,10 @@ const batchDeleteTest = test.extend<BatchDeleteFixtures>({
 
   authenticatedBatchDeletePage: [
     async ({ page, enhancedCognitoTestUser, cloudFrontUrl }, use) => {
-      console.log(
-        "[BatchDelete] Performing login with enhanced Cognito user...",
-      );
+      console.log("[BatchDelete] Performing login with enhanced Cognito user...");
       console.log(`[BatchDelete] CloudFront URL: ${cloudFrontUrl}`);
-      console.log(
-        `[BatchDelete] User pool: ${enhancedCognitoTestUser.userPoolId}`,
-      );
-      console.log(
-        `[BatchDelete] User pool client: ${enhancedCognitoTestUser.userPoolClientId}`,
-      );
+      console.log(`[BatchDelete] User pool: ${enhancedCognitoTestUser.userPoolId}`);
+      console.log(`[BatchDelete] User pool client: ${enhancedCognitoTestUser.userPoolClientId}`);
 
       // Navigate to login page through CloudFront
       const loginUrl = `${cloudFrontUrl}/sign-in`;
@@ -173,17 +149,9 @@ const batchDeleteTest = test.extend<BatchDeleteFixtures>({
       await page.waitForSelector('input[name="username"]', { timeout: 10000 });
 
       // Fill login form
-      console.log(
-        `[BatchDelete] Filling login form for: ${enhancedCognitoTestUser.username}`,
-      );
-      await page.fill(
-        'input[name="username"]',
-        enhancedCognitoTestUser.username,
-      );
-      await page.fill(
-        'input[name="password"]',
-        enhancedCognitoTestUser.password,
-      );
+      console.log(`[BatchDelete] Filling login form for: ${enhancedCognitoTestUser.username}`);
+      await page.fill('input[name="username"]', enhancedCognitoTestUser.username);
+      await page.fill('input[name="password"]', enhancedCognitoTestUser.password);
 
       // Submit login form
       await page.click('.amplify-button[type="submit"]');
@@ -194,7 +162,7 @@ const batchDeleteTest = test.extend<BatchDeleteFixtures>({
           url.toString().includes("/dashboard") ||
           url.toString().endsWith("/") ||
           !url.toString().includes("/sign-in"),
-        { timeout: 30000 },
+        { timeout: 30000 }
       );
 
       // Additional wait to ensure page is fully loaded
@@ -223,8 +191,7 @@ batchDeleteTest.describe("Step 1: Upload UI Prerequisites", () => {
       await authenticatedBatchDeletePage.waitForTimeout(2000);
 
       // Check for upload button with CloudUploadIcon test ID
-      const uploadButton =
-        authenticatedBatchDeletePage.getByTestId("CloudUploadIcon");
+      const uploadButton = authenticatedBatchDeletePage.getByTestId("CloudUploadIcon");
       const uploadExists = (await uploadButton.count()) > 0;
 
       if (uploadExists) {
@@ -242,13 +209,11 @@ batchDeleteTest.describe("Step 1: Upload UI Prerequisites", () => {
         const uploadElements = await authenticatedBatchDeletePage
           .locator('[data-testid*="upload"], [data-testid*="Upload"]')
           .count();
-        console.log(
-          `[Upload UI Check] Found ${uploadElements} upload-related elements`,
-        );
+        console.log(`[Upload UI Check] Found ${uploadElements} upload-related elements`);
 
         expect(uploadExists).toBe(true);
       }
-    },
+    }
   );
 });
 
@@ -257,12 +222,9 @@ batchDeleteTest.describe("Step 2: Connector Prerequisites", () => {
 
   batchDeleteTest(
     "should create a test connector for batch delete testing",
-    async (
-      { authenticatedBatchDeletePage, cloudFrontUrl, enhancedCognitoTestUser },
-      testInfo,
-    ) => {
+    async ({ authenticatedBatchDeletePage, cloudFrontUrl, enhancedCognitoTestUser }, testInfo) => {
       console.log(
-        "[Connector Setup] Creating test S3 connector with NEW bucket for batch delete tests...",
+        "[Connector Setup] Creating test S3 connector with NEW bucket for batch delete tests..."
       );
 
       try {
@@ -272,21 +234,14 @@ batchDeleteTest.describe("Step 2: Connector Prerequisites", () => {
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
           try {
-            console.log(
-              `[Connector Setup] Navigation attempt ${attempt}/${maxRetries}`,
-            );
-            await navigateToConnectors(
-              authenticatedBatchDeletePage,
-              cloudFrontUrl,
-            );
+            console.log(`[Connector Setup] Navigation attempt ${attempt}/${maxRetries}`);
+            await navigateToConnectors(authenticatedBatchDeletePage, cloudFrontUrl);
             navigationSuccess = true;
-            console.log(
-              `[Connector Setup] ✓ Successfully navigated to connectors page`,
-            );
+            console.log(`[Connector Setup] ✓ Successfully navigated to connectors page`);
             break;
           } catch (error: any) {
             console.warn(
-              `[Connector Setup] ⚠️  Navigation attempt ${attempt} failed: ${error.message}`,
+              `[Connector Setup] ⚠️  Navigation attempt ${attempt} failed: ${error.message}`
             );
             if (attempt < maxRetries) {
               console.log(`[Connector Setup] Waiting 3s before retry...`);
@@ -296,33 +251,24 @@ batchDeleteTest.describe("Step 2: Connector Prerequisites", () => {
         }
 
         if (!navigationSuccess) {
-          throw new Error(
-            "Could not navigate to connectors page after 3 attempts",
-          );
+          throw new Error("Could not navigate to connectors page after 3 attempts");
         }
 
         // Create connector with new S3 bucket using helper
         const timestamp = Date.now();
-        const createResult = await createS3ConnectorWithNewBucket(
-          authenticatedBatchDeletePage,
-          {
-            connectorName: `batch-delete-test-${timestamp}`,
-            bucketName: `medialake-test-${timestamp}`,
-            description: "Auto-created connector for batch delete E2E testing",
-          },
-        );
+        const createResult = await createS3ConnectorWithNewBucket(authenticatedBatchDeletePage, {
+          connectorName: `batch-delete-test-${timestamp}`,
+          bucketName: `medialake-test-${timestamp}`,
+          description: "Auto-created connector for batch delete E2E testing",
+        });
 
         if (createResult.success) {
           // Store connector name for cleanup
           testConnectorName = createResult.connectorName;
           testConnectorWasCreated = true;
 
-          console.log(
-            `[Connector Setup] ✅ Created test connector: ${createResult.connectorName}`,
-          );
-          console.log(
-            `[Connector Setup] ✅ Created new S3 bucket: ${createResult.bucketName}`,
-          );
+          console.log(`[Connector Setup] ✅ Created test connector: ${createResult.connectorName}`);
+          console.log(`[Connector Setup] ✅ Created new S3 bucket: ${createResult.bucketName}`);
 
           // Verify connector was created and is visible on the page
           console.log("[Connector Setup] Verifying connector is visible...");
@@ -331,7 +277,7 @@ batchDeleteTest.describe("Step 2: Connector Prerequisites", () => {
           const verifyResult = await checkConnectorsConfigured(
             authenticatedBatchDeletePage,
             cloudFrontUrl,
-            { minConnectors: 1 },
+            { minConnectors: 1 }
           );
 
           expect(verifyResult.success).toBe(true);
@@ -341,15 +287,11 @@ batchDeleteTest.describe("Step 2: Connector Prerequisites", () => {
           const ourConnectorCard = authenticatedBatchDeletePage
             .locator('[data-testid^="connector-card-"]')
             .filter({
-              has: authenticatedBatchDeletePage.locator(
-                `h5:has-text("${testConnectorName}")`,
-              ),
+              has: authenticatedBatchDeletePage.locator(`h5:has-text("${testConnectorName}")`),
             });
 
           const ourConnectorVisible = await ourConnectorCard.count();
-          console.log(
-            `[Connector Setup] Our connector visible count: ${ourConnectorVisible}`,
-          );
+          console.log(`[Connector Setup] Our connector visible count: ${ourConnectorVisible}`);
 
           if (ourConnectorVisible === 0) {
             // Take screenshot for debugging
@@ -358,12 +300,12 @@ batchDeleteTest.describe("Step 2: Connector Prerequisites", () => {
               fullPage: true,
             });
             throw new Error(
-              `Created connector "${testConnectorName}" not found on connectors page`,
+              `Created connector "${testConnectorName}" not found on connectors page`
             );
           }
 
           console.log(
-            `[Connector Setup] ✅ Verified connector "${testConnectorName}" is visible and ready`,
+            `[Connector Setup] ✅ Verified connector "${testConnectorName}" is visible and ready`
           );
 
           expect(testConnectorName).toBeTruthy();
@@ -373,13 +315,10 @@ batchDeleteTest.describe("Step 2: Connector Prerequisites", () => {
           throw new Error("Failed to create test connector with new bucket");
         }
       } catch (error: any) {
-        console.error(
-          "[Connector Setup] ❌ Failed to create connector:",
-          error.message,
-        );
+        console.error("[Connector Setup] ❌ Failed to create connector:", error.message);
         throw new Error(`Connector setup failed: ${error.message}`);
       }
-    },
+    }
   );
 });
 
@@ -393,9 +332,7 @@ batchDeleteTest.describe("Step 3: File Upload for Batch Delete Testing", () => {
 
       // Verify we have a test connector to use
       if (!testConnectorName) {
-        throw new Error(
-          "No test connector available for upload - Step 2 may have failed",
-        );
+        throw new Error("No test connector available for upload - Step 2 may have failed");
       }
 
       console.log(`[Upload Test] Using test connector: ${testConnectorName}`);
@@ -412,24 +349,20 @@ batchDeleteTest.describe("Step 3: File Upload for Batch Delete Testing", () => {
       const uploadDir = UPLOAD_FILES_DIR;
 
       console.log(`[Upload Test] Using upload directory: ${uploadDir}`);
-      console.log(
-        `[Upload Test] (Set UPLOAD_FILES_DIR env var to use a different directory)`,
-      );
+      console.log(`[Upload Test] (Set UPLOAD_FILES_DIR env var to use a different directory)`);
 
       // Upload all files from the directory using our test connector
       const uploadResult = await uploadFilesFromDirectory(
         authenticatedBatchDeletePage,
         uploadDir,
         testConnectorName, // Use the connector we created in Step 2
-        { captureScreenshots: true, waitAfterUpload: 5000 },
+        { captureScreenshots: true, waitAfterUpload: 5000 }
       );
 
       if (uploadResult.success) {
         console.log("[Upload Test] ✅ File upload successful via modal");
         console.log(`[Upload Test] Method: ${uploadResult.method}`);
-        console.log(
-          `[Upload Test] Files uploaded: ${uploadResult.uploadedFiles.length} files`,
-        );
+        console.log(`[Upload Test] Files uploaded: ${uploadResult.uploadedFiles.length} files`);
         uploadResult.uploadedFiles.forEach((file) => {
           console.log(`  - ${path.basename(file)}`);
         });
@@ -440,15 +373,13 @@ batchDeleteTest.describe("Step 3: File Upload for Batch Delete Testing", () => {
         expect(uploadResult.uploadedFiles.length).toBeGreaterThan(0);
         expect(uploadResult.success).toBe(true);
       } else {
-        console.log(
-          "[Upload Test] ⚠️  Upload failed or no files found in directory",
-        );
+        console.log("[Upload Test] ⚠️  Upload failed or no files found in directory");
         console.log(`[Upload Test] Error: ${uploadResult.error}`);
 
         // The test should fail if upload doesn't work
         expect(uploadResult.success).toBe(true);
       }
-    },
+    }
   );
 
   batchDeleteTest(
@@ -465,24 +396,18 @@ batchDeleteTest.describe("Step 3: File Upload for Batch Delete Testing", () => {
 
       for (let attempt = 1; attempt <= maxNavRetries; attempt++) {
         try {
-          console.log(
-            `[Thumbnail Wait Test] Navigation attempt ${attempt}/${maxNavRetries}`,
-          );
+          console.log(`[Thumbnail Wait Test] Navigation attempt ${attempt}/${maxNavRetries}`);
           await authenticatedBatchDeletePage.goto(searchUrl, {
             waitUntil: "domcontentloaded",
             timeout: 30000,
           });
-          await authenticatedBatchDeletePage.waitForLoadState(
-            "domcontentloaded",
-          );
+          await authenticatedBatchDeletePage.waitForLoadState("domcontentloaded");
           navigationSuccess = true;
-          console.log(
-            `[Thumbnail Wait Test] ✓ Successfully navigated to search page`,
-          );
+          console.log(`[Thumbnail Wait Test] ✓ Successfully navigated to search page`);
           break;
         } catch (error: any) {
           console.warn(
-            `[Thumbnail Wait Test] ⚠️  Navigation attempt ${attempt} failed: ${error.message}`,
+            `[Thumbnail Wait Test] ⚠️  Navigation attempt ${attempt} failed: ${error.message}`
           );
           if (attempt < maxNavRetries) {
             console.log(`[Thumbnail Wait Test] Waiting 3s before retry...`);
@@ -496,15 +421,11 @@ batchDeleteTest.describe("Step 3: File Upload for Batch Delete Testing", () => {
       }
 
       // Wait for assets to be indexed in OpenSearch (can take time after upload)
-      console.log(
-        "[Thumbnail Wait Test] Waiting for assets to be indexed (up to 60s)...",
-      );
+      console.log("[Thumbnail Wait Test] Waiting for assets to be indexed (up to 60s)...");
       await authenticatedBatchDeletePage.waitForTimeout(10000); // Initial 10s wait
 
       // Wait for search results to appear with retries
-      const assetCards = authenticatedBatchDeletePage.locator(
-        '[data-testid^="asset-card-"]',
-      );
+      const assetCards = authenticatedBatchDeletePage.locator('[data-testid^="asset-card-"]');
 
       let assetsFound = false;
       const maxRetries = 5;
@@ -512,7 +433,7 @@ batchDeleteTest.describe("Step 3: File Upload for Batch Delete Testing", () => {
       for (let retry = 1; retry <= maxRetries; retry++) {
         const count = await assetCards.count();
         console.log(
-          `[Thumbnail Wait Test] Search attempt ${retry}/${maxRetries}: Found ${count} assets`,
+          `[Thumbnail Wait Test] Search attempt ${retry}/${maxRetries}: Found ${count} assets`
         );
 
         if (count > 0) {
@@ -530,9 +451,7 @@ batchDeleteTest.describe("Step 3: File Upload for Batch Delete Testing", () => {
       }
 
       if (!assetsFound) {
-        throw new Error(
-          "No asset cards found after 5 attempts - files may not be indexed yet",
-        );
+        throw new Error("No asset cards found after 5 attempts - files may not be indexed yet");
       }
 
       await assetCards.first().waitFor({ state: "visible", timeout: 5000 });
@@ -546,35 +465,29 @@ batchDeleteTest.describe("Step 3: File Upload for Batch Delete Testing", () => {
       const startTime = Date.now();
       let allThumbnailsLoaded = false;
 
-      console.log(
-        "[Thumbnail Wait Test] Waiting for all thumbnails to load (max 2 minutes)",
-      );
+      console.log("[Thumbnail Wait Test] Waiting for all thumbnails to load (max 2 minutes)");
 
       while (Date.now() - startTime < maxWaitTime && !allThumbnailsLoaded) {
         // Find all images with placeholder SVG (base64 encoded)
         const placeholderImages = authenticatedBatchDeletePage.locator(
-          'img[src^="data:image/svg+xml;base64,"]',
+          'img[src^="data:image/svg+xml;base64,"]'
         );
         const placeholderCount = await placeholderImages.count();
 
         if (placeholderCount === 0) {
-          console.log(
-            "[Thumbnail Wait Test] ✓ All thumbnails loaded successfully!",
-          );
+          console.log("[Thumbnail Wait Test] ✓ All thumbnails loaded successfully!");
           allThumbnailsLoaded = true;
           break;
         }
 
         const elapsed = Math.round((Date.now() - startTime) / 1000);
         console.log(
-          `[Thumbnail Wait Test] ${placeholderCount} placeholder(s) remaining... (${elapsed}s elapsed)`,
+          `[Thumbnail Wait Test] ${placeholderCount} placeholder(s) remaining... (${elapsed}s elapsed)`
         );
 
         // Refresh the page every 15 seconds to help trigger thumbnail loading
         if (elapsed > 0 && elapsed % 15 === 0) {
-          console.log(
-            "[Thumbnail Wait Test] Refreshing page to trigger thumbnail updates...",
-          );
+          console.log("[Thumbnail Wait Test] Refreshing page to trigger thumbnail updates...");
           await authenticatedBatchDeletePage.reload({
             waitUntil: "domcontentloaded",
           });
@@ -586,11 +499,11 @@ batchDeleteTest.describe("Step 3: File Upload for Batch Delete Testing", () => {
 
       if (!allThumbnailsLoaded) {
         const placeholderImages = authenticatedBatchDeletePage.locator(
-          'img[src^="data:image/svg+xml;base64,"]',
+          'img[src^="data:image/svg+xml;base64,"]'
         );
         const remainingPlaceholders = await placeholderImages.count();
         console.warn(
-          `[Thumbnail Wait Test] ⚠️  ${remainingPlaceholders} thumbnail(s) still loading after 2 minutes`,
+          `[Thumbnail Wait Test] ⚠️  ${remainingPlaceholders} thumbnail(s) still loading after 2 minutes`
         );
       }
 
@@ -604,18 +517,14 @@ batchDeleteTest.describe("Step 3: File Upload for Batch Delete Testing", () => {
       const loadedAssets = totalAssets - placeholderCount;
 
       console.log(`[Thumbnail Wait Test] Total assets: ${totalAssets}`);
-      console.log(
-        `[Thumbnail Wait Test] Assets with placeholders: ${placeholderCount}`,
-      );
-      console.log(
-        `[Thumbnail Wait Test] Assets with loaded thumbnails: ${loadedAssets}`,
-      );
+      console.log(`[Thumbnail Wait Test] Assets with placeholders: ${placeholderCount}`);
+      console.log(`[Thumbnail Wait Test] Assets with loaded thumbnails: ${loadedAssets}`);
 
       // Strict validation: ALL assets must have loaded thumbnails (no placeholders)
       expect(placeholderCount).toBe(0);
       expect(loadedAssets).toBe(totalAssets);
       console.log(
-        `[Thumbnail Wait Test] ✓ Validated ${loadedAssets} assets with loaded thumbnails (no placeholders)`,
+        `[Thumbnail Wait Test] ✓ Validated ${loadedAssets} assets with loaded thumbnails (no placeholders)`
       );
 
       // Take screenshot for verification
@@ -623,18 +532,14 @@ batchDeleteTest.describe("Step 3: File Upload for Batch Delete Testing", () => {
         path: "test-results/thumbnails-loaded.png",
         fullPage: true,
       });
-      console.log(
-        "[Thumbnail Wait Test] Screenshot saved to test-results/thumbnails-loaded.png",
-      );
-    },
+      console.log("[Thumbnail Wait Test] Screenshot saved to test-results/thumbnails-loaded.png");
+    }
   );
 
   batchDeleteTest(
     "should perform complete batch delete workflow",
     async ({ authenticatedBatchDeletePage, cloudFrontUrl }) => {
-      console.log(
-        "[Batch Delete Workflow] Starting complete batch delete test",
-      );
+      console.log("[Batch Delete Workflow] Starting complete batch delete test");
 
       // Navigate to search page with retry logic
       const searchUrl = `${cloudFrontUrl}/search?q=*&semantic=false`;
@@ -645,24 +550,18 @@ batchDeleteTest.describe("Step 3: File Upload for Batch Delete Testing", () => {
 
       for (let attempt = 1; attempt <= maxNavRetries; attempt++) {
         try {
-          console.log(
-            `[Batch Delete Workflow] Navigation attempt ${attempt}/${maxNavRetries}`,
-          );
+          console.log(`[Batch Delete Workflow] Navigation attempt ${attempt}/${maxNavRetries}`);
           await authenticatedBatchDeletePage.goto(searchUrl, {
             waitUntil: "domcontentloaded",
             timeout: 30000,
           });
-          await authenticatedBatchDeletePage.waitForLoadState(
-            "domcontentloaded",
-          );
+          await authenticatedBatchDeletePage.waitForLoadState("domcontentloaded");
           navigationSuccess = true;
-          console.log(
-            `[Batch Delete Workflow] ✓ Successfully navigated to search page`,
-          );
+          console.log(`[Batch Delete Workflow] ✓ Successfully navigated to search page`);
           break;
         } catch (error: any) {
           console.warn(
-            `[Batch Delete Workflow] ⚠️  Navigation attempt ${attempt} failed: ${error.message}`,
+            `[Batch Delete Workflow] ⚠️  Navigation attempt ${attempt} failed: ${error.message}`
           );
           if (attempt < maxNavRetries) {
             console.log(`[Batch Delete Workflow] Waiting 3s before retry...`);
@@ -676,15 +575,11 @@ batchDeleteTest.describe("Step 3: File Upload for Batch Delete Testing", () => {
       }
 
       // Wait for assets to be indexed in OpenSearch (can take time after upload)
-      console.log(
-        "[Batch Delete Workflow] Waiting for assets to be indexed (up to 60s)...",
-      );
+      console.log("[Batch Delete Workflow] Waiting for assets to be indexed (up to 60s)...");
       await authenticatedBatchDeletePage.waitForTimeout(10000); // Initial 10s wait
 
       // Wait for search results to appear with retries
-      const assetCards = authenticatedBatchDeletePage.locator(
-        '[data-testid^="asset-card-"]',
-      );
+      const assetCards = authenticatedBatchDeletePage.locator('[data-testid^="asset-card-"]');
 
       let assetsFound = false;
       const maxRetries = 5;
@@ -692,7 +587,7 @@ batchDeleteTest.describe("Step 3: File Upload for Batch Delete Testing", () => {
       for (let retry = 1; retry <= maxRetries; retry++) {
         const count = await assetCards.count();
         console.log(
-          `[Batch Delete Workflow] Search attempt ${retry}/${maxRetries}: Found ${count} assets`,
+          `[Batch Delete Workflow] Search attempt ${retry}/${maxRetries}: Found ${count} assets`
         );
 
         if (count > 0) {
@@ -701,9 +596,7 @@ batchDeleteTest.describe("Step 3: File Upload for Batch Delete Testing", () => {
         }
 
         if (retry < maxRetries) {
-          console.log(
-            "[Batch Delete Workflow] Refreshing page and retrying...",
-          );
+          console.log("[Batch Delete Workflow] Refreshing page and retrying...");
           await authenticatedBatchDeletePage.reload({
             waitUntil: "domcontentloaded",
           });
@@ -712,9 +605,7 @@ batchDeleteTest.describe("Step 3: File Upload for Batch Delete Testing", () => {
       }
 
       if (!assetsFound) {
-        throw new Error(
-          "No asset cards found after 5 attempts - files may not be indexed yet",
-        );
+        throw new Error("No asset cards found after 5 attempts - files may not be indexed yet");
       }
 
       await assetCards.first().waitFor({ state: "visible", timeout: 5000 });
@@ -723,18 +614,13 @@ batchDeleteTest.describe("Step 3: File Upload for Batch Delete Testing", () => {
       console.log(`[Batch Delete Workflow] Found ${totalAssets} assets`);
 
       // Wait up to 2 minutes for all thumbnails to load (stricter than before)
-      console.log(
-        "[Batch Delete Workflow] Waiting for all thumbnails to load (max 2 minutes)...",
-      );
+      console.log("[Batch Delete Workflow] Waiting for all thumbnails to load (max 2 minutes)...");
       const maxThumbnailWait = 120000; // 2 minutes
       const checkInterval = 5000; // Check every 5 seconds
       const thumbnailStartTime = Date.now();
       let allThumbnailsLoaded = false;
 
-      while (
-        Date.now() - thumbnailStartTime < maxThumbnailWait &&
-        !allThumbnailsLoaded
-      ) {
+      while (Date.now() - thumbnailStartTime < maxThumbnailWait && !allThumbnailsLoaded) {
         const placeholderCount = await authenticatedBatchDeletePage
           .locator('img[src^="data:image/svg+xml;base64,"]')
           .count();
@@ -747,14 +633,12 @@ batchDeleteTest.describe("Step 3: File Upload for Batch Delete Testing", () => {
 
         const elapsed = Math.round((Date.now() - thumbnailStartTime) / 1000);
         console.log(
-          `[Batch Delete Workflow] ${placeholderCount} placeholder(s) remaining... (${elapsed}s elapsed)`,
+          `[Batch Delete Workflow] ${placeholderCount} placeholder(s) remaining... (${elapsed}s elapsed)`
         );
 
         // Refresh the page every 15 seconds to help trigger thumbnail loading
         if (elapsed > 0 && elapsed % 15 === 0) {
-          console.log(
-            "[Batch Delete Workflow] Refreshing page to trigger thumbnail updates...",
-          );
+          console.log("[Batch Delete Workflow] Refreshing page to trigger thumbnail updates...");
           await authenticatedBatchDeletePage.reload({
             waitUntil: "domcontentloaded",
           });
@@ -769,11 +653,11 @@ batchDeleteTest.describe("Step 3: File Upload for Batch Delete Testing", () => {
         .locator('img[src^="data:image/svg+xml;base64,"]')
         .count();
 
+      console.log(`[Batch Delete Workflow] Final placeholder count: ${finalPlaceholderCount}`);
       console.log(
-        `[Batch Delete Workflow] Final placeholder count: ${finalPlaceholderCount}`,
-      );
-      console.log(
-        `[Batch Delete Workflow] Assets without placeholders: ${totalAssets - finalPlaceholderCount}`,
+        `[Batch Delete Workflow] Assets without placeholders: ${
+          totalAssets - finalPlaceholderCount
+        }`
       );
 
       // Strict validation: ALL assets must have loaded thumbnails (no placeholders)
@@ -782,58 +666,41 @@ batchDeleteTest.describe("Step 3: File Upload for Batch Delete Testing", () => {
       // Validate we have at least 10 assets (based on user's test files)
       expect(totalAssets).toBeGreaterThanOrEqual(10);
       console.log(
-        `[Batch Delete Workflow] ✓ Validated ${totalAssets} assets without placeholders (minimum 10 required)`,
+        `[Batch Delete Workflow] ✓ Validated ${totalAssets} assets without placeholders (minimum 10 required)`
       );
 
       // Step 1: Click "Select Page" checkbox
-      console.log(
-        "[Batch Delete Workflow] Step 1: Clicking 'Select Page' checkbox",
-      );
-      const selectPageCheckbox = authenticatedBatchDeletePage.getByRole(
-        "checkbox",
-        {
-          name: /select page/i,
-        },
-      );
+      console.log("[Batch Delete Workflow] Step 1: Clicking 'Select Page' checkbox");
+      const selectPageCheckbox = authenticatedBatchDeletePage.getByRole("checkbox", {
+        name: /select page/i,
+      });
       await selectPageCheckbox.click();
       await authenticatedBatchDeletePage.waitForTimeout(1000);
 
       // Step 2: Validate BATCH OPERATIONS tab shows correct count
-      console.log(
-        "[Batch Delete Workflow] Step 2: Validating BATCH OPERATIONS tab count",
-      );
+      console.log("[Batch Delete Workflow] Step 2: Validating BATCH OPERATIONS tab count");
       const batchOpsTab = authenticatedBatchDeletePage.getByRole("tab", {
         name: /batch operations/i,
       });
       await batchOpsTab.waitFor({ state: "visible", timeout: 5000 });
 
       const batchOpsText = await batchOpsTab.textContent();
-      console.log(
-        `[Batch Delete Workflow] BATCH OPERATIONS tab text: "${batchOpsText}"`,
-      );
+      console.log(`[Batch Delete Workflow] BATCH OPERATIONS tab text: "${batchOpsText}"`);
 
       // Extract count from tab text (e.g., "BATCH OPERATIONS (9)")
       const countMatch = batchOpsText?.match(/\((\d+)\)/);
       const selectedCount = countMatch ? parseInt(countMatch[1]) : 0;
-      console.log(
-        `[Batch Delete Workflow] Selected assets count: ${selectedCount}`,
-      );
+      console.log(`[Batch Delete Workflow] Selected assets count: ${selectedCount}`);
       expect(selectedCount).toBe(totalAssets);
 
       // Step 3: Click BATCH OPERATIONS tab
-      console.log(
-        "[Batch Delete Workflow] Step 3: Clicking BATCH OPERATIONS tab",
-      );
+      console.log("[Batch Delete Workflow] Step 3: Clicking BATCH OPERATIONS tab");
       await batchOpsTab.click();
       await authenticatedBatchDeletePage.waitForTimeout(1000);
 
       // Step 4: Click Delete button (use testid for the batch delete button)
-      console.log(
-        "[Batch Delete Workflow] Step 4: Clicking batch delete button",
-      );
-      const deleteButton = authenticatedBatchDeletePage.getByTestId(
-        "batch-delete-button",
-      );
+      console.log("[Batch Delete Workflow] Step 4: Clicking batch delete button");
+      const deleteButton = authenticatedBatchDeletePage.getByTestId("batch-delete-button");
       await deleteButton.waitFor({ state: "visible", timeout: 5000 });
       await deleteButton.click();
       await authenticatedBatchDeletePage.waitForTimeout(1000);
@@ -842,19 +709,14 @@ batchDeleteTest.describe("Step 3: File Upload for Batch Delete Testing", () => {
       console.log("[Batch Delete Workflow] Step 5: Confirming deletion");
 
       // Wait for confirmation dialog
-      const confirmDialog =
-        authenticatedBatchDeletePage.locator('[role="dialog"]');
+      const confirmDialog = authenticatedBatchDeletePage.locator('[role="dialog"]');
       await confirmDialog.waitFor({ state: "visible", timeout: 5000 });
 
       // Find the input field and type DELETE
-      const deleteInput = authenticatedBatchDeletePage.getByPlaceholder(
-        /type delete to confirm/i,
-      );
+      const deleteInput = authenticatedBatchDeletePage.getByPlaceholder(/type delete to confirm/i);
       await deleteInput.waitFor({ state: "visible", timeout: 5000 });
       await deleteInput.fill("DELETE");
-      console.log(
-        "[Batch Delete Workflow] Typed 'DELETE' in confirmation field",
-      );
+      console.log("[Batch Delete Workflow] Typed 'DELETE' in confirmation field");
 
       // Take screenshot before confirming
       await authenticatedBatchDeletePage.screenshot({
@@ -863,18 +725,14 @@ batchDeleteTest.describe("Step 3: File Upload for Batch Delete Testing", () => {
       });
 
       // Step 6: Click the Delete button in the popup
-      console.log(
-        "[Batch Delete Workflow] Step 6: Clicking confirm delete button",
-      );
+      console.log("[Batch Delete Workflow] Step 6: Clicking confirm delete button");
       const confirmDeleteButton = confirmDialog.getByRole("button", {
         name: /delete/i,
       });
       await confirmDeleteButton.click();
 
       // Step 7: Monitor deletion progress popup
-      console.log(
-        "[Batch Delete Workflow] Step 7: Monitoring deletion progress",
-      );
+      console.log("[Batch Delete Workflow] Step 7: Monitoring deletion progress");
 
       // Wait for progress dialog to appear
       await authenticatedBatchDeletePage.waitForTimeout(1000);
@@ -887,13 +745,13 @@ batchDeleteTest.describe("Step 3: File Upload for Batch Delete Testing", () => {
       while (Date.now() - startTime < maxWaitTime && !deletionComplete) {
         // Check if progress dialog is still visible
         const progressDialog = authenticatedBatchDeletePage.locator(
-          '[role="dialog"]:has-text("deletion")',
+          '[role="dialog"]:has-text("deletion")'
         );
         const isVisible = await progressDialog.isVisible().catch(() => false);
 
         if (!isVisible) {
           console.log(
-            "[Batch Delete Workflow] ✓ Deletion progress dialog closed - deletion complete!",
+            "[Batch Delete Workflow] ✓ Deletion progress dialog closed - deletion complete!"
           );
           deletionComplete = true;
           break;
@@ -902,18 +760,14 @@ batchDeleteTest.describe("Step 3: File Upload for Batch Delete Testing", () => {
         // Try to read progress text
         const progressText = await progressDialog.textContent().catch(() => "");
         if (progressText) {
-          console.log(
-            `[Batch Delete Workflow] Progress: ${progressText.substring(0, 100)}...`,
-          );
+          console.log(`[Batch Delete Workflow] Progress: ${progressText.substring(0, 100)}...`);
         }
 
         await authenticatedBatchDeletePage.waitForTimeout(2000);
       }
 
       if (!deletionComplete) {
-        console.warn(
-          "[Batch Delete Workflow] ⚠️  Deletion still in progress after 2 minutes",
-        );
+        console.warn("[Batch Delete Workflow] ⚠️  Deletion still in progress after 2 minutes");
       }
 
       // Take screenshot after deletion
@@ -923,17 +777,13 @@ batchDeleteTest.describe("Step 3: File Upload for Batch Delete Testing", () => {
       });
 
       // Step 8: Refresh and verify no results
-      console.log(
-        "[Batch Delete Workflow] Step 8: Verifying assets were deleted",
-      );
+      console.log("[Batch Delete Workflow] Step 8: Verifying assets were deleted");
 
       let noResultsFound = false;
       const maxRefreshAttempts = 10;
 
       for (let attempt = 1; attempt <= maxRefreshAttempts; attempt++) {
-        console.log(
-          `[Batch Delete Workflow] Refresh attempt ${attempt}/${maxRefreshAttempts}`,
-        );
+        console.log(`[Batch Delete Workflow] Refresh attempt ${attempt}/${maxRefreshAttempts}`);
 
         await authenticatedBatchDeletePage.reload({
           waitUntil: "domcontentloaded",
@@ -941,9 +791,7 @@ batchDeleteTest.describe("Step 3: File Upload for Batch Delete Testing", () => {
         await authenticatedBatchDeletePage.waitForTimeout(2000);
 
         // Check for "no results" message or empty results
-        const noResultsMsg = authenticatedBatchDeletePage.getByText(
-          /no results found|no assets/i,
-        );
+        const noResultsMsg = authenticatedBatchDeletePage.getByText(/no results found|no assets/i);
         const hasNoResults = await noResultsMsg.isVisible().catch(() => false);
 
         // Also check if asset cards are gone
@@ -951,14 +799,10 @@ batchDeleteTest.describe("Step 3: File Upload for Batch Delete Testing", () => {
           .locator('[data-testid^="asset-card-"]')
           .count();
 
-        console.log(
-          `[Batch Delete Workflow] Remaining assets: ${remainingAssets}`,
-        );
+        console.log(`[Batch Delete Workflow] Remaining assets: ${remainingAssets}`);
 
         if (hasNoResults || remainingAssets === 0) {
-          console.log(
-            "[Batch Delete Workflow] ✓ All assets successfully deleted!",
-          );
+          console.log("[Batch Delete Workflow] ✓ All assets successfully deleted!");
           noResultsFound = true;
           break;
         }
@@ -973,10 +817,8 @@ batchDeleteTest.describe("Step 3: File Upload for Batch Delete Testing", () => {
       });
 
       expect(noResultsFound).toBe(true);
-      console.log(
-        "[Batch Delete Workflow] ✅ Batch delete workflow completed successfully!",
-      );
-    },
+      console.log("[Batch Delete Workflow] ✅ Batch delete workflow completed successfully!");
+    }
   );
 });
 
@@ -987,9 +829,7 @@ batchDeleteTest.describe("Step 4: Cleanup - Remove Test Connector", () => {
     "should delete the test connector if it was created",
     async ({ authenticatedBatchDeletePage, cloudFrontUrl }) => {
       if (!testConnectorWasCreated || !testConnectorName) {
-        console.log(
-          "[Cleanup] No test connector to delete (using existing connector)",
-        );
+        console.log("[Cleanup] No test connector to delete (using existing connector)");
         return;
       }
 
@@ -1002,17 +842,12 @@ batchDeleteTest.describe("Step 4: Cleanup - Remove Test Connector", () => {
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
           console.log(`[Cleanup] Navigation attempt ${attempt}/${maxRetries}`);
-          await navigateToConnectors(
-            authenticatedBatchDeletePage,
-            cloudFrontUrl,
-          );
+          await navigateToConnectors(authenticatedBatchDeletePage, cloudFrontUrl);
           navigationSuccess = true;
           console.log(`[Cleanup] ✓ Successfully navigated to connectors page`);
           break;
         } catch (error: any) {
-          console.warn(
-            `[Cleanup] ⚠️  Navigation attempt ${attempt} failed: ${error.message}`,
-          );
+          console.warn(`[Cleanup] ⚠️  Navigation attempt ${attempt} failed: ${error.message}`);
           if (attempt < maxRetries) {
             console.log(`[Cleanup] Waiting 3s before retry...`);
             await authenticatedBatchDeletePage.waitForTimeout(3000);
@@ -1021,9 +856,7 @@ batchDeleteTest.describe("Step 4: Cleanup - Remove Test Connector", () => {
       }
 
       if (!navigationSuccess) {
-        console.error(
-          "[Cleanup] ❌ Failed to navigate to connectors page after 3 attempts",
-        );
+        console.error("[Cleanup] ❌ Failed to navigate to connectors page after 3 attempts");
         throw new Error("Could not navigate to connectors page for cleanup");
       }
 
@@ -1039,25 +872,19 @@ batchDeleteTest.describe("Step 4: Cleanup - Remove Test Connector", () => {
       const deleted = await deleteConnector(
         authenticatedBatchDeletePage,
         testConnectorName,
-        60000, // 60 second timeout for delete operation
+        60000 // 60 second timeout for delete operation
       );
 
       if (deleted) {
-        console.log(
-          `[Cleanup] ✓ Delete operation completed for: ${testConnectorName}`,
-        );
+        console.log(`[Cleanup] ✓ Delete operation completed for: ${testConnectorName}`);
 
         // Wait for backend deletion to complete with retry logic
-        console.log(
-          "[Cleanup] Waiting for connector to be removed from backend...",
-        );
+        console.log("[Cleanup] Waiting for connector to be removed from backend...");
         let connectorRemoved = false;
         const maxWaitAttempts = 15; // Increased from 10 to 15
 
         for (let attempt = 1; attempt <= maxWaitAttempts; attempt++) {
-          console.log(
-            `[Cleanup] Checking removal attempt ${attempt}/${maxWaitAttempts}`,
-          );
+          console.log(`[Cleanup] Checking removal attempt ${attempt}/${maxWaitAttempts}`);
 
           // Refresh page to get latest state
           await authenticatedBatchDeletePage.reload({
@@ -1070,30 +897,21 @@ batchDeleteTest.describe("Step 4: Cleanup - Remove Test Connector", () => {
             .locator('[data-testid^="connector-card-"]')
             .count();
           console.log(
-            `[Cleanup] Connectors after deletion (attempt ${attempt}): ${connectorsAfter}`,
+            `[Cleanup] Connectors after deletion (attempt ${attempt}): ${connectorsAfter}`
           );
 
           // Check specifically for the deleted connector (using h5 like in delete function)
           const deletedConnector = await authenticatedBatchDeletePage
             .locator('[data-testid^="connector-card-"]')
             .filter({
-              has: authenticatedBatchDeletePage.locator(
-                `h5:has-text("${testConnectorName}")`,
-              ),
+              has: authenticatedBatchDeletePage.locator(`h5:has-text("${testConnectorName}")`),
             })
             .count();
 
-          console.log(
-            `[Cleanup] Deleted connector still visible: ${deletedConnector}`,
-          );
+          console.log(`[Cleanup] Deleted connector still visible: ${deletedConnector}`);
 
-          if (
-            connectorsAfter === connectorsBefore - 1 &&
-            deletedConnector === 0
-          ) {
-            console.log(
-              `[Cleanup] ✓ Connector successfully removed after ${attempt} attempt(s)`,
-            );
+          if (connectorsAfter === connectorsBefore - 1 && deletedConnector === 0) {
+            console.log(`[Cleanup] ✓ Connector successfully removed after ${attempt} attempt(s)`);
             connectorRemoved = true;
 
             // Take screenshot after successful deletion
@@ -1109,9 +927,7 @@ batchDeleteTest.describe("Step 4: Cleanup - Remove Test Connector", () => {
           }
 
           if (attempt < maxWaitAttempts) {
-            console.log(
-              "[Cleanup] Connector still present, waiting 8s before next check...",
-            );
+            console.log("[Cleanup] Connector still present, waiting 8s before next check...");
             await authenticatedBatchDeletePage.waitForTimeout(8000); // Increased from 5s to 8s
           }
         }
@@ -1123,26 +939,26 @@ batchDeleteTest.describe("Step 4: Cleanup - Remove Test Connector", () => {
             fullPage: true,
           });
           console.error(
-            `[Cleanup] ❌ Connector ${testConnectorName} still visible after ${maxWaitAttempts} attempts (up to ${maxWaitAttempts * 8}s)`,
+            `[Cleanup] ❌ Connector ${testConnectorName} still visible after ${maxWaitAttempts} attempts (up to ${
+              maxWaitAttempts * 8
+            }s)`
           );
           throw new Error(
-            `Connector ${testConnectorName} still visible after ${maxWaitAttempts} attempts`,
+            `Connector ${testConnectorName} still visible after ${maxWaitAttempts} attempts`
           );
         }
 
         console.log(
-          `[Cleanup] ✅ Successfully deleted and verified removal of: ${testConnectorName}`,
+          `[Cleanup] ✅ Successfully deleted and verified removal of: ${testConnectorName}`
         );
 
         // Reset tracking variables
         testConnectorName = null;
         testConnectorWasCreated = false;
       } else {
-        console.warn(
-          `[Cleanup] ⚠️  Failed to delete test connector: ${testConnectorName}`,
-        );
+        console.warn(`[Cleanup] ⚠️  Failed to delete test connector: ${testConnectorName}`);
         throw new Error(`Failed to delete connector: ${testConnectorName}`);
       }
-    },
+    }
   );
 });

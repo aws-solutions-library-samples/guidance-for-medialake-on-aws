@@ -5,6 +5,7 @@
 ### Collection Types Access Patterns
 
 1. **List Collection Types** (`GET /collection-types`)
+
    - Cursor pagination
    - Filter by `active` status
    - Sort by: `sortOrder`, `typeName`, `createdAt` (ascending/descending)
@@ -16,6 +17,7 @@
 ### Collections Access Patterns
 
 1. **List Collections** (`GET /collections`)
+
    - Cursor pagination
    - Filters: `type`, `ownerId`, `favorite`, `status`, `search`, `parentId`
    - Sort by: `name`, `createdAt`, `updatedAt` (ascending/descending)
@@ -23,14 +25,17 @@
    - Complex query patterns requiring multiple GSIs
 
 2. **Get Single Collection** (`GET /collections/{collectionId}`)
+
    - Direct lookup by collectionId
    - Includes: `items`, `children`, `owner`, `permissions`, `rules`
    - Field selection capability
 
 3. **Create Collection** (`POST /collections`)
+
    - Insert new collection with hierarchical parent/child relationships
 
 4. **Update Collection** (`PATCH /collections/{collectionId}`)
+
    - Update collection attributes and metadata
 
 5. **Delete Collection** (`DELETE /collections/{collectionId}`)
@@ -39,21 +44,26 @@
 ### Collection Items Access Patterns
 
 1. **List Collection Items** (`GET /collections/{collectionId}/items`)
+
    - Query items by collection ID
    - Cursor pagination
    - Filter by item `type` (asset, workflow, collection)
    - Sort by: `sortOrder`, `addedAt`
 
 2. **Add Single Item** (`POST /collections/{collectionId}/items`)
+
    - Insert item-collection relationship
 
 3. **Batch Add Items** (`POST /collections/{collectionId}/items/batch`)
+
    - Batch insert up to 100 items efficiently
 
 4. **Batch Remove Items** (`POST /collections/{collectionId}/items/batch-remove`)
+
    - Batch delete up to 100 items efficiently
 
 5. **Update Item** (`PUT /collections/{collectionId}/items/{itemId}`)
+
    - Update item metadata within collection context
 
 6. **Remove Single Item** (`DELETE /collections/{collectionId}/items/{itemId}`)
@@ -62,15 +72,18 @@
 ### Collection Rules Access Patterns
 
 1. **List Collection Rules** (`GET /collections/{collectionId}/rules`)
+
    - Query rules by collection ID
    - Cursor pagination
    - Filter by `active` status
    - Implicit priority-based ordering
 
 2. **Create Rule** (`POST /collections/{collectionId}/rules`)
+
    - Insert new rule with priority handling
 
 3. **Update Rule** (`PUT /collections/{collectionId}/rules/{ruleId}`)
+
    - Update rule criteria and status
 
 4. **Delete Rule** (`DELETE /collections/{collectionId}/rules/{ruleId}`)
@@ -79,13 +92,16 @@
 ### Collection Sharing Access Patterns
 
 1. **List Collection Shares** (`GET /collections/{collectionId}/share`)
+
    - Query shares by collection ID
    - Cursor pagination
 
 2. **Share Collection** (`POST /collections/{collectionId}/share`)
+
    - Create sharing relationship with users/groups
 
 3. **Remove Share** (`DELETE /collections/{collectionId}/share/{userId}`)
+
    - Remove sharing relationship
 
 4. **List Shared Collections** (`GET /collections/shared-with-me`)

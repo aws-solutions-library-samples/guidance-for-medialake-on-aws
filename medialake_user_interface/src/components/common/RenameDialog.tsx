@@ -91,18 +91,10 @@ export const RenameDialog: React.FC<RenameDialogProps> = ({
         </Box>
       </DialogContent>
       <DialogActions sx={{ p: 2, pt: 0 }}>
-        <ActionButton
-          variant="outlined"
-          onClick={handleCancel}
-          disabled={isLoading}
-        >
+        <ActionButton variant="outlined" onClick={handleCancel} disabled={isLoading}>
           Cancel
         </ActionButton>
-        <ActionButton
-          variant="contained"
-          onClick={handleConfirm}
-          loading={isLoading}
-        >
+        <ActionButton variant="contained" onClick={handleConfirm} loading={isLoading}>
           Rename
         </ActionButton>
       </DialogActions>

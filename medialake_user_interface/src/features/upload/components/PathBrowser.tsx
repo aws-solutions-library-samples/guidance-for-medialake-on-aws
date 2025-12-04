@@ -79,10 +79,7 @@ export const PathBrowser: React.FC<PathBrowserProps> = ({
           // Find the longest matching prefix
           let longestMatch = "";
           for (const prefix of normalizedPrefixes) {
-            if (
-              normalizedPath.startsWith(prefix) &&
-              prefix.length > longestMatch.length
-            ) {
+            if (normalizedPath.startsWith(prefix) && prefix.length > longestMatch.length) {
               longestMatch = prefix;
             }
           }
@@ -114,11 +111,7 @@ export const PathBrowser: React.FC<PathBrowserProps> = ({
 
   // Update current browse path when selected prefix changes
   useEffect(() => {
-    if (
-      isRestrictedMode &&
-      selectedPrefix &&
-      selectedPrefix !== currentBrowsePath
-    ) {
+    if (isRestrictedMode && selectedPrefix && selectedPrefix !== currentBrowsePath) {
       setCurrentBrowsePath(selectedPrefix);
       setValidationError("");
     }
@@ -135,11 +128,9 @@ export const PathBrowser: React.FC<PathBrowserProps> = ({
       const normalizedPath = path.endsWith("/") ? path : `${path}/`;
 
       // Check if path starts with any allowed prefix (only check forward, not reverse)
-      return normalizedPrefixes.some((prefix) =>
-        normalizedPath.startsWith(prefix),
-      );
+      return normalizedPrefixes.some((prefix) => normalizedPath.startsWith(prefix));
     },
-    [isRestrictedMode, normalizedPrefixes],
+    [isRestrictedMode, normalizedPrefixes]
   );
 
   // Handle prefix selection change
@@ -178,17 +169,12 @@ export const PathBrowser: React.FC<PathBrowserProps> = ({
     }
 
     // Ensure consistent normalization with trailing slash
-    const normalizedPath = pathToCheck.endsWith("/")
-      ? pathToCheck
-      : `${pathToCheck}/`;
+    const normalizedPath = pathToCheck.endsWith("/") ? pathToCheck : `${pathToCheck}/`;
 
     // Find the longest matching prefix
     let longestMatch = "";
     for (const prefix of normalizedPrefixes) {
-      if (
-        normalizedPath.startsWith(prefix) &&
-        prefix.length > longestMatch.length
-      ) {
+      if (normalizedPath.startsWith(prefix) && prefix.length > longestMatch.length) {
         longestMatch = prefix;
       }
     }
@@ -202,10 +188,7 @@ export const PathBrowser: React.FC<PathBrowserProps> = ({
   useEffect(() => {
     if (isRestrictedMode && s3ExplorerRestrictedBase && open) {
       // Only update if currentBrowsePath is invalid or doesn't start with the restricted base
-      if (
-        currentBrowsePath &&
-        currentBrowsePath.startsWith(s3ExplorerRestrictedBase)
-      ) {
+      if (currentBrowsePath && currentBrowsePath.startsWith(s3ExplorerRestrictedBase)) {
         return;
       }
       // Update only when the path is genuinely incorrect
@@ -260,12 +243,7 @@ export const PathBrowser: React.FC<PathBrowserProps> = ({
   }
 
   return (
-    <Dialog
-      open={open}
-      onClose={handleDialogClose}
-      maxWidth={isMobile ? "md" : "lg"}
-      fullWidth
-    >
+    <Dialog open={open} onClose={handleDialogClose} maxWidth={isMobile ? "md" : "lg"} fullWidth>
       <DialogTitle>{t("pathBrowser.title")}</DialogTitle>
 
       <DialogContent>
@@ -280,9 +258,7 @@ export const PathBrowser: React.FC<PathBrowserProps> = ({
         {isRestrictedMode && (
           <Box sx={{ mb: 3 }}>
             <FormControl fullWidth>
-              <InputLabel id="prefix-select-label">
-                {t("pathBrowser.prefixLabel")}
-              </InputLabel>
+              <InputLabel id="prefix-select-label">{t("pathBrowser.prefixLabel")}</InputLabel>
               <Select
                 labelId="prefix-select-label"
                 id="prefix-select"
@@ -321,11 +297,7 @@ export const PathBrowser: React.FC<PathBrowserProps> = ({
             backgroundColor: alpha(theme.palette.primary.main, 0.02),
           }}
         >
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ display: "block", mb: 0.5 }}
-          >
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
             {t("pathBrowser.currentPath")}
           </Typography>
           <Typography

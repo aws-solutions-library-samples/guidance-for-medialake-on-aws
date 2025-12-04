@@ -16,9 +16,11 @@ interface PipelineUpdateConfirmationDialogProps {
   onConfirm: () => void;
 }
 
-export const PipelineUpdateConfirmationDialog: React.FC<
-  PipelineUpdateConfirmationDialogProps
-> = ({ open, onClose, onConfirm }) => {
+export const PipelineUpdateConfirmationDialog: React.FC<PipelineUpdateConfirmationDialogProps> = ({
+  open,
+  onClose,
+  onConfirm,
+}) => {
   return (
     <Dialog open={open} onClose={onClose}>
       <DialogTitle>Update Pipeline</DialogTitle>
@@ -26,8 +28,8 @@ export const PipelineUpdateConfirmationDialog: React.FC<
         <Box sx={{ display: "flex", alignItems: "flex-start", mb: 2 }}>
           <WarningIcon color="warning" sx={{ mr: 1, mt: 0.5 }} />
           <Typography variant="body1">
-            <strong>Warning:</strong> Updating a pipeline while executions are
-            processing might interrupt those executions.
+            <strong>Warning:</strong> Updating a pipeline while executions are processing might
+            interrupt those executions.
           </Typography>
         </Box>
         <Typography variant="body2" color="text.secondary">

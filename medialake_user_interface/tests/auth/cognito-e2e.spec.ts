@@ -34,12 +34,8 @@ test.describe("Cognito E2E Authentication Tests", () => {
       .waitFor({ state: "visible", timeout: 10000 });
 
     // Fill in the login form with the dynamically created test user
-    await page
-      .getByRole("textbox", { name: "Email" })
-      .fill(cognitoTestUser.username);
-    await page
-      .getByRole("textbox", { name: "Password" })
-      .fill(cognitoTestUser.password);
+    await page.getByRole("textbox", { name: "Email" }).fill(cognitoTestUser.username);
+    await page.getByRole("textbox", { name: "Password" }).fill(cognitoTestUser.password);
 
     // Submit the form
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
@@ -52,33 +48,25 @@ test.describe("Cognito E2E Authentication Tests", () => {
     await expect(page).toHaveURL(rootUrl);
   });
 
-  test("should provide unique test users for parallel execution", async ({
-    cognitoTestUser,
-  }) => {
+  test("should provide unique test users for parallel execution", async ({ cognitoTestUser }) => {
     // Each test gets its own unique user, safe for parallel execution
     expect(cognitoTestUser.username).toMatch(
-      /^mne-medialake\+e2etest-\d+-[a-f0-9]{8}@amazon\.com$/,
+      /^mne-medialake\+e2etest-\d+-[a-f0-9]{8}@amazon\.com$/
     );
-    expect(cognitoTestUser.email).toMatch(
-      /^mne-medialake\+e2etest-\d+-[a-f0-9]{8}@amazon\.com$/,
-    );
+    expect(cognitoTestUser.email).toMatch(/^mne-medialake\+e2etest-\d+-[a-f0-9]{8}@amazon\.com$/);
     expect(cognitoTestUser.password.length).toBeGreaterThanOrEqual(8); // Dynamic length based on policy
     expect(cognitoTestUser.userPoolId).toBeTruthy();
     expect(cognitoTestUser.userPoolClientId).toBeTruthy();
   });
 
-  test("should cleanup test user after test completion", async ({
-    cognitoTestUser,
-  }) => {
+  test("should cleanup test user after test completion", async ({ cognitoTestUser }) => {
     // This test verifies that the fixture provides valid user data
     // The cleanup happens automatically in the fixture's finally block
     expect(cognitoTestUser.username).toBeTruthy();
     expect(cognitoTestUser.password).toBeTruthy();
 
     // The user will be automatically deleted after this test completes
-    console.log(
-      `Test user ${cognitoTestUser.username} will be cleaned up automatically`,
-    );
+    console.log(`Test user ${cognitoTestUser.username} will be cleaned up automatically`);
   });
 });
 

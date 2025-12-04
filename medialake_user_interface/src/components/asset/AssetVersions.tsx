@@ -32,17 +32,12 @@ const AssetVersions: React.FC<AssetVersionsProps> = ({ versions }) => {
               p: 2,
             }}
           >
-            <Box
-              sx={{ display: "flex", alignItems: "flex-start", width: "100%" }}
-            >
+            <Box sx={{ display: "flex", alignItems: "flex-start", width: "100%" }}>
               <ListItemIcon sx={{ minWidth: 40, mt: 0.5 }}>
                 <HistoryIcon />
               </ListItemIcon>
               <Box sx={{ flex: 1 }}>
-                <Typography
-                  variant="subtitle1"
-                  sx={{ textTransform: "capitalize" }}
-                >
+                <Typography variant="subtitle1" sx={{ textTransform: "capitalize" }}>
                   {version.type}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">

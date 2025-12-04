@@ -54,11 +54,7 @@ export const PipelineFilterPopover: React.FC<PipelineFilterPopoverProps> = ({
           />
           <Stack direction="row" spacing={1} justifyContent="flex-end">
             <Button onClick={handleClearFilter}>Clear</Button>
-            <Button
-              variant="contained"
-              onClick={handleApplyFilter}
-              disabled={!filterValue}
-            >
+            <Button variant="contained" onClick={handleApplyFilter} disabled={!filterValue}>
               Apply
             </Button>
           </Stack>

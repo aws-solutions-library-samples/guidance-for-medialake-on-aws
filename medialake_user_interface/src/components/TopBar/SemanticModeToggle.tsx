@@ -1,10 +1,5 @@
 import React from "react";
-import {
-  Box,
-  ToggleButton,
-  ToggleButtonGroup,
-  Typography,
-} from "@mui/material";
+import { Box, ToggleButton, ToggleButtonGroup, Typography } from "@mui/material";
 import { useTheme as useMuiTheme } from "@mui/material/styles";
 import { useTheme } from "../../hooks/useTheme";
 import { useSemanticMode, useDomainActions } from "../../stores/searchStore";
@@ -13,9 +8,7 @@ interface SemanticModeToggleProps {
   isVisible: boolean;
 }
 
-const SemanticModeToggle: React.FC<SemanticModeToggleProps> = ({
-  isVisible,
-}) => {
+const SemanticModeToggle: React.FC<SemanticModeToggleProps> = ({ isVisible }) => {
   const muiTheme = useMuiTheme();
   const { theme } = useTheme();
   const semanticMode = useSemanticMode();
@@ -23,7 +16,7 @@ const SemanticModeToggle: React.FC<SemanticModeToggleProps> = ({
 
   const handleModeChange = (
     event: React.MouseEvent<HTMLElement>,
-    newMode: "full" | "clip" | null,
+    newMode: "full" | "clip" | null
   ) => {
     if (newMode !== null) {
       setSemanticMode(newMode);
@@ -43,8 +36,7 @@ const SemanticModeToggle: React.FC<SemanticModeToggleProps> = ({
         px: 1,
         py: 0.5,
         borderRadius: "16px",
-        backgroundColor:
-          theme === "dark" ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.02)",
+        backgroundColor: theme === "dark" ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.02)",
         border: `1px solid ${theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)"}`,
       }}
     >
@@ -72,14 +64,10 @@ const SemanticModeToggle: React.FC<SemanticModeToggleProps> = ({
             textTransform: "none",
             border: "none",
             borderRadius: "12px !important",
-            color:
-              theme === "dark" ? "rgba(255,255,255,0.6)" : "text.secondary",
+            color: theme === "dark" ? "rgba(255,255,255,0.6)" : "text.secondary",
             backgroundColor: "transparent",
             "&:hover": {
-              backgroundColor:
-                theme === "dark"
-                  ? "rgba(255,255,255,0.08)"
-                  : "rgba(0,0,0,0.04)",
+              backgroundColor: theme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.04)",
             },
             "&.Mui-selected": {
               backgroundColor: muiTheme.palette.primary.main,

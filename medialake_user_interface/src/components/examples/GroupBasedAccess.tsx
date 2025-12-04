@@ -75,10 +75,9 @@ const GroupBasedAccess: React.FC = () => {
       </Typography>
 
       <Typography variant="body1" paragraph>
-        This component demonstrates how to use the Can component to
-        conditionally render UI elements based on the user's group membership.
-        In this case, system settings are only visible to users in the
-        "administrators" group.
+        This component demonstrates how to use the Can component to conditionally render UI elements
+        based on the user's group membership. In this case, system settings are only visible to
+        users in the "administrators" group.
       </Typography>
 
       {userInfo && (
@@ -87,15 +86,10 @@ const GroupBasedAccess: React.FC = () => {
             Current User Information
           </Typography>
           <Typography variant="body2">User ID: {userInfo.sub}</Typography>
-          <Typography variant="body2">
-            Username: {userInfo["cognito:username"]}
-          </Typography>
+          <Typography variant="body2">Username: {userInfo["cognito:username"]}</Typography>
           <Typography variant="body2">Email: {userInfo.email}</Typography>
           <Typography variant="body2">
-            Groups:{" "}
-            {userInfo["cognito:groups"]
-              ? userInfo["cognito:groups"].join(", ")
-              : "None"}
+            Groups: {userInfo["cognito:groups"] ? userInfo["cognito:groups"].join(", ") : "None"}
           </Typography>
         </Paper>
       )}
@@ -131,10 +125,7 @@ const GroupBasedAccess: React.FC = () => {
               <ListItemIcon>
                 <SecurityIcon />
               </ListItemIcon>
-              <ListItemText
-                primary="Security Settings"
-                secondary="Manage your account security"
-              />
+              <ListItemText primary="Security Settings" secondary="Manage your account security" />
             </ListItem>
           </List>
         </Paper>
@@ -147,8 +138,7 @@ const GroupBasedAccess: React.FC = () => {
                 System Settings
               </Typography>
               <Typography variant="body2" color="text.secondary" paragraph>
-                These settings are only available to users in the
-                "administrators" group.
+                These settings are only available to users in the "administrators" group.
               </Typography>
 
               {/* Debug information */}
@@ -175,12 +165,8 @@ const GroupBasedAccess: React.FC = () => {
                     ? "Yes"
                     : "No"}
                 </Typography>
-                <Typography variant="body2">
-                  Loading: {loading ? "Yes" : "No"}
-                </Typography>
-                <Typography variant="body2">
-                  Error: {error ? error.message : "None"}
-                </Typography>
+                <Typography variant="body2">Loading: {loading ? "Yes" : "No"}</Typography>
+                <Typography variant="body2">Error: {error ? error.message : "None"}</Typography>
                 {userInfo && (
                   <Typography variant="body2">
                     Groups: {JSON.stringify(userInfo["cognito:groups"])}
@@ -214,26 +200,20 @@ const GroupBasedAccess: React.FC = () => {
                     <ListItemIcon>
                       <BackupIcon />
                     </ListItemIcon>
-                    <ListItemText
-                      primary="Backup Settings"
-                      secondary="Configure backup settings"
-                    />
+                    <ListItemText primary="Backup Settings" secondary="Configure backup settings" />
                   </ListItem>
                   <Divider />
                   <ListItem>
                     <ListItemIcon>
                       <IntegrationInstructionsIcon />
                     </ListItemIcon>
-                    <ListItemText
-                      primary="API Configuration"
-                      secondary="Configure API settings"
-                    />
+                    <ListItemText primary="API Configuration" secondary="Configure API settings" />
                   </ListItem>
                 </List>
               ) : (
                 <Alert severity="warning">
-                  You don't have permission to access system settings. Only
-                  administrators can access these settings.
+                  You don't have permission to access system settings. Only administrators can
+                  access these settings.
                 </Alert>
               )}
             </Paper>

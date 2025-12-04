@@ -11,10 +11,7 @@ interface ActionsCellProps {
   onEdit: (environment: Environment) => void;
 }
 
-export const ActionsCell: React.FC<ActionsCellProps> = ({
-  environment,
-  onEdit,
-}) => {
+export const ActionsCell: React.FC<ActionsCellProps> = ({ environment, onEdit }) => {
   const { t } = useTranslation();
   const { enqueueSnackbar } = useSnackbar();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -43,10 +40,8 @@ export const ActionsCell: React.FC<ActionsCellProps> = ({
       });
     } catch (error) {
       enqueueSnackbar(
-        error instanceof Error
-          ? error.message
-          : t("settings.environments.deleteError"),
-        { variant: "error" },
+        error instanceof Error ? error.message : t("settings.environments.deleteError"),
+        { variant: "error" }
       );
     }
     handleClose();
@@ -73,12 +68,8 @@ export const ActionsCell: React.FC<ActionsCellProps> = ({
           "aria-labelledby": "environment-actions-button",
         }}
       >
-        <MenuItem onClick={handleEdit}>
-          {t("settings.environments.actions.edit")}
-        </MenuItem>
-        <MenuItem onClick={handleDelete}>
-          {t("settings.environments.actions.delete")}
-        </MenuItem>
+        <MenuItem onClick={handleEdit}>{t("settings.environments.actions.edit")}</MenuItem>
+        <MenuItem onClick={handleDelete}>{t("settings.environments.actions.delete")}</MenuItem>
       </Menu>
     </>
   );

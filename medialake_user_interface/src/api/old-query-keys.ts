@@ -26,19 +26,8 @@ export const queryKeys = createQueryKeyStore({
   connectorS3: {
     root: ["connectors", "s3"],
     buckets: null,
-    explorer: (
-      connectorId: string,
-      prefix: string,
-      continuationToken: string | null,
-    ) => ({
-      queryKey: [
-        "connectors",
-        "s3",
-        "explorer",
-        connectorId,
-        prefix,
-        continuationToken,
-      ],
+    explorer: (connectorId: string, prefix: string, continuationToken: string | null) => ({
+      queryKey: ["connectors", "s3", "explorer", connectorId, prefix, continuationToken],
     }),
   },
   pipelines: {

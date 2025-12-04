@@ -61,7 +61,7 @@ export const useAddFavorite = () => {
     mutationFn: async (favoriteData) => {
       const { data } = await apiClient.post<AddFavoriteResponse>(
         API_ENDPOINTS.FAVORITES.BASE,
-        favoriteData,
+        favoriteData
       );
       return data.data.favorite;
     },
@@ -74,10 +74,7 @@ export const useAddFavorite = () => {
 
       // Also explicitly invalidate the specific query for the item type
       // This ensures that filtered queries like useGetFavorites('ASSET') are also refreshed
-      console.log(
-        "Invalidating specific query with itemType:",
-        variables.itemType,
-      );
+      console.log("Invalidating specific query with itemType:", variables.itemType);
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.FAVORITES.list(variables.itemType),
       });
@@ -103,10 +100,7 @@ export const useRemoveFavorite = () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FAVORITES.all });
 
       // Also explicitly invalidate the specific query for the item type
-      console.log(
-        "Invalidating specific query with itemType:",
-        variables.itemType,
-      );
+      console.log("Invalidating specific query with itemType:", variables.itemType);
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.FAVORITES.list(variables.itemType),
       });
@@ -121,8 +115,7 @@ export const useRemoveFavorite = () => {
 export const useIsFavorited = (itemId: string, itemType: string) => {
   const { data: favorites, isLoading } = useGetFavorites(itemType);
 
-  const isFavorited =
-    favorites?.some((favorite) => favorite.itemId === itemId) || false;
+  const isFavorited = favorites?.some((favorite) => favorite.itemId === itemId) || false;
 
   return {
     isFavorited,

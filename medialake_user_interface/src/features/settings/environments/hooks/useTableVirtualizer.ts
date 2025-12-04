@@ -9,7 +9,7 @@ interface UseTableVirtualizerOptions {
 export const useTableVirtualizer = <T extends HTMLElement>(
   rows: any[],
   containerRef: React.RefObject<T>,
-  options: UseTableVirtualizerOptions = {},
+  options: UseTableVirtualizerOptions = {}
 ) => {
   const { rowHeight = 53, overscan = 20 } = options;
 

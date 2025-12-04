@@ -419,12 +419,15 @@ Key performance indicators:
 ### Common Issues
 
 1. **Missing Assets in OpenSearch**: Assets may not be indexed yet
+
    - **Solution**: Check OpenSearch indexing status
 
 2. **CloudFront URL Generation Failures**: Network or permission issues
+
    - **Solution**: Verify CloudFront configuration and IAM permissions
 
 3. **Collection Access Denied**: Permission validation failures
+
    - **Solution**: Check collection ownership and sharing settings
 
 4. **Performance Issues**: Large collections causing timeouts

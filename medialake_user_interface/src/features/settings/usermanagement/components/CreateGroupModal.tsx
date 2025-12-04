@@ -21,10 +21,7 @@ interface CreateGroupModalProps {
   onClose: () => void;
 }
 
-const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
-  open,
-  onClose,
-}) => {
+const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ open, onClose }) => {
   const { t } = useTranslation();
   const [formData, setFormData] = useState<CreateGroupRequest>({
     name: "",
@@ -167,11 +164,7 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
             onClick={handleSubmit}
             variant="contained"
             disabled={createGroupMutation.isPending}
-            startIcon={
-              createGroupMutation.isPending ? (
-                <CircularProgress size={20} />
-              ) : null
-            }
+            startIcon={createGroupMutation.isPending ? <CircularProgress size={20} /> : null}
           >
             {t("common.actions.create")}
           </Button>
@@ -184,11 +177,7 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
-        <Alert
-          onClose={handleCloseSnackbar}
-          severity={snackbar.severity}
-          sx={{ width: "100%" }}
-        >
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: "100%" }}>
           {snackbar.message}
         </Alert>
       </Snackbar>

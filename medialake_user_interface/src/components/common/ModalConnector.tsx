@@ -1,13 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  Box,
-} from "@mui/material";
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Box } from "@mui/material";
 
 interface ModalContextType {
   showModal: (content: ReactNode, options?: ModalOptions) => void;

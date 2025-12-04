@@ -78,7 +78,7 @@ class ApiClient extends ApiClientBase {
       (error) => {
         console.error("❌ Request Interceptor Error:", error);
         return Promise.reject(error);
-      },
+      }
     );
 
     this.axiosInstance.interceptors.response.use(
@@ -111,9 +111,7 @@ class ApiClient extends ApiClientBase {
           console.log("🔄 Token expired, attempting refresh...");
 
           if (this.isRefreshing) {
-            console.log(
-              "⏳ Token refresh already in progress, queuing request...",
-            );
+            console.log("⏳ Token refresh already in progress, queuing request...");
             return new Promise((resolve, reject) => {
               this.failedQueue.push({ resolve, reject });
             })
@@ -153,7 +151,7 @@ class ApiClient extends ApiClientBase {
         }
 
         return Promise.reject(error);
-      },
+      }
     );
   }
 

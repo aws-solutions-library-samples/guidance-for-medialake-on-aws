@@ -56,18 +56,11 @@ export class CloudFrontServiceAdapter implements ServiceAdapter {
    * Discover CloudFront distributions using tag-based filtering
    * TODO: Implement with actual AWS SDK when packages are installed
    */
-  async discoverResources(
-    filters: TagFilter[],
-  ): Promise<CloudFrontDistribution[]> {
-    console.log(
-      `[CloudFrontAdapter] Discovering distributions with filters:`,
-      filters,
-    );
+  async discoverResources(filters: TagFilter[]): Promise<CloudFrontDistribution[]> {
+    console.log(`[CloudFrontAdapter] Discovering distributions with filters:`, filters);
 
     // Use fallback discovery method to find real CloudFront distributions
-    console.log(
-      `[CloudFrontAdapter] Using fallback discovery - AWS SDK packages not installed`,
-    );
+    console.log(`[CloudFrontAdapter] Using fallback discovery - AWS SDK packages not installed`);
 
     return await this.fallbackDiscovery(filters);
   }
@@ -91,11 +84,9 @@ export class CloudFrontServiceAdapter implements ServiceAdapter {
    * TODO: Implement with actual AWS SDK when packages are installed
    */
   async getDistributionConfiguration(distributionId: string): Promise<any> {
-    console.log(
-      `[CloudFrontAdapter] Getting configuration for distribution: ${distributionId}`,
-    );
+    console.log(`[CloudFrontAdapter] Getting configuration for distribution: ${distributionId}`);
     console.warn(
-      `[CloudFrontAdapter] Placeholder implementation - would fetch config with AWS SDK`,
+      `[CloudFrontAdapter] Placeholder implementation - would fetch config with AWS SDK`
     );
 
     // Return mock configuration
@@ -115,8 +106,7 @@ export class CloudFrontServiceAdapter implements ServiceAdapter {
             DomainName: "medialake-assets.s3.amazonaws.com",
             OriginPath: "/media",
             S3OriginConfig: {
-              OriginAccessIdentity:
-                "origin-access-identity/cloudfront/E1234567890ABC", // pragma: allowlist secret
+              OriginAccessIdentity: "origin-access-identity/cloudfront/E1234567890ABC", // pragma: allowlist secret
             },
           },
         ],
@@ -139,23 +129,18 @@ export class CloudFrontServiceAdapter implements ServiceAdapter {
   /**
    * Create cache invalidation for testing purposes
    */
-  async createInvalidation(
-    distributionId: string,
-    paths: string[],
-  ): Promise<string> {
+  async createInvalidation(distributionId: string, paths: string[]): Promise<string> {
     console.log(
       `[CloudFrontAdapter] Creating invalidation for distribution ${distributionId}, paths:`,
-      paths,
+      paths
     );
     console.warn(
-      `[CloudFrontAdapter] Placeholder implementation - would create invalidation with AWS SDK`,
+      `[CloudFrontAdapter] Placeholder implementation - would create invalidation with AWS SDK`
     );
 
     // Return mock invalidation ID
     const invalidationId = `I${Date.now()}`;
-    console.log(
-      `[CloudFrontAdapter] Mock invalidation created: ${invalidationId}`,
-    );
+    console.log(`[CloudFrontAdapter] Mock invalidation created: ${invalidationId}`);
 
     return invalidationId;
   }
@@ -163,40 +148,30 @@ export class CloudFrontServiceAdapter implements ServiceAdapter {
   /**
    * Wait for invalidation to complete
    */
-  async waitForInvalidation(
-    distributionId: string,
-    invalidationId: string,
-  ): Promise<void> {
+  async waitForInvalidation(distributionId: string, invalidationId: string): Promise<void> {
     console.log(
-      `[CloudFrontAdapter] Waiting for invalidation ${invalidationId} on distribution ${distributionId}`,
+      `[CloudFrontAdapter] Waiting for invalidation ${invalidationId} on distribution ${distributionId}`
     );
     console.warn(
-      `[CloudFrontAdapter] Placeholder implementation - would poll invalidation status with AWS SDK`,
+      `[CloudFrontAdapter] Placeholder implementation - would poll invalidation status with AWS SDK`
     );
 
     // Mock wait time
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    console.log(
-      `[CloudFrontAdapter] Mock invalidation completed: ${invalidationId}`,
-    );
+    console.log(`[CloudFrontAdapter] Mock invalidation completed: ${invalidationId}`);
   }
 
   /**
    * Check if distribution is ready for testing
    */
   async isDistributionReady(distributionId: string): Promise<boolean> {
-    console.log(
-      `[CloudFrontAdapter] Checking if distribution ${distributionId} is ready`,
-    );
+    console.log(`[CloudFrontAdapter] Checking if distribution ${distributionId} is ready`);
 
     try {
       const config = await this.getDistributionConfiguration(distributionId);
       return config.Enabled === true;
     } catch (error) {
-      console.warn(
-        `[CloudFrontAdapter] Error checking distribution readiness:`,
-        error,
-      );
+      console.warn(`[CloudFrontAdapter] Error checking distribution readiness:`, error);
       return false;
     }
   }
@@ -205,9 +180,7 @@ export class CloudFrontServiceAdapter implements ServiceAdapter {
    * Get distribution domain name for testing
    */
   async getDistributionDomainName(distributionId: string): Promise<string> {
-    console.log(
-      `[CloudFrontAdapter] Getting domain name for distribution: ${distributionId}`,
-    );
+    console.log(`[CloudFrontAdapter] Getting domain name for distribution: ${distributionId}`);
 
     // Placeholder - would get from actual distribution configuration
     return `${distributionId.toLowerCase()}.cloudfront.net`;
@@ -216,12 +189,9 @@ export class CloudFrontServiceAdapter implements ServiceAdapter {
   /**
    * Test distribution accessibility
    */
-  async testDistributionAccess(
-    distributionId: string,
-    testPath: string = "/",
-  ): Promise<boolean> {
+  async testDistributionAccess(distributionId: string, testPath: string = "/"): Promise<boolean> {
     console.log(
-      `[CloudFrontAdapter] Testing access to distribution ${distributionId} at path: ${testPath}`,
+      `[CloudFrontAdapter] Testing access to distribution ${distributionId} at path: ${testPath}`
     );
 
     try {
@@ -230,16 +200,13 @@ export class CloudFrontServiceAdapter implements ServiceAdapter {
 
       console.log(`[CloudFrontAdapter] Would test URL: ${testUrl}`);
       console.warn(
-        `[CloudFrontAdapter] Placeholder implementation - would make HTTP request to test access`,
+        `[CloudFrontAdapter] Placeholder implementation - would make HTTP request to test access`
       );
 
       // Mock successful access test
       return true;
     } catch (error) {
-      console.warn(
-        `[CloudFrontAdapter] Distribution access test failed:`,
-        error,
-      );
+      console.warn(`[CloudFrontAdapter] Distribution access test failed:`, error);
       return false;
     }
   }
@@ -248,18 +215,14 @@ export class CloudFrontServiceAdapter implements ServiceAdapter {
    * Fallback discovery using list-based approach
    * This method provides backward compatibility if tag-based discovery fails
    */
-  async fallbackDiscovery(
-    filters: TagFilter[],
-  ): Promise<CloudFrontDistribution[]> {
+  async fallbackDiscovery(filters: TagFilter[]): Promise<CloudFrontDistribution[]> {
     console.log(`[CloudFrontAdapter] Using fallback discovery method`);
 
     // Look for Application filter to determine naming pattern
     const applicationFilter = filters.find((f) => f.key === "Application");
     const searchPattern = applicationFilter?.values[0] || "medialake";
 
-    console.log(
-      `[CloudFrontAdapter] Searching for distributions related to: ${searchPattern}`,
-    );
+    console.log(`[CloudFrontAdapter] Searching for distributions related to: ${searchPattern}`);
 
     try {
       // Use AWS CLI to list CloudFront distributions
@@ -281,9 +244,7 @@ export class CloudFrontServiceAdapter implements ServiceAdapter {
       const distributionsData = JSON.parse(distributionsOutput);
       const distributions = distributionsData.DistributionList?.Items || [];
 
-      console.log(
-        `[CloudFrontAdapter] Found ${distributions.length} total distributions`,
-      );
+      console.log(`[CloudFrontAdapter] Found ${distributions.length} total distributions`);
 
       const matchingDistributions: CloudFrontDistribution[] = [];
 
@@ -300,9 +261,7 @@ export class CloudFrontServiceAdapter implements ServiceAdapter {
         console.log(`  - ARN: ${dist.ARN}`);
 
         // Always check tags for every distribution, regardless of name/comment matching
-        console.log(
-          `[CloudFrontAdapter] Checking tags for distribution: ${dist.Id}`,
-        );
+        console.log(`[CloudFrontAdapter] Checking tags for distribution: ${dist.Id}`);
 
         // Get distribution tags to verify it matches our filters
         try {
@@ -321,9 +280,7 @@ export class CloudFrontServiceAdapter implements ServiceAdapter {
           const tagsData = JSON.parse(tagsOutput);
           const tags = tagsData.Tags?.Items || [];
 
-          console.log(
-            `[CloudFrontAdapter] Found ${tags.length} tags for distribution ${dist.Id}:`,
-          );
+          console.log(`[CloudFrontAdapter] Found ${tags.length} tags for distribution ${dist.Id}:`);
           tags.forEach((tag: any) => {
             console.log(`  - ${tag.Key}: ${tag.Value}`);
           });
@@ -337,16 +294,11 @@ export class CloudFrontServiceAdapter implements ServiceAdapter {
           // Check if tags match our filters - check both cases
           const applicationTag = tagMap["Application"] || tagMap["application"];
           console.log(
-            `[CloudFrontAdapter] Application tag value: "${applicationTag}", searching for: "${searchPattern}"`,
+            `[CloudFrontAdapter] Application tag value: "${applicationTag}", searching for: "${searchPattern}"`
           );
 
-          if (
-            applicationTag &&
-            applicationTag.toLowerCase() === searchPattern.toLowerCase()
-          ) {
-            console.log(
-              `[CloudFrontAdapter] ✓ Distribution ${dist.Id} matches Application tag!`,
-            );
+          if (applicationTag && applicationTag.toLowerCase() === searchPattern.toLowerCase()) {
+            console.log(`[CloudFrontAdapter] ✓ Distribution ${dist.Id} matches Application tag!`);
 
             const cloudFrontDist: CloudFrontDistribution = {
               id: dist.Id,
@@ -372,31 +324,29 @@ export class CloudFrontServiceAdapter implements ServiceAdapter {
 
             matchingDistributions.push(cloudFrontDist);
             console.log(
-              `[CloudFrontAdapter] Added distribution: ${cloudFrontDist.name} (${cloudFrontDist.domainName})`,
+              `[CloudFrontAdapter] Added distribution: ${cloudFrontDist.name} (${cloudFrontDist.domainName})`
             );
           } else {
             console.log(
-              `[CloudFrontAdapter] ✗ Distribution ${dist.Id} does not match Application tag`,
+              `[CloudFrontAdapter] ✗ Distribution ${dist.Id} does not match Application tag`
             );
           }
         } catch (tagError: any) {
           console.warn(
             `[CloudFrontAdapter] Could not get tags for distribution ${dist.Id}:`,
-            tagError.message,
+            tagError.message
           );
 
           // Check if distribution comment or aliases contain the search pattern as fallback
           const matchesPattern =
             comment.toLowerCase().includes(searchPattern.toLowerCase()) ||
             aliases.some((alias: string) =>
-              alias.toLowerCase().includes(searchPattern.toLowerCase()),
+              alias.toLowerCase().includes(searchPattern.toLowerCase())
             ) ||
             domainName.toLowerCase().includes(searchPattern.toLowerCase());
 
           if (matchesPattern) {
-            console.log(
-              `[CloudFrontAdapter] Using fallback pattern matching for ${dist.Id}`,
-            );
+            console.log(`[CloudFrontAdapter] Using fallback pattern matching for ${dist.Id}`);
             const cloudFrontDist: CloudFrontDistribution = {
               id: dist.Id,
               name: comment || `cloudfront-${dist.Id}`,
@@ -421,21 +371,18 @@ export class CloudFrontServiceAdapter implements ServiceAdapter {
 
             matchingDistributions.push(cloudFrontDist);
             console.log(
-              `[CloudFrontAdapter] Added distribution via fallback: ${cloudFrontDist.name}`,
+              `[CloudFrontAdapter] Added distribution via fallback: ${cloudFrontDist.name}`
             );
           }
         }
       }
 
       console.log(
-        `[CloudFrontAdapter] Found ${matchingDistributions.length} matching distributions`,
+        `[CloudFrontAdapter] Found ${matchingDistributions.length} matching distributions`
       );
       return matchingDistributions;
     } catch (error: any) {
-      console.error(
-        `[CloudFrontAdapter] Fallback discovery failed:`,
-        error.message,
-      );
+      console.error(`[CloudFrontAdapter] Fallback discovery failed:`, error.message);
       return [];
     }
   }
@@ -444,9 +391,7 @@ export class CloudFrontServiceAdapter implements ServiceAdapter {
    * Cleanup resources and connections
    */
   async cleanup(): Promise<void> {
-    console.log(
-      `[CloudFrontAdapter] Cleaning up CloudFront service adapter...`,
-    );
+    console.log(`[CloudFrontAdapter] Cleaning up CloudFront service adapter...`);
     // AWS SDK clients don't require explicit cleanup in v3
   }
 }
@@ -455,7 +400,7 @@ export class CloudFrontServiceAdapter implements ServiceAdapter {
  * Factory function to create CloudFrontServiceAdapter
  */
 export function createCloudFrontServiceAdapter(
-  config: ResourceDiscoveryConfig,
+  config: ResourceDiscoveryConfig
 ): CloudFrontServiceAdapter {
   return new CloudFrontServiceAdapter(config);
 }

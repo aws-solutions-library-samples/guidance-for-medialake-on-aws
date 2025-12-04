@@ -6,9 +6,7 @@ export function useNavigationPanelState(): [
   NavigationPanelState,
   (state: Partial<NavigationPanelState>) => void,
 ] {
-  const [currentState, setCurrentState] = useState(
-    StorageHelper.getNavigationPanelState(),
-  );
+  const [currentState, setCurrentState] = useState(StorageHelper.getNavigationPanelState());
 
   const onChange = (state: Partial<NavigationPanelState>) => {
     setCurrentState(StorageHelper.setNavigationPanelState(state));

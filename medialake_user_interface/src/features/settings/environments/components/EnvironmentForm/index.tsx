@@ -66,12 +66,7 @@ export const EnvironmentForm: React.FC<EnvironmentFormProps> = ({
           : t("settings.environments.createTitle")}
       </DialogTitle>
       <DialogContent>
-        <Form
-          form={form}
-          onSubmit={handleSubmit}
-          onCancel={onClose}
-          submitLabel={t("common.save")}
-        >
+        <Form form={form} onSubmit={handleSubmit} onCancel={onClose} submitLabel={t("common.save")}>
           <FormField
             name="name"
             control={form.control}

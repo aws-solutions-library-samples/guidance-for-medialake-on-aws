@@ -136,9 +136,11 @@ We recommend creating a **Budget through AWS Cost Explorer** to help manage cost
 ### Deployment Steps
 
 1. **Download the CloudFormation template**
+
    - Download `medialake.template` from the GitHub repository
 
 2. **Deploy using AWS Console**
+
    - Go to the AWS Console > CloudFormation > "Create Stack" > "With new resources (standard)"
    - Choose **Upload a template file**, select `medialake.template`
    - Set stack name to `medialake-cf`
@@ -146,11 +148,13 @@ We recommend creating a **Budget through AWS Cost Explorer** to help manage cost
 3. **Configure template parameters:**
 
    #### Initial Media Lake User
+
    - **InitialUserEmail**: Email address for the initial administrator account (required)
    - **InitialUserFirstName**: First name of the initial administrator (1-50 characters, letters/spaces/hyphens/periods only)
    - **InitialUserLastName**: Last name of the initial administrator (1-50 characters, letters/spaces/hyphens/periods only)
 
    #### Media Lake Configuration
+
    - **MediaLakeEnvironmentName**: Environment identifier (1-4 alphanumeric characters, default: `dev`)
    - **OpenSearchDeploymentSize**: Controls the size of your OpenSearch cluster
      - `small`: Suitable for development and testing environments
@@ -158,6 +162,7 @@ We recommend creating a **Budget through AWS Cost Explorer** to help manage cost
      - `large`: Designed for high-volume production environments
 
    #### Media Lake Deployment Configuration
+
    - **SourceType**: Deployment source method
      - `Git`: Deploy directly from a public Git repository
      - `S3PresignedURL`: Deploy from a ZIP file via presigned URL
@@ -167,10 +172,12 @@ We recommend creating a **Budget through AWS Cost Explorer** to help manage cost
    > **Note:** You can use the default deployment configuration settings without making any changes. The defaults are configured to deploy from the official AWS Solutions Library repository.
 
 4. **Complete deployment**
+
    - Accept the required IAM capabilities and deploy
    - Monitor the stack creation progress in the CloudFormation console
 
 5. **Initiate deployment**
+
    - Click "Create stack" to begin the deployment process
    - The initial CloudFormation stack will be created first
 

@@ -1,9 +1,5 @@
 import React from "react";
-import {
-  type ImageItem,
-  type VideoItem,
-  type AudioItem,
-} from "@/types/search/searchResults";
+import { type ImageItem, type VideoItem, type AudioItem } from "@/types/search/searchResults";
 import { type SortingState } from "@tanstack/react-table";
 import { type AssetTableColumn } from "@/types/shared/assetComponents";
 import { formatFileSize } from "@/utils/fileSize";
@@ -25,7 +21,7 @@ interface ModularUnifiedResultsViewProps {
   viewMode: "card" | "table";
   onViewModeChange: (
     event: React.MouseEvent<HTMLElement>,
-    newMode: "card" | "table" | null,
+    newMode: "card" | "table" | null
   ) => void;
   cardSize: "small" | "medium" | "large";
   onCardSizeChange: (size: "small" | "medium" | "large") => void;
@@ -43,10 +39,7 @@ interface ModularUnifiedResultsViewProps {
   onColumnToggle: (columnId: string) => void;
   // Asset action handlers
   onAssetClick: (asset: AssetItem) => void;
-  onDeleteClick: (
-    asset: AssetItem,
-    event: React.MouseEvent<HTMLElement>,
-  ) => void;
+  onDeleteClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onMenuClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onEditClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
@@ -55,16 +48,10 @@ interface ModularUnifiedResultsViewProps {
   editedName?: string;
   // Favorite functionality
   isAssetFavorited?: (assetId: string) => boolean;
-  onFavoriteToggle?: (
-    asset: AssetItem,
-    event: React.MouseEvent<HTMLElement>,
-  ) => void;
+  onFavoriteToggle?: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   // Selection functionality
   selectedAssets?: string[];
-  onSelectToggle?: (
-    asset: AssetItem,
-    event: React.MouseEvent<HTMLElement>,
-  ) => void;
+  onSelectToggle?: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onGroupByTypeChange: (checked: boolean) => void;
   onPageSizeChange: (newPageSize: number) => void;
   error?: { status: string; message: string } | null;
@@ -114,30 +101,25 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
   isRenaming = false,
   renamingAssetId,
 }) => {
-  const renderCardField = (
-    fieldId: string,
-    asset: AssetItem,
-  ): React.ReactNode => {
+  const renderCardField = (fieldId: string, asset: AssetItem): React.ReactNode => {
     switch (fieldId) {
       case "name":
-        return asset.DigitalSourceAsset.MainRepresentation.StorageInfo
-          .PrimaryLocation.ObjectKey.Name;
+        return asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey
+          .Name;
       case "type":
         return asset.DigitalSourceAsset.Type;
       case "format":
         return asset.DigitalSourceAsset.MainRepresentation.Format;
       case "size": {
         const sizeInBytes =
-          asset.DigitalSourceAsset.MainRepresentation.StorageInfo
-            .PrimaryLocation.FileInfo.Size;
+          asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size;
         return formatFileSize(sizeInBytes);
       }
       case "createdAt":
         return formatDate(asset.DigitalSourceAsset.CreateDate);
       case "modifiedAt":
         return formatDate(
-          asset.DigitalSourceAsset.ModifiedDate ||
-            asset.DigitalSourceAsset.CreateDate,
+          asset.DigitalSourceAsset.ModifiedDate || asset.DigitalSourceAsset.CreateDate
         );
       default:
         return "";
@@ -194,8 +176,7 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
       renamingAssetId={renamingAssetId}
       getAssetId={(asset) => asset.InventoryID}
       getAssetName={(asset) =>
-        asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-          .ObjectKey.Name
+        asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name
       }
       getAssetType={(asset) => asset.DigitalSourceAsset.Type}
       getAssetThumbnail={(asset) => asset.thumbnailUrl || ""}

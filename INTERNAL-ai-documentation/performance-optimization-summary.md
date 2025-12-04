@@ -213,6 +213,7 @@ Search Query → TanStack Query Cache → Search Results Page
 ### Manual Testing
 
 1. **Search Results**
+
    - Search for "cats"
    - Scroll through results (observe lazy video loading)
    - Click on a video
@@ -221,6 +222,7 @@ Search Query → TanStack Query Cache → Search Results Page
    - Navigate back to "cats" (should be instant if <10min)
 
 2. **Video Player**
+
    - Observe video loads before markers appear
    - Adjust confidence slider (should be smooth)
    - Scroll quickly through many videos (should not jank)

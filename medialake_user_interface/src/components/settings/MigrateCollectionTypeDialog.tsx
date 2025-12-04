@@ -43,9 +43,12 @@ interface MigrateCollectionTypeDialogProps {
   availableTypes: CollectionType[];
 }
 
-const MigrateCollectionTypeDialog: React.FC<
-  MigrateCollectionTypeDialogProps
-> = ({ open, onClose, sourceType, availableTypes }) => {
+const MigrateCollectionTypeDialog: React.FC<MigrateCollectionTypeDialogProps> = ({
+  open,
+  onClose,
+  sourceType,
+  availableTypes,
+}) => {
   const [targetTypeId, setTargetTypeId] = useState("");
 
   const migrateMutation = useMigrateCollectionType();
@@ -84,8 +87,8 @@ const MigrateCollectionTypeDialog: React.FC<
       <DialogContent>
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
           <Alert severity="warning">
-            This collection type is in use and cannot be deleted directly. You
-            must first migrate all collections to another type.
+            This collection type is in use and cannot be deleted directly. You must first migrate
+            all collections to another type.
           </Alert>
 
           {sourceType && (
@@ -161,8 +164,8 @@ const MigrateCollectionTypeDialog: React.FC<
 
           {targetTypeId && (
             <Alert severity="info">
-              All collections will be migrated to the selected type, and the
-              source type will be deleted.
+              All collections will be migrated to the selected type, and the source type will be
+              deleted.
             </Alert>
           )}
         </Box>

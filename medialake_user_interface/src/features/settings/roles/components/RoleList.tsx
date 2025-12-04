@@ -1,14 +1,5 @@
 import React from "react";
-import {
-  Box,
-  Paper,
-  Typography,
-  IconButton,
-  Tooltip,
-  useTheme,
-  Chip,
-  Stack,
-} from "@mui/material";
+import { Box, Paper, Typography, IconButton, Tooltip, useTheme, Chip, Stack } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { Role } from "../../../../api/types/api.types";
@@ -19,11 +10,7 @@ interface RoleListProps {
   onDeleteRole: (roleId: string) => void;
 }
 
-const RoleList: React.FC<RoleListProps> = ({
-  roles,
-  onEditRole,
-  onDeleteRole,
-}) => {
+const RoleList: React.FC<RoleListProps> = ({ roles, onEditRole, onDeleteRole }) => {
   const theme = useTheme();
 
   return (
@@ -58,9 +45,7 @@ const RoleList: React.FC<RoleListProps> = ({
                     key={permission}
                     label={permission
                       .split("_")
-                      .map(
-                        (word) => word.charAt(0) + word.slice(1).toLowerCase(),
-                      )
+                      .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
                       .join(" ")}
                     size="small"
                     color="primary"

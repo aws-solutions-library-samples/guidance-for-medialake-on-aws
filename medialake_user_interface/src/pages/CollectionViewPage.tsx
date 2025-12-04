@@ -41,18 +41,11 @@ import {
   useDeleteItemFromCollection,
 } from "@/api/hooks/useCollections";
 import { useGetCollectionAssets } from "@/api/hooks/useCollections";
-import {
-  RightSidebar,
-  RightSidebarProvider,
-} from "../components/common/RightSidebar";
+import { RightSidebar, RightSidebarProvider } from "../components/common/RightSidebar";
 import SearchFilters from "../components/search/SearchFilters";
 import AssetResultsView from "../components/shared/AssetResultsView";
 import { useAssetOperations } from "@/hooks/useAssetOperations";
-import {
-  type ImageItem,
-  type VideoItem,
-  type AudioItem,
-} from "@/types/search/searchResults";
+import { type ImageItem, type VideoItem, type AudioItem } from "@/types/search/searchResults";
 import { type CellContext } from "@tanstack/react-table";
 import { type AssetTableColumn } from "@/types/shared/assetComponents";
 import TabbedSidebar from "../components/common/RightSidebar/TabbedSidebar";
@@ -101,25 +94,24 @@ const CollectionViewPage: React.FC = () => {
   const currentPage = parseInt(searchParams.get("page") || "1", 10);
 
   const [pageSize, setPageSize] = useState<number>(
-    parseInt(searchParams.get("pageSize") || DEFAULT_PAGE_SIZE.toString(), 10),
+    parseInt(searchParams.get("pageSize") || DEFAULT_PAGE_SIZE.toString(), 10)
   );
 
   // Sidebar collapse state
   const [isTreeCollapsed, setIsTreeCollapsed] = useState(false);
 
   // Add to Collection state
-  const [addToCollectionModalOpen, setAddToCollectionModalOpen] =
-    useState(false);
-  const [selectedAssetForCollection, setSelectedAssetForCollection] =
-    useState<AssetItem | null>(null);
+  const [addToCollectionModalOpen, setAddToCollectionModalOpen] = useState(false);
+  const [selectedAssetForCollection, setSelectedAssetForCollection] = useState<AssetItem | null>(
+    null
+  );
   const addItemToCollectionMutation = useAddItemToCollection();
   const deleteItemMutation = useDeleteItemFromCollection();
 
   // Collection Edit/Delete state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isCreateSubCollectionOpen, setIsCreateSubCollectionOpen] =
-    useState(false);
+  const [isCreateSubCollectionOpen, setIsCreateSubCollectionOpen] = useState(false);
   const [collectionAlert, setCollectionAlert] = useState<{
     severity: "success" | "error" | "info" | "warning";
     message: string;
@@ -128,8 +120,7 @@ const CollectionViewPage: React.FC = () => {
   const deleteCollectionMutation = useDeleteCollection();
 
   // Get collection details
-  const { data: collectionResponse, isLoading: isLoadingCollection } =
-    useGetCollection(id!);
+  const { data: collectionResponse, isLoading: isLoadingCollection } = useGetCollection(id!);
   const collection = collectionResponse?.data;
 
   // Get collection assets using the new hook
@@ -188,22 +179,12 @@ const CollectionViewPage: React.FC = () => {
   }, []);
   const getAssetName = useCallback(
     (asset: AssetItem) =>
-      asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-        .ObjectKey.Name,
-    [],
+      asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+    []
   );
-  const getAssetType = useCallback(
-    (asset: AssetItem) => asset.DigitalSourceAsset.Type,
-    [],
-  );
-  const getAssetThumbnail = useCallback(
-    (asset: AssetItem) => asset.thumbnailUrl || "",
-    [],
-  );
-  const getAssetProxy = useCallback(
-    (asset: AssetItem) => asset.proxyUrl || "",
-    [],
-  );
+  const getAssetType = useCallback((asset: AssetItem) => asset.DigitalSourceAsset.Type, []);
+  const getAssetThumbnail = useCallback((asset: AssetItem) => asset.thumbnailUrl || "", []);
+  const getAssetProxy = useCallback((asset: AssetItem) => asset.proxyUrl || "", []);
 
   // Use custom hooks for asset selection and favorites
   const assetSelection = useAssetSelection({
@@ -252,7 +233,7 @@ const CollectionViewPage: React.FC = () => {
         },
       });
     },
-    [navigate, collection?.name],
+    [navigate, collection?.name]
   );
 
   // Handle Remove from Collection click
@@ -276,7 +257,7 @@ const CollectionViewPage: React.FC = () => {
         deleteItemMutation.mutate({ collectionId: id, itemId });
       }
     },
-    [id, deleteItemMutation],
+    [id, deleteItemMutation]
   );
 
   // Handle actually adding the asset to a collection
@@ -305,7 +286,7 @@ const CollectionViewPage: React.FC = () => {
         },
       });
     },
-    [selectedAssetForCollection, addItemToCollectionMutation],
+    [selectedAssetForCollection, addItemToCollectionMutation]
   );
 
   // Handle collection selection from tree (soft navigation)
@@ -314,7 +295,7 @@ const CollectionViewPage: React.FC = () => {
       // Use navigate without replace to allow back button
       navigate(`/collections/${collectionId}/view`);
     },
-    [navigate],
+    [navigate]
   );
 
   // Toggle sidebar
@@ -355,8 +336,7 @@ const CollectionViewPage: React.FC = () => {
         navigate("/collections");
       }, 1000);
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to delete collection";
+      const errorMessage = error instanceof Error ? error.message : "Failed to delete collection";
       setCollectionAlert({
         severity: "error",
         message: errorMessage,
@@ -389,15 +369,13 @@ const CollectionViewPage: React.FC = () => {
       visible: true,
       minWidth: 200,
       accessorFn: (row: AssetItem) =>
-        row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-          .ObjectKey.Name,
-      cell: (info: CellContext<AssetItem, unknown>) =>
-        info.getValue() as string,
+        row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+      cell: (info: CellContext<AssetItem, unknown>) => info.getValue() as string,
       sortable: true,
       sortingFn: (rowA, rowB) =>
         rowA.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name.localeCompare(
-          rowB.original.DigitalSourceAsset.MainRepresentation.StorageInfo
-            .PrimaryLocation.ObjectKey.Name,
+          rowB.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey
+            .Name
         ),
     },
     {
@@ -408,21 +386,18 @@ const CollectionViewPage: React.FC = () => {
       accessorFn: (row: AssetItem) => row.DigitalSourceAsset.Type,
       sortable: true,
       sortingFn: (rowA, rowB) =>
-        rowA.original.DigitalSourceAsset.Type.localeCompare(
-          rowB.original.DigitalSourceAsset.Type,
-        ),
+        rowA.original.DigitalSourceAsset.Type.localeCompare(rowB.original.DigitalSourceAsset.Type),
     },
     {
       id: "format",
       label: "Format",
       visible: true,
       minWidth: 100,
-      accessorFn: (row: AssetItem) =>
-        row.DigitalSourceAsset.MainRepresentation.Format,
+      accessorFn: (row: AssetItem) => row.DigitalSourceAsset.MainRepresentation.Format,
       sortable: true,
       sortingFn: (rowA, rowB) =>
         rowA.original.DigitalSourceAsset.MainRepresentation.Format.localeCompare(
-          rowB.original.DigitalSourceAsset.MainRepresentation.Format,
+          rowB.original.DigitalSourceAsset.MainRepresentation.Format
         ),
     },
     {
@@ -431,18 +406,16 @@ const CollectionViewPage: React.FC = () => {
       visible: true,
       minWidth: 100,
       accessorFn: (row: AssetItem) =>
-        row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-          .FileInfo.Size,
-      cell: (info: CellContext<AssetItem, unknown>) =>
-        formatFileSize(info.getValue() as number),
+        row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
+      cell: (info: CellContext<AssetItem, unknown>) => formatFileSize(info.getValue() as number),
       sortable: true,
       sortingFn: (rowA, rowB) => {
         const a =
-          rowA.original.DigitalSourceAsset.MainRepresentation.StorageInfo
-            .PrimaryLocation.FileInfo.Size;
+          rowA.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo
+            .Size;
         const b =
-          rowB.original.DigitalSourceAsset.MainRepresentation.StorageInfo
-            .PrimaryLocation.FileInfo.Size;
+          rowB.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo
+            .Size;
         return a - b;
       },
     },
@@ -457,12 +430,8 @@ const CollectionViewPage: React.FC = () => {
       },
       sortable: true,
       sortingFn: (rowA, rowB) => {
-        const a = new Date(
-          rowA.original.DigitalSourceAsset.CreateDate,
-        ).getTime();
-        const b = new Date(
-          rowB.original.DigitalSourceAsset.CreateDate,
-        ).getTime();
+        const a = new Date(rowA.original.DigitalSourceAsset.CreateDate).getTime();
+        const b = new Date(rowB.original.DigitalSourceAsset.CreateDate).getTime();
         return a - b;
       },
     },
@@ -471,10 +440,8 @@ const CollectionViewPage: React.FC = () => {
   const handleColumnToggle = (columnId: string) => {
     setColumns((prev) =>
       prev.map((column) =>
-        column.id === columnId
-          ? { ...column, visible: !column.visible }
-          : column,
-      ),
+        column.id === columnId ? { ...column, visible: !column.visible } : column
+      )
     );
   };
 
@@ -494,24 +461,18 @@ const CollectionViewPage: React.FC = () => {
 
   const filteredResults =
     assets?.filter((item) => {
-      const isImage =
-        item.DigitalSourceAsset.Type === "Image" && filters.mediaTypes.images;
-      const isVideo =
-        item.DigitalSourceAsset.Type === "Video" && filters.mediaTypes.videos;
-      const isAudio =
-        item.DigitalSourceAsset.Type === "Audio" && filters.mediaTypes.audio;
+      const isImage = item.DigitalSourceAsset.Type === "Image" && filters.mediaTypes.images;
+      const isVideo = item.DigitalSourceAsset.Type === "Video" && filters.mediaTypes.videos;
+      const isAudio = item.DigitalSourceAsset.Type === "Audio" && filters.mediaTypes.audio;
 
       // Time-based filtering
       const createdAt = new Date(item.DigitalSourceAsset.CreateDate);
       const now = new Date();
       const timeDiff = now.getTime() - createdAt.getTime();
       const isRecent = filters.time.recent && timeDiff <= 24 * 60 * 60 * 1000;
-      const isLastWeek =
-        filters.time.lastWeek && timeDiff <= 7 * 24 * 60 * 60 * 1000;
-      const isLastMonth =
-        filters.time.lastMonth && timeDiff <= 30 * 24 * 60 * 60 * 1000;
-      const isLastYear =
-        filters.time.lastYear && timeDiff <= 365 * 24 * 60 * 60 * 1000;
+      const isLastWeek = filters.time.lastWeek && timeDiff <= 7 * 24 * 60 * 60 * 1000;
+      const isLastMonth = filters.time.lastMonth && timeDiff <= 30 * 24 * 60 * 60 * 1000;
+      const isLastYear = filters.time.lastYear && timeDiff <= 365 * 24 * 60 * 60 * 1000;
 
       const passesTimeFilter =
         (!filters.time.recent &&
@@ -579,8 +540,7 @@ const CollectionViewPage: React.FC = () => {
         return getAssetType(asset);
       case "size":
         return formatFileSize(
-          asset.DigitalSourceAsset.MainRepresentation.StorageInfo
-            .PrimaryLocation.FileInfo.Size,
+          asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size
         );
       case "date":
         return formatDate(asset.DigitalSourceAsset.CreateDate);
@@ -785,10 +745,7 @@ const CollectionViewPage: React.FC = () => {
                     {ancestor.name}
                   </Link>
                 ))}
-                <Typography
-                  color="text.primary"
-                  sx={{ display: "flex", alignItems: "center" }}
-                >
+                <Typography color="text.primary" sx={{ display: "flex", alignItems: "center" }}>
                   <FolderIcon sx={{ mr: 0.5 }} fontSize="inherit" />
                   {collection?.name || "Loading..."}
                 </Typography>
@@ -839,11 +796,7 @@ const CollectionViewPage: React.FC = () => {
                 }}
               >
                 <LinearProgress sx={{ width: "100%", maxWidth: 400 }} />
-                <Typography
-                  variant="body1"
-                  color="text.secondary"
-                  sx={{ mt: 2 }}
-                >
+                <Typography variant="body1" color="text.secondary" sx={{ mt: 2 }}>
                   Loading assets...
                 </Typography>
               </Box>
@@ -869,9 +822,7 @@ const CollectionViewPage: React.FC = () => {
                 aspectRatio={viewPreferences.aspectRatio}
                 onAspectRatioChange={viewPreferences.handleAspectRatioChange}
                 thumbnailScale={viewPreferences.thumbnailScale}
-                onThumbnailScaleChange={
-                  viewPreferences.handleThumbnailScaleChange
-                }
+                onThumbnailScaleChange={viewPreferences.handleThumbnailScaleChange}
                 showMetadata={viewPreferences.showMetadata}
                 onShowMetadataChange={viewPreferences.handleShowMetadataChange}
                 sorting={viewPreferences.sorting}
@@ -897,9 +848,7 @@ const CollectionViewPage: React.FC = () => {
                 }
                 onSelectToggle={assetSelection.handleSelectToggle}
                 hasSelectedAssets={assetSelection.selectedAssets.length > 0}
-                selectAllState={assetSelection.getSelectAllState(
-                  filteredResults,
-                )}
+                selectAllState={assetSelection.getSelectAllState(filteredResults)}
                 onSelectAllToggle={() => {
                   assetSelection.handleSelectAll(filteredResults);
                 }}
@@ -908,10 +857,8 @@ const CollectionViewPage: React.FC = () => {
                 error={
                   error
                     ? {
-                        status:
-                          (error as any).apiResponse?.status || error.name,
-                        message:
-                          (error as any).apiResponse?.message || error.message,
+                        status: (error as any).apiResponse?.status || error.name,
+                        message: (error as any).apiResponse?.message || error.message,
                       }
                     : undefined
                 }
@@ -997,8 +944,7 @@ const CollectionViewPage: React.FC = () => {
           <DialogTitle id="delete-dialog-title">Confirm Delete</DialogTitle>
           <DialogContent>
             <DialogContentText id="delete-dialog-description">
-              Are you sure you want to delete this asset? This action cannot be
-              undone.
+              Are you sure you want to delete this asset? This action cannot be undone.
             </DialogContentText>
           </DialogContent>
           <DialogActions>
@@ -1030,14 +976,11 @@ const CollectionViewPage: React.FC = () => {
           aria-labelledby="delete-collection-dialog-title"
           aria-describedby="delete-collection-dialog-description"
         >
-          <DialogTitle id="delete-collection-dialog-title">
-            Delete Collection
-          </DialogTitle>
+          <DialogTitle id="delete-collection-dialog-title">Delete Collection</DialogTitle>
           <DialogContent>
             <DialogContentText id="delete-collection-dialog-description">
-              Are you sure you want to delete this collection? This will
-              permanently delete the collection and remove all items from it.
-              This action cannot be undone.
+              Are you sure you want to delete this collection? This will permanently delete the
+              collection and remove all items from it. This action cannot be undone.
             </DialogContentText>
           </DialogContent>
           <DialogActions>
@@ -1089,11 +1032,7 @@ const CollectionViewPage: React.FC = () => {
           onClose={handleAlertClose}
           anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         >
-          <Alert
-            onClose={handleAlertClose}
-            severity={alert?.severity}
-            sx={{ width: "100%" }}
-          >
+          <Alert onClose={handleAlertClose} severity={alert?.severity} sx={{ width: "100%" }}>
             {alert?.message}
           </Alert>
         </Snackbar>
@@ -1124,8 +1063,8 @@ const CollectionViewPage: React.FC = () => {
             }}
             assetId={getOriginalAssetId(selectedAssetForCollection)}
             assetName={
-              selectedAssetForCollection.DigitalSourceAsset.MainRepresentation
-                .StorageInfo.PrimaryLocation.ObjectKey.Name
+              selectedAssetForCollection.DigitalSourceAsset.MainRepresentation.StorageInfo
+                .PrimaryLocation.ObjectKey.Name
             }
             assetType={selectedAssetForCollection.DigitalSourceAsset.Type}
             onAddToCollection={handleAddToCollection}

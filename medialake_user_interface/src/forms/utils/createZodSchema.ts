@@ -36,8 +36,7 @@ export const createZodSchema = (fields: FormFieldDefinition[]) => {
                   message: `Value must be one of: ${values.join(", ")}`,
                 });
         } else {
-          fieldSchema =
-            field.type === "multiselect" ? z.array(z.string()) : z.string();
+          fieldSchema = field.type === "multiselect" ? z.array(z.string()) : z.string();
         }
         break;
       case "password":
@@ -53,11 +52,7 @@ export const createZodSchema = (fields: FormFieldDefinition[]) => {
     } else {
       // For required fields, make them more lenient
       // Allow empty strings for text fields but mark them as required
-      if (
-        field.type === "text" ||
-        field.type === "email" ||
-        field.type === "password"
-      ) {
+      if (field.type === "text" || field.type === "email" || field.type === "password") {
         fieldSchema = z.string().optional().or(z.literal("")).or(z.undefined());
       } else if (field.type === "select") {
         // For select fields, allow empty strings or undefined

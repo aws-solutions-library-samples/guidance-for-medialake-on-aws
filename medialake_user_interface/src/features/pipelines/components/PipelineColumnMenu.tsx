@@ -1,11 +1,5 @@
 import React from "react";
-import {
-  Menu,
-  MenuItem,
-  FormControlLabel,
-  Checkbox,
-  Typography,
-} from "@mui/material";
+import { Menu, MenuItem, FormControlLabel, Checkbox, Typography } from "@mui/material";
 
 interface PipelineColumnMenuProps {
   anchorEl: HTMLElement | null;

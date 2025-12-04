@@ -13,10 +13,7 @@ import { TableCellContent } from "./TableCellContent";
 
 interface TableHeaderProps<T> {
   header: Header<T, unknown>;
-  onFilterClick?: (
-    event: React.MouseEvent<HTMLElement>,
-    columnId: string,
-  ) => void;
+  onFilterClick?: (event: React.MouseEvent<HTMLElement>, columnId: string) => void;
 }
 
 const useHeaderStyles = (theme: Theme) => {
@@ -80,7 +77,7 @@ const useHeaderStyles = (theme: Theme) => {
         },
       },
     }),
-    [theme.palette.mode, theme.palette.primary.main],
+    [theme.palette.mode, theme.palette.primary.main]
   );
 };
 
@@ -97,7 +94,7 @@ export function TableHeader<T>({ header, onFilterClick }: TableHeaderProps<T>) {
         handler(e);
       }
     },
-    [header.column],
+    [header.column]
   );
 
   const handleFilterClick = useCallback(
@@ -108,19 +105,16 @@ export function TableHeader<T>({ header, onFilterClick }: TableHeaderProps<T>) {
         onFilterClick(e, header.column.id);
       }
     },
-    [header.column.id, onFilterClick],
+    [header.column.id, onFilterClick]
   );
 
-  const handleKeyPress = useCallback(
-    (e: React.KeyboardEvent, action: () => void) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        e.stopPropagation();
-        action();
-      }
-    },
-    [],
-  );
+  const handleKeyPress = useCallback((e: React.KeyboardEvent, action: () => void) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      e.stopPropagation();
+      action();
+    }
+  }, []);
 
   const sortDirection = header.column.getIsSorted();
   const canSort = header.column.getCanSort();
@@ -142,13 +136,7 @@ export function TableHeader<T>({ header, onFilterClick }: TableHeaderProps<T>) {
         minWidth: header.getSize(),
       }}
       role="columnheader"
-      aria-sort={
-        sortDirection
-          ? sortDirection === "asc"
-            ? "ascending"
-            : "descending"
-          : "none"
-      }
+      aria-sort={sortDirection ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
     >
       <Box
         sx={{
@@ -180,9 +168,7 @@ export function TableHeader<T>({ header, onFilterClick }: TableHeaderProps<T>) {
             {canSort && (
               <Box
                 onClick={handleSortClick}
-                onKeyPress={(e) =>
-                  handleKeyPress(e, () => handleSortClick(e as any))
-                }
+                onKeyPress={(e) => handleKeyPress(e, () => handleSortClick(e as any))}
                 sx={styles.iconWrapper(Boolean(sortDirection))}
                 role="button"
                 tabIndex={0}
@@ -194,9 +180,7 @@ export function TableHeader<T>({ header, onFilterClick }: TableHeaderProps<T>) {
             {header.column.getCanFilter() && onFilterClick && (
               <Box
                 onClick={handleFilterClick}
-                onKeyPress={(e) =>
-                  handleKeyPress(e, () => handleFilterClick(e as any))
-                }
+                onKeyPress={(e) => handleKeyPress(e, () => handleFilterClick(e as any))}
                 sx={styles.iconWrapper(Boolean(header.column.getFilterValue()))}
                 role="button"
                 tabIndex={0}
@@ -208,11 +192,7 @@ export function TableHeader<T>({ header, onFilterClick }: TableHeaderProps<T>) {
           </Stack>
         </Stack>
       </Box>
-      <ColumnResizer
-        header={header}
-        className="column-resizer"
-        sx={styles.columnResizer}
-      />
+      <ColumnResizer header={header} className="column-resizer" sx={styles.columnResizer} />
     </TableCell>
   );
 }

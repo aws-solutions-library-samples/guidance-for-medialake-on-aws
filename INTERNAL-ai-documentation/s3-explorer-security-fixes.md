@@ -68,17 +68,20 @@ Created comprehensive unit tests in `lambdas/api/connectors/s3/explorer/rp_conne
 ### Test Categories:
 
 1. **TestNormalizePrefix** (7 tests)
+
    - Empty string handling
    - Trailing slash addition/preservation
    - Whitespace trimming
 
 2. **TestParseObjectPrefixes** (8 tests)
+
    - Single string parsing
    - List parsing
    - Empty value filtering
    - Whitespace handling
 
 3. **TestValidatePrefixAccess** (10 tests)
+
    - Exact match validation
    - Subdirectory access (allowed)
    - Parent directory access (denied)
@@ -87,6 +90,7 @@ Created comprehensive unit tests in `lambdas/api/connectors/s3/explorer/rp_conne
    - Normalization edge cases
 
 4. **TestSecurityScenarios** (4 tests)
+
    - Counter-example: `"foo/"` allowed, `"foobar/"` requested → DENIED
    - Counter-example: `"foo/bar/"` allowed, `"foo/"` requested → DENIED
    - Legitimate subdirectory access → ALLOWED
@@ -135,6 +139,7 @@ Result: DENIED (normalized to "foobar/" first) ✓
 ## Files Modified
 
 1. **lambdas/api/connectors/s3/explorer/rp_connector_id/index.py**
+
    - Added `normalize_prefix()` function
    - Modified `parse_object_prefixes()` to use normalization
    - Fixed `validate_prefix_access()` security logic

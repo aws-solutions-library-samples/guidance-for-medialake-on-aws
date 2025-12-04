@@ -1,10 +1,6 @@
 import React from "react";
 import { Stack, Chip, Tooltip, Typography, Box } from "@mui/material";
-import {
-  Event as EventIcon,
-  Api as ApiIcon,
-  TouchApp as ManualIcon,
-} from "@mui/icons-material";
+import { Event as EventIcon, Api as ApiIcon, TouchApp as ManualIcon } from "@mui/icons-material";
 import { Pipeline } from "../types/pipelines.types";
 
 interface EventRule {
@@ -56,12 +52,7 @@ export const TriggerTypeChips: React.FC<TriggerTypeChipsProps> = ({
 
         return (
           <Tooltip key={index} title={tooltipContent} arrow placement="top">
-            <Chip
-              icon={icon}
-              label={type}
-              size="small"
-              color={getChipColor(type)}
-            />
+            <Chip icon={icon} label={type} size="small" color={getChipColor(type)} />
           </Tooltip>
         );
       })}
@@ -72,10 +63,7 @@ export const TriggerTypeChips: React.FC<TriggerTypeChipsProps> = ({
 /**
  * Process API-provided eventRuleInfo to fix descriptions
  */
-const processEventRuleInfo = (
-  eventRuleInfo: EventRuleInfo,
-  pipeline?: Pipeline,
-): EventRuleInfo => {
+const processEventRuleInfo = (eventRuleInfo: EventRuleInfo, pipeline?: Pipeline): EventRuleInfo => {
   const processed: EventRuleInfo = {
     ...eventRuleInfo,
     eventRules: eventRuleInfo.eventRules.map((rule) => {
@@ -130,9 +118,7 @@ const processEventRuleInfo = (
 /**
  * Extract event rule information from a pipeline object
  */
-const extractEventRuleInfoFromPipeline = (
-  pipeline: Pipeline,
-): EventRuleInfo => {
+const extractEventRuleInfoFromPipeline = (pipeline: Pipeline): EventRuleInfo => {
   const eventRuleInfo: EventRuleInfo = {
     triggerTypes: ["Event Triggered"],
     eventRules: [],
@@ -150,10 +136,7 @@ const extractEventRuleInfoFromPipeline = (
         } else {
           // If it's just a string ARN, extract the rule name from the ARN
           rule.ruleArn = resourceValue as string;
-          if (
-            typeof resourceValue === "string" &&
-            resourceValue.includes("/")
-          ) {
+          if (typeof resourceValue === "string" && resourceValue.includes("/")) {
             rule.ruleName = resourceValue.split("/").pop() || "";
           }
         }
@@ -183,8 +166,7 @@ const extractEventRuleInfoFromPipeline = (
             rule.description = "Triggers on audio files";
             rule.eventType = "AssetCreated";
           } else if (ruleNameLower.includes("pipeline_execution_completed")) {
-            rule.description =
-              "Triggers when another pipeline completes execution";
+            rule.description = "Triggers when another pipeline completes execution";
             rule.eventType = "Pipeline Execution Completed";
           }
         }
@@ -217,30 +199,19 @@ const getTriggerIcon = (type: string) => {
  * Get the tooltip content for a trigger type
  */
 const getTooltipContent = (type: string, eventRuleInfo?: EventRuleInfo) => {
-  if (
-    !eventRuleInfo ||
-    !eventRuleInfo.eventRules ||
-    eventRuleInfo.eventRules.length === 0
-  ) {
+  if (!eventRuleInfo || !eventRuleInfo.eventRules || eventRuleInfo.eventRules.length === 0) {
     return type;
   }
 
   return (
     <Box sx={{ p: 1, maxWidth: 300 }}>
-      <Typography
-        variant="subtitle2"
-        gutterBottom
-        sx={{ color: "common.white" }}
-      >
+      <Typography variant="subtitle2" gutterBottom sx={{ color: "common.white" }}>
         {type}
       </Typography>
       {eventRuleInfo.eventRules.map((rule, index) => (
         <Box key={index} sx={{ mt: 1 }}>
           {rule.description && (
-            <Typography
-              variant="body2"
-              sx={{ color: "rgba(255, 255, 255, 0.9)" }}
-            >
+            <Typography variant="body2" sx={{ color: "rgba(255, 255, 255, 0.9)" }}>
               {rule.description}
             </Typography>
           )}
@@ -279,9 +250,7 @@ const getTooltipContent = (type: string, eventRuleInfo?: EventRuleInfo) => {
 /**
  * Get the appropriate color for a trigger type chip
  */
-const getChipColor = (
-  type: string,
-): "primary" | "secondary" | "success" | "info" => {
+const getChipColor = (type: string): "primary" | "secondary" | "success" | "info" => {
   switch (type) {
     case "Event Triggered":
       return "primary";

@@ -42,9 +42,7 @@ interface UseAssetOperationsReturn<T extends AssetBase> {
   handleDeleteModalClose: () => void;
 }
 
-export function useAssetOperations<
-  T extends AssetBase,
->(): UseAssetOperationsReturn<T> {
+export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsReturn<T> {
   const [menuAnchorEl, setMenuAnchorEl] = useState<HTMLElement | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<T | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -52,9 +50,7 @@ export function useAssetOperations<
   const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
   const [editedName, setEditedName] = useState<string>("");
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
-  const [downloadingAssetId, setDownloadingAssetId] = useState<string | null>(
-    null,
-  );
+  const [downloadingAssetId, setDownloadingAssetId] = useState<string | null>(null);
   const [alert, setAlert] = useState<{
     message: string;
     severity: "success" | "error";
@@ -98,16 +94,16 @@ export function useAssetOperations<
       case "rename":
         setEditingAssetId(selectedAsset.InventoryID);
         setEditedName(
-          selectedAsset.DigitalSourceAsset.MainRepresentation.StorageInfo
-            .PrimaryLocation.ObjectKey.Name,
+          selectedAsset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey
+            .Name
         );
         setIsRenameDialogOpen(true);
         break;
       case "share":
         console.log(
           "Share:",
-          selectedAsset.DigitalSourceAsset.MainRepresentation.StorageInfo
-            .PrimaryLocation.ObjectKey.Name,
+          selectedAsset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey
+            .Name
         );
         break;
       case "download":
@@ -120,8 +116,8 @@ export function useAssetOperations<
           const purpose = "original";
 
           const fileName =
-            selectedAsset.DigitalSourceAsset.MainRepresentation.StorageInfo
-              .PrimaryLocation.ObjectKey.Name;
+            selectedAsset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
+              .ObjectKey.Name;
           const result = await generatePresignedUrl.mutateAsync({
             inventoryId: selectedAsset.InventoryID,
             expirationTime: 60, // 1 minute in seconds
@@ -144,10 +140,7 @@ export function useAssetOperations<
     }
   };
 
-  const handleDownloadClick = async (
-    asset: T,
-    event: React.MouseEvent<HTMLElement>,
-  ) => {
+  const handleDownloadClick = async (asset: T, event: React.MouseEvent<HTMLElement>) => {
     // Make sure to stop propagation to prevent the card click
     event.stopPropagation();
     event.preventDefault();
@@ -161,8 +154,7 @@ export function useAssetOperations<
       const purpose = "original";
 
       const fileName =
-        asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-          .ObjectKey.Name;
+        asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name;
       const result = await generatePresignedUrl.mutateAsync({
         inventoryId: asset.InventoryID,
         expirationTime: 60, // 1 minute in seconds
@@ -183,10 +175,7 @@ export function useAssetOperations<
     }
   };
 
-  const handleDeleteClick = (
-    asset: T,
-    event: React.MouseEvent<HTMLElement>,
-  ) => {
+  const handleDeleteClick = (asset: T, event: React.MouseEvent<HTMLElement>) => {
     // Make sure to stop propagation to prevent the card click
     event.stopPropagation();
     event.preventDefault();
@@ -236,15 +225,11 @@ export function useAssetOperations<
     });
   };
 
-  const handleStartEditing = (
-    asset: T,
-    event: React.MouseEvent<HTMLElement>,
-  ) => {
+  const handleStartEditing = (asset: T, event: React.MouseEvent<HTMLElement>) => {
     event.stopPropagation();
     setEditingAssetId(asset.InventoryID);
     setEditedName(
-      asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-        .ObjectKey.Name,
+      asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name
     );
   };
 
@@ -259,12 +244,11 @@ export function useAssetOperations<
       "value:",
       value,
       "editedName:",
-      editedName,
+      editedName
     );
     console.log(
       "🔍 Original name:",
-      asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-        .ObjectKey.Name,
+      asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name
     );
 
     // Use the passed value if available, otherwise fall back to editedName
@@ -274,8 +258,7 @@ export function useAssetOperations<
     if (
       save &&
       nameToUse !==
-        asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-          .ObjectKey.Name
+        asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name
     ) {
       console.log("🔍 Names different - calling API");
       handleRenameConfirm(nameToUse);
@@ -286,8 +269,7 @@ export function useAssetOperations<
     setEditingAssetId(null);
     if (!save) {
       setEditedName(
-        asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-          .ObjectKey.Name,
+        asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name
       );
     }
   };

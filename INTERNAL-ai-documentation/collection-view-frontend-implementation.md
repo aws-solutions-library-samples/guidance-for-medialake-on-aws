@@ -9,9 +9,11 @@ This document describes the successful implementation of the Collection View fea
 ### 1. API Integration
 
 - **File**: `medialake_user_interface/src/api/endpoints.ts`
+
   - Added `ASSETS: (id: string) => '/collections/${id}/assets'` endpoint
 
 - **File**: `medialake_user_interface/src/api/queryKeys.ts`
+
   - Added `assets: (id: string, filters?: Record<string, any>)` query key
 
 - **File**: `medialake_user_interface/src/api/hooks/useCollections.ts`

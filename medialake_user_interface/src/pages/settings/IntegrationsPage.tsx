@@ -34,14 +34,11 @@ import queryClient from "@/api/queryClient";
 const IntegrationsPage: React.FC = () => {
   const { t } = useTranslation();
   const [openIntegrationForm, setOpenIntegrationForm] = useState(false);
-  const [editingIntegration, setEditingIntegration] =
-    useState<Integration | null>(null);
+  const [editingIntegration, setEditingIntegration] = useState<Integration | null>(null);
   const [activeFilters, setActiveFilters] = useState<IntegrationFilters[]>([]);
   const [activeSorting, setActiveSorting] = useState<IntegrationSorting[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [integrationToDelete, setIntegrationToDelete] = useState<string | null>(
-    null,
-  );
+  const [integrationToDelete, setIntegrationToDelete] = useState<string | null>(null);
   const [apiStatus, setApiStatus] = useState<{
     show: boolean;
     status: "loading" | "success" | "error";
@@ -115,9 +112,7 @@ const IntegrationsPage: React.FC = () => {
     setApiStatus({
       show: true,
       status: "loading",
-      action: editingIntegration
-        ? "Updating integration…"
-        : "Creating integration…",
+      action: editingIntegration ? "Updating integration…" : "Creating integration…",
     });
 
     try {
@@ -140,15 +135,11 @@ const IntegrationsPage: React.FC = () => {
       // 3) Show success
       const displayName =
         result.data?.name ||
-        values.nodeId
-          .replace(/_/g, " ")
-          .replace(/\b\w/g, (l) => l.toUpperCase());
+        values.nodeId.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
       setApiStatus({
         show: true,
         status: "success",
-        action: editingIntegration
-          ? "Integration Updated"
-          : "Integration Created",
+        action: editingIntegration ? "Integration Updated" : "Integration Created",
         message: `Integration "${displayName}" saved.`,
       });
 
@@ -157,10 +148,7 @@ const IntegrationsPage: React.FC = () => {
       setEditingIntegration(null);
       refreshIntegrations();
     } catch (err) {
-      console.error(
-        `Failed to ${editingIntegration ? "update" : "create"} integration:`,
-        err,
-      );
+      console.error(`Failed to ${editingIntegration ? "update" : "create"} integration:`, err);
       setApiStatus({
         show: true,
         status: "error",
@@ -210,9 +198,7 @@ const IntegrationsPage: React.FC = () => {
         refreshIntegrations();
       } catch (error) {
         const errorMessage =
-          error instanceof Error
-            ? error.message
-            : "Failed to delete integration";
+          error instanceof Error ? error.message : "Failed to delete integration";
         setApiStatus({
           show: true,
           status: "error",
@@ -292,14 +278,10 @@ const IntegrationsPage: React.FC = () => {
             });
           }}
           onRemoveFilter={(columnId) => {
-            setActiveFilters((filters) =>
-              filters.filter((f) => f.columnId !== columnId),
-            );
+            setActiveFilters((filters) => filters.filter((f) => f.columnId !== columnId));
           }}
           onRemoveSort={(columnId) => {
-            setActiveSorting((sorts) =>
-              sorts.filter((s) => s.columnId !== columnId),
-            );
+            setActiveSorting((sorts) => sorts.filter((s) => s.columnId !== columnId));
           }}
         />
       </PageContent>
@@ -319,10 +301,7 @@ const IntegrationsPage: React.FC = () => {
         aria-labelledby="alert-dialog-title"
         aria-describedby="alert-dialog-description"
       >
-        <DialogTitle
-          id="alert-dialog-title"
-          sx={{ display: "flex", alignItems: "center", gap: 1 }}
-        >
+        <DialogTitle id="alert-dialog-title" sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <WarningIcon color="warning" />
           {t("integrations.deleteConfirmation.title")}
         </DialogTitle>
@@ -330,9 +309,7 @@ const IntegrationsPage: React.FC = () => {
           <DialogContentText id="alert-dialog-description">
             {t("integrations.deleteConfirmation.message")}
           </DialogContentText>
-          <DialogContentText
-            sx={{ mt: 2, fontWeight: "bold", color: "error.main" }}
-          >
+          <DialogContentText sx={{ mt: 2, fontWeight: "bold", color: "error.main" }}>
             {t("integrations.deleteConfirmation.warning")}
           </DialogContentText>
         </DialogContent>
@@ -340,12 +317,7 @@ const IntegrationsPage: React.FC = () => {
           <Button onClick={cancelDeleteIntegration} color="primary">
             {t("common.cancel")}
           </Button>
-          <Button
-            onClick={confirmDeleteIntegration}
-            color="error"
-            variant="contained"
-            autoFocus
-          >
+          <Button onClick={confirmDeleteIntegration} color="error" variant="contained" autoFocus>
             {t("common.actions.delete")}
           </Button>
         </DialogActions>

@@ -2,10 +2,7 @@
 import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { PermissionProvider } from "../context/permission-context";
-import {
-  PermissionGuard,
-  RoutePermissionGuard,
-} from "../components/PermissionGuard";
+import { PermissionGuard, RoutePermissionGuard } from "../components/PermissionGuard";
 
 /**
  * Example component showing how to use the PermissionGuard component

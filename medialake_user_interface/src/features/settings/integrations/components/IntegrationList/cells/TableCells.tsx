@@ -6,7 +6,7 @@ interface DateCellProps {
 }
 
 export const DateCell = React.memo(({ value }: DateCellProps) =>
-  format(new Date(value), "MMM dd, yyyy HH:mm"),
+  format(new Date(value), "MMM dd, yyyy HH:mm")
 );
 
 DateCell.displayName = "DateCell";

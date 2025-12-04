@@ -12,12 +12,9 @@ export const useGetNodes = () => {
     queryKey: ["nodes"],
     queryFn: async ({ signal }) => {
       try {
-        const response = await apiClient.get<NodesResponse>(
-          NODES_API.endpoints.GET_NODES,
-          {
-            signal,
-          },
-        );
+        const response = await apiClient.get<NodesResponse>(NODES_API.endpoints.GET_NODES, {
+          signal,
+        });
 
         if (!response.data?.data) {
           throw new Error("Invalid nodes response structure");
@@ -40,12 +37,9 @@ export const useGetNode = (nodeId: string, options?: { enabled?: boolean }) => {
     queryKey: ["nodes", nodeId],
     queryFn: async ({ signal }) => {
       try {
-        const response = await apiClient.get<NodesResponse>(
-          NODES_API.endpoints.GET_NODE(nodeId),
-          {
-            signal,
-          },
-        );
+        const response = await apiClient.get<NodesResponse>(NODES_API.endpoints.GET_NODE(nodeId), {
+          signal,
+        });
 
         if (!response.data?.data) {
           throw new Error("Invalid node response structure");
@@ -71,7 +65,7 @@ export const useGetUnconfiguredNodeMethods = () => {
       try {
         const response = await apiClient.get<NodesResponse>(
           NODES_API.endpoints.GET_UNCONFIGURED_METHODS,
-          { signal },
+          { signal }
         );
 
         if (!response.data?.data) {
@@ -97,7 +91,7 @@ export const useGetNodeMethods = (nodeId: string) => {
       try {
         const response = await apiClient.get<NodesResponse>(
           NODES_API.endpoints.GET_NODE_METHODS(nodeId),
-          { signal },
+          { signal }
         );
 
         if (!response.data?.data) {

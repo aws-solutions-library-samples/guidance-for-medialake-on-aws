@@ -8,11 +8,7 @@ interface ErrorDisplayProps {
   detailedMessage?: string;
 }
 
-const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
-  title,
-  message,
-  detailedMessage,
-}) => {
+const ErrorDisplay: React.FC<ErrorDisplayProps> = ({ title, message, detailedMessage }) => {
   return (
     <Box sx={{ mt: 4 }}>
       <Paper

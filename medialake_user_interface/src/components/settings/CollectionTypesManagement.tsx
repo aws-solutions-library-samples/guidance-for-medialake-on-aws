@@ -112,12 +112,7 @@ const CollectionTypesManagement: React.FC = () => {
 
   return (
     <Box>
-      <Box
-        display="flex"
-        justifyContent="space-between"
-        alignItems="center"
-        mb={3}
-      >
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Box>
           <Typography variant="h6" gutterBottom>
             Collection Types
@@ -126,11 +121,7 @@ const CollectionTypesManagement: React.FC = () => {
             Manage collection types for organizing your media assets
           </Typography>
         </Box>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={handleCreateClick}
-        >
+        <Button variant="contained" startIcon={<AddIcon />} onClick={handleCreateClick}>
           Create Type
         </Button>
       </Box>
@@ -190,12 +181,7 @@ const CollectionTypesManagement: React.FC = () => {
                         {type.name}
                       </Typography>
                       {type.isSystem && (
-                        <Chip
-                          label="System"
-                          size="small"
-                          sx={{ mt: 0.5 }}
-                          variant="outlined"
-                        />
+                        <Chip label="System" size="small" sx={{ mt: 0.5 }} variant="outlined" />
                       )}
                     </Box>
                   </TableCell>
@@ -226,9 +212,7 @@ const CollectionTypesManagement: React.FC = () => {
                       size="small"
                       onClick={() => handleEditClick(type)}
                       disabled={type.isSystem}
-                      title={
-                        type.isSystem ? "Cannot edit system types" : "Edit type"
-                      }
+                      title={type.isSystem ? "Cannot edit system types" : "Edit type"}
                     >
                       <EditIcon fontSize="small" />
                     </IconButton>
@@ -236,11 +220,7 @@ const CollectionTypesManagement: React.FC = () => {
                       size="small"
                       onClick={() => handleDeleteClick(type)}
                       disabled={type.isSystem}
-                      title={
-                        type.isSystem
-                          ? "Cannot delete system types"
-                          : "Delete type"
-                      }
+                      title={type.isSystem ? "Cannot delete system types" : "Delete type"}
                       color="error"
                     >
                       <DeleteIcon fontSize="small" />
@@ -263,9 +243,7 @@ const CollectionTypesManagement: React.FC = () => {
         open={migrateDialogOpen}
         onClose={handleMigrateClose}
         sourceType={selectedType}
-        availableTypes={collectionTypes.filter(
-          (t) => t.id !== selectedType?.id,
-        )}
+        availableTypes={collectionTypes.filter((t) => t.id !== selectedType?.id)}
       />
     </Box>
   );

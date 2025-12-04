@@ -113,6 +113,7 @@ t("translation.s3Explorer.keyboard.navigation");
 The locale files now contain **two separate** `s3Explorer` sections:
 
 1. **Root-Level** (e.g., `en.s3Explorer`):
+
    - Simpler structure with core UI elements
    - Contains: filter, loading, empty, keyboard, menu
    - Used for basic S3 explorer interface

@@ -104,13 +104,16 @@ else:
 ## Deployment Flow
 
 1. **MediaLakeStack** deploys (with empty cloudfront_domain)
+
    - Creates connector Lambda with `CLOUDFRONT_DOMAIN_SSM_PARAM` environment variable
    - Grants SSM read permissions to Lambda
 
 2. **ApiGatewayDeployment** deploys
+
    - Creates SSM parameter for API Gateway stage name
 
 3. **UserInterfaceStack** deploys
+
    - Creates CloudFront distribution
    - Writes CloudFront domain to SSM parameter
 
@@ -127,6 +130,7 @@ else:
    ```
 
 2. **Test Connector Creation**: Create a new S3 connector with uploads enabled and verify:
+
    - Lambda logs show successful SSM parameter retrieval
    - CORS configuration uses CloudFront domain, not wildcard
    - Uploads work from the MediaLake UI

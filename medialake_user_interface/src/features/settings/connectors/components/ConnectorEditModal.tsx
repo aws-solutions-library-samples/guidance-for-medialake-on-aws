@@ -26,8 +26,7 @@ const ConnectorEditModal: React.FC<ConnectorEditModalProps> = ({
   onSave,
 }) => {
   const theme = useTheme();
-  const [editedConnector, setEditedConnector] =
-    useState<ConnectorResponse>(connector);
+  const [editedConnector, setEditedConnector] = useState<ConnectorResponse>(connector);
 
   useEffect(() => {
     setEditedConnector(connector);
@@ -74,12 +73,7 @@ const ConnectorEditModal: React.FC<ConnectorEditModalProps> = ({
             fullWidth
           />
           {editedConnector.settings?.region && (
-            <TextField
-              label="Region"
-              value={editedConnector.region}
-              disabled
-              fullWidth
-            />
+            <TextField label="Region" value={editedConnector.region} disabled fullWidth />
           )}
           {editedConnector.settings?.path && (
             <TextField

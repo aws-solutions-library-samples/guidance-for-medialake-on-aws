@@ -9,11 +9,7 @@ interface SearchFieldProps {
   placeholder?: string;
 }
 
-export const SearchField: React.FC<SearchFieldProps> = ({
-  value,
-  onChange,
-  placeholder,
-}) => {
+export const SearchField: React.FC<SearchFieldProps> = ({ value, onChange, placeholder }) => {
   const theme = useTheme();
   const { t } = useTranslation();
 
@@ -49,16 +45,12 @@ export const SearchField: React.FC<SearchFieldProps> = ({
         sx={{
           fontSize: "14px",
           color:
-            theme.palette.mode === "dark"
-              ? theme.palette.common.white
-              : theme.palette.text.primary,
+            theme.palette.mode === "dark" ? theme.palette.common.white : theme.palette.text.primary,
           "& input": {
             padding: "0",
             "&::placeholder": {
               color:
-                theme.palette.mode === "dark"
-                  ? alpha(theme.palette.common.white, 0.7)
-                  : "inherit",
+                theme.palette.mode === "dark" ? alpha(theme.palette.common.white, 0.7) : "inherit",
               opacity: 1,
             },
           },

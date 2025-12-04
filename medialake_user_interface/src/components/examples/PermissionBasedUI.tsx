@@ -42,8 +42,8 @@ const PermissionBasedUI: React.FC = () => {
       </Typography>
 
       <Typography variant="body1" paragraph>
-        This component demonstrates different ways to use the Can component for
-        permission-based UI rendering.
+        This component demonstrates different ways to use the Can component for permission-based UI
+        rendering.
       </Typography>
 
       <Grid container spacing={3}>
@@ -66,22 +66,14 @@ const PermissionBasedUI: React.FC = () => {
 
                 {/* Only visible with edit permission */}
                 <Can I="edit" a="asset" subject={asset}>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    startIcon={<EditIcon />}
-                  >
+                  <Button variant="contained" color="primary" startIcon={<EditIcon />}>
                     Edit
                   </Button>
                 </Can>
 
                 {/* Only visible with delete permission */}
                 <Can I="delete" a="asset" subject={asset}>
-                  <Button
-                    variant="contained"
-                    color="error"
-                    startIcon={<DeleteIcon />}
-                  >
+                  <Button variant="contained" color="error" startIcon={<DeleteIcon />}>
                     Delete
                   </Button>
                 </Can>
@@ -114,10 +106,7 @@ const PermissionBasedUI: React.FC = () => {
                     </Button>
 
                     {allowed && (
-                      <Typography
-                        variant="caption"
-                        sx={{ mt: 1, display: "block" }}
-                      >
+                      <Typography variant="caption" sx={{ mt: 1, display: "block" }}>
                         You can share this asset with other users
                       </Typography>
                     )}
@@ -158,11 +147,7 @@ const PermissionBasedUI: React.FC = () => {
                       color="error"
                       startIcon={<DeleteIcon />}
                       disabled={!allowed}
-                      title={
-                        !allowed
-                          ? "You don't have permission to delete this asset"
-                          : ""
-                      }
+                      title={!allowed ? "You don't have permission to delete this asset" : ""}
                       sx={{ minWidth: "150px" }}
                     >
                       Delete

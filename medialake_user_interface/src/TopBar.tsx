@@ -68,8 +68,7 @@ function TopBar() {
   const [searchResults, setSearchResults] = useState<any>(null);
   const searchBoxRef = useRef<HTMLDivElement>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const [isSemanticConfigDialogOpen, setIsSemanticConfigDialogOpen] =
-    useState(false);
+  const [isSemanticConfigDialogOpen, setIsSemanticConfigDialogOpen] = useState(false);
   const isChatEnabled = useFeatureFlag("chat-enabled", true);
   const { toggleChat, isOpen: isChatOpen } = useChat();
 
@@ -95,9 +94,7 @@ function TopBar() {
   }, [storeQuery]);
 
   const getSearchQuery = useCallback(() => {
-    const tagPart = searchTags
-      .map((tag) => `${tag.key}: ${tag.value}`)
-      .join(" ");
+    const tagPart = searchTags.map((tag) => `${tag.key}: ${tag.value}`).join(" ");
     return `${tagPart}${tagPart && searchInput ? " " : ""}${searchInput}`.trim();
   }, [searchTags, searchInput]);
 
@@ -128,14 +125,7 @@ function TopBar() {
 
         // Invalidate search cache to force refetch
         queryClient.invalidateQueries({
-          queryKey: QUERY_KEYS.SEARCH.list(
-            query,
-            1,
-            50,
-            storeIsSemantic,
-            [],
-            facetParams,
-          ),
+          queryKey: QUERY_KEYS.SEARCH.list(query, 1, 50, storeIsSemantic, [], facetParams),
         });
 
         // Build URL with semantic parameter
@@ -146,21 +136,17 @@ function TopBar() {
         // Add filters to URL
         if (filters.type) params.set("type", filters.type);
         if (filters.extension) params.set("extension", filters.extension);
-        if (filters.asset_size_gte)
-          params.set("asset_size_gte", filters.asset_size_gte.toString());
-        if (filters.asset_size_lte)
-          params.set("asset_size_lte", filters.asset_size_lte.toString());
-        if (filters.ingested_date_gte)
-          params.set("ingested_date_gte", filters.ingested_date_gte);
-        if (filters.ingested_date_lte)
-          params.set("ingested_date_lte", filters.ingested_date_lte);
+        if (filters.asset_size_gte) params.set("asset_size_gte", filters.asset_size_gte.toString());
+        if (filters.asset_size_lte) params.set("asset_size_lte", filters.asset_size_lte.toString());
+        if (filters.ingested_date_gte) params.set("ingested_date_gte", filters.ingested_date_gte);
+        if (filters.ingested_date_lte) params.set("ingested_date_lte", filters.ingested_date_lte);
         if (filters.filename) params.set("filename", filters.filename);
 
         // Navigate with URL parameters
         navigate(`/search?${params.toString()}`);
       }
     }, 500),
-    [navigate, storeIsSemantic, setQuery, setIsSemantic, filters, queryClient],
+    [navigate, storeIsSemantic, setQuery, setIsSemantic, filters, queryClient]
   );
 
   // Handle search results from session storage
@@ -227,14 +213,7 @@ function TopBar() {
 
         // Invalidate search cache to force refetch
         queryClient.invalidateQueries({
-          queryKey: QUERY_KEYS.SEARCH.list(
-            searchQuery,
-            1,
-            50,
-            storeIsSemantic,
-            [],
-            facetParams,
-          ),
+          queryKey: QUERY_KEYS.SEARCH.list(searchQuery, 1, 50, storeIsSemantic, [], facetParams),
         });
 
         // Build URL with parameters
@@ -249,9 +228,7 @@ function TopBar() {
     return false;
   };
 
-  const handleSearchInputChange = (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
+  const handleSearchInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
     setSearchInput(value);
 
@@ -309,14 +286,7 @@ function TopBar() {
 
       // Invalidate search cache to force refetch even with identical parameters
       queryClient.invalidateQueries({
-        queryKey: QUERY_KEYS.SEARCH.list(
-          searchQuery,
-          1,
-          50,
-          storeIsSemantic,
-          [],
-          facetParams,
-        ),
+        queryKey: QUERY_KEYS.SEARCH.list(searchQuery, 1, 50, storeIsSemantic, [], facetParams),
       });
 
       // Build URL with parameters
@@ -327,14 +297,10 @@ function TopBar() {
       // Add current filters to URL
       if (filters.type) params.set("type", filters.type);
       if (filters.extension) params.set("extension", filters.extension);
-      if (filters.asset_size_gte)
-        params.set("asset_size_gte", filters.asset_size_gte.toString());
-      if (filters.asset_size_lte)
-        params.set("asset_size_lte", filters.asset_size_lte.toString());
-      if (filters.ingested_date_gte)
-        params.set("ingested_date_gte", filters.ingested_date_gte);
-      if (filters.ingested_date_lte)
-        params.set("ingested_date_lte", filters.ingested_date_lte);
+      if (filters.asset_size_gte) params.set("asset_size_gte", filters.asset_size_gte.toString());
+      if (filters.asset_size_lte) params.set("asset_size_lte", filters.asset_size_lte.toString());
+      if (filters.ingested_date_gte) params.set("ingested_date_gte", filters.ingested_date_gte);
+      if (filters.ingested_date_lte) params.set("ingested_date_lte", filters.ingested_date_lte);
       if (filters.filename) params.set("filename", filters.filename);
 
       navigate(`/search?${params.toString()}`);
@@ -344,12 +310,9 @@ function TopBar() {
   const handleDeleteTag = (tagToDelete: SearchTag) => {
     setSearchTags((prev) => {
       const newTags = prev.filter(
-        (tag) =>
-          !(tag.key === tagToDelete.key && tag.value === tagToDelete.value),
+        (tag) => !(tag.key === tagToDelete.key && tag.value === tagToDelete.value)
       );
-      const searchQuery = newTags
-        .map((tag) => `${tag.key}: ${tag.value}`)
-        .join(" ");
+      const searchQuery = newTags.map((tag) => `${tag.key}: ${tag.value}`).join(" ");
 
       // Build facet parameters for cache invalidation
       const facetParams = {
@@ -371,14 +334,7 @@ function TopBar() {
 
       // Invalidate search cache to force refetch
       queryClient.invalidateQueries({
-        queryKey: QUERY_KEYS.SEARCH.list(
-          searchQuery,
-          1,
-          50,
-          storeIsSemantic,
-          [],
-          facetParams,
-        ),
+        queryKey: QUERY_KEYS.SEARCH.list(searchQuery, 1, 50, storeIsSemantic, [], facetParams),
       });
 
       // Build URL with parameters
@@ -392,7 +348,7 @@ function TopBar() {
   };
   // Handle semantic search toggle
   const handleSemanticSearchToggle = (
-    event: React.MouseEvent | React.ChangeEvent<HTMLInputElement>,
+    event: React.MouseEvent | React.ChangeEvent<HTMLInputElement>
   ) => {
     // Check if semantic search is properly configured
     if (!isSemanticSearchEnabled || !isConfigured) {
@@ -490,20 +446,17 @@ function TopBar() {
             sx={{
               display: "flex",
               alignItems: "center",
-              backgroundColor:
-                theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.04)",
+              backgroundColor: theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.04)",
               borderRadius: "24px",
               padding: "8px 16px",
               width: "100%",
               flexDirection: isRTL ? "row-reverse" : "row",
-              boxShadow:
-                theme === "dark" ? "0 2px 5px rgba(0,0,0,0.2)" : "none",
+              boxShadow: theme === "dark" ? "0 2px 5px rgba(0,0,0,0.2)" : "none",
             }}
           >
             <SearchIcon
               sx={{
-                color:
-                  theme === "dark" ? "rgba(255,255,255,0.7)" : "text.secondary",
+                color: theme === "dark" ? "rgba(255,255,255,0.7)" : "text.secondary",
                 [isRTL ? "ml" : "mr"]: 1.5,
                 fontSize: "20px",
               }}
@@ -517,13 +470,11 @@ function TopBar() {
               sx={{
                 textAlign: isRTL ? "right" : "left",
                 fontSize: "16px",
-                color:
-                  theme === "dark" ? "white" : muiTheme.palette.text.primary,
+                color: theme === "dark" ? "white" : muiTheme.palette.text.primary,
                 "& input": {
                   padding: "6px 0",
                   "&::placeholder": {
-                    color:
-                      theme === "dark" ? "rgba(255,255,255,0.7)" : "inherit",
+                    color: theme === "dark" ? "rgba(255,255,255,0.7)" : "inherit",
                     opacity: 1,
                   },
                 },
@@ -611,9 +562,7 @@ function TopBar() {
                 : theme === "dark"
                   ? "rgba(255,255,255,0.7)"
                   : "text.secondary",
-              backgroundColor: storeIsSemantic
-                ? muiTheme.palette.primary.main
-                : "transparent",
+              backgroundColor: storeIsSemantic ? muiTheme.palette.primary.main : "transparent",
               borderColor: storeIsSemantic
                 ? muiTheme.palette.primary.main
                 : theme === "dark"
@@ -624,7 +573,7 @@ function TopBar() {
                   ["color", "background-color", "border-color", "transform"],
                   {
                     duration: theme.transitions.duration.short,
-                  },
+                  }
                 ),
               "&:hover": {
                 backgroundColor: storeIsSemantic
@@ -636,9 +585,7 @@ function TopBar() {
               },
               "&:focus": {
                 outline: `2px solid ${
-                  storeIsSemantic
-                    ? muiTheme.palette.primary.main
-                    : "rgba(0,0,0,0.2)"
+                  storeIsSemantic ? muiTheme.palette.primary.main : "rgba(0,0,0,0.2)"
                 }`,
                 outlineOffset: "2px",
               },
@@ -648,10 +595,7 @@ function TopBar() {
             }}
             title={
               !isSemanticSearchEnabled || !isConfigured
-                ? t(
-                    "search.semantic.configure",
-                    "Click to configure semantic search",
-                  )
+                ? t("search.semantic.configure", "Click to configure semantic search")
                 : storeIsSemantic
                   ? t("search.semantic.disable", "Disable semantic search")
                   : t("search.semantic.enable", "Enable semantic search")
@@ -677,15 +621,12 @@ function TopBar() {
           size="small"
           onClick={handleOpenUploadModal}
           sx={{
-            color:
-              theme === "dark" ? "rgba(255,255,255,0.7)" : "text.secondary",
-            backgroundColor:
-              theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.04)",
+            color: theme === "dark" ? "rgba(255,255,255,0.7)" : "text.secondary",
+            backgroundColor: theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.04)",
             borderRadius: "8px",
             padding: "8px",
             "&:hover": {
-              backgroundColor:
-                theme === "dark" ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.08)",
+              backgroundColor: theme === "dark" ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.08)",
             },
           }}
         >
@@ -739,7 +680,7 @@ function TopBar() {
         title={t("upload.title", "Upload Media Files")}
         description={t(
           "upload.description",
-          "Select an S3 connector and upload your media files. Only audio, video, HLS, and MPEG-DASH formats are supported.",
+          "Select an S3 connector and upload your media files. Only audio, video, HLS, and MPEG-DASH formats are supported."
         )}
       />
 
@@ -754,16 +695,13 @@ function TopBar() {
         aria-describedby="semantic-config-dialog-description"
       >
         <DialogTitle id="semantic-config-dialog-title">
-          {t(
-            "search.semantic.configDialog.title",
-            "Semantic Search Not Configured",
-          )}
+          {t("search.semantic.configDialog.title", "Semantic Search Not Configured")}
         </DialogTitle>
         <DialogContent>
           <DialogContentText id="semantic-config-dialog-description">
             {t(
               "search.semantic.configDialog.description",
-              "Semantic search is currently not configured or disabled. To enable this feature, go to System Settings > Search to configure a search provider, or press the button below.",
+              "Semantic search is currently not configured or disabled. To enable this feature, go to System Settings > Search to configure a search provider, or press the button below."
             )}
           </DialogContentText>
         </DialogContent>
@@ -771,16 +709,8 @@ function TopBar() {
           <Button onClick={handleCloseSemanticConfigDialog} color="inherit">
             {t("common.cancel", "Cancel")}
           </Button>
-          <Button
-            onClick={handleNavigateToSettings}
-            variant="contained"
-            color="primary"
-            autoFocus
-          >
-            {t(
-              "search.semantic.configDialog.goToSettings",
-              "Go to Search Settings",
-            )}
+          <Button onClick={handleNavigateToSettings} variant="contained" color="primary" autoFocus>
+            {t("search.semantic.configDialog.goToSettings", "Go to Search Settings")}
           </Button>
         </DialogActions>
       </Dialog>

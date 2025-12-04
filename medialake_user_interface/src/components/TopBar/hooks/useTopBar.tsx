@@ -11,31 +11,21 @@ import { StorageHelper } from "../../../common/helpers/storage-helper";
 
 export const useTopBar = () => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterAnchorEl, setFilterAnchorEl] = useState<HTMLElement | null>(
-    null,
-  );
-  const [filterOptions, setFilterOptions] = useState<FilterOptions>(
-    INITIAL_FILTER_OPTIONS,
-  );
+  const [filterAnchorEl, setFilterAnchorEl] = useState<HTMLElement | null>(null);
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>(INITIAL_FILTER_OPTIONS);
   const [chatVisible, setChatVisible] = useState(false);
 
   const navigate = useNavigate();
   const { refetch } = useSearch(searchQuery);
   const { setIsAuthenticated } = useAuth();
 
-  const handleSearchChange = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      setSearchQuery(event.target.value);
-    },
-    [],
-  );
+  const handleSearchChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(event.target.value);
+  }, []);
 
-  const handleFilterClick = useCallback(
-    (event: React.MouseEvent<HTMLElement>) => {
-      setFilterAnchorEl(event.currentTarget);
-    },
-    [],
-  );
+  const handleFilterClick = useCallback((event: React.MouseEvent<HTMLElement>) => {
+    setFilterAnchorEl(event.currentTarget);
+  }, []);
 
   const handleFilterClose = useCallback(() => {
     setFilterAnchorEl(null);
@@ -51,7 +41,7 @@ export const useTopBar = () => {
         },
       }));
     },
-    [],
+    []
   );
 
   const handleSearchSubmit = useCallback(async () => {

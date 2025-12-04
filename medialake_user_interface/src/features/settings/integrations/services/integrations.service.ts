@@ -1,8 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  integrationsController,
-  INTEGRATIONS_QUERY_KEYS,
-} from "../api/integrations.controller";
+import { integrationsController, INTEGRATIONS_QUERY_KEYS } from "../api/integrations.controller";
 import type {
   Integration,
   IntegrationFormData,
@@ -45,10 +42,7 @@ export const useCreateIntegration = () => {
       return integrationsController
         .createIntegration(data)
         .then((result) => {
-          console.log(
-            "[useCreateIntegration] Mutation completed successfully:",
-            result,
-          );
+          console.log("[useCreateIntegration] Mutation completed successfully:", result);
           return result;
         })
         .catch((error) => {

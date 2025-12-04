@@ -143,16 +143,9 @@ const RoleManagement: React.FC<RoleManagementProps> = ({
                   <Typography variant="body2" color="text.secondary">
                     {role.description}
                   </Typography>
-                  <Box
-                    sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mt: 1 }}
-                  >
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mt: 1 }}>
                     {role.permissions.map((permission) => (
-                      <Chip
-                        key={permission}
-                        label={permission}
-                        size="small"
-                        variant="outlined"
-                      />
+                      <Chip key={permission} label={permission} size="small" variant="outlined" />
                     ))}
                   </Box>
                 </Box>
@@ -160,20 +153,12 @@ const RoleManagement: React.FC<RoleManagementProps> = ({
             />
             <ListItemSecondaryAction>
               <Tooltip title="Edit Role">
-                <IconButton
-                  edge="end"
-                  onClick={() => handleOpenDialog(role)}
-                  sx={{ mr: 1 }}
-                >
+                <IconButton edge="end" onClick={() => handleOpenDialog(role)} sx={{ mr: 1 }}>
                   <EditIcon />
                 </IconButton>
               </Tooltip>
               <Tooltip title="Delete Role">
-                <IconButton
-                  edge="end"
-                  onClick={() => onDeleteRole(role.id)}
-                  color="error"
-                >
+                <IconButton edge="end" onClick={() => onDeleteRole(role.id)} color="error">
                   <DeleteIcon />
                 </IconButton>
               </Tooltip>
@@ -182,35 +167,22 @@ const RoleManagement: React.FC<RoleManagementProps> = ({
         ))}
       </List>
 
-      <Dialog
-        open={openDialog}
-        onClose={handleCloseDialog}
-        maxWidth="sm"
-        fullWidth
-      >
+      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
         <form onSubmit={handleSubmit}>
-          <DialogTitle>
-            {editingRole ? "Edit Role" : "Add New Role"}
-          </DialogTitle>
+          <DialogTitle>{editingRole ? "Edit Role" : "Add New Role"}</DialogTitle>
           <DialogContent>
-            <Box
-              sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}
-            >
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}>
               <TextField
                 label="Role Name"
                 value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 required
                 fullWidth
               />
               <TextField
                 label="Description"
                 value={formData.description}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 multiline
                 rows={2}
                 fullWidth

@@ -1,10 +1,4 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  ReactNode,
-} from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 // Helper function to check if a language is RTL
@@ -20,21 +14,15 @@ interface DirectionContextType {
   toggleDirection: () => void;
 }
 
-const DirectionContext = createContext<DirectionContextType | undefined>(
-  undefined,
-);
+const DirectionContext = createContext<DirectionContextType | undefined>(undefined);
 
 interface DirectionProviderProps {
   children: ReactNode;
 }
 
-export const DirectionProvider: React.FC<DirectionProviderProps> = ({
-  children,
-}) => {
+export const DirectionProvider: React.FC<DirectionProviderProps> = ({ children }) => {
   const { i18n } = useTranslation();
-  const [direction, setDirection] = useState<Direction>(
-    isRTL(i18n.language) ? "rtl" : "ltr",
-  );
+  const [direction, setDirection] = useState<Direction>(isRTL(i18n.language) ? "rtl" : "ltr");
 
   // Update direction when language changes
   useEffect(() => {
@@ -44,17 +32,14 @@ export const DirectionProvider: React.FC<DirectionProviderProps> = ({
         "DirectionContext: Language changed to",
         i18n.language,
         "Setting direction to",
-        newDirection,
+        newDirection
       );
       setDirection(newDirection);
 
       // Update HTML dir attribute
       document.documentElement.setAttribute("dir", newDirection);
       document.documentElement.setAttribute("lang", i18n.language);
-      console.log(
-        "DirectionContext: Updated HTML dir attribute to",
-        newDirection,
-      );
+      console.log("DirectionContext: Updated HTML dir attribute to", newDirection);
     };
 
     // Set initial direction
@@ -75,9 +60,7 @@ export const DirectionProvider: React.FC<DirectionProviderProps> = ({
   };
 
   return (
-    <DirectionContext.Provider
-      value={{ direction, setDirection, toggleDirection }}
-    >
+    <DirectionContext.Provider value={{ direction, setDirection, toggleDirection }}>
       {children}
     </DirectionContext.Provider>
   );

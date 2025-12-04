@@ -9,31 +9,21 @@ interface TableCellContentProps {
   "aria-label"?: string;
 }
 
-const getStyles = (
-  theme: Theme,
-  variant: TableCellContentProps["variant"],
-  isDark: boolean,
-) => {
+const getStyles = (theme: Theme, variant: TableCellContentProps["variant"], isDark: boolean) => {
   switch (variant) {
     case "primary":
       return {
-        color: isDark
-          ? alpha(theme.palette.text.primary, 0.95)
-          : theme.palette.text.primary,
+        color: isDark ? alpha(theme.palette.text.primary, 0.95) : theme.palette.text.primary,
         fontWeight: 500,
       };
     case "secondary":
       return {
-        color: isDark
-          ? alpha(theme.palette.text.primary, 0.7)
-          : theme.palette.text.secondary,
+        color: isDark ? alpha(theme.palette.text.primary, 0.7) : theme.palette.text.secondary,
         opacity: isDark ? 1 : 0.8,
       };
     default:
       return {
-        color: isDark
-          ? alpha(theme.palette.text.primary, 0.9)
-          : theme.palette.text.primary,
+        color: isDark ? alpha(theme.palette.text.primary, 0.9) : theme.palette.text.primary,
       };
   }
 };

@@ -25,18 +25,14 @@ export default {
     browsePath: "Parcourir le chemin",
     uploadingTo: "Téléchargement vers",
     restrictedToPrefix: "restreint",
-    allowedPrefixesInfo:
-      "Vous ne pouvez télécharger que vers {{count}} chemin(s) autorisé(s)",
-    pathInfo:
-      "Les fichiers seront téléchargés vers le chemin sélectionné dans le compartiment S3",
+    allowedPrefixesInfo: "Vous ne pouvez télécharger que vers {{count}} chemin(s) autorisé(s)",
+    pathInfo: "Les fichiers seront téléchargés vers le chemin sélectionné dans le compartiment S3",
     selectPathFirst: "Sélectionnez un chemin avant de télécharger",
-    pathResetWarning:
-      "Le changement de connecteur réinitialisera le chemin sélectionné",
+    pathResetWarning: "Le changement de connecteur réinitialisera le chemin sélectionné",
     connectorLabel: "Connecteur S3",
     selectConnectorPlaceholder: "Sélectionnez un connecteur S3",
     loadingConnectors: "Chargement des connecteurs...",
-    noConnectors:
-      "Aucun connecteur S3 disponible. Veuillez d'abord configurer un connecteur S3.",
+    noConnectors: "Aucun connecteur S3 disponible. Veuillez d'abord configurer un connecteur S3.",
     dashboardNote:
       "Seuls les fichiers de type audio/*, video/*, image/*, HLS (application/x-mpegURL) et MPEG-DASH (application/dash+xml) sont autorisés",
     meta: {
@@ -56,8 +52,7 @@ export default {
     currentPath: "Chemin actuel",
     confirm: "Utiliser ce chemin",
     validation: {
-      invalidPath:
-        "Le chemin sélectionné est en dehors des préfixes autorisés.",
+      invalidPath: "Le chemin sélectionné est en dehors des préfixes autorisés.",
       noPathSelected: "Veuillez naviguer vers un dossier avant de confirmer.",
     },
     error: {
@@ -85,8 +80,7 @@ export default {
     },
     deleteDialog: {
       title: "Confirmer la suppression",
-      description:
-        "Êtes-vous sûr de vouloir supprimer cet actif ? Cette action est irréversible.",
+      description: "Êtes-vous sûr de vouloir supprimer cet actif ? Cette action est irréversible.",
       cancel: "Annuler",
       confirm: "Supprimer",
     },
@@ -126,8 +120,7 @@ export default {
     loading: "Chargement...",
     errors: {
       loadingConfig: "Erreur lors du chargement de la configuration AWS :",
-      loadingUserAttributes:
-        "Erreur lors du chargement des attributs utilisateur :",
+      loadingUserAttributes: "Erreur lors du chargement des attributs utilisateur :",
       signingOut: "Erreur lors de la déconnexion :",
     },
     navigation: {
@@ -166,16 +159,11 @@ export default {
       systemLoad: "Charge du système",
     },
     errors: {
-      userDeletionNotImplemented:
-        "La suppression d'utilisateur n'est pas encore implémentée.",
-      userCreationNotImplemented:
-        "La création d'utilisateur n'est pas encore implémentée.",
-      userEditingNotImplemented:
-        "La modification d'utilisateur n'est pas encore implémentée.",
-      analyticsExportNotImplemented:
-        "L'export des analyses n'est pas encore implémenté.",
-      systemResetNotImplemented:
-        "La réinitialisation du système n'est pas encore implémentée.",
+      userDeletionNotImplemented: "La suppression d'utilisateur n'est pas encore implémentée.",
+      userCreationNotImplemented: "La création d'utilisateur n'est pas encore implémentée.",
+      userEditingNotImplemented: "La modification d'utilisateur n'est pas encore implémentée.",
+      analyticsExportNotImplemented: "L'export des analyses n'est pas encore implémenté.",
+      systemResetNotImplemented: "La réinitialisation du système n'est pas encore implémentée.",
     },
     columns: {
       lastActive: "Dernière activité",
@@ -354,8 +342,7 @@ export default {
   settings: {
     environments: {
       title: "Environnements",
-      description:
-        "Gérez les environnements du système et leurs configurations",
+      description: "Gérez les environnements du système et leurs configurations",
       addButton: "Ajouter un environnement",
       searchPlaceholder: "Recherchez des environnements",
       createTitle: "Créer un environnement",
@@ -393,8 +380,7 @@ export default {
         endpoint: "URL de l'endpoint (optionnel)",
         enabled: "Recherche activée",
         noProvider: "Aucun fournisseur de recherche configuré.",
-        configurePrompt:
-          "Configurez Twelve Labs pour activer les capacités de recherche.",
+        configurePrompt: "Configurez Twelve Labs pour activer les capacités de recherche.",
       },
       notifications: {
         title: "Paramètres de notifications",
@@ -651,8 +637,7 @@ export default {
       "Storage Warning": "Avertissement de stockage",
       "Storage capacity reaching 80%": "Capacité de stockage atteignant 80%",
       "Pipeline Failed": "Pipeline échoué",
-      "Video processing pipeline failed":
-        "Le pipeline de traitement vidéo a échoué",
+      "Video processing pipeline failed": "Le pipeline de traitement vidéo a échoué",
     },
     modal: {
       confirmDelete: "Êtes-vous sûr de vouloir supprimer cet élément ?",
@@ -697,10 +682,8 @@ export default {
       },
       error: {
         loading: "Erreur lors du chargement des objets S3 : {{message}}",
-        network:
-          "Erreur réseau. Veuillez vérifier votre connexion et réessayer.",
-        permission:
-          "Accès refusé. Vous n'avez pas la permission d'accéder à ce chemin.",
+        network: "Erreur réseau. Veuillez vérifier votre connexion et réessayer.",
+        permission: "Accès refusé. Vous n'avez pas la permission d'accéder à ce chemin.",
         permissionWithPrefixes:
           "Accès refusé. Vous ne pouvez accéder qu'aux chemins suivants : {{prefixes}}",
         notFound: "Le chemin demandé n'existe pas.",

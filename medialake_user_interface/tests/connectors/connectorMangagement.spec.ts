@@ -25,32 +25,23 @@ test.describe("Connector Management", () => {
     await page.waitForTimeout(2000);
 
     // Get initial connector count by counting connector cards
-    const initialConnectorCards = await page
-      .locator('[data-testid^="connector-card-"]')
-      .count();
+    const initialConnectorCards = await page.locator('[data-testid^="connector-card-"]').count();
     console.log(`[Test] Initial connector count: ${initialConnectorCards}`);
 
     // Create S3 connector using helper
-    const createResult = await createS3ConnectorWithExistingBucket(
-      page,
-      s3BucketName,
-    );
+    const createResult = await createS3ConnectorWithExistingBucket(page, s3BucketName);
     expect(createResult.success).toBe(true);
     const connectorName = createResult.connectorName;
 
     // Verify connector creation using test ID
     // Wait for connector count to increase
     await page.waitForTimeout(3000);
-    const newConnectorCards = await page
-      .locator('[data-testid^="connector-card-"]')
-      .count();
+    const newConnectorCards = await page.locator('[data-testid^="connector-card-"]').count();
     console.log(`[Test] New connector count: ${newConnectorCards}`);
     expect(newConnectorCards).toBe(initialConnectorCards + 1);
 
     // Also verify connector name is visible
-    await expect(
-      page.locator(`//h6[contains(text(), "${connectorName}")]`),
-    ).toBeVisible({
+    await expect(page.locator(`//h6[contains(text(), "${connectorName}")]`)).toBeVisible({
       timeout: 60000,
     });
 
@@ -65,16 +56,12 @@ test.describe("Connector Management", () => {
 
     // Verify connector was deleted using connector count
     await page.waitForTimeout(2000);
-    const finalConnectorCards = await page
-      .locator('[data-testid^="connector-card-"]')
-      .count();
+    const finalConnectorCards = await page.locator('[data-testid^="connector-card-"]').count();
     console.log(`[Test] Final connector count: ${finalConnectorCards}`);
     expect(finalConnectorCards).toBe(initialConnectorCards);
 
     // Also verify connector name is no longer visible
-    await expect(
-      page.locator(`//h6[contains(text(), "${connectorName}")]`),
-    ).not.toBeVisible({
+    await expect(page.locator(`//h6[contains(text(), "${connectorName}")]`)).not.toBeVisible({
       timeout: 20000,
     });
 

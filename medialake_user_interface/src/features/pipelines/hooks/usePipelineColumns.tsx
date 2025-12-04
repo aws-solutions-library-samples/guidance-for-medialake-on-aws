@@ -1,12 +1,6 @@
 import { useMemo } from "react";
 import { createColumnHelper } from "@tanstack/react-table";
-import {
-  Box,
-  Tooltip,
-  IconButton,
-  Typography,
-  FormControlLabel,
-} from "@mui/material";
+import { Box, Tooltip, IconButton, Typography, FormControlLabel } from "@mui/material";
 import { IconSwitch } from "@/components/common";
 import {
   Edit as EditIcon,
@@ -38,9 +32,7 @@ export const usePipelineColumns = ({
         header: "Name",
         size: 200,
         enableSorting: true,
-        cell: ({ getValue }) => (
-          <TableCellContent variant="primary">{getValue()}</TableCellContent>
-        ),
+        cell: ({ getValue }) => <TableCellContent variant="primary">{getValue()}</TableCellContent>,
       }),
       columnHelper.accessor("type", {
         header: "Type",
@@ -88,11 +80,8 @@ export const usePipelineColumns = ({
         cell: (info) => {
           const status = info.getValue();
           const pipeline = info.row.original;
-          let color:
-            | "text.secondary"
-            | "success.main"
-            | "info.main"
-            | "error.main" = "text.secondary";
+          let color: "text.secondary" | "success.main" | "info.main" | "error.main" =
+            "text.secondary";
 
           if (status === "DEPLOYED") {
             color = "success.main";
@@ -129,9 +118,7 @@ export const usePipelineColumns = ({
                       <IconSwitch
                         size="small"
                         checked={pipeline.active !== false}
-                        onChange={(e) =>
-                          onToggleActive(pipeline.id, e.target.checked)
-                        }
+                        onChange={(e) => onToggleActive(pipeline.id, e.target.checked)}
                         disabled={pipeline.system}
                         onIcon={<CheckCircleIcon />}
                         offIcon={<CancelIcon />}
@@ -158,10 +145,7 @@ export const usePipelineColumns = ({
         cell: ({ getValue }) => {
           const dateValue = getValue();
           return (
-            <Tooltip
-              title={format(new Date(dateValue), "MMM dd, yyyy HH:mm")}
-              placement="top"
-            >
+            <Tooltip title={format(new Date(dateValue), "MMM dd, yyyy HH:mm")} placement="top">
               <Box>
                 <TableCellContent variant="secondary">
                   {format(new Date(dateValue), "MMM dd, yyyy")}
@@ -178,10 +162,7 @@ export const usePipelineColumns = ({
         cell: ({ getValue }) => {
           const dateValue = getValue();
           return (
-            <Tooltip
-              title={format(new Date(dateValue), "MMM dd, yyyy HH:mm")}
-              placement="top"
-            >
+            <Tooltip title={format(new Date(dateValue), "MMM dd, yyyy HH:mm")} placement="top">
               <Box>
                 <TableCellContent variant="secondary">
                   {format(new Date(dateValue), "MMM dd, yyyy")}
@@ -200,9 +181,7 @@ export const usePipelineColumns = ({
             <Tooltip
               title={
                 info.row.original.deploymentStatus &&
-                !["DEPLOYED", "FAILED"].includes(
-                  info.row.original.deploymentStatus,
-                )
+                !["DEPLOYED", "FAILED"].includes(info.row.original.deploymentStatus)
                   ? "Cannot edit pipeline while it's being created"
                   : "Edit Pipeline"
               }
@@ -213,9 +192,7 @@ export const usePipelineColumns = ({
                   onClick={() => onEdit(info.row.original.id)}
                   disabled={
                     info.row.original.deploymentStatus &&
-                    !["DEPLOYED", "FAILED"].includes(
-                      info.row.original.deploymentStatus,
-                    )
+                    !["DEPLOYED", "FAILED"].includes(info.row.original.deploymentStatus)
                   }
                 >
                   <EditIcon fontSize="small" />
@@ -225,9 +202,7 @@ export const usePipelineColumns = ({
             <Tooltip
               title={
                 info.row.original.deploymentStatus &&
-                !["DEPLOYED", "FAILED"].includes(
-                  info.row.original.deploymentStatus,
-                )
+                !["DEPLOYED", "FAILED"].includes(info.row.original.deploymentStatus)
                   ? "Cannot delete pipeline while it's being created"
                   : "Delete Pipeline"
               }
@@ -235,15 +210,11 @@ export const usePipelineColumns = ({
               <span>
                 <IconButton
                   size="small"
-                  onClick={() =>
-                    onDelete(info.row.original.id, info.row.original.name)
-                  }
+                  onClick={() => onDelete(info.row.original.id, info.row.original.name)}
                   disabled={
                     info.row.original.system ||
                     (info.row.original.deploymentStatus &&
-                      !["DEPLOYED", "FAILED"].includes(
-                        info.row.original.deploymentStatus,
-                      ))
+                      !["DEPLOYED", "FAILED"].includes(info.row.original.deploymentStatus))
                   }
                 >
                   <DeleteIcon fontSize="small" />
@@ -254,7 +225,7 @@ export const usePipelineColumns = ({
         ),
       }),
     ],
-    [onEdit, onDelete, onToggleActive],
+    [onEdit, onDelete, onToggleActive]
   );
 };
 

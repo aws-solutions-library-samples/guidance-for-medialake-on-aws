@@ -46,8 +46,8 @@ const ExampleWithErrorHandling: React.FC = () => {
         </Typography>
 
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          This example demonstrates how to use the ErrorBoundary component to
-          capture and display errors.
+          This example demonstrates how to use the ErrorBoundary component to capture and display
+          errors.
         </Typography>
 
         {/*

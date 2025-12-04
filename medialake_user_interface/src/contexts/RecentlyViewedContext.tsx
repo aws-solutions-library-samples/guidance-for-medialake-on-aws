@@ -26,9 +26,7 @@ const STORAGE_KEY = "medialake_recently_viewed";
 const STORAGE_VERSION = 3; // Increment when making breaking changes to storage format
 const MAX_ITEMS = 10;
 
-const RecentlyViewedContext = createContext<
-  RecentlyViewedContextType | undefined
->(undefined);
+const RecentlyViewedContext = createContext<RecentlyViewedContextType | undefined>(undefined);
 
 export const RecentlyViewedProvider: React.FC<{
   children: React.ReactNode;
@@ -39,10 +37,7 @@ export const RecentlyViewedProvider: React.FC<{
       // Clear storage if version doesn't match
       if (version !== STORAGE_VERSION.toString()) {
         localStorage.removeItem(STORAGE_KEY);
-        localStorage.setItem(
-          `${STORAGE_KEY}_version`,
-          STORAGE_VERSION.toString(),
-        );
+        localStorage.setItem(`${STORAGE_KEY}_version`, STORAGE_VERSION.toString());
         return [];
       }
 
@@ -70,10 +65,8 @@ export const RecentlyViewedProvider: React.FC<{
             (item: any) =>
               item.id &&
               item.title &&
-              (item.type === "video" ||
-                item.type === "image" ||
-                item.type === "audio") &&
-              item.path,
+              (item.type === "video" || item.type === "image" || item.type === "audio") &&
+              item.path
           )
           .slice(0, MAX_ITEMS);
       }
@@ -86,10 +79,7 @@ export const RecentlyViewedProvider: React.FC<{
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-      localStorage.setItem(
-        `${STORAGE_KEY}_version`,
-        STORAGE_VERSION.toString(),
-      );
+      localStorage.setItem(`${STORAGE_KEY}_version`, STORAGE_VERSION.toString());
     } catch (error) {
       console.error("Error saving recently viewed items:", error);
     }
@@ -98,14 +88,10 @@ export const RecentlyViewedProvider: React.FC<{
   const addItem = (newItem: Omit<RecentlyViewedItem, "timestamp">) => {
     setItems((currentItems) => {
       // Remove existing item if present
-      const filteredItems = currentItems.filter(
-        (item) => item.id !== newItem.id,
-      );
+      const filteredItems = currentItems.filter((item) => item.id !== newItem.id);
 
       // Ensure path uses the correct format
-      const path = newItem.path.startsWith("/")
-        ? newItem.path
-        : `/${newItem.type}s/${newItem.id}`;
+      const path = newItem.path.startsWith("/") ? newItem.path : `/${newItem.type}s/${newItem.id}`;
 
       // Add new item at the beginning with current timestamp
       const updatedItems = [
@@ -131,9 +117,7 @@ export const RecentlyViewedProvider: React.FC<{
   };
 
   return (
-    <RecentlyViewedContext.Provider
-      value={{ items, addItem, removeItem, clearAll }}
-    >
+    <RecentlyViewedContext.Provider value={{ items, addItem, removeItem, clearAll }}>
       {children}
     </RecentlyViewedContext.Provider>
   );
@@ -142,17 +126,13 @@ export const RecentlyViewedProvider: React.FC<{
 export const useRecentlyViewed = () => {
   const context = useContext(RecentlyViewedContext);
   if (context === undefined) {
-    throw new Error(
-      "useRecentlyViewed must be used within a RecentlyViewedProvider",
-    );
+    throw new Error("useRecentlyViewed must be used within a RecentlyViewedProvider");
   }
   return context;
 };
 
 // Helper hook for automatically tracking viewed items
-export const useTrackRecentlyViewed = (
-  item: Omit<RecentlyViewedItem, "timestamp"> | null,
-) => {
+export const useTrackRecentlyViewed = (item: Omit<RecentlyViewedItem, "timestamp"> | null) => {
   const { addItem } = useRecentlyViewed();
 
   useEffect(() => {

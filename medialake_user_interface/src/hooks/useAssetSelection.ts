@@ -40,9 +40,7 @@ export function useAssetSelection<T>({
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedAssets, setSelectedAssets] = useState<SelectedAsset[]>([]);
-  const [bulkDownloadJobId, setBulkDownloadJobId] = useState<string | null>(
-    null,
-  );
+  const [bulkDownloadJobId, setBulkDownloadJobId] = useState<string | null>(null);
   const [batchDeleteJobId, setBatchDeleteJobId] = useState<string | null>(null);
   const [isDownloadLoading, setIsDownloadLoading] = useState(false);
   const [isDeleteLoading, setIsDeleteLoading] = useState(false);
@@ -155,10 +153,7 @@ export function useAssetSelection<T>({
       setModalState({
         open: true,
         status: "loading",
-        action:
-          currentJob.status === "PENDING"
-            ? "Starting deletion..."
-            : "Deleting assets...",
+        action: currentJob.status === "PENDING" ? "Starting deletion..." : "Deleting assets...",
         message: `${processedAssets} of ${totalAssets} assets processed`,
         progress,
         jobId: batchDeleteJobId,
@@ -167,8 +162,7 @@ export function useAssetSelection<T>({
         // cancelDisabled: isCancelling,
       });
     } else if (currentJob.status === "COMPLETED") {
-      const successCount =
-        currentJob.totalAssets - (currentJob.failedAssets || 0);
+      const successCount = currentJob.totalAssets - (currentJob.failedAssets || 0);
 
       setModalState({
         open: true,
@@ -223,13 +217,7 @@ export function useAssetSelection<T>({
         setBatchDeleteJobId(null);
       }, 5000);
     }
-  }, [
-    batchDeleteJobId,
-    deleteJobsResponse,
-    queryClient,
-    handleCancelBatchDelete,
-    isCancelling,
-  ]);
+  }, [batchDeleteJobId, deleteJobsResponse, queryClient, handleCancelBatchDelete, isCancelling]);
 
   // Handle selection toggle
   const handleSelectToggle = useCallback(
@@ -264,7 +252,7 @@ export function useAssetSelection<T>({
         return newSelectedAssets;
       });
     },
-    [searchParams, setSearchParams, getAssetId, getAssetName, getAssetType],
+    [searchParams, setSearchParams, getAssetId, getAssetName, getAssetType]
   );
 
   // Handle removing a single asset from selection
@@ -285,7 +273,7 @@ export function useAssetSelection<T>({
         return newSelectedAssets;
       });
     },
-    [searchParams, setSearchParams],
+    [searchParams, setSearchParams]
   );
 
   // Handle clearing all selections
@@ -301,35 +289,28 @@ export function useAssetSelection<T>({
     (assetId: string) => {
       return selectedAssets.some((item) => item.id === assetId);
     },
-    [selectedAssets],
+    [selectedAssets]
   );
 
   // Handle select all functionality - additive across pages
   const handleSelectAll = useCallback(
     (currentPageAssets: T[]) => {
-      const currentPageAssetIds = currentPageAssets.map((asset) =>
-        getAssetId(asset),
-      );
+      const currentPageAssetIds = currentPageAssets.map((asset) => getAssetId(asset));
 
       setSelectedAssets((prev) => {
         // Check if all current page assets are already selected
         const allCurrentPageSelected = currentPageAssetIds.every((id) =>
-          prev.some((selected) => selected.id === id),
+          prev.some((selected) => selected.id === id)
         );
 
         let newSelectedAssets;
         if (allCurrentPageSelected) {
           // If all current page assets are selected, deselect only the current page assets
-          newSelectedAssets = prev.filter(
-            (selected) => !currentPageAssetIds.includes(selected.id),
-          );
+          newSelectedAssets = prev.filter((selected) => !currentPageAssetIds.includes(selected.id));
         } else {
           // Add current page assets to selection (avoiding duplicates)
           const newAssets = currentPageAssets
-            .filter(
-              (asset) =>
-                !prev.some((selected) => selected.id === getAssetId(asset)),
-            )
+            .filter((asset) => !prev.some((selected) => selected.id === getAssetId(asset)))
             .map((asset) => ({
               id: getAssetId(asset),
               name: getAssetName(asset),
@@ -351,7 +332,7 @@ export function useAssetSelection<T>({
         return newSelectedAssets;
       });
     },
-    [searchParams, setSearchParams, getAssetId, getAssetName, getAssetType],
+    [searchParams, setSearchParams, getAssetId, getAssetName, getAssetType]
   );
 
   // Get select all state for current page
@@ -359,27 +340,21 @@ export function useAssetSelection<T>({
     (currentPageAssets: T[]): "none" | "some" | "all" => {
       if (selectedAssets.length === 0) return "none";
 
-      const currentPageAssetIds = currentPageAssets.map((asset) =>
-        getAssetId(asset),
-      );
+      const currentPageAssetIds = currentPageAssets.map((asset) => getAssetId(asset));
       const selectedCurrentPageAssets = currentPageAssetIds.filter((id) =>
-        selectedAssets.some((selected) => selected.id === id),
+        selectedAssets.some((selected) => selected.id === id)
       );
 
       if (selectedCurrentPageAssets.length === 0) return "none";
-      if (selectedCurrentPageAssets.length === currentPageAssetIds.length)
-        return "all";
+      if (selectedCurrentPageAssets.length === currentPageAssetIds.length) return "all";
       return "some";
     },
-    [selectedAssets, getAssetId],
+    [selectedAssets, getAssetId]
   );
 
   // Handle batch operations
   const handleBatchDelete = useCallback(() => {
-    console.log(
-      "handleBatchDelete called, selectedAssets:",
-      selectedAssets.length,
-    );
+    console.log("handleBatchDelete called, selectedAssets:", selectedAssets.length);
     if (selectedAssets.length === 0) {
       console.log("No assets selected, returning");
       return;
@@ -459,9 +434,7 @@ export function useAssetSelection<T>({
       console.error("Failed to start bulk delete:", error);
 
       const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Failed to start bulk delete. Please try again.";
+        error instanceof Error ? error.message : "Failed to start bulk delete. Please try again.";
 
       setModalState({
         open: true,
@@ -552,9 +525,7 @@ export function useAssetSelection<T>({
 
       // Show error message to user
       const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Failed to start bulk download. Please try again.";
+        error instanceof Error ? error.message : "Failed to start bulk download. Please try again.";
 
       setModalState({
         open: true,

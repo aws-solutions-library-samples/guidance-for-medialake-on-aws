@@ -13,8 +13,7 @@ const MIN_WIDTH = 275;
 const MAX_WIDTH = 600;
 
 export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
-  const { isExpanded, setIsExpanded, width, setWidth, setHasSelectedItems } =
-    useRightSidebar();
+  const { isExpanded, setIsExpanded, width, setWidth, setHasSelectedItems } = useRightSidebar();
   const location = useLocation();
   const [isResizing, setIsResizing] = useState(false);
   const resizeHandleRef = useRef<HTMLDivElement | null>(null);
@@ -101,9 +100,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
           zIndex: 1200,
           borderRadius: "16px 0 0 16px",
           boxShadow: (theme) =>
-            isExpanded
-              ? `0 4px 20px ${alpha(theme.palette.common.black, 0.1)}`
-              : "none",
+            isExpanded ? `0 4px 20px ${alpha(theme.palette.common.black, 0.1)}` : "none",
           overflow: "hidden",
         }}
       >
@@ -121,8 +118,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
               cursor: "col-resize",
               zIndex: 1300,
               "&:hover": {
-                backgroundColor: (theme) =>
-                  alpha(theme.palette.primary.main, 0.1),
+                backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.1),
               },
             }}
           />
@@ -191,9 +187,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
       </Button>
 
       {/* Spacer to maintain layout */}
-      <Box
-        sx={{ width: isExpanded ? width : COLLAPSED_WIDTH, flexShrink: 0 }}
-      />
+      <Box sx={{ width: isExpanded ? width : COLLAPSED_WIDTH, flexShrink: 0 }} />
 
       {/* Optional overlay for better UX during resizing */}
       {isResizing && (

@@ -16,6 +16,7 @@ The Asset Sync System enables efficient synchronization between S3 buckets and a
 ### 2. Core Processing Lambdas
 
 - **Asset Sync Engine Lambda**: Orchestrates the entire process
+
   - Creates S3 Batch Operations jobs
   - Generates CSV manifests of bucket objects
   - Monitors job progress via EventBridge
@@ -33,19 +34,23 @@ The Asset Sync System enables efficient synchronization between S3 buckets and a
 ### 3. Infrastructure Components
 
 - **DynamoDB Tables**:
+
   - Job Table: Tracks overall job status and metadata
   - Chunk Table: Tracks processing of manifest chunks
   - Error Table: Records detailed error information
 
 - **S3 Buckets**:
+
   - Results Bucket: Stores manifests, chunks, and reports
   - Target Buckets: The S3 buckets being synchronized
 
 - **SQS Queues**:
+
   - Processor Queue: Holds chunk processing messages
   - Dead Letter Queue: Captures failed processing attempts
 
 - **SNS Topics**:
+
   - Status Topic: Publishes job status changes
 
 - **IAM Roles**:
@@ -141,10 +146,12 @@ The Asset Sync System enables efficient synchronization between S3 buckets and a
 ### Critical Fields and Parameters
 
 - **User Arguments in S3 Batch Operations**:
+
   - Must be string-to-string map format
   - Contains job ID and timestamp for correlation
 
 - **Manifest Format**:
+
   - CSV with bucket, key, size, lastModified
   - Required specific format for S3 Batch Operations
 

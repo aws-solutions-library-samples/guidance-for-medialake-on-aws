@@ -199,13 +199,7 @@ interface BulkDownloadResponse {
   message: string;
   data: {
     jobId: string;
-    status:
-      | "INITIATED"
-      | "ASSESSED"
-      | "STAGING"
-      | "PROCESSING"
-      | "COMPLETED"
-      | "FAILED";
+    status: "INITIATED" | "ASSESSED" | "STAGING" | "PROCESSING" | "COMPLETED" | "FAILED";
     downloadUrl?: string;
     estimatedSize?: number;
     createdAt: string;
@@ -231,13 +225,7 @@ interface BulkDownloadStatusResponse {
   message: string;
   data: {
     jobId: string;
-    status:
-      | "INITIATED"
-      | "ASSESSED"
-      | "STAGING"
-      | "PROCESSING"
-      | "COMPLETED"
-      | "FAILED";
+    status: "INITIATED" | "ASSESSED" | "STAGING" | "PROCESSING" | "COMPLETED" | "FAILED";
     downloadUrl?: string;
     progress?: number;
     estimatedSize?: number;
@@ -256,9 +244,7 @@ export const useAsset = (inventoryId: string) => {
     queryKey: QUERY_KEYS.ASSETS.detail(inventoryId),
     queryFn: async () => {
       try {
-        const response = await apiClient.get<AssetResponse>(
-          `assets/${inventoryId}`,
-        );
+        const response = await apiClient.get<AssetResponse>(`assets/${inventoryId}`);
         return response.data;
       } catch (error) {
         logger.error("Error fetching asset details:", error);
@@ -284,9 +270,7 @@ export const useDeleteAsset = () => {
   return useMutation({
     mutationFn: async (inventoryId: string) => {
       try {
-        const response = await apiClient.delete<DeleteAssetResponse>(
-          `assets/${inventoryId}`,
-        );
+        const response = await apiClient.delete<DeleteAssetResponse>(`assets/${inventoryId}`);
         return response.data;
       } catch (error) {
         logger.error("Error deleting asset:", error);
@@ -319,20 +303,11 @@ export const useRenameAsset = (onError?: (message: string) => void) => {
   const { enqueueSnackbar } = useSnackbar();
 
   return useMutation({
-    mutationFn: async ({
-      inventoryId,
-      newName,
-    }: {
-      inventoryId: string;
-      newName: string;
-    }) => {
+    mutationFn: async ({ inventoryId, newName }: { inventoryId: string; newName: string }) => {
       try {
-        const response = await apiClient.post<AssetResponse>(
-          `assets/${inventoryId}/rename`,
-          {
-            newName,
-          },
-        );
+        const response = await apiClient.post<AssetResponse>(`assets/${inventoryId}/rename`, {
+          newName,
+        });
         return response.data;
       } catch (error: any) {
         logger.error("Error renaming asset:", error);
@@ -367,10 +342,7 @@ export const useRenameAsset = (onError?: (message: string) => void) => {
     },
     onSuccess: (data, variables) => {
       // Update the specific asset cache
-      queryClient.setQueryData(
-        QUERY_KEYS.ASSETS.detail(variables.inventoryId),
-        data,
-      );
+      queryClient.setQueryData(QUERY_KEYS.ASSETS.detail(variables.inventoryId), data);
 
       // Update asset in any search results cache
       queryClient
@@ -385,9 +357,7 @@ export const useRenameAsset = (onError?: (message: string) => void) => {
                   // (in case there's a duplicate with the same ID)
                   asset.InventoryID !== variables.inventoryId ||
                   asset ===
-                    queryData.data.results.find(
-                      (a: any) => a.InventoryID === variables.inventoryId,
-                    ),
+                    queryData.data.results.find((a: any) => a.InventoryID === variables.inventoryId)
               )
               .map((asset: any) => {
                 if (asset.InventoryID === variables.inventoryId) {
@@ -421,17 +391,8 @@ export const useRenameAsset = (onError?: (message: string) => void) => {
   });
 };
 
-export const useRelatedVersions = (
-  assetId: string,
-  page: number = 1,
-  pageSize: number = 20,
-) => {
-  console.log(
-    "useRelatedVersions - Called with assetId:",
-    assetId,
-    "page:",
-    page,
-  );
+export const useRelatedVersions = (assetId: string, page: number = 1, pageSize: number = 20) => {
+  console.log("useRelatedVersions - Called with assetId:", assetId, "page:", page);
 
   return useQuery<RelatedVersionsResponse, Error>({
     queryKey: ["relatedVersions", assetId, page, pageSize],
@@ -445,7 +406,7 @@ export const useRelatedVersions = (
             pageSize,
             min_score: 0.6,
           },
-        },
+        }
       );
       console.log("useRelatedVersions - Received response:", response.data);
       return response.data;
@@ -468,7 +429,7 @@ export const useTranscription = (inventoryId: string) => {
     queryFn: async () => {
       try {
         const response = await apiClient.get<TranscriptionResponse>(
-          `assets/${inventoryId}/transcript`,
+          `assets/${inventoryId}/transcript`
         );
         console.log("Transcription API response:", response.data);
         return response.data;
@@ -497,7 +458,7 @@ export const useBulkDownload = () => {
       try {
         const response = await apiClient.post<BulkDownloadResponse>(
           API_ENDPOINTS.ASSETS.BULK_DOWNLOAD,
-          request,
+          request
         );
         return response.data;
       } catch (error) {
@@ -514,10 +475,7 @@ export const useBulkDownload = () => {
 };
 
 // Hook to check bulk download status
-export const useBulkDownloadStatus = (
-  jobId: string,
-  enabled: boolean = true,
-) => {
+export const useBulkDownloadStatus = (jobId: string, enabled: boolean = true) => {
   const { showError } = useErrorModal();
 
   return useQuery({
@@ -525,7 +483,7 @@ export const useBulkDownloadStatus = (
     queryFn: async () => {
       try {
         const response = await apiClient.get<BulkDownloadStatusResponse>(
-          `${API_ENDPOINTS.ASSETS.BULK_DOWNLOAD}/${jobId}/status`,
+          `${API_ENDPOINTS.ASSETS.BULK_DOWNLOAD}/${jobId}/status`
         );
         return response.data;
       } catch (error) {
@@ -555,13 +513,7 @@ export const useUserBulkDownloadJobs = (enabled: boolean = true) => {
           data: {
             jobs: Array<{
               jobId: string;
-              status:
-                | "INITIATED"
-                | "ASSESSED"
-                | "STAGING"
-                | "PROCESSING"
-                | "COMPLETED"
-                | "FAILED";
+              status: "INITIATED" | "ASSESSED" | "STAGING" | "PROCESSING" | "COMPLETED" | "FAILED";
               progress?: number;
               createdAt: string;
               updatedAt: string;
@@ -633,7 +585,7 @@ export const useBatchDelete = () => {
       try {
         const response = await apiClient.delete<BatchDeleteResponse>(
           API_ENDPOINTS.ASSETS.BATCH_DELETE,
-          { data: request },
+          { data: request }
         );
         return response.data;
       } catch (error) {
@@ -674,12 +626,7 @@ export const useUserBatchDeleteJobs = (enabled: boolean = true) => {
           data: {
             jobs: Array<{
               jobId: string;
-              status:
-                | "PENDING"
-                | "PROCESSING"
-                | "COMPLETED"
-                | "FAILED"
-                | "CANCELLED";
+              status: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED" | "CANCELLED";
               totalAssets: number;
               processedAssets: number;
               failedAssets: number;

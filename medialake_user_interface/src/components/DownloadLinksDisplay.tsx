@@ -28,9 +28,7 @@ export const DownloadLinksDisplay: React.FC<DownloadLinksDisplayProps> = ({
     if (!expiresAt) return false;
 
     // Handle Unix timestamp (string of numbers) or ISO date string
-    const timestamp = /^\d+$/.test(expiresAt)
-      ? parseInt(expiresAt, 10) * 1000
-      : expiresAt;
+    const timestamp = /^\d+$/.test(expiresAt) ? parseInt(expiresAt, 10) * 1000 : expiresAt;
     const expirationDate = new Date(timestamp);
 
     if (isNaN(expirationDate.getTime())) return false;
@@ -40,9 +38,7 @@ export const DownloadLinksDisplay: React.FC<DownloadLinksDisplayProps> = ({
 
   // Format expiration date
   const formatExpirationDate = React.useCallback((expiresAt: string) => {
-    const timestamp = /^\d+$/.test(expiresAt)
-      ? parseInt(expiresAt, 10) * 1000
-      : expiresAt;
+    const timestamp = /^\d+$/.test(expiresAt) ? parseInt(expiresAt, 10) * 1000 : expiresAt;
     const date = new Date(timestamp);
     return isNaN(date.getTime()) ? "Unknown" : date.toLocaleString();
   }, []);
@@ -100,8 +96,7 @@ export const DownloadLinksDisplay: React.FC<DownloadLinksDisplayProps> = ({
 
   // Handle new structured format
   const { zippedFiles, files = [], singleFiles = [] } = downloadUrls;
-  const hasDownloads =
-    zippedFiles || files.length > 0 || singleFiles.length > 0;
+  const hasDownloads = zippedFiles || files.length > 0 || singleFiles.length > 0;
 
   if (!hasDownloads) {
     return null;

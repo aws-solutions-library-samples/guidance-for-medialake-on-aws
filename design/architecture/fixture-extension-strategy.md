@@ -94,7 +94,9 @@ export const test = cognitoBase.extend<EnhancedCognitoFixtures>({
       const passwordPolicy = getUserPoolPasswordPolicy(selectedPool.id);
       const password = generateSecurePassword(passwordPolicy);
 
-      const uniqueEmail = `mne-medialake+e2etest-${testInfo.workerIndex}-${crypto.randomBytes(4).toString("hex")}@amazon.com`;
+      const uniqueEmail = `mne-medialake+e2etest-${
+        testInfo.workerIndex
+      }-${crypto.randomBytes(4).toString("hex")}@amazon.com`;
       createTestUser(selectedPool.id, uniqueEmail, password, uniqueEmail);
 
       await use({

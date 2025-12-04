@@ -11,10 +11,7 @@ export type EnvironmentStatus =
 export const environmentFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
   region: z.string().min(1, "Region is required"),
-  status: z.enum([
-    EnvironmentStatusValues.Active,
-    EnvironmentStatusValues.Disabled,
-  ]),
+  status: z.enum([EnvironmentStatusValues.Active, EnvironmentStatusValues.Disabled]),
   tags: z
     .object({
       "cost-center": z.string().min(1, "Cost center is required"),

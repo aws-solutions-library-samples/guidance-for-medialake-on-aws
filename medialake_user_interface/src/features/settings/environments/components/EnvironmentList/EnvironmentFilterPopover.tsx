@@ -11,9 +11,12 @@ interface EnvironmentFilterPopoverProps {
   environments: Environment[];
 }
 
-export const EnvironmentFilterPopover: React.FC<
-  EnvironmentFilterPopoverProps
-> = ({ anchorEl, column, onClose, environments }) => {
+export const EnvironmentFilterPopover: React.FC<EnvironmentFilterPopoverProps> = ({
+  anchorEl,
+  column,
+  onClose,
+  environments,
+}) => {
   const { t } = useTranslation();
 
   const formatDateOnly = (dateString: string) => {

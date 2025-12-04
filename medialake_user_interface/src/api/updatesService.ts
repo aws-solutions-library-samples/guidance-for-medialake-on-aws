@@ -105,12 +105,9 @@ export const getVersions = async (): Promise<VersionsResponse> => {
  * Trigger immediate upgrade to selected version
  */
 export const triggerUpgrade = async (
-  request: TriggerUpgradeRequest,
+  request: TriggerUpgradeRequest
 ): Promise<TriggerUpgradeResponse> => {
-  const response = await apiClient.post<{ body: string }>(
-    "/updates/trigger",
-    request,
-  );
+  const response = await apiClient.post<{ body: string }>("/updates/trigger", request);
   const parsedBody = JSON.parse(response.data.body);
   return parsedBody.data;
 };
@@ -129,7 +126,7 @@ export const getUpgradeStatus = async (): Promise<UpgradeStatusResponse> => {
  */
 export const getUpgradeHistory = async (
   limit: number = 10,
-  cursor?: string,
+  cursor?: string
 ): Promise<UpgradeHistoryResponse> => {
   const params = new URLSearchParams();
   params.append("limit", limit.toString());
@@ -137,9 +134,7 @@ export const getUpgradeHistory = async (
     params.append("cursor", cursor);
   }
 
-  const response = await apiClient.get<{ body: string }>(
-    `/updates/history?${params.toString()}`,
-  );
+  const response = await apiClient.get<{ body: string }>(`/updates/history?${params.toString()}`);
   const parsedBody = JSON.parse(response.data.body);
 
   return {

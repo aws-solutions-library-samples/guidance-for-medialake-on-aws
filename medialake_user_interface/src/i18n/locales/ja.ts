@@ -25,16 +25,14 @@ export default {
     browsePath: "パスを参照",
     uploadingTo: "アップロード先",
     restrictedToPrefix: "制限付き",
-    allowedPrefixesInfo:
-      "{{count}}個の許可されたパスにのみアップロードできます",
+    allowedPrefixesInfo: "{{count}}個の許可されたパスにのみアップロードできます",
     pathInfo: "ファイルはS3バケット内の選択されたパスにアップロードされます",
     selectPathFirst: "アップロードする前にパスを選択してください",
     pathResetWarning: "コネクタを変更すると、選択されたパスがリセットされます",
     connectorLabel: "S3コネクタ",
     selectConnectorPlaceholder: "S3コネクタを選択",
     loadingConnectors: "コネクタを読み込んでいます...",
-    noConnectors:
-      "利用可能なS3コネクタがありません。まずS3コネクタを設定してください。",
+    noConnectors: "利用可能なS3コネクタがありません。まずS3コネクタを設定してください。",
     dashboardNote:
       "audio/*、video/*、image/*、HLS (application/x-mpegURL)、MPEG-DASH (application/dash+xml) ファイルのみが許可されています",
     meta: {
@@ -48,8 +46,7 @@ export default {
     descriptionUnrestricted:
       "ファイルをアップロードするために、バケット内の任意のフォルダを参照して選択します。",
     prefixLabel: "許可されたパス",
-    prefixHelper:
-      "選択したパス内のフォルダのみを参照およびアップロードできます。",
+    prefixHelper: "選択したパス内のフォルダのみを参照およびアップロードできます。",
     selectedPath: "選択されたパス",
     currentPath: "現在のパス",
     confirm: "このパスを使用",
@@ -64,8 +61,7 @@ export default {
     hints: {
       clickFolder:
         "フォルダをクリックして移動し、「現在のフォルダを選択」をクリックして選択します。",
-      navigateAndConfirm:
-        "目的のフォルダに移動し、「このパスを使用」をクリックして確認します。",
+      navigateAndConfirm: "目的のフォルダに移動し、「このパスを使用」をクリックして確認します。",
       rootPath: "現在、ルートレベルにいます。",
     },
   },
@@ -127,8 +123,7 @@ export default {
     },
     deleteDialog: {
       title: "削除の確認",
-      description:
-        "このアセットを削除してもよろしいですか？この操作は元に戻せません。",
+      description: "このアセットを削除してもよろしいですか？この操作は元に戻せません。",
       cancel: "キャンセル",
       confirm: "削除",
     },
@@ -224,8 +219,7 @@ export default {
       userDeletionNotImplemented: "ユーザー削除はまだ実装されていません。",
       userCreationNotImplemented: "ユーザー作成はまだ実装されていません。",
       userEditingNotImplemented: "ユーザー編集はまだ実装されていません。",
-      analyticsExportNotImplemented:
-        "アナリティクスエクスポートはまだ実装されていません。",
+      analyticsExportNotImplemented: "アナリティクスエクスポートはまだ実装されていません。",
       systemResetNotImplemented: "システムリセットはまだ実装されていません。",
     },
     columns: {
@@ -246,8 +240,7 @@ export default {
     deleteConfirmation: {
       title: "統合を削除",
       message: "この統合を削除してもよろしいですか？",
-      warning:
-        "警告: この統合を削除すると、それに依存するパイプラインが失敗する可能性があります。",
+      warning: "警告: この統合を削除すると、それに依存するパイプラインが失敗する可能性があります。",
     },
     form: {
       search: {
@@ -464,8 +457,7 @@ export default {
       },
       search: {
         title: "検索設定",
-        description:
-          "メディアアセットの高度な検索機能のために検索プロバイダーを設定します。",
+        description: "メディアアセットの高度な検索機能のために検索プロバイダーを設定します。",
         provider: "検索プロバイダー:",
         configureProvider: "検索プロバイダーを設定",
         editProvider: "プロバイダーを編集",
@@ -476,8 +468,7 @@ export default {
         endpoint: "エンドポイントURL（オプション）",
         enabled: "検索有効",
         noProvider: "検索プロバイダーが設定されていません。",
-        configurePrompt:
-          "検索機能を有効にするためにTwelve Labsを設定してください。",
+        configurePrompt: "検索機能を有効にするためにTwelve Labsを設定してください。",
       },
       notifications: {
         title: "通知設定",
@@ -743,8 +734,7 @@ export default {
       "Storage Warning": "ストレージ警告",
       "Storage capacity reaching 80%": "ストレージ容量が80%に達しています",
       "Pipeline Failed": "パイプライン失敗",
-      "Video processing pipeline failed":
-        "ビデオ処理パイプラインが失敗しました",
+      "Video processing pipeline failed": "ビデオ処理パイプラインが失敗しました",
     },
     modal: {
       confirmDelete: "このアイテムを削除してもよろしいですか？",
@@ -791,8 +781,7 @@ export default {
         loading: "S3オブジェクトの読み込みエラー: {{message}}",
         network: "ネットワークエラー。接続を確認して再試行してください。",
         permission: "アクセス拒否。このパスにアクセスする権限がありません。",
-        permissionWithPrefixes:
-          "アクセス拒否。以下のパスにのみアクセスできます: {{prefixes}}",
+        permissionWithPrefixes: "アクセス拒否。以下のパスにのみアクセスできます: {{prefixes}}",
         notFound: "要求されたパスが存在しません。",
         timeout: "リクエストがタイムアウトしました。再試行してください。",
         retry: "再試行",
@@ -819,8 +808,7 @@ export default {
     },
     metadata: {
       title: "近日公開",
-      description:
-        "メタデータ管理機能をお届けするために作業中です。お楽しみに！",
+      description: "メタデータ管理機能をお届けするために作業中です。お楽しみに！",
     },
     pipelines: {
       title: "パイプライン",
@@ -865,14 +853,12 @@ export default {
         modals: {
           error: {
             title: "エラー",
-            incompatibleNodes:
-              "前のノードの出力が対象ノードの入力と互換性がありません。",
+            incompatibleNodes: "前のノードの出力が対象ノードの入力と互換性がありません。",
             validation: "パイプライン検証に失敗しました",
           },
           delete: {
             title: "パイプラインを削除",
-            message:
-              "このパイプラインを削除してもよろしいですか？この操作は元に戻せません。",
+            message: "このパイプラインを削除してもよろしいですか？この操作は元に戻せません。",
             confirm: "削除を確認するためにパイプライン名を入力してください:",
           },
         },

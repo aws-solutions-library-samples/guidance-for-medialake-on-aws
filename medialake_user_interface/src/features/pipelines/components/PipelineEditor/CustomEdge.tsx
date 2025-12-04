@@ -1,10 +1,5 @@
 import React, { useCallback } from "react";
-import {
-  EdgeLabelRenderer,
-  EdgeProps,
-  Position,
-  useReactFlow,
-} from "reactflow";
+import { EdgeLabelRenderer, EdgeProps, Position, useReactFlow } from "reactflow";
 import { Box, Typography } from "@mui/material";
 import { FlashOn } from "@mui/icons-material";
 
@@ -14,7 +9,7 @@ const adjustPoint = (
   x: number,
   y: number,
   pos: Position,
-  { along = 0, perp = 0 }: Nudge,
+  { along = 0, perp = 0 }: Nudge
 ): [number, number] => {
   switch (pos) {
     case Position.Top: // normal points up
@@ -37,7 +32,7 @@ const computeControlPoints = (
   tx: number,
   ty: number,
   sPos: Position,
-  tPos: Position,
+  tPos: Position
 ) => {
   const dx = tx - sx;
   const dy = ty - sy;
@@ -127,7 +122,7 @@ const CustomEdge: React.FC<EdgeProps> = ({
     tx,
     ty,
     sourcePosition,
-    targetPosition,
+    targetPosition
   );
 
   // === 2) final straight segment ===
@@ -174,7 +169,7 @@ const CustomEdge: React.FC<EdgeProps> = ({
 
       return { x, y };
     },
-    [sx, sy, c1x, c1y, c2x, c2y, tx, ty],
+    [sx, sy, c1x, c1y, c2x, c2y, tx, ty]
   );
 
   const mid = getBezierPoint(0.5);

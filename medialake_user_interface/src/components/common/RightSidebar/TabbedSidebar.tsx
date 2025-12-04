@@ -33,7 +33,7 @@ const TabbedSidebar: React.FC<TabbedSidebarProps> = ({
 }) => {
   const { setHasSelectedItems } = useRightSidebar();
   const [activeTab, setActiveTab] = React.useState<"filter" | "batch">(
-    selectedAssets.length > 0 ? "batch" : "filter",
+    selectedAssets.length > 0 ? "batch" : "filter"
   );
 
   // Auto-switch to batch tab when items are first selected,
@@ -54,10 +54,7 @@ const TabbedSidebar: React.FC<TabbedSidebarProps> = ({
     }
   }, [selectedAssets.length, setHasSelectedItems]);
 
-  const handleTabChange = (
-    event: React.SyntheticEvent,
-    newValue: "filter" | "batch",
-  ) => {
+  const handleTabChange = (event: React.SyntheticEvent, newValue: "filter" | "batch") => {
     setActiveTab(newValue);
   };
 

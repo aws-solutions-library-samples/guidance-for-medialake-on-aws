@@ -74,9 +74,7 @@ const SelectNodeModal: React.FC<SelectNodeModalProps> = ({
           </Alert>
         ) : nodes.length === 0 ? (
           <Box sx={{ p: 3, textAlign: "center" }}>
-            <Typography color="text.secondary">
-              {t("integrations.selectNode.noNodes")}
-            </Typography>
+            <Typography color="text.secondary">{t("integrations.selectNode.noNodes")}</Typography>
           </Box>
         ) : (
           <List sx={{ pt: 0 }}>
@@ -96,19 +94,12 @@ const SelectNodeModal: React.FC<SelectNodeModalProps> = ({
                   >
                     <ListItemText
                       primary={
-                        <Typography
-                          variant="subtitle1"
-                          sx={{ fontWeight: 500 }}
-                        >
+                        <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
                           {node.info.title}
                         </Typography>
                       }
                       secondary={
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                          sx={{ mt: 0.5 }}
-                        >
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                           {node.info.description}
                         </Typography>
                       }

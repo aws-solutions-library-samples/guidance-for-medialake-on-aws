@@ -145,14 +145,7 @@ export const useProcessNotifications = ({
         });
         break;
     }
-  }, [
-    status,
-    processId,
-    processType,
-    addNotification,
-    dismissNotification,
-    onCompleted,
-  ]);
+  }, [status, processId, processType, addNotification, dismissNotification, onCompleted]);
 
   // Cleanup notification when component unmounts or processId changes
   useEffect(() => {
@@ -165,8 +158,6 @@ export const useProcessNotifications = ({
 
   return {
     isProcessInProgress:
-      !!processId &&
-      status?.status !== "COMPLETED" &&
-      status?.status !== "FAILED",
+      !!processId && status?.status !== "COMPLETED" && status?.status !== "FAILED",
   };
 };

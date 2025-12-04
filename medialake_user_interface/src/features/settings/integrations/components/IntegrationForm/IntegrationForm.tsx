@@ -21,11 +21,7 @@ import {
 import SearchIcon from "@mui/icons-material/Search";
 import { useTranslation } from "react-i18next";
 import { useFormWithValidation } from "@/forms/hooks/useFormWithValidation";
-import {
-  IntegrationFormProps,
-  IntegrationFormData,
-  IntegrationFormResult,
-} from "./types";
+import { IntegrationFormProps, IntegrationFormData, IntegrationFormResult } from "./types";
 import { integrationFormSchema } from "./schemas/integrationFormSchema";
 import {
   useCreateIntegration,
@@ -35,10 +31,7 @@ import { IntegrationsNodesService } from "@/features/settings/integrations/servi
 import { IntegrationNode } from "@/features/settings/integrations/types";
 import { IntegrationConfiguration } from "./components/IntegrationConfiguration";
 
-const createSteps = [
-  "integrations.selectIntegration",
-  "integrations.configureIntegration",
-];
+const createSteps = ["integrations.selectIntegration", "integrations.configureIntegration"];
 const editSteps = ["integrations.configureIntegration"];
 
 export const IntegrationForm: React.FC<IntegrationFormProps> = ({
@@ -74,10 +67,7 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
       // Try to construct nodeId from the integration type
       // The nodeId should be in format like "node-twelve-labs-api"
       const nodeId =
-        config.nodeId ||
-        `node-${editingIntegration.type}-api` ||
-        editingIntegration.type ||
-        "";
+        config.nodeId || `node-${editingIntegration.type}-api` || editingIntegration.type || "";
 
       console.log("[IntegrationForm] Edit mode - extracting data:", {
         editingIntegration,
@@ -123,18 +113,13 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
       .filter((node) => {
         // Filter out nodes that don't have authentication requirements
         // A node has auth requirements if it has a non-empty auth object with authMethod
-        const hasAuth =
-          node.auth &&
-          Object.keys(node.auth).length > 0 &&
-          node.auth.authMethod;
+        const hasAuth = node.auth && Object.keys(node.auth).length > 0 && node.auth.authMethod;
         return hasAuth;
       })
       .map((node) => {
         const authMethod = node.auth?.authMethod;
         return {
-          nodeId:
-            node.nodeId ||
-            `node-${node.info.title.toLowerCase().replace(/\s+/g, "-")}`,
+          nodeId: node.nodeId || `node-${node.info.title.toLowerCase().replace(/\s+/g, "-")}`,
           info: {
             title: node.info.title,
             description: node.info.description,
@@ -157,7 +142,7 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
       form.watch("auth.type"),
       form.watch("auth.credentials.apiKey"),
       form.watch("auth.credentials.iamRole"),
-    ],
+    ]
   );
 
   const handleSubmit = React.useCallback(
@@ -216,17 +201,14 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
 
         return result;
       } catch (error) {
-        console.error(
-          `Failed to ${isEditMode ? "update" : "create"} integration:`,
-          {
-            error,
-            formData: data,
-            selectedNodeId,
-            formState: form.formState,
-            isEditMode,
-            editingIntegration,
-          },
-        );
+        console.error(`Failed to ${isEditMode ? "update" : "create"} integration:`, {
+          error,
+          formData: data,
+          selectedNodeId,
+          formState: form.formState,
+          isEditMode,
+          editingIntegration,
+        });
         throw error;
       }
     },
@@ -240,7 +222,7 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
       form.formState,
       isEditMode,
       editingIntegration,
-    ],
+    ]
   );
 
   const handleBack = React.useCallback(() => {
@@ -276,7 +258,7 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
       // Automatically go to next step when node is selected
       setActiveStep(1);
     },
-    [form],
+    [form]
   );
 
   // Reset form when modal closes or initialize for editing
@@ -291,10 +273,7 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
 
       // Try to construct nodeId from the integration type
       const nodeId =
-        config.nodeId ||
-        `node-${editingIntegration.type}-api` ||
-        editingIntegration.type ||
-        "";
+        config.nodeId || `node-${editingIntegration.type}-api` || editingIntegration.type || "";
 
       console.log("[IntegrationForm] Initializing edit mode:", {
         editingIntegration,
@@ -408,10 +387,7 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
                       primaryTypographyProps={{
                         variant: "subtitle1",
                         fontWeight: node.nodeId === selectedNodeId ? 600 : 500,
-                        color:
-                          node.nodeId === selectedNodeId
-                            ? "primary.main"
-                            : "text.primary",
+                        color: node.nodeId === selectedNodeId ? "primary.main" : "text.primary",
                       }}
                       secondaryTypographyProps={{
                         variant: "body2",
@@ -463,9 +439,7 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
     >
       <DialogTitle>
         <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
-          {isEditMode
-            ? t("integrations.form.editTitle")
-            : t("integrations.form.title")}
+          {isEditMode ? t("integrations.form.editTitle") : t("integrations.form.title")}
         </Typography>
       </DialogTitle>
       <DialogContent>

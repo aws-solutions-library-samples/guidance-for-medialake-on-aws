@@ -1,8 +1,4 @@
-import {
-  type ImageItem,
-  type VideoItem,
-  type AudioItem,
-} from "@/types/search/searchResults";
+import { type ImageItem, type VideoItem, type AudioItem } from "@/types/search/searchResults";
 
 type AssetItem = (ImageItem | VideoItem | AudioItem) & {
   DigitalSourceAsset: {
@@ -18,13 +14,11 @@ function generateCacheKey(
   results: AssetItem[],
   isSemantic: boolean,
   semanticMode: "full" | "clip",
-  pagination?: { page: number; pageSize: number },
+  pagination?: { page: number; pageSize: number }
 ): string {
   // Create a simple hash of the results array and parameters
   const resultIds = results.map((r) => r.InventoryID).join(",");
-  const paginationKey = pagination
-    ? `_p${pagination.page}_s${pagination.pageSize}`
-    : "";
+  const paginationKey = pagination ? `_p${pagination.page}_s${pagination.pageSize}` : "";
   return `${isSemantic}_${semanticMode}_${resultIds}${paginationKey}`;
 }
 
@@ -56,7 +50,7 @@ export function transformResultsToClipMode(
   pagination?: {
     page: number;
     pageSize: number;
-  },
+  }
 ): { results: AssetItem[]; totalClips: number } {
   // If not in semantic clip mode, return original results immediately
   if (!isSemantic || semanticMode !== "clip") {
@@ -65,16 +59,10 @@ export function transformResultsToClipMode(
 
   // Check cache first (only cache the full transformation, not paginated results)
   const fullCacheKey = generateCacheKey(results, isSemantic, semanticMode);
-  let allClipAssets = transformationCache.get(fullCacheKey) as
-    | ClipAssetItem[]
-    | undefined;
+  let allClipAssets = transformationCache.get(fullCacheKey) as ClipAssetItem[] | undefined;
 
   if (!allClipAssets) {
-    console.log(
-      "🎬 Starting clip transformation for",
-      results.length,
-      "assets",
-    );
+    console.log("🎬 Starting clip transformation for", results.length, "assets");
     const startTime = performance.now();
 
     allClipAssets = [];
@@ -86,7 +74,9 @@ export function transformResultsToClipMode(
 
       // Debug: Log asset types and clip availability
       console.log(
-        `🎬 Processing asset ${assetIndex + 1}/${results.length}: Type=${assetType}, HasClips=${!!clips}, ClipCount=${clips?.length || 0}`,
+        `🎬 Processing asset ${assetIndex + 1}/${
+          results.length
+        }: Type=${assetType}, HasClips=${!!clips}, ClipCount=${clips?.length || 0}`
       );
 
       // Debug: Log all clips for this asset to see if the 00:00:00 clip is present
@@ -97,17 +87,15 @@ export function transformResultsToClipMode(
             start_timecode: clip.start_timecode,
             end_timecode: clip.end_timecode,
             score: clip.score,
-          })),
+          }))
         );
 
         // Check specifically for clips starting at 00:00:00
-        const zeroStartClips = clips.filter(
-          (clip) => clip.start_timecode === "00:00:00:00",
-        );
+        const zeroStartClips = clips.filter((clip) => clip.start_timecode === "00:00:00:00");
         if (zeroStartClips.length > 0) {
           console.log(
             `🔍 Found ${zeroStartClips.length} clips starting at 00:00:00:00:`,
-            zeroStartClips,
+            zeroStartClips
           );
         }
       }
@@ -150,24 +138,18 @@ export function transformResultsToClipMode(
 
             // Debug logging for clips starting at 00:00:00 that are being added
             if (clip.start_timecode === "00:00:00:00") {
-              console.log(
-                `✅ Adding clip starting at 00:00:00:00 to results:`,
-                {
-                  clipAssetId: clipAsset.InventoryID,
-                  score: clipAsset.score,
-                },
-              );
+              console.log(`✅ Adding clip starting at 00:00:00:00 to results:`, {
+                clipAssetId: clipAsset.InventoryID,
+                score: clipAsset.score,
+              });
             }
 
             allClipAssets!.push(clipAsset);
           } else if (clip.start_timecode === "00:00:00:00") {
-            console.log(
-              `❌ Skipping clip starting at 00:00:00:00 due to invalid score:`,
-              {
-                score: clip.score,
-                scoreType: typeof clip.score,
-              },
-            );
+            console.log(`❌ Skipping clip starting at 00:00:00:00 due to invalid score:`, {
+              score: clip.score,
+              scoreType: typeof clip.score,
+            });
           }
         });
       }
@@ -223,16 +205,12 @@ export function transformResultsToClipMode(
         if (hasClips) acc[type].withClips++;
         return acc;
       },
-      {} as Record<string, { total: number; withClips: number }>,
+      {} as Record<string, { total: number; withClips: number }>
     );
 
     const endTime = performance.now();
-    console.log(
-      `🎬 Clip transformation completed in ${(endTime - startTime).toFixed(2)}ms`,
-    );
-    console.log(
-      `📊 Transformed ${results.length} assets into ${allClipAssets.length} clips`,
-    );
+    console.log(`🎬 Clip transformation completed in ${(endTime - startTime).toFixed(2)}ms`);
+    console.log(`📊 Transformed ${results.length} assets into ${allClipAssets.length} clips`);
     console.log("📈 Asset type summary:", assetTypeSummary);
 
     // Cache the result for future use
@@ -257,7 +235,7 @@ export function transformResultsToClipMode(
     const paginatedClips = allClipAssets.slice(startIndex, endIndex);
 
     console.log(
-      `📄 Applied pagination: page ${page}, pageSize ${pageSize}, showing ${paginatedClips.length} of ${totalClips} clips`,
+      `📄 Applied pagination: page ${page}, pageSize ${pageSize}, showing ${paginatedClips.length} of ${totalClips} clips`
     );
 
     return { results: paginatedClips, totalClips };
@@ -271,12 +249,7 @@ export function transformResultsToClipMode(
  * Checks if an asset is a clip-based asset (including whole assets treated as clips)
  */
 export function isClipAsset(asset: any): asset is ClipAssetItem {
-  return (
-    asset &&
-    typeof asset === "object" &&
-    "clipData" in asset &&
-    "originalAssetId" in asset
-  );
+  return asset && typeof asset === "object" && "clipData" in asset && "originalAssetId" in asset;
 }
 
 /**
@@ -285,16 +258,12 @@ export function isClipAsset(asset: any): asset is ClipAssetItem {
 export function getClipDisplayName(asset: any): string {
   if (isClipAsset(asset)) {
     const originalName =
-      asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-        .ObjectKey.Name;
+      asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name;
     const clipData = asset.clipData;
     const assetType = asset.DigitalSourceAsset?.Type || "Unknown";
 
     // For non-video assets or video assets without time markers, just return the name
-    if (
-      assetType !== "Video" ||
-      (!clipData.start_timecode && !clipData.start)
-    ) {
+    if (assetType !== "Video" || (!clipData.start_timecode && !clipData.start)) {
       return originalName;
     }
 
@@ -313,8 +282,7 @@ export function getClipDisplayName(asset: any): string {
     }
   }
 
-  return asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-    .ObjectKey.Name;
+  return asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name;
 }
 
 /**
@@ -330,10 +298,7 @@ export function getOriginalAssetId(asset: any): string {
   }
 
   // If the ID contains "_clip_", extract the original part
-  if (
-    typeof asset.InventoryID === "string" &&
-    asset.InventoryID.includes("_clip_")
-  ) {
+  if (typeof asset.InventoryID === "string" && asset.InventoryID.includes("_clip_")) {
     return asset.InventoryID.split("_clip_")[0];
   }
 

@@ -15,9 +15,7 @@ test("login with credentials", async ({ page }) => {
 test("test", async ({ page }) => {
   await page.goto("http://localhost:5173/sign-in");
   await page.getByRole("textbox", { name: "Email" }).click();
-  await page
-    .getByRole("textbox", { name: "Email" })
-    .fill("mne-medialake@amazon.com");
+  await page.getByRole("textbox", { name: "Email" }).fill("mne-medialake@amazon.com");
   await page.getByRole("textbox", { name: "Password" }).click();
   await page.getByRole("textbox", { name: "Password" }).fill("ChangeMe123!");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
@@ -28,14 +26,10 @@ test("test", async ({ page }) => {
   await page.getByRole("textbox", { name: "First Name" }).click();
   await page.getByRole("textbox", { name: "First Name" }).fill("load");
   await page.getByRole("textbox", { name: "First Name" }).press("Tab");
-  await page
-    .getByRole("button", { name: "Enter the user's first name" })
-    .press("Tab");
+  await page.getByRole("button", { name: "Enter the user's first name" }).press("Tab");
   await page.getByRole("textbox", { name: "Last Name" }).fill("user");
   await page.getByRole("textbox", { name: "Email" }).click();
-  await page
-    .getByRole("textbox", { name: "Email" })
-    .fill("medialake+testuser@amazon.com");
+  await page.getByRole("textbox", { name: "Email" }).fill("medialake+testuser@amazon.com");
   await page.getByLabel("", { exact: true }).click();
   await page.getByRole("option", { name: "Admin" }).click();
   await page.locator("#menu-roles div").first().click();

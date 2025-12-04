@@ -25,10 +25,7 @@ interface ResizableTableProps<T> {
   rows: Row<T>[];
   maxHeight?: string;
   onRowClick?: (row: Row<T>) => void;
-  onFilterClick?: (
-    event: React.MouseEvent<HTMLElement>,
-    columnId: string,
-  ) => void;
+  onFilterClick?: (event: React.MouseEvent<HTMLElement>, columnId: string) => void;
   activeFilters?: Array<{ columnId: string; value: string }>;
   activeSorting?: Array<{ columnId: string; desc: boolean }>;
   onRemoveFilter?: (columnId: string) => void;
@@ -44,7 +41,7 @@ const useTableStyles = (
   theme: any,
   mode: "compact" | "normal",
   hasRowClick: boolean,
-  rowCount: number,
+  rowCount: number
 ) => {
   const isDark = theme.palette.mode === "dark";
 
@@ -168,14 +165,7 @@ const useTableStyles = (
         borderRadius: "12px",
       },
     }),
-    [
-      theme.palette.mode,
-      theme.palette.primary.main,
-      mode,
-      isDark,
-      hasRowClick,
-      rowCount,
-    ],
+    [theme.palette.mode, theme.palette.primary.main, mode, isDark, hasRowClick, rowCount]
   );
 };
 
@@ -207,7 +197,7 @@ export function ResizableTable<T>({
         onRowClick?.(row);
       }
     },
-    [onRowClick],
+    [onRowClick]
   );
 
   return (
@@ -244,8 +234,7 @@ export function ResizableTable<T>({
             minHeight:
               rows.length > 0
                 ? `${
-                    rows.length * (mode === "compact" ? 40 : 48) +
-                    (mode === "compact" ? 32 : 40)
+                    rows.length * (mode === "compact" ? 40 : 48) + (mode === "compact" ? 32 : 40)
                   }px`
                 : "auto",
             overflow: rows.length <= 3 ? "visible" : "auto",
@@ -260,11 +249,7 @@ export function ResizableTable<T>({
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id} role="row">
                   {headerGroup.headers.map((header) => (
-                    <TableHeader
-                      key={header.id}
-                      header={header}
-                      onFilterClick={onFilterClick}
-                    />
+                    <TableHeader key={header.id} header={header} onFilterClick={onFilterClick} />
                   ))}
                 </TableRow>
               ))}
@@ -272,10 +257,7 @@ export function ResizableTable<T>({
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
-                  <TableCell
-                    colSpan={table.getAllColumns().length}
-                    sx={{ p: 0, border: 0 }}
-                  >
+                  <TableCell colSpan={table.getAllColumns().length} sx={{ p: 0, border: 0 }}>
                     <EmptyTableState
                       message={emptyState?.message}
                       icon={emptyState?.icon}
@@ -300,10 +282,7 @@ export function ResizableTable<T>({
                     }}
                   >
                     {row.getVisibleCells().map((cell) => {
-                      const content = flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      );
+                      const content = flexRender(cell.column.columnDef.cell, cell.getContext());
 
                       return (
                         <TableCell

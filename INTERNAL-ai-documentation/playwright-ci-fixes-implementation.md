@@ -154,21 +154,25 @@ reporter: [
 Key features:
 
 - **Test Filtering:**
+
   - Excludes: Old local dev tests (`auth/login.spec.ts`)
   - Includes: Only integration tests (`integration/**/*.spec.ts`)
 
 - **CI Optimizations:**
+
   - `fullyParallel: true` for faster execution
   - `workers: 4` (configurable via `CI_WORKERS` env var)
   - `timeout: 120000` (2 minutes per test)
   - `retries: 2` for flaky test resilience
 
 - **Reporting:**
+
   - Console (`list`)
   - JUnit XML for GitLab
   - HTML report (not opened automatically)
 
 - **Enhanced Debugging:**
+
   - Traces on first retry
   - Screenshots on failure
   - Videos on failure (retained)
@@ -221,14 +225,17 @@ npx playwright test \
 ## Expected Improvements
 
 1. **No More Password Errors:**
+
    - All generated passwords start with alphanumeric characters
    - No more AWS CLI flag parsing errors
 
 2. **Only Relevant Tests Run:**
+
    - Old `localhost:5173` tests excluded
    - Only CloudFront-compatible integration tests execute
 
 3. **Better Debugging:**
+
    - Detailed login process logging
    - Screenshots on failure
    - Clear error messages with context
@@ -295,12 +302,14 @@ If issues occur:
 ## Next Steps
 
 1. **Monitor first CI run** for:
+
    - Test selection correctness
    - Password generation success
    - Login diagnostics output quality
    - Test report generation
 
 2. **If tests still fail:**
+
    - Review diagnostic logs
    - Check screenshot artifacts
    - Verify CloudFront URL accessibility

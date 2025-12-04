@@ -10,14 +10,7 @@ import {
   AccordionDetails,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import {
-  FaFileVideo,
-  FaBolt,
-  FaCodeBranch,
-  FaTools,
-  FaPlug,
-  FaCogs,
-} from "react-icons/fa";
+import { FaFileVideo, FaBolt, FaCodeBranch, FaTools, FaPlug, FaCogs } from "react-icons/fa";
 import { useGetUnconfiguredNodeMethods } from "@/shared/nodes/api/nodesController";
 import { Node as NodeType } from "@/shared/nodes/types/nodes.types";
 import { RightSidebar } from "@/components/common/RightSidebar/RightSidebar";
@@ -30,17 +23,9 @@ interface NodeSection {
 
 const SidebarContent: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [expandedSections, setExpandedSections] = useState<string[]>([
-    "TRIGGER",
-  ]);
-  const [manuallyExpandedSections, setManuallyExpandedSections] = useState<
-    string[]
-  >(["TRIGGER"]);
-  const {
-    data: nodesResponse,
-    isLoading,
-    error,
-  } = useGetUnconfiguredNodeMethods();
+  const [expandedSections, setExpandedSections] = useState<string[]>(["TRIGGER"]);
+  const [manuallyExpandedSections, setManuallyExpandedSections] = useState<string[]>(["TRIGGER"]);
+  const { data: nodesResponse, isLoading, error } = useGetUnconfiguredNodeMethods();
 
   // Function to get the appropriate icon based on node type
   const getNodeIcon = (nodeType: string | undefined) => {
@@ -78,17 +63,8 @@ const SidebarContent: React.FC = () => {
     });
   };
 
-  const onDragStart = (
-    event: React.DragEvent,
-    node: NodeType,
-    methodName: string,
-  ) => {
-    console.log(
-      "[Sidebar] onDragStart for node:",
-      node.nodeId,
-      "method:",
-      methodName,
-    );
+  const onDragStart = (event: React.DragEvent, node: NodeType, methodName: string) => {
+    console.log("[Sidebar] onDragStart for node:", node.nodeId, "method:", methodName);
     console.log("[Sidebar] Node methods:", node.methods);
 
     // For trigger nodes, we need to use "trigger" as the method name
@@ -103,10 +79,7 @@ const SidebarContent: React.FC = () => {
         const methodObj = node.methods[parseInt(methodName)] as any;
         if (methodObj && methodObj.name) {
           actualMethodName = methodObj.name;
-          console.log(
-            "[Sidebar] Using method name from array:",
-            actualMethodName,
-          );
+          console.log("[Sidebar] Using method name from array:", actualMethodName);
         }
       } else if (typeof node.methods === "object") {
         // If methods is an object, the keys might be the method names
@@ -114,10 +87,7 @@ const SidebarContent: React.FC = () => {
         const methodObj = node.methods[methodName] as any;
         if (methodObj && methodObj.name) {
           actualMethodName = methodObj.name;
-          console.log(
-            "[Sidebar] Using method name from object:",
-            actualMethodName,
-          );
+          console.log("[Sidebar] Using method name from object:", actualMethodName);
         }
       }
     }
@@ -128,10 +98,7 @@ const SidebarContent: React.FC = () => {
       const parts = methodName.split(":");
       actualMethodName = parts[0];
       targetOperationId = parts[1];
-      console.log(
-        "[Sidebar] Extracted operationId from methodName:",
-        targetOperationId,
-      );
+      console.log("[Sidebar] Extracted operationId from methodName:", targetOperationId);
     }
 
     // Find the method in the methods array or object
@@ -140,14 +107,12 @@ const SidebarContent: React.FC = () => {
       // If we have an operationId, use it to find the exact method
       if (targetOperationId) {
         method = node.methods.find(
-          (m: any) =>
-            m.name === actualMethodName &&
-            m.config?.operationId === targetOperationId,
+          (m: any) => m.name === actualMethodName && m.config?.operationId === targetOperationId
         );
         console.log(
           "[Sidebar] Finding method by name and operationId:",
           actualMethodName,
-          targetOperationId,
+          targetOperationId
         );
       }
 
@@ -171,9 +136,7 @@ const SidebarContent: React.FC = () => {
         // If we have an operationId, use it to find the exact method
         if (targetOperationId) {
           method = methods.find(
-            (m: any) =>
-              m.name === actualMethodName &&
-              m.config?.operationId === targetOperationId,
+            (m: any) => m.name === actualMethodName && m.config?.operationId === targetOperationId
           );
         } else {
           method = methods.find((m: any) => m.name === actualMethodName);
@@ -193,13 +156,10 @@ const SidebarContent: React.FC = () => {
       methodConfig = {
         method: actualMethodName,
         parameters:
-          methodWithConfig?.config?.parameters?.reduce(
-            (acc: any, param: any) => {
-              acc[param.name] = ""; // Initialize with empty values
-              return acc;
-            },
-            {},
-          ) || {},
+          methodWithConfig?.config?.parameters?.reduce((acc: any, param: any) => {
+            acc[param.name] = ""; // Initialize with empty values
+            return acc;
+          }, {}) || {},
         requestMapping: null,
         responseMapping: null,
         path: "",
@@ -242,69 +202,43 @@ const SidebarContent: React.FC = () => {
     let inputTypesConfig;
 
     // Check for output types in the standard location first
-    if (
-      node.connections?.outgoing?.[actualMethodName]?.[0]?.connectionConfig
-        ?.type
-    ) {
-      outputTypesConfig =
-        node.connections.outgoing[actualMethodName][0].connectionConfig.type;
-      console.log(
-        "[Sidebar] Found output types in standard location:",
-        outputTypesConfig,
-      );
+    if (node.connections?.outgoing?.[actualMethodName]?.[0]?.connectionConfig?.type) {
+      outputTypesConfig = node.connections.outgoing[actualMethodName][0].connectionConfig.type;
+      console.log("[Sidebar] Found output types in standard location:", outputTypesConfig);
     }
     // If not found, try to look in all outgoing connections
     else if (node.connections?.outgoing) {
       // Look through all methods in outgoing connections
-      Object.entries(node.connections.outgoing).forEach(
-        ([method, connections]) => {
-          if (Array.isArray(connections) && connections.length > 0) {
-            connections.forEach((connection: any) => {
-              if (connection.connectionConfig?.type) {
-                outputTypesConfig = connection.connectionConfig.type;
-                console.log(
-                  "[Sidebar] Found output types in method:",
-                  method,
-                  outputTypesConfig,
-                );
-              }
-            });
-          }
-        },
-      );
+      Object.entries(node.connections.outgoing).forEach(([method, connections]) => {
+        if (Array.isArray(connections) && connections.length > 0) {
+          connections.forEach((connection: any) => {
+            if (connection.connectionConfig?.type) {
+              outputTypesConfig = connection.connectionConfig.type;
+              console.log("[Sidebar] Found output types in method:", method, outputTypesConfig);
+            }
+          });
+        }
+      });
     }
 
     // Check for input types in the standard location first
-    if (
-      node.connections?.incoming?.[actualMethodName]?.[0]?.connectionConfig
-        ?.type
-    ) {
-      inputTypesConfig =
-        node.connections.incoming[actualMethodName][0].connectionConfig.type;
-      console.log(
-        "[Sidebar] Found input types in standard location:",
-        inputTypesConfig,
-      );
+    if (node.connections?.incoming?.[actualMethodName]?.[0]?.connectionConfig?.type) {
+      inputTypesConfig = node.connections.incoming[actualMethodName][0].connectionConfig.type;
+      console.log("[Sidebar] Found input types in standard location:", inputTypesConfig);
     }
     // If not found, try to look in all incoming connections
     else if (node.connections?.incoming) {
       // Look through all methods in incoming connections
-      Object.entries(node.connections.incoming).forEach(
-        ([method, connections]) => {
-          if (Array.isArray(connections) && connections.length > 0) {
-            connections.forEach((connection: any) => {
-              if (connection.connectionConfig?.type) {
-                inputTypesConfig = connection.connectionConfig.type;
-                console.log(
-                  "[Sidebar] Found input types in method:",
-                  method,
-                  inputTypesConfig,
-                );
-              }
-            });
-          }
-        },
-      );
+      Object.entries(node.connections.incoming).forEach(([method, connections]) => {
+        if (Array.isArray(connections) && connections.length > 0) {
+          connections.forEach((connection: any) => {
+            if (connection.connectionConfig?.type) {
+              inputTypesConfig = connection.connectionConfig.type;
+              console.log("[Sidebar] Found input types in method:", method, inputTypesConfig);
+            }
+          });
+        }
+      });
     }
 
     // If we found output types, use them
@@ -317,10 +251,7 @@ const SidebarContent: React.FC = () => {
             name: type,
             description: `Output type: ${type}`,
           }));
-        } else if (
-          typeof outputTypesConfig[0] === "object" &&
-          outputTypesConfig[0] !== null
-        ) {
+        } else if (typeof outputTypesConfig[0] === "object" && outputTypesConfig[0] !== null) {
           // If it's already an array of objects, use as is if they have name property
           // or create objects with name property if they don't
           outputTypes = outputTypesConfig.map((type: any) => {
@@ -349,10 +280,7 @@ const SidebarContent: React.FC = () => {
         if (typeof inputTypesConfig[0] === "string") {
           // If it's already an array of strings, use it directly
           inputTypes = inputTypesConfig;
-        } else if (
-          typeof inputTypesConfig[0] === "object" &&
-          inputTypesConfig[0] !== null
-        ) {
+        } else if (typeof inputTypesConfig[0] === "object" && inputTypesConfig[0] !== null) {
           // If it's an array of objects, extract the name property
           inputTypes = inputTypesConfig.map((type: any) => {
             if (type.name) {
@@ -383,10 +311,7 @@ const SidebarContent: React.FC = () => {
 
     console.log("[Sidebar] Node data for drag:", nodeData);
 
-    event.dataTransfer.setData(
-      "application/reactflow",
-      JSON.stringify(nodeData),
-    );
+    event.dataTransfer.setData("application/reactflow", JSON.stringify(nodeData));
     event.dataTransfer.effectAllowed = "move";
   };
 
@@ -404,10 +329,7 @@ const SidebarContent: React.FC = () => {
       if (node.methods) {
         // For integration nodes with multiple methods with the same name,
         // we need to use the operationId to distinguish between them
-        if (
-          node.info.nodeType === "INTEGRATION" &&
-          Array.isArray(node.methods)
-        ) {
+        if (node.info.nodeType === "INTEGRATION" && Array.isArray(node.methods)) {
           // Group methods by name to check for duplicates
           const methodsByName: Record<string, any[]> = {};
 
@@ -422,7 +344,7 @@ const SidebarContent: React.FC = () => {
           Object.entries(methodsByName).forEach(([name, methods]) => {
             const nodeType = node.info.nodeType;
             const section = groupedNodes.find((s) =>
-              s.types.some((type) => nodeType.includes(type)),
+              s.types.some((type) => nodeType.includes(type))
             );
 
             if (section) {
@@ -455,7 +377,7 @@ const SidebarContent: React.FC = () => {
           Object.entries(node.methods).forEach(([, method]) => {
             const nodeType = node.info.nodeType;
             const section = groupedNodes.find((s) =>
-              s.types.some((type) => nodeType.includes(type)),
+              s.types.some((type) => nodeType.includes(type))
             );
 
             if (section) {
@@ -476,9 +398,7 @@ const SidebarContent: React.FC = () => {
         const searchLower = searchQuery.toLowerCase();
         return (
           node.info.title.toLowerCase().includes(searchLower) ||
-          (method.description || node.info.description)
-            .toLowerCase()
-            .includes(searchLower)
+          (method.description || node.info.description).toLowerCase().includes(searchLower)
         );
       }),
     }));
@@ -518,9 +438,7 @@ const SidebarContent: React.FC = () => {
   if (error || !nodesResponse?.data) {
     return (
       <Box sx={{ p: 2 }}>
-        <Typography color="error">
-          Failed to load nodes. Please try again later.
-        </Typography>
+        <Typography color="error">Failed to load nodes. Please try again later.</Typography>
       </Box>
     );
   }
@@ -528,11 +446,7 @@ const SidebarContent: React.FC = () => {
   return (
     <Box sx={{ pt: 2 }}>
       <Box sx={{ px: 2, mb: 2 }}>
-        <Typography
-          variant="h6"
-          gutterBottom
-          sx={{ textAlign: "center", mb: 2 }}
-        >
+        <Typography variant="h6" gutterBottom sx={{ textAlign: "center", mb: 2 }}>
           Available Nodes
         </Typography>
 
@@ -633,9 +547,7 @@ const SidebarContent: React.FC = () => {
                   <Paper
                     key={`${node.nodeId}-${methodName}`}
                     elevation={2}
-                    onDragStart={(event) =>
-                      onDragStart(event, node, methodName)
-                    }
+                    onDragStart={(event) => onDragStart(event, node, methodName)}
                     draggable
                     sx={{
                       p: 2,
@@ -658,9 +570,7 @@ const SidebarContent: React.FC = () => {
                       >
                         {getNodeIcon(node.info.nodeType)}
                       </Box>
-                      <Typography variant="subtitle1">
-                        {node.info.title}
-                      </Typography>
+                      <Typography variant="subtitle1">{node.info.title}</Typography>
                     </Box>
                     <Typography variant="body2" color="text.secondary">
                       {method.description || node.info.description}

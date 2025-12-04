@@ -26,8 +26,7 @@ const sampleCollections: Collection[] = [
   {
     id: "3",
     name: "Brand Guidelines",
-    description:
-      "Official brand assets including logos, color palettes, and typography examples.",
+    description: "Official brand assets including logos, color palettes, and typography examples.",
     itemCount: 45,
     createdAt: "2024-01-01T08:00:00Z",
     lastModified: "2024-03-01T14:15:00Z",
@@ -69,10 +68,7 @@ export const Collections: React.FC = () => {
       <Grid container spacing={3}>
         {sampleCollections.map((collection) => (
           <Grid item xs={12} sm={6} md={4} key={collection.id}>
-            <CollectionCard
-              collection={collection}
-              onOpen={handleOpenCollection}
-            />
+            <CollectionCard collection={collection} onOpen={handleOpenCollection} />
           </Grid>
         ))}
       </Grid>

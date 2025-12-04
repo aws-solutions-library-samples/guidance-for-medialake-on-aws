@@ -94,6 +94,7 @@ logger.info(f"Processing connector for bucket '{s3_bucket}' with bucketType='{bu
 ## Files Modified
 
 1. `medialake_user_interface/src/features/settings/connectors/components/ConnectorModal.tsx`
+
    - Added `bucketType` field to API payload configuration
 
 2. `lambdas/api/connectors/s3/post_s3/index.py`
@@ -105,6 +106,7 @@ logger.info(f"Processing connector for bucket '{s3_bucket}' with bucketType='{bu
 ## Testing Recommendations
 
 1. **Create New Bucket:**
+
    - Open connector modal
    - Select "Amazon S3"
    - Select "New S3 Bucket"
@@ -114,6 +116,7 @@ logger.info(f"Processing connector for bucket '{s3_bucket}' with bucketType='{bu
    - Verify bucket is created successfully
 
 2. **Create Existing Bucket:**
+
    - Open connector modal
    - Select "Amazon S3"
    - Select "Existing S3 Bucket"

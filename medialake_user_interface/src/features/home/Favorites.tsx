@@ -1,10 +1,7 @@
 import React from "react";
 import { Box, Typography, Stack, CircularProgress } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import {
-  useGetFavorites,
-  useRemoveFavorite,
-} from "../../api/hooks/useFavorites";
+import { useGetFavorites, useRemoveFavorite } from "../../api/hooks/useFavorites";
 import AssetCard from "../../components/shared/AssetCard";
 import { getOriginalAssetId } from "@/utils/clipTransformation";
 
@@ -55,9 +52,7 @@ export const Favorites: React.FC = () => {
   // Handle clicking on an asset to navigate to its detail page
   const handleAssetClick = (assetId: string, assetType: string) => {
     const pathPrefix =
-      assetType.toLowerCase() === "audio"
-        ? "/audio/"
-        : `/${assetType.toLowerCase()}s/`;
+      assetType.toLowerCase() === "audio" ? "/audio/" : `/${assetType.toLowerCase()}s/`;
     // Always use the original asset ID, not the clip ID
     const originalAssetId = getOriginalAssetId({ InventoryID: assetId });
     navigate(`${pathPrefix}${originalAssetId}`);
@@ -67,7 +62,7 @@ export const Favorites: React.FC = () => {
   const handleFavoriteToggle = (
     assetId: string,
     itemType: string,
-    event: React.MouseEvent<HTMLElement>,
+    event: React.MouseEvent<HTMLElement>
   ) => {
     event.stopPropagation();
     removeFavorite({ itemId: assetId, itemType });
@@ -96,9 +91,7 @@ export const Favorites: React.FC = () => {
         <Typography variant="h5" component="h2" sx={{ mb: 2 }}>
           Favorites
         </Typography>
-        <Typography color="error">
-          Error loading favorites: {error.message}
-        </Typography>
+        <Typography color="error">Error loading favorites: {error.message}</Typography>
       </Box>
     );
   }
@@ -158,24 +151,17 @@ export const Favorites: React.FC = () => {
                 { id: "type", label: "Type", visible: true },
               ]}
               renderField={(fieldId) => {
-                if (fieldId === "name")
-                  return favorite.metadata?.name || favorite.itemId;
-                if (fieldId === "type")
-                  return favorite.metadata?.assetType || "Unknown";
+                if (fieldId === "name") return favorite.metadata?.name || favorite.itemId;
+                if (fieldId === "type") return favorite.metadata?.assetType || "Unknown";
                 return "";
               }}
               onAssetClick={() =>
-                handleAssetClick(
-                  favorite.itemId,
-                  favorite.metadata?.assetType || "Unknown",
-                )
+                handleAssetClick(favorite.itemId, favorite.metadata?.assetType || "Unknown")
               }
               onDeleteClick={() => {}} // Not used in this context
               onDownloadClick={() => {}} // Not used in this context
               isFavorite={true}
-              onFavoriteToggle={(e) =>
-                handleFavoriteToggle(favorite.itemId, favorite.itemType, e)
-              }
+              onFavoriteToggle={(e) => handleFavoriteToggle(favorite.itemId, favorite.itemType, e)}
               cardSize="medium"
               aspectRatio="square"
               thumbnailScale="fill"

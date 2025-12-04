@@ -53,18 +53,13 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  const {
-    formattedDate,
-    absoluteDate,
-    showSeconds,
-    toggleSeconds,
-    canToggleSeconds,
-  } = useDateFormat(connector.updatedAt, {
-    showRelative: false,
-    showSeconds: initialShowSeconds,
-    allowSecondsToggle,
-    updateInterval: 60000,
-  });
+  const { formattedDate, absoluteDate, showSeconds, toggleSeconds, canToggleSeconds } =
+    useDateFormat(connector.updatedAt, {
+      showRelative: false,
+      showSeconds: initialShowSeconds,
+      allowSecondsToggle,
+      updateInterval: 60000,
+    });
 
   const handleDeleteClick = () => {
     setDeleteDialogOpen(true);
@@ -237,8 +232,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
           </Typography>
           {(connector.region || connector.configuration?.region) && (
             <Typography variant="body2">
-              <strong>Region:</strong>{" "}
-              {connector.region || connector.configuration?.region}
+              <strong>Region:</strong> {connector.region || connector.configuration?.region}
             </Typography>
           )}
           {connector.description && (
@@ -251,8 +245,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
               <Typography variant="body2">
                 <strong>Prefix:</strong> {connector.objectPrefix}
               </Typography>
-            ) : Array.isArray(connector.objectPrefix) &&
-              connector.objectPrefix.length > 0 ? (
+            ) : Array.isArray(connector.objectPrefix) && connector.objectPrefix.length > 0 ? (
               <>
                 <Typography variant="body2">
                   <strong>Prefixes:</strong>
@@ -283,12 +276,10 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                 ))}
               </>
             ) : null)}
-          {(connector.integrationMethod ||
-            connector.configuration?.s3IntegrationMethod) && (
+          {(connector.integrationMethod || connector.configuration?.s3IntegrationMethod) && (
             <Typography variant="body2">
               <strong>Integration Method:</strong>{" "}
-              {connector.integrationMethod ||
-                connector.configuration?.s3IntegrationMethod}
+              {connector.integrationMethod || connector.configuration?.s3IntegrationMethod}
             </Typography>
           )}
           <Box sx={{ mt: 2 }}>
@@ -449,8 +440,8 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
         <DialogTitle sx={{ fontWeight: 600 }}>Delete Connector</DialogTitle>
         <DialogContent>
           <Typography sx={{ color: theme.palette.text.secondary }}>
-            Are you sure you want to delete the connector "{connector.name}"?
-            This action cannot be undone.
+            Are you sure you want to delete the connector "{connector.name}"? This action cannot be
+            undone.
           </Typography>
           {connector.integrationMethod?.toLowerCase() === "eventbridge" && (
             <Typography
@@ -466,8 +457,8 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
               }}
             >
               <WarningIcon fontSize="small" />
-              Please ensure you disable the EventBridge integration for this S3
-              bucket if it is no longer required.
+              Please ensure you disable the EventBridge integration for this S3 bucket if it is no
+              longer required.
             </Typography>
           )}
         </DialogContent>

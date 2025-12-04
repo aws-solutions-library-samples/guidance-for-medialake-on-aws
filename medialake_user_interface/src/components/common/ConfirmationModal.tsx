@@ -61,19 +61,10 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         <Typography>{message}</Typography>
       </DialogContent>
       <DialogActions sx={{ p: 2, pt: 0 }}>
-        <ActionButton
-          variant="outlined"
-          onClick={onCancel}
-          disabled={isLoading}
-        >
+        <ActionButton variant="outlined" onClick={onCancel} disabled={isLoading}>
           {cancelText}
         </ActionButton>
-        <ActionButton
-          variant="contained"
-          color="error"
-          onClick={onConfirm}
-          loading={isLoading}
-        >
+        <ActionButton variant="contained" color="error" onClick={onConfirm} loading={isLoading}>
           {confirmText}
         </ActionButton>
       </DialogActions>

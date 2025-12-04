@@ -38,14 +38,9 @@ const AccessDeniedPage: React.FC = () => {
           Access Denied
         </Typography>
 
-        <Typography
-          variant="body1"
-          color="text.secondary"
-          align="center"
-          sx={{ mb: 4 }}
-        >
-          You don't have permission to access this page. Please contact your
-          administrator if you believe this is an error.
+        <Typography variant="body1" color="text.secondary" align="center" sx={{ mb: 4 }}>
+          You don't have permission to access this page. Please contact your administrator if you
+          believe this is an error.
         </Typography>
 
         <Box sx={{ display: "flex", gap: 2 }}>

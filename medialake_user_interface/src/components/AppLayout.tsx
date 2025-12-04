@@ -19,15 +19,15 @@ const AppLayout: React.FC = () => {
   const gradientBackground = `
         radial-gradient(ellipse at top, ${alpha(
           theme.palette.primary.main,
-          0.08,
+          0.08
         )} 0%, transparent 50%),
         radial-gradient(ellipse at bottom, ${alpha(
           theme.palette.secondary.main,
-          0.05,
+          0.05
         )} 0%, transparent 50%),
         linear-gradient(135deg, ${theme.palette.background.default} 0%, ${alpha(
           theme.palette.primary.main,
-          0.02,
+          0.02
         )} 100%)
     `;
 
@@ -71,11 +71,11 @@ const AppLayout: React.FC = () => {
                 background: `
                             radial-gradient(ellipse at top, ${alpha(
                               theme.palette.primary.main,
-                              0.08,
+                              0.08
                             )} 0%, transparent 50%),
                             linear-gradient(135deg, ${theme.palette.background.default} 0%, ${alpha(
                               theme.palette.primary.main,
-                              0.02,
+                              0.02
                             )} 100%)
                         `,
                 backdropFilter: "blur(10px)",

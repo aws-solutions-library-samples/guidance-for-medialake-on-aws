@@ -9,11 +9,7 @@ export const useUserPool = () => {
 
   const initializeUserPool = useCallback(() => {
     const config = awsConfig || StorageHelper.getAwsConfig();
-    if (
-      config &&
-      config.Auth?.Cognito?.userPoolId &&
-      config.Auth?.Cognito?.userPoolClientId
-    ) {
+    if (config && config.Auth?.Cognito?.userPoolId && config.Auth?.Cognito?.userPoolClientId) {
       const pool = new CognitoUserPool({
         UserPoolId: config.Auth.Cognito.userPoolId,
         ClientId: config.Auth.Cognito.userPoolClientId,

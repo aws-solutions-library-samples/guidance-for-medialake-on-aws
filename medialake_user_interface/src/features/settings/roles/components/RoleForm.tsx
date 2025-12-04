@@ -77,9 +77,7 @@ const RoleForm: React.FC<RoleFormProps> = ({ open, onClose, onSave, role }) => {
             <TextField
               label="Role Name"
               value={formData.name}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
               fullWidth
             />
@@ -87,9 +85,7 @@ const RoleForm: React.FC<RoleFormProps> = ({ open, onClose, onSave, role }) => {
             <TextField
               label="Description"
               value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               multiline
               rows={2}
               fullWidth
@@ -109,9 +105,7 @@ const RoleForm: React.FC<RoleFormProps> = ({ open, onClose, onSave, role }) => {
                     }
                     label={permission
                       .split("_")
-                      .map(
-                        (word) => word.charAt(0) + word.slice(1).toLowerCase(),
-                      )
+                      .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
                       .join(" ")}
                   />
                 ))}

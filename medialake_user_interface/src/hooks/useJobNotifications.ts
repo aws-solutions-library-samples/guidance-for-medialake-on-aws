@@ -1,22 +1,10 @@
 import { useEffect, useRef, useCallback } from "react";
-import {
-  useUserBulkDownloadJobs,
-  useUserBatchDeleteJobs,
-} from "@/api/hooks/useAssets";
-import {
-  useNotifications,
-  Notification,
-} from "@/components/NotificationCenter";
+import { useUserBulkDownloadJobs, useUserBatchDeleteJobs } from "@/api/hooks/useAssets";
+import { useNotifications, Notification } from "@/components/NotificationCenter";
 
 interface DownloadJobData {
   jobId: string;
-  status:
-    | "INITIATED"
-    | "ASSESSED"
-    | "STAGING"
-    | "PROCESSING"
-    | "COMPLETED"
-    | "FAILED";
+  status: "INITIATED" | "ASSESSED" | "STAGING" | "PROCESSING" | "COMPLETED" | "FAILED";
   progress?: number;
   createdAt: string;
   updatedAt: string;
@@ -74,12 +62,9 @@ export const useJobNotifications = () => {
     (jobId: string) => {
       const dismissedJobs = getDismissedJobs();
       dismissedJobs.add(jobId);
-      localStorage.setItem(
-        "medialake_dismissed_jobs",
-        JSON.stringify([...dismissedJobs]),
-      );
+      localStorage.setItem("medialake_dismissed_jobs", JSON.stringify([...dismissedJobs]));
     },
-    [getDismissedJobs],
+    [getDismissedJobs]
   );
 
   // Clear dismissible job notifications only (respects non-dismissible notifications)
@@ -99,17 +84,12 @@ export const useJobNotifications = () => {
       .map((n) => n.jobId);
 
     dismissibleJobIds.forEach((_jobId) => {
-      const jobKeysToRemove = [...seenJobs].filter((key) =>
-        key.startsWith(`${_jobId}:`),
-      );
+      const jobKeysToRemove = [...seenJobs].filter((key) => key.startsWith(`${_jobId}:`));
       jobKeysToRemove.forEach((key) => seenJobs.delete(key));
     });
 
     if (dismissibleJobIds.length > 0) {
-      localStorage.setItem(
-        "medialake_seen_job_notifications",
-        JSON.stringify([...seenJobs]),
-      );
+      localStorage.setItem("medialake_seen_job_notifications", JSON.stringify([...seenJobs]));
     }
 
     // Only clear synced jobs for dismissed notifications
@@ -151,7 +131,7 @@ export const useJobNotifications = () => {
       const jobKey = `${jobId}:${status}`;
       return seenJobs.has(jobKey);
     },
-    [getSeenJobNotifications],
+    [getSeenJobNotifications]
   );
 
   const markAsUnseen = useCallback(
@@ -160,16 +140,14 @@ export const useJobNotifications = () => {
       unseenNotifications.add(notificationId);
       localStorage.setItem(
         "medialake_unseen_notifications",
-        JSON.stringify([...unseenNotifications]),
+        JSON.stringify([...unseenNotifications])
       );
     },
-    [getUnseenNotifications],
+    [getUnseenNotifications]
   );
 
   const jobToNotification = useCallback(
-    (
-      job: JobData & { jobType: "download" | "delete" },
-    ): Omit<Notification, "id" | "seen"> => {
+    (job: JobData & { jobType: "download" | "delete" }): Omit<Notification, "id" | "seen"> => {
       // Handle batch delete jobs
       if (job.jobType === "delete") {
         const deleteJob = job as DeleteJobData & { jobType: "delete" };
@@ -192,12 +170,13 @@ export const useJobNotifications = () => {
           case "PROCESSING":
             return {
               ...baseNotification,
-              message: `Deleting assets: ${deleteJob.progress || 0}% complete (${deleteJob.processedAssets}/${deleteJob.totalAssets})`,
+              message: `Deleting assets: ${deleteJob.progress || 0}% complete (${
+                deleteJob.processedAssets
+              }/${deleteJob.totalAssets})`,
               type: "sticky" as const,
             };
           case "COMPLETED": {
-            const successCount =
-              deleteJob.totalAssets - (deleteJob.failedAssets || 0);
+            const successCount = deleteJob.totalAssets - (deleteJob.failedAssets || 0);
             return {
               ...baseNotification,
               message: `Deleted ${successCount} of ${deleteJob.totalAssets} assets successfully`,
@@ -265,9 +244,7 @@ export const useJobNotifications = () => {
           let stagingMessage = "Preparing download archive...";
 
           if (stagingProgress > 50) {
-            const uploadProgress = Math.round(
-              ((stagingProgress - 50) / 50) * 100,
-            );
+            const uploadProgress = Math.round(((stagingProgress - 50) / 50) * 100);
             stagingMessage = `Staging archive: ${uploadProgress}% complete`;
           } else if (stagingProgress > 0) {
             const zipProgress = Math.round((stagingProgress / 50) * 100);
@@ -323,7 +300,7 @@ export const useJobNotifications = () => {
           };
       }
     },
-    [],
+    []
   );
 
   const createNotificationForJob = useCallback(
@@ -338,14 +315,11 @@ export const useJobNotifications = () => {
 
       return notificationId;
     },
-    [add, jobToNotification, markAsUnseen, isJobNotificationSeen],
+    [add, jobToNotification, markAsUnseen, isJobNotificationSeen]
   );
 
   const updateNotificationForJob = useCallback(
-    (
-      existingNotification: Notification,
-      job: JobData & { jobType: "download" | "delete" },
-    ) => {
+    (existingNotification: Notification, job: JobData & { jobType: "download" | "delete" }) => {
       const updatedNotification = jobToNotification(job);
 
       // Only update if there's a meaningful change
@@ -358,17 +332,14 @@ export const useJobNotifications = () => {
         update(existingNotification.id, updatedNotification);
 
         // Mark as unseen if status changed to completed and this completion hasn't been seen before
-        if (
-          job.status === "COMPLETED" &&
-          existingNotification.jobStatus !== "COMPLETED"
-        ) {
+        if (job.status === "COMPLETED" && existingNotification.jobStatus !== "COMPLETED") {
           if (!isJobNotificationSeen(job.jobId, "COMPLETED")) {
             markAsUnseen(existingNotification.id);
           }
         }
       }
     },
-    [update, jobToNotification, markAsUnseen, isJobNotificationSeen],
+    [update, jobToNotification, markAsUnseen, isJobNotificationSeen]
   );
 
   // Custom dismiss function that tracks dismissed jobs
@@ -380,7 +351,7 @@ export const useJobNotifications = () => {
       }
       dismiss(notificationId);
     },
-    [notifications, dismiss, markJobAsDismissed],
+    [notifications, dismiss, markJobAsDismissed]
   );
 
   // Sync backend jobs with notifications
@@ -423,9 +394,7 @@ export const useJobNotifications = () => {
         return;
       }
 
-      const existingNotifications = notifications.filter(
-        (n) => n.jobId === job.jobId,
-      );
+      const existingNotifications = notifications.filter((n) => n.jobId === job.jobId);
 
       if (existingNotifications.length === 0) {
         // Create new notification for new job
@@ -446,21 +415,15 @@ export const useJobNotifications = () => {
         // Also remove from dismissed jobs since the job no longer exists
         const updatedDismissedJobs = getDismissedJobs();
         updatedDismissedJobs.delete(notification.jobId);
-        localStorage.setItem(
-          "medialake_dismissed_jobs",
-          JSON.stringify([...updatedDismissedJobs]),
-        );
+        localStorage.setItem("medialake_dismissed_jobs", JSON.stringify([...updatedDismissedJobs]));
 
         // Clean up seen job notifications for this job
         const seenJobs = getSeenJobNotifications();
         const jobKeysToRemove = [...seenJobs].filter((key) =>
-          key.startsWith(`${notification.jobId}:`),
+          key.startsWith(`${notification.jobId}:`)
         );
         jobKeysToRemove.forEach((key) => seenJobs.delete(key));
-        localStorage.setItem(
-          "medialake_seen_job_notifications",
-          JSON.stringify([...seenJobs]),
-        );
+        localStorage.setItem("medialake_seen_job_notifications", JSON.stringify([...seenJobs]));
       }
     });
   }, [

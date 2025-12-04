@@ -7,13 +7,9 @@ interface TableDensityContextType {
   toggleMode: () => void;
 }
 
-const TableDensityContext = createContext<TableDensityContextType | undefined>(
-  undefined,
-);
+const TableDensityContext = createContext<TableDensityContextType | undefined>(undefined);
 
-export const TableDensityProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
+export const TableDensityProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [mode, setMode] = useState<TableDensityMode>("compact");
 
   const toggleMode = () => {
@@ -30,9 +26,7 @@ export const TableDensityProvider: React.FC<{ children: React.ReactNode }> = ({
 export const useTableDensity = () => {
   const context = useContext(TableDensityContext);
   if (context === undefined) {
-    throw new Error(
-      "useTableDensity must be used within a TableDensityProvider",
-    );
+    throw new Error("useTableDensity must be used within a TableDensityProvider");
   }
   return context;
 };

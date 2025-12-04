@@ -25,17 +25,14 @@ export default {
     browsePath: "Navegar caminho",
     uploadingTo: "Carregando para",
     restrictedToPrefix: "restrito",
-    allowedPrefixesInfo:
-      "Você só pode carregar para {{count}} caminho(s) permitido(s)",
-    pathInfo:
-      "Os arquivos serão carregados para o caminho selecionado no bucket S3",
+    allowedPrefixesInfo: "Você só pode carregar para {{count}} caminho(s) permitido(s)",
+    pathInfo: "Os arquivos serão carregados para o caminho selecionado no bucket S3",
     selectPathFirst: "Selecione um caminho antes de carregar",
     pathResetWarning: "Alterar o conector redefinirá o caminho selecionado",
     connectorLabel: "Conector S3",
     selectConnectorPlaceholder: "Selecione um conector S3",
     loadingConnectors: "Carregando conectores...",
-    noConnectors:
-      "Nenhum conector S3 disponível. Por favor, configure um conector S3 primeiro.",
+    noConnectors: "Nenhum conector S3 disponível. Por favor, configure um conector S3 primeiro.",
     dashboardNote:
       "Apenas arquivos do tipo audio/*, video/*, image/*, HLS (application/x-mpegURL) e MPEG-DASH (application/dash+xml) são permitidos",
     meta: {
@@ -49,8 +46,7 @@ export default {
     descriptionUnrestricted:
       "Navegue e selecione qualquer pasta no bucket para carregar seus arquivos.",
     prefixLabel: "Caminho Permitido",
-    prefixHelper:
-      "Você só pode navegar e carregar para pastas dentro do caminho selecionado.",
+    prefixHelper: "Você só pode navegar e carregar para pastas dentro do caminho selecionado.",
     selectedPath: "Caminho Selecionado",
     currentPath: "Caminho Atual",
     confirm: "Usar Este Caminho",
@@ -83,8 +79,7 @@ export default {
     },
     deleteDialog: {
       title: "Confirmar exclusão",
-      description:
-        "Tem certeza de que deseja excluir este ativo? Esta ação não pode ser desfeita.",
+      description: "Tem certeza de que deseja excluir este ativo? Esta ação não pode ser desfeita.",
       cancel: "Cancelar",
       confirm: "Excluir",
     },
@@ -163,16 +158,11 @@ export default {
       systemLoad: "Carga do Sistema",
     },
     errors: {
-      userDeletionNotImplemented:
-        "A exclusão de usuário ainda não foi implementada.",
-      userCreationNotImplemented:
-        "A criação de usuário ainda não foi implementada.",
-      userEditingNotImplemented:
-        "A edição de usuário ainda não foi implementada.",
-      analyticsExportNotImplemented:
-        "A exportação de análises ainda não foi implementada.",
-      systemResetNotImplemented:
-        "A redefinição do sistema ainda não foi implementada.",
+      userDeletionNotImplemented: "A exclusão de usuário ainda não foi implementada.",
+      userCreationNotImplemented: "A criação de usuário ainda não foi implementada.",
+      userEditingNotImplemented: "A edição de usuário ainda não foi implementada.",
+      analyticsExportNotImplemented: "A exportação de análises ainda não foi implementada.",
+      systemResetNotImplemented: "A redefinição do sistema ainda não foi implementada.",
     },
     columns: {
       lastActive: "Último Acesso",
@@ -437,8 +427,7 @@ export default {
         endpoint: "URL do Endpoint (Opcional)",
         enabled: "Pesquisa Ativada",
         noProvider: "Nenhum provedor de pesquisa configurado.",
-        configurePrompt:
-          "Configure o Twelve Labs para habilitar recursos de pesquisa.",
+        configurePrompt: "Configure o Twelve Labs para habilitar recursos de pesquisa.",
       },
       notifications: {
         title: "Configurações de Notificações",
@@ -487,8 +476,7 @@ export default {
       noResults: "Nenhum item corresponde ao seu filtro",
     },
     keyboard: {
-      navigation:
-        "Use as setas para navegar, Enter para abrir, Backspace para voltar",
+      navigation: "Use as setas para navegar, Enter para abrir, Backspace para voltar",
     },
     menu: {
       rename: "Renomear",
@@ -643,8 +631,7 @@ export default {
     },
     home: {
       welcome: "Bem-vindo ao Media Lake",
-      description:
-        "Gerencie e organize seus arquivos de mídia de forma eficiente",
+      description: "Gerencie e organize seus arquivos de mídia de forma eficiente",
       statistics: "Estatísticas",
       collections: "Coleções",
       sharedCollections: "Coleções Compartilhadas",
@@ -659,11 +646,9 @@ export default {
       "Asset processing pipeline completed successfully":
         "Pipeline de processamento de ativos concluído com sucesso",
       "Storage Warning": "Aviso de Armazenamento",
-      "Storage capacity reaching 80%":
-        "Capacidade de armazenamento atingindo 80%",
+      "Storage capacity reaching 80%": "Capacidade de armazenamento atingindo 80%",
       "Pipeline Failed": "Pipeline Falhou",
-      "Video processing pipeline failed":
-        "Pipeline de processamento de vídeo falhou",
+      "Video processing pipeline failed": "Pipeline de processamento de vídeo falhou",
     },
     modal: {
       confirmDelete: "Tem certeza de que deseja excluir este item?",
@@ -708,10 +693,8 @@ export default {
       },
       error: {
         loading: "Erro ao carregar objetos S3: {{message}}",
-        network:
-          "Erro de rede. Por favor, verifique sua conexão e tente novamente.",
-        permission:
-          "Acesso negado. Você não tem permissão para acessar este caminho.",
+        network: "Erro de rede. Por favor, verifique sua conexão e tente novamente.",
+        permission: "Acesso negado. Você não tem permissão para acessar este caminho.",
         permissionWithPrefixes:
           "Acesso negado. Você só pode acessar os seguintes caminhos: {{prefixes}}",
         notFound: "O caminho solicitado não existe.",
@@ -727,8 +710,7 @@ export default {
         noResults: "Nenhum item corresponde ao seu filtro",
       },
       keyboard: {
-        navigation:
-          "Use as setas para navegar, Enter para abrir, Backspace para voltar",
+        navigation: "Use as setas para navegar, Enter para abrir, Backspace para voltar",
       },
       menu: {
         rename: "Renomear",

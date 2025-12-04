@@ -1,12 +1,5 @@
 import React from "react";
-import {
-  Box,
-  Typography,
-  useTheme,
-  useMediaQuery,
-  Container,
-  Fade,
-} from "@mui/material";
+import { Box, Typography, useTheme, useMediaQuery, Container, Fade } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import { useDirection } from "../contexts/DirectionContext";
 import { useSidebar } from "../contexts/SidebarContext";
@@ -46,10 +39,7 @@ const Home: React.FC = () => {
         }),
       }}
     >
-      <Container
-        maxWidth="lg"
-        sx={{ textAlign: "center", px: { xs: 3, sm: 4 } }}
-      >
+      <Container maxWidth="lg" sx={{ textAlign: "center", px: { xs: 3, sm: 4 } }}>
         <Fade in={true} timeout={1200}>
           <Box
             sx={{
@@ -68,7 +58,7 @@ const Home: React.FC = () => {
                 height: "200px",
                 background: `radial-gradient(circle, ${alpha(
                   theme.palette.primary.main,
-                  0.1,
+                  0.1
                 )} 0%, transparent 70%)`,
                 borderRadius: "50%",
                 filter: "blur(40px)",
@@ -89,7 +79,7 @@ const Home: React.FC = () => {
                 height: "150px",
                 background: `radial-gradient(circle, ${alpha(
                   theme.palette.secondary.main,
-                  0.08,
+                  0.08
                 )} 0%, transparent 70%)`,
                 borderRadius: "50%",
                 filter: "blur(30px)",
@@ -130,7 +120,7 @@ const Home: React.FC = () => {
                   height: "120%",
                   background: `radial-gradient(ellipse, ${alpha(
                     theme.palette.primary.main,
-                    0.05,
+                    0.05
                   )} 0%, transparent 70%)`,
                   borderRadius: "50%",
                   zIndex: -1,

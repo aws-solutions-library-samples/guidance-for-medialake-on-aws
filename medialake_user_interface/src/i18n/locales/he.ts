@@ -41,8 +41,7 @@ export default {
   },
   pathBrowser: {
     title: "בחירת נתיב העלאה",
-    descriptionRestricted:
-      "עיין ובחר תיקייה בתוך הנתיבים המותרים להעלאת הקבצים שלך.",
+    descriptionRestricted: "עיין ובחר תיקייה בתוך הנתיבים המותרים להעלאת הקבצים שלך.",
     descriptionUnrestricted: "עיין ובחר כל תיקייה בדלי להעלאת הקבצים שלך.",
     prefixLabel: "נתיב מותר",
     prefixHelper: "אתה יכול רק לעיין ולהעלות לתיקיות בתוך הנתיב שנבחר.",
@@ -58,18 +57,15 @@ export default {
       loadingFailed: "טעינת פרטי המחבר נכשלה.",
     },
     hints: {
-      clickFolder:
-        "לחץ על תיקייה כדי לנווט אליה, ואז לחץ על 'בחירת תיקייה נוכחית' כדי לבחור בה.",
-      navigateAndConfirm:
-        "נווט לתיקייה הרצויה, ואז לחץ על 'השתמש בנתיב זה' כדי לאשר.",
+      clickFolder: "לחץ על תיקייה כדי לנווט אליה, ואז לחץ על 'בחירת תיקייה נוכחית' כדי לבחור בה.",
+      navigateAndConfirm: "נווט לתיקייה הרצויה, ואז לחץ על 'השתמש בנתיב זה' כדי לאשר.",
       rootPath: "אתה נמצא כעת ברמת השורש.",
     },
   },
   assetExplorer: {
     noConnectorSelected: "בחר מחבר כדי לצפות בנכסים",
     noAssetsFound: "לא נמצאו נכסים עבור מחבר זה",
-    noIndexedAssets:
-      'לא נמצאו נכסים ממודדים עבור מחבר זה עם הדלי "{{bucketName}}".',
+    noIndexedAssets: 'לא נמצאו נכסים ממודדים עבור מחבר זה עם הדלי "{{bucketName}}".',
     loadingAssets: "טוען נכסים...",
     menu: {
       rename: "שנה שם",
@@ -78,8 +74,7 @@ export default {
     },
     deleteDialog: {
       title: "אישור מחיקה",
-      description:
-        "האם אתה בטוח שברצונך למחוק נכס זה? פעולה זו אינה ניתנת לביטול.",
+      description: "האם אתה בטוח שברצונך למחוק נכס זה? פעולה זו אינה ניתנת לביטול.",
       cancel: "ביטול",
       confirm: "מחק",
     },
@@ -646,8 +641,7 @@ export default {
     },
     notifications: {
       "Pipeline Complete": "צינור הושלם",
-      "Asset processing pipeline completed successfully":
-        "צינור עיבוד הנכסים הושלם בהצלחה",
+      "Asset processing pipeline completed successfully": "צינור עיבוד הנכסים הושלם בהצלחה",
       "Storage Warning": "אזהרת אחסון",
       "Storage capacity reaching 80%": "קיבולת האחסון מתקרבת ל-80%",
       "Pipeline Failed": "הצינור נכשל",
@@ -698,8 +692,7 @@ export default {
         loading: "שגיאה בטעינת עצמים מ-S3: {{message}}",
         network: "שגיאת רשת. אנא בדוק את החיבור שלך ונסה שוב.",
         permission: "הגישה נדחתה. אין לך הרשאה לגשת לנתיב זה.",
-        permissionWithPrefixes:
-          "הגישה נדחתה. אתה יכול לגשת רק לנתיבים הבאים: {{prefixes}}",
+        permissionWithPrefixes: "הגישה נדחתה. אתה יכול לגשת רק לנתיבים הבאים: {{prefixes}}",
         notFound: "הנתיב המבוקש לא קיים.",
         timeout: "פג הזמן הקצוב לבקשה. אנא נסה שוב.",
         retry: "נסה שוב",
@@ -726,8 +719,7 @@ export default {
     },
     metadata: {
       title: "בקרוב",
-      description:
-        "אנחנו עובדים כדי להביא לך יכולות ניהול מטא-דאטה. הישאר מעודכן!",
+      description: "אנחנו עובדים כדי להביא לך יכולות ניהול מטא-דאטה. הישאר מעודכן!",
     },
     pipelines: {
       title: "צינורות",
@@ -777,8 +769,7 @@ export default {
           },
           delete: {
             title: "מחק צינור",
-            message:
-              "האם אתה בטוח שברצונך למחוק צינור זה? פעולה זו אינה ניתנת לביטול.",
+            message: "האם אתה בטוח שברצונך למחוק צינור זה? פעולה זו אינה ניתנת לביטול.",
             confirm: "הקלד את שם הצינור לאישור המחיקה:",
           },
         },

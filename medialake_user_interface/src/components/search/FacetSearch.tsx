@@ -72,10 +72,10 @@ const FacetSearch: React.FC<FacetSearchProps> = ({
 
   // State for date pickers
   const [startDate, setStartDate] = useState<Date | null>(
-    filters.ingested_date_gte ? new Date(filters.ingested_date_gte) : null,
+    filters.ingested_date_gte ? new Date(filters.ingested_date_gte) : null
   );
   const [endDate, setEndDate] = useState<Date | null>(
-    filters.ingested_date_lte ? new Date(filters.ingested_date_lte) : null,
+    filters.ingested_date_lte ? new Date(filters.ingested_date_lte) : null
   );
 
   // Count active filters
@@ -256,14 +256,8 @@ const FacetSearch: React.FC<FacetSearchProps> = ({
               borderColor: "divider",
             }}
           >
-            <Typography variant="subtitle1">
-              {t("search.filters.title", "Filters")}
-            </Typography>
-            <Button
-              size="small"
-              onClick={handleClearFilters}
-              disabled={!activeFilterCount}
-            >
+            <Typography variant="subtitle1">{t("search.filters.title", "Filters")}</Typography>
+            <Button size="small" onClick={handleClearFilters} disabled={!activeFilterCount}>
               {t("search.filters.clearAll", "Clear All")}
             </Button>
           </Box>
@@ -283,31 +277,11 @@ const FacetSearch: React.FC<FacetSearchProps> = ({
               },
             }}
           >
-            <Tab
-              icon={<ImageIcon fontSize="small" />}
-              label="Media Type"
-              iconPosition="start"
-            />
-            <Tab
-              icon={<FileIcon fontSize="small" />}
-              label="Extension"
-              iconPosition="start"
-            />
-            <Tab
-              icon={<SizeIcon fontSize="small" />}
-              label="Size"
-              iconPosition="start"
-            />
-            <Tab
-              icon={<DateIcon fontSize="small" />}
-              label="Date"
-              iconPosition="start"
-            />
-            <Tab
-              icon={<TextIcon fontSize="small" />}
-              label="Filename"
-              iconPosition="start"
-            />
+            <Tab icon={<ImageIcon fontSize="small" />} label="Media Type" iconPosition="start" />
+            <Tab icon={<FileIcon fontSize="small" />} label="Extension" iconPosition="start" />
+            <Tab icon={<SizeIcon fontSize="small" />} label="Size" iconPosition="start" />
+            <Tab icon={<DateIcon fontSize="small" />} label="Date" iconPosition="start" />
+            <Tab icon={<TextIcon fontSize="small" />} label="Filename" iconPosition="start" />
           </Tabs>
 
           {/* Tab content area */}
@@ -327,8 +301,7 @@ const FacetSearch: React.FC<FacetSearchProps> = ({
                       }
                       label={
                         <Typography variant="body2">
-                          {type.key}{" "}
-                          {type.doc_count > 0 && `(${type.doc_count})`}
+                          {type.key} {type.doc_count > 0 && `(${type.doc_count})`}
                         </Typography>
                       }
                     />
@@ -363,36 +336,25 @@ const FacetSearch: React.FC<FacetSearchProps> = ({
                   </Grid>
                 ) : (
                   <Box>
-                    {Object.entries(extensionsByType).map(
-                      ([type, extensions]) => (
-                        <Box key={type} sx={{ mb: 1.5 }}>
-                          <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-                            {type}
-                          </Typography>
-                          <Stack
-                            direction="row"
-                            spacing={0.5}
-                            flexWrap="wrap"
-                            useFlexGap
-                          >
-                            {extensions.map((ext) => (
-                              <Chip
-                                key={ext}
-                                label={ext}
-                                size="small"
-                                onClick={() => handleExtensionChange(ext)}
-                                color={
-                                  filters.extension === ext
-                                    ? "primary"
-                                    : "default"
-                                }
-                                sx={{ mb: 0.5, mr: 0.5 }}
-                              />
-                            ))}
-                          </Stack>
-                        </Box>
-                      ),
-                    )}
+                    {Object.entries(extensionsByType).map(([type, extensions]) => (
+                      <Box key={type} sx={{ mb: 1.5 }}>
+                        <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                          {type}
+                        </Typography>
+                        <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                          {extensions.map((ext) => (
+                            <Chip
+                              key={ext}
+                              label={ext}
+                              size="small"
+                              onClick={() => handleExtensionChange(ext)}
+                              color={filters.extension === ext ? "primary" : "default"}
+                              sx={{ mb: 0.5, mr: 0.5 }}
+                            />
+                          ))}
+                        </Stack>
+                      </Box>
+                    ))}
                   </Box>
                 )}
               </Box>
@@ -411,8 +373,7 @@ const FacetSearch: React.FC<FacetSearchProps> = ({
                       size="small"
                       value={minSizeValue}
                       onChange={(e) => {
-                        const newValue =
-                          e.target.value === "" ? "" : Number(e.target.value);
+                        const newValue = e.target.value === "" ? "" : Number(e.target.value);
                         setMinSizeValue(newValue);
                         // Don't auto-apply on every keystroke for number inputs
                       }}
@@ -448,8 +409,7 @@ const FacetSearch: React.FC<FacetSearchProps> = ({
                       size="small"
                       value={maxSizeValue}
                       onChange={(e) => {
-                        const newValue =
-                          e.target.value === "" ? "" : Number(e.target.value);
+                        const newValue = e.target.value === "" ? "" : Number(e.target.value);
                         setMaxSizeValue(newValue);
                         // Don't auto-apply on every keystroke for number inputs
                       }}
@@ -527,10 +487,7 @@ const FacetSearch: React.FC<FacetSearchProps> = ({
                 <TextField
                   fullWidth
                   size="small"
-                  placeholder={t(
-                    "search.filters.filenameSearch",
-                    "Search by filename",
-                  )}
+                  placeholder={t("search.filters.filenameSearch", "Search by filename")}
                   value={filters.filename || ""}
                   onChange={handleFilenameChange}
                   onBlur={() => applyFiltersWithConversions()} // Apply on blur

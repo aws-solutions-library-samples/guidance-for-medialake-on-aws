@@ -1,11 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
-import {
-  Box,
-  IconButton,
-  Tooltip,
-  useTheme,
-  CircularProgress,
-} from "@mui/material";
+import { Box, IconButton, Tooltip, useTheme, CircularProgress } from "@mui/material";
 import Rotate90DegreesCwIcon from "@mui/icons-material/Rotate90DegreesCw";
 import HomeIcon from "@mui/icons-material/Home";
 import LockIcon from "@mui/icons-material/Lock";
@@ -49,11 +43,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
   const MAX_ZOOM = scaleSize * 5;
 
   /** Calculate scale to fit image (considering rotation) in the canvas */
-  const calculateFitScale = (
-    imgW: number,
-    imgH: number,
-    rot: number,
-  ): number => {
+  const calculateFitScale = (imgW: number, imgH: number, rot: number): number => {
     const canvas = canvasRef.current;
     if (!canvas) return 1;
     const cw = canvas.clientWidth;
@@ -89,10 +79,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     ctx.scale(dpr, dpr);
 
     // background fill
-    const bgColor =
-      theme.palette.mode === "dark"
-        ? theme.palette.background.paper
-        : "#ffffff";
+    const bgColor = theme.palette.mode === "dark" ? theme.palette.background.paper : "#ffffff";
     ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
 
@@ -183,17 +170,13 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
       e.preventDefault();
       isZoomingRef.current = true;
       const dir = e.deltaY > 0 ? -1 : 1;
-      const newZoom = _.clamp(
-        zoom * Math.pow(ZOOM_FACTOR, dir),
-        MIN_ZOOM,
-        MAX_ZOOM,
-      );
+      const newZoom = _.clamp(zoom * Math.pow(ZOOM_FACTOR, dir), MIN_ZOOM, MAX_ZOOM);
       setZoom(newZoom);
       setTimeout(() => {
         isZoomingRef.current = false;
       }, 300);
     },
-    [isCanvasLocked, zoom, MIN_ZOOM, MAX_ZOOM],
+    [isCanvasLocked, zoom, MIN_ZOOM, MAX_ZOOM]
   );
 
   useEffect(() => {
@@ -305,10 +288,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
             alignItems: "center",
           }}
         >
-          <CircularProgress
-            size={48}
-            sx={{ mb: 2, color: theme.palette.primary.main }}
-          />
+          <CircularProgress size={48} sx={{ mb: 2, color: theme.palette.primary.main }} />
         </Box>
       )}
       <Box

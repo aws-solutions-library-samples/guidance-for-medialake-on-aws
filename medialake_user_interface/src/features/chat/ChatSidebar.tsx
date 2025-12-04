@@ -2,10 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Box, Typography, IconButton, Slide, Fade } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/Delete";
-import {
-  useChat,
-  ChatMessage as ChatMessageType,
-} from "../../contexts/ChatContext";
+import { useChat, ChatMessage as ChatMessageType } from "../../contexts/ChatContext";
 import ChatMessage from "./ChatMessage";
 import ChatInput from "./ChatInput";
 import { alpha } from "@mui/material/styles";
@@ -102,7 +99,7 @@ const ChatSidebar: React.FC = () => {
           boxShadow: (theme) =>
             `0 4px 20px ${alpha(
               theme.palette.common.black,
-              theme.palette.mode === "dark" ? 0.5 : 0.1,
+              theme.palette.mode === "dark" ? 0.5 : 0.1
             )}`,
           transition: isResizing
             ? "none"
@@ -127,8 +124,7 @@ const ChatSidebar: React.FC = () => {
             cursor: "col-resize",
             zIndex: 1300,
             "&:hover": {
-              backgroundColor: (theme) =>
-                alpha(theme.palette.primary.main, 0.1),
+              backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.1),
             },
             "&::after": {
               content: '""',
@@ -137,8 +133,7 @@ const ChatSidebar: React.FC = () => {
               left: "3px",
               width: "2px",
               height: "40px",
-              backgroundColor: (theme) =>
-                alpha(theme.palette.primary.main, 0.3),
+              backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.3),
               borderRadius: "2px",
               transform: "translateY(-50%)",
             },
@@ -215,8 +210,7 @@ const ChatSidebar: React.FC = () => {
                 ? alpha(theme.palette.background.default, 0.3)
                 : alpha(theme.palette.background.default, 0.5),
             scrollbarWidth: "thin",
-            scrollbarColor: (theme) =>
-              `${alpha(theme.palette.text.secondary, 0.3)} transparent`,
+            scrollbarColor: (theme) => `${alpha(theme.palette.text.secondary, 0.3)} transparent`,
             "&::-webkit-scrollbar": {
               width: "6px",
             },
@@ -246,11 +240,7 @@ const ChatSidebar: React.FC = () => {
                   px: 4,
                 }}
               >
-                <Typography
-                  variant="body1"
-                  gutterBottom
-                  sx={{ fontWeight: 500 }}
-                >
+                <Typography variant="body1" gutterBottom sx={{ fontWeight: 500 }}>
                   No messages yet
                 </Typography>
                 <Typography variant="body2">

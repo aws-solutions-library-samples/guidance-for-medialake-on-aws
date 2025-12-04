@@ -1,8 +1,4 @@
-import {
-  type ImageItem,
-  type VideoItem,
-  type AudioItem,
-} from "@/types/search/searchResults";
+import { type ImageItem, type VideoItem, type AudioItem } from "@/types/search/searchResults";
 
 export type AssetItem = (ImageItem | VideoItem | AudioItem) & {
   DigitalSourceAsset: {

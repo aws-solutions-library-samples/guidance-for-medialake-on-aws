@@ -34,9 +34,13 @@ interface IntegrationValidationDialogProps {
   onConfirm: (mappings: IntegrationMapping[]) => void;
 }
 
-export const IntegrationValidationDialog: React.FC<
-  IntegrationValidationDialogProps
-> = ({ open, invalidNodes, availableIntegrations, onClose, onConfirm }) => {
+export const IntegrationValidationDialog: React.FC<IntegrationValidationDialogProps> = ({
+  open,
+  invalidNodes,
+  availableIntegrations,
+  onClose,
+  onConfirm,
+}) => {
   const [mappings, setMappings] = useState<IntegrationMapping[]>([]);
   const [isValid, setIsValid] = useState(false);
 
@@ -45,30 +49,22 @@ export const IntegrationValidationDialog: React.FC<
     const initialMappings = invalidNodes.map((node) => ({
       nodeIndex: node.nodeIndex,
       oldIntegrationId: node.invalidIntegrationId,
-      newIntegrationId:
-        availableIntegrations.length > 0 ? availableIntegrations[0].id : "",
+      newIntegrationId: availableIntegrations.length > 0 ? availableIntegrations[0].id : "",
     }));
 
     setMappings(initialMappings);
     setIsValid(availableIntegrations.length > 0);
   }, [invalidNodes, availableIntegrations]);
 
-  const handleIntegrationChange = (
-    nodeIndex: number,
-    integrationId: string,
-  ) => {
+  const handleIntegrationChange = (nodeIndex: number, integrationId: string) => {
     const updatedMappings = mappings.map((mapping) =>
-      mapping.nodeIndex === nodeIndex
-        ? { ...mapping, newIntegrationId: integrationId }
-        : mapping,
+      mapping.nodeIndex === nodeIndex ? { ...mapping, newIntegrationId: integrationId } : mapping
     );
 
     setMappings(updatedMappings);
 
     // Check if all mappings have a selected integration
-    const allMappingsValid = updatedMappings.every(
-      (mapping) => !!mapping.newIntegrationId,
-    );
+    const allMappingsValid = updatedMappings.every((mapping) => !!mapping.newIntegrationId);
     setIsValid(allMappingsValid);
   };
 
@@ -82,15 +78,14 @@ export const IntegrationValidationDialog: React.FC<
       <DialogContent>
         <Box sx={{ mb: 3 }}>
           <Typography variant="body1" paragraph>
-            Some nodes in the imported pipeline reference integrations that
-            don't exist in this environment. Please select replacement
-            integrations for each node:
+            Some nodes in the imported pipeline reference integrations that don't exist in this
+            environment. Please select replacement integrations for each node:
           </Typography>
 
           {availableIntegrations.length === 0 && (
             <Alert severity="warning" sx={{ mb: 2 }}>
-              No integrations are available in this environment. You'll need to
-              create integrations before you can use these nodes.
+              No integrations are available in this environment. You'll need to create integrations
+              before you can use these nodes.
             </Alert>
           )}
         </Box>
@@ -114,14 +109,11 @@ export const IntegrationValidationDialog: React.FC<
                       <InputLabel>Select Integration</InputLabel>
                       <Select
                         value={
-                          mappings.find((m) => m.nodeIndex === node.nodeIndex)
-                            ?.newIntegrationId || ""
+                          mappings.find((m) => m.nodeIndex === node.nodeIndex)?.newIntegrationId ||
+                          ""
                         }
                         onChange={(e) =>
-                          handleIntegrationChange(
-                            node.nodeIndex,
-                            e.target.value as string,
-                          )
+                          handleIntegrationChange(node.nodeIndex, e.target.value as string)
                         }
                         label="Select Integration"
                         disabled={availableIntegrations.length === 0}
@@ -144,12 +136,7 @@ export const IntegrationValidationDialog: React.FC<
         <Button onClick={onClose} color="inherit">
           Cancel
         </Button>
-        <Button
-          onClick={handleConfirm}
-          color="primary"
-          variant="contained"
-          disabled={!isValid}
-        >
+        <Button onClick={handleConfirm} color="primary" variant="contained" disabled={!isValid}>
           Apply Changes
         </Button>
       </DialogActions>

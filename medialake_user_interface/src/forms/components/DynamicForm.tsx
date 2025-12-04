@@ -32,7 +32,7 @@ export const DynamicForm: React.FC<DynamicFormProps> = React.memo(
     const fields = React.useMemo(
       () => definition.fields,
       // Use JSON.stringify to compare deep equality
-      [JSON.stringify(definition.fields)],
+      [JSON.stringify(definition.fields)]
     );
 
     // Create schema using cached version
@@ -63,13 +63,11 @@ export const DynamicForm: React.FC<DynamicFormProps> = React.memo(
 
         if (dependentValue !== field.showWhen.value) {
           console.log(
-            `[DynamicForm] Hiding field ${field.name} because ${dependentValue} !== ${field.showWhen.value}`,
+            `[DynamicForm] Hiding field ${field.name} because ${dependentValue} !== ${field.showWhen.value}`
           );
           return null;
         }
-        console.log(
-          `[DynamicForm] Showing field ${field.name} because condition matched`,
-        );
+        console.log(`[DynamicForm] Showing field ${field.name} because condition matched`);
       }
 
       // Common props for all field types
@@ -93,13 +91,7 @@ export const DynamicForm: React.FC<DynamicFormProps> = React.memo(
           return <FormSelect {...commonProps} options={field.options || []} />;
 
         case "multiselect":
-          return (
-            <FormSelect
-              {...commonProps}
-              options={field.options || []}
-              multiple
-            />
-          );
+          return <FormSelect {...commonProps} options={field.options || []} multiple />;
 
         case "switch":
           return <FormSwitch {...commonProps} />;
@@ -120,57 +112,37 @@ export const DynamicForm: React.FC<DynamicFormProps> = React.memo(
           const validatedData = schema.safeParse(data);
 
           if (!validatedData.success) {
-            console.error(
-              "[DynamicForm] Validation failed:",
-              validatedData.error,
-            );
-            console.error(
-              "[DynamicForm] Validation errors:",
-              validatedData.error.errors,
-            );
-            console.error(
-              "[DynamicForm] Form data that failed validation:",
-              data,
-            );
+            console.error("[DynamicForm] Validation failed:", validatedData.error);
+            console.error("[DynamicForm] Validation errors:", validatedData.error.errors);
+            console.error("[DynamicForm] Form data that failed validation:", data);
 
             // Try to submit anyway with the original data
             console.warn(
-              "[DynamicForm] Attempting to submit with original data despite validation errors",
+              "[DynamicForm] Attempting to submit with original data despite validation errors"
             );
             try {
               await onSubmit(data);
-              console.log(
-                "[DynamicForm] Submit successful despite validation errors",
-              );
+              console.log("[DynamicForm] Submit successful despite validation errors");
               return;
             } catch (submitError) {
-              console.error(
-                "[DynamicForm] Submit failed with original data:",
-                submitError,
-              );
+              console.error("[DynamicForm] Submit failed with original data:", submitError);
               throw validatedData.error;
             }
           }
 
-          console.log(
-            "[DynamicForm] Validation successful, submitting data:",
-            validatedData.data,
-          );
+          console.log("[DynamicForm] Validation successful, submitting data:", validatedData.data);
           await onSubmit(validatedData.data);
         } catch (error) {
           console.error("[DynamicForm] Submit error:", error);
           throw error;
         }
       },
-      [onSubmit, schema],
+      [onSubmit, schema]
     );
 
     // Only log errors and submission state
     React.useEffect(() => {
-      if (
-        form.formState.errors &&
-        Object.keys(form.formState.errors).length > 0
-      ) {
+      if (form.formState.errors && Object.keys(form.formState.errors).length > 0) {
         console.log("[DynamicForm] Form errors:", form.formState.errors);
       }
     }, [form.formState.errors]);
@@ -183,12 +155,10 @@ export const DynamicForm: React.FC<DynamicFormProps> = React.memo(
         showButtons={showButtons}
         id={definition.id}
       >
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          {renderField}
-        </Box>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>{renderField}</Box>
       </Form>
     );
-  },
+  }
 );
 
 DynamicForm.displayName = "DynamicForm";

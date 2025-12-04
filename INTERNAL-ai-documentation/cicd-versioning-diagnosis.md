@@ -115,11 +115,13 @@ All versions 2.0.0-6.0.0 show date "2025-11-22" but version 1.0.1 shows "2025-11
 **Changes Made to `.gitlab-ci.yml`:**
 
 1. **Replaced merge base logic with last tag baseline** (lines 207-240)
+
    - Changed from: `git merge-base main origin/stable`
    - Changed to: `git log ${LAST_TAG}..main`
    - This ensures only commits since the last version tag are analyzed
 
 2. **Added comprehensive debug logging:**
+
    - Git state information (branch HEADs, tag details)
    - Number of commits to analyze
    - First 10 commits being versioned

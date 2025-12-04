@@ -728,7 +728,9 @@ class AWSErrorHandler {
           return {
             ...baseContext,
             retryable: false,
-            userMessage: `AWS resource not found: ${context.resourceId || "unknown"}`,
+            userMessage: `AWS resource not found: ${
+              context.resourceId || "unknown"
+            }`,
           };
 
         case "ValidationException":

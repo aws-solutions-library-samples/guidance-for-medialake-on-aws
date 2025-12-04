@@ -60,8 +60,7 @@ export function transformPermissions(permissionSets: any[]): Permission[] {
           return {
             id: p.id || `${action}-${resource}`,
             principalId: p.principalId || permissionSet.principalId || "",
-            principalType:
-              p.principalType || permissionSet.principalType || "USER",
+            principalType: p.principalType || permissionSet.principalType || "USER",
             action: mapAction(action),
             resource: mapResource(resource),
             effect: p.effect || "Allow",

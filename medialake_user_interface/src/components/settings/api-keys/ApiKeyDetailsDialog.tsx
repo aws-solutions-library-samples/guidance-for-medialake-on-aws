@@ -13,11 +13,7 @@ import {
   InputAdornment,
   Tooltip,
 } from "@mui/material";
-import {
-  Close as CloseIcon,
-  Edit as EditIcon,
-  ContentCopy as CopyIcon,
-} from "@mui/icons-material";
+import { Close as CloseIcon, Edit as EditIcon, ContentCopy as CopyIcon } from "@mui/icons-material";
 import { format } from "date-fns";
 import { ActionButton } from "@/components/common/button/ActionButton";
 import { Can } from "@/permissions/components/Can";
@@ -111,21 +107,14 @@ const ApiKeyDetailsDialog: React.FC<ApiKeyDetailsDialogProps> = ({
 
         {error && (
           <Box py={2}>
-            <Typography color="error">
-              Failed to load API key details. Please try again.
-            </Typography>
+            <Typography color="error">Failed to load API key details. Please try again.</Typography>
           </Box>
         )}
 
         {displayApiKey && !isLoading && (
           <Box>
             {/* Name and Status */}
-            <Box
-              display="flex"
-              justifyContent="space-between"
-              alignItems="center"
-              mb={2}
-            >
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
               <Typography variant="h6" component="h2">
                 {displayApiKey.name}
               </Typography>
@@ -161,9 +150,7 @@ const ApiKeyDetailsDialog: React.FC<ApiKeyDetailsDialogProps> = ({
                 readOnly: true,
                 endAdornment: (
                   <InputAdornment position="end">
-                    <Tooltip
-                      title={copySuccess ? "Copied!" : "Copy API Key ID"}
-                    >
+                    <Tooltip title={copySuccess ? "Copied!" : "Copy API Key ID"}>
                       <IconButton
                         onClick={handleCopyId}
                         size="small"

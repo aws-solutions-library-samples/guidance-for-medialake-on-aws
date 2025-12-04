@@ -28,11 +28,12 @@ const DescriptiveTab: React.FC<DescriptiveTabProps> = ({ assetData }) => {
   }
 
   // Convert descriptive data object to array of results
-  const results: Array<{ key: string; data: DescriptiveResult }> =
-    Object.entries(descriptiveData).map(([key, data]) => ({
-      key,
-      data: data as DescriptiveResult,
-    }));
+  const results: Array<{ key: string; data: DescriptiveResult }> = Object.entries(
+    descriptiveData
+  ).map(([key, data]) => ({
+    key,
+    data: data as DescriptiveResult,
+  }));
 
   return (
     <TabContentContainer noPaper>

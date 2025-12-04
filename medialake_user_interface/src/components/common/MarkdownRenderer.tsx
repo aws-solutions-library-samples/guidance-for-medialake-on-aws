@@ -5,9 +5,7 @@ interface MarkdownRendererProps {
   content: string;
 }
 
-export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
-  content,
-}) => {
+export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
   const theme = useTheme();
 
   const parseMarkdown = (text: string) => {
@@ -37,7 +35,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             }}
           >
             {trimmedLine.replace(/^###\s*/, "")}
-          </Typography>,
+          </Typography>
         );
       } else if (trimmedLine.startsWith("##")) {
         elements.push(
@@ -52,7 +50,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             }}
           >
             {trimmedLine.replace(/^##\s*/, "")}
-          </Typography>,
+          </Typography>
         );
       } else if (trimmedLine.startsWith("#")) {
         elements.push(
@@ -67,7 +65,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             }}
           >
             {trimmedLine.replace(/^#\s*/, "")}
-          </Typography>,
+          </Typography>
         );
       }
       // Bold text with **
@@ -75,53 +73,36 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
         const parts = trimmedLine.split(/(\*\*[^*]+\*\*)/g);
         const formattedParts = parts.map((part, partIndex) => {
           if (part.startsWith("**") && part.endsWith("**")) {
-            return (
-              <strong key={`bold-${index}-${partIndex}`}>
-                {part.replace(/\*\*/g, "")}
-              </strong>
-            );
+            return <strong key={`bold-${index}-${partIndex}`}>{part.replace(/\*\*/g, "")}</strong>;
           }
           return part;
         });
 
         elements.push(
-          <Typography
-            key={`text-${index}`}
-            variant="body1"
-            paragraph
-            sx={{ mb: 1 }}
-          >
+          <Typography key={`text-${index}`} variant="body1" paragraph sx={{ mb: 1 }}>
             {formattedParts}
-          </Typography>,
+          </Typography>
         );
       }
       // List items
       else if (trimmedLine.startsWith("- ") || trimmedLine.startsWith("* ")) {
         elements.push(
           <Box key={`list-${index}`} sx={{ display: "flex", mb: 0.5 }}>
-            <Typography
-              variant="body1"
-              sx={{ mr: 1, color: theme.palette.primary.main }}
-            >
+            <Typography variant="body1" sx={{ mr: 1, color: theme.palette.primary.main }}>
               •
             </Typography>
             <Typography variant="body1" sx={{ flex: 1 }}>
               {trimmedLine.replace(/^[-*]\s*/, "")}
             </Typography>
-          </Box>,
+          </Box>
         );
       }
       // Regular paragraphs
       else {
         elements.push(
-          <Typography
-            key={`text-${index}`}
-            variant="body1"
-            paragraph
-            sx={{ mb: 1 }}
-          >
+          <Typography key={`text-${index}`} variant="body1" paragraph sx={{ mb: 1 }}>
             {trimmedLine}
-          </Typography>,
+          </Typography>
         );
       }
     });

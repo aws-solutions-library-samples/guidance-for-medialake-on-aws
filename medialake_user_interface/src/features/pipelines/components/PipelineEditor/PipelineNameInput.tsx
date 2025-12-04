@@ -6,10 +6,7 @@ interface PipelineNameInputProps {
   onChange: (value: string) => void;
 }
 
-const PipelineNameInput: React.FC<PipelineNameInputProps> = ({
-  value,
-  onChange,
-}) => {
+const PipelineNameInput: React.FC<PipelineNameInputProps> = ({ value, onChange }) => {
   return (
     <TextField
       fullWidth

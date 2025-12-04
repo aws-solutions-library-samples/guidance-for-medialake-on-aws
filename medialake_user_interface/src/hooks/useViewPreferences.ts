@@ -22,15 +22,11 @@ export function useViewPreferences({
 }: ViewPreferencesOptions = {}) {
   // View mode state
   const [viewMode, setViewMode] = useState<"card" | "table">(initialViewMode);
-  const [cardSize, setCardSize] = useState<"small" | "medium" | "large">(
-    initialCardSize,
+  const [cardSize, setCardSize] = useState<"small" | "medium" | "large">(initialCardSize);
+  const [aspectRatio, setAspectRatio] = useState<"vertical" | "square" | "horizontal">(
+    initialAspectRatio
   );
-  const [aspectRatio, setAspectRatio] = useState<
-    "vertical" | "square" | "horizontal"
-  >(initialAspectRatio);
-  const [thumbnailScale, setThumbnailScale] = useState<"fit" | "fill">(
-    initialThumbnailScale,
-  );
+  const [thumbnailScale, setThumbnailScale] = useState<"fit" | "fill">(initialThumbnailScale);
   const [showMetadata, setShowMetadata] = useState(initialShowMetadata);
   const [groupByType, setGroupByType] = useState(initialGroupByType);
   const [sorting, setSorting] = useState<SortingState>(initialSorting);
@@ -50,24 +46,18 @@ export function useViewPreferences({
     (_: React.MouseEvent<HTMLElement>, newMode: "card" | "table" | null) => {
       if (newMode) setViewMode(newMode);
     },
-    [],
+    []
   );
 
   // Handle card size change
-  const handleCardSizeChange = useCallback(
-    (size: "small" | "medium" | "large") => {
-      setCardSize(size);
-    },
-    [],
-  );
+  const handleCardSizeChange = useCallback((size: "small" | "medium" | "large") => {
+    setCardSize(size);
+  }, []);
 
   // Handle aspect ratio change
-  const handleAspectRatioChange = useCallback(
-    (ratio: "vertical" | "square" | "horizontal") => {
-      setAspectRatio(ratio);
-    },
-    [],
-  );
+  const handleAspectRatioChange = useCallback((ratio: "vertical" | "square" | "horizontal") => {
+    setAspectRatio(ratio);
+  }, []);
 
   // Handle thumbnail scale change
   const handleThumbnailScaleChange = useCallback((scale: "fit" | "fill") => {
@@ -92,9 +82,7 @@ export function useViewPreferences({
   // Handle card field toggle
   const handleCardFieldToggle = useCallback((fieldId: string) => {
     setCardFields((prev) =>
-      prev.map((field) =>
-        field.id === fieldId ? { ...field, visible: !field.visible } : field,
-      ),
+      prev.map((field) => (field.id === fieldId ? { ...field, visible: !field.visible } : field))
     );
   }, []);
 

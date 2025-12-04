@@ -96,12 +96,7 @@ const UserProfile: React.FC = () => {
       setEditing(false);
       setError(null);
     } catch (err) {
-      setError(
-        t(
-          "errors.saveFailed",
-          "Failed to save profile changes. Please try again.",
-        ),
-      );
+      setError(t("errors.saveFailed", "Failed to save profile changes. Please try again."));
     }
   };
 
@@ -133,15 +128,10 @@ const UserProfile: React.FC = () => {
               border: `1px solid ${theme.palette.divider}`,
             }}
           >
-            <Box
-              sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}
-            >
+            <Box sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}>
               <Typography variant="h6">{t("common.profile")}</Typography>
               {!editing ? (
-                <Button
-                  startIcon={<EditIcon />}
-                  onClick={() => setEditing(true)}
-                >
+                <Button startIcon={<EditIcon />} onClick={() => setEditing(true)}>
                   {t("actions.edit", "Edit Profile")}
                 </Button>
               ) : (
@@ -149,11 +139,7 @@ const UserProfile: React.FC = () => {
                   <Button startIcon={<CancelIcon />} onClick={handleCancel}>
                     {t("common.cancel", "Cancel")}
                   </Button>
-                  <Button
-                    variant="contained"
-                    startIcon={<SaveIcon />}
-                    onClick={handleSave}
-                  >
+                  <Button variant="contained" startIcon={<SaveIcon />} onClick={handleSave}>
                     {t("common.save", "Save Changes")}
                   </Button>
                 </Box>
@@ -177,15 +163,9 @@ const UserProfile: React.FC = () => {
                     <Typography variant="h6">
                       {profileData.firstName} {profileData.lastName}
                     </Typography>
-                    <Typography color="text.secondary">
-                      {profileData.jobTitle}
-                    </Typography>
+                    <Typography color="text.secondary">{profileData.jobTitle}</Typography>
                     {editing && (
-                      <Button
-                        size="small"
-                        startIcon={<PhotoCameraIcon />}
-                        sx={{ mt: 1 }}
-                      >
+                      <Button size="small" startIcon={<PhotoCameraIcon />} sx={{ mt: 1 }}>
                         {t("profile.changePhoto", "Change Photo")}
                       </Button>
                     )}
@@ -285,9 +265,7 @@ const UserProfile: React.FC = () => {
             <Box sx={{ mb: 3 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
                 <ScheduleIcon sx={{ mr: 1, color: "text.secondary" }} />
-                <Typography variant="subtitle1">
-                  {t("profile.timezone", "Timezone")}
-                </Typography>
+                <Typography variant="subtitle1">{t("profile.timezone", "Timezone")}</Typography>
               </Box>
               <FormControl fullWidth>
                 <Select
@@ -371,9 +349,7 @@ const UserProfile: React.FC = () => {
             <Box>
               <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
                 <PaletteIcon sx={{ mr: 1, color: "text.secondary" }} />
-                <Typography variant="subtitle1">
-                  {t("profile.appearance", "Appearance")}
-                </Typography>
+                <Typography variant="subtitle1">{t("profile.appearance", "Appearance")}</Typography>
               </Box>
               <FormControlLabel
                 control={

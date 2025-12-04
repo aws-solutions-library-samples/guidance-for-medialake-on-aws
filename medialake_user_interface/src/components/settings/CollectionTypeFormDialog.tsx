@@ -125,7 +125,7 @@ const CollectionTypeFormDialog: React.FC<CollectionTypeFormDialogProps> = ({
           onSuccess: () => {
             onClose();
           },
-        },
+        }
       );
     } else {
       createMutation.mutate(data, {
@@ -147,9 +147,7 @@ const CollectionTypeFormDialog: React.FC<CollectionTypeFormDialogProps> = ({
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <DialogTitle>
-        {isEditMode ? "Edit Collection Type" : "Create Collection Type"}
-      </DialogTitle>
+      <DialogTitle>{isEditMode ? "Edit Collection Type" : "Create Collection Type"}</DialogTitle>
       <DialogContent>
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
           <TextField
@@ -176,11 +174,7 @@ const CollectionTypeFormDialog: React.FC<CollectionTypeFormDialogProps> = ({
 
           <FormControl fullWidth>
             <InputLabel>Icon</InputLabel>
-            <Select
-              value={icon}
-              label="Icon"
-              onChange={(e) => setIcon(e.target.value)}
-            >
+            <Select value={icon} label="Icon" onChange={(e) => setIcon(e.target.value)}>
               {AVAILABLE_ICONS.map((item) => (
                 <MenuItem key={item.name} value={item.name}>
                   <Box display="flex" alignItems="center" gap={1}>
@@ -207,10 +201,7 @@ const CollectionTypeFormDialog: React.FC<CollectionTypeFormDialogProps> = ({
                     backgroundColor: presetColor,
                     borderRadius: 1,
                     cursor: "pointer",
-                    border:
-                      color === presetColor
-                        ? "3px solid #000"
-                        : "1px solid #ddd",
+                    border: color === presetColor ? "3px solid #000" : "1px solid #ddd",
                     transition: "all 0.2s",
                     "&:hover": {
                       transform: "scale(1.1)",
@@ -232,12 +223,7 @@ const CollectionTypeFormDialog: React.FC<CollectionTypeFormDialogProps> = ({
           </Box>
 
           <FormControlLabel
-            control={
-              <Switch
-                checked={isActive}
-                onChange={(e) => setIsActive(e.target.checked)}
-              />
-            }
+            control={<Switch checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />}
             label="Active"
           />
 
@@ -287,11 +273,7 @@ const CollectionTypeFormDialog: React.FC<CollectionTypeFormDialogProps> = ({
         <Button onClick={handleClose} disabled={isLoading}>
           Cancel
         </Button>
-        <Button
-          onClick={handleSubmit}
-          variant="contained"
-          disabled={!isValid || isLoading}
-        >
+        <Button onClick={handleSubmit} variant="contained" disabled={!isValid || isLoading}>
           {isLoading ? "Saving..." : isEditMode ? "Update" : "Create"}
         </Button>
       </DialogActions>

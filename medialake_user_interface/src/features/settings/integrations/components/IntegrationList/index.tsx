@@ -39,8 +39,7 @@ const IntegrationList: React.FC<IntegrationListProps> = ({
       columnFilters: activeFilters,
     },
     onSortingChange: (updater) => {
-      const newSorting =
-        typeof updater === "function" ? updater(activeSorting) : updater;
+      const newSorting = typeof updater === "function" ? updater(activeSorting) : updater;
       if (newSorting.length === 0 && activeSorting.length > 0) {
         onRemoveSort(activeSorting[0].id);
       } else if (newSorting.length > 0) {
@@ -48,8 +47,7 @@ const IntegrationList: React.FC<IntegrationListProps> = ({
       }
     },
     onColumnFiltersChange: (updater) => {
-      const newFilters =
-        typeof updater === "function" ? updater(activeFilters) : updater;
+      const newFilters = typeof updater === "function" ? updater(activeFilters) : updater;
       if (newFilters.length > 0) {
         const lastFilter = newFilters[newFilters.length - 1];
         onFilterChange(lastFilter.id, lastFilter.value as string);

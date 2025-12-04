@@ -306,15 +306,12 @@ fixtures(
     // Perform login test
     await page.goto(cloudFrontLoginContext.loginUrl);
     await page.fill('[data-testid="email"]', enhancedCognitoTestUser.email);
-    await page.fill(
-      '[data-testid="password"]',
-      enhancedCognitoTestUser.password,
-    );
+    await page.fill('[data-testid="password"]', enhancedCognitoTestUser.password);
     await page.click('[data-testid="login-button"]');
 
     // Verify successful login
     await expect(page).toHaveURL(/dashboard/);
-  },
+  }
 );
 ```
 
@@ -326,25 +323,19 @@ import { awsDiscoveryFixtures } from "../fixtures/aws-discovery.fixtures";
 
 const fixtures = test.extend(awsDiscoveryFixtures);
 
-fixtures(
-  "should discover AWS resources by tags",
-  async ({ awsResourceDiscovery }) => {
-    // Discover Cognito User Pools
-    const userPools =
-      await awsResourceDiscovery.discoverResources("cognito-user-pool");
-    expect(userPools.length).toBeGreaterThan(0);
-    expect(userPools[0]).toHaveProperty("userPoolId");
-    expect(userPools[0]).toHaveProperty("userPoolName");
+fixtures("should discover AWS resources by tags", async ({ awsResourceDiscovery }) => {
+  // Discover Cognito User Pools
+  const userPools = await awsResourceDiscovery.discoverResources("cognito-user-pool");
+  expect(userPools.length).toBeGreaterThan(0);
+  expect(userPools[0]).toHaveProperty("userPoolId");
+  expect(userPools[0]).toHaveProperty("userPoolName");
 
-    // Discover CloudFront Distributions
-    const distributions = await awsResourceDiscovery.discoverResources(
-      "cloudfront-distribution",
-    );
-    expect(distributions.length).toBeGreaterThan(0);
-    expect(distributions[0]).toHaveProperty("distributionId");
-    expect(distributions[0]).toHaveProperty("domainName");
-  },
-);
+  // Discover CloudFront Distributions
+  const distributions = await awsResourceDiscovery.discoverResources("cloudfront-distribution");
+  expect(distributions.length).toBeGreaterThan(0);
+  expect(distributions[0]).toHaveProperty("distributionId");
+  expect(distributions[0]).toHaveProperty("domainName");
+});
 ```
 
 ## 🔍 Discovery Mechanisms
@@ -354,15 +345,12 @@ fixtures(
 Uses AWS Resource Groups Tagging API to find resources with specific tags:
 
 ```typescript
-const userPools = await awsResourceDiscovery.discoverResources(
-  "cognito-user-pool",
-  {
-    tags: [
-      { key: "Application", values: ["medialake"], operator: "equals" },
-      { key: "Environment", values: ["dev"], operator: "equals" },
-    ],
-  },
-);
+const userPools = await awsResourceDiscovery.discoverResources("cognito-user-pool", {
+  tags: [
+    { key: "Application", values: ["medialake"], operator: "equals" },
+    { key: "Environment", values: ["dev"], operator: "equals" },
+  ],
+});
 ```
 
 ### Fallback: Service-specific Discovery
@@ -374,8 +362,7 @@ When tag-based discovery fails, falls back to service-specific methods:
 const userPools = await cognitoAdapter.discoverByNamePattern("medialake");
 
 // CloudFront fallback: List all distributions and filter
-const distributions =
-  await cloudFrontAdapter.discoverByDomainPattern("medialake");
+const distributions = await cloudFrontAdapter.discoverByDomainPattern("medialake");
 ```
 
 ## 👤 User Management

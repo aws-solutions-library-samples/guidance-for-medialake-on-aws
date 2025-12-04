@@ -8,12 +8,7 @@ interface StatCardProps {
   subtitle: string;
 }
 
-export const StatCard: React.FC<StatCardProps> = ({
-  icon,
-  title,
-  value,
-  subtitle,
-}) => {
+export const StatCard: React.FC<StatCardProps> = ({ icon, title, value, subtitle }) => {
   const theme = useTheme();
 
   return (
@@ -41,11 +36,7 @@ export const StatCard: React.FC<StatCardProps> = ({
         <Typography variant="h6" component="div" sx={{ mb: 0.5 }}>
           {title}
         </Typography>
-        <Typography
-          variant="h4"
-          component="div"
-          sx={{ mb: 0.5, fontWeight: "bold" }}
-        >
+        <Typography variant="h4" component="div" sx={{ mb: 0.5, fontWeight: "bold" }}>
           {value}
         </Typography>
         <Typography variant="body2" color="text.secondary">

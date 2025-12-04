@@ -25,12 +25,7 @@ interface ApiKeyCardProps {
   onDelete: (apiKey: ApiKey) => void;
 }
 
-const ApiKeyCard: React.FC<ApiKeyCardProps> = ({
-  apiKey,
-  onView,
-  onEdit,
-  onDelete,
-}) => {
+const ApiKeyCard: React.FC<ApiKeyCardProps> = ({ apiKey, onView, onEdit, onDelete }) => {
   const formatDate = (dateString: string) => {
     return formatDistanceToNow(new Date(dateString), { addSuffix: true });
   };
@@ -51,12 +46,7 @@ const ApiKeyCard: React.FC<ApiKeyCardProps> = ({
     >
       <CardContent sx={{ flexGrow: 1, pb: 1 }}>
         {/* Header with name and status */}
-        <Box
-          display="flex"
-          justifyContent="space-between"
-          alignItems="flex-start"
-          mb={1}
-        >
+        <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
           <Typography
             variant="h6"
             component="h3"
@@ -105,20 +95,12 @@ const ApiKeyCard: React.FC<ApiKeyCardProps> = ({
             Created {formatDate(apiKey.createdAt)}
           </Typography>
           {apiKey.updatedAt !== apiKey.createdAt && (
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              display="block"
-            >
+            <Typography variant="caption" color="text.secondary" display="block">
               Updated {formatDate(apiKey.updatedAt)}
             </Typography>
           )}
           {apiKey.lastUsed && (
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              display="block"
-            >
+            <Typography variant="caption" color="text.secondary" display="block">
               Last used {formatDate(apiKey.lastUsed)}
             </Typography>
           )}

@@ -13,14 +13,7 @@
  */
 export interface ParameterSchema {
   /** The parameter type */
-  type:
-    | "text"
-    | "number"
-    | "boolean"
-    | "select"
-    | "string"
-    | "integer"
-    | "object";
+  type: "text" | "number" | "boolean" | "select" | "string" | "integer" | "object";
 
   // Text-specific properties
   /** Enable multiline text input (textarea) */

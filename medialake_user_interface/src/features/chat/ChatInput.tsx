@@ -1,12 +1,5 @@
 import React, { useState, KeyboardEvent, useRef, useEffect } from "react";
-import {
-  Box,
-  TextField,
-  IconButton,
-  Paper,
-  Zoom,
-  CircularProgress,
-} from "@mui/material";
+import { Box, TextField, IconButton, Paper, Zoom, CircularProgress } from "@mui/material";
 import SendIcon from "@mui/icons-material/Send";
 import { useChat } from "../../contexts/ChatContext";
 import { alpha } from "@mui/material/styles";
@@ -50,7 +43,7 @@ const ChatInput: React.FC = () => {
         // In a real implementation, you would replace it with the actual response
         setIsLoading(false);
         updateLastMessage(
-          "This is a simulated response. In a real implementation, this would come from the backend.",
+          "This is a simulated response. In a real implementation, this would come from the backend."
         );
       }, 1500);
     }
@@ -77,14 +70,14 @@ const ChatInput: React.FC = () => {
         boxShadow: (theme) =>
           `0 2px 12px ${alpha(
             theme.palette.common.black,
-            theme.palette.mode === "dark" ? 0.3 : 0.1,
+            theme.palette.mode === "dark" ? 0.3 : 0.1
           )}`,
         transition: (theme) => theme.transitions.create(["box-shadow"]),
         "&:hover": {
           boxShadow: (theme) =>
             `0 4px 16px ${alpha(
               theme.palette.common.black,
-              theme.palette.mode === "dark" ? 0.4 : 0.15,
+              theme.palette.mode === "dark" ? 0.4 : 0.15
             )}`,
         },
       }}
@@ -108,8 +101,7 @@ const ChatInput: React.FC = () => {
                 theme.palette.mode === "dark"
                   ? alpha(theme.palette.background.default, 0.3)
                   : alpha(theme.palette.background.default, 0.5),
-              transition: (theme) =>
-                theme.transitions.create(["background-color", "box-shadow"]),
+              transition: (theme) => theme.transitions.create(["background-color", "box-shadow"]),
               "&:hover": {
                 backgroundColor: (theme) =>
                   theme.palette.mode === "dark"
@@ -121,8 +113,7 @@ const ChatInput: React.FC = () => {
                   theme.palette.mode === "dark"
                     ? alpha(theme.palette.background.default, 0.5)
                     : alpha(theme.palette.background.default, 0.8),
-                boxShadow: (theme) =>
-                  `0 0 0 2px ${alpha(theme.palette.primary.main, 0.25)}`,
+                boxShadow: (theme) => `0 0 0 2px ${alpha(theme.palette.primary.main, 0.25)}`,
               },
             },
             "& .MuiInputBase-input": {
@@ -152,16 +143,11 @@ const ChatInput: React.FC = () => {
               "&.Mui-disabled": {
                 bgcolor: "transparent",
               },
-              transition: (theme) =>
-                theme.transitions.create(["background-color", "transform"]),
+              transition: (theme) => theme.transitions.create(["background-color", "transform"]),
               transform: message.trim() ? "scale(1)" : "scale(0.9)",
             }}
           >
-            {isLoading ? (
-              <CircularProgress size={20} thickness={5} />
-            ) : (
-              <SendIcon />
-            )}
+            {isLoading ? <CircularProgress size={20} thickness={5} /> : <SendIcon />}
           </IconButton>
         </Zoom>
       </Box>

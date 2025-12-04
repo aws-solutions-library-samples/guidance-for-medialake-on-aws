@@ -72,10 +72,7 @@ export function logPermissionDebugInfo(): void {
     console.log("Token expired:", info.tokenExpired);
     if (info.timeUntilExpiry !== undefined) {
       console.log("Time until expiry (seconds):", info.timeUntilExpiry);
-      console.log(
-        "Time until expiry (minutes):",
-        Math.round(info.timeUntilExpiry / 60),
-      );
+      console.log("Time until expiry (minutes):", Math.round(info.timeUntilExpiry / 60));
     }
     console.log("User groups:", info.userGroups);
     console.log("Custom permissions:", info.customPermissions);

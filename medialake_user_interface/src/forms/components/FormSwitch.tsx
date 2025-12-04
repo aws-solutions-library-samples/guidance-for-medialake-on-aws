@@ -83,10 +83,7 @@ export const FormSwitch = <T extends FieldValues>({
             <FormHelperText>
               {error
                 ? translationPrefix
-                  ? t(
-                      `${translationPrefix}.errors.${error.type}`,
-                      error.message || "",
-                    )
+                  ? t(`${translationPrefix}.errors.${error.type}`, error.message || "")
                   : error.message
                 : translatedHelperText}
             </FormHelperText>

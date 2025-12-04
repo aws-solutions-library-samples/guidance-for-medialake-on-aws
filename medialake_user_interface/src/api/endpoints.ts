@@ -5,10 +5,8 @@ export const API_ENDPOINTS = {
   PIPELINES: "/pipelines",
   PIPELINE_EXECUTIONS: "/pipelines/executions",
   PIPELINE_EXECUTION_RETRY: {
-    FROM_CURRENT: (id: string) =>
-      `/pipelines/executions/${id}/retry?type=from_current`,
-    FROM_START: (id: string) =>
-      `/pipelines/executions/${id}/retry?type=from_start`,
+    FROM_CURRENT: (id: string) => `/pipelines/executions/${id}/retry?type=from_current`,
+    FROM_START: (id: string) => `/pipelines/executions/${id}/retry?type=from_start`,
     BASE: (id: string) => `/pipelines/executions/${id}/retry`,
   },
   SEARCH: "/search",
@@ -45,8 +43,7 @@ export const API_ENDPOINTS = {
     UPDATE: (id: string) => `/groups/${id}`,
     DELETE: (id: string) => `/groups/${id}`,
     ADD_MEMBERS: (id: string) => `/groups/${id}/members`,
-    REMOVE_MEMBER: (groupId: string, userId: string) =>
-      `/groups/${groupId}/members/${userId}`,
+    REMOVE_MEMBER: (groupId: string, userId: string) => `/groups/${groupId}/members/${userId}`,
   },
   ASSIGNMENTS: {
     USER: {
@@ -68,8 +65,7 @@ export const API_ENDPOINTS = {
   },
   FAVORITES: {
     BASE: "/users/favorites",
-    DELETE: (itemType: string, itemId: string) =>
-      `/users/favorites/${itemType}/${itemId}`,
+    DELETE: (itemType: string, itemId: string) => `/users/favorites/${itemType}/${itemId}`,
   },
   COLLECTIONS: {
     BASE: "/collections",
@@ -78,8 +74,7 @@ export const API_ENDPOINTS = {
     DELETE: (id: string) => `/collections/${id}`,
     ANCESTORS: (id: string) => `/collections/${id}/ancestors`,
     SHARE: (id: string) => `/collections/${id}/share`,
-    UNSHARE: (id: string, userId: string) =>
-      `/collections/${id}/share/${userId}`,
+    UNSHARE: (id: string, userId: string) => `/collections/${id}/share/${userId}`,
     SHARES: (id: string) => `/collections/${id}/shares`,
     SHARED: "/collections/shared",
     ITEMS: (id: string) => `/collections/${id}/items`,

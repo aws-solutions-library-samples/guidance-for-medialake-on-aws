@@ -80,35 +80,27 @@ const convertToPermissionArray = (permissions: any): Permission[] => {
 
     // Handle nested structure (e.g., permissions.assets.view = true)
     Object.entries(permissions).forEach(([resource, actions]) => {
-      if (
-        typeof actions === "object" &&
-        actions !== null &&
-        !Array.isArray(actions)
-      ) {
-        Object.entries(actions as Record<string, any>).forEach(
-          ([action, value]) => {
-            if (typeof value === "boolean") {
-              result.push({
-                resource,
-                action,
-                effect: value ? "Allow" : "Deny",
-              });
-            } else if (typeof value === "object" && value !== null) {
-              // Handle deeply nested structure (e.g., settings.users.edit)
-              Object.entries(value as Record<string, any>).forEach(
-                ([subAction, subValue]) => {
-                  if (typeof subValue === "boolean") {
-                    result.push({
-                      resource,
-                      action: `${action}.${subAction}`,
-                      effect: subValue ? "Allow" : "Deny",
-                    });
-                  }
-                },
-              );
-            }
-          },
-        );
+      if (typeof actions === "object" && actions !== null && !Array.isArray(actions)) {
+        Object.entries(actions as Record<string, any>).forEach(([action, value]) => {
+          if (typeof value === "boolean") {
+            result.push({
+              resource,
+              action,
+              effect: value ? "Allow" : "Deny",
+            });
+          } else if (typeof value === "object" && value !== null) {
+            // Handle deeply nested structure (e.g., settings.users.edit)
+            Object.entries(value as Record<string, any>).forEach(([subAction, subValue]) => {
+              if (typeof subValue === "boolean") {
+                result.push({
+                  resource,
+                  action: `${action}.${subAction}`,
+                  effect: subValue ? "Allow" : "Deny",
+                });
+              }
+            });
+          }
+        });
       }
     });
 
@@ -226,18 +218,10 @@ const PermissionSetCard: React.FC<{
         </Box>
       </CardContent>
       <CardActions>
-        <Button
-          size="small"
-          startIcon={<VisibilityIcon />}
-          onClick={() => onView(permissionSet)}
-        >
+        <Button size="small" startIcon={<VisibilityIcon />} onClick={() => onView(permissionSet)}>
           View Details
         </Button>
-        <Button
-          size="small"
-          startIcon={<EditIcon />}
-          onClick={() => onEdit(permissionSet)}
-        >
+        <Button size="small" startIcon={<EditIcon />} onClick={() => onEdit(permissionSet)}>
           Edit
         </Button>
         {!permissionSet.isSystem && (
@@ -293,11 +277,9 @@ const PermissionSetFormDialog: React.FC<{
   permissionSet?: PermissionSet;
 }> = ({ open, onClose, onSave, permissionSet }) => {
   const [name, setName] = useState(permissionSet?.name || "");
-  const [description, setDescription] = useState(
-    permissionSet?.description || "",
-  );
+  const [description, setDescription] = useState(permissionSet?.description || "");
   const [permissions, setPermissions] = useState<Permission[]>(
-    convertToPermissionArray(permissionSet?.permissions),
+    convertToPermissionArray(permissionSet?.permissions)
   );
   const [openMatrixModal, setOpenMatrixModal] = useState(false);
 
@@ -343,9 +325,7 @@ const PermissionSetFormDialog: React.FC<{
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>
-        {permissionSet ? "Edit Permission Set" : "Add Permission Set"}
-      </DialogTitle>
+      <DialogTitle>{permissionSet ? "Edit Permission Set" : "Add Permission Set"}</DialogTitle>
       <DialogContent>
         <Box sx={{ pt: 2 }}>
           <TextField
@@ -372,9 +352,7 @@ const PermissionSetFormDialog: React.FC<{
             Permissions
           </Typography>
 
-          <Box
-            sx={{ mb: 3, p: 2, border: "1px solid #e0e0e0", borderRadius: 1 }}
-          >
+          <Box sx={{ mb: 3, p: 2, border: "1px solid #e0e0e0", borderRadius: 1 }}>
             <Box
               sx={{
                 display: "flex",
@@ -432,8 +410,8 @@ const DeleteConfirmationDialog: React.FC<{
       <DialogTitle>Delete Permission Set</DialogTitle>
       <DialogContent>
         <Typography>
-          Are you sure you want to delete the permission set "
-          {permissionSet?.name}"? This action cannot be undone.
+          Are you sure you want to delete the permission set "{permissionSet?.name}"? This action
+          cannot be undone.
         </Typography>
       </DialogContent>
       <DialogActions>
@@ -556,15 +534,11 @@ const PermissionSetDetailDialog: React.FC<{
               >
                 <Typography variant="subtitle1" gutterBottom>
                   Effective Role:{" "}
-                  <Chip
-                    label={permissionSet.effectiveRole}
-                    color="primary"
-                    size="small"
-                  />
+                  <Chip label={permissionSet.effectiveRole} color="primary" size="small" />
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  This permission set inherits permissions from the{" "}
-                  {permissionSet.effectiveRole} role.
+                  This permission set inherits permissions from the {permissionSet.effectiveRole}{" "}
+                  role.
                 </Typography>
               </Box>
             )}
@@ -613,18 +587,11 @@ const PermissionSetsPage: React.FC = () => {
   const [filterCategory, setFilterCategory] = useState("all");
   const [openPermissionSetForm, setOpenPermissionSetForm] = useState(false);
   const [openPermissionSetDetail, setOpenPermissionSetDetail] = useState(false);
-  const [selectedPermissionSet, setSelectedPermissionSet] = useState<
-    PermissionSet | undefined
-  >();
-  const [editingPermissionSet, setEditingPermissionSet] = useState<
-    PermissionSet | undefined
-  >();
-  const [deletingPermissionSet, setDeletingPermissionSet] = useState<
-    PermissionSet | undefined
-  >();
+  const [selectedPermissionSet, setSelectedPermissionSet] = useState<PermissionSet | undefined>();
+  const [editingPermissionSet, setEditingPermissionSet] = useState<PermissionSet | undefined>();
+  const [deletingPermissionSet, setDeletingPermissionSet] = useState<PermissionSet | undefined>();
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
-  const [openPermissionMatrixModal, setOpenPermissionMatrixModal] =
-    useState(false);
+  const [openPermissionMatrixModal, setOpenPermissionMatrixModal] = useState(false);
   const [editingPermissions, setEditingPermissions] = useState<any>(null);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
@@ -799,11 +766,7 @@ const PermissionSetsPage: React.FC = () => {
           </Select>
         </FormControl>
 
-        <Button
-          variant="outlined"
-          startIcon={<FilterListIcon />}
-          sx={{ height: "56px" }}
-        >
+        <Button variant="outlined" startIcon={<FilterListIcon />} sx={{ height: "56px" }}>
           Filters
         </Button>
       </Box>

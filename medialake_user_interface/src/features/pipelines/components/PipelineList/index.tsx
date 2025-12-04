@@ -9,10 +9,7 @@ import { useTableFilters } from "../../context/TableFiltersContext";
 
 interface PipelineListProps {
   table: TanStackTable<Pipeline>;
-  onFilterColumn: (
-    event: React.MouseEvent<HTMLElement>,
-    columnId: string,
-  ) => void;
+  onFilterColumn: (event: React.MouseEvent<HTMLElement>, columnId: string) => void;
   togglingPipelines?: Record<string, boolean>;
   onToggleActive?: (id: string, active: boolean) => void;
 }
@@ -22,8 +19,7 @@ const PipelineList: React.FC<PipelineListProps> = memo(
     const containerRef = useRef<HTMLDivElement>(null);
     const { rows } = table.getRowModel();
     const virtualizer = useTableVirtualizer(rows, containerRef);
-    const { activeFilters, activeSorting, onRemoveFilter, onRemoveSort } =
-      useTableFilters();
+    const { activeFilters, activeSorting, onRemoveFilter, onRemoveSort } = useTableFilters();
 
     return (
       <Box
@@ -61,7 +57,7 @@ const PipelineList: React.FC<PipelineListProps> = memo(
         />
       </Box>
     );
-  },
+  }
 );
 
 PipelineList.displayName = "PipelineList";

@@ -32,8 +32,7 @@ export default {
     connectorLabel: "Conector S3",
     selectConnectorPlaceholder: "Selecciona un conector S3",
     loadingConnectors: "Cargando conectores...",
-    noConnectors:
-      "No hay conectores S3 disponibles. Por favor, configure un conector S3 primero.",
+    noConnectors: "No hay conectores S3 disponibles. Por favor, configure un conector S3 primero.",
     dashboardNote:
       "Solo se permiten archivos de tipo audio/*, video/*, image/*, HLS (application/x-mpegURL) y MPEG-DASH (application/dash+xml)",
     meta: {
@@ -47,14 +46,12 @@ export default {
     descriptionUnrestricted:
       "Explora y selecciona cualquier carpeta en el bucket para subir tus archivos.",
     prefixLabel: "Ruta permitida",
-    prefixHelper:
-      "Solo puedes explorar y subir a carpetas dentro de la ruta seleccionada.",
+    prefixHelper: "Solo puedes explorar y subir a carpetas dentro de la ruta seleccionada.",
     selectedPath: "Ruta seleccionada",
     currentPath: "Ruta actual",
     confirm: "Usar esta ruta",
     validation: {
-      invalidPath:
-        "La ruta seleccionada está fuera de los prefijos permitidos.",
+      invalidPath: "La ruta seleccionada está fuera de los prefijos permitidos.",
       noPathSelected: "Por favor, navega a una carpeta antes de confirmar.",
     },
     error: {
@@ -221,16 +218,11 @@ export default {
       systemLoad: "Carga del sistema",
     },
     errors: {
-      userDeletionNotImplemented:
-        "La eliminación de usuarios aún no está implementada.",
-      userCreationNotImplemented:
-        "La creación de usuarios aún no está implementada.",
-      userEditingNotImplemented:
-        "La edición de usuarios aún no está implementada.",
-      analyticsExportNotImplemented:
-        "La exportación de analíticas aún no está implementada.",
-      systemResetNotImplemented:
-        "El reinicio del sistema aún no está implementado.",
+      userDeletionNotImplemented: "La eliminación de usuarios aún no está implementada.",
+      userCreationNotImplemented: "La creación de usuarios aún no está implementada.",
+      userEditingNotImplemented: "La edición de usuarios aún no está implementada.",
+      analyticsExportNotImplemented: "La exportación de analíticas aún no está implementada.",
+      systemResetNotImplemented: "El reinicio del sistema aún no está implementado.",
     },
     columns: {
       lastActive: "Última actividad",
@@ -480,8 +472,7 @@ export default {
         endpoint: "URL del endpoint (Opcional)",
         enabled: "Búsqueda habilitada",
         noProvider: "No hay proveedor de búsqueda configurado.",
-        configurePrompt:
-          "Configura Twelve Labs para habilitar las capacidades de búsqueda.",
+        configurePrompt: "Configura Twelve Labs para habilitar las capacidades de búsqueda.",
       },
       notifications: {
         title: "Configuración de notificaciones",
@@ -562,8 +553,7 @@ export default {
       noResults: "No hay elementos que coincidan con tu filtro",
     },
     keyboard: {
-      navigation:
-        "Usa las teclas de flecha para navegar, Enter para abrir, Backspace para volver",
+      navigation: "Usa las teclas de flecha para navegar, Enter para abrir, Backspace para volver",
     },
     menu: {
       rename: "Renombrar",
@@ -731,8 +721,7 @@ export default {
     },
     home: {
       welcome: "Bienvenido a Media Lake",
-      description:
-        "Gestiona y organiza tus archivos multimedia de manera eficiente",
+      description: "Gestiona y organiza tus archivos multimedia de manera eficiente",
       statistics: "Estadísticas",
       collections: "Colecciones",
       sharedCollections: "Colecciones compartidas",
@@ -747,11 +736,9 @@ export default {
       "Asset processing pipeline completed successfully":
         "El pipeline de procesamiento de activos se completó exitosamente",
       "Storage Warning": "Advertencia de almacenamiento",
-      "Storage capacity reaching 80%":
-        "La capacidad de almacenamiento está llegando al 80%",
+      "Storage capacity reaching 80%": "La capacidad de almacenamiento está llegando al 80%",
       "Pipeline Failed": "Pipeline falló",
-      "Video processing pipeline failed":
-        "El pipeline de procesamiento de video falló",
+      "Video processing pipeline failed": "El pipeline de procesamiento de video falló",
     },
     modal: {
       confirmDelete: "¿Estás seguro de que quieres eliminar este elemento?",
@@ -796,10 +783,8 @@ export default {
       },
       error: {
         loading: "Error al cargar objetos S3: {{message}}",
-        network:
-          "Error de red. Por favor, verifica tu conexión y vuelve a intentarlo.",
-        permission:
-          "Acceso denegado. No tienes permiso para acceder a esta ruta.",
+        network: "Error de red. Por favor, verifica tu conexión y vuelve a intentarlo.",
+        permission: "Acceso denegado. No tienes permiso para acceder a esta ruta.",
         permissionWithPrefixes:
           "Acceso denegado. Solo puedes acceder a las siguientes rutas: {{prefixes}}",
         notFound: "La ruta solicitada no existe.",
@@ -883,8 +868,7 @@ export default {
             title: "Eliminar pipeline",
             message:
               "¿Estás seguro de que quieres eliminar este pipeline? Esta acción no se puede deshacer.",
-            confirm:
-              "Escribe el nombre del pipeline para confirmar la eliminación:",
+            confirm: "Escribe el nombre del pipeline para confirmar la eliminación:",
           },
         },
         controls: {

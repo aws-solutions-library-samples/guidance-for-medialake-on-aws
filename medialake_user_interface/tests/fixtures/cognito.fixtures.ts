@@ -20,13 +20,10 @@ type CognitoFixtures = {
 // Helper function to execute AWS CLI commands
 function executeAwsCommand(command: string): string {
   try {
-    const result = execSync(
-      `aws ${command} --profile ${AWS_PROFILE} --region ${AWS_REGION}`,
-      {
-        encoding: "utf8",
-        stdio: ["pipe", "pipe", "pipe"],
-      },
-    );
+    const result = execSync(`aws ${command} --profile ${AWS_PROFILE} --region ${AWS_REGION}`, {
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
     return result.trim();
   } catch (error: any) {
     console.error(`AWS CLI command failed: aws ${command}`);
@@ -83,9 +80,7 @@ function generateSecurePassword(passwordPolicy?: any): string {
 
   // Fill to target length (1.5x minimum length)
   while (password.length < targetLength) {
-    password += availableChars.charAt(
-      Math.floor(Math.random() * availableChars.length),
-    );
+    password += availableChars.charAt(Math.floor(Math.random() * availableChars.length));
   }
 
   // Shuffle the password to randomize character positions
@@ -99,9 +94,7 @@ function generateSecurePassword(passwordPolicy?: any): string {
   const alphanumeric = uppercase + lowercase + numbers;
   if (!/^[a-zA-Z0-9]/.test(shuffled)) {
     // Replace first character with random alphanumeric
-    const safeStart = alphanumeric.charAt(
-      Math.floor(Math.random() * alphanumeric.length),
-    );
+    const safeStart = alphanumeric.charAt(Math.floor(Math.random() * alphanumeric.length));
     return safeStart + shuffled.slice(1);
   }
 
@@ -112,23 +105,19 @@ function generateSecurePassword(passwordPolicy?: any): string {
 function findUserPoolId(): string {
   try {
     console.log("[Cognito Fixture] Finding user pool...");
-    const userPoolsOutput = executeAwsCommand(
-      "cognito-idp list-user-pools --max-results 50",
-    );
+    const userPoolsOutput = executeAwsCommand("cognito-idp list-user-pools --max-results 50");
     const userPools = JSON.parse(userPoolsOutput);
 
     // Look for a user pool with 'medialake' in the name
-    const mediaLakePool = userPools.UserPools?.find((pool: any) =>
-      pool.Name?.toLowerCase().includes("medialake"),
+    const mediaLakePool = userPools.UserPools?.find(
+      (pool: any) => pool.Name?.toLowerCase().includes("medialake")
     );
 
     if (!mediaLakePool) {
       throw new Error("No MediaLake user pool found");
     }
 
-    console.log(
-      `[Cognito Fixture] Found user pool: ${mediaLakePool.Name} (${mediaLakePool.Id})`,
-    );
+    console.log(`[Cognito Fixture] Found user pool: ${mediaLakePool.Name} (${mediaLakePool.Id})`);
     return mediaLakePool.Id;
   } catch (error) {
     console.error("[Cognito Fixture] Error finding user pool:", error);
@@ -141,7 +130,7 @@ function findUserPoolClientId(userPoolId: string): string {
   try {
     console.log("[Cognito Fixture] Finding user pool client...");
     const clientsOutput = executeAwsCommand(
-      `cognito-idp list-user-pool-clients --user-pool-id ${userPoolId}`,
+      `cognito-idp list-user-pool-clients --user-pool-id ${userPoolId}`
     );
     const clients = JSON.parse(clientsOutput);
 
@@ -153,7 +142,7 @@ function findUserPoolClientId(userPoolId: string): string {
     }
 
     console.log(
-      `[Cognito Fixture] Found user pool client: ${client.ClientName} (${client.ClientId})`,
+      `[Cognito Fixture] Found user pool client: ${client.ClientName} (${client.ClientId})`
     );
     return client.ClientId;
   } catch (error) {
@@ -165,18 +154,13 @@ function findUserPoolClientId(userPoolId: string): string {
 // Helper function to get user pool password policy
 function getUserPoolPasswordPolicy(userPoolId: string): any {
   try {
-    console.log(
-      `[Cognito Fixture] Getting password policy for user pool: ${userPoolId}`,
-    );
+    console.log(`[Cognito Fixture] Getting password policy for user pool: ${userPoolId}`);
     const policyOutput = executeAwsCommand(
-      `cognito-idp describe-user-pool --user-pool-id ${userPoolId}`,
+      `cognito-idp describe-user-pool --user-pool-id ${userPoolId}`
     );
     const userPool = JSON.parse(policyOutput);
     const passwordPolicy = userPool.UserPool?.Policies?.PasswordPolicy;
-    console.log(
-      `[Cognito Fixture] Password policy:`,
-      JSON.stringify(passwordPolicy, null, 2),
-    );
+    console.log(`[Cognito Fixture] Password policy:`, JSON.stringify(passwordPolicy, null, 2));
     return passwordPolicy;
   } catch (error) {
     console.error("[Cognito Fixture] Error getting password policy:", error);
@@ -188,32 +172,23 @@ function getUserPoolPasswordPolicy(userPoolId: string): any {
 function verifySuperAdminGroupExists(userPoolId: string): boolean {
   try {
     console.log(
-      `[Cognito Fixture] Verifying superAdministrators group exists in user pool: ${userPoolId}`,
+      `[Cognito Fixture] Verifying superAdministrators group exists in user pool: ${userPoolId}`
     );
-    const groupsOutput = executeAwsCommand(
-      `cognito-idp list-groups --user-pool-id ${userPoolId}`,
-    );
+    const groupsOutput = executeAwsCommand(`cognito-idp list-groups --user-pool-id ${userPoolId}`);
     const groupsData = JSON.parse(groupsOutput);
     const groups = groupsData.Groups || [];
 
-    const superAdminGroup = groups.find(
-      (group: any) => group.GroupName === "superAdministrators",
-    );
+    const superAdminGroup = groups.find((group: any) => group.GroupName === "superAdministrators");
 
     if (superAdminGroup) {
       console.log(`[Cognito Fixture] Found superAdministrators group`);
       return true;
     } else {
-      console.warn(
-        `[Cognito Fixture] superAdministrators group not found in user pool`,
-      );
+      console.warn(`[Cognito Fixture] superAdministrators group not found in user pool`);
       return false;
     }
   } catch (error) {
-    console.error(
-      "[Cognito Fixture] Error verifying superAdministrators group:",
-      error,
-    );
+    console.error("[Cognito Fixture] Error verifying superAdministrators group:", error);
     return false;
   }
 }
@@ -223,7 +198,7 @@ function createTestUser(
   userPoolId: string,
   username: string,
   password: string,
-  email: string,
+  email: string
 ): void {
   try {
     console.log(`[Cognito Fixture] Creating test user: ${username}`);
@@ -245,23 +220,17 @@ function createTestUser(
     if (verifySuperAdminGroupExists(userPoolId)) {
       const addToGroupCommand = `cognito-idp admin-add-user-to-group --user-pool-id ${userPoolId} --username "${username}" --group-name superAdministrators`;
       executeAwsCommand(addToGroupCommand);
-      console.log(
-        `[Cognito Fixture] Test user added to superAdministrators group: ${username}`,
-      );
+      console.log(`[Cognito Fixture] Test user added to superAdministrators group: ${username}`);
     } else {
       console.warn(
-        `[Cognito Fixture] Could not add user to superAdministrators group - group not found`,
+        `[Cognito Fixture] Could not add user to superAdministrators group - group not found`
       );
     }
 
-    console.log(
-      `[Cognito Fixture] Test user created successfully: ${username}`,
-    );
+    console.log(`[Cognito Fixture] Test user created successfully: ${username}`);
   } catch (error: any) {
     if (error.message.includes("UsernameExistsException")) {
-      console.log(
-        `[Cognito Fixture] User ${username} already exists, updating password...`,
-      );
+      console.log(`[Cognito Fixture] User ${username} already exists, updating password...`);
       try {
         // Update the existing user's password
         const setPasswordCommand = `cognito-idp admin-set-user-password --user-pool-id ${userPoolId} --username "${username}" --password "${password}" --permanent`;
@@ -273,7 +242,7 @@ function createTestUser(
             const addToGroupCommand = `cognito-idp admin-add-user-to-group --user-pool-id ${userPoolId} --username "${username}" --group-name superAdministrators`;
             executeAwsCommand(addToGroupCommand);
             console.log(
-              `[Cognito Fixture] Test user added to superAdministrators group: ${username}`,
+              `[Cognito Fixture] Test user added to superAdministrators group: ${username}`
             );
           } catch (groupError: any) {
             // Ignore if user is already in the group
@@ -283,20 +252,15 @@ function createTestUser(
             ) {
               console.warn(
                 `[Cognito Fixture] Warning: Could not add user to group:`,
-                groupError.message,
+                groupError.message
               );
             }
           }
         }
 
-        console.log(
-          `[Cognito Fixture] Updated password for existing user: ${username}`,
-        );
+        console.log(`[Cognito Fixture] Updated password for existing user: ${username}`);
       } catch (updateError) {
-        console.error(
-          "[Cognito Fixture] Error updating existing user password:",
-          updateError,
-        );
+        console.error("[Cognito Fixture] Error updating existing user password:", updateError);
         throw updateError;
       }
     } else {
@@ -312,14 +276,10 @@ function deleteTestUser(userPoolId: string, username: string): void {
     console.log(`[Cognito Fixture] Deleting test user: ${username}`);
     const deleteUserCommand = `cognito-idp admin-delete-user --user-pool-id ${userPoolId} --username "${username}"`;
     executeAwsCommand(deleteUserCommand);
-    console.log(
-      `[Cognito Fixture] Test user deleted successfully: ${username}`,
-    );
+    console.log(`[Cognito Fixture] Test user deleted successfully: ${username}`);
   } catch (error: any) {
     if (error.message.includes("UserNotFoundException")) {
-      console.log(
-        `[Cognito Fixture] User ${username} not found, already deleted or never existed`,
-      );
+      console.log(`[Cognito Fixture] User ${username} not found, already deleted or never existed`);
     } else {
       console.error("[Cognito Fixture] Error deleting test user:", error);
       // Don't throw here to avoid failing test cleanup
@@ -335,9 +295,7 @@ export const test = base.extend<CognitoFixtures>({
       const randomId = crypto.randomBytes(4).toString("hex");
       const uniqueEmail = `mne-medialake+e2etest-${testInfo.workerIndex}-${randomId}@amazon.com`;
 
-      console.log(
-        `[Cognito Fixture] Setting up test user for worker ${testInfo.workerIndex}`,
-      );
+      console.log(`[Cognito Fixture] Setting up test user for worker ${testInfo.workerIndex}`);
 
       let userPoolId: string | undefined;
       let userPoolClientId: string | undefined;
@@ -374,10 +332,7 @@ export const test = base.extend<CognitoFixtures>({
           try {
             deleteTestUser(userPoolId, uniqueEmail);
           } catch (cleanupError) {
-            console.error(
-              "[Cognito Fixture] Error during cleanup:",
-              cleanupError,
-            );
+            console.error("[Cognito Fixture] Error during cleanup:", cleanupError);
             // Don't throw cleanup errors to avoid masking test failures
           }
         }

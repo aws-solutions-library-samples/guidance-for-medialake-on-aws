@@ -4,12 +4,7 @@ import AddIcon from "@mui/icons-material/Add";
 import { useTranslation } from "react-i18next";
 import { PageHeader, PageContent } from "@/components/common/layout";
 import { Role, CreateRoleRequest } from "../../api/types/api.types";
-import {
-  useGetRoles,
-  useCreateRole,
-  useUpdateRole,
-  useDeleteRole,
-} from "../../api/hooks/useRoles";
+import { useGetRoles, useCreateRole, useUpdateRole, useDeleteRole } from "../../api/hooks/useRoles";
 import RoleList from "../../features/settings/roles/components/RoleList";
 import RoleForm from "../../features/settings/roles/components/RoleForm";
 
@@ -19,11 +14,7 @@ const RoleManagement: React.FC = () => {
   const [editingRole, setEditingRole] = useState<Role | undefined>();
 
   // API Hooks
-  const {
-    data: roles,
-    isLoading: isLoadingRoles,
-    error: rolesError,
-  } = useGetRoles();
+  const { data: roles, isLoading: isLoadingRoles, error: rolesError } = useGetRoles();
   const createRoleMutation = useCreateRole();
   const updateRoleMutation = useUpdateRole();
   const deleteRoleMutation = useDeleteRole();
@@ -97,11 +88,7 @@ const RoleManagement: React.FC = () => {
       />
 
       <PageContent isLoading={isLoadingRoles} error={rolesError as Error}>
-        <RoleList
-          roles={roles || []}
-          onEditRole={handleEditRole}
-          onDeleteRole={handleDeleteRole}
-        />
+        <RoleList roles={roles || []} onEditRole={handleEditRole} onDeleteRole={handleDeleteRole} />
       </PageContent>
 
       <RoleForm

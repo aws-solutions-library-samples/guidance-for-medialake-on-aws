@@ -121,12 +121,14 @@ CIRCUIT_TIMEOUT = 60  # Seconds before retry
 ### Key Metrics to Track
 
 1. **Lambda Metrics**:
+
    - Concurrent executions
    - Duration
    - Throttles
    - Errors
 
 2. **OpenSearch Metrics**:
+
    - Indexing rate
    - CPU utilization
    - JVM memory pressure

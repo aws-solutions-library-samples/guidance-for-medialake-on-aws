@@ -111,9 +111,11 @@ The UI stack will read the SSM parameter at runtime, allowing it to deploy even 
 ## Alternative Solutions Considered
 
 1. **Reorder Stack Creation**: Deploy `ApiGatewayDeployment` before `UserInterface`
+
    - Rejected: Would require significant refactoring of dependency chain
 
 2. **Hardcoded Stage Name**: Use a fixed stage name value
+
    - Rejected: Reduces flexibility and doesn't follow infrastructure-as-code best practices
 
 3. **Direct Stack References**: Pass stage name directly between stacks

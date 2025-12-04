@@ -129,9 +129,7 @@ export const BaseTableToolbar: React.FC<BaseTableToolbarProps> = ({
           ))}
         </Box>
       </Box>
-      <Box
-        sx={{ display: "flex", gap: 1, alignItems: "center", flexShrink: 0 }}
-      >
+      <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexShrink: 0 }}>
         <TableDensityToggle />
         <IconButton
           onClick={onColumnMenuOpen}

@@ -15,9 +15,7 @@ import type {
 const ENVIRONMENTS_CACHE_KEY = "environments";
 
 // Create a wrapper function to use the environments query client
-const useEnvironmentsQueryWithClient = <T>(
-  queryFn: (client: QueryClient) => T,
-): T => {
+const useEnvironmentsQueryWithClient = <T>(queryFn: (client: QueryClient) => T): T => {
   return queryFn(environmentsQueryClient);
 };
 
@@ -31,7 +29,7 @@ export const useEnvironmentsQuery = () => {
         try {
           const response = await apiClient.get<EnvironmentsResponse>(
             ENVIRONMENTS_API.endpoints.GET_ENVIRONMENTS,
-            { signal },
+            { signal }
           );
           return response.data;
         } catch (error) {
@@ -40,7 +38,7 @@ export const useEnvironmentsQuery = () => {
           throw error;
         }
       },
-    }),
+    })
   );
 };
 
@@ -53,7 +51,7 @@ export const useCreateEnvironmentMutation = () => {
         try {
           const response = await apiClient.post<EnvironmentResponse>(
             ENVIRONMENTS_API.endpoints.CREATE_ENVIRONMENT,
-            environment,
+            environment
           );
           return response.data;
         } catch (error) {
@@ -65,7 +63,7 @@ export const useCreateEnvironmentMutation = () => {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: [ENVIRONMENTS_CACHE_KEY] });
       },
-    }),
+    })
   );
 };
 
@@ -74,17 +72,11 @@ export const useUpdateEnvironmentMutation = () => {
 
   return useEnvironmentsQueryWithClient((queryClient) =>
     useMutation({
-      mutationFn: async ({
-        id,
-        data,
-      }: {
-        id: string;
-        data: EnvironmentUpdate;
-      }) => {
+      mutationFn: async ({ id, data }: { id: string; data: EnvironmentUpdate }) => {
         try {
           const response = await apiClient.put<EnvironmentResponse>(
             ENVIRONMENTS_API.endpoints.UPDATE_ENVIRONMENT(id),
-            data,
+            data
           );
           return response.data;
         } catch (error) {
@@ -96,7 +88,7 @@ export const useUpdateEnvironmentMutation = () => {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: [ENVIRONMENTS_CACHE_KEY] });
       },
-    }),
+    })
   );
 };
 
@@ -108,7 +100,7 @@ export const useDeleteEnvironmentMutation = () => {
       mutationFn: async (id: string) => {
         try {
           const response = await apiClient.delete(
-            ENVIRONMENTS_API.endpoints.DELETE_ENVIRONMENT(id),
+            ENVIRONMENTS_API.endpoints.DELETE_ENVIRONMENT(id)
           );
           return response.data;
         } catch (error) {
@@ -120,6 +112,6 @@ export const useDeleteEnvironmentMutation = () => {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: [ENVIRONMENTS_CACHE_KEY] });
       },
-    }),
+    })
   );
 };

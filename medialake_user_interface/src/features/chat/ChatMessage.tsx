@@ -1,12 +1,5 @@
 import React, { useState } from "react";
-import {
-  Box,
-  Typography,
-  Paper,
-  Avatar,
-  CircularProgress,
-  Fade,
-} from "@mui/material";
+import { Box, Typography, Paper, Avatar, CircularProgress, Fade } from "@mui/material";
 import { ChatMessage as ChatMessageType } from "../../contexts/ChatContext";
 import { useTheme, alpha } from "@mui/material/styles";
 import PersonIcon from "@mui/icons-material/Person";
@@ -21,7 +14,7 @@ interface ChatMessageProps {
 
 // Helper function to detect media URLs in message content
 const detectMediaType = (
-  content: string,
+  content: string
 ): { type: "text" | "image" | "video" | "audio"; url?: string } => {
   // Simple regex to detect image URLs
   const imageRegex = /(https?:\/\/.*\.(?:png|jpg|jpeg|gif|webp))/i;
@@ -94,21 +87,14 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
         {/* Avatar for the message sender */}
         <Avatar
           sx={{
-            bgcolor: isUser
-              ? theme.palette.primary.main
-              : theme.palette.secondary.main,
+            bgcolor: isUser ? theme.palette.primary.main : theme.palette.secondary.main,
             width: 36,
             height: 36,
-            boxShadow: (theme) =>
-              `0 2px 8px ${alpha(theme.palette.common.black, 0.15)}`,
+            boxShadow: (theme) => `0 2px 8px ${alpha(theme.palette.common.black, 0.15)}`,
             mt: 0.5,
           }}
         >
-          {isUser ? (
-            <PersonIcon fontSize="small" />
-          ) : (
-            <SmartToyIcon fontSize="small" />
-          )}
+          {isUser ? <PersonIcon fontSize="small" /> : <SmartToyIcon fontSize="small" />}
         </Avatar>
 
         {/* Message content */}
@@ -124,10 +110,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
               p: 1.5,
               borderRadius: 2.5,
               bgcolor: isUser
-                ? alpha(
-                    theme.palette.primary.main,
-                    theme.palette.mode === "dark" ? 0.3 : 0.1,
-                  )
+                ? alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.3 : 0.1)
                 : theme.palette.mode === "dark"
                   ? alpha(theme.palette.background.paper, 0.4)
                   : alpha(theme.palette.background.paper, 0.7),
@@ -136,7 +119,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
               boxShadow: (theme) =>
                 `0 2px 10px ${alpha(
                   theme.palette.common.black,
-                  theme.palette.mode === "dark" ? 0.3 : 0.08,
+                  theme.palette.mode === "dark" ? 0.3 : 0.08
                 )}`,
               overflow: "hidden",
               position: "relative",
@@ -164,9 +147,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
 
             {/* Image content */}
             {mediaContent.type === "image" && mediaContent.url && (
-              <Box
-                sx={{ position: "relative", width: "100%", minHeight: "150px" }}
-              >
+              <Box sx={{ position: "relative", width: "100%", minHeight: "150px" }}>
                 {!mediaLoaded && !mediaError && (
                   <Box
                     sx={{
@@ -198,9 +179,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                       borderRadius: 1,
                     }}
                   >
-                    <ImageIcon
-                      sx={{ fontSize: 40, color: "text.secondary", mb: 1 }}
-                    />
+                    <ImageIcon sx={{ fontSize: 40, color: "text.secondary", mb: 1 }} />
                     <Typography variant="caption" color="text.secondary">
                       Failed to load image
                     </Typography>
@@ -234,9 +213,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
 
             {/* Video content */}
             {mediaContent.type === "video" && mediaContent.url && (
-              <Box
-                sx={{ position: "relative", width: "100%", minHeight: "150px" }}
-              >
+              <Box sx={{ position: "relative", width: "100%", minHeight: "150px" }}>
                 {!mediaLoaded && !mediaError && (
                   <Box
                     sx={{
@@ -268,9 +245,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                       borderRadius: 1,
                     }}
                   >
-                    <VideocamIcon
-                      sx={{ fontSize: 40, color: "text.secondary", mb: 1 }}
-                    />
+                    <VideocamIcon sx={{ fontSize: 40, color: "text.secondary", mb: 1 }} />
                     <Typography variant="caption" color="text.secondary">
                       Failed to load video
                     </Typography>
@@ -304,9 +279,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
 
             {/* Audio content */}
             {mediaContent.type === "audio" && mediaContent.url && (
-              <Box
-                sx={{ position: "relative", width: "100%", minHeight: "50px" }}
-              >
+              <Box sx={{ position: "relative", width: "100%", minHeight: "50px" }}>
                 {!mediaLoaded && !mediaError && (
                   <Box
                     sx={{
@@ -334,9 +307,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                       borderRadius: 1,
                     }}
                   >
-                    <AudioFileIcon
-                      sx={{ fontSize: 40, color: "text.secondary", mb: 1 }}
-                    />
+                    <AudioFileIcon sx={{ fontSize: 40, color: "text.secondary", mb: 1 }} />
                     <Typography variant="caption" color="text.secondary">
                       Failed to load audio
                     </Typography>

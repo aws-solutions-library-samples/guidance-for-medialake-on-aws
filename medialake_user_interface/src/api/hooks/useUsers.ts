@@ -53,14 +53,9 @@ export const useGetUser = (userId: string) => {
   return useQuery<UserProfileResponse, Error>({
     queryKey: QUERY_KEYS.USERS.detail(userId),
     queryFn: async () => {
-      const { data } = await apiClient.get<UserProfileResponse>(
-        `${API_ENDPOINTS.USER}/${userId}`,
-      );
+      const { data } = await apiClient.get<UserProfileResponse>(`${API_ENDPOINTS.USER}/${userId}`);
       // Debug logging to see the raw API response
-      console.log(
-        "Raw API Response from useGetUser:",
-        JSON.stringify(data, null, 2),
-      );
+      console.log("Raw API Response from useGetUser:", JSON.stringify(data, null, 2));
 
       // Handle both wrapped and direct response formats
       let responseData = data;
@@ -93,10 +88,7 @@ export const useCreateUser = () => {
   return useMutation<CreateUserResponse, Error, CreateUserRequest>({
     mutationFn: async (newUser) => {
       console.log("Sending user creation request with groups:", newUser.groups);
-      const response = await apiClient.post<CreateUserResponse>(
-        API_ENDPOINTS.USER,
-        newUser,
-      );
+      const response = await apiClient.post<CreateUserResponse>(API_ENDPOINTS.USER, newUser);
       console.log("Raw API Response:", response.data);
 
       // Handle both wrapped and direct response formats
@@ -130,23 +122,11 @@ export const useCreateUser = () => {
         });
 
         // Log any issues with group assignment
-        if (
-          responseData.data.groupsFailed &&
-          responseData.data.groupsFailed.length > 0
-        ) {
-          console.warn(
-            "Some groups failed to be assigned:",
-            responseData.data.groupsFailed,
-          );
+        if (responseData.data.groupsFailed && responseData.data.groupsFailed.length > 0) {
+          console.warn("Some groups failed to be assigned:", responseData.data.groupsFailed);
         }
-        if (
-          responseData.data.invalidGroups &&
-          responseData.data.invalidGroups.length > 0
-        ) {
-          console.warn(
-            "Some groups were invalid:",
-            responseData.data.invalidGroups,
-          );
+        if (responseData.data.invalidGroups && responseData.data.invalidGroups.length > 0) {
+          console.warn("Some groups were invalid:", responseData.data.invalidGroups);
         }
       }
 
@@ -174,16 +154,9 @@ export const useCreateUser = () => {
 export const useUpdateUser = () => {
   const queryClient = useQueryClient();
 
-  return useMutation<
-    User,
-    Error,
-    { username: string; updates: UpdateUserRequest }
-  >({
+  return useMutation<User, Error, { username: string; updates: UpdateUserRequest }>({
     mutationFn: async ({ username, updates }) => {
-      const { data } = await apiClient.put<User>(
-        `${API_ENDPOINTS.USER}/${username}`,
-        updates,
-      );
+      const { data } = await apiClient.put<User>(`${API_ENDPOINTS.USER}/${username}`, updates);
       return data;
     },
     onSuccess: () => {

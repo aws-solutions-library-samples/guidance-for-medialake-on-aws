@@ -76,11 +76,13 @@ All six verification comments have been successfully implemented to improve the 
 ### Backend Changes:
 
 1. **New Lambda Function**: Created `multipart_sign` Lambda
+
    - File: `lambdas/api/assets/upload/multipart_sign/index.py`
    - Endpoint: `POST /assets/upload/multipart/sign`
    - Signs individual parts on-demand by part number
 
 2. **CDK Infrastructure**: Added Lambda and API Gateway resources
+
    - File: `medialake_constructs/api_gateway/api_gateway_assets.py`
    - Added IAM permissions (DynamoDB, KMS, S3 GetBucketLocation)
    - Added API endpoint with CORS support
@@ -94,16 +96,19 @@ All six verification comments have been successfully implemented to improve the 
 ### Frontend Changes:
 
 1. **Hook Updates**: Added `signPart` function
+
    - File: `medialake_user_interface/src/features/upload/hooks/useS3Upload.ts`
    - Calls backend endpoint to sign individual parts
 
 2. **Type Definitions**: Added new interfaces
+
    - File: `medialake_user_interface/src/features/upload/types/upload.types.ts`
    - `SignPartRequest`: Request payload for part signing
    - `SignPartResponse`: Response with presigned URL
    - Updated `MultipartUploadMetadata` to remove pre-generated URLs
 
 3. **FileUploader Component**: Implemented on-demand signing
+
    - File: `medialake_user_interface/src/features/upload/components/FileUploader.tsx`
    - `signPart` now calls backend for each part as needed
    - Removed storage of pre-generated part URLs
@@ -116,11 +121,13 @@ All six verification comments have been successfully implemented to improve the 
 ### Benefits:
 
 1. **Performance**:
+
    - Eliminates latency spike from pre-generating thousands of URLs
    - Upload can start immediately after multipart initiation
    - Reduced initial payload size
 
 2. **Scalability**:
+
    - Dynamic part size calculation prevents exceeding 10,000 parts limit
    - Supports files of any size (up to S3's 5TB limit)
    - Part sizes automatically adjust (5MB default, scales up as needed)
@@ -222,11 +229,13 @@ All six verification comments have been successfully implemented to improve the 
 ### Expected Improvements:
 
 1. **Initial Response Time**: Reduced from O(n) to O(1) where n = number of parts
+
    - 100MB file: ~20 parts → Improvement: ~95% faster initial response
    - 1GB file: ~200 parts → Improvement: ~99% faster initial response
    - 10GB file: ~2000 parts → Improvement: ~99.95% faster initial response
 
 2. **Memory Usage**: Reduced Lambda memory footprint
+
    - No longer storing arrays of thousands of URLs
    - Estimated: 50-90% reduction for large file uploads
 

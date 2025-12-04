@@ -53,7 +53,7 @@ export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
       collection.status === "ACTIVE" &&
       (collection.userRole === "owner" ||
         collection.userRole === "admin" ||
-        collection.userRole === "editor"),
+        collection.userRole === "editor")
   );
 
   const handleSubmit = async () => {
@@ -88,8 +88,7 @@ export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
 
   const getCollectionTypeIcon = (collection: any) => {
     if (collection.isPublic) return <PublicIcon fontSize="small" />;
-    if (collection.userRole === "owner")
-      return <PrivateIcon fontSize="small" />;
+    if (collection.userRole === "owner") return <PrivateIcon fontSize="small" />;
     return <SharedIcon fontSize="small" />;
   };
 
@@ -162,9 +161,7 @@ export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
             </Box>
           ) : availableCollections.length === 0 ? (
             <Box sx={{ textAlign: "center", py: 4 }}>
-              <FolderIcon
-                sx={{ fontSize: 48, color: "text.secondary", mb: 2 }}
-              />
+              <FolderIcon sx={{ fontSize: 48, color: "text.secondary", mb: 2 }} />
               <Typography variant="body1" color="text.secondary">
                 No collections available
               </Typography>
@@ -211,9 +208,7 @@ export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
                               gap: 1,
                             }}
                           >
-                            <Typography variant="body1">
-                              {collection.name}
-                            </Typography>
+                            <Typography variant="body1">{collection.name}</Typography>
                             {getCollectionTypeBadge(collection)}
                           </Box>
                         }
@@ -249,11 +244,7 @@ export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
         <Button
           onClick={handleSubmit}
           variant="contained"
-          disabled={
-            !selectedCollectionId ||
-            isAdding ||
-            availableCollections.length === 0
-          }
+          disabled={!selectedCollectionId || isAdding || availableCollections.length === 0}
           startIcon={isAdding ? <CircularProgress size={20} /> : null}
         >
           {isAdding ? "Adding..." : "Add to Collection"}

@@ -36,12 +36,7 @@ export const BulkDeleteDialog: React.FC<BulkDeleteDialogProps> = ({
   const isConfirmDisabled = confirmationText !== "DELETE" || isLoading;
 
   useEffect(() => {
-    console.log(
-      "BulkDeleteDialog - open prop changed:",
-      open,
-      "selectedCount:",
-      selectedCount,
-    );
+    console.log("BulkDeleteDialog - open prop changed:", open, "selectedCount:", selectedCount);
   }, [open, selectedCount]);
 
   return (
@@ -61,8 +56,7 @@ export const BulkDeleteDialog: React.FC<BulkDeleteDialogProps> = ({
       <DialogContent>
         <Box display="flex" flexDirection="column" gap={2}>
           <Alert severity="error">
-            This action cannot be undone. All selected assets will be
-            permanently deleted.
+            This action cannot be undone. All selected assets will be permanently deleted.
           </Alert>
 
           <DialogContentText>
@@ -89,11 +83,7 @@ export const BulkDeleteDialog: React.FC<BulkDeleteDialogProps> = ({
         </Box>
       </DialogContent>
       <DialogActions>
-        <Button
-          onClick={onClose}
-          disabled={isLoading}
-          data-testid="bulk-delete-cancel-button"
-        >
+        <Button onClick={onClose} disabled={isLoading} data-testid="bulk-delete-cancel-button">
           Cancel
         </Button>
         <Button

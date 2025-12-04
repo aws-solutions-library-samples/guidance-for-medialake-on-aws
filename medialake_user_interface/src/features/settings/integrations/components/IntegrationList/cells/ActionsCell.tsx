@@ -11,11 +11,7 @@ interface ActionsCellProps {
   onDelete: (id: string) => void;
 }
 
-export const ActionsCell: React.FC<ActionsCellProps> = ({
-  row,
-  onEdit,
-  onDelete,
-}) => {
+export const ActionsCell: React.FC<ActionsCellProps> = ({ row, onEdit, onDelete }) => {
   const integration = row.original;
 
   return (

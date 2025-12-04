@@ -11,13 +11,7 @@ import { Actions, Subjects } from "../types/ability.types";
  * @param props Component props
  * @returns React element or null
  */
-export function Can({
-  I: action,
-  a: subject,
-  field,
-  passThrough = false,
-  children,
-}: CanProps) {
+export function Can({ I: action, a: subject, field, passThrough = false, children }: CanProps) {
   const { can, loading } = usePermission();
   const { isAuthenticated, isInitialized } = useAuth();
   const [lastKnownResult, setLastKnownResult] = useState<boolean | null>(null);

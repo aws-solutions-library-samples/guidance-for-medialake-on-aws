@@ -1,12 +1,5 @@
 import React from "react";
-import {
-  Box,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  useTheme,
-} from "@mui/material";
+import { Box, FormControl, InputLabel, Select, MenuItem, useTheme } from "@mui/material";
 import { useDirection } from "../../../contexts/DirectionContext";
 
 export interface FilterOption {
@@ -25,10 +18,7 @@ interface PageFiltersProps {
   filters: FilterConfig[];
   onFilterChange: (key: string, value: string) => void;
 }
-const PageFilters: React.FC<PageFiltersProps> = ({
-  filters,
-  onFilterChange,
-}) => {
+const PageFilters: React.FC<PageFiltersProps> = ({ filters, onFilterChange }) => {
   const theme = useTheme();
   const { direction } = useDirection();
   const isRTL = direction === "rtl";

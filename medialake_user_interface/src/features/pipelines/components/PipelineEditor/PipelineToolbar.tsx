@@ -34,10 +34,7 @@ import { ensureCorrectTypes, normalizeNumericValues } from "../../types";
 import { IconSwitch } from "@/components/common";
 import { PipelineNameInput } from "./";
 import { useSidebar } from "@/contexts/SidebarContext";
-import {
-  useRightSidebar,
-  COLLAPSED_WIDTH,
-} from "@/components/common/RightSidebar/SidebarContext";
+import { useRightSidebar, COLLAPSED_WIDTH } from "@/components/common/RightSidebar/SidebarContext";
 import type { Node, Edge, ReactFlowInstance } from "reactflow";
 import { IntegrationValidationService } from "../../services/integrationValidation.service";
 import IntegrationValidationDialog from "../../components/IntegrationValidationDialog";
@@ -90,9 +87,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
 
   /* —— NEW: Two-mode responsive approach —— */
   // Calculate available width for toolbar
-  const leftSidebarWidth = isLeftSidebarCollapsed
-    ? collapsedDrawerWidth
-    : drawerWidth;
+  const leftSidebarWidth = isLeftSidebarCollapsed ? collapsedDrawerWidth : drawerWidth;
   const rightSidebarWidth = isRightSidebarExpanded ? width : COLLAPSED_WIDTH;
 
   // Determine if we should use compact mode based on available space
@@ -108,9 +103,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [validationDialogOpen, setValidationDialogOpen] = useState(false);
   const [invalidNodes, setInvalidNodes] = useState<InvalidNodeInfo[]>([]);
-  const [availableIntegrations, setAvailableIntegrations] = useState<
-    Integration[]
-  >([]);
+  const [availableIntegrations, setAvailableIntegrations] = useState<Integration[]>([]);
   const [importedFlow, setImportedFlow] = useState<any>(null);
   const [isImporting, setIsImporting] = useState(false);
 
@@ -126,10 +119,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
     console.log("[PipelineToolbar] Files selected:", files);
 
     if (files && files.length > 0) {
-      console.log(
-        "[PipelineToolbar] Starting import process for file:",
-        files[0].name,
-      );
+      console.log("[PipelineToolbar] Starting import process for file:", files[0].name);
       setIsImporting(true);
 
       // Extract the file name without extension to use as pipeline name
@@ -138,10 +128,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
         ? fileName.slice(0, -5) // Remove .json extension
         : fileName;
 
-      console.log(
-        "[PipelineToolbar] Pipeline name from file:",
-        pipelineNameFromFile,
-      );
+      console.log("[PipelineToolbar] Pipeline name from file:", pipelineNameFromFile);
 
       // Update the pipeline name
       onPipelineNameChange(pipelineNameFromFile);
@@ -158,9 +145,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
               processedFlow.configuration.nodes &&
               processedFlow.configuration.edges
             ) {
-              console.log(
-                "[PipelineToolbar] Found nodes and edges under configuration property",
-              );
+              console.log("[PipelineToolbar] Found nodes and edges under configuration property");
               // Move nodes and edges to the top level
               processedFlow.nodes = processedFlow.configuration.nodes;
               processedFlow.edges = processedFlow.configuration.edges;
@@ -172,309 +157,42 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
             // Check if the flow uses the nodes/edges structure
             if (processedFlow.nodes && processedFlow.edges) {
               // Fix edges first to ensure proper connections
-              const fixedEdges = (processedFlow.edges || []).map(
-                (edge: any) => {
-                  // Ensure edge has data field
-                  if (!edge.data) {
-                    edge.data = { text: "" };
-                  }
-
-                  // Find the source node for this edge
-                  const sourceNode = processedFlow.nodes.find(
-                    (n: any) => n.id === edge.source,
-                  );
-
-                  // Find the target node for this edge
-                  const targetNode = processedFlow.nodes.find(
-                    (n: any) => n.id === edge.target,
-                  );
-
-                  // Fix Map node connections
-                  if (
-                    sourceNode &&
-                    sourceNode.data &&
-                    (sourceNode.data.id === "map" ||
-                      sourceNode.data.nodeId === "map")
-                  ) {
-                    console.log(
-                      "[PipelineToolbar] Fixing edge for Map node:",
-                      edge.id,
-                    );
-
-                    if (targetNode) {
-                      // Check if this is a connection to a Success node
-                      if (
-                        targetNode.data &&
-                        (targetNode.data.id === "success" ||
-                          targetNode.data.nodeId === "success")
-                      ) {
-                        // This should be the "Next" connection
-                        edge.sourceHandle = "Next";
-                        console.log(
-                          '[PipelineToolbar] Set sourceHandle to "Next" for edge to Success node',
-                        );
-                      } else {
-                        // This should be the "Processor" connection
-                        edge.sourceHandle = "Processor";
-                        console.log(
-                          '[PipelineToolbar] Set sourceHandle to "Processor" for edge to processor node',
-                        );
-                      }
-                    }
-                  }
-
-                  // Ensure all edges have proper targetHandle values
-                  if (!edge.targetHandle && targetNode) {
-                    // Default to 'input-any' or the first available input type
-                    if (
-                      targetNode.data &&
-                      targetNode.data.inputTypes &&
-                      targetNode.data.inputTypes.length > 0
-                    ) {
-                      const inputType =
-                        typeof targetNode.data.inputTypes[0] === "string"
-                          ? targetNode.data.inputTypes[0]
-                          : "any";
-                      edge.targetHandle = `input-${inputType}`;
-                      console.log(
-                        `[PipelineToolbar] Set targetHandle to "${edge.targetHandle}" for edge ${edge.id}`,
-                      );
-                    } else {
-                      edge.targetHandle = "input-any";
-                      console.log(
-                        `[PipelineToolbar] Set default targetHandle to "input-any" for edge ${edge.id}`,
-                      );
-                    }
-                  }
-
-                  // Ensure all edges have proper sourceHandle values if not already set
-                  if (
-                    !edge.sourceHandle &&
-                    sourceNode &&
-                    sourceNode.data &&
-                    sourceNode.data.outputTypes &&
-                    sourceNode.data.outputTypes.length > 0
-                  ) {
-                    // Use the first available output type or a default value
-                    try {
-                      const outputType = sourceNode.data.outputTypes[0];
-                      if (typeof outputType === "string") {
-                        edge.sourceHandle = outputType;
-                      } else if (
-                        typeof outputType === "object" &&
-                        outputType !== null
-                      ) {
-                        // Try to access name property safely
-                        const name = (outputType as any).name;
-                        if (name) {
-                          edge.sourceHandle = String(name);
-                        } else {
-                          // Default to first output type as string or 'default'
-                          edge.sourceHandle = "default";
-                        }
-                      } else {
-                        edge.sourceHandle = "default";
-                      }
-                      console.log(
-                        `[PipelineToolbar] Set sourceHandle to "${edge.sourceHandle}" for edge ${edge.id}`,
-                      );
-                    } catch (error) {
-                      // Fallback to default if any error occurs
-                      edge.sourceHandle = "default";
-                      console.log(
-                        `[PipelineToolbar] Set default sourceHandle for edge ${edge.id}`,
-                      );
-                    }
-                  }
-
-                  return edge;
-                },
-              );
-
-              // Now fix the nodes
-              const fixedNodes = (processedFlow.nodes || []).map(
-                (node: any) => {
-                  // Fix Map node configuration
-                  if (
-                    node.data &&
-                    (node.data.id === "map" || node.data.nodeId === "map") &&
-                    node.data.type === "FLOW"
-                  ) {
-                    console.log(
-                      "[PipelineToolbar] Fixing Map node for import:",
-                      node.id,
-                    );
-
-                    // Ensure the Map node has the correct configuration
-                    if (!node.data.configuration) {
-                      node.data.configuration = {};
-                    }
-
-                    if (!node.data.configuration.parameters) {
-                      node.data.configuration.parameters = {};
-                    }
-
-                    // Set the ItemsPath to the correct value
-                    node.data.configuration.parameters.ItemsPath =
-                      "$.payload.externalTaskStatus";
-
-                    // Set the ConcurrencyLimit if not already set
-                    if (!node.data.configuration.parameters.ConcurrencyLimit) {
-                      node.data.configuration.parameters.ConcurrencyLimit = 1;
-                    } else if (
-                      typeof node.data.configuration.parameters
-                        .ConcurrencyLimit === "string"
-                    ) {
-                      // Convert string to number if it's a string
-                      node.data.configuration.parameters.ConcurrencyLimit =
-                        parseInt(
-                          node.data.configuration.parameters.ConcurrencyLimit,
-                          10,
-                        );
-                    }
-                  }
-
-                  // Ensure all numeric values are saved as numbers
-                  if (node.data && node.data.configuration) {
-                    // Apply the ensureCorrectTypes function to ensure numeric values remain as numbers
-                    node.data.configuration = ensureCorrectTypes(
-                      node.data.configuration,
-                    );
-                  }
-
-                  // Ensure node.data has both id and nodeId properties
-                  const updatedData = {
-                    ...node.data,
-                    // If id is missing but nodeId exists, copy nodeId to id
-                    id: node.data.id || node.data.nodeId,
-                    // If nodeId is missing but id exists, copy id to nodeId
-                    nodeId: node.data.nodeId || node.data.id,
-                    // Check if the icon is an object (serialized React element)
-                    icon:
-                      node.data.icon &&
-                      typeof node.data.icon === "object" &&
-                      node.data.icon.props ? (
-                        <FaFileVideo size={20} />
-                      ) : (
-                        node.data.icon
-                      ),
-                  };
-
-                  return {
-                    ...node,
-                    data: updatedData,
-                  };
-                },
-              );
-
-              // Validate integration IDs
-              try {
-                console.log("[PipelineToolbar] Validating integration IDs...");
-                const validationResult =
-                  await IntegrationValidationService.validateIntegrationIds(
-                    fixedNodes,
-                  );
-
-                if (validationResult.isValid) {
-                  console.log(
-                    "[PipelineToolbar] All integration IDs are valid",
-                  );
-                  // All integration IDs are valid, proceed with import
-                  setNodes(fixedNodes);
-                  setEdges(fixedEdges);
-
-                  // Update form data
-                  if (updateFormData) {
-                    updateFormData(fixedNodes, fixedEdges);
-                  }
-
-                  // Update viewport if available
-                  if (flow.viewport && reactFlowInstance) {
-                    const { x = 0, y = 0, zoom = 1 } = flow.viewport;
-                    reactFlowInstance.setViewport({ x, y, zoom });
-                  }
-                } else {
-                  console.log(
-                    "[PipelineToolbar] Invalid integration IDs found:",
-                    validationResult.invalidNodes,
-                  );
-                  // Some integration IDs are invalid, show validation dialog
-                  setInvalidNodes(validationResult.invalidNodes);
-                  setAvailableIntegrations(
-                    validationResult.availableIntegrations,
-                  );
-                  setValidationDialogOpen(true);
-                }
-              } catch (validationError) {
-                console.error(
-                  "[PipelineToolbar] Error validating integration IDs:",
-                  validationError,
-                );
-                // Proceed with import without validation
-                setNodes(fixedNodes);
-                setEdges(fixedEdges);
-
-                if (updateFormData) {
-                  updateFormData(fixedNodes, fixedEdges);
-                }
-
-                // Update viewport if available
-                if (flow.viewport && reactFlowInstance) {
-                  const { x = 0, y = 0, zoom = 1 } = flow.viewport;
-                  reactFlowInstance.setViewport({ x, y, zoom });
-                }
-              }
-            }
-            // Alternatively, if the flow uses an "elements" array, split it into nodes and edges.
-            else if (flow.elements) {
-              const nodes = flow.elements.filter(
-                (el: any) => !("source" in el && "target" in el),
-              );
-              const edges = flow.elements.filter(
-                (el: any) => "source" in el && "target" in el,
-              );
-              // Fix edges first
-              const fixedEdges = edges.map((edge: any) => {
+              const fixedEdges = (processedFlow.edges || []).map((edge: any) => {
                 // Ensure edge has data field
                 if (!edge.data) {
                   edge.data = { text: "" };
                 }
 
                 // Find the source node for this edge
-                const sourceNode = nodes.find((n: any) => n.id === edge.source);
+                const sourceNode = processedFlow.nodes.find((n: any) => n.id === edge.source);
 
                 // Find the target node for this edge
-                const targetNode = nodes.find((n: any) => n.id === edge.target);
+                const targetNode = processedFlow.nodes.find((n: any) => n.id === edge.target);
 
-                // Check if the source node is a Map node
+                // Fix Map node connections
                 if (
                   sourceNode &&
                   sourceNode.data &&
-                  (sourceNode.data.id === "map" ||
-                    sourceNode.data.nodeId === "map")
+                  (sourceNode.data.id === "map" || sourceNode.data.nodeId === "map")
                 ) {
-                  console.log(
-                    "[PipelineToolbar] Fixing edge for Map node (elements format):",
-                    edge.id,
-                  );
+                  console.log("[PipelineToolbar] Fixing edge for Map node:", edge.id);
 
                   if (targetNode) {
                     // Check if this is a connection to a Success node
                     if (
                       targetNode.data &&
-                      (targetNode.data.id === "success" ||
-                        targetNode.data.nodeId === "success")
+                      (targetNode.data.id === "success" || targetNode.data.nodeId === "success")
                     ) {
                       // This should be the "Next" connection
                       edge.sourceHandle = "Next";
                       console.log(
-                        '[PipelineToolbar] Set sourceHandle to "Next" for edge to Success node',
+                        '[PipelineToolbar] Set sourceHandle to "Next" for edge to Success node'
                       );
                     } else {
                       // This should be the "Processor" connection
                       edge.sourceHandle = "Processor";
                       console.log(
-                        '[PipelineToolbar] Set sourceHandle to "Processor" for edge to processor node',
+                        '[PipelineToolbar] Set sourceHandle to "Processor" for edge to processor node'
                       );
                     }
                   }
@@ -494,12 +212,12 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                         : "any";
                     edge.targetHandle = `input-${inputType}`;
                     console.log(
-                      `[PipelineToolbar] Set targetHandle to "${edge.targetHandle}" for edge ${edge.id}`,
+                      `[PipelineToolbar] Set targetHandle to "${edge.targetHandle}" for edge ${edge.id}`
                     );
                   } else {
                     edge.targetHandle = "input-any";
                     console.log(
-                      `[PipelineToolbar] Set default targetHandle to "input-any" for edge ${edge.id}`,
+                      `[PipelineToolbar] Set default targetHandle to "input-any" for edge ${edge.id}`
                     );
                   }
                 }
@@ -517,10 +235,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                     const outputType = sourceNode.data.outputTypes[0];
                     if (typeof outputType === "string") {
                       edge.sourceHandle = outputType;
-                    } else if (
-                      typeof outputType === "object" &&
-                      outputType !== null
-                    ) {
+                    } else if (typeof outputType === "object" && outputType !== null) {
                       // Try to access name property safely
                       const name = (outputType as any).name;
                       if (name) {
@@ -533,14 +248,239 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                       edge.sourceHandle = "default";
                     }
                     console.log(
-                      `[PipelineToolbar] Set sourceHandle to "${edge.sourceHandle}" for edge ${edge.id}`,
+                      `[PipelineToolbar] Set sourceHandle to "${edge.sourceHandle}" for edge ${edge.id}`
                     );
                   } catch (error) {
                     // Fallback to default if any error occurs
                     edge.sourceHandle = "default";
-                    console.log(
-                      `[PipelineToolbar] Set default sourceHandle for edge ${edge.id}`,
+                    console.log(`[PipelineToolbar] Set default sourceHandle for edge ${edge.id}`);
+                  }
+                }
+
+                return edge;
+              });
+
+              // Now fix the nodes
+              const fixedNodes = (processedFlow.nodes || []).map((node: any) => {
+                // Fix Map node configuration
+                if (
+                  node.data &&
+                  (node.data.id === "map" || node.data.nodeId === "map") &&
+                  node.data.type === "FLOW"
+                ) {
+                  console.log("[PipelineToolbar] Fixing Map node for import:", node.id);
+
+                  // Ensure the Map node has the correct configuration
+                  if (!node.data.configuration) {
+                    node.data.configuration = {};
+                  }
+
+                  if (!node.data.configuration.parameters) {
+                    node.data.configuration.parameters = {};
+                  }
+
+                  // Set the ItemsPath to the correct value
+                  node.data.configuration.parameters.ItemsPath = "$.payload.externalTaskStatus";
+
+                  // Set the ConcurrencyLimit if not already set
+                  if (!node.data.configuration.parameters.ConcurrencyLimit) {
+                    node.data.configuration.parameters.ConcurrencyLimit = 1;
+                  } else if (
+                    typeof node.data.configuration.parameters.ConcurrencyLimit === "string"
+                  ) {
+                    // Convert string to number if it's a string
+                    node.data.configuration.parameters.ConcurrencyLimit = parseInt(
+                      node.data.configuration.parameters.ConcurrencyLimit,
+                      10
                     );
+                  }
+                }
+
+                // Ensure all numeric values are saved as numbers
+                if (node.data && node.data.configuration) {
+                  // Apply the ensureCorrectTypes function to ensure numeric values remain as numbers
+                  node.data.configuration = ensureCorrectTypes(node.data.configuration);
+                }
+
+                // Ensure node.data has both id and nodeId properties
+                const updatedData = {
+                  ...node.data,
+                  // If id is missing but nodeId exists, copy nodeId to id
+                  id: node.data.id || node.data.nodeId,
+                  // If nodeId is missing but id exists, copy id to nodeId
+                  nodeId: node.data.nodeId || node.data.id,
+                  // Check if the icon is an object (serialized React element)
+                  icon:
+                    node.data.icon && typeof node.data.icon === "object" && node.data.icon.props ? (
+                      <FaFileVideo size={20} />
+                    ) : (
+                      node.data.icon
+                    ),
+                };
+
+                return {
+                  ...node,
+                  data: updatedData,
+                };
+              });
+
+              // Validate integration IDs
+              try {
+                console.log("[PipelineToolbar] Validating integration IDs...");
+                const validationResult =
+                  await IntegrationValidationService.validateIntegrationIds(fixedNodes);
+
+                if (validationResult.isValid) {
+                  console.log("[PipelineToolbar] All integration IDs are valid");
+                  // All integration IDs are valid, proceed with import
+                  setNodes(fixedNodes);
+                  setEdges(fixedEdges);
+
+                  // Update form data
+                  if (updateFormData) {
+                    updateFormData(fixedNodes, fixedEdges);
+                  }
+
+                  // Update viewport if available
+                  if (flow.viewport && reactFlowInstance) {
+                    const { x = 0, y = 0, zoom = 1 } = flow.viewport;
+                    reactFlowInstance.setViewport({ x, y, zoom });
+                  }
+                } else {
+                  console.log(
+                    "[PipelineToolbar] Invalid integration IDs found:",
+                    validationResult.invalidNodes
+                  );
+                  // Some integration IDs are invalid, show validation dialog
+                  setInvalidNodes(validationResult.invalidNodes);
+                  setAvailableIntegrations(validationResult.availableIntegrations);
+                  setValidationDialogOpen(true);
+                }
+              } catch (validationError) {
+                console.error(
+                  "[PipelineToolbar] Error validating integration IDs:",
+                  validationError
+                );
+                // Proceed with import without validation
+                setNodes(fixedNodes);
+                setEdges(fixedEdges);
+
+                if (updateFormData) {
+                  updateFormData(fixedNodes, fixedEdges);
+                }
+
+                // Update viewport if available
+                if (flow.viewport && reactFlowInstance) {
+                  const { x = 0, y = 0, zoom = 1 } = flow.viewport;
+                  reactFlowInstance.setViewport({ x, y, zoom });
+                }
+              }
+            }
+            // Alternatively, if the flow uses an "elements" array, split it into nodes and edges.
+            else if (flow.elements) {
+              const nodes = flow.elements.filter((el: any) => !("source" in el && "target" in el));
+              const edges = flow.elements.filter((el: any) => "source" in el && "target" in el);
+              // Fix edges first
+              const fixedEdges = edges.map((edge: any) => {
+                // Ensure edge has data field
+                if (!edge.data) {
+                  edge.data = { text: "" };
+                }
+
+                // Find the source node for this edge
+                const sourceNode = nodes.find((n: any) => n.id === edge.source);
+
+                // Find the target node for this edge
+                const targetNode = nodes.find((n: any) => n.id === edge.target);
+
+                // Check if the source node is a Map node
+                if (
+                  sourceNode &&
+                  sourceNode.data &&
+                  (sourceNode.data.id === "map" || sourceNode.data.nodeId === "map")
+                ) {
+                  console.log(
+                    "[PipelineToolbar] Fixing edge for Map node (elements format):",
+                    edge.id
+                  );
+
+                  if (targetNode) {
+                    // Check if this is a connection to a Success node
+                    if (
+                      targetNode.data &&
+                      (targetNode.data.id === "success" || targetNode.data.nodeId === "success")
+                    ) {
+                      // This should be the "Next" connection
+                      edge.sourceHandle = "Next";
+                      console.log(
+                        '[PipelineToolbar] Set sourceHandle to "Next" for edge to Success node'
+                      );
+                    } else {
+                      // This should be the "Processor" connection
+                      edge.sourceHandle = "Processor";
+                      console.log(
+                        '[PipelineToolbar] Set sourceHandle to "Processor" for edge to processor node'
+                      );
+                    }
+                  }
+                }
+
+                // Ensure all edges have proper targetHandle values
+                if (!edge.targetHandle && targetNode) {
+                  // Default to 'input-any' or the first available input type
+                  if (
+                    targetNode.data &&
+                    targetNode.data.inputTypes &&
+                    targetNode.data.inputTypes.length > 0
+                  ) {
+                    const inputType =
+                      typeof targetNode.data.inputTypes[0] === "string"
+                        ? targetNode.data.inputTypes[0]
+                        : "any";
+                    edge.targetHandle = `input-${inputType}`;
+                    console.log(
+                      `[PipelineToolbar] Set targetHandle to "${edge.targetHandle}" for edge ${edge.id}`
+                    );
+                  } else {
+                    edge.targetHandle = "input-any";
+                    console.log(
+                      `[PipelineToolbar] Set default targetHandle to "input-any" for edge ${edge.id}`
+                    );
+                  }
+                }
+
+                // Ensure all edges have proper sourceHandle values if not already set
+                if (
+                  !edge.sourceHandle &&
+                  sourceNode &&
+                  sourceNode.data &&
+                  sourceNode.data.outputTypes &&
+                  sourceNode.data.outputTypes.length > 0
+                ) {
+                  // Use the first available output type or a default value
+                  try {
+                    const outputType = sourceNode.data.outputTypes[0];
+                    if (typeof outputType === "string") {
+                      edge.sourceHandle = outputType;
+                    } else if (typeof outputType === "object" && outputType !== null) {
+                      // Try to access name property safely
+                      const name = (outputType as any).name;
+                      if (name) {
+                        edge.sourceHandle = String(name);
+                      } else {
+                        // Default to first output type as string or 'default'
+                        edge.sourceHandle = "default";
+                      }
+                    } else {
+                      edge.sourceHandle = "default";
+                    }
+                    console.log(
+                      `[PipelineToolbar] Set sourceHandle to "${edge.sourceHandle}" for edge ${edge.id}`
+                    );
+                  } catch (error) {
+                    // Fallback to default if any error occurs
+                    edge.sourceHandle = "default";
+                    console.log(`[PipelineToolbar] Set default sourceHandle for edge ${edge.id}`);
                   }
                 }
 
@@ -557,7 +497,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                 ) {
                   console.log(
                     "[PipelineToolbar] Fixing Map node for import (elements format):",
-                    node.id,
+                    node.id
                   );
 
                   // Ensure the Map node has the correct configuration
@@ -570,31 +510,26 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                   }
 
                   // Set the ItemsPath to the correct value
-                  node.data.configuration.parameters.ItemsPath =
-                    "$.payload.externalTaskStatus";
+                  node.data.configuration.parameters.ItemsPath = "$.payload.externalTaskStatus";
 
                   // Set the ConcurrencyLimit if not already set
                   if (!node.data.configuration.parameters.ConcurrencyLimit) {
                     node.data.configuration.parameters.ConcurrencyLimit = 1;
                   } else if (
-                    typeof node.data.configuration.parameters
-                      .ConcurrencyLimit === "string"
+                    typeof node.data.configuration.parameters.ConcurrencyLimit === "string"
                   ) {
                     // Convert string to number if it's a string
-                    node.data.configuration.parameters.ConcurrencyLimit =
-                      parseInt(
-                        node.data.configuration.parameters.ConcurrencyLimit,
-                        10,
-                      );
+                    node.data.configuration.parameters.ConcurrencyLimit = parseInt(
+                      node.data.configuration.parameters.ConcurrencyLimit,
+                      10
+                    );
                   }
                 }
 
                 // Ensure all numeric values are saved as numbers
                 if (node.data && node.data.configuration) {
                   // Apply the ensureCorrectTypes function to ensure numeric values remain as numbers
-                  node.data.configuration = ensureCorrectTypes(
-                    node.data.configuration,
-                  );
+                  node.data.configuration = ensureCorrectTypes(node.data.configuration);
                 }
 
                 // Ensure node.data has both id and nodeId properties
@@ -606,9 +541,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                   nodeId: node.data.nodeId || node.data.id,
                   // Check if the icon is an object (serialized React element)
                   icon:
-                    node.data.icon &&
-                    typeof node.data.icon === "object" &&
-                    node.data.icon.props ? (
+                    node.data.icon && typeof node.data.icon === "object" && node.data.icon.props ? (
                       <FaFileVideo size={20} />
                     ) : (
                       node.data.icon
@@ -623,18 +556,12 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
 
               // Validate integration IDs
               try {
-                console.log(
-                  "[PipelineToolbar] Validating integration IDs for elements format...",
-                );
+                console.log("[PipelineToolbar] Validating integration IDs for elements format...");
                 const validationResult =
-                  await IntegrationValidationService.validateIntegrationIds(
-                    fixedNodes,
-                  );
+                  await IntegrationValidationService.validateIntegrationIds(fixedNodes);
 
                 if (validationResult.isValid) {
-                  console.log(
-                    "[PipelineToolbar] All integration IDs are valid (elements format)",
-                  );
+                  console.log("[PipelineToolbar] All integration IDs are valid (elements format)");
                   // All integration IDs are valid, proceed with import
                   setNodes(fixedNodes);
                   setEdges(fixedEdges);
@@ -646,19 +573,17 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                 } else {
                   console.log(
                     "[PipelineToolbar] Invalid integration IDs found (elements format):",
-                    validationResult.invalidNodes,
+                    validationResult.invalidNodes
                   );
                   // Some integration IDs are invalid, show validation dialog
                   setInvalidNodes(validationResult.invalidNodes);
-                  setAvailableIntegrations(
-                    validationResult.availableIntegrations,
-                  );
+                  setAvailableIntegrations(validationResult.availableIntegrations);
                   setValidationDialogOpen(true);
                 }
               } catch (validationError) {
                 console.error(
                   "[PipelineToolbar] Error validating integration IDs (elements format):",
-                  validationError,
+                  validationError
                 );
                 // Proceed with import without validation
                 setNodes(fixedNodes);
@@ -688,9 +613,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
         setIsImporting(false);
       };
     } else {
-      console.log(
-        "[PipelineToolbar] No files selected or files array is empty",
-      );
+      console.log("[PipelineToolbar] No files selected or files array is empty");
     }
   };
 
@@ -702,11 +625,10 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
 
       if (importedFlow.nodes) {
         // Update nodes with new integration IDs
-        const updatedPipelineNodes =
-          IntegrationValidationService.mapInvalidIntegrationIds(
-            importedFlow.nodes,
-            mappings,
-          );
+        const updatedPipelineNodes = IntegrationValidationService.mapInvalidIntegrationIds(
+          importedFlow.nodes,
+          mappings
+        );
 
         // Fix edges first to ensure proper connections
         const fixedEdges = importedFlow.edges.map((edge: any) => {
@@ -716,14 +638,10 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
           }
 
           // Find the source node for this edge
-          const sourceNode = updatedPipelineNodes.find(
-            (n: any) => n.id === edge.source,
-          );
+          const sourceNode = updatedPipelineNodes.find((n: any) => n.id === edge.source);
 
           // Find the target node for this edge
-          const targetNode = updatedPipelineNodes.find(
-            (n: any) => n.id === edge.target,
-          );
+          const targetNode = updatedPipelineNodes.find((n: any) => n.id === edge.target);
 
           // Check if the source node is a Map node
           if (
@@ -733,26 +651,25 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
           ) {
             console.log(
               "[PipelineToolbar] Fixing edge for Map node in validation confirm:",
-              edge.id,
+              edge.id
             );
 
             if (targetNode) {
               // Check if this is a connection to a Success node
               if (
                 targetNode.data &&
-                (targetNode.data.id === "success" ||
-                  targetNode.data.nodeId === "success")
+                (targetNode.data.id === "success" || targetNode.data.nodeId === "success")
               ) {
                 // This should be the "Next" connection
                 edge.sourceHandle = "Next";
                 console.log(
-                  '[PipelineToolbar] Set sourceHandle to "Next" for edge to Success node',
+                  '[PipelineToolbar] Set sourceHandle to "Next" for edge to Success node'
                 );
               } else {
                 // This should be the "Processor" connection
                 edge.sourceHandle = "Processor";
                 console.log(
-                  '[PipelineToolbar] Set sourceHandle to "Processor" for edge to processor node',
+                  '[PipelineToolbar] Set sourceHandle to "Processor" for edge to processor node'
                 );
               }
             }
@@ -772,12 +689,12 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                   : "any";
               edge.targetHandle = `input-${inputType}`;
               console.log(
-                `[PipelineToolbar] Set targetHandle to "${edge.targetHandle}" for edge ${edge.id}`,
+                `[PipelineToolbar] Set targetHandle to "${edge.targetHandle}" for edge ${edge.id}`
               );
             } else {
               edge.targetHandle = "input-any";
               console.log(
-                `[PipelineToolbar] Set default targetHandle to "input-any" for edge ${edge.id}`,
+                `[PipelineToolbar] Set default targetHandle to "input-any" for edge ${edge.id}`
               );
             }
           }
@@ -795,10 +712,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
               const outputType = sourceNode.data.outputTypes[0];
               if (typeof outputType === "string") {
                 edge.sourceHandle = outputType;
-              } else if (
-                typeof outputType === "object" &&
-                outputType !== null
-              ) {
+              } else if (typeof outputType === "object" && outputType !== null) {
                 // Try to access name property safely
                 const name = (outputType as any).name;
                 if (name) {
@@ -811,14 +725,12 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                 edge.sourceHandle = "default";
               }
               console.log(
-                `[PipelineToolbar] Set sourceHandle to "${edge.sourceHandle}" for edge ${edge.id}`,
+                `[PipelineToolbar] Set sourceHandle to "${edge.sourceHandle}" for edge ${edge.id}`
               );
             } catch (error) {
               // Fallback to default if any error occurs
               edge.sourceHandle = "default";
-              console.log(
-                `[PipelineToolbar] Set default sourceHandle for edge ${edge.id}`,
-              );
+              console.log(`[PipelineToolbar] Set default sourceHandle for edge ${edge.id}`);
             }
           }
 
@@ -828,15 +740,8 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
         // Convert PipelineNode[] to Node[] for ReactFlow
         const updatedReactFlowNodes = updatedPipelineNodes.map((node: any) => {
           // Fix Map node configuration
-          if (
-            node.data &&
-            node.data.id === "map" &&
-            node.data.type === "FLOW"
-          ) {
-            console.log(
-              "[PipelineToolbar] Fixing Map node for validation confirm:",
-              node.id,
-            );
+          if (node.data && node.data.id === "map" && node.data.type === "FLOW") {
+            console.log("[PipelineToolbar] Fixing Map node for validation confirm:", node.id);
 
             // Ensure the Map node has the correct configuration
             if (!node.data.configuration) {
@@ -848,20 +753,16 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
             }
 
             // Set the ItemsPath to the correct value
-            node.data.configuration.parameters.ItemsPath =
-              "$.payload.externalTaskStatus";
+            node.data.configuration.parameters.ItemsPath = "$.payload.externalTaskStatus";
 
             // Set the ConcurrencyLimit if not already set
             if (!node.data.configuration.parameters.ConcurrencyLimit) {
               node.data.configuration.parameters.ConcurrencyLimit = 1;
-            } else if (
-              typeof node.data.configuration.parameters.ConcurrencyLimit ===
-              "string"
-            ) {
+            } else if (typeof node.data.configuration.parameters.ConcurrencyLimit === "string") {
               // Convert string to number if it's a string
               node.data.configuration.parameters.ConcurrencyLimit = parseInt(
                 node.data.configuration.parameters.ConcurrencyLimit,
-                10,
+                10
               );
             }
           }
@@ -869,9 +770,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
           // Ensure all numeric values are saved as numbers
           if (node.data && node.data.configuration) {
             // Apply the ensureCorrectTypes function to ensure numeric values remain as numbers
-            node.data.configuration = ensureCorrectTypes(
-              node.data.configuration,
-            );
+            node.data.configuration = ensureCorrectTypes(node.data.configuration);
           }
 
           return {
@@ -880,9 +779,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
               ...node.data,
               // Fix the icon property to ensure it's properly rendered
               icon:
-                node.data.icon &&
-                typeof node.data.icon === "object" &&
-                node.data.icon.props ? (
+                node.data.icon && typeof node.data.icon === "object" && node.data.icon.props ? (
                   <FaFileVideo size={20} />
                 ) : (
                   node.data.icon
@@ -890,13 +787,9 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
             },
             position: {
               x:
-                typeof node.position.x === "string"
-                  ? parseFloat(node.position.x)
-                  : node.position.x,
+                typeof node.position.x === "string" ? parseFloat(node.position.x) : node.position.x,
               y:
-                typeof node.position.y === "string"
-                  ? parseFloat(node.position.y)
-                  : node.position.y,
+                typeof node.position.y === "string" ? parseFloat(node.position.y) : node.position.y,
             },
             // Convert other string numbers to actual numbers if needed
             ...(node.positionAbsolute && {
@@ -931,18 +824,15 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
       } else if (importedFlow.elements) {
         // Handle elements format
         const nodes = importedFlow.elements.filter(
-          (el: any) => !("source" in el && "target" in el),
+          (el: any) => !("source" in el && "target" in el)
         );
-        const edges = importedFlow.elements.filter(
-          (el: any) => "source" in el && "target" in el,
-        );
+        const edges = importedFlow.elements.filter((el: any) => "source" in el && "target" in el);
 
         // Update nodes with new integration IDs
-        const updatedPipelineNodes =
-          IntegrationValidationService.mapInvalidIntegrationIds(
-            nodes,
-            mappings,
-          );
+        const updatedPipelineNodes = IntegrationValidationService.mapInvalidIntegrationIds(
+          nodes,
+          mappings
+        );
 
         // Fix edges first to ensure proper connections
         const fixedEdges = edges.map((edge: any) => {
@@ -953,21 +843,17 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
 
           // Fix Map node connections
           // Find the source node for this edge
-          const sourceNode = updatedPipelineNodes.find(
-            (n: any) => n.id === edge.source,
-          );
+          const sourceNode = updatedPipelineNodes.find((n: any) => n.id === edge.source);
 
           // Check if the source node is a Map node
           if (sourceNode && sourceNode.data && sourceNode.data.id === "map") {
             console.log(
               "[PipelineToolbar] Fixing edge for Map node in validation confirm (elements format):",
-              edge.id,
+              edge.id
             );
 
             // Find the target node
-            const targetNode = updatedPipelineNodes.find(
-              (n: any) => n.id === edge.target,
-            );
+            const targetNode = updatedPipelineNodes.find((n: any) => n.id === edge.target);
 
             if (targetNode) {
               // Check if this is a connection to a Success node
@@ -975,13 +861,13 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                 // This should be the "Next" connection
                 edge.sourceHandle = "Next";
                 console.log(
-                  '[PipelineToolbar] Set sourceHandle to "Next" for edge to Success node',
+                  '[PipelineToolbar] Set sourceHandle to "Next" for edge to Success node'
                 );
               } else {
                 // This should be the "Processor" connection
                 edge.sourceHandle = "Processor";
                 console.log(
-                  '[PipelineToolbar] Set sourceHandle to "Processor" for edge to processor node',
+                  '[PipelineToolbar] Set sourceHandle to "Processor" for edge to processor node'
                 );
               }
             }
@@ -993,14 +879,10 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
         // Convert PipelineNode[] to Node[] for ReactFlow
         const updatedReactFlowNodes = updatedPipelineNodes.map((node: any) => {
           // Fix Map node configuration
-          if (
-            node.data &&
-            node.data.id === "map" &&
-            node.data.type === "FLOW"
-          ) {
+          if (node.data && node.data.id === "map" && node.data.type === "FLOW") {
             console.log(
               "[PipelineToolbar] Fixing Map node for validation confirm (elements format):",
-              node.id,
+              node.id
             );
 
             // Ensure the Map node has the correct configuration
@@ -1013,20 +895,16 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
             }
 
             // Set the ItemsPath to the correct value
-            node.data.configuration.parameters.ItemsPath =
-              "$.payload.externalTaskStatus";
+            node.data.configuration.parameters.ItemsPath = "$.payload.externalTaskStatus";
 
             // Set the ConcurrencyLimit if not already set
             if (!node.data.configuration.parameters.ConcurrencyLimit) {
               node.data.configuration.parameters.ConcurrencyLimit = 1;
-            } else if (
-              typeof node.data.configuration.parameters.ConcurrencyLimit ===
-              "string"
-            ) {
+            } else if (typeof node.data.configuration.parameters.ConcurrencyLimit === "string") {
               // Convert string to number if it's a string
               node.data.configuration.parameters.ConcurrencyLimit = parseInt(
                 node.data.configuration.parameters.ConcurrencyLimit,
-                10,
+                10
               );
             }
           }
@@ -1034,9 +912,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
           // Ensure all numeric values are saved as numbers
           if (node.data && node.data.configuration) {
             // Apply the ensureCorrectTypes function to ensure numeric values remain as numbers
-            node.data.configuration = ensureCorrectTypes(
-              node.data.configuration,
-            );
+            node.data.configuration = ensureCorrectTypes(node.data.configuration);
           }
 
           return {
@@ -1045,9 +921,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
               ...node.data,
               // Fix the icon property to ensure it's properly rendered
               icon:
-                node.data.icon &&
-                typeof node.data.icon === "object" &&
-                node.data.icon.props ? (
+                node.data.icon && typeof node.data.icon === "object" && node.data.icon.props ? (
                   <FaFileVideo size={20} />
                 ) : (
                   node.data.icon
@@ -1055,13 +929,9 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
             },
             position: {
               x:
-                typeof node.position.x === "string"
-                  ? parseFloat(node.position.x)
-                  : node.position.x,
+                typeof node.position.x === "string" ? parseFloat(node.position.x) : node.position.x,
               y:
-                typeof node.position.y === "string"
-                  ? parseFloat(node.position.y)
-                  : node.position.y,
+                typeof node.position.y === "string" ? parseFloat(node.position.y) : node.position.y,
             },
             // Convert other string numbers to actual numbers if needed
             ...(node.positionAbsolute && {
@@ -1161,20 +1031,16 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
           }
 
           // Set the ItemsPath to the correct value
-          node.data.configuration.parameters.ItemsPath =
-            "$.payload.externalTaskStatus";
+          node.data.configuration.parameters.ItemsPath = "$.payload.externalTaskStatus";
 
           // Set the ConcurrencyLimit if not already set
           if (!node.data.configuration.parameters.ConcurrencyLimit) {
             node.data.configuration.parameters.ConcurrencyLimit = 1;
-          } else if (
-            typeof node.data.configuration.parameters.ConcurrencyLimit ===
-            "string"
-          ) {
+          } else if (typeof node.data.configuration.parameters.ConcurrencyLimit === "string") {
             // Convert string to number if it's a string
             node.data.configuration.parameters.ConcurrencyLimit = parseInt(
               node.data.configuration.parameters.ConcurrencyLimit,
-              10,
+              10
             );
           }
         }
@@ -1189,14 +1055,10 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
       // Fix edge connections for all nodes
       fixedFlow.edges.forEach((edge: any) => {
         // Find the source node for this edge
-        const sourceNode = fixedFlow.nodes.find(
-          (n: any) => n.id === edge.source,
-        );
+        const sourceNode = fixedFlow.nodes.find((n: any) => n.id === edge.source);
 
         // Find the target node for this edge
-        const targetNode = fixedFlow.nodes.find(
-          (n: any) => n.id === edge.target,
-        );
+        const targetNode = fixedFlow.nodes.find((n: any) => n.id === edge.target);
 
         // Ensure edge has data field
         if (!edge.data) {
@@ -1212,15 +1074,11 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
             if (targetNode.data && targetNode.data.id === "success") {
               // This should be the "Next" connection
               edge.sourceHandle = "Next";
-              console.log(
-                'Set sourceHandle to "Next" for edge to Success node',
-              );
+              console.log('Set sourceHandle to "Next" for edge to Success node');
             } else {
               // This should be the "Processor" connection
               edge.sourceHandle = "Processor";
-              console.log(
-                'Set sourceHandle to "Processor" for edge to processor node',
-              );
+              console.log('Set sourceHandle to "Processor" for edge to processor node');
             }
           }
         }
@@ -1238,14 +1096,10 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                 ? targetNode.data.inputTypes[0]
                 : "any";
             edge.targetHandle = `input-${inputType}`;
-            console.log(
-              `Set targetHandle to "${edge.targetHandle}" for edge ${edge.id}`,
-            );
+            console.log(`Set targetHandle to "${edge.targetHandle}" for edge ${edge.id}`);
           } else {
             edge.targetHandle = "input-any";
-            console.log(
-              `Set default targetHandle to "input-any" for edge ${edge.id}`,
-            );
+            console.log(`Set default targetHandle to "input-any" for edge ${edge.id}`);
           }
         }
 
@@ -1274,9 +1128,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
             } else {
               edge.sourceHandle = "default";
             }
-            console.log(
-              `Set sourceHandle to "${edge.sourceHandle}" for edge ${edge.id}`,
-            );
+            console.log(`Set sourceHandle to "${edge.sourceHandle}" for edge ${edge.id}`);
           } catch (error) {
             // Fallback to default if any error occurs
             edge.sourceHandle = "default";
@@ -1285,16 +1137,9 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
         }
 
         // Generic handling for connections to Map nodes - ensure targetHandle is set
-        if (
-          targetNode &&
-          targetNode.data &&
-          targetNode.data.id === "map" &&
-          !edge.targetHandle
-        ) {
+        if (targetNode && targetNode.data && targetNode.data.id === "map" && !edge.targetHandle) {
           edge.targetHandle = "input-any";
-          console.log(
-            'Set targetHandle to "input-any" for Map node connection',
-          );
+          console.log('Set targetHandle to "input-any" for Map node connection');
         }
       });
     }
@@ -1324,10 +1169,10 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
           if (n.data.configuration?.parameters) {
             n.data.configuration.parameters = normalizeNumericValues(
               Object.fromEntries(
-                Object.entries(n.data.configuration.parameters).filter(
-                  ([key]) => isNaN(Number(key)),
-                ),
-              ),
+                Object.entries(n.data.configuration.parameters).filter(([key]) =>
+                  isNaN(Number(key))
+                )
+              )
             );
           }
           // Drop positionAbsolute
@@ -1354,10 +1199,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
   };
 
   const handleCompactMenuClose = (event: Event) => {
-    if (
-      compactMenuRef.current &&
-      compactMenuRef.current.contains(event.target as HTMLElement)
-    ) {
+    if (compactMenuRef.current && compactMenuRef.current.contains(event.target as HTMLElement)) {
       return;
     }
     setCompactMenuOpen(false);
@@ -1372,10 +1214,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
   };
 
   const handleImportExportClose = (event: Event) => {
-    if (
-      importExportRef.current &&
-      importExportRef.current.contains(event.target as HTMLElement)
-    ) {
+    if (importExportRef.current && importExportRef.current.contains(event.target as HTMLElement)) {
       return;
     }
     setImportExportOpen(false);
@@ -1383,10 +1222,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
 
   const handleImport = () => {
     console.log("[PipelineToolbar] handleImport called");
-    console.log(
-      "[PipelineToolbar] fileInputRef.current:",
-      fileInputRef.current,
-    );
+    console.log("[PipelineToolbar] fileInputRef.current:", fileInputRef.current);
     fileInputRef.current?.click();
     setImportExportOpen(false);
   };
@@ -1423,9 +1259,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
         open={isImporting}
       >
         <CircularProgress color="inherit" />
-        <Box sx={{ typography: "body1", fontWeight: 500 }}>
-          Importing Pipeline…
-        </Box>
+        <Box sx={{ typography: "body1", fontWeight: 500 }}>Importing Pipeline…</Box>
       </Backdrop>
 
       {/* Main bar */}
@@ -1447,11 +1281,11 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
           background: (t) => `
             radial-gradient(ellipse at top, ${alpha(
               t.palette.primary.main,
-              0.08,
+              0.08
             )} 0%, transparent 50%),
             linear-gradient(135deg, ${t.palette.background.default} 0%, ${alpha(
               t.palette.primary.main,
-              0.02,
+              0.02
             )} 100%)
           `,
           backdropFilter: "blur(10px)",
@@ -1496,10 +1330,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                   maxWidth: 250,
                 }}
               >
-                <PipelineNameInput
-                  value={pipelineName}
-                  onChange={onPipelineNameChange}
-                />
+                <PipelineNameInput value={pipelineName} onChange={onPipelineNameChange} />
               </Box>
 
               {/* Save button - always icon in compact mode */}
@@ -1516,11 +1347,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                   <IconButton
                     color="primary"
                     onClick={onSave}
-                    disabled={
-                      isLoading ||
-                      !pipelineName.trim() ||
-                      (isEditMode && !hasChanges)
-                    }
+                    disabled={isLoading || !pipelineName.trim() || (isEditMode && !hasChanges)}
                     size="medium"
                   >
                     {isLoading ? <CircularProgress size={24} /> : <SaveIcon />}
@@ -1530,11 +1357,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
 
               {/* Cancel button - always icon in compact mode */}
               <Tooltip title="Cancel">
-                <IconButton
-                  color="inherit"
-                  onClick={handleCancel}
-                  size="medium"
-                >
+                <IconButton color="inherit" onClick={handleCancel} size="medium">
                   <CloseIcon />
                 </IconButton>
               </Tooltip>
@@ -1543,11 +1366,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
             {/* Right: Dropdown menu with everything else */}
             <Box ref={compactMenuRef}>
               <Tooltip title="More options">
-                <IconButton
-                  color="inherit"
-                  onClick={handleCompactMenuToggle}
-                  size="medium"
-                >
+                <IconButton color="inherit" onClick={handleCompactMenuToggle} size="medium">
                   <MoreVertIcon />
                 </IconButton>
               </Tooltip>
@@ -1564,8 +1383,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                   <Grow
                     {...TransitionProps}
                     style={{
-                      transformOrigin:
-                        placement === "bottom" ? "center top" : "center bottom",
+                      transformOrigin: placement === "bottom" ? "center top" : "center bottom",
                     }}
                   >
                     <Paper>
@@ -1618,9 +1436,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                             >
                               <IconSwitch
                                 checked={active}
-                                onChange={(e) =>
-                                  onActiveChange(e.target.checked)
-                                }
+                                onChange={(e) => onActiveChange(e.target.checked)}
                                 color="primary"
                                 onIcon={<ToggleOnIcon fontSize="medium" />}
                                 offIcon={<ToggleOffIcon fontSize="medium" />}
@@ -1699,15 +1515,10 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                   maxWidth: 300,
                 }}
               >
-                <PipelineNameInput
-                  value={pipelineName}
-                  onChange={onPipelineNameChange}
-                />
+                <PipelineNameInput value={pipelineName} onChange={onPipelineNameChange} />
               </Box>
 
-              <Tooltip
-                title={isEditMode && !hasChanges ? "No changes to save" : ""}
-              >
+              <Tooltip title={isEditMode && !hasChanges ? "No changes to save" : ""}>
                 <span>
                   <Button
                     variant="contained"
@@ -1795,11 +1606,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                 variant="outlined"
                 aria-label="Pipeline file operations"
               >
-                <Button
-                  color="inherit"
-                  onClick={handleImport}
-                  startIcon={<FileUploadIcon />}
-                >
+                <Button color="inherit" onClick={handleImport} startIcon={<FileUploadIcon />}>
                   Import
                 </Button>
                 <Button
@@ -1826,17 +1633,13 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                   <Grow
                     {...TransitionProps}
                     style={{
-                      transformOrigin:
-                        placement === "bottom" ? "center top" : "center bottom",
+                      transformOrigin: placement === "bottom" ? "center top" : "center bottom",
                     }}
                   >
                     <Paper>
                       <ClickAwayListener onClickAway={handleImportExportClose}>
                         <MenuList id="import-export-menu" autoFocusItem>
-                          <MenuItem
-                            onClick={handleExport}
-                            disabled={isExportDisabled()}
-                          >
+                          <MenuItem onClick={handleExport} disabled={isExportDisabled()}>
                             <FileDownloadIcon sx={{ mr: 1 }} />
                             Export Pipeline
                           </MenuItem>
@@ -1893,9 +1696,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
           }}
         >
           <CircularProgress color="inherit" />
-          <Box sx={{ color: "white", fontSize: "1.1rem" }}>
-            Importing Pipeline...
-          </Box>
+          <Box sx={{ color: "white", fontSize: "1.1rem" }}>Importing Pipeline...</Box>
         </Box>
       </Backdrop>
 

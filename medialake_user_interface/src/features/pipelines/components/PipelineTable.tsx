@@ -60,11 +60,7 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
     () => [
       columnHelper.accessor("name", {
         header: "Name",
-        cell: (info) => (
-          <TableCellContent variant="primary">
-            {info.getValue()}
-          </TableCellContent>
-        ),
+        cell: (info) => <TableCellContent variant="primary">{info.getValue()}</TableCellContent>,
         enableSorting: true,
         size: 200,
       }),
@@ -160,10 +156,7 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
               <IconButton
                 size="small"
                 onClick={() =>
-                  tableActions.openDeleteDialog(
-                    info.row.original.id,
-                    info.row.original.name,
-                  )
+                  tableActions.openDeleteDialog(info.row.original.id, info.row.original.name)
                 }
                 disabled={info.row.original.system}
               >
@@ -193,7 +186,7 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
         size: 200,
       }),
     ],
-    [tableActions, onStartPipeline, onStopPipeline, onToggleActive],
+    [tableActions, onStartPipeline, onStopPipeline, onToggleActive]
   );
 
   const table = useReactTable({
@@ -249,9 +242,7 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
           value: f.value as string,
         }))}
         onRemoveFilter={(columnId) => {
-          tableActions.setColumnFilters(
-            tableState.columnFilters.filter((f) => f.id !== columnId),
-          );
+          tableActions.setColumnFilters(tableState.columnFilters.filter((f) => f.id !== columnId));
         }}
         searchPlaceholder="Search pipelines..."
       />

@@ -5,10 +5,7 @@
 
 import { TagFilter, TagMatcher } from "./tag-matcher.js";
 
-export type AWSResourceType =
-  | "cognito-user-pool"
-  | "cloudfront-distribution"
-  | "s3-bucket";
+export type AWSResourceType = "cognito-user-pool" | "cloudfront-distribution" | "s3-bucket";
 
 export interface DiscoveredResource {
   id: string;
@@ -145,7 +142,7 @@ export class ResourceDiscoveryEngine {
     this.workerIndex = workerIndex;
     this.cacheManager = new ResourceCacheManager(
       config.cacheTtlMs || 300000,
-      config.maxCacheSize || 100,
+      config.maxCacheSize || 100
     );
   }
 
@@ -155,7 +152,9 @@ export class ResourceDiscoveryEngine {
   registerAdapter(adapter: ServiceAdapter): void {
     this.serviceAdapters.set(adapter.getResourceType(), adapter);
     console.log(
-      `[ResourceDiscovery Worker ${this.workerIndex}] Registered adapter for ${adapter.getResourceType()}`,
+      `[ResourceDiscovery Worker ${
+        this.workerIndex
+      }] Registered adapter for ${adapter.getResourceType()}`
     );
   }
 
@@ -164,7 +163,7 @@ export class ResourceDiscoveryEngine {
    */
   async discoverByTags(
     resourceType: AWSResourceType,
-    filters: TagFilter[],
+    filters: TagFilter[]
   ): Promise<DiscoveredResource[]> {
     const cacheKey = TagMatcher.generateCacheKey(resourceType, filters);
 
@@ -172,48 +171,42 @@ export class ResourceDiscoveryEngine {
     const cachedResources = this.cacheManager.retrieve(cacheKey);
     if (cachedResources) {
       console.log(
-        `[ResourceDiscovery Worker ${this.workerIndex}] Cache hit for ${resourceType}: ${cachedResources.length} resources`,
+        `[ResourceDiscovery Worker ${this.workerIndex}] Cache hit for ${resourceType}: ${cachedResources.length} resources`
       );
       return cachedResources;
     }
 
     console.log(
-      `[ResourceDiscovery Worker ${this.workerIndex}] Cache miss for ${resourceType}, discovering resources...`,
+      `[ResourceDiscovery Worker ${this.workerIndex}] Cache miss for ${resourceType}, discovering resources...`
     );
 
     // Get appropriate service adapter
     const adapter = this.serviceAdapters.get(resourceType);
     if (!adapter) {
-      throw new Error(
-        `No service adapter registered for resource type: ${resourceType}`,
-      );
+      throw new Error(`No service adapter registered for resource type: ${resourceType}`);
     }
 
     try {
       // Discover resources using the adapter
-      const resources = await this.withRetry(
-        () => adapter.discoverResources(filters),
-        3,
-        1000,
-      );
+      const resources = await this.withRetry(() => adapter.discoverResources(filters), 3, 1000);
 
       // Let service adapters handle their own filtering logic
       // This prevents overly strict filtering that causes infinite loops
       console.log(
-        `[ResourceDiscovery Worker ${this.workerIndex}] Service adapter returned ${resources.length} ${resourceType} resources`,
+        `[ResourceDiscovery Worker ${this.workerIndex}] Service adapter returned ${resources.length} ${resourceType} resources`
       );
 
       // Cache the results from the service adapter
       this.cacheManager.store(cacheKey, resources);
 
       console.log(
-        `[ResourceDiscovery Worker ${this.workerIndex}] Discovered ${resources.length} ${resourceType} resources`,
+        `[ResourceDiscovery Worker ${this.workerIndex}] Discovered ${resources.length} ${resourceType} resources`
       );
       return resources;
     } catch (error) {
       console.error(
         `[ResourceDiscovery Worker ${this.workerIndex}] Error discovering ${resourceType}:`,
-        error,
+        error
       );
 
       // Return empty array on error to prevent test failures
@@ -226,7 +219,7 @@ export class ResourceDiscoveryEngine {
    */
   getCachedResources(
     resourceType: AWSResourceType,
-    filters: TagFilter[],
+    filters: TagFilter[]
   ): DiscoveredResource[] | null {
     const cacheKey = TagMatcher.generateCacheKey(resourceType, filters);
     return this.cacheManager.retrieve(cacheKey);
@@ -239,13 +232,11 @@ export class ResourceDiscoveryEngine {
     if (resourceType) {
       this.cacheManager.invalidate(resourceType);
       console.log(
-        `[ResourceDiscovery Worker ${this.workerIndex}] Invalidated cache for ${resourceType}`,
+        `[ResourceDiscovery Worker ${this.workerIndex}] Invalidated cache for ${resourceType}`
       );
     } else {
       this.cacheManager.invalidate();
-      console.log(
-        `[ResourceDiscovery Worker ${this.workerIndex}] Invalidated all cache entries`,
-      );
+      console.log(`[ResourceDiscovery Worker ${this.workerIndex}] Invalidated all cache entries`);
     }
   }
 
@@ -254,7 +245,7 @@ export class ResourceDiscoveryEngine {
    */
   async discoverWithFallback<T extends DiscoveredResource>(
     primaryStrategy: () => Promise<T[]>,
-    fallbackStrategy: () => Promise<T[]>,
+    fallbackStrategy: () => Promise<T[]>
   ): Promise<T[]> {
     if (!this.config.enableFallback) {
       return await primaryStrategy();
@@ -267,12 +258,12 @@ export class ResourceDiscoveryEngine {
       }
 
       console.warn(
-        `[ResourceDiscovery Worker ${this.workerIndex}] Primary strategy returned no results, trying fallback...`,
+        `[ResourceDiscovery Worker ${this.workerIndex}] Primary strategy returned no results, trying fallback...`
       );
     } catch (error) {
       console.warn(
         `[ResourceDiscovery Worker ${this.workerIndex}] Primary strategy failed, using fallback:`,
-        (error as Error).message,
+        (error as Error).message
       );
     }
 
@@ -282,9 +273,7 @@ export class ResourceDiscoveryEngine {
   /**
    * Validate discovered resources
    */
-  async validateResources(
-    resources: DiscoveredResource[],
-  ): Promise<DiscoveredResource[]> {
+  async validateResources(resources: DiscoveredResource[]): Promise<DiscoveredResource[]> {
     const validationPromises = resources.map(async (resource) => {
       const adapter = this.serviceAdapters.get(resource.resourceType);
       if (!adapter) {
@@ -297,7 +286,7 @@ export class ResourceDiscoveryEngine {
       } catch (error) {
         console.warn(
           `[ResourceDiscovery Worker ${this.workerIndex}] Validation failed for ${resource.id}:`,
-          error,
+          error
         );
         return null;
       }
@@ -305,7 +294,7 @@ export class ResourceDiscoveryEngine {
 
     const validationResults = await Promise.all(validationPromises);
     return validationResults.filter(
-      (resource): resource is DiscoveredResource => resource !== null,
+      (resource): resource is DiscoveredResource => resource !== null
     );
   }
 
@@ -313,14 +302,9 @@ export class ResourceDiscoveryEngine {
    * Prefetch common resources for worker initialization
    */
   async prefetchResources(commonFilters: TagFilter[]): Promise<void> {
-    console.log(
-      `[ResourceDiscovery Worker ${this.workerIndex}] Prefetching common resources...`,
-    );
+    console.log(`[ResourceDiscovery Worker ${this.workerIndex}] Prefetching common resources...`);
 
-    const resourceTypes: AWSResourceType[] = [
-      "cognito-user-pool",
-      "cloudfront-distribution",
-    ];
+    const resourceTypes: AWSResourceType[] = ["cognito-user-pool", "cloudfront-distribution"];
 
     const prefetchPromises = resourceTypes.map(async (resourceType) => {
       if (this.serviceAdapters.has(resourceType)) {
@@ -329,16 +313,14 @@ export class ResourceDiscoveryEngine {
         } catch (error) {
           console.warn(
             `[ResourceDiscovery Worker ${this.workerIndex}] Prefetch failed for ${resourceType}:`,
-            error,
+            error
           );
         }
       }
     });
 
     await Promise.all(prefetchPromises);
-    console.log(
-      `[ResourceDiscovery Worker ${this.workerIndex}] Prefetch completed`,
-    );
+    console.log(`[ResourceDiscovery Worker ${this.workerIndex}] Prefetch completed`);
   }
 
   /**
@@ -364,7 +346,7 @@ export class ResourceDiscoveryEngine {
   private async withRetry<T>(
     operation: () => Promise<T>,
     maxRetries: number = 3,
-    backoffMs: number = 1000,
+    backoffMs: number = 1000
   ): Promise<T> {
     let lastError: Error;
 
@@ -384,7 +366,7 @@ export class ResourceDiscoveryEngine {
 
         console.warn(
           `[ResourceDiscovery Worker ${this.workerIndex}] Attempt ${attempt} failed, retrying in ${delay}ms:`,
-          error,
+          error
         );
       }
     }
@@ -396,9 +378,7 @@ export class ResourceDiscoveryEngine {
    * Cleanup resources and connections
    */
   async cleanup(): Promise<void> {
-    console.log(
-      `[ResourceDiscovery Worker ${this.workerIndex}] Cleaning up discovery engine...`,
-    );
+    console.log(`[ResourceDiscovery Worker ${this.workerIndex}] Cleaning up discovery engine...`);
     this.cacheManager.invalidate();
     this.serviceAdapters.clear();
   }
@@ -409,7 +389,7 @@ export class ResourceDiscoveryEngine {
  */
 export function createResourceDiscoveryEngine(
   config: ResourceDiscoveryConfig,
-  workerIndex: number = 0,
+  workerIndex: number = 0
 ): ResourceDiscoveryEngine {
   return new ResourceDiscoveryEngine(config, workerIndex);
 }

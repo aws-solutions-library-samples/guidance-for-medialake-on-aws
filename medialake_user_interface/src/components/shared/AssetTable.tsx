@@ -29,10 +29,7 @@ import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import { type AssetTableColumn } from "@/types/shared/assetComponents";
 import { AssetAudio } from "../asset";
-import {
-  PLACEHOLDER_IMAGE,
-  VIDEO_PLACEHOLDER_IMAGE,
-} from "@/utils/placeholderSvg";
+import { PLACEHOLDER_IMAGE, VIDEO_PLACEHOLDER_IMAGE } from "@/utils/placeholderSvg";
 import { useFeatureFlag } from "@/utils/featureFlags";
 
 export interface AssetTableProps<T> {
@@ -42,10 +39,7 @@ export interface AssetTableProps<T> {
   onSortingChange: (sorting: SortingState) => void;
   onDeleteClick: (item: T, event: React.MouseEvent<HTMLElement>) => void;
   onDownloadClick: (item: T, event: React.MouseEvent<HTMLElement>) => void;
-  onAddToCollectionClick?: (
-    item: T,
-    event: React.MouseEvent<HTMLElement>,
-  ) => void;
+  onAddToCollectionClick?: (item: T, event: React.MouseEvent<HTMLElement>) => void;
   showRemoveButton?: boolean;
   onEditClick?: (item: T, event: React.MouseEvent<HTMLElement>) => void;
   onAssetClick: (item: T) => void;
@@ -57,10 +51,7 @@ export interface AssetTableProps<T> {
   editedName?: string;
   onEditNameChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onEditNameComplete?: (item: T, save: boolean, value?: string) => void;
-  onFilterClick?: (
-    event: React.MouseEvent<HTMLElement>,
-    columnId: string,
-  ) => void;
+  onFilterClick?: (event: React.MouseEvent<HTMLElement>, columnId: string) => void;
   activeFilters?: Array<{ columnId: string; value: string }>;
   onRemoveFilter?: (columnId: string) => void;
   isSelected?: (item: T) => boolean;
@@ -124,21 +115,15 @@ export function AssetTable<T>({
     // Legacy nested fields (for backward compatibility)
     "DigitalSourceAsset.Type": "type",
     "DigitalSourceAsset.MainRepresentation.Format": "format",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate":
-      "date",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate":
-      "date",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate": "date",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate": "date",
     "DigitalSourceAsset.CreateDate": "date",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name":
-      "name",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size":
-      "size",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize":
-      "size",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name": "name",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size": "size",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize": "size",
     "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath":
       "fullPath",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket":
-      "bucket",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket": "bucket",
     "Metadata.Consolidated": "metadata",
     InventoryID: "id",
   };
@@ -170,7 +155,7 @@ export function AssetTable<T>({
         });
       }
     },
-    [data, onSelectToggle, isSelected],
+    [data, onSelectToggle, isSelected]
   );
 
   // Update allSelected and someSelected states when data or isSelected changes
@@ -197,42 +182,34 @@ export function AssetTable<T>({
         // Special case for name field
         if (col.id === "name") {
           return selectedSearchFields.some(
-            (field) => field.includes("Name") || field === "objectName",
+            (field) => field.includes("Name") || field === "objectName"
           );
         }
 
         // Special case for date field
         if (col.id === "date") {
           return selectedSearchFields.some(
-            (field) => field.includes("CreateDate") || field === "createdAt",
+            (field) => field.includes("CreateDate") || field === "createdAt"
           );
         }
 
         // Special case for size field
         if (col.id === "size") {
           return selectedSearchFields.some(
-            (field) =>
-              field.includes("FileSize") ||
-              field.includes("Size") ||
-              field === "fileSize",
+            (field) => field.includes("FileSize") || field.includes("Size") || field === "fileSize"
           );
         }
 
         // Special case for fullPath field
         if (col.id === "fullPath") {
           return selectedSearchFields.some(
-            (field) =>
-              field.includes("FullPath") ||
-              field.includes("Path") ||
-              field === "fullPath",
+            (field) => field.includes("FullPath") || field.includes("Path") || field === "fullPath"
           );
         }
 
         // For other fields, check if any of their mapped API field IDs are in the selectedSearchFields
         const apiFieldIds = reverseFieldMapping[col.id] || [];
-        return apiFieldIds.some((apiFieldId) =>
-          selectedSearchFields.includes(apiFieldId),
-        );
+        return apiFieldIds.some((apiFieldId) => selectedSearchFields.includes(apiFieldId));
       });
     } else {
       // No selectedSearchFields - use the visible property
@@ -280,10 +257,7 @@ export function AssetTable<T>({
           enableSorting: false,
           size: 100,
           cell: (info) => (
-            <Box
-              sx={{ p: 1, display: "flex", justifyContent: "center" }}
-              className="checkbox-cell"
-            >
+            <Box sx={{ p: 1, display: "flex", justifyContent: "center" }} className="checkbox-cell">
               <Checkbox
                 size="small"
                 checked={isSelected(info.row.original)}
@@ -303,7 +277,7 @@ export function AssetTable<T>({
               />
             </Box>
           ),
-        }),
+        })
       );
     }
 
@@ -347,9 +321,7 @@ export function AssetTable<T>({
                 alt={getName(info.row.original)}
                 onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                   e.currentTarget.src =
-                    assetType === "Video"
-                      ? VIDEO_PLACEHOLDER_IMAGE
-                      : PLACEHOLDER_IMAGE;
+                    assetType === "Video" ? VIDEO_PLACEHOLDER_IMAGE : PLACEHOLDER_IMAGE;
                 }}
                 sx={{
                   width: 60,
@@ -365,8 +337,7 @@ export function AssetTable<T>({
       }),
       ...visibleColumns.map((col) =>
         columnHelper.accessor(
-          (row) =>
-            col.accessorFn ? col.accessorFn(row) : (row as any)[col.id],
+          (row) => (col.accessorFn ? col.accessorFn(row) : (row as any)[col.id]),
           {
             id: col.id,
             header: col.label,
@@ -451,22 +422,15 @@ export function AssetTable<T>({
                               e.stopPropagation();
                               e.preventDefault();
                               console.log("💾 AssetTable Save clicked");
-                              console.log(
-                                "💾 AssetTable commitRef.current:",
-                                commitRef.current,
-                              );
+                              console.log("💾 AssetTable commitRef.current:", commitRef.current);
                               // Reset the prevent flag
                               preventCommitRef.current = false;
                               // Call the commit function directly via ref
                               if (commitRef.current) {
-                                console.log(
-                                  "💾 AssetTable calling commitRef.current()",
-                                );
+                                console.log("💾 AssetTable calling commitRef.current()");
                                 commitRef.current();
                               } else {
-                                console.error(
-                                  "💾 AssetTable commitRef.current is null!",
-                                );
+                                console.error("💾 AssetTable commitRef.current is null!");
                               }
                             }}
                           >
@@ -483,11 +447,7 @@ export function AssetTable<T>({
                             }}
                             onClick={(e) => {
                               e.stopPropagation();
-                              onEditNameComplete?.(
-                                info.row.original,
-                                false,
-                                undefined,
-                              );
+                              onEditNameComplete?.(info.row.original, false, undefined);
                             }}
                           >
                             Cancel
@@ -525,17 +485,15 @@ export function AssetTable<T>({
               // 3) Final fallback - display raw value:
               return <Box sx={{ p: 1 }}>{info.getValue()}</Box>;
             },
-          },
-        ),
+          }
+        )
       ),
       columnHelper.display({
         id: "actions",
         header: "Actions",
         size: 150,
         cell: (info) => (
-          <Box
-            sx={{ display: "flex", gap: 1, justifyContent: "flex-end", p: 1 }}
-          >
+          <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end", p: 1 }}>
             {favoritesFeature.value && (
               <IconButton
                 size="small"
@@ -556,10 +514,7 @@ export function AssetTable<T>({
                 )}
               </IconButton>
             )}
-            <IconButton
-              size="small"
-              onClick={(e) => onDeleteClick(info.row.original, e)}
-            >
+            <IconButton size="small" onClick={(e) => onDeleteClick(info.row.original, e)}>
               <DeleteIcon fontSize="small" />
             </IconButton>
             <IconButton
@@ -587,7 +542,7 @@ export function AssetTable<T>({
             )}
           </Box>
         ),
-      }),
+      })
     );
 
     return tableColumns;

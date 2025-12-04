@@ -13,10 +13,7 @@ interface AssetGridViewProps<T> {
   onAssetClick: (asset: T) => void;
   onDeleteClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onDownloadClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
-  onAddToCollectionClick?: (
-    asset: T,
-    event: React.MouseEvent<HTMLElement>,
-  ) => void;
+  onAddToCollectionClick?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   showRemoveButton?: boolean;
   onEditClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
@@ -84,7 +81,7 @@ function AssetGridView<T>({
   console.log(
     "AssetGridView: onAddToCollectionClick prop is:",
     typeof onAddToCollectionClick,
-    onAddToCollectionClick,
+    onAddToCollectionClick
   );
 
   // Group results by type if needed
@@ -107,7 +104,7 @@ function AssetGridView<T>({
         acc[normalizedType].push(item);
         return acc;
       },
-      {} as Record<string, T[]>,
+      {} as Record<string, T[]>
     );
   }, [results, groupByType, getAssetType]);
 
@@ -145,34 +142,22 @@ function AssetGridView<T>({
               onDeleteClick={(e) => onDeleteClick(asset, e)}
               onDownloadClick={(e) => onDownloadClick(asset, e)}
               onAddToCollectionClick={
-                onAddToCollectionClick
-                  ? (e) => onAddToCollectionClick(asset, e)
-                  : undefined
+                onAddToCollectionClick ? (e) => onAddToCollectionClick(asset, e) : undefined
               }
               showRemoveButton={showRemoveButton}
               onEditClick={(e) => onEditClick(asset, e)}
               isEditing={editingAssetId === getAssetId(asset)}
               editedName={editedName}
               onEditNameChange={onEditNameChange}
-              onEditNameComplete={(save, value) =>
-                onEditNameComplete(asset, save, value)
-              }
+              onEditNameComplete={(save, value) => onEditNameComplete(asset, save, value)}
               cardSize={cardSize}
               aspectRatio={aspectRatio}
               thumbnailScale={thumbnailScale}
               showMetadata={showMetadata}
-              isFavorite={
-                isAssetFavorited ? isAssetFavorited(getAssetId(asset)) : false
-              }
-              onFavoriteToggle={
-                onFavoriteToggle ? (e) => onFavoriteToggle(asset, e) : undefined
-              }
-              isSelected={
-                isAssetSelected ? isAssetSelected(getAssetId(asset)) : false
-              }
-              onSelectToggle={
-                onSelectToggle ? (id, e) => onSelectToggle(asset, e) : undefined
-              }
+              isFavorite={isAssetFavorited ? isAssetFavorited(getAssetId(asset)) : false}
+              onFavoriteToggle={onFavoriteToggle ? (e) => onFavoriteToggle(asset, e) : undefined}
+              isSelected={isAssetSelected ? isAssetSelected(getAssetId(asset)) : false}
+              onSelectToggle={onSelectToggle ? (id, e) => onSelectToggle(asset, e) : undefined}
               selectedSearchFields={selectedSearchFields}
               isRenaming={isRenaming && renamingAssetId === getAssetId(asset)}
               isSemantic={isSemantic}
@@ -217,9 +202,7 @@ function AssetGridView<T>({
                       id={getAssetId(asset)}
                       name={getAssetName(asset)}
                       thumbnailUrl={getAssetThumbnail(asset)}
-                      proxyUrl={
-                        getAssetProxy ? getAssetProxy(asset) : undefined
-                      }
+                      proxyUrl={getAssetProxy ? getAssetProxy(asset) : undefined}
                       assetType={getAssetType(asset)}
                       clips={(asset as any).clips}
                       fields={cardFields}
@@ -228,46 +211,28 @@ function AssetGridView<T>({
                       onDeleteClick={(e) => onDeleteClick(asset, e)}
                       onDownloadClick={(e) => onDownloadClick(asset, e)}
                       onAddToCollectionClick={
-                        onAddToCollectionClick
-                          ? (e) => onAddToCollectionClick(asset, e)
-                          : undefined
+                        onAddToCollectionClick ? (e) => onAddToCollectionClick(asset, e) : undefined
                       }
                       showRemoveButton={showRemoveButton}
                       onEditClick={(e) => onEditClick(asset, e)}
                       isEditing={editingAssetId === getAssetId(asset)}
                       editedName={editedName}
                       onEditNameChange={onEditNameChange}
-                      onEditNameComplete={(save, value) =>
-                        onEditNameComplete(asset, save, value)
-                      }
+                      onEditNameComplete={(save, value) => onEditNameComplete(asset, save, value)}
                       cardSize={cardSize}
                       aspectRatio={aspectRatio}
                       thumbnailScale={thumbnailScale}
                       showMetadata={showMetadata}
-                      isFavorite={
-                        isAssetFavorited
-                          ? isAssetFavorited(getAssetId(asset))
-                          : false
-                      }
+                      isFavorite={isAssetFavorited ? isAssetFavorited(getAssetId(asset)) : false}
                       onFavoriteToggle={
-                        onFavoriteToggle
-                          ? (e) => onFavoriteToggle(asset, e)
-                          : undefined
+                        onFavoriteToggle ? (e) => onFavoriteToggle(asset, e) : undefined
                       }
-                      isSelected={
-                        isAssetSelected
-                          ? isAssetSelected(getAssetId(asset))
-                          : false
-                      }
+                      isSelected={isAssetSelected ? isAssetSelected(getAssetId(asset)) : false}
                       onSelectToggle={
-                        onSelectToggle
-                          ? (id, e) => onSelectToggle(asset, e)
-                          : undefined
+                        onSelectToggle ? (id, e) => onSelectToggle(asset, e) : undefined
                       }
                       selectedSearchFields={selectedSearchFields}
-                      isRenaming={
-                        isRenaming && renamingAssetId === getAssetId(asset)
-                      }
+                      isRenaming={isRenaming && renamingAssetId === getAssetId(asset)}
                       isSemantic={isSemantic}
                       confidenceThreshold={confidenceThreshold}
                     />
@@ -275,7 +240,7 @@ function AssetGridView<T>({
                 ))}
               </Grid>
             </Box>
-          ),
+          )
       )}
     </Box>
   );

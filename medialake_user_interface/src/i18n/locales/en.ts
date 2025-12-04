@@ -32,8 +32,7 @@ export default {
     connectorLabel: "S3 Connector",
     selectConnectorPlaceholder: "Select an S3 connector",
     loadingConnectors: "Loading connectors...",
-    noConnectors:
-      "No S3 connectors available. Please configure an S3 connector first.",
+    noConnectors: "No S3 connectors available. Please configure an S3 connector first.",
     dashboardNote:
       "Only audio/*, video/*, image/*, HLS (application/x-mpegURL), and MPEG-DASH (application/dash+xml) files are allowed",
     meta: {
@@ -44,11 +43,9 @@ export default {
     title: "Select Upload Path",
     descriptionRestricted:
       "Browse and select a folder within the allowed paths for uploading your files.",
-    descriptionUnrestricted:
-      "Browse and select any folder in the bucket for uploading your files.",
+    descriptionUnrestricted: "Browse and select any folder in the bucket for uploading your files.",
     prefixLabel: "Allowed Path",
-    prefixHelper:
-      "You can only browse and upload to folders within the selected path.",
+    prefixHelper: "You can only browse and upload to folders within the selected path.",
     selectedPath: "Selected Path",
     currentPath: "Current Path",
     confirm: "Use This Path",
@@ -63,8 +60,7 @@ export default {
     hints: {
       clickFolder:
         "Click on a folder to navigate into it, then click 'Select Current Folder' to choose it.",
-      navigateAndConfirm:
-        "Navigate to the folder you want, then click 'Use This Path' to confirm.",
+      navigateAndConfirm: "Navigate to the folder you want, then click 'Use This Path' to confirm.",
       rootPath: "You are currently at the root level.",
     },
   },
@@ -132,8 +128,7 @@ export default {
     },
     deleteDialog: {
       title: "Confirm Delete",
-      description:
-        "Are you sure you want to delete this asset? This action cannot be undone.",
+      description: "Are you sure you want to delete this asset? This action cannot be undone.",
       cancel: "Cancel",
       confirm: "Delete",
       deleting: "Deleting...",
@@ -180,10 +175,8 @@ export default {
     },
     deleteDialog: {
       title: "Delete Collection",
-      description:
-        "Are you sure you want to delete this collection? This action cannot be undone.",
-      cascadeWarning:
-        "All items and sub-collections within this collection will also be removed.",
+      description: "Are you sure you want to delete this collection? This action cannot be undone.",
+      cascadeWarning: "All items and sub-collections within this collection will also be removed.",
       cancel: "Cancel",
       confirm: "Delete",
       deleting: "Deleting...",
@@ -315,8 +308,7 @@ export default {
     deleteConfirmation: {
       title: "Delete Integration",
       message: "Are you sure you want to delete this integration?",
-      warning:
-        "Caution: Removing this integration may cause pipelines that rely on it to fail.",
+      warning: "Caution: Removing this integration may cause pipelines that rely on it to fail.",
     },
     form: {
       search: {
@@ -557,17 +549,14 @@ export default {
         configurePrompt: "Configure Twelve Labs to enable search capabilities.",
         semanticEnabled: "Semantic Search Enabled",
         semanticEnabledDesc: "Enable or disable semantic search functionality",
-        providerDesc:
-          "Select the embedding provider for semantic search capabilities",
+        providerDesc: "Select the embedding provider for semantic search capabilities",
         selectProvider: "Select Provider",
         editApiKey: "Edit", // pragma: allowlist secret
         configured: "Configured",
         configureApiKey: "Configure API Key", // pragma: allowlist secret
-        apiKeyDesc:
-          "Enter your Twelve Labs API key to enable semantic search functionality.",
+        apiKeyDesc: "Enter your Twelve Labs API key to enable semantic search functionality.", // pragma: allowlist secret
         embeddingStore: "Semantic Search Embedding Store",
-        embeddingStoreDesc:
-          "Choose what embedding store to use for semantic searches",
+        embeddingStoreDesc: "Choose what embedding store to use for semantic searches",
         selectStore: "Select Store",
         saveSuccess: "Settings saved successfully",
         saveError: "Failed to save settings",
@@ -654,8 +643,7 @@ export default {
       noResults: "No items match your filter",
     },
     keyboard: {
-      navigation:
-        "Use arrow keys to navigate, Enter to open, Backspace to go back",
+      navigation: "Use arrow keys to navigate, Enter to open, Backspace to go back",
     },
     menu: {
       rename: "Rename",
@@ -887,8 +875,7 @@ export default {
       error: {
         loading: "Error loading S3 objects: {{message}}",
         network: "Network error. Please check your connection and try again.",
-        permission:
-          "Access denied. You don't have permission to access this path.",
+        permission: "Access denied. You don't have permission to access this path.",
         permissionWithPrefixes:
           "Access denied. You can only access the following paths: {{prefixes}}",
         notFound: "The requested path does not exist.",
@@ -904,8 +891,7 @@ export default {
         noResults: "No items match your filter",
       },
       keyboard: {
-        navigation:
-          "Use arrow keys to navigate, Enter to open, Backspace to go back",
+        navigation: "Use arrow keys to navigate, Enter to open, Backspace to go back",
       },
       menu: {
         rename: "Rename",
@@ -918,8 +904,7 @@ export default {
     },
     metadata: {
       title: "Coming Soon",
-      description:
-        "We're working to bring you metadata management capabilities. Stay tuned!",
+      description: "We're working to bring you metadata management capabilities. Stay tuned!",
     },
     pipelines: {
       title: "Pipelines",
@@ -970,8 +955,7 @@ export default {
           },
           delete: {
             title: "Delete Pipeline",
-            message:
-              "Are you sure you want to delete this pipeline? This action cannot be undone.",
+            message: "Are you sure you want to delete this pipeline? This action cannot be undone.",
             confirm: "Type the pipeline name to confirm deletion:",
           },
         },
@@ -1004,8 +988,7 @@ export default {
       deleteConfirmation: {
         title: "Delete Integration",
         message: "Are you sure you want to delete this integration?",
-        warning:
-          "Warning: Deleting this integration may break pipelines that are using it.",
+        warning: "Warning: Deleting this integration may break pipelines that are using it.",
       },
       form: {
         title: "Add Integration",

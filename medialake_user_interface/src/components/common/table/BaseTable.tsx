@@ -48,8 +48,7 @@ export const BaseTable = <T extends object>({
   const paddingTop = virtualizer.getVirtualItems()[0]?.start || 0;
   const paddingBottom =
     virtualizer.getTotalSize() -
-    (virtualizer.getVirtualItems()[virtualizer.getVirtualItems().length - 1]
-      ?.end || 0);
+    (virtualizer.getVirtualItems()[virtualizer.getVirtualItems().length - 1]?.end || 0);
 
   return (
     <TableContainer component={Paper}>
@@ -76,7 +75,7 @@ export const BaseTable = <T extends object>({
                         header.column.columnDef.header as ColumnDefTemplate<
                           HeaderContext<T, unknown>
                         >,
-                        header.getContext(),
+                        header.getContext()
                       )}
                 </TableCell>
               ))}
@@ -96,10 +95,8 @@ export const BaseTable = <T extends object>({
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id}>
                     {flexRender(
-                      cell.column.columnDef.cell as ColumnDefTemplate<
-                        CellContext<T, unknown>
-                      >,
-                      cell.getContext(),
+                      cell.column.columnDef.cell as ColumnDefTemplate<CellContext<T, unknown>>,
+                      cell.getContext()
                     )}
                   </TableCell>
                 ))}

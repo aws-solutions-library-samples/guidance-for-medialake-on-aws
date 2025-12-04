@@ -24,7 +24,7 @@ export const PipelineDeleteButton: React.FC<PipelineDeleteButtonProps> = ({
     // Use the browser's native confirm dialog directly
     if (
       window.confirm(
-        `Are you sure you want to delete pipeline "${name}"? This action cannot be undone.`,
+        `Are you sure you want to delete pipeline "${name}"? This action cannot be undone.`
       )
     ) {
       try {
@@ -39,7 +39,7 @@ export const PipelineDeleteButton: React.FC<PipelineDeleteButtonProps> = ({
         console.error("Error deleting pipeline:", error);
         // Show error message
         alert(
-          `Error deleting pipeline: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error deleting pipeline: ${error instanceof Error ? error.message : "Unknown error"}`
         );
       }
     }

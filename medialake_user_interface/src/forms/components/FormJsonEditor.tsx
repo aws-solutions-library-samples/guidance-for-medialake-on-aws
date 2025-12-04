@@ -11,10 +11,7 @@ interface FormJsonEditorProps<T extends FieldValues> {
   placeholder?: string;
 }
 
-export function FormJsonEditor<T extends FieldValues>({
-  name,
-  control,
-}: FormJsonEditorProps<T>) {
+export function FormJsonEditor<T extends FieldValues>({ name, control }: FormJsonEditorProps<T>) {
   return (
     <Controller
       name={name}
@@ -36,12 +33,7 @@ export function FormJsonEditor<T extends FieldValues>({
           field.onChange(JSON.stringify(value));
         };
 
-        return (
-          <EventBridgePatternEditor
-            value={parseValue(field.value)}
-            onChange={handleChange}
-          />
-        );
+        return <EventBridgePatternEditor value={parseValue(field.value)} onChange={handleChange} />;
       }}
     />
   );

@@ -12,8 +12,7 @@ export const createJobStatusNodeData = () => {
     id: `job-status-${Date.now()}`,
     type: "UTILITY",
     label: "Check Job Status",
-    description:
-      "Checks the status of a job and routes based on completion status",
+    description: "Checks the status of a job and routes based on completion status",
     inputTypes: ["*"],
     outputTypes: ["completed", "in-progress", "failed"],
     selectedMethod: JOB_STATUS_NODE_METHOD,

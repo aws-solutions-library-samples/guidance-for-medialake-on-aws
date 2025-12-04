@@ -13,10 +13,7 @@ interface UseColumnsProps {
 
 const columnHelper = createColumnHelper<Integration>();
 
-export const useColumns = ({
-  onEditIntegration,
-  onDeleteIntegration,
-}: UseColumnsProps) => {
+export const useColumns = ({ onEditIntegration, onDeleteIntegration }: UseColumnsProps) => {
   return useMemo(
     () => [
       columnHelper.accessor("name", {
@@ -47,14 +44,10 @@ export const useColumns = ({
         header: "Actions",
         size: 100,
         cell: (info) => (
-          <ActionsCell
-            row={info.row}
-            onEdit={onEditIntegration}
-            onDelete={onDeleteIntegration}
-          />
+          <ActionsCell row={info.row} onEdit={onEditIntegration} onDelete={onDeleteIntegration} />
         ),
       }),
     ],
-    [onEditIntegration, onDeleteIntegration],
+    [onEditIntegration, onDeleteIntegration]
   );
 };

@@ -14,12 +14,7 @@ class PermissionTokenCache {
   /**
    * Store permissions with token information
    */
-  static set(
-    user: User,
-    customPermissions: string[],
-    token: string,
-    expiresIn: number,
-  ): void {
+  static set(user: User, customPermissions: string[], token: string, expiresIn: number): void {
     const cacheData: CachedPermissions = {
       user,
       customPermissions,
@@ -29,10 +24,7 @@ class PermissionTokenCache {
 
     try {
       localStorage.setItem(this.CACHE_KEY, JSON.stringify(cacheData));
-      console.log(
-        "Cached permissions until:",
-        new Date(cacheData.expiresAt).toISOString(),
-      );
+      console.log("Cached permissions until:", new Date(cacheData.expiresAt).toISOString());
     } catch (error) {
       console.error("Failed to cache permissions:", error);
     }
@@ -41,9 +33,7 @@ class PermissionTokenCache {
   /**
    * Get cached permissions if valid
    */
-  static get(
-    currentToken: string,
-  ): { user: User; customPermissions: string[] } | null {
+  static get(currentToken: string): { user: User; customPermissions: string[] } | null {
     try {
       const cached = localStorage.getItem(this.CACHE_KEY);
       if (!cached) return null;
@@ -66,7 +56,7 @@ class PermissionTokenCache {
 
       console.log(
         "Using cached permissions, expires at:",
-        new Date(cacheData.expiresAt).toISOString(),
+        new Date(cacheData.expiresAt).toISOString()
       );
       return {
         user: cacheData.user,

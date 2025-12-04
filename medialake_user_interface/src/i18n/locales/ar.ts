@@ -41,8 +41,7 @@ export default {
   },
   pathBrowser: {
     title: "حدد مسار التحميل",
-    descriptionRestricted:
-      "تصفح وحدد مجلدًا ضمن المسارات المسموح بها لتحميل ملفاتك.",
+    descriptionRestricted: "تصفح وحدد مجلدًا ضمن المسارات المسموح بها لتحميل ملفاتك.",
     descriptionUnrestricted: "تصفح وحدد أي مجلد في الحاوية لتحميل ملفاتك.",
     prefixLabel: "المسار المسموح به",
     prefixHelper: "يمكنك فقط التصفح والتحميل إلى المجلدات ضمن المسار المحدد.",
@@ -58,18 +57,15 @@ export default {
       loadingFailed: "فشل تحميل معلومات الموصل.",
     },
     hints: {
-      clickFolder:
-        "انقر على مجلد للانتقال إليه، ثم انقر على 'تحديد المجلد الحالي' لاختياره.",
-      navigateAndConfirm:
-        "انتقل إلى المجلد الذي تريده، ثم انقر على 'استخدم هذا المسار' للتأكيد.",
+      clickFolder: "انقر على مجلد للانتقال إليه، ثم انقر على 'تحديد المجلد الحالي' لاختياره.",
+      navigateAndConfirm: "انتقل إلى المجلد الذي تريده، ثم انقر على 'استخدم هذا المسار' للتأكيد.",
       rootPath: "أنت حاليًا في المستوى الجذر.",
     },
   },
   assetExplorer: {
     noConnectorSelected: "اختر موصل لعرض الأصول",
     noAssetsFound: "لم يتم العثور على أصول لهذا الموصل",
-    noIndexedAssets:
-      'لم يتم العثور على أصول مفهرسة لهذا الموصل في الحاوية "{{bucketName}}".',
+    noIndexedAssets: 'لم يتم العثور على أصول مفهرسة لهذا الموصل في الحاوية "{{bucketName}}".',
     loadingAssets: "جارٍ تحميل الأصول...",
     menu: {
       rename: "إعادة التسمية",
@@ -78,8 +74,7 @@ export default {
     },
     deleteDialog: {
       title: "تأكيد الحذف",
-      description:
-        "هل أنت متأكد أنك تريد حذف هذا الأصل؟ لا يمكن التراجع عن هذا الإجراء.",
+      description: "هل أنت متأكد أنك تريد حذف هذا الأصل؟ لا يمكن التراجع عن هذا الإجراء.",
       cancel: "إلغاء",
       confirm: "حذف",
     },
@@ -367,8 +362,7 @@ export default {
       },
       search: {
         title: "إعدادات البحث",
-        description:
-          "قم بتكوين مزود البحث لتحسين قدرات البحث عبر أصول الوسائط الخاصة بك.",
+        description: "قم بتكوين مزود البحث لتحسين قدرات البحث عبر أصول الوسائط الخاصة بك.",
         provider: "مزود البحث:",
         configureProvider: "تكوين مزود البحث",
         editProvider: "تعديل المزود",
@@ -647,8 +641,7 @@ export default {
     },
     notifications: {
       "Pipeline Complete": "اكتمل خط الأنابيب",
-      "Asset processing pipeline completed successfully":
-        "اكتمل خط معالجة الأصول بنجاح",
+      "Asset processing pipeline completed successfully": "اكتمل خط معالجة الأصول بنجاح",
       "Storage Warning": "تحذير التخزين",
       "Storage capacity reaching 80%": "سعة التخزين تقترب من 80%",
       "Pipeline Failed": "فشل خط الأنابيب",
@@ -714,8 +707,7 @@ export default {
         noResults: "لا توجد عناصر تطابق التصفية الخاصة بك",
       },
       keyboard: {
-        navigation:
-          "استخدم مفاتيح الأسهم للتنقل، Enter للفتح، Backspace للرجوع",
+        navigation: "استخدم مفاتيح الأسهم للتنقل، Enter للفتح، Backspace للرجوع",
       },
       menu: {
         rename: "إعادة التسمية",
@@ -773,14 +765,12 @@ export default {
         modals: {
           error: {
             title: "خطأ",
-            incompatibleNodes:
-              "مخرجات العقدة السابقة غير متوافقة مع مدخلات العقدة الوجهة.",
+            incompatibleNodes: "مخرجات العقدة السابقة غير متوافقة مع مدخلات العقدة الوجهة.",
             validation: "فشل التحقق من خط الأنابيب",
           },
           delete: {
             title: "حذف خط الأنابيب",
-            message:
-              "هل أنت متأكد أنك تريد حذف هذا الخط؟ لا يمكن التراجع عن هذا الإجراء.",
+            message: "هل أنت متأكد أنك تريد حذف هذا الخط؟ لا يمكن التراجع عن هذا الإجراء.",
             confirm: "اكتب اسم خط الأنابيب لتأكيد الحذف:",
           },
         },

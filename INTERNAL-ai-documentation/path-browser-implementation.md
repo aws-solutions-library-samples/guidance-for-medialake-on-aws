@@ -9,6 +9,7 @@ Created a new PathBrowser component that bridges the gap between connector selec
 ### Files Created
 
 1. **medialake_user_interface/src/features/upload/components/PathBrowser.tsx**
+
    - New React functional component with full TypeScript typing
    - Manages prefix selection and path browsing state
    - Integrates with existing S3Explorer component
@@ -24,6 +25,7 @@ Created a new PathBrowser component that bridges the gap between connector selec
 ### Files Modified
 
 3. **medialake_user_interface/src/i18n/locales/en.ts**
+
    - Added pathBrowser translation section after upload section
    - Includes all required translation keys for UI elements, validation, errors, and hints
 
@@ -35,6 +37,7 @@ Created a new PathBrowser component that bridges the gap between connector selec
 ### Two Operating Modes
 
 1. **Restricted Mode** (when allowedPrefixes provided)
+
    - Shows prefix dropdown with normalized allowed paths
    - Validates selected paths against allowed prefixes
    - Displays helper text about restrictions

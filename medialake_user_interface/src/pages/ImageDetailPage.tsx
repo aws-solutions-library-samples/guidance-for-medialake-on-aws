@@ -1,28 +1,9 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import {
-  Box,
-  CircularProgress,
-  Typography,
-  Paper,
-  Button,
-  Tabs,
-  Tab,
-  alpha,
-} from "@mui/material";
-import {
-  useAsset,
-  useRelatedVersions,
-  RelatedVersionsResponse,
-} from "../api/hooks/useAssets";
-import {
-  RightSidebarProvider,
-  useRightSidebar,
-} from "../components/common/RightSidebar";
-import {
-  RecentlyViewedProvider,
-  useTrackRecentlyViewed,
-} from "../contexts/RecentlyViewedContext";
+import { Box, CircularProgress, Typography, Paper, Button, Tabs, Tab, alpha } from "@mui/material";
+import { useAsset, useRelatedVersions, RelatedVersionsResponse } from "../api/hooks/useAssets";
+import { RightSidebarProvider, useRightSidebar } from "../components/common/RightSidebar";
+import { RecentlyViewedProvider, useTrackRecentlyViewed } from "../contexts/RecentlyViewedContext";
 import { formatFileSize } from "../utils/imageUtils";
 import ImageViewer from "../components/common/ImageViewer";
 import BreadcrumbNavigation from "../components/common/BreadcrumbNavigation";
@@ -44,23 +25,15 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
   const imageMetadata = metadata?.Image?.[0] || {};
 
   // Create a helper function to render a field only if it exists in the API response
-  const renderField = (
-    label: string,
-    value: any,
-    formatter?: (val: any) => string,
-  ) => {
+  const renderField = (label: string, value: any, formatter?: (val: any) => string) => {
     if (value === undefined || value === null) return null;
 
     return (
       <Box sx={{ display: "flex", mb: 1 }}>
-        <Typography
-          sx={{ width: "120px", color: "text.secondary", fontSize: "0.875rem" }}
-        >
+        <Typography sx={{ width: "120px", color: "text.secondary", fontSize: "0.875rem" }}>
           {label}:
         </Typography>
-        <Typography
-          sx={{ flex: 1, fontSize: "0.875rem", wordBreak: "break-all" }}
-        >
+        <Typography sx={{ flex: 1, fontSize: "0.875rem", wordBreak: "break-all" }}>
           {formatter ? formatter(value) : value}
         </Typography>
       </Box>
@@ -69,23 +42,17 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
 
   // File Information fields
   const fileSize =
-    asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation
-      ?.FileInfo?.Size;
+    asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.FileInfo?.Size;
   const fileType = asset?.DigitalSourceAsset?.Type;
   const fileFormat = asset?.DigitalSourceAsset?.MainRepresentation?.Format;
   const s3Bucket =
-    asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation
-      ?.Bucket;
+    asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.Bucket;
   const objectName =
-    asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation
-      ?.ObjectKey?.Name;
+    asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey?.Name;
   const objectFullPath =
-    asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation
-      ?.ObjectKey?.FullPath;
-  const s3Uri =
-    s3Bucket && objectFullPath
-      ? `s3://${s3Bucket}/${objectFullPath}`
-      : undefined;
+    asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey
+      ?.FullPath;
+  const s3Uri = s3Bucket && objectFullPath ? `s3://${s3Bucket}/${objectFullPath}` : undefined;
 
   // Technical details
   const width = imageMetadata?.Width || generalMetadata?.ImageWidth;
@@ -93,8 +60,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
   const dimensions = width && height ? `${width}x${height}` : undefined;
   const colorDepth = imageMetadata?.BitDepth || imageMetadata?.Bitdepth;
   const colorSpace = imageMetadata?.ColorSpace || imageMetadata?.Colorspace;
-  const compression =
-    imageMetadata?.Compression || imageMetadata?.CompressionAlgorithm;
+  const compression = imageMetadata?.Compression || imageMetadata?.CompressionAlgorithm;
   const createdDate = asset?.DigitalSourceAsset?.CreateDate
     ? new Date(asset.DigitalSourceAsset.CreateDate).toLocaleDateString()
     : undefined;
@@ -177,16 +143,14 @@ const RelatedItemsTab: React.FC<{
     const mappedItems = relatedVersionsData.data.results.map((result) => ({
       id: result.InventoryID,
       title:
-        result.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-          .ObjectKey.Name,
+        result.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
       type: result.DigitalSourceAsset.Type,
       thumbnail: result.thumbnailUrl,
       proxyUrl: result.proxyUrl,
       score: result.score,
       format: result.DigitalSourceAsset.MainRepresentation.Format,
       fileSize:
-        result.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-          .FileInfo.Size,
+        result.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
       createDate: result.DigitalSourceAsset.CreateDate,
     }));
     console.log("Mapped items:", mappedItems);
@@ -199,8 +163,7 @@ const RelatedItemsTab: React.FC<{
       return false;
     }
 
-    const { totalResults, page, pageSize } =
-      relatedVersionsData.data.searchMetadata;
+    const { totalResults, page, pageSize } = relatedVersionsData.data.searchMetadata;
     const hasMoreItems = totalResults > page * pageSize;
     console.log("Has more items:", hasMoreItems);
     return hasMoreItems;
@@ -224,12 +187,12 @@ const ImageDetailContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState("summary");
   const [relatedPage, setRelatedPage] = useState(1);
   const { data: assetData, isLoading: isLoadingAsset } = useAsset(id || "");
-  const { data: relatedVersionsData, isLoading: isLoadingRelated } =
-    useRelatedVersions(id || "", relatedPage);
-  const { isExpanded } = useRightSidebar();
-  const [commentAnchorEl, setCommentAnchorEl] = useState<null | HTMLElement>(
-    null,
+  const { data: relatedVersionsData, isLoading: isLoadingRelated } = useRelatedVersions(
+    id || "",
+    relatedPage
   );
+  const { isExpanded } = useRightSidebar();
+  const [commentAnchorEl, setCommentAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedComment, setSelectedComment] = useState<number | null>(null);
   const [showHeader, setShowHeader] = useState(true);
   const [comments, setComments] = useState([
@@ -256,9 +219,7 @@ const ImageDetailContent: React.FC = () => {
   // Scroll to top when component mounts
   useEffect(() => {
     // Find the scrollable container in the AppLayout
-    const container = document.querySelector(
-      '[class*="AppLayout"] [style*="overflow: auto"]',
-    );
+    const container = document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]');
     if (container) {
       container.scrollTo(0, 0);
     } else {
@@ -274,8 +235,7 @@ const ImageDetailContent: React.FC = () => {
     const handleScroll = () => {
       // Get scrollTop from the parent scrollable container instead
       const currentScrollTop =
-        document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]')
-          ?.scrollTop || 0;
+        document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]')?.scrollTop || 0;
 
       if (currentScrollTop <= 10) {
         setShowHeader(true);
@@ -289,9 +249,7 @@ const ImageDetailContent: React.FC = () => {
     };
 
     // Listen to scroll on the parent container
-    const container = document.querySelector(
-      '[class*="AppLayout"] [style*="overflow: auto"]',
-    );
+    const container = document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]');
     if (container) {
       container.addEventListener("scroll", handleScroll, { passive: true });
     }
@@ -308,19 +266,13 @@ const ImageDetailContent: React.FC = () => {
     const asset = assetData.data.asset;
     return {
       id,
-      title:
-        asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-          .ObjectKey.Name,
-      type: asset.DigitalSourceAsset.Type.toLowerCase() as
-        | "video"
-        | "image"
-        | "audio",
+      title: asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+      type: asset.DigitalSourceAsset.Type.toLowerCase() as "video" | "image" | "audio",
       path: location.pathname,
       searchTerm: "",
       metadata: {
         fileSize: formatFileSize(
-          asset.DigitalSourceAsset.MainRepresentation.StorageInfo
-            .PrimaryLocation.FileInfo.Size,
+          asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size
         ),
       },
     };
@@ -350,18 +302,16 @@ const ImageDetailContent: React.FC = () => {
 
     return Object.entries(metadata).map(([parentCategory, parentData]) => ({
       category: parentCategory,
-      subCategories: Object.entries(parentData as object).map(
-        ([subCategory, data]) => ({
-          category: subCategory,
-          data: data,
-          count:
-            typeof data === "object"
-              ? Array.isArray(data)
-                ? data.length
-                : Object.keys(data).length
-              : 1,
-        }),
-      ),
+      subCategories: Object.entries(parentData as object).map(([subCategory, data]) => ({
+        category: subCategory,
+        data: data,
+        count:
+          typeof data === "object"
+            ? Array.isArray(data)
+              ? data.length
+              : Object.keys(data).length
+            : 1,
+      })),
       count: Object.keys(parentData as object).length,
     }));
   }, []);
@@ -382,11 +332,10 @@ const ImageDetailContent: React.FC = () => {
     return [
       {
         id: assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID,
-        src: assetData.data.asset.DigitalSourceAsset.MainRepresentation
-          .StorageInfo.PrimaryLocation.ObjectKey.FullPath,
+        src: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
+          .ObjectKey.FullPath,
         type: "Original",
-        format:
-          assetData.data.asset.DigitalSourceAsset.MainRepresentation.Format,
+        format: assetData.data.asset.DigitalSourceAsset.MainRepresentation.Format,
         fileSize:
           assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size.toString(),
         description: "Original high resolution version",
@@ -398,7 +347,7 @@ const ImageDetailContent: React.FC = () => {
         format: rep.Format,
         fileSize: formatFileSize(rep.StorageInfo.PrimaryLocation.FileInfo.Size),
         description: `${rep.Format} file - ${formatFileSize(
-          rep.StorageInfo.PrimaryLocation.FileInfo.Size,
+          rep.StorageInfo.PrimaryLocation.FileInfo.Size
         )}${
           rep.ImageSpec?.Resolution
             ? ` - ${rep.ImageSpec.Resolution.Width}x${rep.ImageSpec.Resolution.Height}`
@@ -411,12 +360,12 @@ const ImageDetailContent: React.FC = () => {
   const proxyUrl = useMemo(() => {
     if (!assetData?.data?.asset) return "";
     const proxyRep = assetData.data.asset.DerivedRepresentations.find(
-      (rep) => rep.Purpose === "proxy",
+      (rep) => rep.Purpose === "proxy"
     );
     return (
       proxyRep?.URL ||
-      assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo
-        .PrimaryLocation.ObjectKey.FullPath
+      assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
+        .ObjectKey.FullPath
     );
   }, [assetData]);
 
@@ -535,11 +484,7 @@ const ImageDetailContent: React.FC = () => {
         <Typography variant="h5" color="error">
           Error loading asset data
         </Typography>
-        <Button
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate(-1)}
-          sx={{ mt: 2 }}
-        >
+        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)} sx={{ mt: 2 }}>
           Go Back
         </Button>
       </Box>
@@ -578,8 +523,8 @@ const ImageDetailContent: React.FC = () => {
             totalResults={totalResults}
             onBack={handleBack}
             assetName={
-              assetData.data.asset.DigitalSourceAsset.MainRepresentation
-                .StorageInfo.PrimaryLocation.ObjectKey.Name
+              assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
+                .ObjectKey.Name
             }
             assetId={assetData.data.asset.InventoryID}
             assetType="Image"
@@ -629,8 +574,7 @@ const ImageDetailContent: React.FC = () => {
                 fontWeight: 500,
                 transition: "all 0.2s",
                 "&:hover": {
-                  backgroundColor: (theme) =>
-                    alpha(theme.palette.secondary.main, 0.05),
+                  backgroundColor: (theme) => alpha(theme.palette.secondary.main, 0.05),
                 },
               },
             }}
@@ -662,8 +606,7 @@ const ImageDetailContent: React.FC = () => {
               pt: 2,
               outline: "none",
               borderRadius: 1,
-              backgroundColor: (theme) =>
-                alpha(theme.palette.background.paper, 0.5),
+              backgroundColor: (theme) => alpha(theme.palette.background.paper, 0.5),
               maxHeight: "none",
               overflow: "visible",
             }}

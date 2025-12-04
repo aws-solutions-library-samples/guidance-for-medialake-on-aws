@@ -5,9 +5,7 @@ interface FilterOperationsProps {
   filterComponent?: React.ReactNode;
 }
 
-const FilterOperations: React.FC<FilterOperationsProps> = ({
-  filterComponent,
-}) => {
+const FilterOperations: React.FC<FilterOperationsProps> = ({ filterComponent }) => {
   return <Box sx={{ height: "100%", overflow: "auto" }}>{filterComponent}</Box>;
 };
 

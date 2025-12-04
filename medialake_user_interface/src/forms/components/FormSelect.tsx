@@ -39,10 +39,7 @@ export type FormSelectProps<T extends FieldValues> = {
   tooltip?: string;
   translationPrefix?: string;
   showHelper?: boolean;
-} & Omit<
-  SelectProps<string | string[]>,
-  "name" | "multiple" | "value" | "onChange"
->;
+} & Omit<SelectProps<string | string[]>, "name" | "multiple" | "value" | "onChange">;
 
 export const FormSelect = <T extends FieldValues>({
   name,
@@ -78,10 +75,7 @@ export const FormSelect = <T extends FieldValues>({
   const translatedOptions = options.map((option) => ({
     ...option,
     label: translationPrefix
-      ? t(
-          `${translationPrefix}.fields.${name}.options.${option.value}`,
-          option.label,
-        )
+      ? t(`${translationPrefix}.fields.${name}.options.${option.value}`, option.label)
       : option.label,
   }));
 
@@ -105,31 +99,17 @@ export const FormSelect = <T extends FieldValues>({
       control={control}
       render={({ field, fieldState: { error } }) => {
         // Debug: Log the current field value
-        console.log(
-          `[FormSelect] Field "${name}" value:`,
-          field.value,
-          typeof field.value,
-        );
+        console.log(`[FormSelect] Field "${name}" value:`, field.value, typeof field.value);
 
         return (
-          <FormControl
-            fullWidth={fullWidth}
-            error={!!error}
-            required={required}
-            variant="outlined"
-          >
+          <FormControl fullWidth={fullWidth} error={!!error} required={required} variant="outlined">
             <InputLabel>{translatedLabel}</InputLabel>
             <Select<string | string[]>
               {...field}
               {...rest}
               multiple={multiple}
               variant="outlined"
-              input={
-                <OutlinedInput
-                  label={translatedLabel}
-                  endAdornment={tooltipIcon}
-                />
-              }
+              input={<OutlinedInput label={translatedLabel} endAdornment={tooltipIcon} />}
               renderValue={(selected) => {
                 if (multiple) {
                   return (
@@ -138,8 +118,7 @@ export const FormSelect = <T extends FieldValues>({
                         <Chip
                           key={value}
                           label={
-                            translatedOptions.find((opt) => opt.value === value)
-                              ?.label || value
+                            translatedOptions.find((opt) => opt.value === value)?.label || value
                           }
                         />
                       ))}
@@ -147,8 +126,8 @@ export const FormSelect = <T extends FieldValues>({
                   );
                 }
                 return (
-                  translatedOptions.find((opt) => opt.value === selected)
-                    ?.label || (selected as string)
+                  translatedOptions.find((opt) => opt.value === selected)?.label ||
+                  (selected as string)
                 );
               }}
               MenuProps={MenuProps}
@@ -163,10 +142,7 @@ export const FormSelect = <T extends FieldValues>({
               <FormHelperText>
                 {error
                   ? translationPrefix
-                    ? t(
-                        `${translationPrefix}.errors.${error.type}`,
-                        error.message || "",
-                      )
+                    ? t(`${translationPrefix}.errors.${error.type}`, error.message || "")
                     : error.message
                   : translatedHelperText}
               </FormHelperText>

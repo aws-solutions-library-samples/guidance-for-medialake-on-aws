@@ -47,7 +47,7 @@ function getConnectorCards(page: Page) {
 export async function checkConnectorsConfigured(
   page: Page,
   baseUrl: string,
-  options: ConnectorCheckOptions = {},
+  options: ConnectorCheckOptions = {}
 ): Promise<ConnectorCheckResult> {
   const {
     timeout = 30000,
@@ -68,9 +68,7 @@ export async function checkConnectorsConfigured(
       timeout,
     });
     await page.waitForLoadState("domcontentloaded");
-    console.log(
-      "[ConnectorHelper] Page loaded, waiting for content to render...",
-    );
+    console.log("[ConnectorHelper] Page loaded, waiting for content to render...");
     await page.waitForTimeout(12000); // Wait 12 seconds for connectors to load
 
     // Check for connector cards using partial test ID match with retry logic
@@ -81,27 +79,21 @@ export async function checkConnectorsConfigured(
 
     // If no connectors found initially, wait and retry multiple times
     if (connectorCount === 0) {
-      console.log(
-        "[ConnectorHelper] No connectors found, waiting 5s and retrying...",
-      );
+      console.log("[ConnectorHelper] No connectors found, waiting 5s and retrying...");
       await page.waitForTimeout(5000);
       connectorCount = await connectorCards.count();
       console.log(`[ConnectorHelper] Retry 1 count: ${connectorCount}`);
 
       // If still not found, retry one more time
       if (connectorCount === 0) {
-        console.log(
-          "[ConnectorHelper] Still no connectors, waiting another 5s...",
-        );
+        console.log("[ConnectorHelper] Still no connectors, waiting another 5s...");
         await page.waitForTimeout(5000);
         connectorCount = await connectorCards.count();
         console.log(`[ConnectorHelper] Retry 2 count: ${connectorCount}`);
       }
     }
 
-    console.log(
-      `[ConnectorHelper] Found ${connectorCount} configured connector(s)`,
-    );
+    console.log(`[ConnectorHelper] Found ${connectorCount} configured connector(s)`);
 
     // Get first connector info if available
     let firstConnectorInfo: string | undefined;
@@ -109,9 +101,7 @@ export async function checkConnectorsConfigured(
       const firstCard = connectorCards.first();
       const connectorText = await firstCard.textContent();
       firstConnectorInfo = connectorText?.substring(0, 100) || "";
-      console.log(
-        `[ConnectorHelper] First connector: ${firstConnectorInfo}...`,
-      );
+      console.log(`[ConnectorHelper] First connector: ${firstConnectorInfo}...`);
     }
 
     // Take screenshot if requested
@@ -125,9 +115,7 @@ export async function checkConnectorsConfigured(
         path: `${screenshotDir}/connectors-check.png`,
         fullPage: true,
       });
-      console.log(
-        `[ConnectorHelper] Screenshot saved to ${screenshotDir}/connectors-check.png`,
-      );
+      console.log(`[ConnectorHelper] Screenshot saved to ${screenshotDir}/connectors-check.png`);
     }
 
     // Check if minimum requirement is met
@@ -135,11 +123,11 @@ export async function checkConnectorsConfigured(
 
     if (success) {
       console.log(
-        `[ConnectorHelper] ✅ Found ${connectorCount} connector(s) (minimum: ${minConnectors})`,
+        `[ConnectorHelper] ✅ Found ${connectorCount} connector(s) (minimum: ${minConnectors})`
       );
     } else {
       console.warn(
-        `[ConnectorHelper] ⚠️  Only found ${connectorCount} connector(s), expected at least ${minConnectors}`,
+        `[ConnectorHelper] ⚠️  Only found ${connectorCount} connector(s), expected at least ${minConnectors}`
       );
     }
 
@@ -149,10 +137,7 @@ export async function checkConnectorsConfigured(
       firstConnectorInfo,
     };
   } catch (error: any) {
-    console.error(
-      "[ConnectorHelper] Error checking connectors:",
-      error.message,
-    );
+    console.error("[ConnectorHelper] Error checking connectors:", error.message);
 
     if (captureScreenshot) {
       try {
@@ -194,12 +179,10 @@ export async function getConnectorCount(page: Page): Promise<number> {
 export async function navigateToConnectors(
   page: Page,
   baseUrl: string,
-  timeout: number = 30000,
+  timeout: number = 30000
 ): Promise<void> {
   const connectorsUrl = `${baseUrl}/settings/connectors`;
-  console.log(
-    `[ConnectorHelper] Navigating to connectors page: ${connectorsUrl}`,
-  );
+  console.log(`[ConnectorHelper] Navigating to connectors page: ${connectorsUrl}`);
 
   await page.goto(connectorsUrl, {
     waitUntil: "domcontentloaded",
@@ -225,7 +208,7 @@ export async function verifyMinimumConnectors(
   page: Page,
   baseUrl: string,
   minCount: number = 1,
-  options: Omit<ConnectorCheckOptions, "minConnectors"> = {},
+  options: Omit<ConnectorCheckOptions, "minConnectors"> = {}
 ): Promise<boolean> {
   const result = await checkConnectorsConfigured(page, baseUrl, {
     ...options,
@@ -242,10 +225,7 @@ export async function verifyMinimumConnectors(
  * @param maxConnectors - Maximum number of connectors to get info for (default: 5)
  * @returns Array of connector info strings
  */
-export async function getConnectorInfo(
-  page: Page,
-  maxConnectors: number = 5,
-): Promise<string[]> {
+export async function getConnectorInfo(page: Page, maxConnectors: number = 5): Promise<string[]> {
   const connectorCards = getConnectorCards(page);
   const count = await connectorCards.count();
   const limit = Math.min(count, maxConnectors);
@@ -260,9 +240,7 @@ export async function getConnectorInfo(
     }
   }
 
-  console.log(
-    `[ConnectorHelper] Retrieved info for ${info.length} connector(s)`,
-  );
+  console.log(`[ConnectorHelper] Retrieved info for ${info.length} connector(s)`);
   return info;
 }
 
@@ -280,15 +258,13 @@ export async function createS3ConnectorWithNewBucket(
     description?: string;
     bucketName?: string;
     allowUploads?: boolean;
-  } = {},
+  } = {}
 ): Promise<{ success: boolean; connectorName: string; bucketName: string }> {
   const timestamp = Date.now();
   const connectorName = options.connectorName || `test-connector-${timestamp}`;
   const bucketName = options.bucketName || `test-bucket-${timestamp}`;
-  const description =
-    options.description || "Test S3 connector with new bucket";
-  const allowUploads =
-    options.allowUploads !== undefined ? options.allowUploads : true;
+  const description = options.description || "Test S3 connector with new bucket";
+  const allowUploads = options.allowUploads !== undefined ? options.allowUploads : true;
 
   console.log(`[ConnectorHelper] Creating S3 connector with NEW bucket`);
   console.log(`[ConnectorHelper] Connector Name: ${connectorName}`);
@@ -315,9 +291,7 @@ export async function createS3ConnectorWithNewBucket(
     await page.waitForTimeout(1000);
 
     // Step 4: Fill in connector name
-    console.log(
-      `[ConnectorHelper] Step 4: Filling connector name: ${connectorName}`,
-    );
+    console.log(`[ConnectorHelper] Step 4: Filling connector name: ${connectorName}`);
     const nameInput = page.getByRole("textbox", { name: /Connector Name/i });
     await nameInput.waitFor({ state: "visible", timeout: 5000 });
     await nameInput.fill(connectorName);
@@ -330,9 +304,7 @@ export async function createS3ConnectorWithNewBucket(
     await page.waitForTimeout(500);
 
     // Step 6: Fill in new bucket name
-    console.log(
-      `[ConnectorHelper] Step 6: Filling new bucket name: ${bucketName}`,
-    );
+    console.log(`[ConnectorHelper] Step 6: Filling new bucket name: ${bucketName}`);
     const bucketInput = page.getByRole("textbox", { name: /New Bucket Name/i });
     await bucketInput.waitFor({ state: "visible", timeout: 5000 });
     await bucketInput.fill(bucketName);
@@ -340,14 +312,10 @@ export async function createS3ConnectorWithNewBucket(
 
     // Step 7: Configure advanced settings (Allow Uploads)
     if (allowUploads) {
-      console.log(
-        "[ConnectorHelper] Step 7: Enabling Allow Uploads in Advanced Configuration",
-      );
+      console.log("[ConnectorHelper] Step 7: Enabling Allow Uploads in Advanced Configuration");
 
       // Click the "ADVANCED CONFIGURATION" toggle button
-      await page
-        .getByRole("button", { name: "ADVANCED CONFIGURATION" })
-        .click();
+      await page.getByRole("button", { name: "ADVANCED CONFIGURATION" }).click();
       await page.waitForTimeout(1000);
 
       // Find and check the "Allow Uploads" checkbox
@@ -364,9 +332,7 @@ export async function createS3ConnectorWithNewBucket(
         console.log("[ConnectorHelper] Allow Uploads already checked");
       }
     } else {
-      console.log(
-        "[ConnectorHelper] Step 7: Skipping Allow Uploads (disabled by option)",
-      );
+      console.log("[ConnectorHelper] Step 7: Skipping Allow Uploads (disabled by option)");
     }
 
     // Step 8: Submit the connector creation form
@@ -374,20 +340,15 @@ export async function createS3ConnectorWithNewBucket(
     await page.getByRole("button", { name: "Add Connector" }).click();
 
     // Wait for connector to be created and modal to close (backend processing may take time)
-    console.log(
-      "[ConnectorHelper] Waiting for connector creation to complete (30s timeout)...",
-    );
+    console.log("[ConnectorHelper] Waiting for connector creation to complete (30s timeout)...");
     await page.waitForTimeout(30000);
 
     console.log(
-      `[ConnectorHelper] ✅ Connector created successfully: ${connectorName} with bucket: ${bucketName}`,
+      `[ConnectorHelper] ✅ Connector created successfully: ${connectorName} with bucket: ${bucketName}`
     );
     return { success: true, connectorName, bucketName };
   } catch (error: any) {
-    console.error(
-      `[ConnectorHelper] ❌ Error creating connector:`,
-      error.message,
-    );
+    console.error(`[ConnectorHelper] ❌ Error creating connector:`, error.message);
 
     // Take error screenshot
     try {
@@ -396,7 +357,7 @@ export async function createS3ConnectorWithNewBucket(
         fullPage: true,
       });
       console.log(
-        "[ConnectorHelper] Error screenshot saved to test-results/connector-creation-error.png",
+        "[ConnectorHelper] Error screenshot saved to test-results/connector-creation-error.png"
       );
     } catch (screenshotError) {
       console.error("[ConnectorHelper] Failed to capture error screenshot");
@@ -421,13 +382,11 @@ export async function createS3ConnectorWithExistingBucket(
     connectorName?: string;
     description?: string;
     allowUploads?: boolean;
-  } = {},
+  } = {}
 ): Promise<{ success: boolean; connectorName: string }> {
-  const connectorName =
-    options.connectorName || `test-s3-connector-${Date.now()}`;
+  const connectorName = options.connectorName || `test-s3-connector-${Date.now()}`;
   const description = options.description || "this is my test S3 connector";
-  const allowUploads =
-    options.allowUploads !== undefined ? options.allowUploads : true;
+  const allowUploads = options.allowUploads !== undefined ? options.allowUploads : true;
 
   console.log(`[ConnectorHelper] Creating S3 connector: ${connectorName}`);
   console.log(`[ConnectorHelper] Using S3 bucket: ${s3BucketName}`);
@@ -453,9 +412,7 @@ export async function createS3ConnectorWithExistingBucket(
     await page.waitForTimeout(1000);
 
     // Step 4: Fill in connector name
-    console.log(
-      `[ConnectorHelper] Step 4: Filling connector name: ${connectorName}`,
-    );
+    console.log(`[ConnectorHelper] Step 4: Filling connector name: ${connectorName}`);
     const nameInput = page.getByRole("textbox", { name: /Connector Name/i });
     await nameInput.waitFor({ state: "visible", timeout: 5000 });
     await nameInput.fill(connectorName);
@@ -468,9 +425,7 @@ export async function createS3ConnectorWithExistingBucket(
     await page.waitForTimeout(500);
 
     // Step 6: Select S3 bucket from dropdown
-    console.log(
-      `[ConnectorHelper] Step 6: Selecting S3 bucket: ${s3BucketName}`,
-    );
+    console.log(`[ConnectorHelper] Step 6: Selecting S3 bucket: ${s3BucketName}`);
 
     // Find the S3 Bucket combobox (should be the only combobox in the new UI)
     const bucketCombobox = page.getByRole("combobox").first();
@@ -485,18 +440,14 @@ export async function createS3ConnectorWithExistingBucket(
 
     while (!bucketFound && attempts < maxAttempts) {
       try {
-        await page
-          .getByRole("option", { name: s3BucketName })
-          .waitFor({ timeout: 5000 });
+        await page.getByRole("option", { name: s3BucketName }).waitFor({ timeout: 5000 });
         await page.getByRole("option", { name: s3BucketName }).click();
         bucketFound = true;
-        console.log(
-          `[ConnectorHelper] Successfully selected S3 bucket: ${s3BucketName}`,
-        );
+        console.log(`[ConnectorHelper] Successfully selected S3 bucket: ${s3BucketName}`);
       } catch (error) {
         attempts++;
         console.log(
-          `[ConnectorHelper] Bucket ${s3BucketName} not found in dropdown, attempt ${attempts}/${maxAttempts}`,
+          `[ConnectorHelper] Bucket ${s3BucketName} not found in dropdown, attempt ${attempts}/${maxAttempts}`
         );
 
         if (attempts < maxAttempts) {
@@ -512,7 +463,7 @@ export async function createS3ConnectorWithExistingBucket(
             fullPage: true,
           });
           throw new Error(
-            `S3 bucket ${s3BucketName} not found in dropdown after ${maxAttempts} attempts. Screenshot saved.`,
+            `S3 bucket ${s3BucketName} not found in dropdown after ${maxAttempts} attempts. Screenshot saved.`
           );
         }
       }
@@ -520,14 +471,10 @@ export async function createS3ConnectorWithExistingBucket(
 
     // Step 7: Configure advanced settings (Allow Uploads)
     if (allowUploads) {
-      console.log(
-        "[ConnectorHelper] Step 7: Enabling Allow Uploads in Advanced Configuration",
-      );
+      console.log("[ConnectorHelper] Step 7: Enabling Allow Uploads in Advanced Configuration");
 
       // Click the "ADVANCED CONFIGURATION" toggle button
-      await page
-        .getByRole("button", { name: "ADVANCED CONFIGURATION" })
-        .click();
+      await page.getByRole("button", { name: "ADVANCED CONFIGURATION" }).click();
       await page.waitForTimeout(1000);
 
       // Find and check the "Allow Uploads" checkbox
@@ -544,9 +491,7 @@ export async function createS3ConnectorWithExistingBucket(
         console.log("[ConnectorHelper] Allow Uploads already checked");
       }
     } else {
-      console.log(
-        "[ConnectorHelper] Step 7: Skipping Allow Uploads (disabled by option)",
-      );
+      console.log("[ConnectorHelper] Step 7: Skipping Allow Uploads (disabled by option)");
     }
 
     // Step 8: Submit the connector creation form
@@ -554,20 +499,13 @@ export async function createS3ConnectorWithExistingBucket(
     await page.getByRole("button", { name: "Add Connector" }).click();
 
     // Wait for connector to be created and modal to close (backend processing may take time)
-    console.log(
-      "[ConnectorHelper] Waiting for connector creation to complete (30s timeout)...",
-    );
+    console.log("[ConnectorHelper] Waiting for connector creation to complete (30s timeout)...");
     await page.waitForTimeout(30000);
 
-    console.log(
-      `[ConnectorHelper] ✅ Connector created successfully: ${connectorName}`,
-    );
+    console.log(`[ConnectorHelper] ✅ Connector created successfully: ${connectorName}`);
     return { success: true, connectorName };
   } catch (error: any) {
-    console.error(
-      `[ConnectorHelper] ❌ Error creating connector:`,
-      error.message,
-    );
+    console.error(`[ConnectorHelper] ❌ Error creating connector:`, error.message);
 
     // Take error screenshot
     try {
@@ -576,7 +514,7 @@ export async function createS3ConnectorWithExistingBucket(
         fullPage: true,
       });
       console.log(
-        "[ConnectorHelper] Error screenshot saved to test-results/connector-creation-error.png",
+        "[ConnectorHelper] Error screenshot saved to test-results/connector-creation-error.png"
       );
     } catch (screenshotError) {
       console.error("[ConnectorHelper] Failed to capture error screenshot");
@@ -597,7 +535,7 @@ export async function createS3ConnectorWithExistingBucket(
 export async function deleteConnector(
   page: Page,
   connectorName: string,
-  timeout: number = 60000,
+  timeout: number = 60000
 ): Promise<boolean> {
   console.log(`[ConnectorHelper] Deleting connector: ${connectorName}`);
 
@@ -613,9 +551,7 @@ export async function deleteConnector(
     console.log(`[ConnectorHelper] Found connector card for: ${connectorName}`);
 
     // Find the delete button using data-testid pattern within the card
-    const deleteButton = connectorCard.locator(
-      '[data-testid^="connector-delete-button-"]',
-    );
+    const deleteButton = connectorCard.locator('[data-testid^="connector-delete-button-"]');
     await deleteButton.waitFor({ state: "visible", timeout: 10000 });
     console.log(`[ConnectorHelper] Found delete button for: ${connectorName}`);
 
@@ -637,10 +573,7 @@ export async function deleteConnector(
     console.log(`[ConnectorHelper] ✅ Connector deleted: ${connectorName}`);
     return true;
   } catch (error: any) {
-    console.error(
-      `[ConnectorHelper] ❌ Error deleting connector:`,
-      error.message,
-    );
+    console.error(`[ConnectorHelper] ❌ Error deleting connector:`, error.message);
 
     // Take error screenshot
     try {
@@ -649,7 +582,7 @@ export async function deleteConnector(
         fullPage: true,
       });
       console.log(
-        "[ConnectorHelper] Error screenshot saved to test-results/connector-deletion-error.png",
+        "[ConnectorHelper] Error screenshot saved to test-results/connector-deletion-error.png"
       );
     } catch (screenshotError) {
       console.error("[ConnectorHelper] Failed to capture error screenshot");

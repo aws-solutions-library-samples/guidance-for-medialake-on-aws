@@ -32,8 +32,7 @@ export default {
     connectorLabel: "S3 커넥터",
     selectConnectorPlaceholder: "S3 커넥터 선택",
     loadingConnectors: "커넥터 로딩 중...",
-    noConnectors:
-      "사용 가능한 S3 커넥터가 없습니다. 먼저 S3 커넥터를 구성하세요.",
+    noConnectors: "사용 가능한 S3 커넥터가 없습니다. 먼저 S3 커넥터를 구성하세요.",
     dashboardNote:
       "audio/*, video/*, image/*, HLS (application/x-mpegURL) 및 MPEG-DASH (application/dash+xml) 파일만 허용됩니다",
     meta: {
@@ -42,10 +41,8 @@ export default {
   },
   pathBrowser: {
     title: "업로드 경로 선택",
-    descriptionRestricted:
-      "파일을 업로드할 허용된 경로 내의 폴더를 찾아보고 선택하세요.",
-    descriptionUnrestricted:
-      "파일을 업로드할 버킷 내의 모든 폴더를 찾아보고 선택하세요.",
+    descriptionRestricted: "파일을 업로드할 허용된 경로 내의 폴더를 찾아보고 선택하세요.",
+    descriptionUnrestricted: "파일을 업로드할 버킷 내의 모든 폴더를 찾아보고 선택하세요.",
     prefixLabel: "허용된 경로",
     prefixHelper: "선택한 경로 내의 폴더만 찾아보고 업로드할 수 있습니다.",
     selectedPath: "선택된 경로",
@@ -60,10 +57,8 @@ export default {
       loadingFailed: "커넥터 정보를 로드하지 못했습니다.",
     },
     hints: {
-      clickFolder:
-        "폴더를 클릭하여 이동한 다음 '현재 폴더 선택'을 클릭하여 선택합니다.",
-      navigateAndConfirm:
-        "원하는 폴더로 이동한 다음 '이 경로 사용'을 클릭하여 확인합니다.",
+      clickFolder: "폴더를 클릭하여 이동한 다음 '현재 폴더 선택'을 클릭하여 선택합니다.",
+      navigateAndConfirm: "원하는 폴더로 이동한 다음 '이 경로 사용'을 클릭하여 확인합니다.",
       rootPath: "현재 루트 수준에 있습니다.",
     },
   },
@@ -115,8 +110,7 @@ export default {
   assetExplorer: {
     noConnectorSelected: "자산을 보려면 커넥터를 선택하세요",
     noAssetsFound: "이 커넥터에 대한 자산을 찾을 수 없습니다",
-    noIndexedAssets:
-      '버킷 "{{bucketName}}"의 이 커넥터에 대한 인덱싱된 자산을 찾을 수 없습니다.',
+    noIndexedAssets: '버킷 "{{bucketName}}"의 이 커넥터에 대한 인덱싱된 자산을 찾을 수 없습니다.',
     loadingAssets: "자산 로딩 중...",
     menu: {
       rename: "이름 변경",
@@ -221,8 +215,7 @@ export default {
       userDeletionNotImplemented: "사용자 삭제가 아직 구현되지 않았습니다.",
       userCreationNotImplemented: "사용자 생성이 아직 구현되지 않았습니다.",
       userEditingNotImplemented: "사용자 편집이 아직 구현되지 않았습니다.",
-      analyticsExportNotImplemented:
-        "분석 내보내기가 아직 구현되지 않았습니다.",
+      analyticsExportNotImplemented: "분석 내보내기가 아직 구현되지 않았습니다.",
       systemResetNotImplemented: "시스템 재설정이 아직 구현되지 않았습니다.",
     },
     columns: {
@@ -243,8 +236,7 @@ export default {
     deleteConfirmation: {
       title: "통합 삭제",
       message: "이 통합을 삭제하시겠습니까?",
-      warning:
-        "경고: 이 통합을 제거하면 이에 의존하는 파이프라인이 실패할 수 있습니다.",
+      warning: "경고: 이 통합을 제거하면 이에 의존하는 파이프라인이 실패할 수 있습니다.",
     },
     form: {
       search: {
@@ -461,8 +453,7 @@ export default {
       },
       search: {
         title: "검색 구성",
-        description:
-          "미디어 자산의 고급 검색 기능을 위해 검색 제공업체를 구성합니다.",
+        description: "미디어 자산의 고급 검색 기능을 위해 검색 제공업체를 구성합니다.",
         provider: "검색 제공업체:",
         configureProvider: "검색 제공업체 구성",
         editProvider: "제공업체 편집",
@@ -739,8 +730,7 @@ export default {
       "Storage Warning": "스토리지 경고",
       "Storage capacity reaching 80%": "스토리지 용량이 80%에 도달했습니다",
       "Pipeline Failed": "파이프라인 실패",
-      "Video processing pipeline failed":
-        "비디오 처리 파이프라인이 실패했습니다",
+      "Video processing pipeline failed": "비디오 처리 파이프라인이 실패했습니다",
     },
     modal: {
       confirmDelete: "이 항목을 삭제하시겠습니까?",
@@ -787,8 +777,7 @@ export default {
         loading: "S3 객체 로딩 오류: {{message}}",
         network: "네트워크 오류. 연결을 확인하고 다시 시도하세요.",
         permission: "액세스 거부. 이 경로에 액세스할 권한이 없습니다.",
-        permissionWithPrefixes:
-          "액세스 거부. 다음 경로에만 액세스할 수 있습니다: {{prefixes}}",
+        permissionWithPrefixes: "액세스 거부. 다음 경로에만 액세스할 수 있습니다: {{prefixes}}",
         notFound: "요청한 경로가 존재하지 않습니다.",
         timeout: "요청 시간 초과. 다시 시도하세요.",
         retry: "재시도",
@@ -815,8 +804,7 @@ export default {
     },
     metadata: {
       title: "곧 출시",
-      description:
-        "메타데이터 관리 기능을 제공하기 위해 작업 중입니다. 기대해 주세요!",
+      description: "메타데이터 관리 기능을 제공하기 위해 작업 중입니다. 기대해 주세요!",
     },
     pipelines: {
       title: "파이프라인",
@@ -861,14 +849,12 @@ export default {
         modals: {
           error: {
             title: "오류",
-            incompatibleNodes:
-              "이전 노드의 출력이 대상 노드의 입력과 호환되지 않습니다.",
+            incompatibleNodes: "이전 노드의 출력이 대상 노드의 입력과 호환되지 않습니다.",
             validation: "파이프라인 검증에 실패했습니다",
           },
           delete: {
             title: "파이프라인 삭제",
-            message:
-              "이 파이프라인을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+            message: "이 파이프라인을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
             confirm: "삭제를 확인하려면 파이프라인 이름을 입력하세요:",
           },
         },
@@ -901,8 +887,7 @@ export default {
       deleteConfirmation: {
         title: "통합 삭제",
         message: "이 통합을 삭제하시겠습니까?",
-        warning:
-          "경고: 이 통합을 삭제하면 이를 사용하는 파이프라인이 손상될 수 있습니다.",
+        warning: "경고: 이 통합을 삭제하면 이를 사용하는 파이프라인이 손상될 수 있습니다.",
       },
       form: {
         title: "통합 추가",

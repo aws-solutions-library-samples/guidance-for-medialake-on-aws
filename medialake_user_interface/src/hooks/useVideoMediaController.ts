@@ -7,9 +7,7 @@ export interface VideoMediaController {
   isPlaying: boolean;
   seekTo: (time: number) => void;
   onTimeUpdate: (callback: (time: number) => void) => () => void;
-  registerVideoViewer: (
-    videoViewerRef: React.RefObject<VideoViewerRef>,
-  ) => void;
+  registerVideoViewer: (videoViewerRef: React.RefObject<VideoViewerRef>) => void;
 }
 
 export const useVideoMediaController = (): VideoMediaController => {
@@ -19,12 +17,9 @@ export const useVideoMediaController = (): VideoMediaController => {
   const videoViewerRef = useRef<React.RefObject<VideoViewerRef> | null>(null);
   const timeUpdateCallbacksRef = useRef<Set<(time: number) => void>>(new Set());
 
-  const registerVideoViewer = useCallback(
-    (viewerRef: React.RefObject<VideoViewerRef>) => {
-      videoViewerRef.current = viewerRef;
-    },
-    [],
-  );
+  const registerVideoViewer = useCallback((viewerRef: React.RefObject<VideoViewerRef>) => {
+    videoViewerRef.current = viewerRef;
+  }, []);
 
   const seekTo = useCallback((time: number) => {
     if (videoViewerRef.current?.current) {

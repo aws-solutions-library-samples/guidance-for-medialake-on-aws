@@ -13,30 +13,19 @@ import {
 // User Assignment Hooks
 export const useListUserAssignments = (userId: string) => {
   // Add a unique identifier to track each hook instance
-  const hookId = React.useId
-    ? React.useId()
-    : Math.random().toString(36).substring(7);
+  const hookId = React.useId ? React.useId() : Math.random().toString(36).substring(7);
 
   return useQuery<UserAssignmentListResponse["data"], Error>({
     queryKey: QUERY_KEYS.ASSIGNMENTS.user.list(userId),
     queryFn: async () => {
       try {
-        console.log(
-          `Fetching assignments for user: ${userId} from hook instance: ${hookId}`,
-        );
-        const { data } = await apiClient.get<any>(
-          API_ENDPOINTS.ASSIGNMENTS.USER.BASE(userId),
-        );
-        console.log(
-          `User assignments API response for hook instance: ${hookId}`,
-          data,
-        );
+        console.log(`Fetching assignments for user: ${userId} from hook instance: ${hookId}`);
+        const { data } = await apiClient.get<any>(API_ENDPOINTS.ASSIGNMENTS.USER.BASE(userId));
+        console.log(`User assignments API response for hook instance: ${hookId}`, data);
 
         // Handle string body format
         if (typeof data.body === "string") {
-          const parsedBody = JSON.parse(
-            data.body,
-          ) as UserAssignmentListResponse;
+          const parsedBody = JSON.parse(data.body) as UserAssignmentListResponse;
           console.log("Parsed user assignments from string:", parsedBody.data);
           return parsedBody.data;
         }
@@ -58,12 +47,8 @@ export const useListUserAssignments = (userId: string) => {
       } catch (error: any) {
         // Handle 403 errors gracefully
         if (error?.response?.status === 403) {
-          console.log(
-            `User assignments API returned 403 Forbidden for hook instance: ${hookId}`,
-          );
-          console.log(
-            "User likely does not have permission to access assignments",
-          );
+          console.log(`User assignments API returned 403 Forbidden for hook instance: ${hookId}`);
+          console.log("User likely does not have permission to access assignments");
           // Return empty assignments instead of throwing an error
           return { assignments: [] };
         }
@@ -105,9 +90,7 @@ export const useRemoveUserAssignment = () => {
 
   return useMutation<void, Error, { userId: string; permissionSetId: string }>({
     mutationFn: async ({ userId, permissionSetId }) => {
-      await apiClient.delete(
-        API_ENDPOINTS.ASSIGNMENTS.USER.REMOVE(userId, permissionSetId),
-      );
+      await apiClient.delete(API_ENDPOINTS.ASSIGNMENTS.USER.REMOVE(userId, permissionSetId));
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
@@ -122,30 +105,19 @@ export const useRemoveUserAssignment = () => {
 // Group Assignment Hooks
 export const useListGroupAssignments = (groupId: string) => {
   // Add a unique identifier to track each hook instance
-  const hookId = React.useId
-    ? React.useId()
-    : Math.random().toString(36).substring(7);
+  const hookId = React.useId ? React.useId() : Math.random().toString(36).substring(7);
 
   return useQuery<GroupAssignmentListResponse["data"], Error>({
     queryKey: QUERY_KEYS.ASSIGNMENTS.group.list(groupId),
     queryFn: async () => {
       try {
-        console.log(
-          `Fetching assignments for group: ${groupId} from hook instance: ${hookId}`,
-        );
-        const { data } = await apiClient.get<any>(
-          API_ENDPOINTS.ASSIGNMENTS.GROUP.BASE(groupId),
-        );
-        console.log(
-          `Group assignments API response for hook instance: ${hookId}`,
-          data,
-        );
+        console.log(`Fetching assignments for group: ${groupId} from hook instance: ${hookId}`);
+        const { data } = await apiClient.get<any>(API_ENDPOINTS.ASSIGNMENTS.GROUP.BASE(groupId));
+        console.log(`Group assignments API response for hook instance: ${hookId}`, data);
 
         // Handle string body format
         if (typeof data.body === "string") {
-          const parsedBody = JSON.parse(
-            data.body,
-          ) as GroupAssignmentListResponse;
+          const parsedBody = JSON.parse(data.body) as GroupAssignmentListResponse;
           console.log("Parsed group assignments from string:", parsedBody.data);
           return parsedBody.data;
         }
@@ -167,12 +139,8 @@ export const useListGroupAssignments = (groupId: string) => {
       } catch (error: any) {
         // Handle 403 errors gracefully
         if (error?.response?.status === 403) {
-          console.log(
-            `Group assignments API returned 403 Forbidden for hook instance: ${hookId}`,
-          );
-          console.log(
-            "User likely does not have permission to access group assignments",
-          );
+          console.log(`Group assignments API returned 403 Forbidden for hook instance: ${hookId}`);
+          console.log("User likely does not have permission to access group assignments");
           // Return empty assignments instead of throwing an error
           return { assignments: [] };
         }
@@ -214,22 +182,18 @@ export const useAssignPsToGroup = () => {
 export const useRemoveGroupAssignment = () => {
   const queryClient = useQueryClient();
 
-  return useMutation<void, Error, { groupId: string; permissionSetId: string }>(
-    {
-      mutationFn: async ({ groupId, permissionSetId }) => {
-        await apiClient.delete(
-          API_ENDPOINTS.ASSIGNMENTS.GROUP.REMOVE(groupId, permissionSetId),
-        );
-      },
-      onSuccess: (_, variables) => {
-        queryClient.invalidateQueries({
-          queryKey: QUERY_KEYS.ASSIGNMENTS.group.all(variables.groupId),
-        });
-        // Also invalidate groups query to refresh their permission sets
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.GROUPS.all });
-        // Also invalidate users query as their effective permissions might have changed
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.USERS.all });
-      },
+  return useMutation<void, Error, { groupId: string; permissionSetId: string }>({
+    mutationFn: async ({ groupId, permissionSetId }) => {
+      await apiClient.delete(API_ENDPOINTS.ASSIGNMENTS.GROUP.REMOVE(groupId, permissionSetId));
     },
-  );
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.ASSIGNMENTS.group.all(variables.groupId),
+      });
+      // Also invalidate groups query to refresh their permission sets
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.GROUPS.all });
+      // Also invalidate users query as their effective permissions might have changed
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.USERS.all });
+    },
+  });
 };

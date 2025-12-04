@@ -18,11 +18,7 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import { ActionButton } from "@/components/common/button/ActionButton";
 import { useCreateApiKey, useUpdateApiKey } from "@/api/hooks/useApiKeys";
-import {
-  ApiKey,
-  CreateApiKeyRequest,
-  UpdateApiKeyRequest,
-} from "@/api/types/apiKey.types";
+import { ApiKey, CreateApiKeyRequest, UpdateApiKeyRequest } from "@/api/types/apiKey.types";
 
 interface ApiKeyFormDialogProps {
   open: boolean;
@@ -160,11 +156,7 @@ const ApiKeyFormDialog: React.FC<ApiKeyFormDialogProps> = ({
   const handleClose = () => {
     if (newSecret) {
       // If showing new secret, just close and call success
-      onSuccess(
-        isEditMode
-          ? "API key updated successfully"
-          : "API key created successfully",
-      );
+      onSuccess(isEditMode ? "API key updated successfully" : "API key created successfully");
       setNewSecret(null);
     } else {
       onClose();
@@ -200,11 +192,7 @@ const ApiKeyFormDialog: React.FC<ApiKeyFormDialogProps> = ({
       <DialogTitle>
         <Box display="flex" justifyContent="space-between" alignItems="center">
           <Typography variant="h6">
-            {newSecret
-              ? "API Key Created"
-              : isEditMode
-                ? "Edit API Key"
-                : "Create API Key"}
+            {newSecret ? "API Key Created" : isEditMode ? "Edit API Key" : "Create API Key"}
           </Typography>
           <IconButton onClick={handleClose} size="small">
             <CloseIcon />
@@ -217,9 +205,7 @@ const ApiKeyFormDialog: React.FC<ApiKeyFormDialogProps> = ({
         {newSecret && (
           <Box sx={{ mb: 3 }}>
             <Alert severity="success" sx={{ mb: 2 }}>
-              {isEditMode
-                ? "API key rotated successfully!"
-                : "API key created successfully!"}
+              {isEditMode ? "API key rotated successfully!" : "API key created successfully!"}
             </Alert>
             <Typography variant="subtitle2" gutterBottom>
               Your API Key Secret (save this securely):
@@ -236,17 +222,12 @@ const ApiKeyFormDialog: React.FC<ApiKeyFormDialogProps> = ({
               }}
               sx={{ mb: 2 }}
             />
-            <ActionButton
-              variant="outlined"
-              size="small"
-              onClick={handleCopySecret}
-            >
+            <ActionButton variant="outlined" size="small" onClick={handleCopySecret}>
               Copy to Clipboard
             </ActionButton>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-              <strong>Important:</strong> This is the only time you'll be able
-              to see this secret. Please save it securely as it cannot be
-              recovered later.
+              <strong>Important:</strong> This is the only time you'll be able to see this secret.
+              Please save it securely as it cannot be recovered later.
             </Typography>
           </Box>
         )}
@@ -290,9 +271,7 @@ const ApiKeyFormDialog: React.FC<ApiKeyFormDialogProps> = ({
               control={
                 <Switch
                   checked={formData.isEnabled}
-                  onChange={(e) =>
-                    handleInputChange("isEnabled", e.target.checked)
-                  }
+                  onChange={(e) => handleInputChange("isEnabled", e.target.checked)}
                 />
               }
               label="Enabled"
@@ -316,8 +295,7 @@ const ApiKeyFormDialog: React.FC<ApiKeyFormDialogProps> = ({
                   label="Rotate API Key"
                 />
                 <FormHelperText>
-                  Generate a new secret for this API key. The old secret will
-                  become invalid.
+                  Generate a new secret for this API key. The old secret will become invalid.
                 </FormHelperText>
               </>
             )}
@@ -335,11 +313,7 @@ const ApiKeyFormDialog: React.FC<ApiKeyFormDialogProps> = ({
             <ActionButton variant="text" onClick={onClose} disabled={isLoading}>
               Cancel
             </ActionButton>
-            <ActionButton
-              variant="contained"
-              onClick={handleSubmit}
-              loading={isLoading}
-            >
+            <ActionButton variant="contained" onClick={handleSubmit} loading={isLoading}>
               {isEditMode ? "Update" : "Create"}
             </ActionButton>
           </>

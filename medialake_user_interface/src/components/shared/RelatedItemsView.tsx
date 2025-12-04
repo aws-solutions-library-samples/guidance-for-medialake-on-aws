@@ -108,9 +108,7 @@ export const RelatedItemsView: React.FC<RelatedItemsViewProps> = ({
                 showMetadata={true}
                 isFavorite={false} // Default to false since we don't have favorite info here
                 onFavoriteToggle={() =>
-                  console.log(
-                    "Favorite toggle not implemented in RelatedItemsView",
-                  )
+                  console.log("Favorite toggle not implemented in RelatedItemsView")
                 }
               />
             </Grid>
@@ -123,9 +121,7 @@ export const RelatedItemsView: React.FC<RelatedItemsViewProps> = ({
               variant="outlined"
               onClick={onLoadMore}
               disabled={isLoading}
-              startIcon={
-                isLoading ? <CircularProgress size={20} /> : <ExpandMoreIcon />
-              }
+              startIcon={isLoading ? <CircularProgress size={20} /> : <ExpandMoreIcon />}
             >
               Load More
             </Button>

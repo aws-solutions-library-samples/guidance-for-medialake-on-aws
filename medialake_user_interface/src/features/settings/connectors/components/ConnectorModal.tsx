@@ -35,10 +35,7 @@ import {
 import { useTranslation } from "react-i18next";
 import ApiStatusModal from "@/components/ApiStatusModal";
 import { useApiMutationHandler } from "@/shared/hooks/useApiMutationHandler";
-import {
-  ConnectorResponse,
-  CreateConnectorRequest,
-} from "@/api/types/api.types";
+import { ConnectorResponse, CreateConnectorRequest } from "@/api/types/api.types";
 import { useGetS3Buckets } from "@/api/hooks/useConnectors";
 
 interface ConnectorModalProps {
@@ -78,9 +75,7 @@ const S3_BUCKET_TYPES = [
   },
 ];
 
-const S3_CONNECTOR_TYPES = [
-  { value: "non-managed", label: "MediaLake Non-Managed" },
-];
+const S3_CONNECTOR_TYPES = [{ value: "non-managed", label: "MediaLake Non-Managed" }];
 
 const S3_INTEGRATION_METHODS = [
   { value: "eventbridge" as const, label: "S3 EventBridge Notifications" },
@@ -123,14 +118,11 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
       setType(editingConnector.type);
       setConfiguration(editingConnector.configuration || {});
       const connectorType = editingConnector.configuration?.connectorType;
-      setS3ConnectorType(
-        typeof connectorType === "string" ? connectorType : "non-managed",
-      );
+      setS3ConnectorType(typeof connectorType === "string" ? connectorType : "non-managed");
 
       // Normalize integration method from either field
       const method =
-        editingConnector.integrationMethod ||
-        editingConnector.configuration?.s3IntegrationMethod;
+        editingConnector.integrationMethod || editingConnector.configuration?.s3IntegrationMethod;
       if (method) {
         setConfiguration((prev) => ({ ...prev, s3IntegrationMethod: method }));
       }
@@ -153,9 +145,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
 
       // Initialize allowUploads from top-level field first, fallback to configuration
       setAllowUploads(
-        editingConnector.allowUploads ??
-          editingConnector.configuration?.allowUploads ??
-          false,
+        editingConnector.allowUploads ?? editingConnector.configuration?.allowUploads ?? false
       );
 
       setActiveStep(2);
@@ -233,9 +223,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
     return ""; // No error
   };
 
-  const handleBucketNameChange = (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
+  const handleBucketNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newName = event.target.value;
     setConfiguration({ ...configuration, bucket: newName });
     const errorMsg = validateBucketName(newName);
@@ -245,9 +233,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
   const handleSaveInternal = async () => {
     // Perform validation before attempting to save
     const bucketValidationError =
-      bucketType === "new"
-        ? validateBucketName(configuration.bucket || "")
-        : "";
+      bucketType === "new" ? validateBucketName(configuration.bucket || "") : "";
     if (bucketValidationError) {
       setBucketNameError(bucketValidationError);
       return; // Stop submission if bucket name is invalid
@@ -274,16 +260,13 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
     }
 
     // Filter out empty prefixes
-    const filteredPrefixes = objectPrefixes.filter(
-      (prefix) => prefix.trim() !== "",
-    );
+    const filteredPrefixes = objectPrefixes.filter((prefix) => prefix.trim() !== "");
 
     // Sanitize configuration to remove integrationMethod and only include valid fields
     const { integrationMethod, ...restConfig } = configuration as any;
 
     // Build new bucket extras, only including region if non-empty
-    const newBucketExtras =
-      bucketType === "new" && awsRegion.trim() ? { region: awsRegion } : {};
+    const newBucketExtras = bucketType === "new" && awsRegion.trim() ? { region: awsRegion } : {};
 
     const connectorData: CreateConnectorRequest = {
       name,
@@ -292,8 +275,9 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
       configuration: {
         ...restConfig,
         connectorType: s3ConnectorType,
-        s3IntegrationMethod: (configuration.s3IntegrationMethod ||
-          integrationMethod) as "eventbridge" | "s3Notifications",
+        s3IntegrationMethod: (configuration.s3IntegrationMethod || integrationMethod) as
+          | "eventbridge"
+          | "s3Notifications",
         objectPrefix: filteredPrefixes.length > 0 ? filteredPrefixes : [],
         allowUploads: allowUploads,
         bucketType: bucketType as "new" | "existing",
@@ -321,7 +305,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
           onClose();
         },
       },
-      connectorData,
+      connectorData
     );
   };
 
@@ -404,11 +388,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                 }}
                 helperText="Connector name cannot be modified after creation"
               />
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ mt: -1 }}
-              >
+              <Typography variant="caption" color="text.secondary" sx={{ mt: -1 }}>
                 Amazon S3
               </Typography>
             </>
@@ -440,9 +420,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                   label="S3 Bucket"
                   sx={{ bgcolor: "action.disabledBackground" }}
                 >
-                  <MenuItem value={configuration.bucket}>
-                    {configuration.bucket}
-                  </MenuItem>
+                  <MenuItem value={configuration.bucket}>{configuration.bucket}</MenuItem>
                 </Select>
               </FormControl>
             </>
@@ -463,9 +441,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                       }
                       disabled={isLoadingBuckets}
                       startAdornment={
-                        isLoadingBuckets ? (
-                          <CircularProgress size={20} sx={{ ml: 1 }} />
-                        ) : null
+                        isLoadingBuckets ? <CircularProgress size={20} sx={{ ml: 1 }} /> : null
                       }
                     >
                       {buckets.map((bucket) => (
@@ -480,11 +456,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                     disabled={isLoadingBuckets}
                     sx={{ mt: 1 }}
                   >
-                    {isLoadingBuckets ? (
-                      <CircularProgress size={24} />
-                    ) : (
-                      <RefreshIcon />
-                    )}
+                    {isLoadingBuckets ? <CircularProgress size={24} /> : <RefreshIcon />}
                   </IconButton>
                 </Box>
               )}
@@ -529,21 +501,13 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
         <>
           {/* S3 Connector Type */}
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <FormControl
-              fullWidth
-              disabled={!!editingConnector}
-              required={!editingConnector}
-            >
+            <FormControl fullWidth disabled={!!editingConnector} required={!editingConnector}>
               <InputLabel>S3 Connector Type</InputLabel>
               <Select
                 value={s3ConnectorType}
                 label="S3 Connector Type"
                 onChange={(e) => setS3ConnectorType(e.target.value)}
-                sx={
-                  editingConnector
-                    ? { bgcolor: "action.disabledBackground" }
-                    : {}
-                }
+                sx={editingConnector ? { bgcolor: "action.disabledBackground" } : {}}
               >
                 {S3_CONNECTOR_TYPES.map((type) => (
                   <MenuItem key={type.value} value={type.value}>
@@ -558,11 +522,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
           </Box>
 
           {/* S3 Integration Method */}
-          <FormControl
-            fullWidth
-            disabled={!!editingConnector}
-            required={!editingConnector}
-          >
+          <FormControl fullWidth disabled={!!editingConnector} required={!editingConnector}>
             <InputLabel>S3 Integration Method</InputLabel>
             <Select
               value={configuration.s3IntegrationMethod || ""}
@@ -573,9 +533,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                   s3IntegrationMethod: e.target.value,
                 })
               }
-              sx={
-                editingConnector ? { bgcolor: "action.disabledBackground" } : {}
-              }
+              sx={editingConnector ? { bgcolor: "action.disabledBackground" } : {}}
             >
               {S3_INTEGRATION_METHODS.map((method) => (
                 <MenuItem key={method.value} value={method.value}>
@@ -601,9 +559,8 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
               color="text.secondary"
               sx={{ display: "block", ml: 4, mt: 0.5 }}
             >
-              Enable direct browser uploads to this S3 bucket. This will
-              configure CORS policies to allow PUT and POST requests from the
-              MediaLake application.
+              Enable direct browser uploads to this S3 bucket. This will configure CORS policies to
+              allow PUT and POST requests from the MediaLake application.
             </Typography>
           </Box>
 
@@ -612,10 +569,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
           </Typography>
 
           {objectPrefixes.map((prefix, index) => (
-            <Box
-              key={index}
-              sx={{ display: "flex", alignItems: "center", gap: 1 }}
-            >
+            <Box key={index} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <TextField
                 label={`Object Prefix ${objectPrefixes.length > 1 ? index + 1 : ""}`}
                 value={prefix}
@@ -679,11 +633,9 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                     border: `1px solid ${theme.palette.divider}`,
                     borderRadius: "8px",
                     // Disable FSx styling and interaction
-                    cursor:
-                      connectorType.value === "fsx" ? "not-allowed" : "pointer",
+                    cursor: connectorType.value === "fsx" ? "not-allowed" : "pointer",
                     opacity: connectorType.value === "fsx" ? 0.5 : 1,
-                    pointerEvents:
-                      connectorType.value === "fsx" ? "none" : "auto",
+                    pointerEvents: connectorType.value === "fsx" ? "none" : "auto",
                     transition: "all 0.2s",
                     "&:hover": {
                       borderColor: connectorType.colorHex,
@@ -691,9 +643,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                     },
                   }}
                 >
-                  <Icon
-                    sx={{ color: connectorType.colorHex, fontSize: 40, mb: 1 }}
-                  />
+                  <Icon sx={{ color: connectorType.colorHex, fontSize: 40, mb: 1 }} />
                   <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                     {connectorType.label}
                   </Typography>
@@ -765,18 +715,11 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
 
         <DialogActions sx={{ p: 2, gap: 1 }}>
           {!editingConnector && activeStep > 0 && (
-            <Button
-              onClick={handleBack}
-              disabled={apiStatus.status === "loading"}
-            >
+            <Button onClick={handleBack} disabled={apiStatus.status === "loading"}>
               Back
             </Button>
           )}
-          <Button
-            onClick={onClose}
-            color="inherit"
-            disabled={apiStatus.status === "loading"}
-          >
+          <Button onClick={onClose} color="inherit" disabled={apiStatus.status === "loading"}>
             Cancel
           </Button>
           {activeStep === steps.length - 1 || editingConnector ? (
@@ -784,14 +727,9 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
               variant="contained"
               onClick={handleSaveInternal}
               disabled={
-                apiStatus.status === "loading" ||
-                (bucketType === "new" && !!bucketNameError)
+                apiStatus.status === "loading" || (bucketType === "new" && !!bucketNameError)
               }
-              startIcon={
-                apiStatus.status === "loading" ? (
-                  <CircularProgress size={20} />
-                ) : null
-              }
+              startIcon={apiStatus.status === "loading" ? <CircularProgress size={20} /> : null}
               sx={{
                 backgroundColor: theme.palette.primary.main,
                 "&:hover": {
@@ -832,16 +770,15 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
         >
           <Box sx={{ p: 2, maxWidth: 400 }}>
             <Typography variant="body2" sx={{ mb: 2 }}>
-              • MediaLake Non-Managed (If/when other remote storage systems are
-              introduced this would be that category)
+              • MediaLake Non-Managed (If/when other remote storage systems are introduced this
+              would be that category)
             </Typography>
             <Typography variant="body2" sx={{ mb: 2 }}>
-              • Original files are kept on bucket, folder structure is not
-              modified
+              • Original files are kept on bucket, folder structure is not modified
             </Typography>
             <Typography variant="body2">
-              • Representations of files created, such as proxies, will be put
-              in a MediaLake managed bucket with a shadow folder structure
+              • Representations of files created, such as proxies, will be put in a MediaLake
+              managed bucket with a shadow folder structure
             </Typography>
           </Box>
         </Popover>

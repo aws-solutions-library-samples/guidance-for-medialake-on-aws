@@ -14,9 +14,7 @@ export const useEnvironmentColumns = () => {
         header: "Name",
         size: 200,
         enableSorting: true,
-        cell: ({ getValue }) => (
-          <TableCellContent variant="primary">{getValue()}</TableCellContent>
-        ),
+        cell: ({ getValue }) => <TableCellContent variant="primary">{getValue()}</TableCellContent>,
       }),
       columnHelper.accessor("region", {
         header: "Region",
@@ -41,10 +39,7 @@ export const useEnvironmentColumns = () => {
         cell: ({ getValue }) => {
           const dateValue = getValue();
           return (
-            <Tooltip
-              title={formatLocalDateTime(dateValue, { showSeconds: true })}
-              placement="top"
-            >
+            <Tooltip title={formatLocalDateTime(dateValue, { showSeconds: true })} placement="top">
               <Box>
                 <TableCellContent variant="secondary">
                   {formatLocalDateTime(dateValue, { showSeconds: false })}
@@ -61,10 +56,7 @@ export const useEnvironmentColumns = () => {
         cell: ({ getValue }) => {
           const dateValue = getValue();
           return (
-            <Tooltip
-              title={formatLocalDateTime(dateValue, { showSeconds: true })}
-              placement="top"
-            >
+            <Tooltip title={formatLocalDateTime(dateValue, { showSeconds: true })} placement="top">
               <Box>
                 <TableCellContent variant="secondary">
                   {formatLocalDateTime(dateValue, { showSeconds: false })}
@@ -75,6 +67,6 @@ export const useEnvironmentColumns = () => {
         },
       }),
     ],
-    [],
+    []
   );
 };

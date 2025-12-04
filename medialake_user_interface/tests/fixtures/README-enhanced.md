@@ -11,11 +11,13 @@ The enhanced fixture system extends the original MediaLake Playwright fixtures w
 ### Core Components
 
 1. **AWS Resource Discovery Engine** ([`aws-resource-finder.ts`](../utils/aws-resource-finder.ts))
+
    - Unified resource discovery with caching and fallback mechanisms
    - Support for multiple AWS services (Cognito, CloudFront, S3, etc.)
    - Worker-isolated caching for parallel test execution
 
 2. **Service Adapters**
+
    - [`cognito-service-adapter.ts`](../utils/cognito-service-adapter.ts): Cognito user pool discovery and management
    - [`cloudfront-service-adapter.ts`](../utils/cloudfront-service-adapter.ts): CloudFront distribution discovery and testing
    - [`tag-matcher.ts`](../utils/tag-matcher.ts): Standardized tag filtering and matching
@@ -42,16 +44,9 @@ Provides unified AWS resource discovery capabilities with comprehensive caching 
 #### Usage
 
 ```typescript
-import {
-  test,
-  expect,
-  AWSDiscoveryUtils,
-} from "../fixtures/aws-discovery.fixtures";
+import { test, expect, AWSDiscoveryUtils } from "../fixtures/aws-discovery.fixtures";
 
-test("should discover AWS resources by tags", async ({
-  awsResourceContext,
-  discoveryEngine,
-}) => {
+test("should discover AWS resources by tags", async ({ awsResourceContext, discoveryEngine }) => {
   // Access discovered resources
   expect(awsResourceContext.cognitoUserPool).toBeTruthy();
   expect(awsResourceContext.cloudFrontDistribution).toBeTruthy();
@@ -84,31 +79,21 @@ Extends the original Cognito fixtures with tag-based discovery and permanent pas
 #### Usage
 
 ```typescript
-import {
-  test,
-  expect,
-  EnhancedCognitoUtils,
-} from "../fixtures/enhanced-cognito.fixtures";
+import { test, expect, EnhancedCognitoUtils } from "../fixtures/enhanced-cognito.fixtures";
 
-test("should create user with permanent password", async ({
-  enhancedCognitoTestUser,
-}) => {
+test("should create user with permanent password", async ({ enhancedCognitoTestUser }) => {
   // User is ready to use immediately (no password reset required)
   expect(enhancedCognitoTestUser.username).toBeTruthy();
   expect(enhancedCognitoTestUser.password).toBeTruthy();
-  expect(enhancedCognitoTestUser.discoveryMethod).toMatch(
-    /^(tag-based|name-based|fallback)$/,
-  );
+  expect(enhancedCognitoTestUser.discoveryMethod).toMatch(/^(tag-based|name-based|fallback)$/);
 
   // Validate discovery method
   const isTagBased = EnhancedCognitoUtils.validateDiscoveryMethod(
     enhancedCognitoTestUser,
-    "tag-based",
+    "tag-based"
   );
 
-  console.log(
-    `User discovered via: ${enhancedCognitoTestUser.discoveryMethod}`,
-  );
+  console.log(`User discovered via: ${enhancedCognitoTestUser.discoveryMethod}`);
 });
 ```
 
@@ -133,28 +118,19 @@ Provides comprehensive CloudFront distribution discovery and testing capabilitie
 #### Usage
 
 ```typescript
-import {
-  test,
-  expect,
-  CloudFrontTestUtils,
-} from "../fixtures/cloudfront.fixtures";
+import { test, expect, CloudFrontTestUtils } from "../fixtures/cloudfront.fixtures";
 
-test("should test CloudFront distribution", async ({
-  cloudFrontContext,
-  cloudFrontTestPage,
-}) => {
+test("should test CloudFront distribution", async ({ cloudFrontContext, cloudFrontTestPage }) => {
   // Test distribution accessibility
   const testResults = await CloudFrontTestUtils.testDistributionAccess(
     cloudFrontTestPage,
-    cloudFrontContext.testUrls,
+    cloudFrontContext.testUrls
   );
 
   expect(testResults.length).toBeGreaterThan(0);
 
   // Validate cache headers
-  const response = await cloudFrontTestPage.goto(
-    cloudFrontContext.testUrls.root,
-  );
+  const response = await cloudFrontTestPage.goto(cloudFrontContext.testUrls.root);
   const headers = await response.allHeaders();
   const cacheValidation = CloudFrontTestUtils.validateCacheHeaders(headers);
 
@@ -178,17 +154,20 @@ Comprehensive integration tests that validate the complete workflow from tag-bas
 #### Test Coverage
 
 1. **Complete Workflow Validation**
+
    - Tag-based resource discovery
    - User creation with permanent passwords
    - CloudFront navigation and login automation
    - End-to-end authentication flow
 
 2. **Performance and Caching**
+
    - Discovery performance benchmarks
    - Cache behavior validation
    - Concurrent execution testing
 
 3. **Backward Compatibility**
+
    - Compatibility with existing [`auth.fixtures.ts`](auth.fixtures.ts)
    - S3 bucket naming pattern compatibility
    - Worker isolation validation
@@ -213,9 +192,7 @@ test("should perform complete E2E workflow", async ({
   expect(e2eIntegrationContext.validationResults.backwardCompatible).toBe(true);
 
   // Test authenticated access
-  await authenticatedE2EPage.goto(
-    e2eIntegrationContext.testUrls.cloudFrontDashboard,
-  );
+  await authenticatedE2EPage.goto(e2eIntegrationContext.testUrls.cloudFrontDashboard);
   expect(authenticatedE2EPage.url()).not.toContain("/sign-in");
 });
 ```
@@ -329,10 +306,7 @@ test("enhanced login test", async ({ enhancedCognitoTestUser }) => {
 ```typescript
 import { test, expect } from "../integration/aws-tag-discovery-e2e.spec";
 
-test("complete E2E test", async ({
-  e2eIntegrationContext,
-  authenticatedE2EPage,
-}) => {
+test("complete E2E test", async ({ e2eIntegrationContext, authenticatedE2EPage }) => {
   // Full end-to-end testing with all enhancements
 });
 ```
@@ -505,11 +479,13 @@ PWDEBUG=1 npx playwright test tests/integration/aws-tag-discovery-e2e.spec.ts
 ### Resource Management
 
 1. **Tag Resources Consistently**
+
    - Use standardized tag patterns
    - Include environment and application tags
    - Add testing-specific tags for test resources
 
 2. **Optimize Discovery Performance**
+
    - Use appropriate cache TTL for your environment
    - Prefetch common resources in setup
    - Monitor discovery performance metrics
@@ -522,6 +498,7 @@ PWDEBUG=1 npx playwright test tests/integration/aws-tag-discovery-e2e.spec.ts
 ### Parallel Execution
 
 1. **Ensure Worker Isolation**
+
    - Each worker gets unique test users
    - Cache instances are worker-isolated
    - Resource cleanup is worker-specific
@@ -543,9 +520,7 @@ test("basic resource discovery", async ({ awsResourceContext }) => {
   expect(awsResourceContext.cloudFrontDistribution).toBeTruthy();
 
   console.log(`Found Cognito pool: ${awsResourceContext.cognitoUserPool.name}`);
-  console.log(
-    `Found CloudFront distribution: ${awsResourceContext.cloudFrontDistribution.name}`,
-  );
+  console.log(`Found CloudFront distribution: ${awsResourceContext.cloudFrontDistribution.name}`);
 });
 ```
 
@@ -554,9 +529,7 @@ test("basic resource discovery", async ({ awsResourceContext }) => {
 ```typescript
 import { test, expect } from "../fixtures/enhanced-cognito.fixtures";
 
-test("permanent password user creation", async ({
-  enhancedCognitoTestUser,
-}) => {
+test("permanent password user creation", async ({ enhancedCognitoTestUser }) => {
   // User is immediately ready for login (no password reset)
   expect(enhancedCognitoTestUser.password).toBeTruthy();
   expect(enhancedCognitoTestUser.discoveryMethod).toBeTruthy();
@@ -569,20 +542,13 @@ test("permanent password user creation", async ({
 ### CloudFront Testing
 
 ```typescript
-import {
-  test,
-  expect,
-  CloudFrontTestUtils,
-} from "../fixtures/cloudfront.fixtures";
+import { test, expect, CloudFrontTestUtils } from "../fixtures/cloudfront.fixtures";
 
-test("CloudFront performance testing", async ({
-  cloudFrontContext,
-  cloudFrontTestPage,
-}) => {
+test("CloudFront performance testing", async ({ cloudFrontContext, cloudFrontTestPage }) => {
   // Test distribution performance
   const results = await CloudFrontTestUtils.testDistributionAccess(
     cloudFrontTestPage,
-    cloudFrontContext.testUrls,
+    cloudFrontContext.testUrls
   );
 
   // Validate performance benchmarks
@@ -598,20 +564,13 @@ test("CloudFront performance testing", async ({
 ```typescript
 import { test, expect } from "../integration/aws-tag-discovery-e2e.spec";
 
-test("complete workflow validation", async ({
-  e2eIntegrationContext,
-  authenticatedE2EPage,
-}) => {
+test("complete workflow validation", async ({ e2eIntegrationContext, authenticatedE2EPage }) => {
   // Validate complete setup
-  expect(e2eIntegrationContext.discoveryMetrics.totalSetupTime).toBeLessThan(
-    30000,
-  );
+  expect(e2eIntegrationContext.discoveryMetrics.totalSetupTime).toBeLessThan(30000);
   expect(e2eIntegrationContext.validationResults.backwardCompatible).toBe(true);
 
   // Test authenticated navigation
-  await authenticatedE2EPage.goto(
-    e2eIntegrationContext.testUrls.cloudFrontDashboard,
-  );
+  await authenticatedE2EPage.goto(e2eIntegrationContext.testUrls.cloudFrontDashboard);
 
   // Validate successful authentication
   expect(authenticatedE2EPage.url()).not.toContain("/sign-in");

@@ -46,12 +46,7 @@ export const EmptyTableState: React.FC<EmptyTableStateProps> = ({
       >
         {icon || <InboxIcon sx={{ fontSize: 40 }} />}
       </Box>
-      <Typography
-        variant="h6"
-        color="text.secondary"
-        align="center"
-        gutterBottom
-      >
+      <Typography variant="h6" color="text.secondary" align="center" gutterBottom>
         {message}
       </Typography>
       {action && <Box sx={{ mt: 2 }}>{action}</Box>}

@@ -1,11 +1,5 @@
 import React, { useCallback, useRef, useState } from "react";
-import {
-  Handle,
-  Position,
-  NodeProps,
-  useReactFlow,
-  useOnSelectionChange,
-} from "reactflow";
+import { Handle, Position, NodeProps, useReactFlow, useOnSelectionChange } from "reactflow";
 import { Box, Typography, IconButton, Tooltip } from "@mui/material";
 import { FaCog, FaTrash } from "react-icons/fa";
 import { RotateRight } from "@mui/icons-material";
@@ -23,8 +17,7 @@ const ExpandableDescription: React.FC<{ text: string }> = ({ text }) => {
     const checkOverflow = () => {
       if (textRef.current) {
         // For multi-line text with line clamp, check if scrollHeight > clientHeight
-        const isTextOverflowing =
-          textRef.current.scrollHeight > textRef.current.clientHeight;
+        const isTextOverflowing = textRef.current.scrollHeight > textRef.current.clientHeight;
         setIsOverflowing(isTextOverflowing);
       }
     };
@@ -88,8 +81,7 @@ const LabelWithTooltip: React.FC<{ text: string }> = ({ text }) => {
   React.useEffect(() => {
     const checkOverflow = () => {
       if (textRef.current) {
-        const isTextOverflowing =
-          textRef.current.scrollWidth > textRef.current.clientWidth;
+        const isTextOverflowing = textRef.current.scrollWidth > textRef.current.clientWidth;
         setIsOverflowing(isTextOverflowing);
       }
     };
@@ -145,11 +137,7 @@ export interface CustomNodeData {
   rotation?: number; // Rotation angle in degrees (0, 90, 180, 270)
 }
 
-const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
-  id,
-  data,
-  isConnectable,
-}) => {
+const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectable }) => {
   // In File 1: track selection state
   const [selected, setSelected] = useState(false);
   const { project } = useReactFlow();
@@ -160,7 +148,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
       const isSelected = nodes.find((node: any) => node.id === id);
       setSelected(!!isSelected);
     },
-    [id],
+    [id]
   );
 
   useOnSelectionChange({ onChange });
@@ -176,10 +164,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
   };
 
   // Helper function to get handle position based on rotation
-  const getHandlePosition = (
-    originalPosition: Position,
-    rotation: number,
-  ): Position => {
+  const getHandlePosition = (originalPosition: Position, rotation: number): Position => {
     const rotationMap = {
       0: {
         [Position.Left]: Position.Left,
@@ -207,8 +192,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
       },
     };
     return (
-      rotationMap[rotation as keyof typeof rotationMap]?.[originalPosition] ||
-      originalPosition
+      rotationMap[rotation as keyof typeof rotationMap]?.[originalPosition] || originalPosition
     );
   };
 
@@ -360,18 +344,14 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
         const handleX = handleRect.left + handleRect.width / 2;
         const handleY = handleRect.top + handleRect.height / 2;
 
-        const distance = Math.sqrt(
-          Math.pow(clickX - handleX, 2) + Math.pow(clickY - handleY, 2),
-        );
+        const distance = Math.sqrt(Math.pow(clickX - handleX, 2) + Math.pow(clickY - handleY, 2));
 
         return distance <= HANDLE_CONNECT_RADIUS;
       };
 
       // Find the closest handle
       const handles = Array.from(
-        document.querySelectorAll(
-          `[data-nodeid="${id}"] .react-flow__handle-source`,
-        ),
+        document.querySelectorAll(`[data-nodeid="${id}"] .react-flow__handle-source`)
       );
       for (const handle of handles) {
         if (isNearHandle(handle)) {
@@ -385,7 +365,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
         }
       }
     },
-    [id, project],
+    [id, project]
   );
 
   const isTriggerNode = data.type?.includes("TRIGGER");
@@ -406,11 +386,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
   const outputPos = getHandlePosition(Position.Right, currentRotation);
 
   const edgeNudge = (pos: Position) =>
-    pos === Position.Top
-      ? { top: -2 }
-      : pos === Position.Bottom
-        ? { bottom: -2 }
-        : {};
+    pos === Position.Top ? { top: -2 } : pos === Position.Bottom ? { bottom: -2 } : {};
 
   return (
     <Box
@@ -457,24 +433,15 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
         {!isTriggerNode && (
           <Box sx={getHandleContainerStyles(true, currentRotation)}>
             {inputTypes.map((inputType, index) => (
-              <Box
-                key={`input-${index}`}
-                sx={getHandleItemStyles(currentRotation)}
-              >
+              <Box key={`input-${index}`} sx={getHandleItemStyles(currentRotation)}>
                 <Tooltip
-                  title={
-                    typeof inputType === "string"
-                      ? inputType
-                      : (inputType as InputType).name
-                  }
+                  title={typeof inputType === "string" ? inputType : (inputType as InputType).name}
                 >
                   <Handle
                     type="target"
                     position={inputPos}
                     id={`input-${
-                      typeof inputType === "string"
-                        ? inputType
-                        : (inputType as InputType).name
+                      typeof inputType === "string" ? inputType : (inputType as InputType).name
                     }`}
                     isConnectable={isConnectable}
                     style={{
@@ -536,11 +503,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
             }}
           >
             {hasConfigurableParameters() && (
-              <IconButton
-                size="small"
-                onClick={handleConfigure}
-                sx={{ p: 0.5 }}
-              >
+              <IconButton size="small" onClick={handleConfigure} sx={{ p: 0.5 }}>
                 <FaCog size={14} />
               </IconButton>
             )}

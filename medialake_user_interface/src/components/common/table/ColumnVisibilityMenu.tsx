@@ -1,11 +1,5 @@
 import React from "react";
-import {
-  Menu,
-  MenuItem,
-  Typography,
-  FormControlLabel,
-  Checkbox,
-} from "@mui/material";
+import { Menu, MenuItem, Typography, FormControlLabel, Checkbox } from "@mui/material";
 import { Column } from "@tanstack/react-table";
 
 interface ColumnVisibilityMenuProps {

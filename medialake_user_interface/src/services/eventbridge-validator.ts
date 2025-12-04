@@ -63,7 +63,9 @@ export class EventBridgePatternValidator {
       if (!this.VALID_ROOT_FIELDS.includes(field)) {
         errors.push({
           path: field,
-          message: `Invalid root field: ${field}. Valid fields are: ${this.VALID_ROOT_FIELDS.join(", ")}`,
+          message: `Invalid root field: ${field}. Valid fields are: ${this.VALID_ROOT_FIELDS.join(
+            ", "
+          )}`,
           severity: "error",
         });
       }
@@ -82,7 +84,7 @@ export class EventBridgePatternValidator {
     node: any,
     path: string,
     errors: ValidationError[],
-    warnings: ValidationError[],
+    warnings: ValidationError[]
   ): void {
     if (Array.isArray(node)) {
       node.forEach((item, index) => {
@@ -103,7 +105,7 @@ export class EventBridgePatternValidator {
     item: any,
     path: string,
     errors: ValidationError[],
-    warnings: ValidationError[],
+    warnings: ValidationError[]
   ): void {
     if (typeof item === "object" && item !== null && !Array.isArray(item)) {
       for (const [operator, value] of Object.entries(item)) {
@@ -137,7 +139,7 @@ export class EventBridgePatternValidator {
   private static validateNumericOperator(
     value: any,
     path: string,
-    errors: ValidationError[],
+    errors: ValidationError[]
   ): void {
     if (!Array.isArray(value)) {
       errors.push({
@@ -193,11 +195,7 @@ export class EventBridgePatternValidator {
     }
   }
 
-  private static validateCidrOperator(
-    value: any,
-    path: string,
-    errors: ValidationError[],
-  ): void {
+  private static validateCidrOperator(value: any, path: string, errors: ValidationError[]): void {
     if (typeof value !== "string") {
       errors.push({
         path,
@@ -218,11 +216,7 @@ export class EventBridgePatternValidator {
     }
   }
 
-  private static validateExistsOperator(
-    value: any,
-    path: string,
-    errors: ValidationError[],
-  ): void {
+  private static validateExistsOperator(value: any, path: string, errors: ValidationError[]): void {
     if (typeof value !== "boolean") {
       errors.push({
         path,
@@ -236,7 +230,7 @@ export class EventBridgePatternValidator {
     value: any,
     path: string,
     errors: ValidationError[],
-    warnings: ValidationError[],
+    warnings: ValidationError[]
   ): void {
     if (typeof value !== "string" && !Array.isArray(value)) {
       errors.push({
@@ -256,12 +250,7 @@ export class EventBridgePatternValidator {
             severity: "error",
           });
         } else {
-          this.validateWildcardPattern(
-            v,
-            `${path}[${index}]`,
-            errors,
-            warnings,
-          );
+          this.validateWildcardPattern(v, `${path}[${index}]`, errors, warnings);
         }
       });
     } else {
@@ -273,7 +262,7 @@ export class EventBridgePatternValidator {
     pattern: string,
     path: string,
     errors: ValidationError[],
-    warnings: ValidationError[],
+    warnings: ValidationError[]
   ): void {
     if (pattern.includes("**")) {
       errors.push({
@@ -297,7 +286,7 @@ export class EventBridgePatternValidator {
     value: any,
     path: string,
     errors: ValidationError[],
-    warnings: ValidationError[],
+    warnings: ValidationError[]
   ): void {
     if (!Array.isArray(value)) {
       errors.push({

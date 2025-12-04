@@ -1,9 +1,5 @@
 import { useState, useEffect } from "react";
-import {
-  formatLocalDateTime,
-  formatRelativeTime,
-  isValidISOString,
-} from "../utils/dateUtils";
+import { formatLocalDateTime, formatRelativeTime, isValidISOString } from "../utils/dateUtils";
 import { useTimezone } from "../../contexts/TimezoneContext";
 
 interface DateFormatOptions {
@@ -13,10 +9,7 @@ interface DateFormatOptions {
   updateInterval?: number;
 }
 
-export const useDateFormat = (
-  isoString: string | undefined,
-  options: DateFormatOptions = {},
-) => {
+export const useDateFormat = (isoString: string | undefined, options: DateFormatOptions = {}) => {
   const {
     showRelative = true,
     showSeconds: initialShowSeconds = false,
@@ -72,9 +65,7 @@ export const useDateFormat = (
 
   return {
     formattedDate,
-    absoluteDate: isoString
-      ? formatLocalDateTime(isoString, { showSeconds })
-      : "Invalid date",
+    absoluteDate: isoString ? formatLocalDateTime(isoString, { showSeconds }) : "Invalid date",
     relativeDate: isoString ? formatRelativeTime(isoString) : "Invalid date",
     showSeconds,
     toggleSeconds,

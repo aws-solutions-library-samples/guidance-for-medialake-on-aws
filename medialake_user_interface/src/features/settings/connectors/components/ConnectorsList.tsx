@@ -7,10 +7,7 @@ import {
   useToggleConnector,
   useSyncConnector,
 } from "@/api/hooks/useConnectors";
-import {
-  ConnectorResponse,
-  ConnectorListResponse,
-} from "@/api/types/api.types";
+import { ConnectorResponse, ConnectorListResponse } from "@/api/types/api.types";
 import ConnectorCard from "./ConnectorCard";
 import { UseQueryResult } from "@tanstack/react-query";
 
@@ -18,9 +15,7 @@ interface ConnectorsListProps {
   onAddConnector: () => void;
 }
 
-export const ConnectorsList: React.FC<ConnectorsListProps> = ({
-  onAddConnector,
-}) => {
+export const ConnectorsList: React.FC<ConnectorsListProps> = ({ onAddConnector }) => {
   return (
     <Suspense fallback={<LoadingSpinner />}>
       <ConnectorsListContent onAddConnector={onAddConnector} />
@@ -29,12 +24,7 @@ export const ConnectorsList: React.FC<ConnectorsListProps> = ({
 };
 
 const LoadingSpinner = () => (
-  <Box
-    display="flex"
-    justifyContent="center"
-    alignItems="center"
-    minHeight="200px"
-  >
+  <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
     <CircularProgress />
   </Box>
 );
@@ -43,9 +33,7 @@ interface ConnectorsListContentProps {
   onAddConnector: () => void;
 }
 
-const ConnectorsListContent: React.FC<ConnectorsListContentProps> = ({
-  onAddConnector,
-}) => {
+const ConnectorsListContent: React.FC<ConnectorsListContentProps> = ({ onAddConnector }) => {
   const {
     data: connectorsData,
     isLoading,
@@ -92,9 +80,7 @@ const ConnectorsListContent: React.FC<ConnectorsListContentProps> = ({
   if (error) {
     return (
       <Box p={3}>
-        <Typography color="error">
-          Error loading connectors: {error.message}
-        </Typography>
+        <Typography color="error">Error loading connectors: {error.message}</Typography>
       </Box>
     );
   }

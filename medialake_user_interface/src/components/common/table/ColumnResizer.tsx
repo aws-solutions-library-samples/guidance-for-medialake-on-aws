@@ -9,11 +9,7 @@ interface ColumnResizerProps {
   sx?: SxProps<Theme>;
 }
 
-export const ColumnResizer: React.FC<ColumnResizerProps> = ({
-  header,
-  className,
-  sx = {},
-}) => {
+export const ColumnResizer: React.FC<ColumnResizerProps> = ({ header, className, sx = {} }) => {
   const theme = useTheme();
 
   return (

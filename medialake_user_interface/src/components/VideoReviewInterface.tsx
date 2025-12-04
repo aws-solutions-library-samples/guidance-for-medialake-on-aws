@@ -37,9 +37,7 @@ interface VideoReviewInterfaceProps {
   onClose: () => void;
 }
 
-const VideoReviewInterface: React.FC<VideoReviewInterfaceProps> = ({
-  onClose,
-}) => {
+const VideoReviewInterface: React.FC<VideoReviewInterfaceProps> = ({ onClose }) => {
   const [currentReview, setCurrentReview] = useState<VideoReviewData>({
     id: "1",
     title: "Sample Video",
@@ -179,9 +177,7 @@ const VideoReviewInterface: React.FC<VideoReviewInterfaceProps> = ({
                 <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
                   <Avatar>{comment.author[0]}</Avatar>
                   <Box sx={{ flex: 1 }}>
-                    <Typography variant="subtitle2">
-                      {comment.author}
-                    </Typography>
+                    <Typography variant="subtitle2">{comment.author}</Typography>
                     <Typography variant="body2" color="text.secondary">
                       {comment.timestamp.toLocaleString()}
                     </Typography>

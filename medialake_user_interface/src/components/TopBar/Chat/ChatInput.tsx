@@ -10,12 +10,7 @@ interface ChatInputProps {
   onClose: () => void;
 }
 
-const ChatInput: React.FC<ChatInputProps> = ({
-  value,
-  onChange,
-  onSubmit,
-  onClose,
-}) => (
+const ChatInput: React.FC<ChatInputProps> = ({ value, onChange, onSubmit, onClose }) => (
   <Box sx={{ p: 2, borderTop: "1px solid rgba(0, 0, 0, 0.12)" }}>
     <Box sx={{ display: "flex", alignItems: "center" }}>
       <TextField

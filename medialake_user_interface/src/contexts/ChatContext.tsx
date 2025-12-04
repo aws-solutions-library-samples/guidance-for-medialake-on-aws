@@ -16,11 +16,7 @@ interface ChatContextType {
   openChat: () => void;
   closeChat: () => void;
   toggleChat: () => void;
-  addMessage: (
-    content: string,
-    sender: "user" | "system",
-    isThinking?: boolean,
-  ) => void;
+  addMessage: (content: string, sender: "user" | "system", isThinking?: boolean) => void;
   updateLastMessage: (content: string) => void;
   clearHistory: () => void;
 }
@@ -48,11 +44,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const toggleChat = () => setIsOpen((prev) => !prev);
 
   // Add a new message to the chat history
-  const addMessage = (
-    content: string,
-    sender: "user" | "system",
-    isThinking: boolean = false,
-  ) => {
+  const addMessage = (content: string, sender: "user" | "system", isThinking: boolean = false) => {
     const newMessage: ChatMessage = {
       id: Date.now().toString(), // Simple ID generation
       content,

@@ -22,13 +22,10 @@ export interface IntegrationMapping {
 }
 
 export class IntegrationValidationService {
-  static async validateIntegrationIds(
-    nodes: PipelineNode[],
-  ): Promise<ValidationResult> {
+  static async validateIntegrationIds(nodes: PipelineNode[]): Promise<ValidationResult> {
     try {
       // Fetch available integrations
-      const integrationsResponse =
-        await integrationsController.getIntegrations();
+      const integrationsResponse = await integrationsController.getIntegrations();
       const availableIntegrations = integrationsResponse.data || [];
 
       // Extract integration IDs from nodes
@@ -40,7 +37,7 @@ export class IntegrationValidationService {
         if (integrationId && node.data?.type === "INTEGRATION") {
           // Check if integration ID exists in available integrations
           const integrationExists = availableIntegrations.some(
-            (integration) => integration.id === integrationId,
+            (integration) => integration.id === integrationId
           );
 
           if (!integrationExists) {
@@ -60,25 +57,19 @@ export class IntegrationValidationService {
         availableIntegrations,
       };
     } catch (error) {
-      console.error(
-        "[IntegrationValidationService] Error validating integration IDs:",
-        error,
-      );
+      console.error("[IntegrationValidationService] Error validating integration IDs:", error);
       throw error;
     }
   }
 
   static mapInvalidIntegrationIds(
     nodes: PipelineNode[],
-    mappings: IntegrationMapping[],
+    mappings: IntegrationMapping[]
   ): PipelineNode[] {
     return nodes.map((node, index) => {
       const mapping = mappings.find((m) => m.nodeIndex === index);
 
-      if (
-        mapping &&
-        node.data?.configuration?.integrationId === mapping.oldIntegrationId
-      ) {
+      if (mapping && node.data?.configuration?.integrationId === mapping.oldIntegrationId) {
         return {
           ...node,
           data: {

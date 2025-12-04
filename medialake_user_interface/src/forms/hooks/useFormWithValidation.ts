@@ -1,9 +1,4 @@
-import {
-  useForm,
-  UseFormProps,
-  FieldValues,
-  DefaultValues,
-} from "react-hook-form";
+import { useForm, UseFormProps, FieldValues, DefaultValues } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useTranslation } from "react-i18next";
@@ -16,9 +11,7 @@ export type FormConfig<T extends FieldValues> = {
   translationPrefix?: string;
 };
 
-export const useFormWithValidation = <T extends FieldValues>(
-  config: FormConfig<T>,
-) => {
+export const useFormWithValidation = <T extends FieldValues>(config: FormConfig<T>) => {
   const {
     defaultValues,
     validationSchema,
@@ -86,8 +79,5 @@ export const createCommonValidators = (t: (key: string) => string) => ({
       .regex(/[A-Z]/, messages.uppercase || "Must contain uppercase letter")
       .regex(/[a-z]/, messages.lowercase || "Must contain lowercase letter")
       .regex(/[0-9]/, messages.number || "Must contain number")
-      .regex(
-        /[^A-Za-z0-9]/,
-        messages.special || "Must contain special character",
-      ),
+      .regex(/[^A-Za-z0-9]/, messages.special || "Must contain special character"),
 });

@@ -70,6 +70,7 @@ This document provides a comprehensive guide to the Collections frontend UI impl
 ### Core Components
 
 1. **`src/pages/CollectionsPage.tsx`** (528 lines)
+
    - Main Collections page component
    - Collapsible sidebar with collection tabs
    - Card-based collection grid layout
@@ -77,6 +78,7 @@ This document provides a comprehensive guide to the Collections frontend UI impl
    - Context menus and delete confirmation dialogs
 
 2. **`src/components/collections/CreateCollectionModal.tsx`** (209 lines)
+
    - Modal dialog for collection creation
    - Form validation and error handling
    - Collection type and parent selection
@@ -91,19 +93,23 @@ This document provides a comprehensive guide to the Collections frontend UI impl
 ### Configuration Updates
 
 4. **Updated `src/Sidebar.tsx`**
+
    - Added FolderIcon import
    - Added Collections menu item with proper positioning
    - No permission restrictions (available to all users)
 
 5. **Updated `src/api/endpoints.ts`**
+
    - Added COLLECTIONS endpoints configuration
    - Support for all collection operations (CRUD, sharing, types)
 
 6. **Updated `src/api/queryKeys.ts`**
+
    - Added COLLECTIONS query keys structure
    - Support for caching and invalidation strategies
 
 7. **Updated `src/routes/router.tsx`**
+
    - Added `/collections` route configuration
    - Imported CollectionsPage component
 

@@ -14,11 +14,7 @@ interface ErrorModalProps {
   message: string;
 }
 
-export const ErrorModal: React.FC<ErrorModalProps> = ({
-  open,
-  onClose,
-  message,
-}) => {
+export const ErrorModal: React.FC<ErrorModalProps> = ({ open, onClose, message }) => {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ color: "error.main" }}>Error</DialogTitle>

@@ -1,8 +1,5 @@
 import React from "react";
-import {
-  formatLocalDateTime,
-  formatRelativeTime,
-} from "@/shared/utils/dateUtils";
+import { formatLocalDateTime, formatRelativeTime } from "@/shared/utils/dateUtils";
 import type { PipelineExecution } from "../types/pipelineExecutions.types";
 
 interface ExecutionsListProps {
@@ -18,17 +15,13 @@ const ExecutionsList: React.FC<ExecutionsListProps> = ({ executions }) => {
             <div className="flex items-center space-x-2">
               <span className="font-semibold">Started:</span>
               <span>{formatLocalDateTime(execution.start_time)}</span>
-              <span className="text-gray-500">
-                ({formatRelativeTime(execution.start_time)})
-              </span>
+              <span className="text-gray-500">({formatRelativeTime(execution.start_time)})</span>
             </div>
             {execution.end_time && (
               <div className="flex items-center space-x-2">
                 <span className="font-semibold">Ended:</span>
                 <span>{formatLocalDateTime(execution.end_time)}</span>
-                <span className="text-gray-500">
-                  ({formatRelativeTime(execution.end_time)})
-                </span>
+                <span className="text-gray-500">({formatRelativeTime(execution.end_time)})</span>
               </div>
             )}
             <div className="flex items-center space-x-2">
@@ -47,9 +40,7 @@ const ExecutionsList: React.FC<ExecutionsListProps> = ({ executions }) => {
                 {execution.status}
               </span>
             </div>
-            <div className="text-sm text-gray-600">
-              Pipeline: {execution.pipeline_name}
-            </div>
+            <div className="text-sm text-gray-600">Pipeline: {execution.pipeline_name}</div>
           </div>
         </div>
       ))}

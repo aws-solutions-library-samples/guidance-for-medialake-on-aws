@@ -1,12 +1,5 @@
 import React from "react";
-import {
-  Box,
-  Button,
-  IconButton,
-  InputAdornment,
-  FormControlLabel,
-  Switch,
-} from "@mui/material";
+import { Box, Button, IconButton, InputAdornment, FormControlLabel, Switch } from "@mui/material";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
@@ -52,7 +45,7 @@ export const IntegrationConfiguration: React.FC<
         {
           message: "API Key is required",
           path: ["auth", "credentials", "apiKey"],
-        },
+        }
       );
   }, []);
 
@@ -87,14 +80,8 @@ export const IntegrationConfiguration: React.FC<
 
   React.useEffect(() => {
     // Reset if we have a new nodeId (different integration) or haven't initialized yet
-    if (
-      (!hasInitialized || lastNodeId !== initialFormData.nodeId) &&
-      initialFormData.nodeId
-    ) {
-      console.log(
-        "[IntegrationConfiguration] Initial form setup:",
-        initialFormData,
-      );
+    if ((!hasInitialized || lastNodeId !== initialFormData.nodeId) && initialFormData.nodeId) {
+      console.log("[IntegrationConfiguration] Initial form setup:", initialFormData);
       form.reset(initialFormData);
       setHasInitialized(true);
       setLastNodeId(initialFormData.nodeId);
@@ -134,10 +121,7 @@ export const IntegrationConfiguration: React.FC<
       // Close the form immediately before any validation or submission
       onClose();
 
-      console.log(
-        "[IntegrationConfiguration] Starting submission with data:",
-        data,
-      );
+      console.log("[IntegrationConfiguration] Starting submission with data:", data);
       try {
         // Handle the case where API key is the placeholder (not changed in edit mode)
         const submissionData = { ...data };
@@ -152,22 +136,16 @@ export const IntegrationConfiguration: React.FC<
           };
         }
 
-        console.log(
-          "[IntegrationConfiguration] Prepared submission data:",
-          submissionData,
-        );
+        console.log("[IntegrationConfiguration] Prepared submission data:", submissionData);
 
         await onSubmit(submissionData);
         console.log("[IntegrationConfiguration] Submission completed");
       } catch (error) {
-        console.error(
-          "[IntegrationConfiguration] Error during submission:",
-          error,
-        );
+        console.error("[IntegrationConfiguration] Error during submission:", error);
         throw error; // Re-throw to allow parent component to handle the error
       }
     },
-    [onSubmit, enabled, onClose],
+    [onSubmit, enabled, onClose]
   );
 
   const authMethod = formData.auth.type;
@@ -222,10 +200,7 @@ export const IntegrationConfiguration: React.FC<
             InputProps={{
               endAdornment: (
                 <InputAdornment position="end">
-                  <IconButton
-                    onClick={() => setShowApiKey(!showApiKey)}
-                    edge="end"
-                  >
+                  <IconButton onClick={() => setShowApiKey(!showApiKey)} edge="end">
                     {showApiKey ? <VisibilityOff /> : <Visibility />}
                   </IconButton>
                 </InputAdornment>
@@ -251,11 +226,7 @@ export const IntegrationConfiguration: React.FC<
           <Button onClick={onClose} variant="outlined">
             {t("common.cancel")}
           </Button>
-          <Button
-            type="submit"
-            variant="contained"
-            disabled={!form.formState.isValid}
-          >
+          <Button type="submit" variant="contained" disabled={!form.formState.isValid}>
             {t("common.save")}
           </Button>
         </Box>

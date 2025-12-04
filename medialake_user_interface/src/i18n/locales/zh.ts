@@ -19,8 +19,7 @@ export default {
   },
   upload: {
     title: "上传媒体文件",
-    description:
-      "选择S3连接器并上传您的媒体文件。仅支持音频、视频、HLS和MPEG-DASH格式。",
+    description: "选择S3连接器并上传您的媒体文件。仅支持音频、视频、HLS和MPEG-DASH格式。",
     uploadDestination: "上传目标",
     browsePath: "浏览路径",
     uploadingTo: "正在上传到",
@@ -58,8 +57,7 @@ export default {
     },
     hints: {
       clickFolder: "点击文件夹进入，然后点击'选择当前文件夹'进行选择。",
-      navigateAndConfirm:
-        "导航到您想要的文件夹，然后点击'使用此路径'进行确认。",
+      navigateAndConfirm: "导航到您想要的文件夹，然后点击'使用此路径'进行确认。",
       rootPath: "您当前位于根目录。",
     },
   },
@@ -642,8 +640,7 @@ export default {
     },
     notifications: {
       "Pipeline Complete": "管道完成",
-      "Asset processing pipeline completed successfully":
-        "资产处理管道已成功完成",
+      "Asset processing pipeline completed successfully": "资产处理管道已成功完成",
       "Storage Warning": "存储警告",
       "Storage capacity reaching 80%": "存储容量达到80%",
       "Pipeline Failed": "管道失败",

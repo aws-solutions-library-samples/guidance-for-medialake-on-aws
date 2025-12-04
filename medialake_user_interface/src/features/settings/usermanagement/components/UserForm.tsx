@@ -5,11 +5,7 @@ import { Form } from "@/forms/components/Form";
 import { FormField } from "@/forms/components/FormField";
 import { FormSelect } from "@/forms/components/FormSelect";
 import { useFormWithValidation } from "@/forms/hooks/useFormWithValidation";
-import {
-  UserFormData,
-  userFormSchema,
-  createUserFormDefaults,
-} from "../schemas/userFormSchema";
+import { UserFormData, userFormSchema, createUserFormDefaults } from "../schemas/userFormSchema";
 import { useTranslation } from "react-i18next";
 
 interface UserFormProps {
@@ -46,9 +42,7 @@ export const UserForm: React.FC<UserFormProps> = ({
                   // user.groups contains group IDs (e.g., "read-only", "superAdministrators")
                   // Check if the ID exists in availableGroups, otherwise default to "editors"
                   const groupId = user.groups[0];
-                  const groupExists = availableGroups.find(
-                    (g) => g.id === groupId,
-                  );
+                  const groupExists = availableGroups.find((g) => g.id === groupId);
                   console.log("UserForm defaultValues - looking up group:", {
                     groupId,
                     groupExists,
@@ -77,9 +71,7 @@ export const UserForm: React.FC<UserFormProps> = ({
                     // user.groups contains group IDs (e.g., "read-only", "superAdministrators")
                     // Check if the ID exists in availableGroups, otherwise default to "editors"
                     const groupId = user.groups[0];
-                    const groupExists = availableGroups.find(
-                      (g) => g.id === groupId,
-                    );
+                    const groupExists = availableGroups.find((g) => g.id === groupId);
                     console.log("UserForm reset - looking up group:", {
                       groupId,
                       groupExists,
@@ -118,17 +110,13 @@ export const UserForm: React.FC<UserFormProps> = ({
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>
-        {user ? t("users.form.title.edit") : t("users.form.title.add")}
-      </DialogTitle>
+      <DialogTitle>{user ? t("users.form.title.edit") : t("users.form.title.add")}</DialogTitle>
       <DialogContent>
         <Box sx={{ mt: 2 }}>
           <Form
             form={form}
             onSubmit={handleSubmit}
-            submitLabel={
-              user ? t("common.actions.save") : t("common.actions.add")
-            }
+            submitLabel={user ? t("common.actions.save") : t("common.actions.add")}
             onCancel={onClose}
           >
             <FormField
@@ -163,10 +151,7 @@ export const UserForm: React.FC<UserFormProps> = ({
               tooltip={
                 isLoadingGroups
                   ? "Loading groups..."
-                  : t(
-                      "users.form.fields.groups.tooltip",
-                      "Select a group for this user",
-                    )
+                  : t("users.form.fields.groups.tooltip", "Select a group for this user")
               }
               options={availableGroups.map((group) => {
                 console.log("Mapping group in FormSelect:", group);
@@ -175,11 +160,7 @@ export const UserForm: React.FC<UserFormProps> = ({
                   value: group.id,
                 };
               })}
-              disabled={
-                isLoadingGroups ||
-                !availableGroups ||
-                availableGroups.length === 0
-              }
+              disabled={isLoadingGroups || !availableGroups || availableGroups.length === 0}
               translationPrefix="users.form"
             />
           </Form>

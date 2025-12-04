@@ -17,11 +17,5 @@ export const StatusCell: React.FC<StatusCellProps> = ({ value }) => {
     }
   };
 
-  return (
-    <Chip
-      label={value.toUpperCase()}
-      color={getStatusColor(value) as any}
-      size="small"
-    />
-  );
+  return <Chip label={value.toUpperCase()} color={getStatusColor(value) as any} size="small" />;
 };

@@ -293,6 +293,7 @@
 ### Collections
 
 - `GET /collections` → Multiple patterns:
+
   - All collections: GSI5 query with `PK: "COLLECTIONS"`
   - By owner: GSI1 query with `PK: USER#{userId}`
   - By type: GSI3 query with `PK: {collectionTypeId}`
