@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { formatDate } from "@/utils/dateFormat";
 import {
   Box,
@@ -82,6 +83,7 @@ interface Filters {
 const DEFAULT_PAGE_SIZE = 50;
 
 const SearchPage: React.FC = () => {
+  const { t } = useTranslation();
   const location = useLocation();
 
   // Add to Collection state
@@ -708,16 +710,18 @@ const SearchPage: React.FC = () => {
           aria-labelledby="delete-dialog-title"
           aria-describedby="delete-dialog-description"
         >
-          <DialogTitle id="delete-dialog-title">Confirm Delete</DialogTitle>
+          <DialogTitle id="delete-dialog-title">
+            {t("assetExplorer.deleteDialog.title")}
+          </DialogTitle>
           <DialogContent>
             <DialogContentText id="delete-dialog-description">
-              Are you sure you want to delete this asset? This action cannot be undone.
+              {t("assetExplorer.deleteDialog.description")}
             </DialogContentText>
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleDeleteCancel}>Cancel</Button>
+            <Button onClick={handleDeleteCancel}>{t("assetExplorer.deleteDialog.cancel")}</Button>
             <Button onClick={handleDeleteConfirm} color="error" autoFocus>
-              Delete
+              {t("assetExplorer.deleteDialog.confirm")}
             </Button>
           </DialogActions>
         </Dialog>

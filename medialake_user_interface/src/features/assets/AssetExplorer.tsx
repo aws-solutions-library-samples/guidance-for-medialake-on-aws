@@ -410,7 +410,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
               error
                 ? {
                     status: error.name || "Error",
-                    message: error.message || "Failed to load assets",
+                    message: error.message || t("assetExplorer.failedToLoadAssets"),
                   }
                 : undefined
             }

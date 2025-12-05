@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useFeatureFlag } from "@/utils/featureFlags";
 import { useSemanticSearch } from "@/stores/searchStore";
 import { Box, Typography, IconButton, Button, CircularProgress, Checkbox } from "@mui/material";
@@ -111,6 +112,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
     isSemantic = false,
     confidenceThreshold = 0.57,
   }) => {
+    const { t } = useTranslation();
     const [isHovering, setIsHovering] = useState(false);
     const [isMenuClicked, setIsMenuClicked] = useState(false);
     const preventCommitRef = useRef<boolean>(false);
@@ -947,7 +949,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                       color: "primary.contrastText",
                     },
                   }}
-                  title="Download"
+                  title={t("common.actions.download")}
                 >
                   <DownloadIcon fontSize="small" />
                 </IconButton>
@@ -976,7 +978,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                       color: "primary.contrastText",
                     },
                   }}
-                  title={showRemoveButton ? "Remove from Collection" : "Add to Collection"}
+                  title={t("common.actions.addToCollection")}
                 >
                   {showRemoveButton ? (
                     <RemoveIcon fontSize="small" />
@@ -1002,7 +1004,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                     justifyContent: "center",
                     overflow: "hidden",
                   }}
-                  title="Asset Detail"
+                  title={t("common.actions.assetDetail")}
                 >
                   <Box
                     sx={{
@@ -1013,7 +1015,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                       textAlign: "center",
                     }}
                   >
-                    Asset Detail
+                    {t("common.actions.assetDetail")}
                   </Box>
                 </Button>
 
@@ -1027,7 +1029,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                       color: "primary.contrastText",
                     },
                   }}
-                  title="Delete"
+                  title={t("common.actions.delete")}
                 >
                   <DeleteIcon fontSize="small" />
                 </IconButton>
@@ -1077,7 +1079,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                         color: "primary.contrastText",
                       },
                     }}
-                    title="Download"
+                    title={t("common.actions.download")}
                   >
                     <DownloadIcon fontSize="small" />
                   </IconButton>
@@ -1123,7 +1125,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                     justifyContent: "center",
                     overflow: "hidden",
                   }}
-                  title="Asset Detail"
+                  title={t("common.actions.assetDetail")}
                 >
                   <Box
                     sx={{
@@ -1149,7 +1151,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                         color: "primary.contrastText",
                       },
                     }}
-                    title="Delete"
+                    title={t("common.actions.delete")}
                   >
                     <DeleteIcon fontSize="small" />
                   </IconButton>

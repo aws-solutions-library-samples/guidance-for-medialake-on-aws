@@ -1,6 +1,7 @@
 import React from "react";
 import { useCallback, useRef, useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { transformParameterSchema, validateSchemaPreservation } from "../utils/schemaTransformer";
 import ReactFlow, {
   Background,
@@ -498,6 +499,7 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
 };
 
 const PipelineEditorContent = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
@@ -1959,7 +1961,7 @@ const PipelineEditorContent = () => {
         }}
         disableEscapeKeyDown
       >
-        <DialogTitle>Configure Node</DialogTitle>
+        <DialogTitle>{t("integrations.editor.configureNode")}</DialogTitle>
         <DialogContent>
           {selectedNode && !isNodeDetailsLoading && nodeDetails && (
             <NodeConfigurationForm
@@ -1971,7 +1973,7 @@ const PipelineEditorContent = () => {
           )}
           {isNodeDetailsLoading && (
             <Box sx={{ p: 2, textAlign: "center" }}>
-              <Typography>Loading node configuration...</Typography>
+              <Typography>{t("pipelines.loadingNodeConfiguration")}</Typography>
             </Box>
           )}
         </DialogContent>

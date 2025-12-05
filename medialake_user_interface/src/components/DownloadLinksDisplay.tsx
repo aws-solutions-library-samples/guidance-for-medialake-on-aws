@@ -5,6 +5,7 @@ import {
   Archive as ArchiveIcon,
   InsertDriveFile as FileIcon,
 } from "@mui/icons-material";
+import { useTranslation } from "react-i18next";
 
 interface DownloadLinksDisplayProps {
   downloadUrls:
@@ -23,6 +24,7 @@ export const DownloadLinksDisplay: React.FC<DownloadLinksDisplayProps> = ({
   expiresAt,
   description,
 }) => {
+  const { t } = useTranslation();
   // Check if links have expired
   const isExpired = React.useMemo(() => {
     if (!expiresAt) return false;
@@ -86,7 +88,7 @@ export const DownloadLinksDisplay: React.FC<DownloadLinksDisplayProps> = ({
               fontWeight: isExpired ? "bold" : "normal",
             }}
           >
-            {isExpired ? "EXPIRED: " : "Expires: "}
+            {isExpired ? t("downloads.expired") : t("downloads.expires")}:{" "}
             {formatExpirationDate(expiresAt)}
           </Typography>
         )}
@@ -215,7 +217,9 @@ export const DownloadLinksDisplay: React.FC<DownloadLinksDisplayProps> = ({
       {expiresAt && (
         <Box sx={{ mt: 1 }}>
           <Chip
-            label={`${isExpired ? "EXPIRED: " : "Expires: "}${formatExpirationDate(expiresAt)}`}
+            label={`${
+              isExpired ? t("downloads.expired") : t("downloads.expires")
+            }: ${formatExpirationDate(expiresAt)}`}
             size="small"
             color={isExpired ? "error" : "warning"}
             variant={isExpired ? "filled" : "outlined"}

@@ -11,6 +11,7 @@ import {
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { FaFileVideo, FaBolt, FaCodeBranch, FaTools, FaPlug, FaCogs } from "react-icons/fa";
+import { useTranslation } from "react-i18next";
 import { useGetUnconfiguredNodeMethods } from "@/shared/nodes/api/nodesController";
 import { Node as NodeType } from "@/shared/nodes/types/nodes.types";
 import { RightSidebar } from "@/components/common/RightSidebar/RightSidebar";
@@ -22,6 +23,7 @@ interface NodeSection {
 }
 
 const SidebarContent: React.FC = () => {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedSections, setExpandedSections] = useState<string[]>(["TRIGGER"]);
   const [manuallyExpandedSections, setManuallyExpandedSections] = useState<string[]>(["TRIGGER"]);
@@ -319,10 +321,22 @@ const SidebarContent: React.FC = () => {
     if (!nodesResponse?.data) return [];
 
     const groupedNodes: NodeSection[] = [
-      { title: "Triggers", types: ["TRIGGER"], nodes: [] },
-      { title: "Integrations", types: ["INTEGRATION"], nodes: [] },
-      { title: "Flow", types: ["FLOW"], nodes: [] },
-      { title: "Utilities", types: ["UTILITY"], nodes: [] },
+      {
+        title: t("common.pipelineEditor.triggers"),
+        types: ["TRIGGER"],
+        nodes: [],
+      },
+      {
+        title: t("common.pipelineEditor.integrations"),
+        types: ["INTEGRATION"],
+        nodes: [],
+      },
+      { title: t("common.pipelineEditor.flow"), types: ["FLOW"], nodes: [] },
+      {
+        title: t("common.pipelineEditor.utilities"),
+        types: ["UTILITY"],
+        nodes: [],
+      },
     ];
 
     nodesResponse.data.forEach((node) => {
@@ -389,7 +403,7 @@ const SidebarContent: React.FC = () => {
     });
 
     return groupedNodes;
-  }, [nodesResponse?.data]);
+  }, [nodesResponse?.data, t]);
 
   const filteredSections = useMemo(() => {
     return sections.map((section) => ({
@@ -438,7 +452,7 @@ const SidebarContent: React.FC = () => {
   if (error || !nodesResponse?.data) {
     return (
       <Box sx={{ p: 2 }}>
-        <Typography color="error">Failed to load nodes. Please try again later.</Typography>
+        <Typography color="error">{t("common.failedToLoadNodes")}</Typography>
       </Box>
     );
   }
@@ -453,7 +467,7 @@ const SidebarContent: React.FC = () => {
         <TextField
           fullWidth
           size="small"
-          placeholder="Search nodes..."
+          placeholder={t("pipelines.editor.searchNodes")}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />

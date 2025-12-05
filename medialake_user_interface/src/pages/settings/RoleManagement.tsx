@@ -12,6 +12,8 @@ const RoleManagement: React.FC = () => {
   const { t } = useTranslation();
   const [openRoleForm, setOpenRoleForm] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | undefined>();
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars, no-unused-vars
+  const [_error, setError] = useState<string | null>(null);
 
   // API Hooks
   const { data: roles, isLoading: isLoadingRoles, error: rolesError } = useGetRoles();
@@ -41,7 +43,7 @@ const RoleManagement: React.FC = () => {
       }
       setOpenRoleForm(false);
     } catch (err) {
-      console.error("Error saving role:", err);
+      setError(err instanceof Error ? err.message : t("common.messages.errorSavingRole"));
     }
   };
 
@@ -49,7 +51,7 @@ const RoleManagement: React.FC = () => {
     try {
       await deleteRoleMutation.mutateAsync(roleId);
     } catch (err) {
-      console.error("Error deleting role:", err);
+      setError(err instanceof Error ? err.message : t("common.messages.errorDeletingRole"));
     }
   };
 

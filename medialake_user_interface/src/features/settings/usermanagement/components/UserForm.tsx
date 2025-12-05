@@ -150,7 +150,7 @@ export const UserForm: React.FC<UserFormProps> = ({
               label={t("users.form.fields.groups.label", "Group")}
               tooltip={
                 isLoadingGroups
-                  ? "Loading groups..."
+                  ? t("common.loading", "Loading...")
                   : t("users.form.fields.groups.tooltip", "Select a group for this user")
               }
               options={availableGroups.map((group) => {

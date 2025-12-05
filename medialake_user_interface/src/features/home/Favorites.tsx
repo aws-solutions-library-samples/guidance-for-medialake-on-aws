@@ -1,11 +1,13 @@
 import React from "react";
 import { Box, Typography, Stack, CircularProgress } from "@mui/material";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useGetFavorites, useRemoveFavorite } from "../../api/hooks/useFavorites";
 import AssetCard from "../../components/shared/AssetCard";
 import { getOriginalAssetId } from "@/utils/clipTransformation";
 
 export const Favorites: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const {
     data: unsortedFavorites,
@@ -101,9 +103,9 @@ export const Favorites: React.FC = () => {
     return (
       <Box>
         <Typography variant="h5" component="h2" sx={{ mb: 2 }}>
-          Favorites
+          {t("home.favorites")}
         </Typography>
-        <Typography color="text.secondary">No favorite assets yet</Typography>
+        <Typography color="text.secondary">{t("favorites.noFavorites")}</Typography>
       </Box>
     );
   }

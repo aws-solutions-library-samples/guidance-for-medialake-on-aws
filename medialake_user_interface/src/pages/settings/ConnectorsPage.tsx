@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Button, Box, Snackbar, Alert } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
 import ConnectorCard from "@/features/settings/connectors/components/ConnectorCard";
@@ -15,6 +16,7 @@ import { ConnectorResponse, CreateConnectorRequest } from "@/api/types/api.types
 import queryClient from "@/api/queryClient";
 
 const ConnectorsPage: React.FC = () => {
+  const { t } = useTranslation();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingConnector, setEditingConnector] = useState<ConnectorResponse | undefined>();
   const [alert, setAlert] = useState<{
@@ -58,11 +60,14 @@ const ConnectorsPage: React.FC = () => {
       await deleteConnector(id);
       await queryClient.invalidateQueries({ queryKey: ["connectors"] });
       setAlert({
-        message: "Connector deleted successfully",
+        message: t("common.messages.connectorDeletedSuccessfully"),
         severity: "success",
       });
     } catch (error) {
-      setAlert({ message: "Failed to delete connector", severity: "error" });
+      setAlert({
+        message: t("connectors.apiMessages.deleting.error"),
+        severity: "error",
+      });
     }
   };
 
@@ -86,12 +91,12 @@ const ConnectorsPage: React.FC = () => {
     try {
       await syncConnector(id);
       setAlert({
-        message: "Connector sync initiated successfully",
+        message: t("common.messages.connectorSyncInitiated"),
         severity: "success",
       });
     } catch (error) {
       setAlert({
-        message: "Failed to sync connector",
+        message: t("common.messages.failedToSyncConnector"),
         severity: "error",
       });
     }
@@ -110,7 +115,7 @@ const ConnectorsPage: React.FC = () => {
 
         handleModalClose();
         setAlert({
-          message: "Connector created successfully",
+          message: t("common.messages.connectorCreatedSuccessfully"),
           severity: "success",
         });
 
@@ -142,11 +147,11 @@ const ConnectorsPage: React.FC = () => {
   return (
     <Box sx={{ p: 3, height: "100%", display: "flex", flexDirection: "column" }}>
       <PageHeader
-        title="Connectors"
-        description="Manage storage connectors for your media assets"
+        title={t("connectors.title")}
+        description={t("connectors.description")}
         action={
           <Button variant="contained" startIcon={<AddIcon />} onClick={handleAddClick}>
-            Add Connector
+            {t("connectors.addConnector")}
           </Button>
         }
       />

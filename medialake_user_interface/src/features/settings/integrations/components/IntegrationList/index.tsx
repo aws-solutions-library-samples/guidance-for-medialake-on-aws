@@ -12,6 +12,7 @@ import { BaseTableToolbar } from "@/components/common/table";
 import { useTableVirtualizer } from "@/features/settings/integrations/hooks/useTableVirtualizer";
 import { useColumns } from "@/features/settings/integrations/hooks/useColumns";
 import { IntegrationListProps, ColumnSort, ColumnFilter } from "./types";
+import { useTranslation } from "react-i18next";
 
 const IntegrationList: React.FC<IntegrationListProps> = ({
   integrations,
@@ -25,6 +26,7 @@ const IntegrationList: React.FC<IntegrationListProps> = ({
   onRemoveSort,
   isLoading,
 }) => {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const columns = useColumns({ onEditIntegration, onDeleteIntegration });
 
@@ -85,11 +87,11 @@ const IntegrationList: React.FC<IntegrationListProps> = ({
         activeSorting={mappedActiveSorting}
         onRemoveFilter={onRemoveFilter}
         onRemoveSort={handleRemoveSort}
-        searchPlaceholder="Search integrations..."
+        searchPlaceholder={t("integrations.form.search.placeholder")}
         onColumnMenuOpen={() => {}}
       />
       {isLoading ? (
-        <Box sx={{ p: 2, textAlign: "center" }}>Loading...</Box>
+        <Box sx={{ p: 2, textAlign: "center" }}>{t("common.loading")}</Box>
       ) : (
         <ResizableTable
           table={table}
@@ -102,7 +104,7 @@ const IntegrationList: React.FC<IntegrationListProps> = ({
           onRemoveFilter={onRemoveFilter}
           onRemoveSort={handleRemoveSort}
           emptyState={{
-            message: "No integrations found",
+            message: t("common.noIntegrationsFound"),
             icon: <IntegrationIcon sx={{ fontSize: 40 }} />,
           }}
         />

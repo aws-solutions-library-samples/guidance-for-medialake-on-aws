@@ -22,7 +22,7 @@ export const IntegrationConfiguration: React.FC<
   const validationSchema = React.useMemo(() => {
     return z
       .object({
-        nodeId: z.string().min(1, "Integration selection is required"),
+        nodeId: z.string().min(1, t("common.validation.integrationMustBeSelected")),
         description: z.string().optional(), // Made optional
         auth: z.object({
           type: z.enum(["apiKey", "awsIam"]),
@@ -43,11 +43,11 @@ export const IntegrationConfiguration: React.FC<
           return true;
         },
         {
-          message: "API Key is required",
+          message: t("common.validation.apiKeyRequired"),
           path: ["auth", "credentials", "apiKey"],
         }
       );
-  }, []);
+  }, [t]);
 
   // Ensure form data matches schema structure exactly
   const initialFormData = React.useMemo(() => {

@@ -117,6 +117,7 @@ const PermissionSetCard: React.FC<{
   onDelete: (permissionSet: PermissionSet) => void;
   onView: (permissionSet: PermissionSet) => void;
 }> = ({ permissionSet, onEdit, onDelete, onView }) => {
+  const { t } = useTranslation();
   // Get access level label
   const getAccessLevel = (permissions: any) => {
     if (!permissions) return "No Access";
@@ -173,7 +174,7 @@ const PermissionSetCard: React.FC<{
           {permissionSet.name}
           {permissionSet.isSystem && (
             <Chip
-              label="System"
+              label={t("common.system")}
               size="small"
               color="primary"
               variant="outlined"
@@ -276,6 +277,7 @@ const PermissionSetFormDialog: React.FC<{
   onSave: (data: CreatePermissionSetRequest) => void;
   permissionSet?: PermissionSet;
 }> = ({ open, onClose, onSave, permissionSet }) => {
+  const { t } = useTranslation();
   const [name, setName] = useState(permissionSet?.name || "");
   const [description, setDescription] = useState(permissionSet?.description || "");
   const [permissions, setPermissions] = useState<Permission[]>(
@@ -300,7 +302,7 @@ const PermissionSetFormDialog: React.FC<{
     let isValid = true;
 
     if (!name.trim()) {
-      setNameError("Name is required");
+      setNameError(t("common.messages.nameIsRequired"));
       isValid = false;
     } else {
       setNameError("");
@@ -330,7 +332,7 @@ const PermissionSetFormDialog: React.FC<{
         <Box sx={{ pt: 2 }}>
           <TextField
             fullWidth
-            label="Name"
+            label={t("common.name")}
             value={name}
             onChange={(e) => setName(e.target.value)}
             margin="normal"
@@ -340,7 +342,7 @@ const PermissionSetFormDialog: React.FC<{
           />
           <TextField
             fullWidth
-            label="Description"
+            label={t("common.description")}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             margin="normal"
@@ -361,7 +363,9 @@ const PermissionSetFormDialog: React.FC<{
                 mb: 2,
               }}
             >
-              <Typography variant="subtitle1">Permission Matrix</Typography>
+              <Typography variant="subtitle1">
+                {t("permissionSets.labels.permissionMatrix")}
+              </Typography>
               <Button
                 variant="contained"
                 color="primary"
@@ -377,7 +381,7 @@ const PermissionSetFormDialog: React.FC<{
         </Box>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button onClick={handleSave} variant="contained" color="primary">
           {permissionSet ? "Update" : "Create"}
         </Button>
@@ -388,7 +392,7 @@ const PermissionSetFormDialog: React.FC<{
         open={openMatrixModal}
         onClose={() => setOpenMatrixModal(false)}
         permissions={permissions}
-        title="Edit Permission Matrix"
+        title={t("permissionSets.permissionMatrix.editTitle")}
         onSave={(updatedPermissions) => {
           setPermissions(convertToPermissionArray(updatedPermissions));
           setOpenMatrixModal(false);
@@ -405,9 +409,11 @@ const DeleteConfirmationDialog: React.FC<{
   onConfirm: () => void;
   permissionSet?: PermissionSet;
 }> = ({ open, onClose, onConfirm, permissionSet }) => {
+  const { t } = useTranslation();
+
   return (
     <Dialog open={open} onClose={onClose}>
-      <DialogTitle>Delete Permission Set</DialogTitle>
+      <DialogTitle>{t("permissionSets.dialogs.deleteTitle")}</DialogTitle>
       <DialogContent>
         <Typography>
           Are you sure you want to delete the permission set "{permissionSet?.name}"? This action
@@ -415,7 +421,7 @@ const DeleteConfirmationDialog: React.FC<{
         </Typography>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button onClick={onConfirm} color="error" variant="contained">
           Delete
         </Button>
@@ -431,6 +437,7 @@ const PermissionSetDetailDialog: React.FC<{
   permissionSetId?: string;
   onEditPermissions?: (permissionSet: PermissionSet) => void;
 }> = ({ open, onClose, permissionSetId, onEditPermissions }) => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState(0);
 
   // Only fetch data when dialog is open and we have a valid ID
@@ -450,14 +457,14 @@ const PermissionSetDetailDialog: React.FC<{
   if (isLoading) {
     return (
       <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-        <DialogTitle>Permission Set Details</DialogTitle>
+        <DialogTitle>{t("permissionSets.dialogs.detailsTitle")}</DialogTitle>
         <DialogContent>
           <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
             <CircularProgress />
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={onClose}>Close</Button>
+          <Button onClick={onClose}>{t("common.close")}</Button>
         </DialogActions>
       </Dialog>
     );
@@ -466,16 +473,16 @@ const PermissionSetDetailDialog: React.FC<{
   if (error || !permissionSet) {
     return (
       <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-        <DialogTitle>Permission Set Details</DialogTitle>
+        <DialogTitle>{t("permissionSets.dialogs.detailsTitle")}</DialogTitle>
         <DialogContent>
           <Alert severity="error">
             {error
               ? `Error loading permission set: ${(error as Error).message}`
-              : "Permission set not found"}
+              : t("common.messages.permissionSetNotFound")}
           </Alert>
         </DialogContent>
         <DialogActions>
-          <Button onClick={onClose}>Close</Button>
+          <Button onClick={onClose}>{t("common.close")}</Button>
         </DialogActions>
       </Dialog>
     );
@@ -487,7 +494,7 @@ const PermissionSetDetailDialog: React.FC<{
         {permissionSet.name}
         {permissionSet.isSystem && (
           <Chip
-            label="System"
+            label={t("common.system")}
             size="small"
             color="primary"
             variant="outlined"
@@ -505,9 +512,9 @@ const PermissionSetDetailDialog: React.FC<{
           onChange={handleTabChange}
           sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}
         >
-          <Tab label="Permission Matrix" />
-          <Tab label="Assigned Users" />
-          <Tab label="Assigned Groups" />
+          <Tab label={t("permissionSets.tabs.permissionMatrix")} />
+          <Tab label={t("permissionSets.tabs.assignedUsers")} />
+          <Tab label={t("permissionSets.tabs.assignedGroups")} />
         </Tabs>
 
         {activeTab === 0 && (
@@ -553,7 +560,7 @@ const PermissionSetDetailDialog: React.FC<{
             {/* Placeholder for assigned users list */}
             <List>
               <ListItem>
-                <ListItemText primary="No users assigned" />
+                <ListItemText primary={t("common.messages.noUsersAssigned")} />
               </ListItem>
             </List>
           </Box>
@@ -567,14 +574,14 @@ const PermissionSetDetailDialog: React.FC<{
             {/* Placeholder for assigned groups list */}
             <List>
               <ListItem>
-                <ListItemText primary="No groups assigned" />
+                <ListItemText primary={t("common.messages.noGroupsAssigned")} />
               </ListItem>
             </List>
           </Box>
         )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Close</Button>
+        <Button onClick={onClose}>{t("common.close")}</Button>
       </DialogActions>
     </Dialog>
   );
@@ -582,7 +589,7 @@ const PermissionSetDetailDialog: React.FC<{
 
 // Main Permission Sets Page Component
 const PermissionSetsPage: React.FC = () => {
-  useTranslation();
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState("all");
   const [openPermissionSetForm, setOpenPermissionSetForm] = useState(false);
@@ -717,8 +724,8 @@ const PermissionSetsPage: React.FC = () => {
       }}
     >
       <PageHeader
-        title="Resource-Centric Permission Matrix"
-        description="Manage permission sets to control access to resources"
+        title={t("permissionSets.title")}
+        description={t("permissionSets.description")}
         action={
           <Button
             variant="contained"
@@ -739,7 +746,7 @@ const PermissionSetsPage: React.FC = () => {
       {/* Search and Filters */}
       <Box sx={{ mb: 3, display: "flex", gap: 2, flexWrap: "wrap" }}>
         <TextField
-          placeholder="Search permission sets..."
+          placeholder={t("common.placeholders.searchPermissionSets")}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           sx={{ flexGrow: 1, minWidth: "200px" }}
@@ -753,16 +760,16 @@ const PermissionSetsPage: React.FC = () => {
         />
 
         <FormControl sx={{ minWidth: "150px" }}>
-          <InputLabel id="category-filter-label">Category</InputLabel>
+          <InputLabel id="category-filter-label">{t("common.category")}</InputLabel>
           <Select
             labelId="category-filter-label"
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
-            label="Category"
+            label={t("common.category")}
           >
-            <MenuItem value="all">All</MenuItem>
-            <MenuItem value="system">System</MenuItem>
-            <MenuItem value="custom">Custom</MenuItem>
+            <MenuItem value="all">{t("common.all")}</MenuItem>
+            <MenuItem value="system">{t("common.system")}</MenuItem>
+            <MenuItem value="custom">{t("common.custom")}</MenuItem>
           </Select>
         </FormControl>
 

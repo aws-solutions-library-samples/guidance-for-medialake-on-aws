@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { createColumnHelper } from "@tanstack/react-table";
 import { Box, Tooltip, IconButton, Typography, FormControlLabel } from "@mui/material";
 import { IconSwitch } from "@/components/common";
@@ -26,16 +27,18 @@ export const usePipelineColumns = ({
   onDelete,
   onToggleActive,
 }: UsePipelineColumnsProps) => {
+  const { t } = useTranslation();
+
   return useMemo(
     () => [
       columnHelper.accessor("name", {
-        header: "Name",
+        header: t("common.columns.name"),
         size: 200,
         enableSorting: true,
         cell: ({ getValue }) => <TableCellContent variant="primary">{getValue()}</TableCellContent>,
       }),
       columnHelper.accessor("type", {
-        header: "Type",
+        header: t("common.columns.type"),
         size: 150,
         enableSorting: true,
         cell: (info) => {
@@ -74,7 +77,7 @@ export const usePipelineColumns = ({
       //     ),
       // }),
       columnHelper.accessor("deploymentStatus", {
-        header: "Status",
+        header: t("common.columns.status"),
         size: 150, // Increased size to accommodate the switch
         enableSorting: true,
         cell: (info) => {
@@ -139,7 +142,7 @@ export const usePipelineColumns = ({
         },
       }),
       columnHelper.accessor("createdAt", {
-        header: "Created",
+        header: t("common.columns.created"),
         size: 180,
         enableSorting: true,
         cell: ({ getValue }) => {
@@ -156,7 +159,7 @@ export const usePipelineColumns = ({
         },
       }),
       columnHelper.accessor("updatedAt", {
-        header: "Updated",
+        header: t("common.columns.updated"),
         size: 180,
         enableSorting: true,
         cell: ({ getValue }) => {
@@ -174,7 +177,7 @@ export const usePipelineColumns = ({
       }),
       columnHelper.display({
         id: "actions",
-        header: "Actions",
+        header: t("common.columns.actions"),
         size: 120,
         cell: (info) => (
           <Box sx={{ display: "flex", gap: 1 }} className="action-buttons">
@@ -225,7 +228,7 @@ export const usePipelineColumns = ({
         ),
       }),
     ],
-    [onEdit, onDelete, onToggleActive]
+    [onEdit, onDelete, onToggleActive, t]
   );
 };
 

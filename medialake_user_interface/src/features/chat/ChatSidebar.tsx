@@ -6,10 +6,12 @@ import { useChat, ChatMessage as ChatMessageType } from "../../contexts/ChatCont
 import ChatMessage from "./ChatMessage";
 import ChatInput from "./ChatInput";
 import { alpha } from "@mui/material/styles";
+import { useTranslation } from "react-i18next";
 
 const SIDEBAR_WIDTH = 350;
 
 const ChatSidebar: React.FC = () => {
+  const { t } = useTranslation();
   const { isOpen, messages, closeChat, clearHistory } = useChat();
   const [isResizing, setIsResizing] = useState(false);
   const [width, setWidth] = useState(SIDEBAR_WIDTH);
@@ -167,7 +169,7 @@ const ChatSidebar: React.FC = () => {
               <IconButton
                 size="small"
                 onClick={clearHistory}
-                title="Clear chat history"
+                title={t("common.clearChatHistory")}
                 sx={{
                   mr: 1,
                   color: "text.secondary",
@@ -183,7 +185,7 @@ const ChatSidebar: React.FC = () => {
             <IconButton
               size="small"
               onClick={closeChat}
-              title="Close chat"
+              title={t("common.closeChat")}
               sx={{
                 color: "text.secondary",
                 "&:hover": {

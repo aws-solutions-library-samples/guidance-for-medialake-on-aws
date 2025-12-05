@@ -2,6 +2,7 @@ import React from "react";
 import { Box, Typography, IconButton, Divider, Paper, Stack, Slide, Link } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { Link as RouterLink } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { formatLocalDateTime } from "@/shared/utils/dateUtils";
 import type { PipelineExecution } from "../types/pipelineExecutions.types";
 
@@ -16,6 +17,7 @@ export const ExecutionSideBar: React.FC<ExecutionSideBarProps> = ({
   execution,
   onClose,
 }) => {
+  const { t } = useTranslation();
   if (!execution) return null;
 
   return (
@@ -53,7 +55,7 @@ export const ExecutionSideBar: React.FC<ExecutionSideBarProps> = ({
             bgcolor: "background.paper",
           }}
         >
-          <Typography variant="h6">Execution Details</Typography>
+          <Typography variant="h6">{t("executions.details")}</Typography>
           <IconButton onClick={onClose} size="small">
             <CloseIcon />
           </IconButton>

@@ -199,8 +199,8 @@ const PipelinesPage: React.FC = () => {
       setApiStatus({
         open: true,
         status: "success",
-        action: "Pipeline deleted successfully",
-        message: "The pipeline has been deleted.",
+        action: t("integrations.pipelines.actions.delete"),
+        message: t("common.messages.pipelineDeleted"),
       });
 
       // Auto-close the modal after a few seconds
@@ -212,8 +212,8 @@ const PipelinesPage: React.FC = () => {
       setApiStatus({
         open: true,
         status: "error",
-        action: "Error deleting pipeline",
-        message: error instanceof Error ? error.message : "An unknown error occurred",
+        action: t("fileUpload.errorMessages.errorDeletingPipeline"),
+        message: error instanceof Error ? error.message : t("common.messages.unknownErrorOccurred"),
       });
     } finally {
       // Reset deletion in progress
@@ -377,7 +377,7 @@ const PipelinesPage: React.FC = () => {
               <ButtonGroup
                 variant="contained"
                 ref={addPipelineButtonRef}
-                aria-label="Pipeline actions"
+                aria-label={t("common.breadcrumb.ariaLabels.pipelineActions")}
                 sx={{
                   boxShadow: "none",
                   "&:hover": {
@@ -517,7 +517,7 @@ const PipelinesPage: React.FC = () => {
                         open: true,
                         status: "error",
                         action: "Import Failed",
-                        message: "Failed to parse the pipeline file.",
+                        message: t("common.messages.failedToParsePipeline"),
                       });
                     } finally {
                       // Reset the file input

@@ -62,16 +62,16 @@ const CONNECTOR_TYPES = [
   { value: "empty", label: "", icon: CloudUploadIcon, colorHex: "#FF9900" },
 ];
 
-const S3_BUCKET_TYPES = [
+const getS3BucketTypes = (t: (key: string) => string) => [
   {
     value: "existing",
     label: "Existing S3 Bucket",
-    description: "Connect to an existing S3 bucket",
+    description: t("common.messages.connectToExistingS3Bucket"),
   },
   {
     value: "new",
     label: "New S3 Bucket",
-    description: "Create a new S3 bucket",
+    description: t("common.messages.createNewS3Bucket"),
   },
 ];
 
@@ -311,7 +311,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
 
   const renderS3BucketTypeSelection = () => (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      {S3_BUCKET_TYPES.map((bucketType) => (
+      {getS3BucketTypes(t).map((bucketType) => (
         <Box
           key={bucketType.value}
           onClick={() => {
@@ -377,7 +377,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
           {editingConnector ? (
             <>
               <TextField
-                label="Connector Name"
+                label={t("connectors.form.connectorName")}
                 value={name}
                 disabled
                 fullWidth
@@ -386,7 +386,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                     sx: { bgcolor: "action.disabledBackground" },
                   },
                 }}
-                helperText="Connector name cannot be modified after creation"
+                helperText={t("connectors.form.connectorNameHelper")}
               />
               <Typography variant="caption" color="text.secondary" sx={{ mt: -1 }}>
                 Amazon S3
@@ -394,7 +394,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
             </>
           ) : (
             <TextField
-              label="Connector Name"
+              label={t("connectors.form.connectorName")}
               value={name}
               onChange={(e) => setName(e.target.value)}
               fullWidth
@@ -403,7 +403,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
           )}
 
           <TextField
-            label="Description"
+            label={t("connectors.form.description")}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             fullWidth
@@ -414,10 +414,10 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
           {editingConnector ? (
             <>
               <FormControl fullWidth disabled>
-                <InputLabel>S3 Bucket</InputLabel>
+                <InputLabel>{t("connectors.form.s3Bucket")}</InputLabel>
                 <Select
                   value={configuration.bucket || ""}
-                  label="S3 Bucket"
+                  label={t("connectors.form.s3Bucket")}
                   sx={{ bgcolor: "action.disabledBackground" }}
                 >
                   <MenuItem value={configuration.bucket}>{configuration.bucket}</MenuItem>
@@ -429,10 +429,10 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
               {bucketType === "existing" && (
                 <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
                   <FormControl fullWidth required>
-                    <InputLabel>S3 Bucket</InputLabel>
+                    <InputLabel>{t("connectors.form.s3Bucket")}</InputLabel>
                     <Select
                       value={configuration.bucket || ""}
-                      label="S3 Bucket"
+                      label={t("connectors.form.s3Bucket")}
                       onChange={(e) =>
                         setConfiguration({
                           ...configuration,
@@ -463,19 +463,17 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
               {bucketType === "new" && (
                 <>
                   <TextField
-                    label="New Bucket Name"
+                    label={t("connectors.form.newBucketName")}
                     value={configuration.bucket || ""}
                     onChange={handleBucketNameChange}
                     fullWidth
                     required
                     error={!!bucketNameError}
-                    helperText={
-                      bucketNameError ||
-                      "Bucket name must be globally unique, follow S3 naming rules."
-                    }
+                    helperText={bucketNameError || t("connectors.form.bucketNameHelper")}
                   />
                   {/* AWS Region FormControl hidden as requested */}
-                  {/* <FormControl fullWidth required>
+                  {/* i18n-ignore - commented out code
+                  <FormControl fullWidth required>
                                     <InputLabel>AWS Region</InputLabel>
                                     <Select
                                         value={awsRegion}
@@ -488,7 +486,8 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                                             </MenuItem>
                                         ))}
                                     </Select>
-                                </FormControl> */}
+                                </FormControl>
+                  */}
                 </>
               )}
             </>
@@ -502,10 +501,10 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
           {/* S3 Connector Type */}
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <FormControl fullWidth disabled={!!editingConnector} required={!editingConnector}>
-              <InputLabel>S3 Connector Type</InputLabel>
+              <InputLabel>{t("connectors.form.s3ConnectorType")}</InputLabel>
               <Select
                 value={s3ConnectorType}
-                label="S3 Connector Type"
+                label={t("connectors.form.s3ConnectorType")}
                 onChange={(e) => setS3ConnectorType(e.target.value)}
                 sx={editingConnector ? { bgcolor: "action.disabledBackground" } : {}}
               >
@@ -523,10 +522,10 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
 
           {/* S3 Integration Method */}
           <FormControl fullWidth disabled={!!editingConnector} required={!editingConnector}>
-            <InputLabel>S3 Integration Method</InputLabel>
+            <InputLabel>{t("connectors.form.s3IntegrationMethod")}</InputLabel>
             <Select
               value={configuration.s3IntegrationMethod || ""}
-              label="S3 Integration Method"
+              label={t("connectors.form.s3IntegrationMethod")}
               onChange={(e) =>
                 setConfiguration({
                   ...configuration,
@@ -552,7 +551,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                   disabled={!!editingConnector}
                 />
               }
-              label="Allow Uploads"
+              label={t("connectors.form.allowUploads")}
             />
             <Typography
               variant="caption"
@@ -571,11 +570,17 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
           {objectPrefixes.map((prefix, index) => (
             <Box key={index} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <TextField
-                label={`Object Prefix ${objectPrefixes.length > 1 ? index + 1 : ""}`}
+                label={
+                  objectPrefixes.length > 1
+                    ? t("connectors.form.objectPrefixNumbered", {
+                        number: index + 1,
+                      })
+                    : t("connectors.form.objectPrefix")
+                }
                 value={prefix}
                 onChange={(e) => handlePrefixChange(index, e.target.value)}
                 fullWidth
-                helperText="Optional prefix to filter objects (e.g., 'folder/')"
+                helperText={t("connectors.form.pathHelper")}
               />
               <IconButton
                 onClick={() => handleRemovePrefix(index)}
@@ -590,14 +595,18 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
             onClick={handleAddPrefix}
             sx={{ alignSelf: "flex-start", mt: 1 }}
           >
-            Add Prefix
+            {t("connectors.form.addPrefix", "Add Prefix")}
           </Button>
         </>
       )}
     </Box>
   );
 
-  const steps = ["Select Type", "Select S3 Type", "Configuration"];
+  const steps = [
+    t("pipelines.selectType", "Select Type"),
+    t("pipelines.selectS3Type", "Select S3 Type"),
+    t("pipelines.configuration", "Configuration"),
+  ];
 
   const renderStepContent = (step: number) => {
     switch (step) {
@@ -684,7 +693,9 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
           }}
         >
           <Typography variant="h6">
-            {editingConnector ? "Edit Connector" : "Add New Connector"}
+            {editingConnector
+              ? t("pipelines.editConnector", "Edit Connector")
+              : t("pipelines.addConnector", "Add New Connector")}
           </Typography>
           <IconButton
             aria-label="close"
@@ -716,11 +727,11 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
         <DialogActions sx={{ p: 2, gap: 1 }}>
           {!editingConnector && activeStep > 0 && (
             <Button onClick={handleBack} disabled={apiStatus.status === "loading"}>
-              Back
+              {t("common.actions.back", "Back")}
             </Button>
           )}
           <Button onClick={onClose} color="inherit" disabled={apiStatus.status === "loading"}>
-            Cancel
+            {t("common.actions.cancel")}
           </Button>
           {activeStep === steps.length - 1 || editingConnector ? (
             <Button
@@ -737,7 +748,9 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                 },
               }}
             >
-              {editingConnector ? "Save Changes" : "Add Connector"}
+              {editingConnector
+                ? t("pipelines.saveChanges", "Save Changes")
+                : t("pipelines.addConnector", "Add Connector")}
             </Button>
           ) : (
             <Button
@@ -750,7 +763,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                 (bucketType === "new" && !!bucketNameError)
               }
             >
-              Next
+              {t("common.actions.next", "Next")}
             </Button>
           )}
         </DialogActions>

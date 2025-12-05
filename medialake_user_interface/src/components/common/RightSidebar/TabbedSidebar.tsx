@@ -3,6 +3,7 @@ import { Box, Tabs, Tab } from "@mui/material";
 import FilterOperations from "./FilterOperations";
 import BatchOperationsWrapper from "./BatchOperationsWrapper";
 import { useRightSidebar } from "./SidebarContext";
+import { useTranslation } from "react-i18next";
 
 interface TabbedSidebarProps {
   selectedAssets: Array<{
@@ -31,6 +32,7 @@ const TabbedSidebar: React.FC<TabbedSidebarProps> = ({
   onRemoveItem,
   filterComponent,
 }) => {
+  const { t } = useTranslation();
   const { setHasSelectedItems } = useRightSidebar();
   const [activeTab, setActiveTab] = React.useState<"filter" | "batch">(
     selectedAssets.length > 0 ? "batch" : "filter"
@@ -86,7 +88,7 @@ const TabbedSidebar: React.FC<TabbedSidebarProps> = ({
             }}
           >
             <Tab
-              label="FILTER OPTIONS"
+              label={t("rightSidebar.filterOptions")}
               value="filter"
               id="filter-tab"
               aria-controls="filter-panel"

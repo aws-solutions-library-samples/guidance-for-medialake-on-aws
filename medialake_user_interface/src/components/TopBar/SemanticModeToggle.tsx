@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Box, ToggleButton, ToggleButtonGroup, Typography } from "@mui/material";
 import { useTheme as useMuiTheme } from "@mui/material/styles";
 import { useTheme } from "../../hooks/useTheme";
@@ -9,6 +10,7 @@ interface SemanticModeToggleProps {
 }
 
 const SemanticModeToggle: React.FC<SemanticModeToggleProps> = ({ isVisible }) => {
+  const { t } = useTranslation();
   const muiTheme = useMuiTheme();
   const { theme } = useTheme();
   const semanticMode = useSemanticMode();
@@ -79,8 +81,8 @@ const SemanticModeToggle: React.FC<SemanticModeToggleProps> = ({ isVisible }) =>
           },
         }}
       >
-        <ToggleButton value="full">Full</ToggleButton>
-        <ToggleButton value="clip">Clip</ToggleButton>
+        <ToggleButton value="full">{t("common.full")}</ToggleButton>
+        <ToggleButton value="clip">{t("common.clip")}</ToggleButton>
       </ToggleButtonGroup>
     </Box>
   );

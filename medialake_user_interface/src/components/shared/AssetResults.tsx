@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Box, Grid, Paper, Snackbar, Alert } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { ConfirmationModal } from "../common/ConfirmationModal";
@@ -76,6 +77,7 @@ function AssetResults<T extends AssetBase>({
   isSemantic = false,
   confidenceThreshold = 0,
 }: AssetResultsProps<T>) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [columnFilters, setColumnFilters] = useState<Array<{ columnId: string; value: string }>>(
     []
@@ -390,7 +392,7 @@ function AssetResults<T extends AssetBase>({
 
         <RenameDialog
           open={isRenameDialogOpen}
-          title="Rename Asset"
+          title={t("common.actions.renameAsset")}
           currentName={
             selectedAsset?.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
               .ObjectKey.Name || ""

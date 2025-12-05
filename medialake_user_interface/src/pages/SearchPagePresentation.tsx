@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
   Box,
@@ -177,6 +178,7 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
 
   error,
 }) => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   // Add to Collection state
@@ -573,14 +575,16 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
           aria-labelledby="delete-dialog-title"
           aria-describedby="delete-dialog-description"
         >
-          <DialogTitle id="delete-dialog-title">Confirm Delete</DialogTitle>
+          <DialogTitle id="delete-dialog-title">
+            {t("assetExplorer.deleteDialog.title")}
+          </DialogTitle>
           <DialogContent>
             <DialogContentText id="delete-dialog-description">
               Are you sure you want to delete this asset? This action cannot be undone.
             </DialogContentText>
           </DialogContent>
           <DialogActions>
-            <Button onClick={assetOperations.handleDeleteCancel}>Cancel</Button>
+            <Button onClick={assetOperations.handleDeleteCancel}>{t("common.cancel")}</Button>
             <Button onClick={assetOperations.handleDeleteConfirm} color="error" autoFocus>
               Delete
             </Button>

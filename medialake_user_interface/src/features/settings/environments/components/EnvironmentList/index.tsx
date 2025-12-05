@@ -2,6 +2,7 @@ import React, { useRef, memo } from "react";
 import { Box } from "@mui/material";
 import { type Table as TanStackTable } from "@tanstack/react-table";
 import { Cloud as EnvironmentIcon } from "@mui/icons-material";
+import { useTranslation } from "react-i18next";
 import { Environment } from "@/types/environment";
 import { ResizableTable } from "@/components/common/table";
 import { useTableVirtualizer } from "../../hooks/useTableVirtualizer";
@@ -13,6 +14,7 @@ interface EnvironmentListProps {
 }
 
 const EnvironmentList: React.FC<EnvironmentListProps> = memo(({ table, onFilterColumn }) => {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const { rows } = table.getRowModel();
   const virtualizer = useTableVirtualizer(rows, containerRef);
@@ -46,7 +48,7 @@ const EnvironmentList: React.FC<EnvironmentListProps> = memo(({ table, onFilterC
         onRemoveFilter={onRemoveFilter}
         onRemoveSort={onRemoveSort}
         emptyState={{
-          message: "No environments found",
+          message: t("common.noEnvironmentsFound"),
           icon: <EnvironmentIcon sx={{ fontSize: 40 }} />,
         }}
       />

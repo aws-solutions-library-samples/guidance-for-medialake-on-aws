@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Typography,
   Paper,
@@ -38,6 +39,7 @@ interface VideoReviewInterfaceProps {
 }
 
 const VideoReviewInterface: React.FC<VideoReviewInterfaceProps> = ({ onClose }) => {
+  const { t } = useTranslation();
   const [currentReview, setCurrentReview] = useState<VideoReviewData>({
     id: "1",
     title: "Sample Video",
@@ -86,7 +88,7 @@ const VideoReviewInterface: React.FC<VideoReviewInterfaceProps> = ({ onClose }) 
           mb: 2,
         }}
       >
-        <Typography variant="h5">Video Review</Typography>
+        <Typography variant="h5">{t("videoReview.title")}</Typography>
         <IconButton onClick={onClose}>
           <Close />
         </IconButton>
@@ -156,7 +158,7 @@ const VideoReviewInterface: React.FC<VideoReviewInterfaceProps> = ({ onClose }) 
             multiline
             rows={2}
             variant="outlined"
-            placeholder="Add a comment..."
+            placeholder={t("videoReview.addCommentPlaceholder")}
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
           />

@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { type ImageItem, type VideoItem, type AudioItem } from "@/types/search/searchResults";
 import { type SortingState } from "@tanstack/react-table";
 import { type AssetTableColumn } from "@/types/shared/assetComponents";
@@ -101,6 +102,8 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
   isRenaming = false,
   renamingAssetId,
 }) => {
+  const { t } = useTranslation();
+
   const renderCardField = (fieldId: string, asset: AssetItem): React.ReactNode => {
     switch (fieldId) {
       case "name":
@@ -139,7 +142,7 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
       onPageChange={onPageChange}
       onPageSizeChange={onPageSizeChange}
       searchTerm={searchTerm}
-      title="Results"
+      title={t("search.results.title")}
       groupByType={groupByType}
       onGroupByTypeChange={onGroupByTypeChange}
       viewMode={viewMode}

@@ -17,6 +17,7 @@ import {
 import AddIcon from "@mui/icons-material/Add";
 import SearchIcon from "@mui/icons-material/Search";
 import FilterListIcon from "@mui/icons-material/FilterList";
+import { useTranslation } from "react-i18next";
 import { PageHeader, PageContent } from "@/components/common/layout";
 import { Can } from "@/permissions/components/Can";
 import { useGetApiKeys } from "@/api/hooks/useApiKeys";
@@ -28,6 +29,7 @@ import DeleteApiKeyDialog from "./DeleteApiKeyDialog";
 import ApiKeyDetailsDialog from "./ApiKeyDetailsDialog";
 
 const ApiKeyManagement: React.FC = () => {
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState("all");
   const [selectedApiKey, setSelectedApiKey] = useState<ApiKey | null>(null);
@@ -141,12 +143,12 @@ const ApiKeyManagement: React.FC = () => {
   return (
     <Box>
       <PageHeader
-        title="API Key Management"
-        description="Manage API keys for programmatic access to the system"
+        title={t("apiKeys.title")}
+        description={t("apiKeys.description")}
         action={
           <Can I="create" a="api-key">
             <Button variant="contained" startIcon={<AddIcon />} onClick={handleAddApiKey}>
-              Add API Key
+              {t("apiKeys.addApiKey")}
             </Button>
           </Can>
         }
@@ -159,7 +161,7 @@ const ApiKeyManagement: React.FC = () => {
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
-                placeholder="Search API keys..."
+                placeholder={t("apiKeys.searchPlaceholder")}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 InputProps={{
@@ -178,7 +180,7 @@ const ApiKeyManagement: React.FC = () => {
                 </InputLabel>
                 <Select
                   value={filterCategory}
-                  label="Category"
+                  label={t("common.category")}
                   onChange={(e) => setFilterCategory(e.target.value)}
                   startAdornment={
                     <InputAdornment position="start">
@@ -187,9 +189,9 @@ const ApiKeyManagement: React.FC = () => {
                   }
                   notched
                 >
-                  <MenuItem value="all">All API Keys</MenuItem>
-                  <MenuItem value="enabled">Enabled</MenuItem>
-                  <MenuItem value="disabled">Disabled</MenuItem>
+                  <MenuItem value="all">{t("apiKeys.categoryAll")}</MenuItem>
+                  <MenuItem value="enabled">{t("common.enabled")}</MenuItem>
+                  <MenuItem value="disabled">{t("common.disabled")}</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
@@ -221,13 +223,13 @@ const ApiKeyManagement: React.FC = () => {
           >
             <Typography variant="h6" color="textSecondary" gutterBottom>
               {searchTerm || filterCategory !== "all"
-                ? "No API keys match your search"
-                : "No API keys found"}
+                ? t("apiKeys.emptyState.noMatchingApiKeys")
+                : t("apiKeys.emptyState.noApiKeys")}
             </Typography>
             <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
               {searchTerm || filterCategory !== "all"
-                ? "Try adjusting your search or filter criteria"
-                : "Create your first API key to get started"}
+                ? t("common.messages.tryAdjustingSearchOrFilter")
+                : t("apiKeys.emptyState.createFirstApiKey")}
             </Typography>
             <Can I="create" a="api-key">
               <Button variant="contained" startIcon={<AddIcon />} onClick={handleAddApiKey}>

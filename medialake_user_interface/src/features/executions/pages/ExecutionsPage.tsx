@@ -305,7 +305,7 @@ const ExecutionsPage: React.FC = () => {
               <IconButton
                 size="small"
                 color="primary"
-                title="View Details"
+                title={t("common.actions.viewDetails")}
                 onClick={() => handleViewDetails(row.original)}
                 sx={{
                   backgroundColor: alpha(theme.palette.primary.main, 0.1),

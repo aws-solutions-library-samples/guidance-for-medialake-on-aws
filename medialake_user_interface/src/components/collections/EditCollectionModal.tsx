@@ -205,7 +205,7 @@ export const EditCollectionModal: React.FC<EditCollectionModalProps> = ({
                 onChange={handleSelectChange("collectionTypeId")}
               >
                 <MenuItem value="">
-                  <em>None</em>
+                  <em>{t("common.none")}</em>
                 </MenuItem>
                 {collectionTypes
                   .filter((type) => type.isActive)

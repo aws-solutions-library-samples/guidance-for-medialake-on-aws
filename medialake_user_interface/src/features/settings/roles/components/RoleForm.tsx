@@ -14,6 +14,7 @@ import {
   Box,
   Alert,
 } from "@mui/material";
+import { useTranslation } from "react-i18next";
 import { Role, CreateRoleRequest } from "../../../../api/types/api.types";
 
 interface RoleFormProps {
@@ -35,6 +36,7 @@ const AVAILABLE_PERMISSIONS = [
 ];
 
 const RoleForm: React.FC<RoleFormProps> = ({ open, onClose, onSave, role }) => {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState<CreateRoleRequest>({
     name: role?.name || "",
     description: role?.description || "",
@@ -65,7 +67,9 @@ const RoleForm: React.FC<RoleFormProps> = ({ open, onClose, onSave, role }) => {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <form onSubmit={handleSubmit}>
-        <DialogTitle>{role ? "Edit Role" : "Create New Role"}</DialogTitle>
+        <DialogTitle>
+          {role ? t("roles.tooltips.editRole") : t("roles.actions.addRole")}
+        </DialogTitle>
         <DialogContent>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}>
             {error && (
@@ -75,7 +79,7 @@ const RoleForm: React.FC<RoleFormProps> = ({ open, onClose, onSave, role }) => {
             )}
 
             <TextField
-              label="Role Name"
+              label={t("userManagement.form.roleName")}
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
@@ -83,7 +87,7 @@ const RoleForm: React.FC<RoleFormProps> = ({ open, onClose, onSave, role }) => {
             />
 
             <TextField
-              label="Description"
+              label={t("common.labels.description")}
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               multiline
@@ -92,7 +96,7 @@ const RoleForm: React.FC<RoleFormProps> = ({ open, onClose, onSave, role }) => {
             />
 
             <FormControl component="fieldset" variant="standard">
-              <FormLabel component="legend">Permissions</FormLabel>
+              <FormLabel component="legend">{t("common.permissions")}</FormLabel>
               <FormGroup>
                 {AVAILABLE_PERMISSIONS.map((permission) => (
                   <FormControlLabel
@@ -114,9 +118,9 @@ const RoleForm: React.FC<RoleFormProps> = ({ open, onClose, onSave, role }) => {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={onClose}>Cancel</Button>
+          <Button onClick={onClose}>{t("common.cancel")}</Button>
           <Button type="submit" variant="contained" color="primary">
-            {role ? "Save Changes" : "Create Role"}
+            {role ? t("common.save") : t("roles.actions.addRole")}
           </Button>
         </DialogActions>
       </form>

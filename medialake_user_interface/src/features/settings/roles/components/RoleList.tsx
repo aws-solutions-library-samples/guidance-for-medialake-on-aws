@@ -2,6 +2,7 @@ import React from "react";
 import { Box, Paper, Typography, IconButton, Tooltip, useTheme, Chip, Stack } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import { useTranslation } from "react-i18next";
 import { Role } from "../../../../api/types/api.types";
 
 interface RoleListProps {
@@ -11,6 +12,7 @@ interface RoleListProps {
 }
 
 const RoleList: React.FC<RoleListProps> = ({ roles, onEditRole, onDeleteRole }) => {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   return (
@@ -55,7 +57,7 @@ const RoleList: React.FC<RoleListProps> = ({ roles, onEditRole, onDeleteRole }) 
               </Box>
             </Box>
             <Box sx={{ display: "flex", gap: 1 }}>
-              <Tooltip title="Edit Role">
+              <Tooltip title={t("roles.tooltips.editRole")}>
                 <IconButton
                   size="small"
                   onClick={() => onEditRole(role)}
@@ -66,7 +68,7 @@ const RoleList: React.FC<RoleListProps> = ({ roles, onEditRole, onDeleteRole }) 
                   <EditIcon />
                 </IconButton>
               </Tooltip>
-              <Tooltip title="Delete Role">
+              <Tooltip title={t("roles.tooltips.deleteRole")}>
                 <IconButton
                   size="small"
                   onClick={() => onDeleteRole(role.id)}

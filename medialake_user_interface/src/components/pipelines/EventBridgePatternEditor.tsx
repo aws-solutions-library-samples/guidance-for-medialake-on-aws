@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { createJSONEditor, Mode, JSONContent } from "vanilla-jsoneditor";
 import { Box, Alert, Typography, Paper, alpha, IconButton, Tooltip, Divider } from "@mui/material";
 import {
@@ -24,6 +25,7 @@ export const EventBridgePatternEditor: React.FC<EventBridgePatternEditorProps> =
   onValidationChange,
   readonly = false,
 }) => {
+  const { t } = useTranslation();
   const editorRef = useRef<HTMLDivElement>(null);
   const jsonEditorRef = useRef<ReturnType<typeof createJSONEditor> | undefined>(undefined);
   const [validationResult, setValidationResult] = useState<ValidationResult>({
@@ -267,7 +269,7 @@ export const EventBridgePatternEditor: React.FC<EventBridgePatternEditorProps> =
           backgroundColor: theme.palette.background.paper,
         })}
       >
-        <Tooltip title="Pattern Operators Guide">
+        <Tooltip title={t("pipelines.eventBridgeEditor.patternOperatorsGuide")}>
           <IconButton
             size="small"
             onClick={handleOpenDocs}
@@ -282,7 +284,7 @@ export const EventBridgePatternEditor: React.FC<EventBridgePatternEditorProps> =
           </IconButton>
         </Tooltip>
 
-        <Tooltip title="Format JSON">
+        <Tooltip title={t("pipelines.eventBridgeEditor.formatJson")}>
           <IconButton
             size="small"
             onClick={handleFormat}
@@ -299,7 +301,7 @@ export const EventBridgePatternEditor: React.FC<EventBridgePatternEditorProps> =
 
         <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
 
-        <Tooltip title="Export to JSON">
+        <Tooltip title={t("pipelines.eventBridgeEditor.exportToJson")}>
           <IconButton
             size="small"
             onClick={handleExport}
@@ -314,7 +316,7 @@ export const EventBridgePatternEditor: React.FC<EventBridgePatternEditorProps> =
           </IconButton>
         </Tooltip>
 
-        <Tooltip title="Import from JSON">
+        <Tooltip title={t("pipelines.eventBridgeEditor.importFromJson")}>
           <IconButton
             size="small"
             onClick={handleImport}

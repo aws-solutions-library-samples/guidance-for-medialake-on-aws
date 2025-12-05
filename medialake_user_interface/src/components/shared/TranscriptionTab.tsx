@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Box,
   CircularProgress,
@@ -28,6 +29,10 @@ import LanguageIcon from "@mui/icons-material/Language";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import FileDownloadIcon from "@mui/icons-material/FileDownload";
+import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import ClearIcon from "@mui/icons-material/Clear";
+import Badge from "@mui/material/Badge";
 
 // Types
 interface TranscriptWordAlternative {
@@ -248,6 +253,7 @@ const TranscriptWord: React.FC<{
   isSearchMatch: boolean;
   onSeek: (time: number) => void;
 }> = ({ word, isHighlighted, isSearchMatch, onSeek }) => {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [isHovered, setIsHovered] = useState(false);
@@ -330,7 +336,7 @@ const TranscriptWord: React.FC<{
                 backgroundColor: alpha(theme.palette.primary.main, 0.1),
               },
             }}
-            title="View alternative transcriptions"
+            title={t("common.actions.viewAlternativeTranscriptions")}
           >
             <MoreVertIcon sx={{ fontSize: 12 }} />
           </IconButton>
@@ -348,7 +354,7 @@ const TranscriptWord: React.FC<{
         >
           <MenuItem disabled>
             <ListItemText
-              primary="Alternative transcriptions:"
+              primary={t("common.alternativeTranscriptions")}
               primaryTypographyProps={{ variant: "caption", fontWeight: 600 }}
             />
           </MenuItem>
@@ -434,6 +440,74 @@ const TranscriptSegment: React.FC<{
   );
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars, no-unused-vars
+const _SearchBar: React.FC<{
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
+  searchResults: SearchResult[];
+  onJumpToResult: (result: SearchResult) => void;
+}> = ({ searchQuery, onSearchChange, searchResults, onJumpToResult }) => {
+  const { t } = useTranslation();
+  const [showResults, setShowResults] = useState(false);
+
+  return (
+    <Box sx={{ mb: 3 }}>
+      <TextField
+        fullWidth
+        variant="outlined"
+        placeholder={t("transcription.searchPlaceholder")}
+        value={searchQuery}
+        onChange={(e) => onSearchChange(e.target.value)}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <SearchIcon />
+            </InputAdornment>
+          ),
+          endAdornment: searchQuery && (
+            <InputAdornment position="end">
+              <Badge badgeContent={searchResults.length} color="primary">
+                <IconButton size="small" onClick={() => setShowResults(!showResults)}>
+                  {showResults ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+                </IconButton>
+              </Badge>
+              <IconButton size="small" onClick={() => onSearchChange("")}>
+                <ClearIcon />
+              </IconButton>
+            </InputAdornment>
+          ),
+        }}
+      />
+
+      <Collapse in={showResults && searchResults.length > 0}>
+        <Paper sx={{ mt: 1, maxHeight: 200, overflow: "auto" }}>
+          {searchResults.map((result, index) => (
+            <Box
+              key={index}
+              sx={{
+                p: 1,
+                borderBottom: index < searchResults.length - 1 ? "1px solid" : "none",
+                borderColor: "divider",
+                cursor: "pointer",
+                "&:hover": { backgroundColor: "action.hover" },
+              }}
+              onClick={() => onJumpToResult(result)}
+            >
+              <Typography variant="body2">
+                <strong>{result.word.content}</strong> - {result.segment.speaker} at{" "}
+                {result.timestamp.toFixed(1)}s
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {result.segment.text.substring(0, 100)}...
+              </Typography>
+            </Box>
+          ))}
+        </Paper>
+      </Collapse>
+    </Box>
+  );
+};
+
 const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
   assetId,
   transcriptionData,
@@ -442,6 +516,7 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
   mediaType,
   mediaController,
 }) => {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [currentTime, setCurrentTime] = useState(0);
   const [accordionExpanded, setAccordionExpanded] = useState(false);
@@ -599,7 +674,7 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
                 {segments.length > 0 && (
                   <TextField
                     size="small"
-                    placeholder="Quick search..."
+                    placeholder={t("transcription.quickSearchPlaceholder")}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     InputProps={{
@@ -637,7 +712,7 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
                     e.stopPropagation();
                     handleExportTranscript();
                   }}
-                  title="Export transcript"
+                  title={t("common.actions.exportTranscript")}
                   sx={{
                     backgroundColor: alpha(theme.palette.secondary.main, 0.1),
                     "&:hover": {

@@ -16,6 +16,7 @@ import {
   Checkbox,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import { useTranslation } from "react-i18next";
 import { ActionButton } from "@/components/common/button/ActionButton";
 import { useCreateApiKey, useUpdateApiKey } from "@/api/hooks/useApiKeys";
 import { ApiKey, CreateApiKeyRequest, UpdateApiKeyRequest } from "@/api/types/apiKey.types";
@@ -35,6 +36,7 @@ const ApiKeyFormDialog: React.FC<ApiKeyFormDialogProps> = ({
   apiKey,
   isEditMode = false,
 }) => {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -226,8 +228,7 @@ const ApiKeyFormDialog: React.FC<ApiKeyFormDialogProps> = ({
               Copy to Clipboard
             </ActionButton>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-              <strong>Important:</strong> This is the only time you'll be able to see this secret.
-              Please save it securely as it cannot be recovered later.
+              {t("settings.apiKeys.form.importantNotice")}
             </Typography>
           </Box>
         )}
@@ -243,26 +244,27 @@ const ApiKeyFormDialog: React.FC<ApiKeyFormDialogProps> = ({
             )}
 
             {/* Name Field */}
+            {/* Name Field */}
             <TextField
-              label="Name"
+              label={t("apiKeys.form.name")}
               fullWidth
               required
               value={formData.name}
               onChange={(e) => handleInputChange("name", e.target.value)}
               error={!!errors.name}
-              helperText={errors.name || "A descriptive name for this API key"}
+              helperText={errors.name || t("common.placeholders.apiKeyDescription")}
               sx={{ mb: 2 }}
             />
 
             {/* Description Field */}
             <TextField
-              label="Description"
+              label={t("apiKeys.form.description")}
               fullWidth
               multiline
               rows={3}
               value={formData.description}
               onChange={(e) => handleInputChange("description", e.target.value)}
-              helperText="Optional description of what this API key will be used for"
+              helperText={t("apiKeys.form.descriptionHelper")}
               sx={{ mb: 2 }}
             />
 
@@ -274,11 +276,14 @@ const ApiKeyFormDialog: React.FC<ApiKeyFormDialogProps> = ({
                   onChange={(e) => handleInputChange("isEnabled", e.target.checked)}
                 />
               }
-              label="Enabled"
+              label={t("apiKeys.form.enabled")}
               sx={{ mb: 2 }}
             />
             <FormHelperText sx={{ mt: -1, mb: 2 }}>
-              Disabled API keys cannot be used for authentication
+              {t(
+                "apiKeys.form.disabledHelperText",
+                "Disabled API keys cannot be used for authentication"
+              )}
             </FormHelperText>
 
             {/* Rotate Key Option (Edit Mode Only) */}
@@ -292,10 +297,13 @@ const ApiKeyFormDialog: React.FC<ApiKeyFormDialogProps> = ({
                       onChange={(e) => setRotateKey(e.target.checked)}
                     />
                   }
-                  label="Rotate API Key"
+                  label={t("apiKeys.form.rotateApiKey")}
                 />
                 <FormHelperText>
-                  Generate a new secret for this API key. The old secret will become invalid.
+                  {t(
+                    "apiKeys.form.rotateHelperText",
+                    "Generate a new secret for this API key. The old secret will become invalid."
+                  )}
                 </FormHelperText>
               </>
             )}
@@ -314,7 +322,7 @@ const ApiKeyFormDialog: React.FC<ApiKeyFormDialogProps> = ({
               Cancel
             </ActionButton>
             <ActionButton variant="contained" onClick={handleSubmit} loading={isLoading}>
-              {isEditMode ? "Update" : "Create"}
+              {isEditMode ? t("common.actions.update") : t("common.actions.create")}
             </ActionButton>
           </>
         )}

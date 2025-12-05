@@ -468,7 +468,7 @@ const SystemSettingsPage: React.FC = () => {
                                   {SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.name}
                                 </Typography>
                                 <Chip
-                                  label="Internal"
+                                  label={t("settings.systemSettings.search.external", "External")}
                                   size="small"
                                   color="success"
                                   sx={{ height: 20, fontSize: "0.7rem" }}
@@ -498,7 +498,7 @@ const SystemSettingsPage: React.FC = () => {
                                   {SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_BEDROCK.name}
                                 </Typography>
                                 <Chip
-                                  label="Internal"
+                                  label={t("settings.systemSettings.search.internal", "Internal")}
                                   size="small"
                                   color="success"
                                   sx={{ height: 20, fontSize: "0.7rem" }}
@@ -528,7 +528,7 @@ const SystemSettingsPage: React.FC = () => {
                                   {SYSTEM_SETTINGS_CONFIG.PROVIDERS.COACTIVE.name}
                                 </Typography>
                                 <Chip
-                                  label="External"
+                                  label={t("settings.systemSettings.search.external", "External")}
                                   size="small"
                                   color="info"
                                   sx={{ height: 20, fontSize: "0.7rem" }}
@@ -601,7 +601,7 @@ const SystemSettingsPage: React.FC = () => {
                           </InputLabel>
                           <Select
                             value={settings.embeddingStore.type}
-                            label="Select Store"
+                            label={t("settings.systemSettings.search.selectStore", "Select Store")}
                             onChange={(e) =>
                               handleEmbeddingStoreChange(
                                 e.target.value as "opensearch" | "s3-vector"
@@ -623,7 +623,7 @@ const SystemSettingsPage: React.FC = () => {
                                   {SYSTEM_SETTINGS_CONFIG.EMBEDDING_STORES.S3_VECTOR.name}
                                 </Typography>
                                 <Chip
-                                  label="Preview"
+                                  label={t("settings.systemSettings.search.preview", "Preview")}
                                   size="small"
                                   color="warning"
                                   sx={{ height: 20, fontSize: "0.7rem" }}
@@ -786,7 +786,7 @@ const SystemSettingsPage: React.FC = () => {
             fullWidth
             margin="normal"
             type={showApiKey ? "text" : "password"}
-            placeholder="Enter your API key"
+            placeholder={t("common.placeholders.enterApiKey")}
             required
             autoFocus
             InputProps={{

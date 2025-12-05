@@ -52,7 +52,7 @@ export const ActionsCell: React.FC<ActionsCellProps> = ({ environment, onEdit })
       <IconButton
         onClick={handleClick}
         size="small"
-        aria-label={t("common.actions")}
+        aria-label={t("common.labels.actions")}
         aria-controls={open ? "environment-actions-menu" : undefined}
         aria-haspopup="true"
         aria-expanded={open ? "true" : undefined}

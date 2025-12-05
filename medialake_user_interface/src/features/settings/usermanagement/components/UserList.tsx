@@ -691,7 +691,7 @@ const UserList: React.FC<UserListProps> = ({
           onRemoveFilter={onRemoveFilter}
           onRemoveSort={onRemoveSort}
           emptyState={{
-            message: "No users found",
+            message: t("common.noUsersFound"),
             icon: <GroupIcon sx={{ fontSize: 40 }} />,
           }}
         />

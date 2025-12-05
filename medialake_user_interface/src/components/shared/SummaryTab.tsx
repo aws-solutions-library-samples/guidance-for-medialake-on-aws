@@ -1,5 +1,6 @@
 import React from "react";
 import { Box, Typography } from "@mui/material";
+import { useTranslation } from "react-i18next";
 import { formatFileSize } from "../../utils/imageUtils";
 import TabContentContainer from "../common/TabContentContainer";
 
@@ -59,6 +60,7 @@ interface FileInfoSectionProps {
 }
 
 export const FileInfoSection: React.FC<FileInfoSectionProps> = ({ assetData }) => {
+  const { t } = useTranslation();
   const s3Bucket =
     assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation
       ?.Bucket;
@@ -79,13 +81,13 @@ export const FileInfoSection: React.FC<FileInfoSectionProps> = ({ assetData }) =
 
   return (
     <Box sx={{ mb: 3 }}>
-      <SectionHeader title="File Information" color={FILE_INFO_COLOR} />
-      <MetadataField label="Type" value={assetType} />
-      <MetadataField label="Size" value={formatFileSize(fileSize)} />
-      <MetadataField label="Format" value={format} />
-      <MetadataField label="S3 Bucket" value={s3Bucket || "Unknown"} />
-      <MetadataField label="Object Name" value={objectName || "Unknown"} />
-      <MetadataField label="S3 URI" value={s3Uri} />
+      <SectionHeader title={t("assets.fileInformation")} color={FILE_INFO_COLOR} />
+      <MetadataField label={t("detailPages.metadata.type")} value={assetType} />
+      <MetadataField label={t("detailPages.metadata.size")} value={formatFileSize(fileSize)} />
+      <MetadataField label={t("detailPages.metadata.format")} value={format} />
+      <MetadataField label={t("detailPages.metadata.s3Bucket")} value={s3Bucket || "Unknown"} />
+      <MetadataField label={t("detailPages.metadata.objectName")} value={objectName || "Unknown"} />
+      <MetadataField label={t("detailPages.metadata.s3Uri")} value={s3Uri} />
     </Box>
   );
 };
@@ -95,6 +97,7 @@ interface AudioSummaryTabProps {
 }
 
 export const AudioSummaryTab: React.FC<AudioSummaryTabProps> = ({ assetData }) => {
+  const { t } = useTranslation();
   const metadata = assetData?.data?.asset?.Metadata?.EmbeddedMetadata || {};
   const general = metadata.general || {};
   const audio = Array.isArray(metadata.audio) ? metadata.audio[0] : {};
@@ -120,14 +123,14 @@ export const AudioSummaryTab: React.FC<AudioSummaryTabProps> = ({ assetData }) =
     <TabContentContainer>
       <FileInfoSection assetData={assetData} />
       <Box sx={{ mb: 3 }}>
-        <SectionHeader title="Technical Details" color={TECH_DETAILS_COLOR} />
-        <MetadataField label="Duration" value={`${duration} seconds`} />
-        <MetadataField label="Sample Rate" value={`${sampleRate} kHz`} />
-        <MetadataField label="Bit Depth" value={`${bitDepth} bit`} />
-        <MetadataField label="Channels" value={channels} />
-        <MetadataField label="Bit Rate" value={bitRate} />
-        <MetadataField label="Codec" value={codec} />
-        <MetadataField label="Created Date" value={createdDate} />
+        <SectionHeader title={t("assets.technicalDetails")} color={TECH_DETAILS_COLOR} />
+        <MetadataField label={t("detailPages.metadata.duration")} value={`${duration} seconds`} />
+        <MetadataField label={t("detailPages.metadata.sampleRate")} value={`${sampleRate} kHz`} />
+        <MetadataField label={t("detailPages.metadata.bitDepth")} value={`${bitDepth} bit`} />
+        <MetadataField label={t("detailPages.metadata.channels")} value={channels} />
+        <MetadataField label={t("detailPages.metadata.bitRate")} value={bitRate} />
+        <MetadataField label={t("detailPages.metadata.codec")} value={codec} />
+        <MetadataField label={t("detailPages.metadata.createdDate")} value={createdDate} />
       </Box>
     </TabContentContainer>
   );
@@ -138,6 +141,7 @@ interface VideoSummaryTabProps {
 }
 
 export const VideoSummaryTab: React.FC<VideoSummaryTabProps> = ({ assetData }) => {
+  const { t } = useTranslation();
   const metadata = assetData?.data?.asset?.Metadata?.EmbeddedMetadata || {};
   const generalMetadata = metadata.general || {};
   const videoMetadata = Array.isArray(metadata.video) ? metadata.video[0] : {};
@@ -161,13 +165,13 @@ export const VideoSummaryTab: React.FC<VideoSummaryTabProps> = ({ assetData }) =
     <TabContentContainer>
       <FileInfoSection assetData={assetData} />
       <Box sx={{ mb: 3 }}>
-        <SectionHeader title="Technical Details" color={TECH_DETAILS_COLOR} />
-        <MetadataField label="Duration" value={`${duration} seconds`} />
-        <MetadataField label="Resolution" value={`${width}x${height}`} />
-        <MetadataField label="Frame Rate" value={`${frameRate} FPS`} />
-        <MetadataField label="Bit Rate" value={bitRate} />
-        <MetadataField label="Codec" value={codec} />
-        <MetadataField label="Created Date" value={createdDate} />
+        <SectionHeader title={t("assets.technicalDetails")} color={TECH_DETAILS_COLOR} />
+        <MetadataField label={t("detailPages.metadata.duration")} value={`${duration} seconds`} />
+        <MetadataField label={t("detailPages.metadata.resolution")} value={`${width}x${height}`} />
+        <MetadataField label={t("detailPages.metadata.frameRate")} value={`${frameRate} FPS`} />
+        <MetadataField label={t("detailPages.metadata.bitRate")} value={bitRate} />
+        <MetadataField label={t("detailPages.metadata.codec")} value={codec} />
+        <MetadataField label={t("detailPages.metadata.createdDate")} value={createdDate} />
       </Box>
     </TabContentContainer>
   );
@@ -178,6 +182,7 @@ interface ImageSummaryTabProps {
 }
 
 export const ImageSummaryTab: React.FC<ImageSummaryTabProps> = ({ assetData }) => {
+  const { t } = useTranslation();
   const asset = assetData?.data?.asset;
   const metadata = asset?.Metadata?.EmbeddedMetadata || {};
   const generalMetadata = metadata?.General || {};
@@ -198,12 +203,12 @@ export const ImageSummaryTab: React.FC<ImageSummaryTabProps> = ({ assetData }) =
     <TabContentContainer>
       <FileInfoSection assetData={assetData} />
       <Box sx={{ mb: 3 }}>
-        <SectionHeader title="Technical Details" color={TECH_DETAILS_COLOR} />
-        <MetadataField label="Dimensions" value={dimensions} />
-        <MetadataField label="Color Depth" value={`${colorDepth} bit`} />
-        <MetadataField label="Color Space" value={colorSpace} />
-        <MetadataField label="Compression" value={compression} />
-        <MetadataField label="Created Date" value={createdDate} />
+        <SectionHeader title={t("assets.technicalDetails")} color={TECH_DETAILS_COLOR} />
+        <MetadataField label={t("detailPages.metadata.dimensions")} value={dimensions} />
+        <MetadataField label={t("detailPages.metadata.colorDepth")} value={`${colorDepth} bit`} />
+        <MetadataField label={t("detailPages.metadata.colorSpace")} value={colorSpace} />
+        <MetadataField label={t("detailPages.metadata.compression")} value={compression} />
+        <MetadataField label={t("detailPages.metadata.createdDate")} value={createdDate} />
       </Box>
     </TabContentContainer>
   );

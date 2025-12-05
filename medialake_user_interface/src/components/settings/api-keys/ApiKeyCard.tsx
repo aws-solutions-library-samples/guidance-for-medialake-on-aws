@@ -17,6 +17,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { Can } from "@/permissions/components/Can";
 import { ApiKey } from "@/api/types/apiKey.types";
+import { useTranslation } from "react-i18next";
 
 interface ApiKeyCardProps {
   apiKey: ApiKey;
@@ -26,6 +27,7 @@ interface ApiKeyCardProps {
 }
 
 const ApiKeyCard: React.FC<ApiKeyCardProps> = ({ apiKey, onView, onEdit, onDelete }) => {
+  const { t } = useTranslation();
   const formatDate = (dateString: string) => {
     return formatDistanceToNow(new Date(dateString), { addSuffix: true });
   };
@@ -60,7 +62,7 @@ const ApiKeyCard: React.FC<ApiKeyCardProps> = ({ apiKey, onView, onEdit, onDelet
             {apiKey.name}
           </Typography>
           <Chip
-            label={apiKey.isEnabled ? "Enabled" : "Disabled"}
+            label={apiKey.isEnabled ? t("common.labels.enabled") : t("common.labels.disabled")}
             size="small"
             color={apiKey.isEnabled ? "success" : "default"}
             sx={{
@@ -117,7 +119,7 @@ const ApiKeyCard: React.FC<ApiKeyCardProps> = ({ apiKey, onView, onEdit, onDelet
       >
         {/* View Button */}
         <Can I="view" a="api-key">
-          <Tooltip title="View details">
+          <Tooltip title={t("common.actions.viewDetails")}>
             <IconButton
               size="small"
               onClick={() => onView(apiKey)}
@@ -136,7 +138,7 @@ const ApiKeyCard: React.FC<ApiKeyCardProps> = ({ apiKey, onView, onEdit, onDelet
 
         {/* Edit Button */}
         <Can I="edit" a="api-key">
-          <Tooltip title="Edit API key">
+          <Tooltip title={t("common.editApiKey")}>
             <IconButton
               size="small"
               onClick={() => onEdit(apiKey)}
@@ -155,7 +157,7 @@ const ApiKeyCard: React.FC<ApiKeyCardProps> = ({ apiKey, onView, onEdit, onDelet
 
         {/* Delete Button */}
         <Can I="delete" a="api-key">
-          <Tooltip title="Delete API key">
+          <Tooltip title={t("common.deleteApiKey")}>
             <IconButton
               size="small"
               onClick={() => onDelete(apiKey)}

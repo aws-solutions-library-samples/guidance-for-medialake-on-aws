@@ -6,13 +6,11 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { RouteErrorBoundary } from "@/shared/ui/errors";
 import { RoutePermissionGuard } from "@/permissions";
 import AccessDeniedPage from "@/pages/AccessDeniedPage";
-import GroupBasedAccess from "@/components/examples/GroupBasedAccess";
 import Home from "@/pages/Home";
 import SearchPage from "@/pages/SearchPage";
 import AssetsPage from "@/pages/AssetsPage";
 import CollectionsPage from "@/pages/CollectionsPage";
 import CollectionViewPage from "@/pages/CollectionViewPage";
-import UploadDemo from "@/pages/UploadDemo";
 import { S3Explorer } from "@/features/home/S3Explorer";
 import { ExecutionsPage } from "@/features/executions";
 import { PipelinesPage, PipelineEditorPage } from "@/features/pipelines/pages";
@@ -84,15 +82,7 @@ export const router = createBrowserRouter([
           />
         ),
       },
-      {
-        path: "assets/upload",
-        element: (
-          <RoutePermissionGuard
-            permission={{ action: "upload", subject: "asset" }}
-            element={<UploadDemo />}
-          />
-        ),
-      },
+
       {
         path: "collections",
         element: <CollectionsPage />,
@@ -249,10 +239,7 @@ export const router = createBrowserRouter([
           />
         ),
       },
-      {
-        path: "examples/group-based-access",
-        element: <GroupBasedAccess />,
-      },
+
       {
         path: "settings",
         element: <Navigate to="settings/profile" replace />,

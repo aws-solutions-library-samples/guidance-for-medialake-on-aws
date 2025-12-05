@@ -22,6 +22,7 @@ import {
   Lock as PrivateIcon,
   Share as SharedIcon,
 } from "@mui/icons-material";
+import { useTranslation } from "react-i18next";
 import { useGetCollections } from "../../api/hooks/useCollections";
 
 interface AddToCollectionModalProps {
@@ -39,6 +40,7 @@ export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
   assetName,
   onAddToCollection,
 }) => {
+  const { t } = useTranslation();
   const [selectedCollectionId, setSelectedCollectionId] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -96,7 +98,7 @@ export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
     if (collection.isPublic) {
       return (
         <Chip
-          label="Public"
+          label={t("collectionsPage.labels.public")}
           size="small"
           sx={{
             backgroundColor: "#e8f5e8",
@@ -109,7 +111,7 @@ export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
     if (collection.userRole === "owner") {
       return (
         <Chip
-          label="Private"
+          label={t("collectionsPage.labels.private")}
           size="small"
           sx={{
             backgroundColor: "#e3f2fd",
@@ -121,7 +123,7 @@ export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
     }
     return (
       <Chip
-        label="Shared"
+        label={t("collectionsPage.labels.shared")}
         size="small"
         sx={{
           backgroundColor: "#fff3e0",

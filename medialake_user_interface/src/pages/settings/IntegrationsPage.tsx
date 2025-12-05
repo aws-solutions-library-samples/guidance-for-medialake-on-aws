@@ -189,8 +189,8 @@ const IntegrationsPage: React.FC = () => {
         setApiStatus({
           show: true,
           status: "success",
-          action: "Integration Deleted",
-          message: "Integration has been successfully deleted",
+          action: t("integrations.deleteConfirmation.title"),
+          message: t("common.messages.integrationDeletedSuccessfully"),
         });
         setIntegrationToDelete(null);
 

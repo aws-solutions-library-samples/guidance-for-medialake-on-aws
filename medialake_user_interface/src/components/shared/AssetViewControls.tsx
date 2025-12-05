@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import {
   Box,
   Typography,
@@ -87,6 +88,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
   selectAllState = "none",
   onSelectAllToggle,
 }) => {
+  const { t } = useTranslation();
   const [sortAnchor, setSortAnchor] = React.useState<null | HTMLElement>(null);
   const [fieldsAnchor, setFieldsAnchor] = React.useState<null | HTMLElement>(null);
   const [appearanceAnchor, setAppearanceAnchor] = React.useState<null | HTMLElement>(null);
@@ -176,12 +178,12 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
     >
       <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
         <ToggleButtonGroup value={viewMode} exclusive onChange={onViewModeChange} size="small">
-          <Tooltip title="Card view">
+          <Tooltip title={t("common.views.cardView")}>
             <ToggleButton value="card">
               <ViewModuleIcon />
             </ToggleButton>
           </Tooltip>
-          <Tooltip title="Table view">
+          <Tooltip title={t("common.views.tableView")}>
             <ToggleButton value="table">
               <ViewListIcon />
             </ToggleButton>
@@ -423,7 +425,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                   Card Size
                 </Typography>
                 <Box sx={{ display: "flex", gap: 1 }}>
-                  <Tooltip title="Small cards">
+                  <Tooltip title={t("common.views.smallCards")}>
                     <ToggleButton
                       value="small"
                       selected={cardSize === "small"}
@@ -433,7 +435,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                       <PhotoSizeSelectSmallIcon />
                     </ToggleButton>
                   </Tooltip>
-                  <Tooltip title="Medium cards">
+                  <Tooltip title={t("common.views.mediumCards")}>
                     <ToggleButton
                       value="medium"
                       selected={cardSize === "medium"}
@@ -443,7 +445,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                       <ViewModuleIcon />
                     </ToggleButton>
                   </Tooltip>
-                  <Tooltip title="Large cards">
+                  <Tooltip title={t("common.views.largeCards")}>
                     <ToggleButton
                       value="large"
                       selected={cardSize === "large"}
@@ -461,7 +463,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                   Aspect Ratio
                 </Typography>
                 <Box sx={{ display: "flex", gap: 1 }}>
-                  <Tooltip title="Vertical aspect ratio">
+                  <Tooltip title={t("common.views.verticalAspectRatio")}>
                     <ToggleButton
                       value="vertical"
                       selected={aspectRatio === "vertical"}
@@ -471,7 +473,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                       <CropPortraitIcon />
                     </ToggleButton>
                   </Tooltip>
-                  <Tooltip title="Square aspect ratio">
+                  <Tooltip title={t("common.views.squareAspectRatio")}>
                     <ToggleButton
                       value="square"
                       selected={aspectRatio === "square"}
@@ -481,7 +483,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                       <CropSquareIcon />
                     </ToggleButton>
                   </Tooltip>
-                  <Tooltip title="Horizontal aspect ratio">
+                  <Tooltip title={t("common.views.horizontalAspectRatio")}>
                     <ToggleButton
                       value="horizontal"
                       selected={aspectRatio === "horizontal"}
@@ -499,7 +501,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                   Thumbnail Scale
                 </Typography>
                 <Box sx={{ display: "flex", gap: 1 }}>
-                  <Tooltip title="Fit to container (maintain aspect ratio)">
+                  <Tooltip title={t("common.views.fitToContainer")}>
                     <ToggleButton
                       value="fit"
                       selected={thumbnailScale === "fit"}
@@ -509,7 +511,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                       <FitScreenIcon />
                     </ToggleButton>
                   </Tooltip>
-                  <Tooltip title="Fill container (may crop image)">
+                  <Tooltip title={t("common.views.fillContainer")}>
                     <ToggleButton
                       value="fill"
                       selected={thumbnailScale === "fill"}
@@ -533,7 +535,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                   size="small"
                 />
               }
-              label="Group by Type"
+              label={t("common.viewControls.groupByType")}
               sx={{
                 "& .MuiFormControlLabel-label": {
                   fontSize: "0.875rem",
@@ -549,7 +551,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                     size="small"
                   />
                 }
-                label="Metadata"
+                label={t("common.viewControls.metadata")}
                 sx={{
                   "& .MuiFormControlLabel-label": {
                     fontSize: "0.875rem",

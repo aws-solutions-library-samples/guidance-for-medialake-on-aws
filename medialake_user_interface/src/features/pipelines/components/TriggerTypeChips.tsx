@@ -1,6 +1,7 @@
 import React from "react";
 import { Stack, Chip, Tooltip, Typography, Box } from "@mui/material";
 import { Event as EventIcon, Api as ApiIcon, TouchApp as ManualIcon } from "@mui/icons-material";
+import { useTranslation } from "react-i18next";
 import { Pipeline } from "../types/pipelines.types";
 
 interface EventRule {
@@ -31,6 +32,8 @@ export const TriggerTypeChips: React.FC<TriggerTypeChipsProps> = ({
   eventRuleInfo,
   pipeline,
 }) => {
+  const { t } = useTranslation();
+
   // If eventRuleInfo is not provided but pipeline is, extract the info from the pipeline
   const derivedEventRuleInfo = React.useMemo(() => {
     if (eventRuleInfo) {
@@ -50,9 +53,19 @@ export const TriggerTypeChips: React.FC<TriggerTypeChipsProps> = ({
         const icon = getTriggerIcon(type);
         const tooltipContent = getTooltipContent(type, derivedEventRuleInfo);
 
+        // Translate the trigger type label
+        const translatedLabel =
+          type === "Event Triggered"
+            ? t("integrations.triggerTypes.eventTriggered")
+            : type === "API Triggered"
+              ? t("integrations.triggerTypes.apiTriggered")
+              : type === "Manually Triggered"
+                ? t("integrations.triggerTypes.manuallyTriggered")
+                : type;
+
         return (
           <Tooltip key={index} title={tooltipContent} arrow placement="top">
-            <Chip icon={icon} label={type} size="small" color={getChipColor(type)} />
+            <Chip icon={icon} label={translatedLabel} size="small" color={getChipColor(type)} />
           </Tooltip>
         );
       })}
@@ -183,15 +196,17 @@ const extractEventRuleInfoFromPipeline = (pipeline: Pipeline): EventRuleInfo => 
  * Get the appropriate icon for a trigger type
  */
 const getTriggerIcon = (type: string) => {
-  switch (type) {
-    case "Event Triggered":
-      return <EventIcon fontSize="small" />;
-    case "API Triggered":
-      return <ApiIcon fontSize="small" />;
-    case "Manually Triggered":
-      return <ManualIcon fontSize="small" />;
-    default:
-      return <EventIcon fontSize="small" />;
+  // Normalize the type for comparison (case-insensitive and trim)
+  const normalizedType = type.toLowerCase().trim();
+
+  if (normalizedType.includes("event")) {
+    return <EventIcon fontSize="small" />;
+  } else if (normalizedType.includes("api")) {
+    return <ApiIcon fontSize="small" />;
+  } else if (normalizedType.includes("manual")) {
+    return <ManualIcon fontSize="small" />;
+  } else {
+    return <EventIcon fontSize="small" />;
   }
 };
 

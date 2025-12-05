@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useMediaController } from "../hooks/useMediaController";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Box, CircularProgress, Typography, Paper, Tabs, Tab, alpha } from "@mui/material";
@@ -358,6 +359,7 @@ const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
   assetType,
   searchTerm,
 }) => {
+  const { t } = useTranslation();
   const audioViewerRef = useRef<VideoViewerRef>(null);
   const seekAttemptsRef = useRef<number>(0);
   const seekTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -827,31 +829,31 @@ const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
             >
               <Tab
                 value="summary"
-                label="Summary"
+                label={t("detailPages.tabs.summary")}
                 id="tab-summary"
                 aria-controls="tabpanel-summary"
               />
               <Tab
                 value="technical"
-                label="Technical Metadata"
+                label={t("detailPages.tabs.technical")}
                 id="tab-technical"
                 aria-controls="tabpanel-technical"
               />
               <Tab
                 value="descriptive"
-                label="Descriptive"
+                label={t("detailPages.tabs.descriptive")}
                 id="tab-descriptive"
                 aria-controls="tabpanel-descriptive"
               />
               <Tab
                 value="transcription"
-                label="Transcription"
+                label={t("detailPages.tabs.transcription")}
                 id="tab-transcription"
                 aria-controls="tabpanel-transcription"
               />
               <Tab
                 value="related"
-                label="Related Items"
+                label={t("detailPages.tabs.relatedItems")}
                 id="tab-related"
                 aria-controls="tabpanel-related"
               />

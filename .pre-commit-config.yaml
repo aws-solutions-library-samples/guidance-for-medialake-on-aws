@@ -84,6 +84,42 @@ repos:
           ]
         pass_filenames: true
 
+  # i18n hardcoded string check - validates translation keys and warns about hardcoded strings
+  - repo: local
+    hooks:
+      - id: i18n-strings
+        name: i18n-strings
+        entry: node medialake_user_interface/scripts/check-i18n-strings.cjs
+        language: system
+        files: ^medialake_user_interface/src/.*\.tsx$
+        exclude: |
+          (?x)^(
+            medialake_user_interface/src/.*\.test\.tsx|
+            medialake_user_interface/src/.*\.spec\.tsx|
+            medialake_user_interface/src/.*\.stories\.tsx|
+            medialake_user_interface/src/i18n/.*
+          )$
+        pass_filenames: true
+        verbose: true
+
+      # i18n locale completeness check - ensures all locale files have translations for keys in en.ts
+      - id: i18n-locale-completeness
+        name: i18n-locale-completeness
+        entry: node medialake_user_interface/scripts/check-locale-completeness.cjs
+        language: system
+        files: ^medialake_user_interface/src/i18n/locales/.*\.ts$
+        pass_filenames: false
+        verbose: true
+
+      # i18n unused keys check - warns about translation keys that are not used in the codebase
+      - id: i18n-unused-keys
+        name: i18n-unused-keys
+        entry: node medialake_user_interface/scripts/check-unused-translations.cjs
+        language: system
+        files: ^medialake_user_interface/src/i18n/locales/en\.ts$
+        pass_filenames: false
+        verbose: true
+
   # Commit message validation (Phase 1)
   - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v4.2.0

@@ -131,7 +131,7 @@ export const UpgradeHistoryView: React.FC = () => {
               <TableRow>
                 <TableCell colSpan={7} sx={{ p: 0, border: 0 }}>
                   <EmptyTableState
-                    message="No upgrade history available"
+                    message={t("common.noUpgradeHistory")}
                     icon={<HistoryIcon sx={{ fontSize: 40 }} />}
                   />
                 </TableCell>

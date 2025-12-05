@@ -1,6 +1,7 @@
 import React from "react";
 import { Suspense } from "react";
 import { Box, CircularProgress, Typography, Grid, Button } from "@mui/material";
+import { useTranslation } from "react-i18next";
 import {
   useGetConnectors,
   useDeleteConnector,
@@ -34,6 +35,7 @@ interface ConnectorsListContentProps {
 }
 
 const ConnectorsListContent: React.FC<ConnectorsListContentProps> = ({ onAddConnector }) => {
+  const { t } = useTranslation();
   const {
     data: connectorsData,
     isLoading,
@@ -91,11 +93,11 @@ const ConnectorsListContent: React.FC<ConnectorsListContentProps> = ({ onAddConn
     <Box p={3}>
       <Box display="flex" justifyContent="flex-end" mb={2}>
         <Button variant="contained" color="primary" onClick={onAddConnector}>
-          Add Connector
+          {t("connectors.addConnector")}
         </Button>
       </Box>
       {connectors.length === 0 ? (
-        <Typography>No connectors found.</Typography>
+        <Typography>{t("connectors.noConnectorsFound")}</Typography>
       ) : (
         <Grid container spacing={3}>
           {connectors.map((connector) => (

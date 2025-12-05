@@ -291,7 +291,7 @@ const ProfilePage: React.FC = () => {
                             >
                               {isRTL ? (
                                 <>
-                                  <span>English</span>
+                                  <span>{t("languages.english")}</span>
                                   <Box
                                     sx={{
                                       width: 24,
@@ -321,7 +321,7 @@ const ProfilePage: React.FC = () => {
                                   >
                                     GB
                                   </Box>
-                                  <span>English</span>
+                                  <span>{t("languages.english")}</span>
                                 </>
                               )}
                             </Box>
@@ -345,7 +345,7 @@ const ProfilePage: React.FC = () => {
                             >
                               {isRTL ? (
                                 <>
-                                  <span>Deutsch</span>
+                                  <span>{t("languages.german")}</span>
                                   <Box
                                     sx={{
                                       width: 24,
@@ -375,7 +375,7 @@ const ProfilePage: React.FC = () => {
                                   >
                                     DE
                                   </Box>
-                                  <span>Deutsch</span>
+                                  <span>{t("languages.german")}</span>
                                 </>
                               )}
                             </Box>
@@ -399,7 +399,7 @@ const ProfilePage: React.FC = () => {
                             >
                               {isRTL ? (
                                 <>
-                                  <span>Português</span>
+                                  <span>{t("languages.portuguese")}</span>
                                   <Box
                                     sx={{
                                       width: 24,
@@ -429,7 +429,7 @@ const ProfilePage: React.FC = () => {
                                   >
                                     PT
                                   </Box>
-                                  <span>Português</span>
+                                  <span>{t("languages.portuguese")}</span>
                                 </>
                               )}
                             </Box>
@@ -453,7 +453,7 @@ const ProfilePage: React.FC = () => {
                             >
                               {isRTL ? (
                                 <>
-                                  <span>Français</span>
+                                  <span>{t("languages.french")}</span>
                                   <Box
                                     sx={{
                                       width: 24,
@@ -483,7 +483,7 @@ const ProfilePage: React.FC = () => {
                                   >
                                     FR
                                   </Box>
-                                  <span>Français</span>
+                                  <span>{t("languages.french")}</span>
                                 </>
                               )}
                             </Box>
@@ -507,7 +507,7 @@ const ProfilePage: React.FC = () => {
                             >
                               {isRTL ? (
                                 <>
-                                  <span>中文</span>
+                                  <span>{t("languages.chinese")}</span>
                                   <Box
                                     sx={{
                                       width: 24,
@@ -537,7 +537,7 @@ const ProfilePage: React.FC = () => {
                                   >
                                     CN
                                   </Box>
-                                  <span>中文</span>
+                                  <span>{t("languages.chinese")}</span>
                                 </>
                               )}
                             </Box>
@@ -561,7 +561,7 @@ const ProfilePage: React.FC = () => {
                             >
                               {isRTL ? (
                                 <>
-                                  <span>हिन्दी</span>
+                                  <span>{t("languages.hindi")}</span>
                                   <Box
                                     sx={{
                                       width: 24,
@@ -591,7 +591,7 @@ const ProfilePage: React.FC = () => {
                                   >
                                     IN
                                   </Box>
-                                  <span>हिन्दी</span>
+                                  <span>{t("languages.hindi")}</span>
                                 </>
                               )}
                             </Box>
@@ -615,7 +615,7 @@ const ProfilePage: React.FC = () => {
                             >
                               {isRTL ? (
                                 <>
-                                  <span>العربية</span>
+                                  <span>{t("languages.arabic")}</span>
                                   <Box
                                     sx={{
                                       width: 24,
@@ -645,7 +645,7 @@ const ProfilePage: React.FC = () => {
                                   >
                                     SA
                                   </Box>
-                                  <span>العربية</span>
+                                  <span>{t("languages.arabic")}</span>
                                 </>
                               )}
                             </Box>
@@ -669,7 +669,7 @@ const ProfilePage: React.FC = () => {
                             >
                               {isRTL ? (
                                 <>
-                                  <span>עברית</span>
+                                  <span>{t("languages.hebrew")}</span>
                                   <Box
                                     sx={{
                                       width: 24,
@@ -699,7 +699,7 @@ const ProfilePage: React.FC = () => {
                                   >
                                     IL
                                   </Box>
-                                  <span>עברית</span>
+                                  <span>{t("languages.hebrew")}</span>
                                 </>
                               )}
                             </Box>

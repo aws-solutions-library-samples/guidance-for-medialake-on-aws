@@ -2,6 +2,7 @@ import React from "react";
 import { Panel } from "reactflow";
 import { Button } from "@mui/material";
 import { FaSave } from "react-icons/fa";
+import { useTranslation } from "react-i18next";
 
 interface SavePipelineButtonProps {
   onClick: () => void;
@@ -14,6 +15,8 @@ const SavePipelineButton: React.FC<SavePipelineButtonProps> = ({
   isEditMode = false,
   hasChanges = true,
 }) => {
+  const { t } = useTranslation();
+
   return (
     <Panel position="top-right">
       <Button
@@ -31,7 +34,9 @@ const SavePipelineButton: React.FC<SavePipelineButtonProps> = ({
           },
         }}
       >
-        {isEditMode ? "Update Pipeline" : "Save Pipeline"}
+        {isEditMode
+          ? t("pipelines.updatePipeline", "Update Pipeline")
+          : t("pipelines.savePipeline", "Save Pipeline")}
       </Button>
     </Panel>
   );

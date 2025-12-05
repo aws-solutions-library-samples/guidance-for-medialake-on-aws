@@ -356,10 +356,18 @@ export const UpgradeSection: React.FC = () => {
                                   {version.name}
                                 </Typography>
                                 {version.is_latest && (
-                                  <Chip label="Latest" size="small" color="primary" />
+                                  <Chip
+                                    label={t("upgradeSection.labels.latest")}
+                                    size="small"
+                                    color="primary"
+                                  />
                                 )}
                                 {version.name === status?.current_version && (
-                                  <Chip label="Current" size="small" color="success" />
+                                  <Chip
+                                    label={t("upgradeSection.labels.current")}
+                                    size="small"
+                                    color="success"
+                                  />
                                 )}
                               </Box>
                             }
@@ -410,10 +418,18 @@ export const UpgradeSection: React.FC = () => {
                                   {version.name}
                                 </Typography>
                                 {version.is_default && (
-                                  <Chip label="Default" size="small" color="info" />
+                                  <Chip
+                                    label={t("upgradeSection.labels.default")}
+                                    size="small"
+                                    color="info"
+                                  />
                                 )}
                                 {version.name === status?.current_version && (
-                                  <Chip label="Current" size="small" color="success" />
+                                  <Chip
+                                    label={t("upgradeSection.labels.current")}
+                                    size="small"
+                                    color="success"
+                                  />
                                 )}
                               </Box>
                             }
@@ -456,11 +472,9 @@ export const UpgradeSection: React.FC = () => {
         </DialogTitle>
         <DialogContent>
           <DialogContentText>
-            {t(
-              "settings.systemSettings.upgrade.confirmMessage",
-              "Are you sure you want to upgrade to {{version}}? This will trigger a deployment pipeline and may cause temporary service interruption.",
-              { version: selectedVersion?.name }
-            )}
+            {t("upgradeSection.dialogs.confirmUpgrade", {
+              version: selectedVersion?.name || "unknown",
+            })}
           </DialogContentText>
           <Alert severity="warning" sx={{ mt: 2 }}>
             {t(

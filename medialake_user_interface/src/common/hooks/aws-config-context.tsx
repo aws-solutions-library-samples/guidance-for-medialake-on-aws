@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useContext, ReactNode } from "react";
 import { StorageHelper } from "../helpers/storage-helper";
 import { Amplify } from "aws-amplify";
+import { useTranslation } from "react-i18next";
 
 interface IdentityProvider {
   identity_provider_method: "cognito" | "saml";
@@ -93,6 +94,7 @@ const configureAmplify = (config: AwsConfig) => {
 };
 
 export const AwsConfigProvider = ({ children }: AwsConfigProviderProps) => {
+  const { t } = useTranslation();
   const [awsConfig, setAwsConfig] = useState<AwsConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -119,7 +121,7 @@ export const AwsConfigProvider = ({ children }: AwsConfigProviderProps) => {
   }, []);
 
   if (isLoading) {
-    return <div>Loading AWS configuration...</div>;
+    return <div>{t("config.loadingAwsConfiguration")}</div>;
   }
 
   return <AwsConfigContext.Provider value={awsConfig}>{children}</AwsConfigContext.Provider>;

@@ -1,10 +1,12 @@
 import React, { useState, KeyboardEvent, useRef, useEffect } from "react";
 import { Box, TextField, IconButton, Paper, Zoom, CircularProgress } from "@mui/material";
 import SendIcon from "@mui/icons-material/Send";
+import { useTranslation } from "react-i18next";
 import { useChat } from "../../contexts/ChatContext";
 import { alpha } from "@mui/material/styles";
 
 const ChatInput: React.FC = () => {
+  const { t } = useTranslation();
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { addMessage, updateLastMessage, isOpen } = useChat();
@@ -86,7 +88,7 @@ const ChatInput: React.FC = () => {
         <TextField
           fullWidth
           variant="outlined"
-          placeholder="Type a message..."
+          placeholder={t("chat.typeMessage")}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyPress={handleKeyPress}

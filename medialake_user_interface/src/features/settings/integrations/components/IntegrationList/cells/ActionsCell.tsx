@@ -4,6 +4,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { Row } from "@tanstack/react-table";
 import { Integration } from "../types";
+import { useTranslation } from "react-i18next";
 
 interface ActionsCellProps {
   row: Row<Integration>;
@@ -12,6 +13,7 @@ interface ActionsCellProps {
 }
 
 export const ActionsCell: React.FC<ActionsCellProps> = ({ row, onEdit, onDelete }) => {
+  const { t } = useTranslation();
   const integration = row.original;
 
   return (
@@ -19,14 +21,14 @@ export const ActionsCell: React.FC<ActionsCellProps> = ({ row, onEdit, onDelete 
       <IconButton
         size="small"
         onClick={() => onEdit(integration.id, integration)}
-        aria-label="Edit integration"
+        aria-label={t("integrations.actions.edit")}
       >
         <EditIcon />
       </IconButton>
       <IconButton
         size="small"
         onClick={() => onDelete(integration.id)}
-        aria-label="Delete integration"
+        aria-label={t("integrations.actions.delete")}
       >
         <DeleteIcon />
       </IconButton>

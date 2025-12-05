@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Box, CircularProgress, Typography, Paper, Button, Tabs, Tab, alpha } from "@mui/material";
 import { useAsset, useRelatedVersions, RelatedVersionsResponse } from "../api/hooks/useAssets";
 import { RightSidebarProvider, useRightSidebar } from "../components/common/RightSidebar";
@@ -181,6 +182,7 @@ const RelatedItemsTab: React.FC<{
 };
 
 const ImageDetailContent: React.FC = () => {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -581,19 +583,19 @@ const ImageDetailContent: React.FC = () => {
           >
             <Tab
               value="summary"
-              label="Summary"
+              label={t("detailPages.tabs.summary")}
               id="tab-summary"
               aria-controls="tabpanel-summary"
             />
             <Tab
               value="technical"
-              label="Technical Metadata"
+              label={t("detailPages.tabs.technical")}
               id="tab-technical"
               aria-controls="tabpanel-technical"
             />
             <Tab
               value="related"
-              label="Related Items"
+              label={t("detailPages.tabs.relatedItems")}
               id="tab-related"
               aria-controls="tabpanel-related"
             />

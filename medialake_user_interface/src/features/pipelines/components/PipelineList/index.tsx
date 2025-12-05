@@ -2,6 +2,7 @@ import React, { useRef, memo } from "react";
 import { Box } from "@mui/material";
 import { type Table as TanStackTable } from "@tanstack/react-table";
 import { AccountTree as PipelineIcon } from "@mui/icons-material";
+import { useTranslation } from "react-i18next";
 import { Pipeline } from "../../types/pipelines.types";
 import { ResizableTable } from "@/components/common/table";
 import { useTableVirtualizer } from "../../hooks/useTableVirtualizer";
@@ -16,6 +17,7 @@ interface PipelineListProps {
 
 const PipelineList: React.FC<PipelineListProps> = memo(
   ({ table, onFilterColumn, togglingPipelines = {}, onToggleActive }) => {
+    const { t } = useTranslation();
     const containerRef = useRef<HTMLDivElement>(null);
     const { rows } = table.getRowModel();
     const virtualizer = useTableVirtualizer(rows, containerRef);
@@ -51,7 +53,7 @@ const PipelineList: React.FC<PipelineListProps> = memo(
           togglingPipelines={togglingPipelines}
           onToggleActive={onToggleActive}
           emptyState={{
-            message: "No pipelines found",
+            message: t("common.noPipelinesFound"),
             icon: <PipelineIcon sx={{ fontSize: 40 }} />,
           }}
         />

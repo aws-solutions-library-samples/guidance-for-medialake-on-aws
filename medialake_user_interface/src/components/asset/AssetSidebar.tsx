@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { useGeneratePresignedUrl } from "../../api/hooks/usePresignedUrl";
 import { useSemanticSearchStatus } from "../../features/settings/system/hooks/useSystemSettings";
 import { fetchUserAttributes } from "aws-amplify/auth";
@@ -10,6 +11,8 @@ import {
   Tab,
   List,
   ListItem,
+  ListItemIcon,
+  ListItemText,
   Divider,
   Button,
   IconButton,
@@ -22,6 +25,8 @@ import {
   Slider,
   FormControlLabel,
   Switch,
+  Paper,
+  Avatar,
 } from "@mui/material";
 import { RightSidebar } from "../common/RightSidebar";
 
@@ -38,6 +43,10 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import SmartToyIcon from "@mui/icons-material/SmartToy";
 import RestoreIcon from "@mui/icons-material/Restore";
+import GroupsIcon from "@mui/icons-material/Groups";
+import SendIcon from "@mui/icons-material/Send";
+import AccountTreeIcon from "@mui/icons-material/AccountTree";
+import TimelineIcon from "@mui/icons-material/Timeline";
 import { RefObject } from "react";
 import { VideoViewerRef } from "../common/VideoViewer";
 import { randomHexColor, getMarkerColorByConfidence } from "../common/utils";
@@ -226,6 +235,7 @@ const EditableTimecode: React.FC<{
   onUpdate: (markerId: string, field: "start" | "end", newTimeSeconds: number) => void;
   videoViewerRef?: RefObject<VideoViewerRef>;
 }> = ({ value, markerId, field, onUpdate, videoViewerRef }) => {
+  const { t } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
 
@@ -303,7 +313,7 @@ const EditableTimecode: React.FC<{
         },
       }}
       onClick={handleStartEdit}
-      title="Click to edit"
+      title={t("common.clickToEdit")}
     >
       {videoViewerRef?.current?.formatToTimecode(value) || formatSecondsToTimecode(value)}
     </Typography>
@@ -338,8 +348,22 @@ interface AssetMarkersProps {
   setClipsMarkersCreated: (created: boolean) => void;
 }
 
+interface AssetCollaborationProps {
+  comments?: any[];
+  onAddComment?: (comment: string) => void;
+}
+
+interface AssetPipelinesProps {
+  // No props required currently
+}
+
+interface AssetActivityProps {
+  // No props required currently
+}
+
 // Version content component (using existing data)
 const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
+  const { t } = useTranslation();
   const theme = useTheme();
   const generatePresignedUrl = useGeneratePresignedUrl();
   const [downloadingVersionId, setDownloadingVersionId] = useState<string | null>(null);
@@ -446,10 +470,11 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
                   </Typography>
                 </Box>
                 <Typography variant="body2" color="text.secondary">
-                  <strong>Size:</strong> {version.size || "N/A"}
+                  <strong>{t("assets.fields.size")}:</strong>{" "}
+                  {version.size || t("common.notAvailable")}
                 </Typography>
                 <Box sx={{ display: "flex", mt: 1 }}>
-                  <Tooltip title="Download this version">
+                  <Tooltip title={t("common.downloadVersion")}>
                     <Button
                       variant="outlined"
                       size="small"
@@ -467,7 +492,8 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
                       {downloadingVersionId === version.id ? "Downloading..." : "Download"}
                     </Button>
                   </Tooltip>
-                  {/* <Tooltip title="Preview this version">
+                  {/* i18n-ignore - commented out code
+                  <Tooltip title="Preview this version">
                                         <Button
                                             variant="text"
                                             size="small"
@@ -476,7 +502,8 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
                                         >
                                             Preview
                                         </Button>
-                                    </Tooltip> */}
+                                    </Tooltip>
+                  */}
                 </Box>
               </Box>
             </ListItem>
@@ -500,6 +527,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
   clipsMarkersCreated,
   setClipsMarkersCreated,
 }) => {
+  const { t } = useTranslation();
   const theme = useTheme();
   // Store all marker references in a Map
   const markerRefsMap = useRef(new Map<string, PeriodMarker>());
@@ -1991,7 +2019,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                         bgcolor: alpha(theme.palette.error.main, 0.1),
                       },
                     }}
-                    aria-label="Delete marker"
+                    aria-label={t("common.breadcrumb.ariaLabels.deleteMarker")}
                   >
                     <CloseIcon sx={{ fontSize: 16 }} />
                   </IconButton>
@@ -2267,7 +2295,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                     });
                     return shouldShow;
                   })() && (
-                    <Tooltip title="Reset marker to original position">
+                    <Tooltip title={t("common.resetMarker")}>
                       <IconButton
                         className="marker-reset"
                         size="small"
@@ -2288,7 +2316,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                             bgcolor: alpha(theme.palette.primary.main, 0.1),
                           },
                         }}
-                        aria-label="Reset marker"
+                        aria-label={t("common.breadcrumb.ariaLabels.resetMarker")}
                       >
                         <RestoreIcon sx={{ fontSize: 16 }} />
                       </IconButton>
@@ -2303,7 +2331,307 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
   );
 };
 
+// Collaboration content component (unused but kept for future use)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars, no-unused-vars
+const _AssetCollaboration: React.FC<AssetCollaborationProps> = ({
+  comments = [],
+  onAddComment,
+}) => {
+  const { t } = useTranslation();
+  const [newComment, setNewComment] = useState("");
+  const theme = useTheme();
+
+  const handleSubmitComment = () => {
+    if (newComment.trim() && onAddComment) {
+      onAddComment(newComment);
+      setNewComment("");
+    }
+  };
+
+  return (
+    <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      <Box sx={{ flex: 1, overflowY: "auto", p: 2 }}>
+        {comments.length === 0 ? (
+          <Paper
+            variant="outlined"
+            sx={{
+              p: 3,
+              textAlign: "center",
+              bgcolor: alpha(theme.palette.background.paper, 0.4),
+            }}
+          >
+            <GroupsIcon color="disabled" sx={{ fontSize: 40, mb: 1, opacity: 0.7 }} />
+            <Typography color="text.secondary" sx={{ mb: 1 }}>
+              No comments yet
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Start the conversation by adding a comment below.
+            </Typography>
+          </Paper>
+        ) : (
+          <List disablePadding>
+            {comments.map((comment, index) => (
+              <ListItem
+                key={index}
+                alignItems="flex-start"
+                sx={{
+                  px: 1,
+                  py: 1.5,
+                  borderRadius: 1,
+                  mb: 1,
+                  bgcolor:
+                    index % 2 === 0 ? "transparent" : alpha(theme.palette.background.paper, 0.4),
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: 40 }}>
+                  <Avatar src={comment.avatar} alt={comment.user} sx={{ width: 32, height: 32 }}>
+                    {comment.user.charAt(0)}
+                  </Avatar>
+                </ListItemIcon>
+                <ListItemText
+                  primary={
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Typography variant="subtitle2" component="span">
+                        {comment.user}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {comment.timestamp}
+                      </Typography>
+                    </Box>
+                  }
+                  secondary={
+                    <Typography
+                      variant="body2"
+                      color="text.primary"
+                      sx={{ mt: 0.5, whiteSpace: "pre-wrap" }}
+                    >
+                      {comment.content}
+                    </Typography>
+                  }
+                />
+              </ListItem>
+            ))}
+          </List>
+        )}
+      </Box>
+
+      <Divider />
+
+      <Box sx={{ p: 2, bgcolor: alpha(theme.palette.background.paper, 0.3) }}>
+        <TextField
+          variant="outlined"
+          size="small"
+          fullWidth
+          multiline
+          rows={2}
+          placeholder={t("common.placeholders.addComment")}
+          value={newComment}
+          onChange={(e) => setNewComment(e.target.value)}
+          sx={{
+            mb: 1,
+            "& .MuiOutlinedInput-root": {
+              backgroundColor: theme.palette.background.paper,
+            },
+          }}
+        />
+        <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+          <Tooltip title={t("common.postComment")}>
+            <span>
+              <Button
+                variant="contained"
+                size="small"
+                endIcon={<SendIcon />}
+                disabled={!newComment.trim()}
+                onClick={handleSubmitComment}
+              >
+                Post
+              </Button>
+            </span>
+          </Tooltip>
+        </Box>
+      </Box>
+    </Box>
+  );
+};
+
+// Pipelines content component (unused but kept for future use)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars, no-unused-vars
+const _AssetPipelines: React.FC<AssetPipelinesProps> = () => {
+  const theme = useTheme();
+  const { t } = useTranslation();
+
+  return (
+    <Box sx={{ p: 2 }}>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Run processing pipelines on this asset to transform or analyze it.
+      </Typography>
+
+      <Paper
+        variant="outlined"
+        sx={{
+          p: 2,
+          mb: 2,
+          borderColor: alpha(theme.palette.info.main, 0.2),
+          transition: "all 0.2s ease",
+          "&:hover": {
+            borderColor: theme.palette.info.main,
+            boxShadow: `0 4px 8px ${alpha(theme.palette.info.main, 0.15)}`,
+          },
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+          <AccountTreeIcon color="info" fontSize="small" sx={{ mr: 1 }} />
+          <Typography variant="subtitle2">{t("assetSidebar.thumbnailGeneration")}</Typography>
+        </Box>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          Creates multiple thumbnail images at different resolutions.
+        </Typography>
+        <Tooltip title={t("common.runPipeline")}>
+          <Button variant="outlined" size="small" color="info">
+            Run Pipeline
+          </Button>
+        </Tooltip>
+      </Paper>
+
+      <Paper
+        variant="outlined"
+        sx={{
+          p: 2,
+          mb: 2,
+          borderColor: alpha(theme.palette.warning.main, 0.2),
+          transition: "all 0.2s ease",
+          "&:hover": {
+            borderColor: theme.palette.warning.main,
+            boxShadow: `0 4px 8px ${alpha(theme.palette.warning.main, 0.15)}`,
+          },
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+          <AccountTreeIcon color="warning" fontSize="small" sx={{ mr: 1 }} />
+          <Typography variant="subtitle2">{t("assetSidebar.aiAnalysis")}</Typography>
+        </Box>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          Extracts metadata, tags, and insights using machine learning.
+        </Typography>
+        <Tooltip title={t("common.runPipeline")}>
+          <Button variant="outlined" size="small" color="warning">
+            Run Pipeline
+          </Button>
+        </Tooltip>
+      </Paper>
+
+      <Tooltip title={t("common.browsePipelines")}>
+        <Button variant="text" fullWidth sx={{ mt: 2 }}>
+          {t("pipelines.viewAll", "View All Pipelines")}
+        </Button>
+      </Tooltip>
+    </Box>
+  );
+};
+
+// Activity content component (unused but kept for future use)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars, no-unused-vars
+const _AssetActivity: React.FC<AssetActivityProps> = () => {
+  const { t } = useTranslation();
+  const theme = useTheme();
+  const activities = [
+    {
+      user: "System",
+      action: "Created asset",
+      timestamp: "2023-11-15 09:30:22",
+      icon: <PersonIcon color="primary" />,
+    },
+    {
+      user: "John Doe",
+      action: "Added to collection",
+      timestamp: "2023-11-15 10:15:43",
+      icon: <PersonIcon color="primary" />,
+    },
+    {
+      user: "AI Pipeline",
+      action: "Generated metadata",
+      timestamp: "2023-11-15 11:22:17",
+      icon: <TimelineIcon color="secondary" />,
+    },
+    {
+      user: "Jane Smith",
+      action: "Added comment",
+      timestamp: "2023-11-15 14:05:36",
+      icon: <PersonIcon color="primary" />,
+    },
+  ];
+
+  return (
+    <Box sx={{ p: 2 }}>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Recent activity history for this asset.
+      </Typography>
+
+      <List
+        disablePadding
+        sx={{
+          bgcolor: alpha(theme.palette.background.paper, 0.4),
+          borderRadius: 1,
+          p: 1,
+        }}
+      >
+        {activities.map((activity, index) => (
+          <React.Fragment key={index}>
+            <ListItem
+              alignItems="flex-start"
+              sx={{
+                px: 1,
+                py: 1.5,
+                borderRadius: 1,
+                "&:hover": {
+                  bgcolor: alpha(theme.palette.background.paper, 0.6),
+                },
+              }}
+            >
+              <ListItemIcon sx={{ minWidth: 36 }}>{activity.icon}</ListItemIcon>
+              <ListItemText
+                primary={activity.action}
+                secondary={
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      mt: 0.5,
+                    }}
+                  >
+                    <Typography variant="caption" component="span">
+                      {activity.user}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" component="span">
+                      {activity.timestamp}
+                    </Typography>
+                  </Box>
+                }
+              />
+            </ListItem>
+            {index < activities.length - 1 && <Divider component="li" sx={{ my: 0.5 }} />}
+          </React.Fragment>
+        ))}
+      </List>
+
+      <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
+        <Tooltip title={t("common.loadMoreActivities")}>
+          <Button size="small" color="primary">
+            Load More
+          </Button>
+        </Tooltip>
+      </Box>
+    </Box>
+  );
+};
 export const AssetSidebar: React.FC<AssetSidebarProps> = (props) => {
+  const { t } = useTranslation();
   const { videoViewerRef, versions = [], assetId, asset, searchTerm } = props;
   const [currentTab, setCurrentTab] = useState(0);
   const theme = useTheme();
@@ -2358,7 +2686,7 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = (props) => {
           >
             <Tab
               icon={<BookmarkIcon fontSize="small" />}
-              label="Markers"
+              label={t("assetSidebar.tabs.markers")}
               id="sidebar-tab-0"
               aria-controls="sidebar-tabpanel-0"
               iconPosition="start"
@@ -2379,7 +2707,7 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = (props) => {
                     },
                   }}
                 >
-                  <span>Versions</span>
+                  <span>{t("common.versions")}</span>
                 </Badge>
               }
               id="sidebar-tab-1"

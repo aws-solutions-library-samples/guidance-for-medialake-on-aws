@@ -30,6 +30,7 @@ import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { FaFileVideo } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { ensureCorrectTypes, normalizeNumericValues } from "../../types";
 import { IconSwitch } from "@/components/common";
 import { PipelineNameInput } from "./";
@@ -63,6 +64,7 @@ export interface PipelineToolbarProps {
 }
 
 const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
+  const { t } = useTranslation();
   const {
     onSave,
     isLoading,
@@ -986,6 +988,23 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
     return false;
   };
 
+  // Helper function to get tooltip message for disabled export (currently unused but kept for future use)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars, no-unused-vars
+  const _getExportTooltipMessage = (): string => {
+    if (!pipelineName || !pipelineName.trim()) {
+      return t("integrations.editor.pipelineNameRequired");
+    }
+
+    if (reactFlowInstance) {
+      const flow = reactFlowInstance.toObject();
+      if (!flow.nodes || flow.nodes.length === 0) {
+        return t("integrations.editor.atLeastOneNodeRequired");
+      }
+    }
+
+    return t("integrations.pipelines.actions.edit");
+  };
+
   const onExport = (): void => {
     if (reactFlowInstance) {
       // Get the flow object from ReactFlow
@@ -1259,7 +1278,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
         open={isImporting}
       >
         <CircularProgress color="inherit" />
-        <Box sx={{ typography: "body1", fontWeight: 500 }}>Importing Pipeline…</Box>
+        <Box sx={{ typography: "body1", fontWeight: 500 }}>{t("common.importingPipeline")}</Box>
       </Backdrop>
 
       {/* Main bar */}
@@ -1337,10 +1356,10 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
               <Tooltip
                 title={
                   isEditMode && !hasChanges
-                    ? "No changes to save"
+                    ? t("integrations.editor.noChangesToSave")
                     : isEditMode
-                      ? "Update Pipeline"
-                      : "Save Pipeline"
+                      ? t("integrations.editor.updatePipeline")
+                      : t("common.actions.save")
                 }
               >
                 <span>
@@ -1356,7 +1375,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
               </Tooltip>
 
               {/* Cancel button - always icon in compact mode */}
-              <Tooltip title="Cancel">
+              <Tooltip title={t("common.cancel")}>
                 <IconButton color="inherit" onClick={handleCancel} size="medium">
                   <CloseIcon />
                 </IconButton>
@@ -1365,7 +1384,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
 
             {/* Right: Dropdown menu with everything else */}
             <Box ref={compactMenuRef}>
-              <Tooltip title="More options">
+              <Tooltip title={t("common.moreOptions")}>
                 <IconButton color="inherit" onClick={handleCompactMenuToggle} size="medium">
                   <MoreVertIcon />
                 </IconButton>
@@ -1443,7 +1462,9 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                                 onColor="#2b6cb0"
                                 offColor="#757575"
                               />
-                              <span>{active ? "Active" : "Inactive"}</span>
+                              <span>
+                                {active ? t("common.labels.active") : t("common.labels.inactive")}
+                              </span>
                             </Box>
                           </MenuItem>
 
@@ -1518,7 +1539,9 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                 <PipelineNameInput value={pipelineName} onChange={onPipelineNameChange} />
               </Box>
 
-              <Tooltip title={isEditMode && !hasChanges ? "No changes to save" : ""}>
+              <Tooltip
+                title={isEditMode && !hasChanges ? t("integrations.editor.noChangesToSave") : ""}
+              >
                 <span>
                   <Button
                     variant="contained"
@@ -1538,13 +1561,17 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                       },
                     }}
                   >
-                    {isLoading ? "Saving…" : isEditMode ? "Update" : "Save"}
+                    {isLoading
+                      ? t("common.actions.saving")
+                      : isEditMode
+                        ? t("common.actions.update")
+                        : t("common.actions.save")}
                   </Button>
                 </span>
               </Tooltip>
 
               <Button variant="outlined" color="inherit" onClick={handleCancel}>
-                Cancel
+                {t("common.actions.cancel")}
               </Button>
             </Box>
 
@@ -1597,14 +1624,14 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                     offColor="#757575"
                   />
                 }
-                label={active ? "Active" : "Inactive"}
+                label={active ? t("common.labels.active") : t("common.labels.inactive")}
               />
 
               {/* Import/Export */}
               <ButtonGroup
                 ref={importExportRef}
                 variant="outlined"
-                aria-label="Pipeline file operations"
+                aria-label={t("common.breadcrumb.ariaLabels.pipelineFileOperations")}
               >
                 <Button color="inherit" onClick={handleImport} startIcon={<FileUploadIcon />}>
                   Import
@@ -1696,7 +1723,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
           }}
         >
           <CircularProgress color="inherit" />
-          <Box sx={{ color: "white", fontSize: "1.1rem" }}>Importing Pipeline...</Box>
+          <Box sx={{ color: "white", fontSize: "1.1rem" }}>{t("common.importingPipeline")}</Box>
         </Box>
       </Backdrop>
 

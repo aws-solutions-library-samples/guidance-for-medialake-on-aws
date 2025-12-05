@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Box,
   Button,
@@ -49,6 +50,7 @@ const MigrateCollectionTypeDialog: React.FC<MigrateCollectionTypeDialogProps> = 
   sourceType,
   availableTypes,
 }) => {
+  const { t } = useTranslation();
   const [targetTypeId, setTargetTypeId] = useState("");
 
   const migrateMutation = useMigrateCollectionType();
@@ -83,7 +85,7 @@ const MigrateCollectionTypeDialog: React.FC<MigrateCollectionTypeDialogProps> = 
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Migrate Collections</DialogTitle>
+      <DialogTitle>{t("collectionTypes.dialogs.migrateTitle")}</DialogTitle>
       <DialogContent>
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
           <Alert severity="warning">
@@ -129,10 +131,10 @@ const MigrateCollectionTypeDialog: React.FC<MigrateCollectionTypeDialogProps> = 
           )}
 
           <FormControl fullWidth>
-            <InputLabel>Target Type</InputLabel>
+            <InputLabel>{t("migrateCollectionType.targetType")}</InputLabel>
             <Select
               value={targetTypeId}
-              label="Target Type"
+              label={t("migrateCollectionType.targetType")}
               onChange={(e) => setTargetTypeId(e.target.value)}
             >
               {availableTypes

@@ -1,5 +1,6 @@
 import React from "react";
 import { Box, Typography, LinearProgress, Slider } from "@mui/material";
+import { useTranslation } from "react-i18next";
 import { type SortingState } from "@tanstack/react-table";
 import { type AssetTableColumn } from "@/types/shared/assetComponents";
 import AssetViewControls from "./AssetViewControls";
@@ -163,6 +164,8 @@ function AssetResultsView<T>({
   getAssetProxy,
   renderCardField,
 }: AssetResultsViewProps<T>) {
+  const { t } = useTranslation();
+
   // Debug: Check if we're receiving the onAddToCollectionClick prop
   console.log(
     "AssetResultsView: onAddToCollectionClick prop is:",
@@ -248,8 +251,8 @@ function AssetResultsView<T>({
         />
 
         <ErrorDisplay
-          title="Error"
-          message="There was a problem retrieving content."
+          title={t("search.results.error")}
+          message={t("search.results.errorMessage")}
           detailedMessage={error.message}
         />
       </Box>

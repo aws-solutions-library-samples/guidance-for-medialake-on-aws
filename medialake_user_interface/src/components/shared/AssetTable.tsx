@@ -1,4 +1,5 @@
 import React, { useRef, useState, useCallback, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Box,
   Typography,
@@ -92,6 +93,7 @@ export function AssetTable<T>({
   isRenaming = false,
   renamingAssetId,
 }: AssetTableProps<T>): React.ReactElement {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const columnHelper = createColumnHelper<T>();
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -285,7 +287,7 @@ export function AssetTable<T>({
     tableColumns.push(
       columnHelper.accessor((row) => getThumbnailUrl(row), {
         id: "preview",
-        header: "Preview",
+        header: t("common.columns.preview"),
         size: 100,
         enableSorting: false,
         cell: (info) => {
@@ -490,7 +492,7 @@ export function AssetTable<T>({
       ),
       columnHelper.display({
         id: "actions",
-        header: "Actions",
+        header: t("common.columns.actions"),
         size: 150,
         cell: (info) => (
           <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end", p: 1 }}>
@@ -535,7 +537,7 @@ export function AssetTable<T>({
                   e.stopPropagation();
                   onAddToCollectionClick(info.row.original, e);
                 }}
-                title="Add to Collection"
+                title={t("common.actions.addToCollection")}
               >
                 <AddIcon fontSize="small" />
               </IconButton>

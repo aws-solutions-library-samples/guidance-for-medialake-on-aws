@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Box,
   Typography,
@@ -70,6 +71,7 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
   availableCategories,
   mediaType = "image",
 }) => {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   /* ---------------------------------------------------------------------- */
@@ -154,7 +156,7 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
         {/* --------------------------------------------------  Filter bar  --- */}
         <Box sx={{ mb: 2, display: "flex", alignItems: "center", gap: 2 }}>
           <TextField
-            placeholder="Filter metadata…"
+            placeholder={t("common.placeholders.filterMetadata")}
             size="small"
             value={textFilter}
             onChange={(e) => setTextFilter(e.target.value)}
@@ -174,7 +176,7 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
               onChange={(e) => setCategoryFilter(e.target.value as string)}
               displayEmpty
             >
-              <MenuItem value="all">All Categories</MenuItem>
+              <MenuItem value="all">{t("detailPages.metadata.allCategories")}</MenuItem>
               {availableCategories.map((key) => (
                 <MenuItem key={key} value={key}>
                   {categoryMapping[key] || key.charAt(0).toUpperCase() + key.slice(1)}

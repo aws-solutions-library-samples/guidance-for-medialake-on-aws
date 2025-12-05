@@ -266,7 +266,7 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
               {
                 type: "regex",
                 value: ".+",
-                message: "An integration must be selected",
+                message: t("common.validation.integrationMustBeSelected"),
               },
             ],
           },
@@ -351,7 +351,7 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
                     {
                       type: "regex",
                       value: ".+",
-                      message: "This field is required",
+                      message: t("common.validation.fieldRequired"),
                     },
                   ],
                 };
@@ -377,7 +377,7 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
                 {
                   type: "regex",
                   value: ".+",
-                  message: "This field is required",
+                  message: t("common.validation.fieldRequired"),
                 },
               ],
             };

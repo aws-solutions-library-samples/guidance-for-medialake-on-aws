@@ -11,6 +11,7 @@ import {
   Tooltip,
   LinearProgress,
 } from "@mui/material";
+import { useTranslation } from "react-i18next";
 import {
   Notifications as NotificationsIcon,
   Close as CloseIcon,
@@ -22,9 +23,9 @@ import { useDeleteBulkDownloadJob } from "@/api/hooks/useAssets";
 import { useJobNotifications } from "@/hooks/useJobNotifications";
 
 // Helper function to format file sizes
-const formatFileSize = (bytes: string | number): string => {
+const formatFileSize = (bytes: string | number, t: (key: string) => string): string => {
   const numBytes = typeof bytes === "string" ? parseInt(bytes, 10) : bytes;
-  if (isNaN(numBytes)) return "Unknown size";
+  if (isNaN(numBytes)) return t("notifications.fileSize.unknown");
 
   const units = ["B", "KB", "MB", "GB", "TB"];
   let size = numBytes;
@@ -39,10 +40,10 @@ const formatFileSize = (bytes: string | number): string => {
 };
 
 // Helper function to format dates
-const formatDate = (dateString: string): string => {
-  if (!dateString) return "Unknown";
+const formatDate = (dateString: string, t: (key: string) => string): string => {
+  if (!dateString) return t("notifications.date.unknown");
   const date = new Date(dateString);
-  if (isNaN(date.getTime())) return "Unknown";
+  if (isNaN(date.getTime())) return t("notifications.date.unknown");
   return date.toLocaleString("en-US", {
     timeZone: "America/Los_Angeles",
     year: "numeric",
@@ -225,6 +226,7 @@ export const NotificationProvider: React.FC<React.PropsWithChildren> = ({ childr
 //  Bell icon + dropdown UI
 // ──────────────────────────/
 export const NotificationCenter: React.FC = () => {
+  const { t } = useTranslation();
   const { notifications, markAsSeen, dismiss } = useNotifications();
   const { dismissJobNotification } = useJobNotifications();
   const deleteBulkDownloadJob = useDeleteBulkDownloadJob();
@@ -358,10 +360,10 @@ export const NotificationCenter: React.FC = () => {
       <Tooltip
         title={
           unseenCount > 0
-            ? `${unseenCount} New`
+            ? t("notifications.tooltip.new", { count: unseenCount })
             : activeJobsCount > 0
-              ? `${activeJobsCount} Running`
-              : "No notifications"
+              ? t("notifications.tooltip.running", { count: activeJobsCount })
+              : t("notifications.tooltip.none")
         }
         arrow
       >
@@ -426,9 +428,9 @@ export const NotificationCenter: React.FC = () => {
                 alignItems: "center",
               }}
             >
-              <Typography variant="h6">Notifications</Typography>
+              <Typography variant="h6">{t("common.notifications")}</Typography>
               {/* Clear dismissible job notifications */}
-              {/* <Tooltip title="Clear completed and failed downloads (active downloads will remain)">
+              {/* <Tooltip title={t("notifications.clearJobsTooltip")}>
                 <Button
                   size="small"
                   variant="outlined"
@@ -436,7 +438,7 @@ export const NotificationCenter: React.FC = () => {
                   onClick={clearAllJobNotifications}
                   sx={{ fontSize: '0.7rem', py: 0.5, px: 1 }}
                 >
-                  Clear Jobs
+                  {t("notifications.clearJobs")}
                 </Button>
               </Tooltip> */}
             </Box>
@@ -454,7 +456,7 @@ export const NotificationCenter: React.FC = () => {
             <Stack spacing={1}>
               {notifications.length === 0 && (
                 <Typography variant="body2" color="text.secondary">
-                  No notifications
+                  {t("notifications.empty")}
                 </Typography>
               )}
               {notifications.map((n) => {
@@ -511,7 +513,7 @@ export const NotificationCenter: React.FC = () => {
                             variant="outlined"
                             onClick={() => handleDismissClick(n)}
                           >
-                            Dismiss
+                            {t("notifications.dismiss")}
                           </Button>
                         )}
 
@@ -595,31 +597,40 @@ export const NotificationCenter: React.FC = () => {
                             <Tooltip
                               title={
                                 n.smallFilesCount !== undefined && n.largeFilesCount !== undefined
-                                  ? `Zipped files: ${n.smallFilesCount}, Large files: ${n.largeFilesCount}`
+                                  ? t("notifications.jobDetails.filesBreakdown", {
+                                      zipped: n.smallFilesCount,
+                                      large: n.largeFilesCount,
+                                    })
                                   : undefined
                               }
                             >
                               <Typography variant="caption" color="text.secondary">
-                                {n.foundAssetsCount} assets
+                                {t("notifications.jobDetails.assets", {
+                                  count: n.foundAssetsCount,
+                                })}
                               </Typography>
                             </Tooltip>
                           )}
 
                           {n.totalSize !== undefined && (
                             <Typography variant="caption" color="text.secondary">
-                              {formatFileSize(n.totalSize)}
+                              {formatFileSize(n.totalSize, t)}
                             </Typography>
                           )}
 
                           {n.createdAt && (
                             <Typography variant="caption" color="text.secondary">
-                              Created: {formatDate(n.createdAt)}
+                              {t("notifications.jobDetails.created", {
+                                date: formatDate(n.createdAt, t),
+                              })}
                             </Typography>
                           )}
 
                           {n.updatedAt && n.updatedAt !== n.createdAt && (
                             <Typography variant="caption" color="text.secondary">
-                              Last updated: {formatDate(n.updatedAt)}
+                              {t("notifications.jobDetails.lastUpdated", {
+                                date: formatDate(n.updatedAt, t),
+                              })}
                             </Typography>
                           )}
                         </Box>

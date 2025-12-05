@@ -1,4 +1,5 @@
 import React, { useCallback, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Handle, Position, NodeProps, useReactFlow, useOnSelectionChange } from "reactflow";
 import { Box, Typography, IconButton, Tooltip } from "@mui/material";
 import { FaCog, FaTrash } from "react-icons/fa";
@@ -8,6 +9,7 @@ const HANDLE_CONNECT_RADIUS = 50;
 
 // Component for expandable description with see more/less functionality
 const ExpandableDescription: React.FC<{ text: string }> = ({ text }) => {
+  const { t } = useTranslation();
   const textRef = useRef<HTMLParagraphElement>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -66,7 +68,9 @@ const ExpandableDescription: React.FC<{ text: string }> = ({ text }) => {
             },
           }}
         >
-          {isExpanded ? "See less" : "See more"}
+          {isExpanded
+            ? t("integrations.pipelines.editor.seeLess")
+            : t("integrations.pipelines.editor.seeMore")}
         </Typography>
       )}
     </Box>
@@ -138,6 +142,8 @@ export interface CustomNodeData {
 }
 
 const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectable }) => {
+  const { t } = useTranslation();
+
   // In File 1: track selection state
   const [selected, setSelected] = useState(false);
   const { project } = useReactFlow();
@@ -507,7 +513,11 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
                 <FaCog size={14} />
               </IconButton>
             )}
-            <Tooltip title={`Rotate (${currentRotation}°)`}>
+            <Tooltip
+              title={t("pipelines.editor.rotateNode", {
+                rotation: currentRotation,
+              })}
+            >
               <IconButton size="small" onClick={handleRotate} sx={{ p: 0.5 }}>
                 <RotateRight sx={{ fontSize: 14 }} />
               </IconButton>

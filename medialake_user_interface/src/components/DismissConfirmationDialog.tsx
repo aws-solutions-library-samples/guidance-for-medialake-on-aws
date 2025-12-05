@@ -9,6 +9,7 @@ import {
   Box,
 } from "@mui/material";
 import { Warning as WarningIcon } from "@mui/icons-material";
+import { useTranslation } from "react-i18next";
 
 interface DismissConfirmationDialogProps {
   open: boolean;
@@ -23,6 +24,7 @@ export const DismissConfirmationDialog: React.FC<DismissConfirmationDialogProps>
   onConfirm,
   notificationMessage,
 }) => {
+  const { t } = useTranslation();
   return (
     <Dialog
       open={open}
@@ -46,7 +48,7 @@ export const DismissConfirmationDialog: React.FC<DismissConfirmationDialogProps>
 
         <Box sx={{ mt: 2, p: 2, bgcolor: "grey.100", borderRadius: 1 }}>
           <Typography variant="body2" color="text.secondary">
-            <strong>Notification:</strong> {notificationMessage}
+            <strong>{t("notifications.label")}:</strong> {notificationMessage}
           </Typography>
         </Box>
 

@@ -277,11 +277,31 @@ const FacetSearch: React.FC<FacetSearchProps> = ({
               },
             }}
           >
-            <Tab icon={<ImageIcon fontSize="small" />} label="Media Type" iconPosition="start" />
-            <Tab icon={<FileIcon fontSize="small" />} label="Extension" iconPosition="start" />
-            <Tab icon={<SizeIcon fontSize="small" />} label="Size" iconPosition="start" />
-            <Tab icon={<DateIcon fontSize="small" />} label="Date" iconPosition="start" />
-            <Tab icon={<TextIcon fontSize="small" />} label="Filename" iconPosition="start" />
+            <Tab
+              icon={<ImageIcon fontSize="small" />}
+              label={t("search.facets.mediaType")}
+              iconPosition="start"
+            />
+            <Tab
+              icon={<FileIcon fontSize="small" />}
+              label={t("search.facets.extension")}
+              iconPosition="start"
+            />
+            <Tab
+              icon={<SizeIcon fontSize="small" />}
+              label={t("search.facets.size")}
+              iconPosition="start"
+            />
+            <Tab
+              icon={<DateIcon fontSize="small" />}
+              label={t("search.facets.date")}
+              iconPosition="start"
+            />
+            <Tab
+              icon={<TextIcon fontSize="small" />}
+              label={t("search.facets.filename")}
+              iconPosition="start"
+            />
           </Tabs>
 
           {/* Tab content area */}

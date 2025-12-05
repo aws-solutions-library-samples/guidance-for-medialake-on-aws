@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Box, Grid, Typography, CircularProgress, Button } from "@mui/material";
 import { formatFileSize } from "../../utils/imageUtils";
 import { formatLocalDateTime } from "../../shared/utils/dateUtils";
@@ -34,6 +35,7 @@ export const RelatedItemsView: React.FC<RelatedItemsViewProps> = ({
   hasMore,
   onItemClick,
 }) => {
+  const { t } = useTranslation();
   console.log("RelatedItemsView - Received items:", items);
   console.log("RelatedItemsView - isLoading:", isLoading);
 
@@ -78,7 +80,7 @@ export const RelatedItemsView: React.FC<RelatedItemsViewProps> = ({
     return (
       <TabContentContainer>
         <Box sx={{ textAlign: "center" }}>
-          <Typography color="text.secondary">No related items found</Typography>
+          <Typography color="text.secondary">{t("emptyStates.noRelatedItems")}</Typography>
         </Box>
       </TabContentContainer>
     );

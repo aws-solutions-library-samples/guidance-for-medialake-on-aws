@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { type ImageItem, type VideoItem, type AudioItem } from "@/types/search/searchResults";
 import { type SortingState } from "@tanstack/react-table";
 import { type AssetTableColumn } from "@/types/shared/assetComponents";
@@ -172,6 +173,8 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   isRenaming = false,
   renamingAssetId,
 }) => {
+  const { t } = useTranslation();
+
   // Debug: Check if we're receiving the onAddToCollectionClick prop
   console.log(
     "MasterResultsView: onAddToCollectionClick prop is:",
@@ -324,7 +327,7 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       availableFields={availableFields}
       onFieldsChange={onFieldsChange}
       searchTerm={searchTerm}
-      title="Results"
+      title={t("search.results.title")}
       groupByType={groupByType}
       onGroupByTypeChange={onGroupByTypeChange}
       viewMode={viewMode}

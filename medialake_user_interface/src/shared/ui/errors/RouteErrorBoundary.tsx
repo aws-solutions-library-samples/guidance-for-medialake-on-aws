@@ -27,7 +27,7 @@ const RouteErrorBoundary: React.FC = () => {
     errorMessage = error;
   } else {
     // Unknown error type
-    errorMessage = "An unexpected error occurred";
+    errorMessage = t("common.messages.unexpectedErrorOccurred");
   }
 
   return (

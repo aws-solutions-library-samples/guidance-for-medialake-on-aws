@@ -18,6 +18,7 @@ import {
   ToggleButton,
   Tooltip,
 } from "@mui/material";
+import { useTranslation } from "react-i18next";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 import RemoveIcon from "@mui/icons-material/Remove";
@@ -47,9 +48,12 @@ const EditPermissionMatrixModal: React.FC<EditPermissionMatrixModalProps> = ({
   onClose,
   onSave,
   permissions: initialPermissions,
-  title = "Edit Permissions",
+  title,
   resourceName,
 }) => {
+  const { t } = useTranslation();
+  const modalTitle = title || t("permissionSets.permissionMatrix.editTitle");
+
   // State to track the edited permissions
   const [permissions, setPermissions] = useState<any>(initialPermissions || {});
 
@@ -213,17 +217,17 @@ const EditPermissionMatrixModal: React.FC<EditPermissionMatrixModalProps> = ({
         aria-label="permission status"
       >
         <ToggleButton value="Allow" aria-label="allow">
-          <Tooltip title="Permit">
+          <Tooltip title={t("common.permit")}>
             <CheckCircleIcon color={status === "Allow" ? "success" : "inherit"} />
           </Tooltip>
         </ToggleButton>
         <ToggleButton value="Deny" aria-label="deny">
-          <Tooltip title="Deny">
+          <Tooltip title={t("common.deny")}>
             <CancelIcon color={status === "Deny" ? "error" : "inherit"} />
           </Tooltip>
         </ToggleButton>
         <ToggleButton value="Not Set" aria-label="not set">
-          <Tooltip title="Not Set">
+          <Tooltip title={t("common.notSet")}>
             <RemoveIcon color={status === "Not Set" ? "action" : "inherit"} />
           </Tooltip>
         </ToggleButton>
@@ -233,7 +237,7 @@ const EditPermissionMatrixModal: React.FC<EditPermissionMatrixModalProps> = ({
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
-      <DialogTitle>{title}</DialogTitle>
+      <DialogTitle>{modalTitle}</DialogTitle>
       <DialogContent>
         <Box sx={{ width: "100%", mt: 2 }}>
           {resourceName && (
@@ -292,9 +296,9 @@ const EditPermissionMatrixModal: React.FC<EditPermissionMatrixModalProps> = ({
         </Box>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button onClick={handleSave} variant="contained" color="primary">
-          Save Changes
+          {t("common.save")}
         </Button>
       </DialogActions>
     </Dialog>

@@ -17,6 +17,7 @@ import { TableHeader } from "./TableHeader";
 import { TableCellContent } from "./TableCellContent";
 import { EmptyTableState, EmptyTableStateProps } from "./EmptyTableState";
 import { useTableDensity } from "../../../contexts/TableDensityContext";
+import { useTranslation } from "react-i18next";
 
 interface ResizableTableProps<T> {
   table: TanStackTable<T>;
@@ -181,6 +182,7 @@ export function ResizableTable<T>({
   // onToggleActive,
   emptyState,
 }: ResizableTableProps<T>) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const { mode } = useTableDensity();
   const styles = useTableStyles(theme, mode, Boolean(onRowClick), rows.length);
@@ -209,7 +211,7 @@ export function ResizableTable<T>({
         flexDirection: "column",
       }}
       role="grid"
-      aria-label="Data table"
+      aria-label={t("common.breadcrumb.ariaLabels.dataTable", "Data table")}
     >
       <Paper
         elevation={0}

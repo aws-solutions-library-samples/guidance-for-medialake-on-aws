@@ -14,6 +14,7 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
+import { useTranslation } from "react-i18next";
 import {
   Add as AddIcon,
   Edit as EditIcon,
@@ -44,6 +45,7 @@ const ICON_MAP: Record<string, React.ReactElement> = {
 };
 
 const CollectionTypesManagement: React.FC = () => {
+  const { t } = useTranslation();
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [migrateDialogOpen, setMigrateDialogOpen] = useState(false);
   const [selectedType, setSelectedType] = useState<CollectionType | null>(null);
@@ -66,12 +68,20 @@ const CollectionTypesManagement: React.FC = () => {
 
   const handleDeleteClick = (type: CollectionType) => {
     if (type.isSystem) {
-      alert("Cannot delete system collection types");
+      alert(
+        t("collectionTypes.alerts.cannotDeleteSystem", "Cannot delete system collection types")
+      );
       return;
     }
 
     // Check if type is in use (you may want to add a usage count API)
-    if (window.confirm(`Are you sure you want to delete "${type.name}"?`)) {
+    if (
+      window.confirm(
+        t("collectionTypes.alerts.confirmDelete", `Are you sure you want to delete "{{name}}"?`, {
+          name: type.name,
+        })
+      )
+    ) {
       deleteTypeMutation.mutate(type.id, {
         onError: (error: any) => {
           // Handle TYPE_IN_USE error
@@ -105,7 +115,7 @@ const CollectionTypesManagement: React.FC = () => {
   if (error) {
     return (
       <Box p={4}>
-        <Typography color="error">Failed to load collection types</Typography>
+        <Typography color="error">{t("errors.failedToLoadCollectionTypes")}</Typography>
       </Box>
     );
   }
@@ -115,14 +125,17 @@ const CollectionTypesManagement: React.FC = () => {
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Box>
           <Typography variant="h6" gutterBottom>
-            Collection Types
+            {t("collectionTypes.title")}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Manage collection types for organizing your media assets
+            {t(
+              "collectionTypes.description",
+              "Manage collection types for organizing your media assets"
+            )}
           </Typography>
         </Box>
         <Button variant="contained" startIcon={<AddIcon />} onClick={handleCreateClick}>
-          Create Type
+          {t("collectionTypes.createType")}
         </Button>
       </Box>
 
@@ -130,11 +143,11 @@ const CollectionTypesManagement: React.FC = () => {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Icon</TableCell>
-              <TableCell>Name</TableCell>
-              <TableCell>Description</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell align="right">Actions</TableCell>
+              <TableCell>{t("common.icon")}</TableCell>
+              <TableCell>{t("common.name")}</TableCell>
+              <TableCell>{t("common.description")}</TableCell>
+              <TableCell>{t("common.labels.status")}</TableCell>
+              <TableCell align="right">{t("common.labels.actions")}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -142,7 +155,7 @@ const CollectionTypesManagement: React.FC = () => {
               <TableRow>
                 <TableCell colSpan={5} sx={{ p: 0, border: 0 }}>
                   <EmptyTableState
-                    message="No collection types found. Create one to get started."
+                    message={t("common.noCollectionTypesFound")}
                     icon={<FolderIcon sx={{ fontSize: 40 }} />}
                     action={
                       <Button
@@ -150,7 +163,7 @@ const CollectionTypesManagement: React.FC = () => {
                         startIcon={<AddIcon />}
                         onClick={handleCreateClick}
                       >
-                        Create Type
+                        {t("collectionTypes.createType")}
                       </Button>
                     }
                   />
@@ -181,7 +194,12 @@ const CollectionTypesManagement: React.FC = () => {
                         {type.name}
                       </Typography>
                       {type.isSystem && (
-                        <Chip label="System" size="small" sx={{ mt: 0.5 }} variant="outlined" />
+                        <Chip
+                          label={t("collectionTypes.labels.system")}
+                          size="small"
+                          sx={{ mt: 0.5 }}
+                          variant="outlined"
+                        />
                       )}
                     </Box>
                   </TableCell>
@@ -201,7 +219,9 @@ const CollectionTypesManagement: React.FC = () => {
                   </TableCell>
                   <TableCell>
                     <Chip
-                      label={type.isActive ? "Active" : "Inactive"}
+                      label={
+                        type.isActive ? t("common.status.active") : t("common.status.inactive")
+                      }
                       size="small"
                       color={type.isActive ? "success" : "default"}
                       variant="outlined"
@@ -212,7 +232,11 @@ const CollectionTypesManagement: React.FC = () => {
                       size="small"
                       onClick={() => handleEditClick(type)}
                       disabled={type.isSystem}
-                      title={type.isSystem ? "Cannot edit system types" : "Edit type"}
+                      title={
+                        type.isSystem
+                          ? t("common.messages.cannotEditSystemTypes")
+                          : t("common.messages.editType")
+                      }
                     >
                       <EditIcon fontSize="small" />
                     </IconButton>
@@ -220,7 +244,11 @@ const CollectionTypesManagement: React.FC = () => {
                       size="small"
                       onClick={() => handleDeleteClick(type)}
                       disabled={type.isSystem}
-                      title={type.isSystem ? "Cannot delete system types" : "Delete type"}
+                      title={
+                        type.isSystem
+                          ? t("common.messages.cannotDeleteSystemTypes")
+                          : t("common.messages.deleteType")
+                      }
                       color="error"
                     >
                       <DeleteIcon fontSize="small" />

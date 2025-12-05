@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogTitle,
@@ -33,6 +34,7 @@ export const BulkDeleteDialog: React.FC<BulkDeleteDialogProps> = ({
   onConfirmationTextChange,
   isLoading,
 }) => {
+  const { t } = useTranslation();
   const isConfirmDisabled = confirmationText !== "DELETE" || isLoading;
 
   useEffect(() => {
@@ -50,7 +52,7 @@ export const BulkDeleteDialog: React.FC<BulkDeleteDialogProps> = ({
       <DialogTitle>
         <Box display="flex" alignItems="center" gap={1}>
           <WarningIcon color="error" />
-          <Typography variant="h6">Confirm Bulk Delete</Typography>
+          <Typography variant="h6">{t("common.confirmBulkDelete")}</Typography>
         </Box>
       </DialogTitle>
       <DialogContent>
@@ -73,7 +75,7 @@ export const BulkDeleteDialog: React.FC<BulkDeleteDialogProps> = ({
               fullWidth
               value={confirmationText}
               onChange={(e) => onConfirmationTextChange(e.target.value)}
-              placeholder="Type DELETE to confirm"
+              placeholder={t("common.typeDeleteToConfirm")}
               disabled={isLoading}
               autoFocus
               data-testid="bulk-delete-confirmation-input"

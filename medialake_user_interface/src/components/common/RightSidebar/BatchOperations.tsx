@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import {
   Box,
   Typography,
@@ -40,6 +41,7 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
   isDownloadLoading = false,
   isDeleteLoading = false,
 }) => {
+  const { t } = useTranslation();
   const { setHasSelectedItems } = useRightSidebar();
 
   // Update selected items state
@@ -98,7 +100,7 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
           borderColor: "divider",
         }}
       >
-        <Tooltip title="Delete selected">
+        <Tooltip title={t("common.batchOperations.deleteSelected")}>
           <Button
             variant="contained"
             size="small"
@@ -122,10 +124,10 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
               },
             }}
           >
-            {isDeleteLoading ? "Deleting..." : "Delete"}
+            {isDeleteLoading ? t("common.actions.deleting") : t("common.actions.delete")}
           </Button>
         </Tooltip>
-        <Tooltip title="Download selected">
+        <Tooltip title={t("common.actions.downloadSelected")}>
           <Button
             variant="outlined"
             size="small"
@@ -136,7 +138,8 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
             {isDownloadLoading ? "Starting..." : "Download"}
           </Button>
         </Tooltip>
-        {/* <Tooltip title="Share selected">
+        {/* i18n-ignore - commented out code
+        <Tooltip title="Share selected">
           <Button
             variant="outlined"
             size="small"
@@ -145,7 +148,8 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
           >
             Share
           </Button>
-        </Tooltip> */}
+        </Tooltip>
+        */}
       </Box>
 
       {/* Selected items list */}
@@ -172,7 +176,7 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
                       edge="end"
                       size="small"
                       onClick={() => handleRemoveItem(asset.id)}
-                      title="Remove this item"
+                      title={t("common.actions.removeItem")}
                     >
                       <DeleteIcon fontSize="small" />
                     </IconButton>

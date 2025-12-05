@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { useParams, useNavigate } from "react-router-dom";
 import { formatDate } from "@/utils/dateFormat";
 import {
@@ -87,6 +88,7 @@ const DRAWER_WIDTH = 280;
 const COLLAPSED_DRAWER_WIDTH = 60;
 
 const CollectionViewPage: React.FC = () => {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const theme = useTheme();
@@ -328,7 +330,7 @@ const CollectionViewPage: React.FC = () => {
       await deleteCollectionMutation.mutateAsync(id);
       setCollectionAlert({
         severity: "success",
-        message: "Collection deleted successfully",
+        message: t("common.messages.collectionDeletedSuccessfully"),
       });
       handleCollectionDeleteClose();
       // Navigate to collections list after successful deletion
@@ -336,7 +338,10 @@ const CollectionViewPage: React.FC = () => {
         navigate("/collections");
       }, 1000);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to delete collection";
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : t("collectionsPage.collectionDeleteFailed", "Failed to delete collection");
       setCollectionAlert({
         severity: "error",
         message: errorMessage,
@@ -941,14 +946,16 @@ const CollectionViewPage: React.FC = () => {
           aria-labelledby="delete-dialog-title"
           aria-describedby="delete-dialog-description"
         >
-          <DialogTitle id="delete-dialog-title">Confirm Delete</DialogTitle>
+          <DialogTitle id="delete-dialog-title">
+            {t("assetExplorer.deleteDialog.title")}
+          </DialogTitle>
           <DialogContent>
             <DialogContentText id="delete-dialog-description">
               Are you sure you want to delete this asset? This action cannot be undone.
             </DialogContentText>
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleDeleteCancel}>Cancel</Button>
+            <Button onClick={handleDeleteCancel}>{t("common.cancel")}</Button>
             <Button onClick={handleDeleteConfirm} color="error" autoFocus>
               Delete
             </Button>
@@ -976,7 +983,9 @@ const CollectionViewPage: React.FC = () => {
           aria-labelledby="delete-collection-dialog-title"
           aria-describedby="delete-collection-dialog-description"
         >
-          <DialogTitle id="delete-collection-dialog-title">Delete Collection</DialogTitle>
+          <DialogTitle id="delete-collection-dialog-title">
+            {t("collectionsPage.dialogs.deleteTitle")}
+          </DialogTitle>
           <DialogContent>
             <DialogContentText id="delete-collection-dialog-description">
               Are you sure you want to delete this collection? This will permanently delete the
@@ -984,7 +993,7 @@ const CollectionViewPage: React.FC = () => {
             </DialogContentText>
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleCollectionDeleteClose}>Cancel</Button>
+            <Button onClick={handleCollectionDeleteClose}>{t("common.cancel")}</Button>
             <Button
               onClick={handleCollectionDeleteConfirm}
               color="error"
