@@ -215,8 +215,23 @@ def initialize_global_clients():
 
     if s3_vector_client is None and VECTOR_BUCKET_NAME:
         try:
-            s3_vector_client = boto3.client("s3vectors", region_name=AWS_REGION)
-            logger.info("Initialized global S3 Vector Store client")
+            # Configure retry strategy for transient errors
+            retry_config = Config(
+                retries={
+                    "max_attempts": 10,
+                    "mode": "adaptive",
+                },
+                connect_timeout=5,
+                read_timeout=60,
+            )
+
+            s3_vector_client = boto3.client(
+                "s3vectors", region_name=AWS_REGION, config=retry_config
+            )
+            logger.info(
+                "Initialized global S3 Vector Store client with retry configuration",
+                extra={"max_attempts": 10, "retry_mode": "adaptive"},
+            )
         except Exception as e:
             logger.warning(f"Failed to initialize S3 Vector Store client: {e}")
             s3_vector_client = None

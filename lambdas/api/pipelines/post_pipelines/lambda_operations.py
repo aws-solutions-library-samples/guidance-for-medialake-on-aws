@@ -1107,7 +1107,44 @@ def create_lambda_function(
                 if vpc_config:
                     create_function_params["VpcConfig"] = vpc_config
 
+                # Configure reserved concurrency if specified in YAML or node parameters
+                # Priority: User parameter > YAML config > No limit
+                reserved_concurrency = None
+
+                # First, check YAML configuration
+                lambda_config = (
+                    yaml_data.get("node", {})
+                    .get("integration", {})
+                    .get("config", {})
+                    .get("lambda", {})
+                )
+                if lambda_config and "reserved_concurrency" in lambda_config:
+                    reserved_concurrency = lambda_config["reserved_concurrency"]
+                    logger.info(
+                        f"Found reserved_concurrency in YAML config: {reserved_concurrency}"
+                    )
+
+                # Second, check if user provided override via node parameters
+                # Parameters are stored in node.data.configuration
+                if hasattr(node.data, "configuration") and isinstance(
+                    node.data.configuration, dict
+                ):
+                    user_concurrency = node.data.configuration.get(
+                        "Reserved Concurrency"
+                    ) or node.data.configuration.get("reservedConcurrency")
+                    if user_concurrency is not None:
+                        try:
+                            reserved_concurrency = int(user_concurrency)
+                            logger.info(
+                                f"User override for reserved_concurrency: {reserved_concurrency}"
+                            )
+                        except (ValueError, TypeError):
+                            logger.warning(
+                                f"Invalid reserved_concurrency value from user: {user_concurrency}"
+                            )
+
                 # Create the Lambda function with the appropriate parameters
+                # Note: ReservedConcurrentExecutions must be set AFTER creation via put_function_concurrency
                 response = lambda_client.create_function(**create_function_params)
 
                 function_arn = response["FunctionArn"]
@@ -1122,6 +1159,22 @@ def create_lambda_function(
                 logger.info(
                     f"Created Lambda function '{function_name}' with ARN: {function_arn}"
                 )
+
+                # Set reserved concurrency AFTER function creation if configured
+                if reserved_concurrency is not None and reserved_concurrency > 0:
+                    try:
+                        lambda_client.put_function_concurrency(
+                            FunctionName=function_name,
+                            ReservedConcurrentExecutions=reserved_concurrency,
+                        )
+                        logger.info(
+                            f"Set reserved concurrency to {reserved_concurrency} for Lambda: {function_name}"
+                        )
+                    except Exception as concurrency_error:
+                        logger.warning(
+                            f"Failed to set reserved concurrency for {function_name}: {concurrency_error}. "
+                            "Function will run without concurrency limits."
+                        )
                 break
             except lambda_client.exceptions.InvalidParameterValueException as e:
                 if "role" in str(e).lower() and attempt < max_retries - 1:

@@ -10,6 +10,7 @@ node:
       lambda:
         handler: utility/S3VectorStoreLambdaDeployment
         runtime: python3.12
+        reserved_concurrency: 5 # Limit concurrent executions to avoid S3 Vectors TPS limits
         iam_policy:
           statements:
             - effect: Allow
@@ -72,6 +73,30 @@ actions:
         name: Vector Dimension
         required: false
         default: ${VECTOR_DIMENSION}
+        schema:
+          type: integer
+      - in: body
+        name: Vector Batch Size
+        required: false
+        default: 500
+        schema:
+          type: integer
+      - in: body
+        name: S3 Vectors Throttle Ms
+        required: false
+        default: 100
+        schema:
+          type: integer
+      - in: body
+        name: Allow Vector Storage Failure
+        required: false
+        default: true
+        schema:
+          type: boolean
+      - in: body
+        name: Reserved Concurrency
+        required: false
+        default: 5
         schema:
           type: integer
     x-requestMapping: utility/S3VectorStoreLambdaDeployment/store/

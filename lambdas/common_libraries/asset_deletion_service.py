@@ -28,6 +28,7 @@ from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.metrics import MetricUnit
 from botocore.auth import SigV4Auth
 from botocore.awsrequest import AWSRequest
+from botocore.config import Config
 from botocore.exceptions import ClientError
 from external_service_manager import MediaLakeExternalServiceManager
 
@@ -306,7 +307,19 @@ class AssetDeletionService:
             return 0
 
         try:
-            client = boto3.client("s3vectors", region_name=AWS_REGION)
+            # Configure retry strategy for transient errors
+            retry_config = Config(
+                retries={
+                    "max_attempts": 10,
+                    "mode": "adaptive",
+                },
+                connect_timeout=5,
+                read_timeout=60,
+            )
+
+            client = boto3.client(
+                "s3vectors", region_name=AWS_REGION, config=retry_config
+            )
 
             # Find vectors by metadata
             vectors_to_delete = []
@@ -455,14 +468,18 @@ class AssetDeletionService:
         conn = http.client.HTTPSConnection(
             parsed.hostname, parsed.port or 443, timeout=timeout
         )
-        conn.request(
-            prepared.method, path, body=prepared.body, headers=dict(prepared.headers)
-        )
-        resp = conn.getresponse()
-        body = resp.read().decode("utf-8")
-        conn.close()
-
-        return resp.status, body
+        try:
+            conn.request(
+                prepared.method,
+                path,
+                body=prepared.body,
+                headers=dict(prepared.headers),
+            )
+            resp = conn.getresponse()
+            body = resp.read().decode("utf-8")
+            return resp.status, body
+        finally:
+            conn.close()
 
     @staticmethod
     def _get_timestamp() -> str:
