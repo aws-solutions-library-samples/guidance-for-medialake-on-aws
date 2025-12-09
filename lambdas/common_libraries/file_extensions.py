@@ -50,6 +50,7 @@ SUPPORTED_EXTENSIONS = {
         "mkv",  # Matroska
         "webm",  # WebM
         "mxf",  # Material Exchange Format
+        "mts",  # AVCHD (Advanced Video Coding High Definition)
     ],
     "Audio": [
         "wav",  # Waveform Audio

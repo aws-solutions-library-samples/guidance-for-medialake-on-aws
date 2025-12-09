@@ -37,7 +37,7 @@
             "method": "trigger",
             "parameters": {
               "Prefix": "",
-              "Format": "FLV, MP4, MOV, AVI, MKV, WEBM, MXF"
+              "Format": "FLV, MP4, MOV, AVI, MKV, WEBM, MXF, MTS"
             },
             "requestMapping": null,
             "responseMapping": null
