@@ -435,9 +435,6 @@ export default {
       noIntegrationsAvailable:
         "No integrations are available in this environment. You'll need to create integrations before you can use these nodes.",
     },
-    dialogs: {
-      deleteTitle: "삭제 Pipeline",
-    },
     triggerTypes: {
       eventTriggered: "Event Triggered",
       apiTriggered: "API Triggered",
@@ -472,9 +469,9 @@ export default {
       replacementIntegration: "대체 통합",
     },
     dialogs: {
+      deleteTitle: "Delete Pipeline",
       deleteConfirmation: "Are you sure you want to delete this pipeline?",
       deleteWarning: "This action cannot be undone.",
-      typeToConfirm: "Type DELETE to confirm",
     },
     viewAll: "모든 파이프라인 보기",
     selectType: "유형 선택",

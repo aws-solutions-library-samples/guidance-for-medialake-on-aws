@@ -442,9 +442,6 @@ export default {
       noIntegrationsAvailable:
         "No integrations are available in this environment. You'll need to create integrations before you can use these nodes.",
     },
-    dialogs: {
-      deleteTitle: "Eliminar Pipeline",
-    },
     triggerTypes: {
       eventTriggered: "Event Triggered",
       apiTriggered: "API Triggered",
@@ -479,9 +476,9 @@ export default {
       replacementIntegration: "Integración de reemplazo",
     },
     dialogs: {
+      deleteTitle: "Eliminar Pipeline",
       deleteConfirmation: '¿Estás seguro de que quieres eliminar el pipeline "{{pipelineName}}"?',
       deleteWarning: "Esta acción no se puede deshacer.",
-      typeToConfirm: "Para confirmar, por favor escribe el nombre del pipeline a continuación:",
     },
     viewAll: "Ver todos los pipelines",
     selectType: "Seleccionar tipo",

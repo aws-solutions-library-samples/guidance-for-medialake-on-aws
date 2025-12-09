@@ -28,16 +28,13 @@ export const PipelineDeleteDialog: React.FC<PipelineDeleteDialogProps> = React.m
 
     return (
       <Dialog open={open} onClose={onClose}>
-        <DialogTitle>{t("integrations.dialogs.deleteTitle")}</DialogTitle>
+        <DialogTitle>{t("pipelines.dialogs.deleteTitle")}</DialogTitle>
         <DialogContent>
           <Typography variant="body1" gutterBottom>
             {t("pipelines.dialogs.deleteConfirmation", { pipelineName })}
           </Typography>
           <Typography variant="body1" gutterBottom>
             {t("pipelines.dialogs.deleteWarning")}
-          </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
-            {t("pipelines.dialogs.typeToConfirm")}
           </Typography>
           <TextField
             autoFocus

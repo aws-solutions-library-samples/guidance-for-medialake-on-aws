@@ -435,9 +435,6 @@ export default {
       noIntegrationsAvailable:
         "No integrations are available in this environment. You'll need to create integrations before you can use these nodes.",
     },
-    dialogs: {
-      deleteTitle: "حذف Pipeline",
-    },
     triggerTypes: {
       eventTriggered: "Event Triggered",
       apiTriggered: "API Triggered",
@@ -472,9 +469,9 @@ export default {
       replacementIntegration: "تكامل بديل",
     },
     dialogs: {
+      deleteTitle: "Delete Pipeline",
       deleteConfirmation: "Are you sure you want to delete this pipeline?",
       deleteWarning: "This action cannot be undone.",
-      typeToConfirm: "Type DELETE to confirm",
     },
     viewAll: "عرض جميع خطوط الأنابيب",
     selectType: "اختر النوع",

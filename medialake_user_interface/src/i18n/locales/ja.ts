@@ -439,9 +439,6 @@ export default {
       noIntegrationsAvailable:
         "No integrations are available in this environment. You'll need to create integrations before you can use these nodes.",
     },
-    dialogs: {
-      deleteTitle: "削除 Pipeline",
-    },
     triggerTypes: {
       eventTriggered: "Event Triggered",
       apiTriggered: "API Triggered",
@@ -476,9 +473,9 @@ export default {
       replacementIntegration: "置換統合",
     },
     dialogs: {
+      deleteTitle: "Delete Pipeline",
       deleteConfirmation: "Are you sure you want to delete this pipeline?",
       deleteWarning: "This action cannot be undone.",
-      typeToConfirm: "Type DELETE to confirm",
     },
     viewAll: "すべてのパイプラインを表示",
     selectType: "タイプを選択",

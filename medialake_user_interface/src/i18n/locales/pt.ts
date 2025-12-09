@@ -447,9 +447,6 @@ export default {
       noIntegrationsAvailable:
         "No integrations are available in this environment. You'll need to create integrations before you can use these nodes.",
     },
-    dialogs: {
-      deleteTitle: "Excluir Pipeline",
-    },
   },
   pipelines: {
     title: "Pipelines",
@@ -480,9 +477,9 @@ export default {
       replacementIntegration: "Integração Substituta",
     },
     dialogs: {
+      deleteTitle: "Excluir Pipeline",
       deleteConfirmation: 'Tem certeza de que deseja excluir o pipeline "{{pipelineName}}"?',
       deleteWarning: "Esta ação não pode ser desfeita.",
-      typeToConfirm: "Para confirmar, digite o nome do pipeline abaixo:",
     },
     viewAll: "Ver todos os pipelines",
     selectType: "Selecionar tipo",

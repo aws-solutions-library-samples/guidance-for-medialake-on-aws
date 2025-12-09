@@ -437,9 +437,6 @@ export default {
       noIntegrationsAvailable:
         "No integrations are available in this environment. You'll need to create integrations before you can use these nodes.",
     },
-    dialogs: {
-      deleteTitle: "Delete Pipeline",
-    },
     triggerTypes: {
       eventTriggered: "Event Triggered",
       apiTriggered: "API Triggered",
@@ -1026,9 +1023,10 @@ export default {
       selectIntegration: "Select Integration",
     },
     dialogs: {
-      deleteConfirmation: "Are you sure you want to delete this pipeline?",
-      deleteWarning: "This action cannot be undone.",
-      typeToConfirm: "Type DELETE to confirm",
+      deleteTitle: "Delete Pipeline",
+      deleteConfirmation:
+        'Are you sure you want to delete the pipeline "{{pipelineName}}"? This action cannot be undone.',
+      deleteWarning: "To confirm, please type the pipeline name below:",
     },
     editor: {
       searchNodes: "Search nodes...",

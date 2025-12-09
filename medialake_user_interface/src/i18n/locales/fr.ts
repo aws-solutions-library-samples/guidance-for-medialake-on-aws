@@ -443,9 +443,6 @@ export default {
       noIntegrationsAvailable:
         "Aucune intégration n'est disponible dans cet environnement. Vous devrez créer des intégrations avant de pouvoir utiliser ces nœuds.",
     },
-    dialogs: {
-      deleteTitle: "Supprimer le pipeline",
-    },
     triggerTypes: {
       eventTriggered: "Déclenché par événement",
       apiTriggered: "Déclenché par API",
@@ -1222,9 +1219,9 @@ export default {
       selectIntegration: "Select Integration",
     },
     dialogs: {
+      deleteTitle: "Supprimer le Pipeline",
       deleteConfirmation: "Are you sure you want to delete this pipeline?",
       deleteWarning: "This action cannot be undone.",
-      typeToConfirm: "Type DELETE to confirm",
     },
     editor: {
       searchNodes: "Search nodes...",
