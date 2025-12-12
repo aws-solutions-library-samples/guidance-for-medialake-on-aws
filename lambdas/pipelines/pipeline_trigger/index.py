@@ -9,7 +9,9 @@ from botocore.config import Config
 from botocore.exceptions import ClientError
 
 # Configuration variables
-MAX_CONCURRENT_EXECUTIONS = 1000
+# MAX_CONCURRENT_EXECUTIONS can be configured per pipeline via environment variable
+# Default to 10 to prevent MediaConvert API throttling
+MAX_CONCURRENT_EXECUTIONS = int(os.environ.get("MAX_CONCURRENT_EXECUTIONS", "10"))
 MAX_API_RETRIES = 20
 BASE_BACKOFF = 0.5  # seconds
 EXECUTION_COUNT_CACHE_TTL = 20  # seconds
@@ -132,13 +134,35 @@ def lambda_handler(event, context):
         running = get_running_executions_count(state_machine_arn)
         if running >= MAX_CONCURRENT_EXECUTIONS:
             logger.info(
-                "Concurrency limit reached (%d/%d) for %s",
+                "Concurrency limit reached (%d/%d), message will be retried",
                 running,
                 MAX_CONCURRENT_EXECUTIONS,
-                inventory_id,
             )
             failures.append(record["messageId"])
             continue
+
+        # Gradual ramp-up: Add startup delay to prevent initial burst race condition
+        # When count is low (0-5), add progressive delay to allow executions to register
+        # This prevents multiple Lambda containers from all seeing "0 running" simultaneously
+        if running < 5:
+            delay_seconds = (
+                5 - running
+            ) * 0.5  # 2.5s at 0, 2s at 1, 1.5s at 2, 1s at 3, 0.5s at 4
+            logger.info(
+                f"Gradual ramp-up: waiting {delay_seconds}s before starting (current: {running}/{MAX_CONCURRENT_EXECUTIONS})"
+            )
+            time.sleep(delay_seconds)
+
+            # Re-check after delay to ensure we're still under limit
+            # Force fresh count by bypassing cache
+            running = _count_running_executions(state_machine_arn)
+            if running >= MAX_CONCURRENT_EXECUTIONS:
+                logger.info(
+                    f"Concurrency limit reached after ramp-up delay ({running}/{MAX_CONCURRENT_EXECUTIONS}), message will be retried"
+                )
+                failures.append(record["messageId"])
+                continue
+
         try:
             resp = start_execution_with_backoff(state_machine_arn, body)
             logger.info("Started %s ", resp["executionArn"])

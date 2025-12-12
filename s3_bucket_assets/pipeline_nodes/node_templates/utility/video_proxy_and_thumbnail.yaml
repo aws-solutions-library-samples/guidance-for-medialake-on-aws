@@ -40,11 +40,9 @@ node:
                 - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}
             - effect: Allow
               actions:
-                - dynamodb:GetItem
-                - dynamodb:UpdateItem
-                - dynamodb:PutItem
+                - cloudwatch:PutMetricData
               resources:
-                - ${MEDIALAKE_ASSET_TABLE}
+                - "*"
             - effect: Allow
               actions:
                 - kms:Decrypt

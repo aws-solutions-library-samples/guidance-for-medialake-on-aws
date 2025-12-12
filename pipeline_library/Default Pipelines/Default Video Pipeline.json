@@ -36,6 +36,7 @@
             "operationId": "",
             "method": "trigger",
             "parameters": {
+              "Max Concurrent Executions": 10,
               "Prefix": "",
               "Format": "FLV, MP4, MOV, AVI, MKV, WEBM, MXF, MTS"
             },

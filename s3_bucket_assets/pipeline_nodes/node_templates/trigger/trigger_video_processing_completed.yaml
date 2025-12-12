@@ -22,6 +22,12 @@ actions:
     operationId: triggerVideoProcessingCompleted
     parameters:
       - in: body
+        name: Max Concurrent Executions
+        required: false
+        default: 10
+        schema:
+          type: integer
+      - in: body
         name: Prefix
         required: false
         schema:
