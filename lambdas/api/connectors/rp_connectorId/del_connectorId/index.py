@@ -6,7 +6,7 @@ from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.event_handler.api_gateway import APIGatewayProxyEvent
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
-from common_libraries.cors_utils import create_error_response, create_response
+from cors_utils import create_error_response, create_response
 
 # Initialize AWS Lambda Powertools
 logger = Logger()
@@ -370,9 +370,18 @@ def remove_event_notification_by_name(
                 "EventBridgeConfiguration"
             ]
 
-        # Process all configuration types except EventBridgeConfiguration
-        for config_type, configs in current_config.items():
-            if config_type != "EventBridgeConfiguration":
+        # Configuration types that contain lists of notification configs
+        # Exclude ResponseMetadata and EventBridgeConfiguration
+        notification_config_types = [
+            "TopicConfigurations",
+            "QueueConfigurations",
+            "LambdaFunctionConfigurations",
+        ]
+
+        # Process only valid notification configuration types
+        for config_type in notification_config_types:
+            configs = current_config.get(config_type)
+            if configs and isinstance(configs, list):
                 filtered_configs = [
                     config
                     for config in configs
