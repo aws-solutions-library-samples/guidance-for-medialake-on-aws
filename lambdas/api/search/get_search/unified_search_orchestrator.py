@@ -193,7 +193,11 @@ class UnifiedSearchOrchestrator:
                         "name": item.get("name", "Coactive AI"),
                         "id": item.get("id"),
                     }
-                elif provider_type in ["bedrock twelvelabs", "twelvelabs-bedrock"]:
+                elif provider_type in [
+                    "bedrock twelvelabs",
+                    "twelvelabs-bedrock",
+                    "twelvelabs-bedrock-3-0",
+                ]:
                     provider_config = {
                         "provider": "bedrock_twelvelabs",
                         "provider_location": "internal",
@@ -211,6 +215,8 @@ class UnifiedSearchOrchestrator:
                         "metadata_mapping": item.get("metadataMapping", {}),
                         "name": item.get("name", "Bedrock TwelveLabs"),
                         "id": item.get("id"),
+                        "type": provider_type,
+                        "dimensions": item.get("dimensions"),
                     }
                 elif provider_type in ["twelvelabs", "twelvelabs-api"]:
                     provider_config = {
@@ -232,6 +238,8 @@ class UnifiedSearchOrchestrator:
                         "metadata_mapping": item.get("metadataMapping", {}),
                         "name": item.get("name", "TwelveLabs API"),
                         "id": item.get("id"),
+                        "type": provider_type,
+                        "dimensions": item.get("dimensions"),
                     }
                 else:
                     # For unknown types, try to infer from the type string

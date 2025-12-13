@@ -30,8 +30,72 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
     def __init__(self, config, logger, metrics):
         super().__init__(config, logger, metrics)
         self._opensearch_client = None
-        # Model-specific configuration for embedding types to include in clips
-        self.embedding_model = "twelvelabs.marengo-embed-2-7-v1:0"
+
+        # Determine model version using priority order:
+        # 1. Type field (most explicit - e.g., "twelvelabs-bedrock-3-0")
+        # 2. Explicit dimensions field (512 for 3.0, 1024 for 2.7)
+        # 3. Name field (e.g., "TwelveLabs Marengo 3.0")
+        # No fallback - configuration must be explicit
+
+        provider_type = getattr(config, "type", "") or ""
+        provider_name = getattr(config, "name", "") or ""
+        dimensions = getattr(config, "dimensions", None)
+
+        # Debug logging
+        self.logger.info(f"[CONFIG] provider_type: '{provider_type}'")
+        self.logger.info(f"[CONFIG] provider_name: '{provider_name}'")
+        self.logger.info(
+            f"[CONFIG] dimensions: {dimensions} (type: {type(dimensions).__name__})"
+        )
+
+        # Prioritize type field check (most explicit and reliable configuration)
+        if "3-0" in provider_type or "3.0" in provider_type:
+            self.embedding_model = "twelvelabs.marengo-embed-3-0-v1:0"
+            self.model_version = "3.0"
+            self.embedding_dimension = 512
+            self.logger.info(f"✓ Using Marengo 3.0 based on type='{provider_type}'")
+        elif "2-7" in provider_type or "2.7" in provider_type:
+            self.embedding_model = "twelvelabs.marengo-embed-2-7-v1:0"
+            self.model_version = "2.7"
+            self.embedding_dimension = 1024
+            self.logger.info(f"✓ Using Marengo 2.7 based on type='{provider_type}'")
+        elif dimensions == 512 or str(dimensions) == "512":
+            self.embedding_model = "twelvelabs.marengo-embed-3-0-v1:0"
+            self.model_version = "3.0"
+            self.embedding_dimension = 512
+            self.logger.info(f"✓ Using Marengo 3.0 based on dimensions={dimensions}")
+        elif dimensions == 1024 or str(dimensions) == "1024":
+            self.embedding_model = "twelvelabs.marengo-embed-2-7-v1:0"
+            self.model_version = "2.7"
+            self.embedding_dimension = 1024
+            self.logger.info(f"✓ Using Marengo 2.7 based on dimensions={dimensions}")
+        elif "3-0" in provider_name or "3.0" in provider_name:
+            self.embedding_model = "twelvelabs.marengo-embed-3-0-v1:0"
+            self.model_version = "3.0"
+            self.embedding_dimension = 512
+            self.logger.info(f"✓ Using Marengo 3.0 based on name='{provider_name}'")
+        elif "2-7" in provider_name or "2.7" in provider_name:
+            self.embedding_model = "twelvelabs.marengo-embed-2-7-v1:0"
+            self.model_version = "2.7"
+            self.embedding_dimension = 1024
+            self.logger.info(f"✓ Using Marengo 2.7 based on name='{provider_name}'")
+        else:
+            # No fallback - configuration must explicitly specify model version
+            error_msg = (
+                f"Unable to determine TwelveLabs model version from configuration. "
+                f"Provided: type='{provider_type}', dimensions={dimensions}, name='{provider_name}'. "
+                f"Configuration must include one of: "
+                f"type='twelvelabs-bedrock-3-0' or 'twelvelabs-bedrock-2-7', "
+                f"dimensions=512 or 1024, "
+                f"or name containing '3.0' or '2.7'"
+            )
+            self.logger.error(error_msg)
+            raise ValueError(error_msg)
+
+        self.logger.info(
+            f"Initialized Bedrock TwelveLabs provider with model: {self.embedding_model} "
+            f"(version: {self.model_version}, dimension: {self.embedding_dimension})"
+        )
 
     def get_allowed_clip_embedding_types(self) -> List[str]:
         """
@@ -39,19 +103,24 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
         This is model-specific as different models return different embedding types.
 
         For TwelveLabs Marengo 2.7:
-        - Returns: audio, visual-text, visual-image
+        - Embedding types: audio, visual-text, visual-image
         - We only want visual-text for clips (timeline markers)
-        - Filter out audio and visual-image
 
-        For future models (e.g., TwelveLabs 3.0, Nova), this method can be updated
-        to return different embedding types based on the model.
+        For TwelveLabs Marengo 3.0:
+        - Embedding types: visual, audio, transcription
+        - Currently only using "visual" for clips
+        - audio and transcription support to be added later
         """
-        if "marengo-embed-2-7" in self.embedding_model:
+        if "marengo-embed-2-7" in self.embedding_model or self.model_version == "2.7":
             # For Marengo 2.7, only include visual-text for clips
             return ["visual-text"]
 
-        # Default: include visual-text for clips (safest option for timeline display)
-        return ["visual-text"]
+        if "marengo-embed-3-0" in self.embedding_model or self.model_version == "3.0":
+            # For Marengo 3.0, include all embedding representations
+            return ["visual", "audio", "transcription"]
+
+        # Default: include common types across models
+        return ["visual-text", "visual"]
 
     def _get_provider_location(self) -> ProviderLocation:
         return ProviderLocation.INTERNAL
@@ -130,13 +199,43 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
 
     def _get_regional_inference_profile(self) -> str:
         """
-        Get the appropriate TwelveLabs Marengo Embed v2.7 inference profile based on AWS region.
+        Get the appropriate TwelveLabs Marengo Embed inference profile based on AWS region.
+        Supports both v2.7 and v3.0 models.
         """
+        # Log entry point for debugging
+        self.logger.info(
+            f"[PROFILE] Getting inference profile - model_version='{self.model_version}', "
+            f"embedding_model='{self.embedding_model}'"
+        )
+
         if "BEDROCK_INFERENCE_PROFILE_ARN" in os.environ:
-            return os.environ["BEDROCK_INFERENCE_PROFILE_ARN"]
+            profile_arn = os.environ["BEDROCK_INFERENCE_PROFILE_ARN"]
+            self.logger.info(
+                f"[PROFILE] Using env var BEDROCK_INFERENCE_PROFILE_ARN: {profile_arn}"
+            )
+            return profile_arn
 
         aws_region = os.environ.get("AWS_REGION", "us-east-1")
-        model_suffix = ".twelvelabs.marengo-embed-2-7-v1:0"
+
+        # Use the model version determined in __init__
+        # CRITICAL: Check model_version explicitly
+        self.logger.info(
+            f"[PROFILE] Checking model_version: '{self.model_version}' (type: {type(self.model_version).__name__})"
+        )
+
+        if self.model_version == "3.0":
+            model_suffix = ".twelvelabs.marengo-embed-3-0-v1:0"
+            self.logger.info(f"[PROFILE] Selected 3.0 suffix: {model_suffix}")
+        elif self.model_version == "2.7":
+            model_suffix = ".twelvelabs.marengo-embed-2-7-v1:0"
+            self.logger.info(f"[PROFILE] Selected 2.7 suffix: {model_suffix}")
+        else:
+            # Fallback with explicit error
+            error_msg = (
+                f"Invalid model_version: '{self.model_version}'. Must be '3.0' or '2.7'"
+            )
+            self.logger.error(f"[PROFILE] {error_msg}")
+            raise ValueError(error_msg)
 
         if aws_region.startswith("us-"):
             regional_prefix = "us"
@@ -152,13 +251,37 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
 
         inference_profile_id = f"{regional_prefix}{model_suffix}"
         self.logger.info(
-            f"Selected inference profile {inference_profile_id} for region {aws_region}"
+            f"[PROFILE] ✓ Final inference profile: {inference_profile_id} "
+            f"(region={aws_region}, model={self.embedding_model}, version={self.model_version}, dim={self.embedding_dimension})"
         )
         return inference_profile_id
+
+    def _get_embedding_field_name(
+        self, dimension: int, space_type: str = "cosine"
+    ) -> str:
+        """
+        Get the field name for an embedding based on its dimension and space type.
+
+        Args:
+            dimension: The embedding dimension (256, 384, 512, 1024, 1536, 3072)
+            space_type: The similarity space type (default: "cosine")
+
+        Returns:
+            Field name like "embedding_512_cosine"
+        """
+        supported_dimensions = [256, 384, 512, 1024, 1536, 3072]
+        if dimension not in supported_dimensions:
+            self.logger.warning(
+                f"Unsupported embedding dimension: {dimension}. Using closest supported dimension."
+            )
+            dimension = min(supported_dimensions, key=lambda x: abs(x - dimension))
+
+        return f"embedding_{dimension}_{space_type}"
 
     def _generate_embedding_via_bedrock(self, query_text: str) -> List[float]:
         """
         Generate text embedding using TwelveLabs model via AWS Bedrock InvokeModel.
+        Supports both Marengo 2.7 and 3.0 API formats.
         """
         import json
 
@@ -168,10 +291,17 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
 
             self.logger.info(f"Using Bedrock inference profile: {inference_profile_id}")
 
-            payload = {"inputType": "text", "inputText": query_text}
+            # API format differs between model versions:
+            # Marengo 2.7: {"inputType": "text", "inputText": query_text}
+            # Marengo 3.0: {"inputType": "text", "text": {"inputText": query_text}}
+            if self.model_version == "3.0":
+                payload = {"inputType": "text", "text": {"inputText": query_text}}
+            else:
+                payload = {"inputType": "text", "inputText": query_text}
 
             self.logger.info(
-                f"Starting Bedrock embedding creation for query: {query_text}"
+                f"Starting Bedrock embedding creation for query: {query_text} "
+                f"(using {'3.0' if self.model_version == '3.0' else '2.7'} API format)"
             )
 
             response = bedrock_client.invoke_model(
@@ -318,7 +448,7 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
                     provider_metadata={
                         "provider": "bedrock_twelvelabs",
                         "store": "s3_vectors",
-                        "embedding_model": "twelvelabs.marengo-embed-2-7-v1:0",
+                        "embedding_model": self.embedding_model,
                     },
                 )
                 search_hits.append(search_hit)
@@ -356,26 +486,143 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
             client = self._get_opensearch_client()
             index_name = os.environ["OPENSEARCH_INDEX"]
 
-            # Build OpenSearch query with embeddings
-            opensearch_query = {
-                "size": query.page_size * 20,  # Get more results for better ranking
-                "query": {
-                    "bool": {
-                        "filter": {"bool": {"must": []}},
-                        "must": [
-                            {
-                                "knn": {
-                                    "embedding": {
-                                        "vector": embeddings,
-                                        "k": query.page_size * 20,
+            # Determine embedding dimension and field name
+            embedding_dimension = len(embeddings)
+            field_name = self._get_embedding_field_name(embedding_dimension)
+
+            self.logger.info(
+                f"Building query for {embedding_dimension}d embeddings "
+                f"(model: {self.embedding_model}, field: {field_name})"
+            )
+
+            # Build query structure based on model version
+            # Marengo 3.0 (512d): ONLY use asset_embeddings nested structure
+            # Marengo 2.7 (1024d): Use BOTH legacy embedding field AND asset_embeddings for backward compatibility
+
+            # Get allowed embedding types for filtering the nested query
+            allowed_types = self.get_allowed_clip_embedding_types()
+
+            if self.model_version == "3.0":
+                # Marengo 3.0: Query separate embedding documents with inventory_id reference
+                # Uses embedding_representation (visual/audio/text/video) for filtering
+                # Matches both clips (embedding_granularity: segment) and whole assets (embedding_granularity: asset)
+                # For images: embedding_type="image", embedding_representation="visual"
+                # For video clips/assets: embedding_type="video", embedding_representation="visual"
+                opensearch_query = {
+                    "size": query.page_size * 20,
+                    "query": {
+                        "bool": {
+                            "filter": {
+                                "bool": {
+                                    "should": [
+                                        # Match by embedding_representation (visual, audio, transcription)
+                                        {
+                                            "terms": {
+                                                "embedding_representation": allowed_types
+                                            }
+                                        },
+                                        # Also match images explicitly (embedding_type: "image")
+                                        {"term": {"embedding_type": "image"}},
+                                    ],
+                                    "minimum_should_match": 1,
+                                }
+                            },
+                            "must": [
+                                {
+                                    "knn": {
+                                        field_name: {
+                                            "vector": embeddings,
+                                            "k": query.page_size * 20,
+                                        }
                                     }
                                 }
-                            }
-                        ],
-                    }
-                },
-                "_source": {"excludes": ["embedding"]},
-            }
+                            ],
+                        }
+                    },
+                    "_source": {
+                        "excludes": [
+                            "embedding_256_cosine",
+                            "embedding_384_cosine",
+                            "embedding_512_cosine",
+                            "embedding_1024_cosine",
+                            "embedding_1536_cosine",
+                            "embedding_3072_cosine",
+                        ]
+                    },
+                }
+                self.logger.info(
+                    f"Using Marengo 3.0 separate documents query "
+                    f"(field: {field_name}, filtered to representations: {allowed_types}, including images)"
+                )
+            else:
+                # Marengo 2.7: Try legacy first, fallback to new structure if needed
+                # This provides backward compatibility while supporting transition period
+                opensearch_query = {
+                    "size": query.page_size * 20,
+                    "query": {
+                        "bool": {
+                            "filter": {"bool": {"must": []}},
+                            "should": [
+                                # Legacy structure: root-level embedding field (preferred)
+                                {
+                                    "knn": {
+                                        "embedding": {
+                                            "vector": embeddings,
+                                            "k": query.page_size * 20,
+                                        }
+                                    }
+                                },
+                                # Fallback: Check asset_embeddings for transition period
+                                # This handles documents that were indexed with new structure
+                                {
+                                    "bool": {
+                                        "must": [
+                                            {"exists": {"field": "asset_embeddings"}},
+                                            {
+                                                "script_score": {
+                                                    "query": {"match_all": {}},
+                                                    "script": {
+                                                        "source": """
+                                                            if (doc.containsKey('asset_embeddings.embedding_1024_cosine') &&
+                                                                doc['asset_embeddings.embedding_1024_cosine'].size() > 0) {
+                                                                def embedding = doc['asset_embeddings.embedding_1024_cosine'];
+                                                                double score = 0.0;
+                                                                for (int i = 0; i < Math.min(params.query_vector.length, embedding.size()); i++) {
+                                                                    score += params.query_vector[i] * embedding[i];
+                                                                }
+                                                                return score;
+                                                            }
+                                                            return 0.0;
+                                                        """,
+                                                        "params": {
+                                                            "query_vector": embeddings
+                                                        },
+                                                    },
+                                                }
+                                            },
+                                        ]
+                                    }
+                                },
+                            ],
+                            "minimum_should_match": 1,
+                        }
+                    },
+                    "_source": {
+                        "excludes": [
+                            "embedding",
+                            "audio_embedding",
+                            "asset_embeddings.embedding_256_cosine",
+                            "asset_embeddings.embedding_384_cosine",
+                            "asset_embeddings.embedding_512_cosine",
+                            "asset_embeddings.embedding_1024_cosine",
+                            "asset_embeddings.embedding_1536_cosine",
+                            "asset_embeddings.embedding_3072_cosine",
+                        ]
+                    },
+                }
+                self.logger.info(
+                    f"Using Marengo 2.7 hybrid query (legacy embedding + asset_embeddings fallback)"
+                )
 
             # Add filters based on query parameters
             self._add_filters_to_opensearch_query(opensearch_query, query)
@@ -408,14 +655,24 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
                     "[DEBUG] No hits returned - query may be too restrictive or no matching documents in index"
                 )
 
-            # Process semantic results to group clips with parent assets
-            from index import process_semantic_results_parallel
-
+            # Process results differently based on model version
             processing_start = time.time()
-            processed_results = process_semantic_results_parallel(hits)
-            self.logger.info(
-                f"[PERF] Clip processing took: {time.time() - processing_start:.3f}s"
-            )
+
+            if self.model_version == "3.0":
+                # Marengo 3.0: Extract clips from inner_hits (nested asset_embeddings)
+                processed_results = self._process_marengo_30_results(hits)
+                self.logger.info(
+                    f"[PERF] Marengo 3.0 clip processing took: {time.time() - processing_start:.3f}s"
+                )
+            else:
+                # Marengo 2.7: Use legacy clip processing (separate clip documents)
+                from index import process_semantic_results_parallel
+
+                processed_results = process_semantic_results_parallel(hits)
+                self.logger.info(
+                    f"[PERF] Clip processing took: {time.time() - processing_start:.3f}s"
+                )
+
             self.logger.info(
                 f"Processed {len(hits)} hits into {len(processed_results)} parent assets with clips"
             )
@@ -429,6 +686,13 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
             for result in processed_results:
                 clips = result.get("clips", [])
                 total_clips_before += len(clips)
+
+                # Debug: Log clip embedding_option values before filtering
+                if clips:
+                    clip_options = [clip.get("embedding_option") for clip in clips]
+                    self.logger.info(
+                        f"[DEBUG] Clips before filtering: {len(clips)} clips with embedding_options: {clip_options}, allowed: {allowed_types}"
+                    )
 
                 # Filter clips to only include allowed embedding types
                 filtered_clips = [
@@ -471,7 +735,7 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
                     media_type=media_type,
                     provider_metadata={
                         "provider": "bedrock_twelvelabs",
-                        "embedding_model": "twelvelabs.marengo-embed-2-7-v1:0",
+                        "embedding_model": self.embedding_model,
                     },
                 )
                 search_hits.append(search_hit)
@@ -499,6 +763,169 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
                 architecture_type=SearchArchitectureType.PROVIDER_PLUS_STORE,
                 provider_location=ProviderLocation.INTERNAL,
             )
+
+    def _process_marengo_30_results(self, hits: List[Dict]) -> List[Dict]:
+        """
+        Process Marengo 3.0 search results from separate clip documents.
+
+        For Marengo 3.0, clips are stored as separate documents with inventory_id reference.
+        We need to group clips by inventory_id and fetch parent document details.
+        """
+        from url_utils import generate_cloudfront_url
+
+        # Group clips by inventory_id (parent asset reference)
+        clips_by_parent = {}
+
+        for hit in hits:
+            source = hit.get("_source", {})
+            parent_id = source.get("inventory_id") or source.get("InventoryID", "")
+            embedding_type = source.get("embedding_type", "video")
+
+            # Skip asset-granularity embeddings for videos (they represent the whole video, not clips)
+            # BUT keep asset-granularity embeddings for images (images only have asset-level embeddings)
+            embedding_granularity = source.get("embedding_granularity", "segment")
+            if embedding_granularity == "asset" and embedding_type != "image":
+                self.logger.debug(
+                    f"Skipping asset-granularity embedding for {parent_id} - not a clip"
+                )
+                continue
+
+            # Build clip object
+            # Use embedding_granularity (not embedding_scope) and embedding_representation (not embedding_type)
+            clip = {
+                "score": hit.get("_score", 0.0),
+                "InventoryID": source.get("InventoryID", parent_id),
+                "embedding_scope": embedding_granularity,  # Map to legacy field for UI compatibility
+                "embedding_option": source.get(
+                    "embedding_representation", "visual"
+                ),  # Use representation for UI
+                "start_timecode": source.get("start_timecode", "")
+                or source.get("start_smpte_timecode", ""),
+                "end_timecode": source.get("end_timecode", "")
+                or source.get("end_smpte_timecode", ""),
+                "start_seconds": source.get("start_seconds"),
+                "end_seconds": source.get("end_seconds"),
+                "type": source.get("type", "video"),
+                "model_provider": source.get("model_provider", "twelvelabs"),
+                "model_name": source.get("model_name", "marengo"),
+                "model_version": source.get("model_version", 3.0),
+                "embedding_representation": source.get(
+                    "embedding_representation", "visual"
+                ),
+                "embedding_granularity": embedding_granularity,
+            }
+
+            if parent_id not in clips_by_parent:
+                clips_by_parent[parent_id] = []
+            clips_by_parent[parent_id].append(clip)
+
+        self.logger.info(
+            f"Grouped {len(hits)} clip documents into {len(clips_by_parent)} parent assets"
+        )
+
+        # Now fetch parent documents for each parent_id
+        # Use the existing OpenSearch client
+        client = self._get_opensearch_client()
+        index_name = os.environ["OPENSEARCH_INDEX"]
+
+        processed_results = []
+
+        for parent_id, clips in clips_by_parent.items():
+            # Fetch parent document
+            try:
+                search_resp = client.search(
+                    index=index_name,
+                    body={
+                        "query": {
+                            "bool": {
+                                "filter": [
+                                    {"match_phrase": {"InventoryID": parent_id}},
+                                    {
+                                        "nested": {
+                                            "path": "DerivedRepresentations",
+                                            "query": {
+                                                "exists": {
+                                                    "field": "DerivedRepresentations.ID"
+                                                }
+                                            },
+                                        }
+                                    },
+                                ]
+                            }
+                        }
+                    },
+                    size=1,
+                )
+
+                if search_resp["hits"]["total"]["value"] > 0:
+                    parent_source = search_resp["hits"]["hits"][0]["_source"]
+
+                    # Build result from parent document
+                    result = {
+                        "InventoryID": parent_id,
+                        "DigitalSourceAsset": parent_source.get(
+                            "DigitalSourceAsset", {}
+                        ),
+                        "DerivedRepresentations": parent_source.get(
+                            "DerivedRepresentations", []
+                        ),
+                        "FileHash": parent_source.get("FileHash", ""),
+                        "Metadata": parent_source.get("Metadata", {}),
+                        "score": max(clip["score"] for clip in clips),
+                        "clips": sorted(
+                            clips, key=lambda x: x.get("score", 0), reverse=True
+                        ),
+                    }
+
+                    # Generate URLs for derived representations
+                    derived_reps = parent_source.get("DerivedRepresentations", [])
+                    for rep in derived_reps:
+                        purpose = rep.get("Purpose", "")
+                        storage_info = rep.get("StorageInfo", {}).get(
+                            "PrimaryLocation", {}
+                        )
+
+                        if storage_info.get("StorageType") == "s3":
+                            bucket = storage_info.get("Bucket", "")
+                            key = storage_info.get("ObjectKey", {}).get("FullPath", "")
+
+                            if bucket and key:
+                                url = generate_cloudfront_url(bucket=bucket, key=key)
+                                if purpose == "thumbnail":
+                                    # Use indexed thumbnail (middle frame)
+                                    import re
+
+                                    if ".jpg" in url:
+                                        pattern = r"\.(\d{7})\.jpg$"
+                                        match = re.search(pattern, url)
+                                        if match:
+                                            url = re.sub(pattern, ".0000002.jpg", url)
+                                        else:
+                                            url = url.replace(".jpg", ".0000002.jpg")
+                                    result["thumbnailUrl"] = url
+                                elif purpose == "proxy":
+                                    result["proxyUrl"] = url
+
+                    # Add common ID field
+                    if parent_id and ":" in parent_id:
+                        result["id"] = parent_id.split(":")[-1]
+                    else:
+                        result["id"] = parent_id
+
+                    processed_results.append(result)
+                else:
+                    self.logger.warning(
+                        f"Parent document not found for {parent_id}, skipping clips"
+                    )
+            except Exception as e:
+                self.logger.error(
+                    f"Error fetching parent document for {parent_id}: {str(e)}"
+                )
+
+        # Sort results by score
+        processed_results.sort(key=lambda x: x.get("score", 0), reverse=True)
+
+        return processed_results
 
     def _add_filters_to_opensearch_query(self, query: Dict, search_query: SearchQuery):
         """Add filters to OpenSearch query based on search parameters"""

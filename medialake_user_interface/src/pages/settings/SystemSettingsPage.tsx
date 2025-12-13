@@ -475,7 +475,7 @@ const SystemSettingsPage: React.FC = () => {
                                 />
                               </Box>
                               <Typography variant="caption" color="text.secondary">
-                                Supports: Image, Video, Audio
+                                Supports: Image, Video, Audio • 1024D embeddings
                               </Typography>
                             </Box>
                           </MenuItem>
@@ -505,7 +505,37 @@ const SystemSettingsPage: React.FC = () => {
                                 />
                               </Box>
                               <Typography variant="caption" color="text.secondary">
-                                Supports: Image, Video, Audio
+                                Supports: Image, Video, Audio • 1024D embeddings
+                              </Typography>
+                            </Box>
+                          </MenuItem>
+                          <MenuItem value="twelvelabs-bedrock-3-0">
+                            <Box
+                              sx={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 0.5,
+                              }}
+                            >
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 1,
+                                }}
+                              >
+                                <Typography>
+                                  {SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_BEDROCK_3_0.name}
+                                </Typography>
+                                <Chip
+                                  label={t("settings.systemSettings.search.internal", "Internal")}
+                                  size="small"
+                                  color="success"
+                                  sx={{ height: 20, fontSize: "0.7rem" }}
+                                />
+                              </Box>
+                              <Typography variant="caption" color="text.secondary">
+                                Supports: Image, Video, Audio • 512D embeddings
                               </Typography>
                             </Box>
                           </MenuItem>
@@ -562,6 +592,46 @@ const SystemSettingsPage: React.FC = () => {
                         />
                       )}
                     </Box>
+
+                    {/* Embedding Dimension Information */}
+                    {settings.provider.type !== "none" && settings.provider.type !== "coactive" && (
+                      <Box sx={{ mt: 3 }}>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                          {t(
+                            "settings.systemSettings.search.embeddingDimension",
+                            "Embedding Dimension"
+                          )}
+                        </Typography>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                          }}
+                        >
+                          <Chip
+                            label={`${
+                              SYSTEM_SETTINGS_CONFIG.PROVIDERS[
+                                settings.provider.type === "twelvelabs-api"
+                                  ? "TWELVE_LABS_API"
+                                  : settings.provider.type === "twelvelabs-bedrock"
+                                    ? "TWELVE_LABS_BEDROCK"
+                                    : "TWELVE_LABS_BEDROCK_3_0"
+                              ]?.dimensions?.[0] || "Unknown"
+                            }D`}
+                            color="primary"
+                            variant="outlined"
+                            size="small"
+                          />
+                          <Typography variant="caption" color="text.secondary">
+                            {t(
+                              "settings.systemSettings.search.embeddingDimensionDesc",
+                              "Vector space dimension for embeddings"
+                            )}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    )}
                   </CardContent>
                 </Card>
 

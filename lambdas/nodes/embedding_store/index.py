@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import random
 import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
@@ -25,6 +26,9 @@ from opensearchpy import AWSV4SignerAuth, OpenSearch, RequestsHttpConnection, ex
 # S3 client for downloading external payloads
 s3_client = boto3.client("s3")
 
+# DynamoDB client for fetching search provider config
+dynamodb = boto3.resource("dynamodb")
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Powertools
 logger = Logger()
@@ -36,13 +40,12 @@ INDEX_NAME = os.getenv("INDEX_NAME", "media")
 CONTENT_TYPE = os.getenv("CONTENT_TYPE", "video").lower()  # "video" | "audio"
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 EVENT_BUS_NAME = os.getenv("EVENT_BUS_NAME", "default-event-bus")
-
-# New environment variable to enable asset_embeddings nested structure
-# When True: stores embeddings in the asset_embeddings nested array with rich metadata
-# When False (default): uses legacy embedding field at root level for backward compatibility
-USE_ASSET_EMBEDDINGS = os.getenv("USE_ASSET_EMBEDDINGS", "false").lower() == "true"
+SYSTEM_SETTINGS_TABLE_NAME = os.getenv("SYSTEM_SETTINGS_TABLE_NAME", "")
 
 IS_AUDIO_CONTENT = CONTENT_TYPE == "audio"
+
+# Cache for search provider config (refreshed on cold start)
+_search_provider_config_cache: Dict[str, Any] = {}
 
 # OpenSearch client
 _session = boto3.Session()
@@ -216,6 +219,15 @@ def extract_embedding_vector(container: Dict[str, Any]) -> Optional[List[float]]
                     f"Failed to download embedding from S3 reference: {str(e)}"
                 )
 
+        # Check nested data.data for float array (after S3 download replaces the reference)
+        if isinstance(data.get("data"), dict):
+            nested_data = data["data"]
+            if isinstance(nested_data.get("float"), list) and nested_data["float"]:
+                logger.info(
+                    "Successfully extracted embedding from nested data.data.float"
+                )
+                return nested_data["float"]
+
         # Direct vector in data (backward compatible)
         if isinstance(data.get("float"), list) and data["float"]:
             return data["float"]
@@ -348,6 +360,35 @@ def _ok_no_op(vector_len: int, inventory_id: Optional[str]):
     }
 
 
+def exponential_backoff_with_jitter(
+    attempt: int, base_delay: float = 0.1, max_delay: float = 30.0
+) -> float:
+    """
+    Calculate exponential backoff delay with full jitter.
+
+    This helps prevent thundering herd problems when multiple Lambda functions
+    are retrying simultaneously.
+
+    Args:
+        attempt: Current retry attempt (0-indexed)
+        base_delay: Base delay in seconds (default 0.1s)
+        max_delay: Maximum delay in seconds (default 30s)
+
+    Returns:
+        Delay in seconds with jitter applied
+    """
+    # Exponential: base_delay * 2^attempt
+    exponential_delay = base_delay * (2**attempt)
+
+    # Cap at max_delay
+    capped_delay = min(exponential_delay, max_delay)
+
+    # Full jitter: random value between 0 and capped_delay
+    jittered_delay = random.uniform(0, capped_delay)
+
+    return jittered_delay
+
+
 def check_opensearch_response(resp: Dict[str, Any], op: str) -> None:
     """Check OpenSearch response and raise error if not successful."""
     status = resp.get("status", 200)
@@ -457,47 +498,254 @@ def _get_embedding_field_name(dimension: int, space_type: str = "cosine") -> str
 
 def _extract_embedding_metadata(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Extract embedding metadata from payload.
+    Extract embedding metadata from payload for storage in asset_embeddings.
+
+    Prioritizes DynamoDB search provider config for model info, then falls back
+    to payload extraction if DynamoDB is not available.
 
     Returns metadata including:
-    - model_provider: e.g., "twelvelabs", "openai"
-    - model_name: e.g., "Marengo-retrieval-2.7"
-    - model_version: e.g., "2.7"
+    - model_provider: e.g., "twelvelabs", "openai", "coactive"
+    - model_name: e.g., "Marengo-retrieval-3.0", "text-embedding-3-large"
+    - model_version: e.g., "3.0", "2.7"
     - embedding_granularity: e.g., "clip", "video", "frame"
     - segmentation_method: e.g., "shot", "scene", "fixed"
     """
     metadata = {}
 
-    # Check various locations for metadata
+    # First, try to get model info from DynamoDB search provider config (most reliable source)
+    try:
+        provider_config = _get_search_provider_config()
+        provider_type = provider_config.get("type", "")
+        provider_name = provider_config.get("name", "")
+        dimensions = provider_config.get("dimensions")
+
+        # Determine model info from provider type
+        if "3-0" in provider_type or "3.0" in provider_type:
+            metadata["model_provider"] = "twelvelabs"
+            metadata["model_name"] = "Marengo-retrieval-3.0"
+            metadata["model_version"] = "3.0"
+        elif "2-7" in provider_type or "2.7" in provider_type:
+            metadata["model_provider"] = "twelvelabs"
+            metadata["model_name"] = "Marengo-retrieval-2.7"
+            metadata["model_version"] = "2.7"
+        elif "3-0" in provider_name or "3.0" in provider_name:
+            metadata["model_provider"] = "twelvelabs"
+            metadata["model_name"] = "Marengo-retrieval-3.0"
+            metadata["model_version"] = "3.0"
+        elif "2-7" in provider_name or "2.7" in provider_name:
+            metadata["model_provider"] = "twelvelabs"
+            metadata["model_name"] = "Marengo-retrieval-2.7"
+            metadata["model_version"] = "2.7"
+        elif "twelvelabs" in provider_type.lower():
+            # Default TwelveLabs - infer from dimensions
+            metadata["model_provider"] = "twelvelabs"
+            if dimensions == 512 or str(dimensions) == "512":
+                metadata["model_name"] = "Marengo-retrieval-3.0"
+                metadata["model_version"] = "3.0"
+            elif dimensions == 1024 or str(dimensions) == "1024":
+                metadata["model_name"] = "Marengo-retrieval-2.7"
+                metadata["model_version"] = "2.7"
+            else:
+                metadata["model_name"] = provider_name or "Marengo-retrieval"
+                metadata["model_version"] = "unknown"
+        else:
+            # Non-TwelveLabs provider
+            metadata["model_provider"] = provider_type or "unknown"
+            metadata["model_name"] = provider_name or "unknown"
+            metadata["model_version"] = "unknown"
+
+        logger.info(
+            "Determined embedding metadata from DynamoDB config",
+            extra={
+                "model_provider": metadata.get("model_provider"),
+                "model_name": metadata.get("model_name"),
+                "model_version": metadata.get("model_version"),
+                "source": "dynamodb",
+            },
+        )
+
+    except Exception as e:
+        logger.warning(
+            f"Could not get model info from DynamoDB: {e}, falling back to payload extraction"
+        )
+        # Fall back to payload extraction
+        data = payload.get("data", {})
+        if isinstance(data, dict):
+            # Direct metadata fields
+            if data.get("model_provider"):
+                metadata["model_provider"] = data["model_provider"]
+            if data.get("model_name"):
+                metadata["model_name"] = data["model_name"]
+            if data.get("model_version"):
+                metadata["model_version"] = data["model_version"]
+
+            # Check nested data.data structure (Bedrock Results pattern)
+            if isinstance(data.get("data"), dict):
+                nested = data["data"]
+                if nested.get("model_provider") and "model_provider" not in metadata:
+                    metadata["model_provider"] = nested["model_provider"]
+                if nested.get("model_name") and "model_name" not in metadata:
+                    metadata["model_name"] = nested["model_name"]
+                if nested.get("model_version") and "model_version" not in metadata:
+                    metadata["model_version"] = nested["model_version"]
+
+        # Check map.item structure
+        map_item = payload.get("map", {}).get("item", {})
+        if isinstance(map_item, dict):
+            if map_item.get("model_provider") and "model_provider" not in metadata:
+                metadata["model_provider"] = map_item["model_provider"]
+            if map_item.get("model_name") and "model_name" not in metadata:
+                metadata["model_name"] = map_item["model_name"]
+            if map_item.get("model_version") and "model_version" not in metadata:
+                metadata["model_version"] = map_item["model_version"]
+
+        # Check top-level payload
+        if payload.get("model_provider") and "model_provider" not in metadata:
+            metadata["model_provider"] = payload["model_provider"]
+        if payload.get("model_name") and "model_name" not in metadata:
+            metadata["model_name"] = payload["model_name"]
+        if payload.get("model_version") and "model_version" not in metadata:
+            metadata["model_version"] = payload["model_version"]
+
+        # Set defaults only if no metadata was found at all
+        if not metadata.get("model_provider"):
+            metadata["model_provider"] = "unknown"
+        if not metadata.get("model_name"):
+            metadata["model_name"] = "unknown"
+        if not metadata.get("model_version"):
+            metadata["model_version"] = "unknown"
+
+        logger.info(
+            "Extracted embedding metadata from payload (fallback)",
+            extra={
+                "model_provider": metadata.get("model_provider"),
+                "model_name": metadata.get("model_name"),
+                "model_version": metadata.get("model_version"),
+                "source": "payload_fallback",
+            },
+        )
+
+    # Extract additional metadata from payload (granularity, segmentation)
     data = payload.get("data", {})
     if isinstance(data, dict):
-        metadata["model_provider"] = data.get("model_provider", "unknown")
-        metadata["model_name"] = data.get("model_name", "unknown")
-        metadata["model_version"] = data.get("model_version", "unknown")
-        metadata["embedding_granularity"] = data.get("embedding_granularity")
-        metadata["segmentation_method"] = data.get("segmentation_method")
-
-    # Fallback to default values if not found
-    if not metadata.get("model_provider"):
-        metadata["model_provider"] = "twelvelabs"  # Default assumption
-    if not metadata.get("model_name"):
-        metadata["model_name"] = "Marengo-retrieval-2.7"  # Default assumption
-    if not metadata.get("model_version"):
-        # Try to extract version from model_name
-        model_name = metadata.get("model_name", "")
-        if "2.7" in model_name:
-            metadata["model_version"] = "2.7"
-        else:
-            metadata["model_version"] = "unknown"
+        if (
+            data.get("embedding_granularity")
+            and "embedding_granularity" not in metadata
+        ):
+            metadata["embedding_granularity"] = data["embedding_granularity"]
+        if data.get("segmentation_method") and "segmentation_method" not in metadata:
+            metadata["segmentation_method"] = data["segmentation_method"]
 
     return metadata
 
 
-def _create_asset_embedding_object(
+def _get_search_provider_config() -> Dict[str, Any]:
+    """
+    Query DynamoDB for the configured search provider.
+
+    Returns cached config if available, otherwise fetches from DynamoDB.
+    Raises an error if the configuration cannot be retrieved.
+    """
+    global _search_provider_config_cache
+
+    # Return cached config if available
+    if _search_provider_config_cache:
+        return _search_provider_config_cache
+
+    if not SYSTEM_SETTINGS_TABLE_NAME:
+        error_msg = "SYSTEM_SETTINGS_TABLE_NAME environment variable not configured - cannot determine search provider"
+        logger.error(error_msg)
+        raise RuntimeError(error_msg)
+
+    try:
+        table = dynamodb.Table(SYSTEM_SETTINGS_TABLE_NAME)
+        response = table.get_item(
+            Key={"PK": "SYSTEM_SETTINGS", "SK": "SEARCH_PROVIDER"}
+        )
+
+        if "Item" in response:
+            config = response["Item"]
+            _search_provider_config_cache = config
+            logger.info(
+                "Fetched search provider config from DynamoDB",
+                extra={
+                    "provider_type": config.get("type", "unknown"),
+                    "provider_name": config.get("name", "unknown"),
+                    "dimensions": config.get("dimensions", "unknown"),
+                },
+            )
+            return config
+        else:
+            error_msg = f"No search provider configured in DynamoDB table {SYSTEM_SETTINGS_TABLE_NAME}"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
+
+    except RuntimeError:
+        # Re-raise RuntimeError (from our own checks)
+        raise
+    except Exception as e:
+        error_msg = f"Failed to fetch search provider config from DynamoDB table {SYSTEM_SETTINGS_TABLE_NAME}: {str(e)}"
+        logger.error(error_msg, extra={"error": str(e)})
+        raise RuntimeError(error_msg) from e
+
+
+def _should_use_asset_embeddings_mode(payload: Dict[str, Any]) -> bool:
+    """
+    Determine if we should use the new asset_embeddings nested structure
+    based on the embedding provider configured in DynamoDB.
+
+    Uses asset_embeddings mode for:
+    - TwelveLabs Marengo 3.0 - type: twelvelabs-bedrock-3-0
+
+    Uses legacy mode for:
+    - TwelveLabs Marengo 2.7 (backward compatibility) - types: twelvelabs-api, twelvelabs-bedrock
+    - All other providers (OpenAI, Coactive, etc.)
+
+    Args:
+        payload: The Lambda event payload (not used for detection, kept for compatibility)
+
+    Returns:
+        True to use asset_embeddings mode, False for legacy mode
+
+    Raises:
+        RuntimeError: If search provider config cannot be retrieved from DynamoDB
+    """
+    # Get provider config from DynamoDB (will raise if not available)
+    provider_config = _get_search_provider_config()
+    provider_type = provider_config.get("type", "").lower()
+
+    # Use new mode ONLY for TwelveLabs Marengo 3.0
+    if (
+        provider_type == "twelvelabs-bedrock-3-0"
+        or "3-0" in provider_type
+        or "3.0" in provider_type
+    ):
+        logger.info(
+            "Using asset_embeddings mode for TwelveLabs Marengo 3.0",
+            extra={
+                "provider_type": provider_type,
+                "provider_name": provider_config.get("name", "unknown"),
+            },
+        )
+        return True
+
+    # Use legacy mode for Marengo 2.7 and all other providers
+    logger.info(
+        "Using legacy mode for backward compatibility",
+        extra={
+            "provider_type": provider_type,
+            "provider_name": provider_config.get("name", "unknown"),
+        },
+    )
+    return False
+
+
+def _create_separate_embedding_document(
     embedding_vector: List[float],
     inventory_id: str,
     scope: str,
     embedding_option: Optional[str],
+    content_type: str,
     start_sec: Optional[int] = None,
     end_sec: Optional[int] = None,
     start_tc: Optional[str] = None,
@@ -505,13 +753,14 @@ def _create_asset_embedding_object(
     metadata: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
-    Create an asset_embeddings nested object with rich metadata.
+    Create a separate embedding document for Marengo 3.0 architecture.
 
     Args:
         embedding_vector: The embedding vector
         inventory_id: Asset inventory ID
-        scope: Embedding scope (clip, video, frame, etc.)
-        embedding_option: Embedding option (visual-text, audio, visual-image)
+        scope: Embedding scope (clip, video, asset, etc.)
+        embedding_option: Embedding option (visual, audio, transcription, image)
+        content_type: Content type (video, audio, image)
         start_sec: Start time in seconds (for clips)
         end_sec: End time in seconds (for clips)
         start_tc: Start SMPTE timecode (for clips)
@@ -519,7 +768,7 @@ def _create_asset_embedding_object(
         metadata: Additional metadata (model info, etc.)
 
     Returns:
-        Dictionary ready to be added to asset_embeddings array
+        Dictionary ready to be indexed as a separate document
     """
     if metadata is None:
         metadata = {}
@@ -527,36 +776,112 @@ def _create_asset_embedding_object(
     dimension = _determine_embedding_dimension(embedding_vector)
     field_name = _get_embedding_field_name(dimension)
 
-    # Build the base embedding object
-    embedding_obj = {
+    # Determine embedding_type based on content_type and embedding_option
+    # For images: embedding_type = "image"
+    # For video/audio clips: embedding_type = content_type (video/audio)
+    if content_type == "image":
+        embedding_type = "image"
+    else:
+        embedding_type = content_type  # "video" or "audio"
+
+    # Determine embedding_granularity
+    # Map embeddingScope from Bedrock to embedding_granularity:
+    # - "asset" (full video/image/audio) -> "asset"
+    # - "clip" (segment) -> "segment"
+    # - "video"/"image"/"audio" (legacy) -> "asset"
+    if scope in ["asset", "video", "image", "audio"]:
+        embedding_granularity = "asset"
+    else:
+        # scope is "clip" - default to "segment"
+        embedding_granularity = "segment"
+
+    # Log for debugging
+    logger.info(
+        "Determined embedding_granularity",
+        extra={
+            "scope": scope,
+            "embedding_granularity": embedding_granularity,
+            "content_type": content_type,
+            "start_sec": start_sec,
+            "end_sec": end_sec,
+        },
+    )
+
+    # Determine segmentation_method
+    # For whole assets: "none"
+    # For clips: use metadata or default to "fixed_interval"
+    if embedding_granularity == "asset":
+        segmentation_method = "none"
+    else:
+        segmentation_method = metadata.get("segmentation_method", "fixed_interval")
+
+    # Map embedding_option to embedding_representation
+    # Schema allows: visual, audio, text, video
+    # Marengo 2.7 uses: visual-text, audio, visual-image
+    if embedding_option:
+        # Normalize to schema format
+        if embedding_option == "visual-text":
+            embedding_representation = "visual"
+        elif embedding_option == "visual-image":
+            embedding_representation = "visual"  # Images use "visual" representation
+        else:
+            embedding_representation = embedding_option  # visual, audio, text, video
+    else:
+        # Default based on content type
+        if content_type == "image":
+            embedding_representation = "visual"  # Images use "visual" representation
+        elif content_type == "audio":
+            embedding_representation = "audio"
+        else:
+            embedding_representation = "visual"
+
+    # Get model version as string (per schema)
+    model_version = str(metadata.get("model_version", "3.0"))
+
+    # Build the separate document per schema
+    # Schema uses: inventory_id (not parent_asset_id), created_at (not timestamp)
+    # Schema uses: start_smpte_timecode/end_smpte_timecode (not start_timecode/end_timecode)
+    document = {
         "inventory_id": inventory_id,
-        "embedding_type": embedding_option or "visual-text",
+        "embedding_type": embedding_type,
         "model_provider": metadata.get("model_provider", "twelvelabs"),
-        "model_name": metadata.get("model_name", "Marengo-retrieval-2.7"),
-        "model_version": metadata.get("model_version", "2.7"),
+        "inference_provider": "aws_bedrock",
+        "model_name": "marengo",
+        "model_version": model_version,
         "created_at": datetime.utcnow().isoformat(),
-        "embedding_granularity": scope,
+        "embedding_granularity": embedding_granularity,
+        "segmentation_method": segmentation_method,
+        "embedding_representation": embedding_representation,
         "embedding_dimension": dimension,
-        "space_type": "cosine",
+        "space_type": "cosinesimil",
         field_name: embedding_vector,
     }
 
-    # Add temporal information for clips
-    if scope == "clip" and start_sec is not None and end_sec is not None:
-        embedding_obj["start_seconds"] = start_sec
-        embedding_obj["end_seconds"] = end_sec
-        if start_tc:
-            embedding_obj["start_smpte_timecode"] = start_tc
-        if end_tc:
-            embedding_obj["end_smpte_timecode"] = end_tc
-        if metadata.get("segmentation_method"):
-            embedding_obj["segmentation_method"] = metadata["segmentation_method"]
+    # Add temporal information
+    if start_sec is not None and end_sec is not None:
+        document["start_seconds"] = start_sec
+        document["end_seconds"] = end_sec
+    else:
+        # Default to 0 for images or whole assets (per schema: start_seconds must be 0 for asset granularity)
+        document["start_seconds"] = 0
+        # Per schema: end_seconds can be null for full-asset
+        document["end_seconds"] = None if embedding_granularity == "asset" else 0
 
-    # Add representation type
-    if embedding_option:
-        embedding_obj["embedding_representation"] = embedding_option
+    # Use SMPTE timecode fields (per schema)
+    if start_tc:
+        document["start_smpte_timecode"] = start_tc
+    else:
+        document["start_smpte_timecode"] = "00:00:00:00"
 
-    return embedding_obj
+    if end_tc:
+        document["end_smpte_timecode"] = end_tc
+    else:
+        # Per schema: can be null for full-asset
+        document["end_smpte_timecode"] = (
+            None if embedding_granularity == "asset" else "00:00:00:00"
+        )
+
+    return document
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -928,6 +1253,23 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                 payload["data"] = data
 
         embedding_vector = extract_embedding_vector(payload)
+        logger.info(
+            "Embedding vector extraction result",
+            extra={
+                "embedding_vector_found": embedding_vector is not None,
+                "embedding_length": len(embedding_vector) if embedding_vector else 0,
+                "payload_data_keys": (
+                    list(payload.get("data", {}).keys())
+                    if isinstance(payload.get("data"), dict)
+                    else "not_dict"
+                ),
+                "payload_data_has_float": (
+                    "float" in payload.get("data", {})
+                    if isinstance(payload.get("data"), dict)
+                    else False
+                ),
+            },
+        )
         if not embedding_vector and payload.get("assets"):
             for asset in payload["assets"]:
                 meta = asset.get("Metadata", {}).get("CustomMetadata", {})
@@ -974,22 +1316,37 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                 },
             )
 
-            if USE_ASSET_EMBEDDINGS:
-                # NEW MODE: Append to asset_embeddings nested array in parent document
+            if _should_use_asset_embeddings_mode(payload):
+                # MARENGO 3.0 MODE: Create separate document for each clip embedding
+                # This avoids document size limits and version conflicts from concurrent writes
                 logger.info(
-                    "Using asset_embeddings mode - appending to parent document",
+                    "Using Marengo 3.0 mode - creating separate clip document with parent reference",
                     extra={"inventory_id": inventory_id, "scope": scope},
                 )
 
                 # Extract embedding metadata
                 metadata = _extract_embedding_metadata(payload)
 
-                # Create asset_embedding object
-                embedding_obj = _create_asset_embedding_object(
+                # Log scope and temporal info for debugging granularity detection
+                logger.info(
+                    "Creating separate embedding document",
+                    extra={
+                        "inventory_id": inventory_id,
+                        "scope": scope,
+                        "embedding_option": embedding_option,
+                        "start_sec": start_sec,
+                        "end_sec": end_sec,
+                        "content_type": CONTENT_TYPE,
+                    },
+                )
+
+                # Create separate clip document using new schema
+                document = _create_separate_embedding_document(
                     embedding_vector=embedding_vector,
                     inventory_id=inventory_id,
                     scope=scope,
                     embedding_option=embedding_option,
+                    content_type=CONTENT_TYPE,
                     start_sec=start_sec,
                     end_sec=end_sec,
                     start_tc=start_tc,
@@ -997,145 +1354,54 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                     metadata=metadata,
                 )
 
-                # Find parent master document
-                search_query = {
-                    "query": {
-                        "bool": {
-                            "filter": [
-                                {"match_phrase": {"InventoryID": inventory_id}},
-                                {
-                                    "nested": {
-                                        "path": "DerivedRepresentations",
-                                        "query": {
-                                            "exists": {
-                                                "field": "DerivedRepresentations.ID"
-                                            }
-                                        },
-                                    }
-                                },
-                            ]
-                        }
-                    }
-                }
-
                 logger.info(
-                    "Searching for parent master document",
-                    extra={"index": INDEX_NAME, "inventory_id": inventory_id},
-                )
-
-                start_time = time.time()
-                try:
-                    search_resp = client.search(
-                        index=INDEX_NAME, body=search_query, size=1
-                    )
-                    check_opensearch_response(search_resp, "search")
-                except Exception as e:
-                    logger.error(
-                        "Failed to search for parent document",
-                        extra={
-                            "inventory_id": inventory_id,
-                            "error": str(e),
-                            "index": INDEX_NAME,
-                        },
-                    )
-                    raise RuntimeError(
-                        f"Failed to search for parent document for asset {inventory_id}: {str(e)}"
-                    ) from e
-
-                # Retry if not found (document may be being indexed)
-                while (
-                    search_resp["hits"]["total"]["value"] == 0
-                    and time.time() - start_time < 120
-                ):
-                    logger.info("Parent doc not found – refreshing index & retrying …")
-                    try:
-                        client.indices.refresh(index=INDEX_NAME)
-                        time.sleep(5)
-                        search_resp = client.search(
-                            index=INDEX_NAME, body=search_query, size=1
-                        )
-                        check_opensearch_response(search_resp, "search")
-                    except Exception as e:
-                        logger.error(
-                            "Failed to refresh index and retry search",
-                            extra={
-                                "inventory_id": inventory_id,
-                                "error": str(e),
-                                "index": INDEX_NAME,
-                            },
-                        )
-                        raise RuntimeError(
-                            f"Failed to refresh index and retry search for asset {inventory_id}: {str(e)}"
-                        ) from e
-
-                if search_resp["hits"]["total"]["value"] == 0:
-                    raise RuntimeError(
-                        f"No parent doc with InventoryID={inventory_id} in '{INDEX_NAME}'"
-                    )
-
-                parent_id = search_resp["hits"]["hits"][0]["_id"]
-
-                # Use Painless script to append to asset_embeddings array
-                dimension = _determine_embedding_dimension(embedding_vector)
-                field_name = _get_embedding_field_name(dimension)
-
-                # Build Painless script to append to nested array
-                painless_script = f"""
-                if (ctx._source.asset_embeddings == null) {{
-                    ctx._source.asset_embeddings = [];
-                }}
-                ctx._source.asset_embeddings.add(params.embedding_obj);
-                """
-
-                update_body = {
-                    "script": {
-                        "source": painless_script,
-                        "lang": "painless",
-                        "params": {"embedding_obj": embedding_obj},
-                    }
-                }
-
-                logger.info(
-                    "Appending clip embedding to parent asset_embeddings array",
+                    "Indexing separate clip document (Marengo 3.0)",
                     extra={
-                        "parent_id": parent_id,
+                        "index": INDEX_NAME,
                         "inventory_id": inventory_id,
-                        "dimension": dimension,
-                        "field_name": field_name,
+                        "parent_asset_id": inventory_id,
+                        "embedding_type": document.get("embedding_type"),
+                        "embedding_representation": document.get(
+                            "embedding_representation"
+                        ),
+                        "embedding_granularity": document.get("embedding_granularity"),
+                        "dimension": document.get("embedding_dimension"),
+                        "start_tc": start_tc,
+                        "end_tc": end_tc,
                     },
                 )
 
                 try:
-                    res = client.update(
-                        index=INDEX_NAME, id=parent_id, body=update_body
-                    )
-                    check_opensearch_response(res, "update")
+                    res = client.index(index=INDEX_NAME, body=document)
+                    check_opensearch_response(res, "index")
+
+                    return {
+                        "statusCode": 200,
+                        "body": json.dumps(
+                            {
+                                "message": "Clip embedding stored as separate document (Marengo 3.0)",
+                                "index": INDEX_NAME,
+                                "document_id": res.get("_id", "unknown"),
+                                "parent_asset_id": inventory_id,
+                                "inventory_id": inventory_id,
+                                "start_timecode": start_tc,
+                                "end_timecode": end_tc,
+                                "mode": "marengo_3.0_separate_documents",
+                            }
+                        ),
+                    }
                 except Exception as e:
                     logger.error(
-                        "Failed to append to asset_embeddings",
+                        "Failed to index clip document (Marengo 3.0)",
                         extra={
                             "inventory_id": inventory_id,
-                            "parent_id": parent_id,
                             "error": str(e),
                             "index": INDEX_NAME,
                         },
                     )
                     raise RuntimeError(
-                        f"Failed to append clip to asset_embeddings for asset {inventory_id}: {str(e)}"
+                        f"Failed to index clip document for asset {inventory_id}: {str(e)}"
                     ) from e
-
-                return {
-                    "statusCode": 200,
-                    "body": json.dumps(
-                        {
-                            "message": "Clip embedding appended to asset_embeddings successfully",
-                            "index": INDEX_NAME,
-                            "parent_document_id": parent_id,
-                            "inventory_id": inventory_id,
-                            "mode": "asset_embeddings",
-                        }
-                    ),
-                }
 
             else:
                 # LEGACY MODE: Create separate clip document (backward compatible)
@@ -1144,9 +1410,18 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                     extra={"inventory_id": inventory_id, "scope": scope},
                 )
 
+                # Determine the correct embedding field based on dimension
+                dimension = _determine_embedding_dimension(embedding_vector)
+
+                # For 1024-d use legacy "embedding" field, otherwise use dimension-specific field
+                if dimension == 1024:
+                    embedding_field = "embedding"
+                else:
+                    embedding_field = _get_embedding_field_name(dimension)
+
                 document: Dict[str, Any] = {
                     "type": CONTENT_TYPE,
-                    "embedding": embedding_vector,
+                    embedding_field: embedding_vector,
                     "embedding_scope": "clip" if IS_AUDIO_CONTENT else scope,
                     "timestamp": datetime.utcnow().isoformat(),
                     "InventoryID": inventory_id,
@@ -1286,87 +1561,104 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
 
         existing_id = search_resp["hits"]["hits"][0]["_id"]
 
-        if USE_ASSET_EMBEDDINGS:
-            # NEW MODE: Append video-level embedding to asset_embeddings array
+        if _should_use_asset_embeddings_mode(payload):
+            # MARENGO 3.0 MODE: Create separate document for video/image-level embedding
+            # Do NOT update master document - keep embeddings separate
             logger.info(
-                "Using asset_embeddings mode - appending video-level embedding to array",
+                "Using Marengo 3.0 mode - creating separate document for video/image-level embedding",
                 extra={
                     "inventory_id": inventory_id,
                     "scope": scope,
-                    "document_id": existing_id,
+                    "content_type": CONTENT_TYPE,
                 },
             )
 
             # Extract embedding metadata
             metadata = _extract_embedding_metadata(payload)
 
-            # Create asset_embedding object (no temporal info for video-level)
-            embedding_obj = _create_asset_embedding_object(
+            # For asset-level embeddings, try to get actual duration from payload
+            # Otherwise default to 0 (for images or when duration not available)
+            try:
+                start_sec, end_sec = _get_segment_bounds(payload)
+                # Get framerate for SMPTE timecode calculation
+                framerate = extract_framerate(payload)
+                if framerate:
+                    start_tc = seconds_to_smpte(start_sec, framerate)
+                    end_tc = seconds_to_smpte(end_sec, framerate)
+                else:
+                    start_tc = "00:00:00:00"
+                    end_tc = "00:00:00:00"
+            except Exception as e:
+                logger.warning(
+                    f"Could not extract segment bounds for asset-level embedding: {e}, using defaults"
+                )
+                start_sec = 0
+                end_sec = 0
+                start_tc = "00:00:00:00"
+                end_tc = "00:00:00:00"
+
+            # Create separate document for video/image-level embedding
+            document = _create_separate_embedding_document(
                 embedding_vector=embedding_vector,
                 inventory_id=inventory_id,
                 scope=scope or "video",
                 embedding_option=embedding_option,
+                content_type=CONTENT_TYPE,
+                start_sec=start_sec,
+                end_sec=end_sec,
+                start_tc=start_tc,
+                end_tc=end_tc,
                 metadata=metadata,
             )
 
-            # Use Painless script to append to asset_embeddings array
-            dimension = _determine_embedding_dimension(embedding_vector)
-            field_name = _get_embedding_field_name(dimension)
-
-            painless_script = """
-            if (ctx._source.asset_embeddings == null) {
-                ctx._source.asset_embeddings = [];
-            }
-            ctx._source.asset_embeddings.add(params.embedding_obj);
-            """
-
-            update_body = {
-                "script": {
-                    "source": painless_script,
-                    "lang": "painless",
-                    "params": {"embedding_obj": embedding_obj},
-                }
-            }
-
             logger.info(
-                "Appending video-level embedding to asset_embeddings array",
+                "Indexing separate document for video/image-level embedding (Marengo 3.0)",
                 extra={
-                    "document_id": existing_id,
+                    "index": INDEX_NAME,
                     "inventory_id": inventory_id,
-                    "dimension": dimension,
-                    "field_name": field_name,
+                    "parent_asset_id": inventory_id,
+                    "embedding_type": document.get("embedding_type"),
+                    "embedding_representation": document.get(
+                        "embedding_representation"
+                    ),
+                    "embedding_granularity": document.get("embedding_granularity"),
+                    "dimension": document.get("embedding_dimension"),
                 },
             )
 
             try:
-                res = client.update(index=INDEX_NAME, id=existing_id, body=update_body)
-                check_opensearch_response(res, "update")
+                res = client.index(index=INDEX_NAME, body=document)
+                check_opensearch_response(res, "index")
+
+                return {
+                    "statusCode": 200,
+                    "body": json.dumps(
+                        {
+                            "message": "Video/image-level embedding stored as separate document (Marengo 3.0)",
+                            "index": INDEX_NAME,
+                            "document_id": res.get("_id", "unknown"),
+                            "parent_asset_id": inventory_id,
+                            "inventory_id": inventory_id,
+                            "mode": "marengo_3.0_separate_documents",
+                        }
+                    ),
+                }
             except Exception as e:
                 logger.error(
-                    "Failed to append video-level embedding to asset_embeddings",
+                    "Failed to index video/image-level embedding document (Marengo 3.0)",
                     extra={
                         "inventory_id": inventory_id,
-                        "document_id": existing_id,
                         "error": str(e),
                         "index": INDEX_NAME,
                     },
                 )
                 raise RuntimeError(
-                    f"Failed to append video-level embedding to asset_embeddings for asset {inventory_id}: {str(e)}"
+                    f"Failed to index video/image-level embedding document for asset {inventory_id}: {str(e)}"
                 ) from e
 
-            return {
-                "statusCode": 200,
-                "body": json.dumps(
-                    {
-                        "message": "Video-level embedding appended to asset_embeddings successfully",
-                        "index": INDEX_NAME,
-                        "document_id": existing_id,
-                        "inventory_id": inventory_id,
-                        "mode": "asset_embeddings",
-                    }
-                ),
-            }
+            # Note: We intentionally do NOT update the master document
+            # All embeddings are stored as separate documents for Marengo 3.0
+            # The master document only contains asset metadata (DerivedRepresentations, etc.)
 
         else:
             # LEGACY MODE: Update root-level embedding field (backward compatible)
@@ -1398,10 +1690,19 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                     f"Failed to get metadata for document {existing_id} (asset {inventory_id}): {str(e)}"
                 ) from e
 
+            # Determine the correct embedding field based on dimension
+            dimension = _determine_embedding_dimension(embedding_vector)
+
+            # For 1024-d use legacy "embedding" field, otherwise use dimension-specific field
+            if dimension == 1024:
+                embedding_field = "embedding"
+            else:
+                embedding_field = _get_embedding_field_name(dimension)
+
             update_body = {
                 "doc": {
                     "type": CONTENT_TYPE,
-                    "embedding": embedding_vector,
+                    embedding_field: embedding_vector,
                     "embedding_scope": scope,
                     "timestamp": datetime.utcnow().isoformat(),
                 }
@@ -1409,7 +1710,7 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
             if embedding_option == "audio":
                 update_body["doc"]["audio_embedding"] = embedding_vector
             else:
-                update_body["doc"]["embedding"] = embedding_vector
+                update_body["doc"][embedding_field] = embedding_vector
 
             if embedding_option is not None:
                 update_body["doc"]["embedding_option"] = embedding_option

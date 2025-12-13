@@ -240,6 +240,10 @@ def get_asset_clips(asset_id: str) -> List[Dict[str, Any]]:
     """
     Retrieve clips for a specific asset from OpenSearch.
 
+    Supports both:
+    - Legacy Marengo 2.7: Queries master document with embedding_scope: "clip"
+    - Marengo 3.0: Queries separate embedding documents with inventory_id and embedding_granularity: "segment"
+
     Args:
         asset_id: The ID of the asset to retrieve clips for
 
@@ -250,8 +254,62 @@ def get_asset_clips(asset_id: str) -> List[Dict[str, Any]]:
         client = get_opensearch_client()
         index_name = os.environ["OPENSEARCH_INDEX"]
 
-        # Query for clips associated with this asset
-        query = {
+        # Try Marengo 3.0 query first (separate embedding documents)
+        query_30 = {
+            "query": {
+                "bool": {
+                    "must": [
+                        {"term": {"inventory_id": asset_id}},
+                        {"term": {"embedding_granularity": "segment"}},
+                    ]
+                }
+            },
+            "size": 100,
+            "_source": {
+                "excludes": [
+                    "embedding_256_cosine",
+                    "embedding_384_cosine",
+                    "embedding_512_cosine",
+                    "embedding_1024_cosine",
+                    "embedding_1536_cosine",
+                    "embedding_3072_cosine",
+                ]
+            },
+            "sort": [{"start_seconds": {"order": "asc"}}],
+            "track_scores": True,
+        }
+
+        response = client.search(body=query_30, index=index_name)
+
+        # If Marengo 3.0 query returns results, use them
+        if response["hits"]["total"]["value"] > 0:
+            clips = []
+            for hit in response["hits"]["hits"]:
+                source = hit["_source"]
+                clip = {
+                    "score": hit.get("_score", 0.0),
+                    "start_timecode": source.get("start_smpte_timecode")
+                    or source.get("start_timecode", ""),
+                    "end_timecode": source.get("end_smpte_timecode")
+                    or source.get("end_timecode", ""),
+                    "start_seconds": source.get("start_seconds"),
+                    "end_seconds": source.get("end_seconds"),
+                    "embedding_scope": source.get("embedding_granularity", "segment"),
+                    "embedding_option": source.get(
+                        "embedding_representation", "visual"
+                    ),
+                    "type": source.get("embedding_type", "video"),
+                    "timestamp": source.get("created_at"),
+                }
+                clips.append(clip)
+
+            logger.info(
+                f"Retrieved {len(clips)} clips for asset {asset_id} (Marengo 3.0)"
+            )
+            return clips
+
+        # Fallback to legacy Marengo 2.7 query
+        query_27 = {
             "query": {
                 "bool": {
                     "must": [
@@ -260,13 +318,13 @@ def get_asset_clips(asset_id: str) -> List[Dict[str, Any]]:
                     ]
                 }
             },
-            "size": 100,  # Limit to 100 clips per asset
+            "size": 100,
             "_source": {"excludes": ["embedding"]},
-            "sort": [{"start_timecode": {"order": "asc"}}],  # Sort by start time
-            "track_scores": True,  # Ensure scores are calculated even with sorting
+            "sort": [{"start_timecode": {"order": "asc"}}],
+            "track_scores": True,
         }
 
-        response = client.search(body=query, index=index_name)
+        response = client.search(body=query_27, index=index_name)
 
         clips = []
         for hit in response["hits"]["hits"]:
@@ -286,7 +344,7 @@ def get_asset_clips(asset_id: str) -> List[Dict[str, Any]]:
 
             clips.append(clip)
 
-        logger.info(f"Retrieved {len(clips)} clips for asset {asset_id}")
+        logger.info(f"Retrieved {len(clips)} clips for asset {asset_id} (Legacy)")
         return clips
 
     except (RequestError, NotFoundError) as e:

@@ -259,7 +259,20 @@ class AssetDeletionService:
 
         try:
             host = OPENSEARCH_ENDPOINT.lstrip("https://").lstrip("http://")
-            query = {"query": {"match_phrase": {"InventoryID": inventory_id}}}
+
+            # Delete both legacy master documents (InventoryID) and
+            # Marengo 3.0 separate embedding documents (inventory_id)
+            query = {
+                "query": {
+                    "bool": {
+                        "should": [
+                            {"match_phrase": {"InventoryID": inventory_id}},
+                            {"match_phrase": {"inventory_id": inventory_id}},
+                        ],
+                        "minimum_should_match": 1,
+                    }
+                }
+            }
 
             url = f"https://{host}/{INDEX_NAME}/_delete_by_query?refresh=true&conflicts=proceed"
 
@@ -288,7 +301,7 @@ class AssetDeletionService:
                 pass
 
             self.logger.info(
-                f"Deleted {deleted} OpenSearch documents for {inventory_id}"
+                f"Deleted {deleted} OpenSearch documents for {inventory_id} (including master doc and separate embeddings)"
             )
             self.metrics.add_metric("OpenSearchDocsDeleted", MetricUnit.Count, deleted)
 

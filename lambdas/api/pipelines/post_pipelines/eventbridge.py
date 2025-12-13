@@ -854,9 +854,11 @@ def create_eventbridge_rule(
         # Create a unique rule name for this pipeline and node
         # Sanitize the pipeline name to replace spaces with hyphens and remove any other invalid characters
         sanitized_pipeline_name = pipeline_name.replace(" ", "-")
-        # Replace any characters that aren't alphanumeric, periods, hyphens, or underscores
+        # Replace periods with hyphens for SQS compatibility
+        sanitized_pipeline_name = sanitized_pipeline_name.replace(".", "-")
+        # Replace any characters that aren't alphanumeric, hyphens, or underscores
         sanitized_pipeline_name = "".join(
-            c for c in sanitized_pipeline_name if c.isalnum() or c in ".-_"
+            c for c in sanitized_pipeline_name if c.isalnum() or c in "-_"
         )
 
         unique_rule_name = f"{sanitized_pipeline_name}-{rule_name}-{node.data.id}"[
@@ -1033,8 +1035,13 @@ def create_eventbridge_rule(
                     PolicyDocument=json.dumps(policy_document),
                 )
 
-                # Wait for role to propagate
-                time.sleep(10)
+                # Wait for role to propagate using the proper wait function
+                from iam_operations import wait_for_role_propagation
+
+                logger.info(
+                    f"Waiting for trigger Lambda role {role_name} to propagate before creating Lambda function"
+                )
+                wait_for_role_propagation(role_name)
 
                 # Get common libraries layer ARN from environment
                 common_libraries_layer_arn = os.environ.get(
@@ -1049,7 +1056,7 @@ def create_eventbridge_rule(
                         f"Adding common libraries layer to EventBridge trigger Lambda: {common_libraries_layer_arn}"
                     )
 
-                # Create the Lambda function
+                # Create the Lambda function with retry logic for role propagation issues
                 create_function_params = {
                     "FunctionName": trigger_lambda_name,
                     "Runtime": "python3.12",
@@ -1073,18 +1080,68 @@ def create_eventbridge_rule(
                 if layers:
                     create_function_params["Layers"] = layers
 
-                response = lambda_client.create_function(**create_function_params)
+                # Retry Lambda creation with exponential backoff for role propagation issues
+                max_lambda_retries = 5
+                for lambda_attempt in range(max_lambda_retries):
+                    try:
+                        response = lambda_client.create_function(
+                            **create_function_params
+                        )
+                        trigger_lambda_arn = response["FunctionArn"]
+                        logger.info(
+                            f"Created trigger lambda with ARN: {trigger_lambda_arn}"
+                        )
+                        break
+                    except lambda_client.exceptions.InvalidParameterValueException as e:
+                        if (
+                            "cannot be assumed" in str(e)
+                            and lambda_attempt < max_lambda_retries - 1
+                        ):
+                            # Role propagation issue - wait and retry
+                            wait_time = 5 * (2**lambda_attempt)  # Exponential backoff
+                            logger.warning(
+                                f"Role {role_name} not yet assumable by Lambda (attempt {lambda_attempt + 1}/{max_lambda_retries}). "
+                                f"Waiting {wait_time} seconds before retry..."
+                            )
+                            time.sleep(wait_time)
+                        else:
+                            # Final attempt failed or different error
+                            error_msg = (
+                                f"Failed to create trigger Lambda function '{trigger_lambda_name}' after {lambda_attempt + 1} attempts. "
+                                f"Role '{role_name}' cannot be assumed by Lambda. Error: {e}"
+                            )
+                            logger.error(error_msg)
+                            raise RuntimeError(error_msg) from e
+                    except Exception as e:
+                        # Other Lambda creation errors
+                        error_msg = (
+                            f"Failed to create trigger Lambda function '{trigger_lambda_name}' on attempt {lambda_attempt + 1}. "
+                            f"Error: {e}"
+                        )
+                        logger.error(error_msg)
+                        raise RuntimeError(error_msg) from e
 
-                trigger_lambda_arn = response["FunctionArn"]
-                logger.info(f"Created trigger lambda with ARN: {trigger_lambda_arn}")
-
+            except RuntimeError:
+                # Re-raise RuntimeError from Lambda creation
+                raise
             except Exception as e:
-                logger.error(f"Failed to create trigger lambda: {e}")
-                return None
+                error_msg = f"Failed to create trigger lambda role or function: {e}"
+                logger.error(error_msg)
+                raise RuntimeError(error_msg) from e
 
         # Create an SQS queue for the pipeline
         sqs_client = boto3.client("sqs")
-        queue_name = f"{resource_prefix}_{sanitized_pipeline_name}_trigger_queue"
+        # Build queue name and ensure it doesn't exceed 80 characters (SQS limit)
+        queue_suffix = "_trigger_queue"
+        max_pipeline_length = (
+            80 - len(resource_prefix) - len(queue_suffix) - 2
+        )  # -2 for underscores
+        truncated_pipeline_name = (
+            sanitized_pipeline_name[:max_pipeline_length]
+            if len(sanitized_pipeline_name) > max_pipeline_length
+            else sanitized_pipeline_name
+        )
+        queue_name = f"{resource_prefix}_{truncated_pipeline_name}{queue_suffix}"
         queue_url = None
         queue_arn = None
         max_retries = 3
@@ -1259,12 +1316,21 @@ def create_eventbridge_rule(
             return None
 
         # Set the SQS queue as the target for the EventBridge rule
+        # Target ID has a 64 character limit, "-target" suffix is 7 chars
+        max_target_id_length = 64 - 7  # 57 characters for pipeline name
+        truncated_target_name = (
+            sanitized_pipeline_name[:max_target_id_length]
+            if len(sanitized_pipeline_name) > max_target_id_length
+            else sanitized_pipeline_name
+        )
+        target_id = f"{truncated_target_name}-target"
+
         events_client.put_targets(
             Rule=unique_rule_name,
             EventBusName=event_bus_name,
             Targets=[
                 {
-                    "Id": f"{sanitized_pipeline_name}-target",
+                    "Id": target_id,
                     "Arn": queue_arn,
                     # Use matched event directly without input transformer
                 }
@@ -1375,7 +1441,17 @@ def delete_eventbridge_rule(
             # Use just the first part (pipeline name) for the target ID and queue name
             pipeline_part = parts[0]
             target_id = f"{pipeline_part}-target"
-            queue_name = f"{resource_prefix}_{pipeline_part}_trigger_queue"
+            # Build queue name and ensure it doesn't exceed 80 characters (SQS limit)
+            queue_suffix = "_trigger_queue"
+            max_pipeline_length = (
+                80 - len(resource_prefix) - len(queue_suffix) - 2
+            )  # -2 for underscores
+            truncated_pipeline_part = (
+                pipeline_part[:max_pipeline_length]
+                if len(pipeline_part) > max_pipeline_length
+                else pipeline_part
+            )
+            queue_name = f"{resource_prefix}_{truncated_pipeline_part}{queue_suffix}"
         else:
             # Fallback to a simple target ID if we can't extract the pipeline name
             target_id = "rule-target"
