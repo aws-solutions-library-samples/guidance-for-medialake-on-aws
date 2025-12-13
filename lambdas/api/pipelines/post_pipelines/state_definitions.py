@@ -81,15 +81,15 @@ class StateDefinitionFactory:
         Returns:
             The appropriate ItemsPath
         """
-        # First check if there's an explicit configuration
-        if "itemsPath" in node.data.configuration:
-            configured_path = node.data.configuration["itemsPath"]
+        # Get ItemsPath from parameters (matching YAML template casing)
+        parameters = node.data.configuration.get("parameters", {})
+        configured_path = parameters.get("ItemsPath")
+
+        if configured_path:
             logger.info(f"Using explicitly configured ItemsPath: {configured_path}")
             return configured_path
 
-        # We need to check for both externalPayloadLocation and externalTaskResults
-        # Since we can't use intrinsic functions directly in ItemsPath, we'll use a simple approach
-        # that works with Step Functions' limitations
+        # Default fallback when no ItemsPath is configured
         logger.info(f"Using $.payload.data as default ItemsPath for Map node {node.id}")
         return "$.payload.data"
 
