@@ -190,8 +190,4 @@ def create_search_provider_config(
         metadata_mapping=provider_data.get("metadata_mapping"),
         callbacks=provider_data.get("callbacks"),
         dataset_id=provider_data.get("dataset_id"),
-        name=provider_data.get("name"),
-        id=provider_data.get("id"),
-        type=provider_data.get("type"),
-        dimensions=provider_data.get("dimensions"),
     )

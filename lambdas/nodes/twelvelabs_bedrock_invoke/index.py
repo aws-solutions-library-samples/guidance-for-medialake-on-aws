@@ -42,9 +42,6 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                 "CONNECTION_INPUT_TYPE environment variable not set. This should be configured during pipeline deployment based on the incoming connection type."
             )
 
-        # Detect model version - 3.0 uses different schema than 2.7
-        is_marengo_3 = "3-0" in model_id or "3.0" in model_id
-
         logger.info(
             "Configuration",
             extra={
@@ -52,7 +49,6 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                 "input_type": input_type,
                 "region": region,
                 "s3_output_bucket": s3_output_bucket,
-                "is_marengo_3": is_marengo_3,
             },
         )
 
@@ -70,11 +66,8 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                 "S3 Output Bucket parameter not configured and EXTERNAL_PAYLOAD_BUCKET environment variable not set"
             )
 
-        # Prepare model input based on input type and model version
-        # Marengo 3.0 uses nested schema: {"inputType": "video", "video": {...}}
-        # Marengo 2.7 uses flat schema: {"inputType": "video", ...}
+        # Prepare model input based on input type
         model_input = {"inputType": input_type}
-        output_prefix = f"{input_type}Embedding"
 
         if input_type == "video":
             # Always get video URI from assets[0]['DerivedRepresentations'] with proxy purpose
@@ -139,6 +132,7 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                         video_uri = f"s3://{data['bucket']}/{data['key']}"
 
             if not video_uri:
+                # Log payload structure for debugging
                 logger.error(
                     "Video S3 location not found in payload", extra={"payload": payload}
                 )
@@ -146,12 +140,11 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                     "Video S3 location not found in payload. Expected 's3_location', 'uri', 's3Uri', 'bucket+key', 'location', 'file_location', or MediaLake assets structure"
                 )
 
-            media_source = {"s3Location": {"uri": video_uri, "bucketOwner": account_id}}
+            model_input["mediaSource"] = {
+                "s3Location": {"uri": video_uri, "bucketOwner": account_id}
+            }
+            output_prefix = "videoEmbedding"
 
-            if is_marengo_3:
-                model_input["video"] = {"mediaSource": media_source}
-            else:
-                model_input["mediaSource"] = media_source
         elif input_type == "text":
             # Extract text from payload with multiple possible field names
             input_text = None
@@ -175,10 +168,8 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                     "Input text not found in payload. Expected 'text', 'content', 'inputText', 'message', or 'query' fields"
                 )
 
-            if is_marengo_3:
-                model_input["text"] = {"inputText": input_text}
-            else:
-                model_input["inputText"] = input_text
+            model_input["inputText"] = input_text
+            output_prefix = "textEmbedding"
 
         elif input_type == "image":
             # Always get image URI from assets[0]['DerivedRepresentations'] with thumbnail purpose
@@ -253,12 +244,10 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                     "Image S3 location not found in payload. Expected 's3_location', 'uri', 's3Uri', 'bucket+key', 'location', 'file_location', or MediaLake assets structure"
                 )
 
-            media_source = {"s3Location": {"uri": image_uri, "bucketOwner": account_id}}
-
-            if is_marengo_3:
-                model_input["image"] = {"mediaSource": media_source}
-            else:
-                model_input["mediaSource"] = media_source
+            model_input["mediaSource"] = {
+                "s3Location": {"uri": image_uri, "bucketOwner": account_id}
+            }
+            output_prefix = "imageEmbedding"
 
         elif input_type == "audio":
             # Always get audio URI from assets[0]['DerivedRepresentations'] with proxy purpose
@@ -330,12 +319,10 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                     "Audio S3 location not found in payload. Expected 's3_location', 'uri', 's3Uri', 'bucket+key', 'location', 'file_location', or MediaLake assets structure"
                 )
 
-            media_source = {"s3Location": {"uri": audio_uri, "bucketOwner": account_id}}
-
-            if is_marengo_3:
-                model_input["audio"] = {"mediaSource": media_source}
-            else:
-                model_input["mediaSource"] = media_source
+            model_input["mediaSource"] = {
+                "s3Location": {"uri": audio_uri, "bucketOwner": account_id}
+            }
+            output_prefix = "audioEmbedding"
 
         else:
             raise RuntimeError(f"Unsupported input type: {input_type}")

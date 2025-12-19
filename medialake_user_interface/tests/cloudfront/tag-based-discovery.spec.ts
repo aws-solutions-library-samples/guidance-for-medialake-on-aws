@@ -126,7 +126,7 @@ const tagDiscoveryTest = awsDiscoveryTest.extend<TagDiscoveryFixtures>({
   /**
    * Tag discovery engine fixture
    */
-  tagDiscoveryEngine: async ({}, use, testInfo) => {
+  tagDiscoveryEngine: async (_fixtures, use, testInfo) => {
     const config = createTagDiscoveryConfig();
     const engine = createResourceDiscoveryEngine(config, testInfo.workerIndex);
 
@@ -170,7 +170,7 @@ const tagDiscoveryTest = awsDiscoveryTest.extend<TagDiscoveryFixtures>({
   /**
    * Standard tag filters fixture
    */
-  standardTagFilters: async ({}, use) => {
+  standardTagFilters: async (_fixtures, use) => {
     const filters = getComprehensiveTagFilters();
     await use(filters);
   },

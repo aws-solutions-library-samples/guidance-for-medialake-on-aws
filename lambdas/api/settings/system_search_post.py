@@ -165,16 +165,6 @@ def register_route(app):
                         "data": {},
                     }
 
-            # Validate dimensions if provided
-            if "dimensions" in body:
-                allowed_dimensions = [256, 384, 512, 1024, 1536, 3072]
-                if body["dimensions"] not in allowed_dimensions:
-                    return {
-                        "status": "error",
-                        "message": f"Invalid dimensions. Allowed values: {allowed_dimensions}",
-                        "data": {},
-                    }
-
             # API key is required for certain providers
             if body.get("type") == "twelvelabs-api" and "apiKey" not in body:
                 return {
@@ -187,16 +177,6 @@ def register_route(app):
                 return {
                     "status": "error",
                     "message": "API key is required for Coactive provider",
-                    "data": {},
-                }
-
-            # Validate inference_provider if provided
-            if "inference_provider" in body and not isinstance(
-                body["inference_provider"], str
-            ):
-                return {
-                    "status": "error",
-                    "message": "inference_provider must be a string",
                     "data": {},
                 }
 
@@ -247,14 +227,6 @@ def register_route(app):
                 "createdAt": now,
                 "updatedAt": now,
             }
-
-            # Add inference_provider if provided
-            if "inference_provider" in body:
-                search_provider["inference_provider"] = body["inference_provider"]
-
-            # Add dimensions if provided
-            if "dimensions" in body:
-                search_provider["dimensions"] = body["dimensions"]
 
             # Only override isEnabled if explicitly provided in request
             if "isEnabled" in body:
@@ -346,9 +318,9 @@ def register_route(app):
             # Don't expose the secret ARN in the response (if it exists)
             response_provider.pop("secretArn", None)
             # Provider is configured if it has a secret ARN or if it's Bedrock (which doesn't need one)
-            response_provider["isConfigured"] = bool(secret_arn) or body.get(
-                "type"
-            ) in ["twelvelabs-bedrock", "twelvelabs-bedrock-3-0"]
+            response_provider["isConfigured"] = (
+                bool(secret_arn) or body.get("type") == "twelvelabs-bedrock"
+            )
 
             # Prepare response
             return {

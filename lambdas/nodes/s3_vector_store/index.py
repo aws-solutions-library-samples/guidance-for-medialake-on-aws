@@ -421,64 +421,6 @@ def _get_segment_bounds(payload: Dict[str, Any]) -> Tuple[int, int]:
     return 0, 0
 
 
-def _extract_embedding_metadata(embedding_data: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Extract embedding metadata from embedding data for storage in S3 vector metadata.
-
-    Returns metadata including:
-    - model_provider: e.g., "twelvelabs", "openai", "coactive"
-    - model_name: e.g., "Marengo-retrieval-3.0", "text-embedding-3-large"
-    - model_version: e.g., "3.0", "2.7"
-    """
-    metadata = {}
-
-    if not isinstance(embedding_data, dict):
-        return metadata
-
-    # Direct metadata fields
-    if embedding_data.get("model_provider"):
-        metadata["model_provider"] = embedding_data["model_provider"]
-    if embedding_data.get("model_name"):
-        metadata["model_name"] = embedding_data["model_name"]
-    if embedding_data.get("model_version"):
-        metadata["model_version"] = embedding_data["model_version"]
-
-    # Check nested data structure
-    if isinstance(embedding_data.get("data"), dict):
-        nested = embedding_data["data"]
-        if nested.get("model_provider") and "model_provider" not in metadata:
-            metadata["model_provider"] = nested["model_provider"]
-        if nested.get("model_name") and "model_name" not in metadata:
-            metadata["model_name"] = nested["model_name"]
-        if nested.get("model_version") and "model_version" not in metadata:
-            metadata["model_version"] = nested["model_version"]
-
-    # Set defaults only if no metadata was found
-    if not metadata.get("model_provider"):
-        metadata["model_provider"] = "unknown"
-    if not metadata.get("model_name"):
-        metadata["model_name"] = "unknown"
-    if not metadata.get("model_version"):
-        model_name = metadata.get("model_name", "")
-        if "3.0" in model_name or "3-0" in model_name:
-            metadata["model_version"] = "3.0"
-        elif "2.7" in model_name or "2-7" in model_name:
-            metadata["model_version"] = "2.7"
-        else:
-            metadata["model_version"] = "unknown"
-
-    logger.info(
-        "Extracted embedding metadata for S3 Vector Store",
-        extra={
-            "model_provider": metadata.get("model_provider"),
-            "model_name": metadata.get("model_name"),
-            "model_version": metadata.get("model_version"),
-        },
-    )
-
-    return metadata
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 # S3 Vector Store client
 def get_s3_vector_client():
@@ -850,9 +792,6 @@ def process_single_embedding(
     start_tc = seconds_to_smpte(start_sec, fps)
     end_tc = seconds_to_smpte(end_sec, fps)
 
-    # Extract embedding metadata for enriched storage
-    embedding_metadata = _extract_embedding_metadata(embedding_data)
-
     metadata = {
         "inventory_id": inventory_id,
         "content_type": content_type,
@@ -862,11 +801,6 @@ def process_single_embedding(
         "end_offset_sec": end_sec,
         "start_timecode": start_tc,
         "end_timecode": end_tc,
-        "embedding_dimension": len(embedding_vector),
-        "space_type": "cosine",
-        "model_provider": embedding_metadata.get("model_provider", "unknown"),
-        "model_name": embedding_metadata.get("model_name", "unknown"),
-        "model_version": embedding_metadata.get("model_version", "unknown"),
     }
     if opt is not None:
         metadata["embedding_option"] = opt
@@ -984,20 +918,12 @@ def process_store_action(payload: Dict[str, Any]) -> Dict[str, Any]:
             else:
                 pass
 
-            # Extract embedding metadata for enriched storage
-            embedding_metadata = _extract_embedding_metadata(emb)
-
             # video-level has no start/end
             metadata = {
                 "inventory_id": inventory_id,
                 "content_type": video_content_type,
                 "embedding_scope": "video",
                 "timestamp": datetime.utcnow().isoformat(),
-                "embedding_dimension": len(vector),
-                "space_type": "cosine",
-                "model_provider": embedding_metadata.get("model_provider", "unknown"),
-                "model_name": embedding_metadata.get("model_name", "unknown"),
-                "model_version": embedding_metadata.get("model_version", "unknown"),
             }
             if opt is not None:
                 metadata["embedding_option"] = opt
@@ -1197,19 +1123,11 @@ def process_store_action(payload: Dict[str, Any]) -> Dict[str, Any]:
         framerate = embedding_data.get("framerate") or extract_framerate(temp_payload)
         int(round(framerate)) if framerate else 30
 
-    # Extract embedding metadata for enriched storage
-    embedding_metadata = _extract_embedding_metadata(embedding_data)
-
     metadata = {
         "inventory_id": inventory_id,
         "content_type": content_type,
         "embedding_scope": scope,
         "timestamp": datetime.utcnow().isoformat(),
-        "embedding_dimension": len(embedding_vector),
-        "space_type": "cosine",
-        "model_provider": embedding_metadata.get("model_provider", "unknown"),
-        "model_name": embedding_metadata.get("model_name", "unknown"),
-        "model_version": embedding_metadata.get("model_version", "unknown"),
     }
     if opt is not None:
         metadata["embedding_option"] = opt

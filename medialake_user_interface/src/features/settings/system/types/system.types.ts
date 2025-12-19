@@ -8,7 +8,6 @@ export interface SearchProvider {
   isEnabled?: boolean;
   isExternal?: boolean;
   supportedMediaTypes?: string[];
-  dimensions?: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -19,7 +18,6 @@ export interface SearchProviderCreate {
   apiKey: string;
   endpoint?: string;
   isEnabled?: boolean;
-  dimensions?: number;
   embeddingStore?: {
     type: "opensearch" | "s3-vector";
     isEnabled?: boolean;
@@ -39,29 +37,12 @@ export interface EmbeddingStore {
   updatedAt?: string;
 }
 
-export interface ProviderMetadata {
-  id: string;
-  name: string;
-  type: string;
-  defaultEndpoint?: string;
-  requiresApiKey: boolean;
-  isExternal: boolean;
-  supportedMediaTypes: string[];
-  dimensions?: number[];
-}
-
-export interface EmbeddingStoreMetadata {
-  id: string;
-  name: string;
-}
-
 export interface SearchProviderUpdate {
   name?: string;
   type?: string;
   apiKey?: string;
   endpoint?: string;
   isEnabled?: boolean;
-  dimensions?: number;
   embeddingStore?: {
     type: "opensearch" | "s3-vector";
     isEnabled?: boolean;
@@ -73,7 +54,7 @@ export interface SearchProviderUpdate {
 export interface SemanticSearchSettings {
   isEnabled: boolean;
   provider: {
-    type: "none" | "twelvelabs-api" | "twelvelabs-bedrock" | "twelvelabs-bedrock-3-0" | "coactive";
+    type: "none" | "twelvelabs-api" | "twelvelabs-bedrock" | "coactive";
     config: SearchProvider | null;
   };
   embeddingStore: {
@@ -93,8 +74,6 @@ export interface SystemSettingsResponse {
   data: {
     searchProvider?: SearchProvider;
     embeddingStore?: EmbeddingStore;
-    availableProviders?: Record<string, ProviderMetadata>;
-    availableEmbeddingStores?: Record<string, EmbeddingStoreMetadata>;
   };
 }
 

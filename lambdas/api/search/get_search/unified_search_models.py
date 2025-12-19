@@ -108,10 +108,6 @@ class SearchProviderConfig:
     metadata_mapping: Optional[Dict[str, str]] = None
     callbacks: Optional[Dict[str, str]] = None
     dataset_id: Optional[str] = None  # For external services like Coactive
-    name: Optional[str] = None
-    id: Optional[str] = None
-    type: Optional[str] = None
-    dimensions: Optional[int] = None
 
 
 def parse_filters_from_query_params(query_params: Dict[str, Any]) -> List[Dict]:

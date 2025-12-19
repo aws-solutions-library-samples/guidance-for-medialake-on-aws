@@ -360,16 +360,6 @@ class AssetsConstruct(Construct):
             )
         )
 
-        # Add EventBridge permissions to DELETE Lambda (for publishing deletion events)
-        delete_asset_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["events:PutEvents"],
-                resources=[
-                    f"arn:aws:events:{Stack.of(self).region}:{Stack.of(self).account}:event-bus/default"
-                ],
-            )
-        )
-
         # Add GET method to /assets/{id}
         asset_get = asset_resource.add_method(
             "GET",
@@ -2422,13 +2412,9 @@ class AssetsConstruct(Construct):
             "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
             "MEDIA_ASSETS_BUCKET": props.media_assets_bucket.bucket_name,
             "OPEN_SEARCH_ENDPOINT": props.open_search_endpoint,
-            "OPENSEARCH_ENDPOINT": props.open_search_endpoint,  # For TwelveLabs plugin
             "OPENSEARCH_INDEX": props.opensearch_index,
-            "INDEX_NAME": props.opensearch_index,  # For TwelveLabs plugin
             "S3_VECTOR_BUCKET": props.s3_vector_bucket_name,
-            "VECTOR_BUCKET_NAME": props.s3_vector_bucket_name,  # For TwelveLabs plugin
             "S3_VECTOR_INDEX": props.s3_vector_index_name,
-            "VECTOR_INDEX_NAME": props.s3_vector_index_name,  # For TwelveLabs plugin
             "SYSTEM_SETTINGS_TABLE": props.system_settings_table,
         }
 
@@ -2606,16 +2592,6 @@ class AssetsConstruct(Construct):
                     "kms:DescribeKey",
                 ],
                 resources=["*"],
-            )
-        )
-
-        # Grant EventBridge permissions to processor Lambda (for publishing deletion events)
-        self._batch_delete_processor_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["events:PutEvents"],
-                resources=[
-                    f"arn:aws:events:{Stack.of(self).region}:{Stack.of(self).account}:event-bus/default"
-                ],
             )
         )
 

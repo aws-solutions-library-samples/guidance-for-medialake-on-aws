@@ -185,14 +185,7 @@ def create_step_function(
     sanitized_role_name_str = sanitize_role_name(pipeline_name)
     sanitized_state_machine_name = sanitize_state_machine_name(pipeline_name)
 
-    # Reserve space for the "_sfn" suffix (4 characters)
-    # AWS IAM role names have a maximum length of 64 characters
-    suffix = "_sfn"
-    max_base_length = 64 - len(suffix)
-    if len(sanitized_role_name_str) > max_base_length:
-        sanitized_role_name_str = sanitized_role_name_str[:max_base_length]
-
-    role_name = f"{sanitized_role_name_str}{suffix}"
+    role_name = f"{sanitized_role_name_str}_sfn_role"
     logger.info(f"Using sanitized role name: {role_name}")
     logger.info(f"Using sanitized state machine name: {sanitized_state_machine_name}")
     role_arn = create_sfn_role(role_name)

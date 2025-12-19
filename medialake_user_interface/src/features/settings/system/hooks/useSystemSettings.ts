@@ -5,12 +5,8 @@ import {
   useUpdateSearchProvider,
   useDeleteSearchProvider,
 } from "../api/systemHooks";
-import {
-  SearchProvider,
-  SemanticSearchSettings,
-  SystemSettingsState,
-  ProviderMetadata,
-} from "../types/system.types";
+import { SearchProvider, SemanticSearchSettings, SystemSettingsState } from "../types/system.types";
+import { SYSTEM_SETTINGS_CONFIG } from "../config";
 
 // Function to check if semantic search is properly configured and enabled
 export const useSemanticSearchStatus = () => {
@@ -61,7 +57,7 @@ export const useSemanticSearchSettings = () => {
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [isEditingApiKey, setIsEditingApiKey] = useState(false);
 
-  // Fetch the current search provider and available providers
+  // Fetch the current search provider
   const {
     data: providerData,
     isLoading: isProviderLoading,
@@ -72,13 +68,6 @@ export const useSemanticSearchSettings = () => {
   const createProvider = useCreateSearchProvider();
   const updateProvider = useUpdateSearchProvider();
   const deleteProvider = useDeleteSearchProvider();
-
-  // Helper function to get provider config by type from API data
-  const getProviderConfig = (providerType: string): ProviderMetadata | undefined => {
-    const availableProviders = providerData?.data?.availableProviders;
-    if (!availableProviders) return undefined;
-    return availableProviders[providerType];
-  };
 
   // Initialize settings from fetched data
   useEffect(() => {
@@ -94,13 +83,11 @@ export const useSemanticSearchSettings = () => {
       const displayType = isConfigured
         ? fetchedProvider.type === "twelvelabs-bedrock"
           ? "twelvelabs-bedrock"
-          : fetchedProvider.type === "twelvelabs-bedrock-3-0"
-            ? "twelvelabs-bedrock-3-0"
-            : fetchedProvider.type === "coactive"
-              ? "coactive"
-              : fetchedProvider.type === "twelvelabs-api"
-                ? "twelvelabs-api"
-                : "none"
+          : fetchedProvider.type === "coactive"
+            ? "coactive"
+            : fetchedProvider.type === "twelvelabs-api"
+              ? "twelvelabs-api"
+              : "none"
         : "none";
 
       const initialSettings: SemanticSearchSettings = {
@@ -233,12 +220,7 @@ export const useSemanticSearchSettings = () => {
 
   // Handle provider type change
   const handleProviderTypeChange = async (
-    providerType:
-      | "none"
-      | "twelvelabs-api"
-      | "twelvelabs-bedrock"
-      | "twelvelabs-bedrock-3-0"
-      | "coactive"
+    providerType: "none" | "twelvelabs-api" | "twelvelabs-bedrock" | "coactive"
   ) => {
     if (providerType === "none") {
       // Reset to no provider
@@ -288,7 +270,7 @@ export const useSemanticSearchSettings = () => {
       setApiKeyInput("");
       setIsApiKeyDialogOpen(true);
     } else {
-      // For Bedrock variants, save immediately since no API key is needed
+      // For Bedrock, save immediately since no API key is needed
       try {
         const embeddingStorePayload = {
           type: settings.current.embeddingStore.type,
@@ -297,57 +279,28 @@ export const useSemanticSearchSettings = () => {
 
         const providerExists = settings.original.provider.config?.id;
 
-        // Get provider config dynamically
-        const providerConfig = getProviderConfig(providerType);
-        if (!providerConfig) {
-          console.error(`Unknown provider type: ${providerType}`);
-          return;
-        }
-
         if (providerExists) {
           // Update existing provider to selected type
-          const updatePayload: any = {
+          await updateProvider.mutateAsync({
             type: providerType,
             isEnabled: settings.current.isEnabled,
             embeddingStore: embeddingStorePayload,
-          };
-
-          // Only include dimensions if the provider config has them
-          if ("dimensions" in providerConfig && providerConfig.dimensions) {
-            updatePayload.dimensions = providerConfig.dimensions[0];
-          }
-
-          // Include inference_provider if available
-          if ("inference_provider" in providerConfig) {
-            updatePayload.inference_provider = providerConfig.inference_provider;
-          }
-
-          await updateProvider.mutateAsync(updatePayload);
+          });
         } else {
           // Create new provider with selected type
-          const createPayload: any = {
+          const providerConfig =
+            providerType === "twelvelabs-bedrock"
+              ? SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_BEDROCK
+              : SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API;
+
+          await createProvider.mutateAsync({
             name: providerConfig.name,
             type: providerType,
             apiKey: "", // Not needed for Bedrock
             isEnabled: settings.current.isEnabled,
             embeddingStore: embeddingStorePayload,
-          };
-
-          // Only include dimensions if the provider config has them
-          if ("dimensions" in providerConfig && providerConfig.dimensions) {
-            createPayload.dimensions = providerConfig.dimensions[0];
-          }
-
-          // Include inference_provider if available
-          if ("inference_provider" in providerConfig) {
-            createPayload.inference_provider = providerConfig.inference_provider;
-          }
-
-          await createProvider.mutateAsync(createPayload);
+          });
         }
-
-        // Use same config for state update
-        const selectedProviderConfig = providerConfig;
 
         // Update local state after successful save
         setSettings((prev) => ({
@@ -356,11 +309,11 @@ export const useSemanticSearchSettings = () => {
             ...prev.current,
             isEnabled: true, // Enable search when Bedrock provider is configured
             provider: {
-              type: providerType as "twelvelabs-bedrock" | "twelvelabs-bedrock-3-0",
+              type: "twelvelabs-bedrock",
               config: {
                 id: providerExists ? prev.original.provider.config?.id || "" : "",
-                name: selectedProviderConfig.name,
-                type: providerType,
+                name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_BEDROCK.name,
+                type: "twelvelabs-bedrock",
                 apiKey: "",
                 isConfigured: true,
                 isEnabled: true,
@@ -371,11 +324,11 @@ export const useSemanticSearchSettings = () => {
             ...prev.current,
             isEnabled: true, // Update original state too
             provider: {
-              type: providerType as "twelvelabs-bedrock" | "twelvelabs-bedrock-3-0",
+              type: "twelvelabs-bedrock",
               config: {
                 id: providerExists ? prev.original.provider.config?.id || "" : "",
-                name: selectedProviderConfig.name,
-                type: providerType,
+                name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_BEDROCK.name,
+                type: "twelvelabs-bedrock",
                 apiKey: "",
                 isConfigured: true,
                 isEnabled: true,
@@ -462,37 +415,29 @@ export const useSemanticSearchSettings = () => {
       let providerConfig: SearchProvider;
       let providerTypeForState: "twelvelabs-api" | "twelvelabs-bedrock" | "coactive";
 
-      // Get provider metadata from API
-      const availableProviders = providerData?.data?.availableProviders;
-
-      if (currentProviderType === "coactive" && availableProviders?.coactive) {
-        const metadata = availableProviders.coactive;
+      if (currentProviderType === "coactive") {
         providerConfig = {
           id: settings.current.provider.config?.id || "",
-          name: metadata.name,
+          name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.COACTIVE.name,
           type: "coactive",
           apiKey: apiKeyInput,
-          endpoint: metadata.defaultEndpoint,
+          endpoint: SYSTEM_SETTINGS_CONFIG.PROVIDERS.COACTIVE.defaultEndpoint,
           isConfigured: true,
           isEnabled: true,
         };
         providerTypeForState = "coactive";
-      } else if (availableProviders?.["twelvelabs-api"]) {
+      } else {
         // Default to TwelveLabs API
-        const metadata = availableProviders["twelvelabs-api"];
         providerConfig = {
           id: settings.current.provider.config?.id || "",
-          name: metadata.name,
-          type: "twelvelabs-api",
+          name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.name,
+          type: "twelvelabs-api", // API key dialog is only for API providers
           apiKey: apiKeyInput,
-          endpoint: metadata.defaultEndpoint,
+          endpoint: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.defaultEndpoint,
           isConfigured: true,
           isEnabled: true,
         };
         providerTypeForState = "twelvelabs-api";
-      } else {
-        console.error("Provider metadata not available from API");
-        return false;
       }
 
       // Update local state first
@@ -520,40 +465,24 @@ export const useSemanticSearchSettings = () => {
 
       if (hasExistingProvider) {
         // Update existing provider (supports type switching now)
-        const updatePayload: any = {
+        await updateProvider.mutateAsync({
           name: providerConfig.name,
           type: providerConfig.type,
           apiKey: providerConfig.apiKey,
           endpoint: providerConfig.endpoint,
           isEnabled: settings.current.isEnabled,
           embeddingStore: embeddingStorePayload,
-        };
-
-        // Include inference_provider if available from metadata
-        const metadata = availableProviders?.[providerConfig.type];
-        if (metadata && "inference_provider" in metadata) {
-          updatePayload.inference_provider = metadata.inference_provider;
-        }
-
-        await updateProvider.mutateAsync(updatePayload);
+        });
       } else {
         // Create new provider (first time setup)
-        const createPayload: any = {
+        await createProvider.mutateAsync({
           name: providerConfig.name,
           type: providerConfig.type,
           apiKey: providerConfig.apiKey,
           endpoint: providerConfig.endpoint,
           isEnabled: settings.current.isEnabled,
           embeddingStore: embeddingStorePayload,
-        };
-
-        // Include inference_provider if available from metadata
-        const metadata = availableProviders?.[providerConfig.type];
-        if (metadata && "inference_provider" in metadata) {
-          createPayload.inference_provider = metadata.inference_provider;
-        }
-
-        await createProvider.mutateAsync(createPayload);
+        });
       }
 
       // Update original to match current (changes saved)
@@ -588,90 +517,41 @@ export const useSemanticSearchSettings = () => {
       ) {
         if (providerExists) {
           // Update existing provider
-          const updatePayload: any = {
+          await updateProvider.mutateAsync({
             type: current.provider.config.type,
             apiKey: current.provider.config.apiKey,
             endpoint: current.provider.config.endpoint,
             isEnabled: current.isEnabled,
             embeddingStore: embeddingStorePayload,
-          };
-
-          // Include inference_provider if available from metadata
-          const metadata = providerData?.data?.availableProviders?.[current.provider.config.type];
-          if (metadata && "inference_provider" in metadata) {
-            updatePayload.inference_provider = metadata.inference_provider;
-          }
-
-          await updateProvider.mutateAsync(updatePayload);
+          });
         } else {
           // Create new provider
-          const createPayload: any = {
+          await createProvider.mutateAsync({
             name: current.provider.config.name,
             type: current.provider.config.type,
             apiKey: current.provider.config.apiKey,
             endpoint: current.provider.config.endpoint,
             isEnabled: current.isEnabled,
             embeddingStore: embeddingStorePayload,
-          };
-
-          // Include inference_provider if available from metadata
-          const metadata = providerData?.data?.availableProviders?.[current.provider.config.type];
-          if (metadata && "inference_provider" in metadata) {
-            createPayload.inference_provider = metadata.inference_provider;
-          }
-
-          await createProvider.mutateAsync(createPayload);
+          });
         }
-      } else if (
-        current.provider.type === "twelvelabs-bedrock" ||
-        current.provider.type === "twelvelabs-bedrock-3-0"
-      ) {
-        // For Bedrock variants, determine if we need to create or update
-        const providerConfig = getProviderConfig(current.provider.type);
-        if (!providerConfig) {
-          console.error(`Unknown provider type: ${current.provider.type}`);
-          return false;
-        }
-
+      } else if (current.provider.type === "twelvelabs-bedrock") {
+        // For Bedrock, determine if we need to create or update
         if (providerExists) {
           // Update existing provider to Bedrock type
-          const updatePayload: any = {
+          await updateProvider.mutateAsync({
             isEnabled: current.isEnabled,
             embeddingStore: embeddingStorePayload,
-          };
-
-          // Only include dimensions if the provider config has them
-          if ("dimensions" in providerConfig && providerConfig.dimensions) {
-            updatePayload.dimensions = providerConfig.dimensions[0];
-          }
-
-          // Include inference_provider if available
-          if ("inference_provider" in providerConfig) {
-            updatePayload.inference_provider = providerConfig.inference_provider;
-          }
-
-          await updateProvider.mutateAsync(updatePayload);
+          });
         } else {
           // Create new Bedrock provider
-          const createPayload: any = {
-            name: providerConfig.name,
-            type: current.provider.type,
+          await createProvider.mutateAsync({
+            name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_BEDROCK.name,
+            type: "twelvelabs-bedrock",
             apiKey: "", // Not needed for Bedrock
             isEnabled: current.isEnabled,
             embeddingStore: embeddingStorePayload,
-          };
-
-          // Only include dimensions if the provider config has them
-          if ("dimensions" in providerConfig && providerConfig.dimensions) {
-            createPayload.dimensions = providerConfig.dimensions[0];
-          }
-
-          // Include inference_provider if available
-          if ("inference_provider" in providerConfig) {
-            createPayload.inference_provider = providerConfig.inference_provider;
-          }
-
-          await createProvider.mutateAsync(createPayload);
+          });
         }
       }
 
@@ -705,10 +585,6 @@ export const useSemanticSearchSettings = () => {
     isLoading: isProviderLoading,
     error: providerError,
 
-    // Provider metadata from API
-    availableProviders: providerData?.data?.availableProviders,
-    availableEmbeddingStores: providerData?.data?.availableEmbeddingStores,
-
     // Dialog state
     isApiKeyDialogOpen,
     apiKeyInput,
@@ -734,22 +610,12 @@ export const useSemanticSearchSettings = () => {
 };
 
 export const useSystemSettingsManager = () => {
-  // Fetch the current search provider first
-  const {
-    data: providerData,
-    isLoading: isProviderLoading,
-    error: providerError,
-  } = useSearchProvider();
-
-  // Get default values from API
-  const defaultProvider = providerData?.data?.availableProviders?.["twelvelabs-api"];
-
   const [provider, setProvider] = useState<SearchProvider>({
     id: "",
-    name: defaultProvider?.name || "TwelveLabs Marengo Embed 2.7 API",
-    type: defaultProvider?.type || "twelvelabs",
+    name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.name,
+    type: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.type,
     apiKey: "",
-    endpoint: defaultProvider?.defaultEndpoint || "https://api.twelvelabs.io/v1",
+    endpoint: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.defaultEndpoint,
     isConfigured: false,
     isEnabled: true,
   });
@@ -758,8 +624,15 @@ export const useSystemSettingsManager = () => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [newProviderDetails, setNewProviderDetails] = useState<Partial<SearchProvider>>({
     apiKey: "",
-    endpoint: defaultProvider?.defaultEndpoint || "https://api.twelvelabs.io/v1",
+    endpoint: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.defaultEndpoint,
   });
+
+  // Fetch the current search provider
+  const {
+    data: providerData,
+    isLoading: isProviderLoading,
+    error: providerError,
+  } = useSearchProvider();
 
   // Mutations for creating and updating the provider
   const createProvider = useCreateSearchProvider();
@@ -778,22 +651,21 @@ export const useSystemSettingsManager = () => {
 
   // Handler for opening the add provider dialog
   const handleAddProviderClick = () => {
-    const defaultEndpoint = defaultProvider?.defaultEndpoint || "https://api.twelvelabs.io/v1";
     setIsEditMode(false);
     setNewProviderDetails({
       apiKey: "",
-      endpoint: defaultEndpoint,
+      endpoint: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.defaultEndpoint,
     });
     setIsProviderDialogOpen(true);
   };
 
   // Handler for opening the edit provider dialog
   const handleEditProviderClick = () => {
-    const defaultEndpoint = defaultProvider?.defaultEndpoint || "https://api.twelvelabs.io/v1";
     setIsEditMode(true);
     setNewProviderDetails({
       apiKey: provider.apiKey || "",
-      endpoint: provider.endpoint || defaultEndpoint,
+      endpoint:
+        provider.endpoint || SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.defaultEndpoint,
     });
     setIsProviderDialogOpen(true);
   };
@@ -827,13 +699,14 @@ export const useSystemSettingsManager = () => {
         } else {
           // Create new provider
           await createProvider.mutateAsync({
-            name: defaultProvider?.name || "TwelveLabs Marengo Embed 2.7 API",
-            type: defaultProvider?.type || "twelvelabs",
+            name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.name,
+            type: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.type,
             apiKey: newProviderDetails.apiKey || "",
             endpoint: newProviderDetails.endpoint,
             isEnabled: true,
           });
         }
+
         // Close the dialog after successful operation
         handleCloseDialog();
       } catch (error) {

@@ -60,9 +60,6 @@ class PipelineStackProps:
     s3_vector_bucket_name: str
     s3_vector_index_name: str = "media-vectors"
     s3_vector_dimension: int = 1024
-    # System Settings table configuration
-    system_settings_table_name: str | None = None
-    system_settings_table_arn: str | None = None
 
 
 class PipelineStack(cdk.NestedStack):
@@ -127,9 +124,6 @@ class PipelineStack(cdk.NestedStack):
                 s3_vector_bucket_name=props.s3_vector_bucket_name,
                 s3_vector_index_name=props.s3_vector_index_name,
                 s3_vector_dimension=props.s3_vector_dimension,
-                # System Settings table configuration
-                system_settings_table_name=props.system_settings_table_name,
-                system_settings_table_arn=props.system_settings_table_arn,
             ),
         )
 
