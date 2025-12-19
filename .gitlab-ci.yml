@@ -23,12 +23,14 @@ cache:
   paths:
     - .cache/pip
 
-# Simple workflow - only MR pipelines and release branch
+# Simple workflow - only MR pipelines, release branch, and main-v2 branch
 workflow:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       when: always
     - if: $CI_COMMIT_BRANCH == "release"
+      when: always
+    - if: $CI_COMMIT_BRANCH == "main-v2"
       when: always
     - when: never
 
@@ -447,8 +449,38 @@ sync-to-github:
     - echo "Current GitHub main commit:" && git log --oneline -1
     - rsync -av --delete --exclude=.git ../ ./
     - rm -f secrets.txt .roomodes .gitleaksignore fix.sh setup-dev.sh manage-hooks.sh PERFORMANCE_OPTIMIZATION.md AUTHORIZATION_FIX.md .pre-commit-config.yaml .secrets.baseline .gitlab-ci.yml .gitattributes .flake8
-    - rm -rf .sonar/ INTERNAL-utils/ docs/ .roo/ .kiro/ github-repo/ .traycer/ INTERNAL-ai-documentation/ memory-bank/ cdk-test-output/ design/ tests/ scripts/ .githooks/ medialake_user_interface/test-results/ medialake_user_interface/playwright-report/
+    - rm -rf .sonar/ INTERNAL-utils/ docs/ .roo/ .kiro/ .cursor/ github-repo/ .traycer/ INTERNAL-ai-documentation/ memory-bank/ cdk-test-output/ design/ tests/ scripts/ .githooks/ medialake_user_interface/test-results/ medialake_user_interface/playwright-report/
     - git add -A
     - git commit --allow-empty -m "${COMMIT_MESSAGE}"
     - echo "New commit created:" && git log --oneline -1
     - git push origin main
+
+# Sync main-v2 branch to GitHub
+sync-main-v2-to-github:
+  image: alpine:latest
+  stage: deploy
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main-v2"
+  script:
+    - apk add --no-cache git openssh rsync
+    - mkdir -p ~/.ssh
+    - echo "${GITHUB_SSH_PRIVATE_KEY}" > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - ssh-keyscan github.com >> ~/.ssh/known_hosts
+    - git config --global user.email "medialake@amazon.com"
+    - git config --global user.name "Media Lake CI"
+    - echo "Debug - Full commit message:"
+    - git log -1 --pretty=%B
+    - export COMMIT_MESSAGE="${CI_COMMIT_TITLE}"
+    - echo "Final commit message for GitHub - ${COMMIT_MESSAGE}"
+    - git clone -b main-v2 git@github.com:aws-solutions-library-samples/guidance-for-medialake-on-aws.git github-repo || git clone git@github.com:aws-solutions-library-samples/guidance-for-medialake-on-aws.git github-repo
+    - cd github-repo
+    - git checkout main-v2 || git checkout -b main-v2
+    - echo "Current GitHub main-v2 commit:" && git log --oneline -1
+    - rsync -av --delete --exclude=.git ../ ./
+    - rm -f secrets.txt .roomodes .gitleaksignore fix.sh setup-dev.sh manage-hooks.sh PERFORMANCE_OPTIMIZATION.md AUTHORIZATION_FIX.md .pre-commit-config.yaml .secrets.baseline .gitlab-ci.yml .gitattributes .flake8
+    - rm -rf .sonar/ INTERNAL-utils/ docs/ .roo/ .kiro/ .cursor/ github-repo/ .traycer/ INTERNAL-ai-documentation/ memory-bank/ cdk-test-output/ design/ tests/ scripts/ .githooks/ medialake_user_interface/test-results/ medialake_user_interface/playwright-report/
+    - git add -A
+    - git commit --allow-empty -m "${COMMIT_MESSAGE}"
+    - echo "New commit created:" && git log --oneline -1
+    - git push origin main-v2
