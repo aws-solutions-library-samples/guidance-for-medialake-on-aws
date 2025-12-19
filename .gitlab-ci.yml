@@ -85,7 +85,7 @@ mr-title-check:
   script:
     - apk add --no-cache grep
     - |
-      REGEX="^(build|ci|docs|feat|fix|perf|refactor|release|style|test)(\([a-zA-Z0-9\-_.]+\))?(!)?: .+"
+      REGEX="^(revert|build|ci|docs|feat|fix|perf|refactor|release|style|test)(\([a-zA-Z0-9\-_.]+\))?(!)?: .+"
       TITLE="${CI_MERGE_REQUEST_TITLE}"
       echo "Validating MR title: ${TITLE}"
       if ! echo "${TITLE}" | grep -E "${REGEX}" > /dev/null; then
