@@ -66,23 +66,20 @@ def register_route(app):
                 logger.error(f"[DELETE] Error deleting item: {e}")
                 raise
 
-            # Update collection item count
+            # Update collection updatedAt timestamp
+            # Note: itemCount is no longer maintained here - it's computed dynamically
             try:
                 collection = CollectionModel.get(
                     f"{COLLECTION_PK_PREFIX}{collection_id}", METADATA_SK
                 )
-                logger.info(f"[DELETE] Current itemCount: {collection.itemCount}")
                 collection.update(
                     actions=[
-                        CollectionModel.itemCount.add(-1),
                         CollectionModel.updatedAt.set(current_timestamp),
                     ]
                 )
-                logger.info(
-                    f"[DELETE] Updated itemCount to: {collection.itemCount - 1}"
-                )
+                logger.info(f"[DELETE] Updated collection updatedAt timestamp")
             except Exception as e:
-                logger.warning(f"[DELETE] Failed to update item count: {e}")
+                logger.warning(f"[DELETE] Failed to update collection timestamp: {e}")
 
             logger.info(f"[DELETE] Item removed from collection {collection_id}")
 

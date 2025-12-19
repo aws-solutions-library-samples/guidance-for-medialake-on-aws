@@ -1,7 +1,9 @@
 """GET /collections - List collections with filtering and pagination."""
 
 import os
+from typing import Any
 
+import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler.exceptions import BadRequestError
 from aws_lambda_powertools.metrics import MetricUnit
@@ -15,12 +17,18 @@ from collections_utils import (
     create_error_response,
     create_success_response,
     format_collection_item,
+    get_collection_item_count,
 )
 from db_models import ChildReferenceModel, CollectionModel
 from models import ListCollectionsQueryParams
 from pynamodb.exceptions import QueryError
 from user_auth import extract_user_context
 from utils.pagination_utils import apply_sorting, create_cursor, parse_cursor
+
+# Initialize DynamoDB resource for dynamic item count queries
+dynamodb = boto3.resource("dynamodb")
+table_name = os.environ.get("COLLECTIONS_TABLE_NAME", "collections_table_dev")
+collections_table = dynamodb.Table(table_name)
 
 logger = Logger(service="collections-get", level=os.environ.get("LOG_LEVEL", "INFO"))
 tracer = Tracer(service="collections-get")
@@ -312,15 +320,27 @@ def _apply_post_filters(items, status_filter, search_filter):
     return filtered_items
 
 
-def _model_to_dict(collection):
-    """Convert PynamoDB model to dict for formatting"""
+def _model_to_dict(collection) -> dict[str, Any]:
+    """Convert PynamoDB model to dict for formatting.
+
+    Args:
+        collection: PynamoDB CollectionModel instance
+
+    Returns:
+        Dictionary representation of the collection
+    """
+    # Get dynamic item count (returns -1 on error)
+    dynamic_item_count: int = get_collection_item_count(
+        collections_table, collection.PK
+    )
+
     item_dict = {
         "PK": collection.PK,
         "SK": collection.SK,
         "name": collection.name,
         "ownerId": collection.ownerId,
         "status": collection.status,
-        "itemCount": collection.itemCount,
+        "itemCount": dynamic_item_count,
         "childCollectionCount": collection.childCollectionCount,
         "isPublic": collection.isPublic,
         "createdAt": collection.createdAt,

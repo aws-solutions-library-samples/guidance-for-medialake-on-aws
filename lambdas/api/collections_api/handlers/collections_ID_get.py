@@ -2,6 +2,7 @@
 
 import os
 
+import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler.exceptions import NotFoundError
 from aws_lambda_powertools.metrics import MetricUnit
@@ -11,10 +12,16 @@ from collections_utils import (
     create_error_response,
     create_success_response,
     format_collection_item,
+    get_collection_item_count,
 )
 from db_models import CollectionModel
 from pynamodb.exceptions import DoesNotExist
 from user_auth import extract_user_context
+
+# Initialize DynamoDB resource for dynamic item count queries
+dynamodb = boto3.resource("dynamodb")
+table_name = os.environ.get("COLLECTIONS_TABLE_NAME", "collections_table_dev")
+collections_table = dynamodb.Table(table_name)
 
 logger = Logger(service="collections-ID-get", level=os.environ.get("LOG_LEVEL", "INFO"))
 tracer = Tracer(service="collections-ID-get")
@@ -71,6 +78,11 @@ def register_route(app):
             except DoesNotExist:
                 raise NotFoundError(f"Collection '{collection_id}' not found")
 
+            # Get dynamic item count (returns -1 on error)
+            dynamic_item_count = get_collection_item_count(
+                collections_table, collection.PK
+            )
+
             # Convert PynamoDB model to dict for formatting
             collection_dict = {
                 "PK": collection.PK,
@@ -78,7 +90,7 @@ def register_route(app):
                 "name": collection.name,
                 "ownerId": collection.ownerId,
                 "status": collection.status,
-                "itemCount": collection.itemCount,
+                "itemCount": dynamic_item_count,
                 "childCollectionCount": collection.childCollectionCount,
                 "isPublic": collection.isPublic,
                 "createdAt": collection.createdAt,

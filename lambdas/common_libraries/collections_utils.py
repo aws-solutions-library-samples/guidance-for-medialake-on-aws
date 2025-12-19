@@ -11,12 +11,15 @@ import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from aws_lambda_powertools import Logger, Tracer
+from aws_lambda_powertools import Logger, Metrics, Tracer
+from aws_lambda_powertools.metrics import MetricUnit
+from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 
 # Initialize PowerTools
 logger = Logger(service="collections-utils")
 tracer = Tracer(service="collections-utils")
+metrics = Metrics(namespace="medialake", service="collections-utils")
 
 # Collection constants
 COLLECTION_PK_PREFIX = "COLL#"
@@ -91,6 +94,152 @@ def get_collection_metadata(table, collection_id: str) -> Optional[Dict[str, Any
             }
         )
         return None
+
+
+@tracer.capture_method
+def get_collection_item_count(table, collection_pk: str) -> int:
+    """
+    Count the actual number of items in a collection by querying DynamoDB.
+
+    This function queries for both ASSET# and ITEM# SK prefixes to count all
+    items in a collection. It uses Select='COUNT' for efficiency, minimizing
+    data transfer. Handles pagination for large collections.
+
+    Args:
+        table: DynamoDB table resource (boto3)
+        collection_pk: Collection primary key (e.g., COLL#{collection_id})
+
+    Returns:
+        Integer count of items, or -1 if an error occurs
+    """
+    try:
+        total_count = 0
+        pk_value = collection_pk
+
+        # Query for ASSET# prefix items
+        asset_count = _count_items_with_prefix(table, pk_value, ASSET_SK_PREFIX)
+        if asset_count < 0:
+            # Error occurred, return -1
+            return -1
+        total_count += asset_count
+
+        # Query for ITEM# prefix items
+        item_count = _count_items_with_prefix(table, pk_value, ITEM_SK_PREFIX)
+        if item_count < 0:
+            # Error occurred, return -1
+            return -1
+        total_count += item_count
+
+        logger.debug(
+            {
+                "message": "Collection item count retrieved",
+                "collection_pk": collection_pk,
+                "asset_count": asset_count,
+                "item_count": item_count,
+                "total_count": total_count,
+                "operation": "get_collection_item_count",
+            }
+        )
+
+        return total_count
+
+    except ClientError as e:
+        logger.error(
+            {
+                "message": "DynamoDB error counting collection items",
+                "collection_pk": collection_pk,
+                "error": str(e),
+                "error_code": e.response.get("Error", {}).get("Code", "Unknown"),
+                "operation": "get_collection_item_count",
+            }
+        )
+        metrics.add_metric(
+            name="CollectionItemCountQueryFailures", unit=MetricUnit.Count, value=1
+        )
+        return -1
+    except Exception as e:
+        logger.error(
+            {
+                "message": "Unexpected error counting collection items",
+                "collection_pk": collection_pk,
+                "error": str(e),
+                "operation": "get_collection_item_count",
+            }
+        )
+        metrics.add_metric(
+            name="CollectionItemCountQueryFailures", unit=MetricUnit.Count, value=1
+        )
+        return -1
+
+
+@tracer.capture_method
+def _count_items_with_prefix(table, pk_value: str, sk_prefix: str) -> int:
+    """
+    Count items with a specific SK prefix using DynamoDB query with Select='COUNT'.
+
+    Handles pagination for large collections where count exceeds 1MB scan limit.
+
+    Args:
+        table: DynamoDB table resource (boto3)
+        pk_value: Partition key value (e.g., COLL#{collection_id})
+        sk_prefix: Sort key prefix to filter by (e.g., ASSET# or ITEM#)
+
+    Returns:
+        Integer count of items, or -1 if an error occurs
+    """
+    try:
+        count = 0
+        last_evaluated_key = None
+
+        while True:
+            query_params = {
+                "KeyConditionExpression": Key("PK").eq(pk_value)
+                & Key("SK").begins_with(sk_prefix),
+                "Select": "COUNT",
+            }
+
+            if last_evaluated_key:
+                query_params["ExclusiveStartKey"] = last_evaluated_key
+
+            response = table.query(**query_params)
+            count += response.get("Count", 0)
+
+            # Check for pagination
+            last_evaluated_key = response.get("LastEvaluatedKey")
+            if not last_evaluated_key:
+                break
+
+        return count
+
+    except ClientError as e:
+        logger.error(
+            {
+                "message": "DynamoDB error in count query",
+                "pk_value": pk_value,
+                "sk_prefix": sk_prefix,
+                "error": str(e),
+                "error_code": e.response.get("Error", {}).get("Code", "Unknown"),
+                "operation": "_count_items_with_prefix",
+            }
+        )
+        metrics.add_metric(
+            name="CollectionItemCountQueryFailures", unit=MetricUnit.Count, value=1
+        )
+        return -1
+    except Exception as e:
+        logger.error(
+            {
+                "message": "Unexpected error in count query",
+                "pk_value": pk_value,
+                "sk_prefix": sk_prefix,
+                "error": str(e),
+                "operation": "_count_items_with_prefix",
+            }
+        )
+        metrics.add_metric(
+            name="CollectionItemCountQueryFailures", unit=MetricUnit.Count, value=1
+        )
+        return -1
 
 
 @tracer.capture_method

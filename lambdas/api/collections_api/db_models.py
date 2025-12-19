@@ -42,6 +42,12 @@ class CollectionModel(Model):
     description = UnicodeAttribute(null=True)
     ownerId = UnicodeAttribute()
     status = UnicodeAttribute()
+    # DEPRECATED: The itemCount attribute is no longer actively maintained or utilized.
+    # Item counts are now computed dynamically by querying CollectionItemModel entries to get the
+    # actual number of items in a collection, since this cached value was subject to race conditions and drift when
+    # errors occurred after a new item had been added/deleted but before the itemCount in this metadata
+    # had been successfully updated.
+    # This attribute is retained for backward compatibility with existing data.
     itemCount = NumberAttribute(default=0)
     childCollectionCount = NumberAttribute(default=0)
     isPublic = BooleanAttribute(default=False)
