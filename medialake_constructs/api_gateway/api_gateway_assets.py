@@ -1403,13 +1403,13 @@ class AssetsConstruct(Construct):
             ),
         )
 
-        # Get SubClips Paths Lambda
-        self._subclips_get_paths_lambda = Lambda(
+        # Get SubClips Settings Lambda
+        self._subclips_get_settings_lambda = Lambda(
             self,
-            "AssetsBulkDownloadSubclipsGetPathsLambda",
+            "AssetsBulkDownloadSubclipsGetSettingsLambda",
             config=LambdaConfig(
-                name="assets_bulk_download_subclips_get_paths",
-                entry="lambdas/api/assets/download/bulk/post_bulk/subclips_get_paths",
+                name="assets_bulk_download_subclips_get_settings",
+                entry="lambdas/api/assets/download/bulk/post_bulk/subclips_get_settings",
                 environment_variables={
                     **common_env_vars,
                     "ASSET_TABLE": props.asset_table.table_name,
@@ -1455,7 +1455,7 @@ class AssetsConstruct(Construct):
             self._get_parts_manifest_lambda,
             self._handle_large_individual_lambda,
             self._delete_bulk_download_lambda,
-            self._subclips_get_paths_lambda,
+            self._subclips_get_settings_lambda,
             self._subclips_size_sort_lambda,
         ]:
             lambda_function.function.add_to_role_policy(
@@ -1479,7 +1479,7 @@ class AssetsConstruct(Construct):
             self._assess_scale_lambda,
             self._append_to_zip_lambda,
             self._handle_large_individual_lambda,
-            self._subclips_get_paths_lambda,
+            self._subclips_get_settings_lambda,
         ]:
             lambda_function.function.add_to_role_policy(
                 iam.PolicyStatement(
@@ -2146,11 +2146,11 @@ class AssetsConstruct(Construct):
         complete_multipart_task.next(success_state)
 
         ## Sub-Clipping Workflow Components ##
-        # Get sub-clips source file locations / output paths
-        get_subclip_paths_task = tasks.LambdaInvoke(
+        # Get sub-clips settings
+        get_subclip_settings_task = tasks.LambdaInvoke(
             self,
-            "AssetsGetSubClipPaths",
-            lambda_function=self._subclips_get_paths_lambda.function,
+            "AssetsGetSubClipSettings",
+            lambda_function=self._subclips_get_settings_lambda.function,
             output_path="$.Payload",
         )
 
@@ -2183,69 +2183,11 @@ class AssetsConstruct(Construct):
                 create_job_request={
                     "Queue": self.subclip_mediaconvert_queue.queue_arn,
                     "Role": self.subclip_mediaconvert_role.role_arn,
-                    "Settings": {
-                        "TimecodeConfig": {"Source": "ZEROBASED"},
-                        "OutputGroups": [
-                            {
-                                "Name": "File Group",
-                                "Outputs": [
-                                    {
-                                        "ContainerSettings": {
-                                            "Container": "MP4",
-                                            "Mp4Settings": {},
-                                        },
-                                        "VideoDescription": {
-                                            "CodecSettings": {
-                                                "Codec": "H_264",
-                                                "H264Settings": {
-                                                    "MaxBitrate.$": "States.StringToJson($.mapItem.video.MaxBitrate)",
-                                                    "Bitrate.$": "States.StringToJson($.mapItem.video.Bitrate)",
-                                                    "RateControlMode.$": "$.mapItem.video.RateControlMode",
-                                                },
-                                            }
-                                        },
-                                        "AudioDescriptions": [
-                                            {
-                                                "AudioSourceName": "Dynamic Audio Selector 1",
-                                                "CodecSettings": {
-                                                    "Codec": "AAC",
-                                                    "AacSettings": {
-                                                        "Bitrate.$": "States.StringToJson($.mapItem.audio.Bitrate)",
-                                                        "CodingMode": "CODING_MODE_2_0",
-                                                        "SampleRate.$": "States.StringToJson($.mapItem.audio.SampleRate)",
-                                                        "RateControlMode.$": "$.mapItem.audio.RateControlMode",
-                                                        "CodecProfile": "LC",
-                                                    },
-                                                },
-                                            }
-                                        ],
-                                    }
-                                ],
-                                "OutputGroupSettings": {
-                                    "Type": "FILE_GROUP_SETTINGS",
-                                    "FileGroupSettings": {
-                                        "Destination.$": "$.mapItem.outputLocationNoExt"
-                                    },
-                                },
-                            }
-                        ],
-                        "FollowSource": 1,
-                        "Inputs": [
-                            {
-                                "InputClippings": [
-                                    {
-                                        "EndTimecode.$": "$.mapItem.clipBoundary.endTime",
-                                        "StartTimecode.$": "$.mapItem.clipBoundary.startTime",
-                                    }
-                                ],
-                                "DynamicAudioSelectors": {
-                                    "Dynamic Audio Selector 1": {}
-                                },
-                                "VideoSelector": {},
-                                "TimecodeSource": "ZEROBASED",
-                                "FileInput.$": "$.mapItem.sourceLocation",
-                            }
-                        ],
+                    "Settings": {  # This block is built with individual interpolations because CDK fails if this field name changed to "Settings.$" for Step Func interpolation
+                        "TimecodeConfig.$": "$.mapItem.mediaConvertJobSettings.TimecodeConfig",
+                        "OutputGroups.$": "$.mapItem.mediaConvertJobSettings.OutputGroups",
+                        "FollowSource.$": "$.mapItem.mediaConvertJobSettings.FollowSource",
+                        "Inputs.$": "$.mapItem.mediaConvertJobSettings.Inputs",
                     },
                 },
                 integration_pattern=sfn.IntegrationPattern.RUN_JOB,
@@ -2260,7 +2202,7 @@ class AssetsConstruct(Construct):
             )
             .when(
                 sfn.Condition.is_present("$.subClips[0]"),
-                get_subclip_paths_task.next(sub_clips_map)
+                get_subclip_settings_task.next(sub_clips_map)
                 .next(sort_subclips_by_size)
                 .next(multipart_workflow),
             )
