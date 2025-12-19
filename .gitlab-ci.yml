@@ -307,6 +307,24 @@ semantic-version:
       echo ""
       echo "Version bump type: ${BUMP_TYPE}"
 
+      # Deduplicate entries by title (removes duplicate merge commits with same title)
+      deduplicate_entries() {
+        local entries="$1"
+        echo "${entries}" | awk '!seen[$0]++' | grep -v '^$' || true
+      }
+
+      BREAKING_CHANGES=$(deduplicate_entries "${BREAKING_CHANGES}")
+      FEATURES=$(deduplicate_entries "${FEATURES}")
+      FIXES=$(deduplicate_entries "${FIXES}")
+      REFACTORS=$(deduplicate_entries "${REFACTORS}")
+      PERFORMANCES=$(deduplicate_entries "${PERFORMANCES}")
+      OTHERS=$(deduplicate_entries "${OTHERS}")
+
+      echo "DEBUG: After deduplication"
+      echo "  Features: $(echo "${FEATURES}" | grep -c '^-' || echo 0) entries"
+      echo "  Fixes: $(echo "${FIXES}" | grep -c '^-' || echo 0) entries"
+      echo "  Others: $(echo "${OTHERS}" | grep -c '^-' || echo 0) entries"
+
       case ${BUMP_TYPE} in
         major)
           MAJOR=$((MAJOR + 1))
