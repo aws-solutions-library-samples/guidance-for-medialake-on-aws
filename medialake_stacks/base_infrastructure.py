@@ -137,6 +137,17 @@ class BaseInfrastructureStack(Stack):
                 destroy_on_delete=True,
                 access_logs=True,
                 access_logs_bucket=self.access_logs_bucket,
+                lifecycle_rules=[
+                    s3.LifecycleRule(
+                        enabled=True,
+                        transitions=[
+                            s3.Transition(
+                                storage_class=s3.StorageClass.INTELLIGENT_TIERING,
+                                transition_after=Duration.days(0),
+                            )
+                        ],
+                    ),
+                ],
             ),
         )
 
@@ -292,6 +303,29 @@ class BaseInfrastructureStack(Stack):
                         exposed_headers=["ETag"],
                         max_age=3000,
                     )
+                ],
+                lifecycle_rules=[
+                    s3.LifecycleRule(
+                        id="DeleteTempZipFiles",
+                        enabled=True,
+                        prefix="temp/zip/",
+                        expiration=Duration.days(7),
+                    ),
+                    s3.LifecycleRule(
+                        id="DeleteTempSubClips",
+                        enabled=True,
+                        prefix="temp/subClips/",
+                        expiration=Duration.days(7),
+                    ),
+                    s3.LifecycleRule(
+                        enabled=True,
+                        transitions=[
+                            s3.Transition(
+                                storage_class=s3.StorageClass.INTELLIGENT_TIERING,
+                                transition_after=Duration.days(0),
+                            )
+                        ],
+                    ),
                 ],
             ),
         )
