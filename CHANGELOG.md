@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.2.0] - 2025-12-19
+
+### Features
+
+- feat: adds optional custom domain support for cloudfront distribution
+- feat: add intelligent tiering and lifecycle policies to s3
+- feat: add TwelveLabs Marengo Embed 3.0 provider with 512D embeddings
+- feat: implement MediaConvert throttling mitigation with module-level caching
+- feat: add mts video extension support
+- feat: migrate hardcoded strings to translation system
+- feat: add ApiStatusModal for search provider API key save with masked input
+- feat: add ApiStatusModal for asset delete operations
+- feat: Add backward-compatible asset_embeddings support with dual-query search
+
+### Bug Fixes
+
+- fix: missing support for vbr/cbr audio/video
+- fix: Collections itemCount bugs
+- fix: resolve S3 notification removal error for connectors
+- fix: resolve S3 notification removal error for connectors
+- fix: pipeline map itemspath parameter
+- fix: restore pipeline delete dialog to show pipeline name confirmation
+- fix: add retry configuration for s3 vectors service unavailable errors
+- fix: correct model_id parameter to model_id_text in transcription pipelines
+- fix: filter pipeline executions to show only MediaLake pipelines
+- fix: resolve embedding store retry failures and flatten payload structure
+- fix: filter map child executions from database
+- fix: update to OS version
+
 ## [1.1.0] - 2025-11-25
 
 ### Features
