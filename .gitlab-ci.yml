@@ -32,35 +32,6 @@ workflow:
       when: always
     - when: never
 
-# This job should ALWAYS run on ANY merge request
-debug-all-mrs:
-  stage: test
-  image: alpine:latest
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-  script:
-    - echo "=========================================="
-    - echo "DEBUG - Pipeline Variables"
-    - echo "=========================================="
-    - echo "Pipeline source - ${CI_PIPELINE_SOURCE}"
-    - echo "Commit branch - ${CI_COMMIT_BRANCH}"
-    - echo "Commit ref name - ${CI_COMMIT_REF_NAME}"
-    - echo "Source branch - ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}"
-    - echo "Target branch - ${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}"
-    - echo "MR ID - ${CI_MERGE_REQUEST_IID}"
-    - echo "MR title - ${CI_MERGE_REQUEST_TITLE}"
-    - echo "=========================================="
-    - echo "Pipeline is working"
-
-# This job should ONLY run on MRs targeting 'main'
-test-mr-to-main:
-  stage: test
-  image: alpine:latest
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
-  script:
-    - echo "This MR is targeting the main branch"
-
 # This job should ONLY run on MRs targeting 'stable'
 test-mr-to-stable:
   stage: build
@@ -261,41 +232,41 @@ semantic-version:
         echo "DEBUG: Analyzing commit: ${SUBJECT}"
         FULL_MESSAGE="${SUBJECT}"$'\n'"${BODY}"
 
-        if [[ "${SUBJECT}" =~ ^[a-z]+(\([a-zA-Z0-9\-_.]+\))?!:[[:space:]] ]] || [[ "${FULL_MESSAGE}" =~ BREAKING[[:space:]]CHANGE: ]]; then
+        if [[ "${SUBJECT}" =~ ^[a-z]+(\([a-zA-Z0-9_.+-]+\))?!:[[:space:]] ]] || [[ "${FULL_MESSAGE}" =~ BREAKING[[:space:]]CHANGE: ]]; then
           echo "  [MAJOR] Breaking change detected: ${SUBJECT}"
           BUMP_TYPE="major"
           BREAKING_CHANGES="${BREAKING_CHANGES}- ${SUBJECT}"$'\n'
-        elif [[ "${SUBJECT}" =~ ^feat(\([a-zA-Z0-9\-_.]+\))?: ]] || [[ "${SUBJECT}" == feat:* ]]; then
+        elif [[ "${SUBJECT}" =~ ^feat(\([a-zA-Z0-9_.+-]+\))?: ]] || [[ "${SUBJECT}" == feat:* ]]; then
           echo "  [MINOR] Feature: ${SUBJECT}"
           if [ "${BUMP_TYPE}" != "major" ]; then
             BUMP_TYPE="minor"
           fi
           FEATURES="${FEATURES}- ${SUBJECT}"$'\n'
-        elif [[ "${SUBJECT}" =~ ^fix(\([a-zA-Z0-9\-_.]+\))?: ]] || [[ "${SUBJECT}" == fix:* ]]; then
+        elif [[ "${SUBJECT}" =~ ^fix(\([a-zA-Z0-9_.+-]+\))?: ]] || [[ "${SUBJECT}" == fix:* ]]; then
           echo "  [PATCH] Fix: ${SUBJECT}"
           if [ "${BUMP_TYPE}" = "none" ]; then
             BUMP_TYPE="patch"
           fi
           FIXES="${FIXES}- ${SUBJECT}"$'\n'
-        elif [[ "${SUBJECT}" =~ ^refactor(\([a-zA-Z0-9\-_.]+\))?: ]]; then
+        elif [[ "${SUBJECT}" =~ ^refactor(\([a-zA-Z0-9_.+-]+\))?: ]]; then
           echo "  [PATCH] Refactor: ${SUBJECT}"
           if [ "${BUMP_TYPE}" = "none" ]; then
             BUMP_TYPE="patch"
           fi
           REFACTORS="${REFACTORS}- ${SUBJECT}"$'\n'
-        elif [[ "${SUBJECT}" =~ ^perf(\([a-zA-Z0-9\-_.]+\))?: ]]; then
+        elif [[ "${SUBJECT}" =~ ^perf(\([a-zA-Z0-9_.+-]+\))?: ]]; then
           echo "  [PATCH] Performance: ${SUBJECT}"
           if [ "${BUMP_TYPE}" = "none" ]; then
             BUMP_TYPE="patch"
           fi
           PERFORMANCES="${PERFORMANCES}- ${SUBJECT}"$'\n'
-        elif [[ "${SUBJECT}" =~ ^release(\([a-zA-Z0-9\-_.]+\))?: ]]; then
+        elif [[ "${SUBJECT}" =~ ^release(\([a-zA-Z0-9_.+-]+\))?: ]]; then
           echo "  [TRACKED] Release: ${SUBJECT}"
           OTHERS="${OTHERS}- ${SUBJECT}"$'\n'
-        elif [[ "${SUBJECT}" =~ ^(docs|ci)(\([a-zA-Z0-9\-_.]+\))?: ]]; then
+        elif [[ "${SUBJECT}" =~ ^(docs|ci)(\([a-zA-Z0-9_.+-]+\))?: ]]; then
           echo "  [NO BUMP] ${SUBJECT}"
           OTHERS="${OTHERS}- ${SUBJECT}"$'\n'
-        elif [[ "${SUBJECT}" =~ ^(style|test|build)(\([a-zA-Z0-9\-_.]+\))?: ]]; then
+        elif [[ "${SUBJECT}" =~ ^(style|test|build)(\([a-zA-Z0-9_.+-]+\))?: ]]; then
           echo "  [PATCH] ${SUBJECT}"
           if [ "${BUMP_TYPE}" = "none" ]; then
             BUMP_TYPE="patch"
