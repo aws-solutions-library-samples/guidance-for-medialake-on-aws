@@ -43,6 +43,10 @@
   "primary_region": "us-east-1",
   "resource_application_tag": "medialake",
   "resource_prefix": "medialake",
+  "cloudfront_custom_domain": {
+    "domain_name": "medialake.example.com",
+    "certificate_arn": "arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"
+  },
   "vpc": {
     "new_vpc": {
       "cidr": "10.0.0.0/16",

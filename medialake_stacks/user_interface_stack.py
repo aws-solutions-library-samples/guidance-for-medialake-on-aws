@@ -123,6 +123,13 @@ class UserInterfaceStack(Stack):
             self, "ImportedAccessLogBucket", access_log_bucket_arn
         )
 
+        # Extract custom domain configuration from config
+        custom_domain_name = None
+        certificate_arn = None
+        if config.cloudfront_custom_domain:
+            custom_domain_name = config.cloudfront_custom_domain.domain_name
+            certificate_arn = config.cloudfront_custom_domain.certificate_arn
+
         self._ui = UIConstruct(
             self,
             "UserInterface",
@@ -138,6 +145,8 @@ class UserInterfaceStack(Stack):
                 cloudfront_waf_acl_arn=waf_acl_arn,
                 cognito_domain_prefix=props.cognito_domain_prefix,
                 parameter_name=parameter_name,
+                custom_domain_name=custom_domain_name,
+                certificate_arn=certificate_arn,
             ),
         )
 
@@ -160,59 +169,69 @@ class UserInterfaceStack(Stack):
             export_name=f"{self.stack_name}-CloudFrontDistributionDomainParameterName",
         )
 
+        update_params = {
+            "UserPoolId": Token.as_string(props.cognito_user_pool_id),
+            "AdminCreateUserConfig": {
+                "AllowAdminCreateUserOnly": True,
+                "InviteMessageTemplate": {
+                    "EmailMessage": f"""
+                    <html>
+                    <body>
+                        <p>Hello,</p>
+                        <p>Welcome to MediaLake! Your account has been created successfully.</p>
+                        <p><strong>Your login credentials:</strong><br/>
+                        Username: {{username}}<br/>
+                        Temporary Password: {{####}}</p>
+                        <p><strong>To get started:</strong></p>
+                        <ol>
+                            <li>Visit {self._ui.user_interface_url} to sign in</li>
+                            <li>Sign in with your credentials</li>
+                            <li>You'll be prompted to create a new password on your first login</li>
+                        </ol>
+                        <p><em>For security reasons, please change your password immediately upon signing in.</em></p>
+                        <p>If you need assistance, please contact your MediaLake administrator.</p>
+                        <p>Best regards,<br/>
+                        The MediaLake Team</p>
+                    </body>
+                    </html>
+                    """,
+                    "EmailSubject": "Welcome to MediaLake",
+                },
+            },
+            "VerificationMessageTemplate": {
+                "DefaultEmailOption": "CONFIRM_WITH_LINK",
+                "EmailMessageByLink": f"""
+                <html>
+                <body>
+                    <p>Hello,</p>
+                    <p>You have requested to reset your MediaLake password.</p>
+                    <p>Click the link below to set a new password:</p>
+                    <p>{{##Click here to reset your password at {self._ui.user_interface_url}/reset-password?code={{####}}##}}</p>
+                    <p>If you did not request this password reset, please ignore this email.</p>
+                    <p>Best regards,<br/>
+                    The MediaLake Team</p>
+                </body>
+                </html>
+                """,
+                "EmailSubjectByLink": "Reset your MediaLake password",
+            },
+        }
+
         _ = cr.AwsCustomResource(
             self,
             "UpdateCognitoVerificationMessage",
             on_create=cr.AwsSdkCall(
                 service="CognitoIdentityServiceProvider",
                 action="updateUserPool",
-                parameters={
-                    "UserPoolId": Token.as_string(props.cognito_user_pool_id),
-                    "AdminCreateUserConfig": {
-                        "AllowAdminCreateUserOnly": True,
-                        "InviteMessageTemplate": {
-                            "EmailMessage": f"""
-                            <html>
-                            <body>
-                                <p>Hello,</p>
-                                <p>Welcome to MediaLake! Your account has been created successfully.</p>
-                                <p><strong>Your login credentials:</strong><br/>
-                                Username: {{username}}<br/>
-                                Temporary Password: {{####}}</p>
-                                <p><strong>To get started:</strong></p>
-                                <ol>
-                                    <li>Visit {self._ui.user_interface_url} to sign in</li>
-                                    <li>Sign in with your credentials</li>
-                                    <li>You'll be prompted to create a new password on your first login</li>
-                                </ol>
-                                <p><em>For security reasons, please change your password immediately upon signing in.</em></p>
-                                <p>If you need assistance, please contact your MediaLake administrator.</p>
-                                <p>Best regards,<br/>
-                                The MediaLake Team</p>
-                            </body>
-                            </html>
-                            """,
-                            "EmailSubject": "Welcome to MediaLake",
-                        },
-                    },
-                    "VerificationMessageTemplate": {
-                        "DefaultEmailOption": "CONFIRM_WITH_LINK",
-                        "EmailMessageByLink": f"""
-                        <html>
-                        <body>
-                            <p>Hello,</p>
-                            <p>You have requested to reset your MediaLake password.</p>
-                            <p>Click the link below to set a new password:</p>
-                            <p>{{##Click here to reset your password at {self._ui.user_interface_url}/reset-password?code={{####}}##}}</p>
-                            <p>If you did not request this password reset, please ignore this email.</p>
-                            <p>Best regards,<br/>
-                            The MediaLake Team</p>
-                        </body>
-                        </html>
-                        """,
-                        "EmailSubjectByLink": "Reset your MediaLake password",
-                    },
-                },
+                parameters=update_params,
+                physical_resource_id=cr.PhysicalResourceId.of(
+                    "UpdateCognitoVerificationMessage"
+                ),
+            ),
+            on_update=cr.AwsSdkCall(
+                service="CognitoIdentityServiceProvider",
+                action="updateUserPool",
+                parameters=update_params,
                 physical_resource_id=cr.PhysicalResourceId.of(
                     "UpdateCognitoVerificationMessage"
                 ),

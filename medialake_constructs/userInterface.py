@@ -16,6 +16,7 @@ from aws_cdk import (
     RemovalPolicy,
     Stack,
 )
+from aws_cdk import aws_certificatemanager as acm
 from aws_cdk import aws_cloudfront as cloudfront
 from aws_cdk import aws_cloudfront_origins as origins
 from aws_cdk import aws_iam as iam
@@ -86,6 +87,8 @@ class UIConstructProps:
     cognito_domain_prefix: str
     cognito_construct: Optional[Construct] = None
     parameter_name: Optional[str] = None
+    custom_domain_name: Optional[str] = None
+    certificate_arn: Optional[str] = None
     app_path: str = os.path.join(
         os.path.dirname(os.path.dirname(__file__)), "medialake_user_interface"
     )
@@ -136,6 +139,7 @@ class UIConstruct(Construct):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
+        self.props = props
         stack = Stack.of(self)
         build_path = os.path.join(props.app_path, "dist")
 
@@ -429,11 +433,10 @@ class UIConstruct(Construct):
             props.media_assets_bucket,
         )
 
-        self.cloudfront_distribution = cloudfront.Distribution(
-            self,
-            "MediaLakeDistrubtion",
-            web_acl_id=props.cloudfront_waf_acl_arn,
-            default_behavior=cloudfront.BehaviorOptions(
+        # Prepare CloudFront distribution configuration
+        distribution_config = {
+            "web_acl_id": props.cloudfront_waf_acl_arn,
+            "default_behavior": cloudfront.BehaviorOptions(
                 origin=s3_orig,
                 response_headers_policy=ui_response_headers_policy,
                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
@@ -443,7 +446,7 @@ class UIConstruct(Construct):
                 origin_request_policy=cloudfront.OriginRequestPolicy.CORS_S3_ORIGIN,
                 compress=True,
             ),
-            additional_behaviors={
+            "additional_behaviors": {
                 "*.js": cloudfront.BehaviorOptions(
                     origin=s3_orig,
                     viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
@@ -515,16 +518,16 @@ class UIConstruct(Construct):
                     origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
                 ),
             },
-            minimum_protocol_version=cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
-            ssl_support_method=cloudfront.SSLMethod.SNI,
+            "minimum_protocol_version": cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
+            "ssl_support_method": cloudfront.SSLMethod.SNI,
             # Disable CloudFront logging to avoid circular dependency with access_log_bucket
             # enable_logging=True,
             # log_bucket=props.access_log_bucket,
             # log_file_prefix="medialake-cloudfront-logs",
-            price_class=cloudfront.PriceClass.PRICE_CLASS_100,
-            default_root_object=props.distribution_default_root_object,
+            "price_class": cloudfront.PriceClass.PRICE_CLASS_100,
+            "default_root_object": props.distribution_default_root_object,
             # geo_restriction=cloudfront.GeoRestriction.allowlist("US", "GB"),
-            error_responses=[
+            "error_responses": [
                 cloudfront.ErrorResponse(
                     http_status=403,
                     response_http_status=200,
@@ -538,6 +541,27 @@ class UIConstruct(Construct):
                     ttl=Duration.minutes(0),
                 ),
             ],
+        }
+
+        # Conditionally add custom domain configuration if provided
+        if (
+            props.custom_domain_name
+            and props.custom_domain_name.strip()
+            and props.certificate_arn
+            and props.certificate_arn.strip()
+        ):
+            # Import the ACM certificate
+            certificate = acm.Certificate.from_certificate_arn(
+                self, "CustomDomainCertificate", certificate_arn=props.certificate_arn
+            )
+
+            # Add custom domain configuration to distribution
+            distribution_config["domain_names"] = [props.custom_domain_name]
+            distribution_config["certificate"] = certificate
+
+        # Create the CloudFront distribution with the prepared configuration
+        self.cloudfront_distribution = cloudfront.Distribution(
+            self, "MediaLakeDistrubtion", **distribution_config
         )
 
         # Add policy statement to media assets bucket for CloudFront access
@@ -722,8 +746,8 @@ class UIConstruct(Construct):
                             "domain": f"{props.cognito_domain_prefix}.auth.{stack.region}.amazoncognito.com",
                             "scopes": ["email", "openid", "profile"],
                             "responseType": "code",
-                            "redirectSignIn": f"https://{self.cloudfront_distribution.distribution_domain_name}/",
-                            "redirectSignOut": f"https://{self.cloudfront_distribution.distribution_domain_name}/sign-in",
+                            "redirectSignIn": f"https://{self._get_distribution_domain()}/",
+                            "redirectSignOut": f"https://{self._get_distribution_domain()}/sign-in",
                         },
                     },
                 },
@@ -731,7 +755,7 @@ class UIConstruct(Construct):
             "API": {
                 "REST": {
                     "RestApi": {
-                        "endpoint": f"https://{self.cloudfront_distribution.distribution_domain_name}/{props.api_gateway_stage}"
+                        "endpoint": f"https://{self._get_distribution_domain()}/{props.api_gateway_stage}"
                     }
                 }
             },
@@ -802,9 +826,9 @@ class UIConstruct(Construct):
                     "CallbackURLs": [
                         f"https://{props.cognito_domain_prefix}.auth.{Stack.of(self).region}.amazoncognito.com/oauth2/idpresponse",
                         f"https://{props.cognito_domain_prefix}.auth.{Stack.of(self).region}.amazoncognito.com/saml2/idpresponse",
-                        f"https://{self.cloudfront_distribution.distribution_domain_name}",
-                        f"https://{self.cloudfront_distribution.distribution_domain_name}/",
-                        f"https://{self.cloudfront_distribution.distribution_domain_name}/sign-in",
+                        f"https://{self._get_distribution_domain()}",
+                        f"https://{self._get_distribution_domain()}/",
+                        f"https://{self._get_distribution_domain()}/sign-in",
                         f"https://localhost:5173",
                         f"https://localhost:5173/",
                         f"https://localhost:5173/login",
@@ -813,9 +837,9 @@ class UIConstruct(Construct):
                         f"https://{props.cognito_domain_prefix}.auth.{Stack.of(self).region}.amazoncognito.com",
                         f"https://{props.cognito_domain_prefix}.auth.{Stack.of(self).region}.amazoncognito.com/",
                         f"https://{props.cognito_domain_prefix}.auth.{Stack.of(self).region}.amazoncognito.com/sign-in",
-                        f"https://{self.cloudfront_distribution.distribution_domain_name}",
-                        f"https://{self.cloudfront_distribution.distribution_domain_name}/",
-                        f"https://{self.cloudfront_distribution.distribution_domain_name}/sign-in",
+                        f"https://{self._get_distribution_domain()}",
+                        f"https://{self._get_distribution_domain()}/",
+                        f"https://{self._get_distribution_domain()}/sign-in",
                         f"https://localhost:5173",
                         f"https://localhost:5173/",
                         f"https://localhost:5173/login",
@@ -868,6 +892,17 @@ class UIConstruct(Construct):
             exclude=["aws-exports.json"],
         )
 
+    def _get_distribution_domain(self) -> str:
+        """
+        Get the domain to use for URLs - custom domain if configured, otherwise CloudFront domain.
+
+        Returns:
+            str: The custom domain name if configured and non-empty, otherwise the CloudFront distribution domain name.
+        """
+        if self.props.custom_domain_name and self.props.custom_domain_name.strip():
+            return self.props.custom_domain_name
+        return self.cloudfront_distribution.distribution_domain_name
+
     @property
     def user_interface_url(self) -> str:
-        return f"https://{self.cloudfront_distribution.distribution_domain_name}"
+        return f"https://{self._get_distribution_domain()}"
