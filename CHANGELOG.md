@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.2.1] - 2025-12-20
+
+### Bug Fixes
+
+- fix: Workflow Completed trigger to match actual event structure
+
+### Other Changes
+
+- ci: update to push main-v2 to github
+- ci: disable eslint temporarily
+- ci: fix regex issue and removed test steps
+- ci: add deduplication to changelog
+
 ## [1.2.0] - 2025-12-19
 
 ### Features
