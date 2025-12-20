@@ -10,6 +10,7 @@ node:
       aws_eventbridge:
         aws_eventbridge_rule: ingest_completed
         event_pattern:
+          source: ["custom.asset.processor"]
           detail-type: ["AssetCreated"]
           detail:
             DigitalSourceAsset:
