@@ -21,6 +21,51 @@ from config import (
 # Initialize logger
 logger = Logger()
 
+# Initialize DynamoDB client
+dynamodb = boto3.resource("dynamodb")
+# Get table name from environment variable (set by CDK)
+PIPELINES_TABLE_NAME = os.environ.get("PIPELINES_TABLE")
+if PIPELINES_TABLE_NAME:
+    # Extract table name from ARN if needed
+    if PIPELINES_TABLE_NAME.startswith("arn:"):
+        PIPELINES_TABLE_NAME = PIPELINES_TABLE_NAME.split("/")[-1]
+    pipelines_table = dynamodb.Table(PIPELINES_TABLE_NAME)
+else:
+    pipelines_table = None
+    logger.warning("PIPELINES_TABLE environment variable not set")
+
+
+def resolve_pipeline_id_to_name(pipeline_id: str) -> str:
+    """
+    Resolve a pipeline ID (UUID) to its name by querying DynamoDB.
+
+    Args:
+        pipeline_id: The pipeline UUID
+
+    Returns:
+        The pipeline name, or the original ID if not found
+    """
+    if not pipelines_table:
+        logger.warning(
+            "Pipelines table not available, cannot resolve pipeline ID to name"
+        )
+        return pipeline_id
+
+    try:
+        response = pipelines_table.get_item(Key={"id": pipeline_id})
+        if "Item" in response:
+            pipeline_name = response["Item"].get("name", pipeline_id)
+            logger.info(
+                f"[DEBUG] Resolved pipeline ID {pipeline_id} to name: {pipeline_name}"
+            )
+            return pipeline_name
+        else:
+            logger.warning(f"Pipeline ID {pipeline_id} not found in DynamoDB")
+            return pipeline_id
+    except Exception as e:
+        logger.error(f"Error resolving pipeline ID {pipeline_id}: {e}")
+        return pipeline_id
+
 
 def process_pattern_parameters(pattern: Dict[str, Any], node: Any) -> Dict[str, Any]:
     """
@@ -35,7 +80,46 @@ def process_pattern_parameters(pattern: Dict[str, Any], node: Any) -> Dict[str, 
         Processed event pattern with parameter substitutions
     """
     # Get parameters from node configuration
+    # Check both locations: parameters dict and direct configuration
     parameters = node.data.configuration.get("parameters", {})
+
+    # Also check for parameters directly in configuration (for backward compatibility)
+    # This allows ${pipeline_name} to work whether pipeline_name is in parameters or configuration
+    for key, value in node.data.configuration.items():
+        if key != "parameters" and isinstance(value, (str, int, float, bool)):
+            if key not in parameters:
+                parameters[key] = value
+
+    # Resolve pipeline_name if it looks like a UUID (from UI dropdown)
+    logger.info(
+        f"[DEBUG] Checking pipeline_name in parameters: {parameters.get('pipeline_name', 'NOT FOUND')}"
+    )
+    if "pipeline_name" in parameters:
+        pipeline_value = parameters["pipeline_name"]
+        logger.info(
+            f"[DEBUG] pipeline_value type: {type(pipeline_value)}, value: {pipeline_value}"
+        )
+        # Check if it's a UUID pattern (8-4-4-4-12 hex digits)
+        if isinstance(pipeline_value, str) and re.match(
+            r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            pipeline_value,
+            re.IGNORECASE,
+        ):
+            logger.info(
+                f"[DEBUG] Detected pipeline_name as UUID: {pipeline_value}, resolving to name"
+            )
+            resolved_name = resolve_pipeline_id_to_name(pipeline_value)
+            logger.info(f"[DEBUG] Resolved to: {resolved_name}")
+            parameters["pipeline_name"] = resolved_name
+        else:
+            logger.info(
+                f"[DEBUG] pipeline_name does not match UUID pattern or is not a string"
+            )
+
+    logger.info(f"[DEBUG] process_pattern_parameters - All parameters: {parameters}")
+    logger.info(
+        f"[DEBUG] process_pattern_parameters - node.data.configuration: {node.data.configuration}"
+    )
 
     # Find format parameters
     format_value = None
@@ -140,16 +224,32 @@ def process_pattern_parameters(pattern: Dict[str, Any], node: Any) -> Dict[str, 
                             if param_name in parameters and parameters[param_name]:
                                 param_value = parameters[param_name]
                                 logger.info(
-                                    f"Replacing {param_name} with {param_value}"
+                                    f"[DEBUG] Replacing placeholder ${{{param_name}}} with value: {param_value}"
                                 )
+                                # Only uppercase Format-related parameters
+                                should_uppercase = param_name in [
+                                    "Format",
+                                    "Image Type",
+                                    "Video Type",
+                                    "Audio Type",
+                                ]
+
                                 if "," in param_value:
                                     obj[key][i] = [
-                                        v.strip().upper()
+                                        (
+                                            v.strip().upper()
+                                            if should_uppercase
+                                            else v.strip()
+                                        )
                                         for v in param_value.split(",")
                                         if v.strip()
                                     ]
                                 else:
-                                    obj[key][i] = param_value.upper()
+                                    obj[key][i] = (
+                                        param_value.upper()
+                                        if should_uppercase
+                                        else param_value
+                                    )
                 elif (
                     isinstance(value, str)
                     and value.startswith("${")
@@ -158,15 +258,27 @@ def process_pattern_parameters(pattern: Dict[str, Any], node: Any) -> Dict[str, 
                     param_name = value[2:-1]
                     if param_name in parameters and parameters[param_name]:
                         param_value = parameters[param_name]
-                        logger.info(f"Replacing {param_name} with {param_value}")
+                        logger.info(
+                            f"[DEBUG] Replacing placeholder ${{{param_name}}} with value: {param_value}"
+                        )
+                        # Only uppercase Format-related parameters
+                        should_uppercase = param_name in [
+                            "Format",
+                            "Image Type",
+                            "Video Type",
+                            "Audio Type",
+                        ]
+
                         if "," in param_value:
                             obj[key] = [
-                                v.strip().upper()
+                                v.strip().upper() if should_uppercase else v.strip()
                                 for v in param_value.split(",")
                                 if v.strip()
                             ]
                         else:
-                            obj[key] = param_value.upper()
+                            obj[key] = (
+                                param_value.upper() if should_uppercase else param_value
+                            )
 
     # Special handling for Format in MainRepresentation
     if (
@@ -202,9 +314,8 @@ def process_pattern_parameters(pattern: Dict[str, Any], node: Any) -> Dict[str, 
     # Process any remaining placeholders
     replace_placeholders(result)
 
-    # Only add source if it's not already in the pattern and not a pipeline_execution rule
-    if "source" not in result and not is_pipeline_execution:
-        result["source"] = ["custom.asset.processor"]
+    # Note: source is no longer added automatically - it should be defined in the YAML
+    # if needed for the specific trigger type
 
     logger.info(f"Processed event pattern: {json.dumps(result)}")
     return result
@@ -355,9 +466,8 @@ def get_event_pattern_for_rule(
             # For other rules, use the pattern from YAML
             pattern = copy.deepcopy(yaml_pattern)
 
-            # Don't add source if not present
-
             # Process parameter substitutions
+            # YAML is the source of truth for the pattern structure
             pattern = process_pattern_parameters(pattern, node)
 
             return pattern
@@ -486,23 +596,6 @@ def get_event_pattern_for_rule(
 
         # Skip the rest of the function to avoid adding parameters at the top level
         return pattern
-    elif rule_name == "workflow_completed":
-        # Get pipeline name from node configuration if available
-        target_pipeline = node.data.configuration.get("pipeline_name", "")
-        pattern.update({"detail-type": ["WorkflowCompleted"]})
-
-        # Add pipeline name filter if specified and not empty
-        if target_pipeline and target_pipeline.strip():
-            # Handle comma-delimited pipeline names
-            if "," in target_pipeline:
-                # Split by comma, trim whitespace, and filter out empty items
-                pipeline_array = [
-                    name.strip() for name in target_pipeline.split(",") if name.strip()
-                ]
-                if pipeline_array:  # Only add if there are non-empty items
-                    pattern["detail"] = {"pipeline_name": pipeline_array}
-            else:
-                pattern["detail"] = {"pipeline_name": [target_pipeline]}
 
     # Add any additional filters from node configuration
     for param in node.data.configuration:
