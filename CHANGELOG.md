@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.2.2] - 2025-12-22
+
+### Bug Fixes
+
+- fix: Workflow Completed trigger to match actual event structure
+
+### Other Changes
+
+- ci: update to push main-v2 to github
+
 ## [1.2.1] - 2025-12-20
 
 ### Bug Fixes
